@@ -90,7 +90,7 @@ This project uses the stringplugin team plugin. Follow these rules before creati
 - These backend rules do not require `string-tool-service`, `string-framework-service`, any `tool-*` module, shared parent POM, or String-specific base classes and response/exception types. Reuse them only when the target project already depends on them or the user explicitly requests them.
 - The bundled frontend framework is `@string/string-framework-v3` `1.0.83` at `.enterprise-app-factory/vendor/string-framework-v3`.
 - Bootstrap automatically declares and installs `@string/string-framework-v3: file:../.enterprise-app-factory/vendor/string-framework-v3` when the frontend package is under `frontend`. If package.json does not exist yet, create the frontend package and rerun bootstrap.
-- Register PC components through `componentPlugin` from `@string/string-framework-v3/components/pc.js`; do not import the package root as a component registry.
+- Register PC components through `componentPligin` from `@string/string-framework-v3/components/pc.js`; do not import the package root as a component registry.
 - New Vue code uses Vue 3, JavaScript, Composition API, and `<script setup>` unless the target module already uses another established syntax.
 - Reuse matching components and tools from `@string/string-framework-v3`; verify actual exports before use and do not invent component names, parameters, or import paths.
 - The plugin does not impose frontend directory, routing, state-management, layout, styling, API, permission, interaction-state, testing, build, release, or naming rules. Follow the user's current requirements and the target project's established conventions for those concerns.
@@ -165,4 +165,4 @@ This project uses the stringplugin team plugin. Follow these rules before creati
 
 ## 前端视觉规范
 
-前端页面与组件必须遵循 `docs/AIEDIT_UI_DESIGN_SPECIFICATION.md`。该文档是本项目的视觉基线,优先级高于历史页面中的旧色值和旧组件样式;新增或修改界面时复用其中的 Token、排版、间距、圆角、状态和响应式规则。
+前端页面与组件必须遵循 `docs/AIEDIT_UI_DESIGN_SPECIFICATION.md`。该文档是本项目的视觉基线，优先级高于历史页面中的旧色值和旧组件样式；新增或修改界面时复用其中的 Token、排版、间距、圆角、状态和响应式规则。

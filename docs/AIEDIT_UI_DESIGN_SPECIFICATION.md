@@ -38,7 +38,7 @@
 
 ### 2.1 颜色系统 (Color Palette)
 
-#### ① 基礎中性色 (Neutrals & Surfaces)
+#### ① 基础中性色 (Neutrals & Surfaces)
 | 语义名称 | Token / 16进制值 | 用途与层级说明 |
 | :--- | :--- | :--- |
 | **页面底色 (Page BG)** | `#0C0F13` | 全局工作区底色，超低饱和深黑灰 |
@@ -133,7 +133,7 @@
 
 ---
 
-## 4. 基礎组件规范 (Core Components)
+## 4. 基础组件规范 (Core Components)
 
 ### 4.1 按钮系统 (Buttons)
 * **主按钮 (Primary Button)**：高 `40px`（大号 `58px`），背景 `#2F66F6`，文字 `#FFFFFF` 粗体，圆角 `8px`。悬停 `#3B73FF`，按下微下沉 `translate-y-px`。
