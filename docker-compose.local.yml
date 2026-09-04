@@ -1,0 +1,42 @@
+services:
+  mysql:
+    image: mysql:9.3
+    container_name: shichuang-manage-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${LOCAL_DB_NAME:-eaf_project_f194fd0628}
+      MYSQL_USER: ${LOCAL_DB_USERNAME:-shichuang}
+      MYSQL_PASSWORD: ${LOCAL_DB_PASSWORD:-shichuang_local}
+      MYSQL_ROOT_PASSWORD: ${LOCAL_DB_ROOT_PASSWORD:-local_root_only}
+    ports:
+      - "3306:3306"
+    volumes:
+      - shichuang-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  backend:
+    build:
+      context: ./backend
+    container_name: shichuang-manage-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      LOCAL_DB_URL: jdbc:mysql://mysql:3306/${LOCAL_DB_NAME:-eaf_project_f194fd0628}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      LOCAL_DB_USERNAME: ${LOCAL_DB_USERNAME:-shichuang}
+      LOCAL_DB_PASSWORD: ${LOCAL_DB_PASSWORD:-shichuang_local}
+      LOCAL_TOKEN_SECRET: ${LOCAL_TOKEN_SECRET:-replace-with-a-local-secret}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+volumes:
+  shichuang-mysql-data:

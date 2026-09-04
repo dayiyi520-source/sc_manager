@@ -1,0 +1,16 @@
+{
+  "currentVersion": "V1.0.0",
+  "currentPrdPath": "docs/prd/V1.0.0.md",
+  "currentPrdRegistryPath": ".enterprise-app-factory/prd/V1.0.0/registry.json",
+  "codeBranch": "master",
+  "branch": "master",
+  "versionMode": "latest-code-version-context",
+  "versions": {
+    "V1.0.0": {
+      "prdPath": "docs/prd/V1.0.0.md",
+      "registryPath": ".enterprise-app-factory/prd/V1.0.0/registry.json",
+      "releaseTag": "version/V1.0.0"
+    }
+  },
+  "updatedAt": "2026-09-01"
+}

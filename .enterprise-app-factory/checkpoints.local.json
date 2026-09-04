@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "checkpoints": [
+    {
+      "id": "CP-20260904-001",
+      "version": "V1.0.0",
+      "requirement": "1.2",
+      "summary": "工作台需求池文案统一为工单中心与提工单",
+      "commit": "d27dd5a38bc99d3e06fd8abcafdc9f19bc9037af",
+      "paths": [
+        "docs/prd/V1.0.0.md",
+        "frontend/src/components/product/RequirementPoolView.tsx",
+        "frontend/src/context/AppContext.tsx"
+      ],
+      "createdAt": "2026-09-04T03:34:20Z"
+    }
+  ],
+  "rollbacks": []
+}

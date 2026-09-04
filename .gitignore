@@ -1,0 +1,19 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+*.zip
+.env*
+!.env.example
+.enterprise-app-factory/secrets/
+.enterprise-app-factory/runtime/
+.enterprise-app-factory/vendor/
+.enterprise-app-factory/config/version.json
+backend/target/
+database/volumes/
+# 嵌套解压备份目录(与外层项目内容重复,不纳入版本控制)
+猫猫师创管理后台/
+MinGit/
+MinGit.zip
