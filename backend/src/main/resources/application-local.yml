@@ -1,0 +1,18 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${LOCAL_DB_URL:jdbc:mysql://127.0.0.1:3306/eaf_project_f194fd0628?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${LOCAL_DB_USERNAME:shichuang}
+    password: ${LOCAL_DB_PASSWORD:shichuang_local}
+  flyway:
+    clean-disabled: true
+string:
+  auth:
+    token-secret: ${LOCAL_TOKEN_SECRET:local-development-token-secret-change-me}
+    local-tenant-id: ${LOCAL_TENANT_ID:local-tenant}
+  requirement:
+    sync:
+      initial-delay-ms: ${REQUIREMENT_SYNC_INITIAL_DELAY_MS:60000}
+      interval-ms: ${REQUIREMENT_SYNC_INTERVAL_MS:60000}

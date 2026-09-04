@@ -1,0 +1,160 @@
+CREATE TABLE IF NOT EXISTS t_sys_user (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  username_ VARCHAR(64) NOT NULL,
+  name_ VARCHAR(128) NOT NULL,
+  avatar_ VARCHAR(512),
+  department_ VARCHAR(128) NOT NULL,
+  role_ VARCHAR(64) NOT NULL,
+  role_title_ VARCHAR(128) NOT NULL,
+  status_ VARCHAR(32) NOT NULL DEFAULT 'enabled',
+  create_by_ VARCHAR(36) NOT NULL,
+  update_by_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  version_ INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_sys_user_tenant_username (tenant_id_, username_)
+);
+
+CREATE TABLE IF NOT EXISTS t_sys_role (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  code_ VARCHAR(64) NOT NULL,
+  name_ VARCHAR(128) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_sys_role_tenant_code (tenant_id_, code_)
+);
+
+CREATE TABLE IF NOT EXISTS t_sys_user_role (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  user_id_ VARCHAR(36) NOT NULL,
+  role_id_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  UNIQUE KEY uk_sys_user_role (tenant_id_, user_id_, role_id_)
+);
+
+CREATE TABLE IF NOT EXISTS t_crm_customer (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  code_ VARCHAR(64) NOT NULL,
+  name_ VARCHAR(255) NOT NULL,
+  type_ VARCHAR(64) NOT NULL,
+  level_ VARCHAR(64) NOT NULL,
+  contact_name_ VARCHAR(128) NOT NULL,
+  contact_phone_ VARCHAR(64) NOT NULL,
+  contact_title_ VARCHAR(128) NOT NULL,
+  contact_email_ VARCHAR(255),
+  annual_budget_ DECIMAL(18,2),
+  source_ VARCHAR(64) NOT NULL,
+  address_ VARCHAR(512) NOT NULL,
+  industry_ VARCHAR(128) NOT NULL,
+  scale_ VARCHAR(64) NOT NULL,
+  tags_ JSON NOT NULL,
+  create_by_ VARCHAR(36) NOT NULL,
+  update_by_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  version_ INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_customer_tenant_code (tenant_id_, code_),
+  KEY idx_customer_tenant_name (tenant_id_, name_)
+);
+
+CREATE TABLE IF NOT EXISTS t_crm_opportunity (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  name_ VARCHAR(255) NOT NULL,
+  type_ VARCHAR(64) NOT NULL,
+  customer_id_ VARCHAR(36) NOT NULL,
+  stage_ VARCHAR(64) NOT NULL,
+  amount_ DECIMAL(18,2) NOT NULL,
+  related_product_ VARCHAR(255) NOT NULL,
+  is_trial_ TINYINT NOT NULL DEFAULT 0,
+  deadline_ DATE NOT NULL,
+  expected_close_date_ DATE,
+  win_rate_ DECIMAL(5,2),
+  key_decision_ VARCHAR(255),
+  owner_name_ VARCHAR(128) NOT NULL,
+  collaborators_ JSON NOT NULL,
+  source_ VARCHAR(128) NOT NULL,
+  probability_ DECIMAL(5,2) NOT NULL,
+  remarks_ TEXT NOT NULL,
+  create_by_ VARCHAR(36) NOT NULL,
+  update_by_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  version_ INT NOT NULL DEFAULT 0,
+  KEY idx_opportunity_tenant_customer (tenant_id_, customer_id_),
+  KEY idx_opportunity_tenant_stage (tenant_id_, stage_)
+);
+
+CREATE TABLE IF NOT EXISTS t_crm_follow_up (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  customer_id_ VARCHAR(36) NOT NULL,
+  opportunity_id_ VARCHAR(36),
+  contact_name_ VARCHAR(128),
+  follow_type_ VARCHAR(64) NOT NULL,
+  content_ TEXT NOT NULL,
+  feedback_ TEXT,
+  next_follow_plan_ TEXT,
+  next_plan_date_ DATE,
+  follow_time_ DATETIME NOT NULL,
+  owner_name_ VARCHAR(128) NOT NULL,
+  attachments_ JSON NOT NULL,
+  create_by_ VARCHAR(36) NOT NULL,
+  update_by_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  version_ INT NOT NULL DEFAULT 0,
+  KEY idx_follow_up_tenant_customer_time (tenant_id_, customer_id_, follow_time_)
+);
+
+CREATE TABLE IF NOT EXISTS t_crm_contract (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  code_ VARCHAR(64) NOT NULL,
+  name_ VARCHAR(255) NOT NULL,
+  customer_id_ VARCHAR(36) NOT NULL,
+  related_product_ VARCHAR(255) NOT NULL,
+  type_ VARCHAR(64) NOT NULL,
+  amount_ DECIMAL(18,2) NOT NULL,
+  paid_amount_ DECIMAL(18,2) NOT NULL DEFAULT 0,
+  owner_name_ VARCHAR(128) NOT NULL,
+  sign_date_ DATE NOT NULL,
+  effective_date_ DATE,
+  duration_months_ INT,
+  end_date_ DATE,
+  status_ VARCHAR(64) NOT NULL,
+  attachments_ JSON NOT NULL,
+  create_by_ VARCHAR(36) NOT NULL,
+  update_by_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  version_ INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_contract_tenant_code (tenant_id_, code_),
+  KEY idx_contract_tenant_customer (tenant_id_, customer_id_)
+);
+
+CREATE TABLE IF NOT EXISTS t_crm_contract_payment_stage (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  contract_id_ VARCHAR(36) NOT NULL,
+  phase_ VARCHAR(128) NOT NULL,
+  percentage_ DECIMAL(5,2) NOT NULL,
+  amount_ DECIMAL(18,2) NOT NULL,
+  status_ VARCHAR(64) NOT NULL,
+  trigger_condition_ VARCHAR(512),
+  due_date_ DATE NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  KEY idx_payment_stage_contract (tenant_id_, contract_id_)
+);

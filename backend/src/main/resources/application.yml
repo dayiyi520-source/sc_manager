@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: shichuang-manage-admin
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    url: ${LOCAL_DB_URL:jdbc:mysql://mysql:3306/eaf_project_f194fd0628?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${LOCAL_DB_USERNAME:shichuang}
+    password: ${LOCAL_DB_PASSWORD:shichuang_local}
+    hikari:
+      maximum-pool-size: 10
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
