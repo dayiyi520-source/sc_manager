@@ -26,4 +26,13 @@ describe('productRepository task API contract', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/dev-tasks/task-2');
     expect(fetchMock.mock.calls[1][1].method).toBe('PUT');
   });
+
+  it('maps each business task kind to its own route', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: [], message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await productRepository.businessTasks('presales');
+    await productRepository.businessTask('delivery', 'delivery-1');
+    await productRepository.updateBusinessTask('ops', 'ops-1', { status: '处理中' });
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(['/api/presales-tasks', '/api/delivery-tasks/delivery-1', '/api/ops-tasks/ops-1']);
+  });
 });
