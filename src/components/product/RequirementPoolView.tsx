@@ -49,6 +49,7 @@ import type {
 } from "../../types";
 import { sanitizeHtml } from "../../utils/sanitizeHtml";
 import { getRejectReasonsForType } from "../../constants/rejectReasons";
+import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
 
 const statuses: RequirementTask["status"][] = [
   "待处理",
@@ -68,21 +69,7 @@ const taskTypes: RequirementTaskType[] = [
   "研发任务",
 ];
 const opportunityStagesBeforeWin = new Set(["发现商机", "需求确认", "方案设计", "商务谈判", "招投标"]);
-const taskTargetPages: Record<RequirementTaskType, string> = {
-  "产品需求": "prod_req_tasks",
-  "数据需求": "prod_req_tasks",
-  "缺陷管理": "prod_bugs",
-  "设计任务": "prod_design_tasks",
-  "售前任务": "crm_presales_tasks",
-  "交付任务": "proj_delivery_tasks",
-  "运维任务": "proj_ops_tasks",
-  "研发任务": "prod_rd_tasks",
-  "bug修复": "prod_bugs",
-  "售前支持": "crm_presales_tickets",
-  "项目交付": "proj_delivery_tickets",
-  "运维部署": "proj_delivery_tickets",
-  "技术问题": "prod_rd_tasks",
-};
+const taskTargetPages: Record<RequirementTaskType, string> = TASK_PAGE_BY_TYPE;
 const workOrderCards: Array<{ type: WorkOrderType; description: string; icon: React.ReactNode }> = [
   { type: "客户诉求", description: "收集客户反馈、业务需求与改进建议", icon: <MessageSquareText className="h-6 w-6" /> },
   { type: "线上问题", description: "记录线上故障、异常现象与影响范围", icon: <WifiOff className="h-6 w-6" /> },
