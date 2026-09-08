@@ -11,17 +11,15 @@ import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { DevLoginPage } from './components/auth/DevLoginPage';
 import { readSession } from './services/session';
 
-// Workbench Views
-import { MyTasksView } from './components/workbench/MyTasksView';
-import { KnowledgeBaseView } from './components/knowledge/KnowledgeBaseView';
-import { CRMDashboardView } from './components/crm/CRMDashboardView';
-import { RequirementTasksView } from './components/product/RequirementTasksView';
-import { RequirementPoolView } from './components/product/RequirementPoolView';
-
 const lazyNamed = (loader: () => Promise<Record<string, unknown>>, exportName: string) => lazy(async () => {
   const module = await loader();
   return { default: module[exportName] as React.ComponentType };
 });
+const MyTasksView = lazyNamed(() => import('./components/workbench/MyTasksView'), 'MyTasksView');
+const KnowledgeBaseView = lazyNamed(() => import('./components/knowledge/KnowledgeBaseView'), 'KnowledgeBaseView');
+const CRMDashboardView = lazyNamed(() => import('./components/crm/CRMDashboardView'), 'CRMDashboardView');
+const RequirementTasksView = lazyNamed(() => import('./components/product/RequirementTasksView'), 'RequirementTasksView');
+const RequirementPoolView = lazyNamed(() => import('./components/product/RequirementPoolView'), 'RequirementPoolView');
 const OKRPerformanceView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'OKRPerformanceView');
 
 // CRM Views
