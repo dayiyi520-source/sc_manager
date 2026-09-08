@@ -321,6 +321,11 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_requirement_task t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_bug t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
+        Map.of(
+            "t_product_design_task", "设计任务",
+            "t_project_ops_task", "运维任务",
+            "t_product_dev_task", "研发任务"
+        ).forEach((table, label) -> assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE t.requirement_id_ IS NOT NULL AND t.requirement_id_<>'' AND r.id_ IS NULL", Integer.class), label + "存在孤立来源需求"));
     }
 
     @Test
