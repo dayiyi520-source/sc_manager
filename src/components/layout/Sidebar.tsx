@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -20,7 +20,16 @@ export const Sidebar: React.FC = () => {
     mobileSidebarOpen,
     toggleMobileSidebar
   } = useApp();
-  const visuallyCollapsed = sidebarCollapsed && !mobileSidebarOpen;
+  const [viewportCollapsed, setViewportCollapsed] = useState(false);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const media = window.matchMedia('(max-width: 1199px)');
+    const syncViewport = () => setViewportCollapsed(media.matches);
+    syncViewport();
+    media.addEventListener('change', syncViewport);
+    return () => media.removeEventListener('change', syncViewport);
+  }, []);
+  const visuallyCollapsed = (sidebarCollapsed || viewportCollapsed) && !mobileSidebarOpen;
 
   // Keep all groups expanded by default
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({

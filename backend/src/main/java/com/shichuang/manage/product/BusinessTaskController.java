@@ -6,21 +6,26 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.time.LocalDate;
 import java.util.*;
 
 @RestController
 @Profile("local")
+@Tag(name = "业务任务", description = "售前、交付和运维任务独立接口")
 public class BusinessTaskController {
     private final JdbcTemplate jdbc;
     public BusinessTaskController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
+    @Operation(summary = "查询业务任务列表")
     @GetMapping({"/api/presales-tasks", "/api/delivery-tasks", "/api/ops-tasks"})
     public ApiResponse<List<Map<String,Object>>> list(@RequestHeader(value="X-Task-Type", required=false) String header, jakarta.servlet.http.HttpServletRequest request) {
         return ApiResponse.ok(jdbc.queryForList(selectSql() + " FROM " + table(request.getRequestURI()) + " WHERE tenant_id_=? AND delete_flag_=0 ORDER BY create_time_ DESC", RequestContext.tenantId()));
     }
 
+    @Operation(summary = "查询业务任务详情")
     @GetMapping({"/api/presales-tasks/{id}", "/api/delivery-tasks/{id}", "/api/ops-tasks/{id}"})
     public ApiResponse<Map<String,Object>> detail(@PathVariable String id, jakarta.servlet.http.HttpServletRequest request) {
         List<Map<String,Object>> rows = jdbc.queryForList(selectSql() + " FROM " + table(request.getRequestURI()) + " WHERE id_=? AND tenant_id_=? AND delete_flag_=0", id, RequestContext.tenantId());
@@ -28,6 +33,7 @@ public class BusinessTaskController {
         return ApiResponse.ok(rows.get(0));
     }
 
+    @Operation(summary = "新建业务任务")
     @PostMapping({"/api/presales-tasks", "/api/delivery-tasks", "/api/ops-tasks"})
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<Map<String,Object>> create(@RequestBody Map<String,Object> body, jakarta.servlet.http.HttpServletRequest request) {
@@ -39,6 +45,7 @@ public class BusinessTaskController {
         return ApiResponse.ok(Map.of("id", id, "code", code));
     }
 
+    @Operation(summary = "更新业务任务")
     @PutMapping({"/api/presales-tasks/{id}", "/api/delivery-tasks/{id}", "/api/ops-tasks/{id}"})
     public ApiResponse<Void> update(@PathVariable String id, @RequestBody Map<String,Object> body, jakarta.servlet.http.HttpServletRequest request) {
         int count = jdbc.update("UPDATE " + table(request.getRequestURI()) + " SET title_=COALESCE(?,title_),description_=COALESCE(?,description_),expected_goal_=COALESCE(?,expected_goal_),status_=COALESCE(?,status_),priority_=COALESCE(?,priority_),owner_name_=COALESCE(?,owner_name_),product_line_id_=COALESCE(?,product_line_id_),product_line_name_=COALESCE(?,product_line_name_),version_id_=COALESCE(?,version_id_),version_name_=COALESCE(?,version_name_),customer_id_=COALESCE(?,customer_id_),customer_name_=COALESCE(?,customer_name_),estimated_hours_=COALESCE(?,estimated_hours_),actual_hours_=COALESCE(?,actual_hours_),due_date_=COALESCE(?,due_date_),update_by_=?,update_time_=NOW(),version_=version_+1 WHERE id_=? AND tenant_id_=? AND delete_flag_=0", body.get("title"), body.get("description"), body.get("expectedGoal"), body.get("status"), body.get("priority"), body.get("ownerName"), body.get("productLineId"), body.get("productLineName"), body.get("versionId"), body.get("versionName"), body.get("customerId"), body.get("customerName"), body.get("estimatedHours"), body.get("actualHours"), body.get("dueDate"), RequestContext.userId(), id, RequestContext.tenantId());

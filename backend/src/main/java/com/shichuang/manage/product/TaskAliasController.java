@@ -8,24 +8,27 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.*;
 
 @RestController
 @Profile("local")
+@Tag(name = "缺陷与研发任务", description = "缺陷管理和研发任务独立接口")
 public class TaskAliasController {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     public TaskAliasController(JdbcTemplate jdbc, ObjectMapper objectMapper) { this.jdbc = jdbc; this.objectMapper = objectMapper; }
 
-    @GetMapping("/api/bugs") public ApiResponse<List<Map<String,Object>>> bugs() { return list("t_product_bug", "assignee_name_"); }
-    @GetMapping("/api/dev-tasks") public ApiResponse<List<Map<String,Object>>> devTasks() { return list("t_product_dev_task", "developer_name_"); }
-    @GetMapping("/api/bugs/{id}") public ApiResponse<Map<String,Object>> bug(@PathVariable String id) { return detail("t_product_bug", "assignee_name_", id); }
-    @GetMapping("/api/dev-tasks/{id}") public ApiResponse<Map<String,Object>> dev(@PathVariable String id) { return detail("t_product_dev_task", "developer_name_", id); }
-    @PostMapping("/api/bugs") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createBug(@RequestBody Map<String,Object> body) { return create("bug", body); }
-    @PostMapping("/api/dev-tasks") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createDev(@RequestBody Map<String,Object> body) { return create("dev", body); }
-    @PutMapping("/api/bugs/{id}") public ApiResponse<Void> updateBug(@PathVariable String id,@RequestBody Map<String,Object> body) { return update("t_product_bug", id, body); }
-    @PutMapping("/api/dev-tasks/{id}") public ApiResponse<Void> updateDev(@PathVariable String id,@RequestBody Map<String,Object> body) { return update("t_product_dev_task", id, body); }
+    @Operation(summary = "查询缺陷列表") @GetMapping("/api/bugs") public ApiResponse<List<Map<String,Object>>> bugs() { return list("t_product_bug", "assignee_name_"); }
+    @Operation(summary = "查询研发任务列表") @GetMapping("/api/dev-tasks") public ApiResponse<List<Map<String,Object>>> devTasks() { return list("t_product_dev_task", "developer_name_"); }
+    @Operation(summary = "查询缺陷详情") @GetMapping("/api/bugs/{id}") public ApiResponse<Map<String,Object>> bug(@PathVariable String id) { return detail("t_product_bug", "assignee_name_", id); }
+    @Operation(summary = "查询研发任务详情") @GetMapping("/api/dev-tasks/{id}") public ApiResponse<Map<String,Object>> dev(@PathVariable String id) { return detail("t_product_dev_task", "developer_name_", id); }
+    @Operation(summary = "新建缺陷") @PostMapping("/api/bugs") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createBug(@RequestBody Map<String,Object> body) { return create("bug", body); }
+    @Operation(summary = "新建研发任务") @PostMapping("/api/dev-tasks") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createDev(@RequestBody Map<String,Object> body) { return create("dev", body); }
+    @Operation(summary = "更新缺陷") @PutMapping("/api/bugs/{id}") public ApiResponse<Void> updateBug(@PathVariable String id,@RequestBody Map<String,Object> body) { return update("t_product_bug", id, body); }
+    @Operation(summary = "更新研发任务") @PutMapping("/api/dev-tasks/{id}") public ApiResponse<Void> updateDev(@PathVariable String id,@RequestBody Map<String,Object> body) { return update("t_product_dev_task", id, body); }
 
     private ApiResponse<List<Map<String,Object>>> list(String table, String ownerColumn) {
         return ApiResponse.ok(jdbc.queryForList("SELECT id_ AS id,code_ AS code,title_ AS title,description_ AS description,description_html_ AS descriptionHtml,expected_goal_ AS expectedGoal,priority_ AS priority,product_line_id_ AS productLineId,product_line_name_ AS productLineName,version_name_ AS versionName,status_ AS status," + ownerColumn + " AS ownerName," + ownerColumn + " AS assigneeName,estimated_hours_ AS estimatedHours,actual_hours_ AS actualHours,due_date_ AS dueDate,source_work_order_ids_ AS sourceWorkOrderIds,source_work_order_titles_ AS sourceWorkOrderTitles,create_by_ AS creatorName,create_time_ AS createdAt FROM " + table + " WHERE tenant_id_=? AND delete_flag_=0 ORDER BY create_time_ DESC", RequestContext.tenantId()));
