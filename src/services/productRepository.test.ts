@@ -35,4 +35,17 @@ describe('productRepository task API contract', () => {
     await productRepository.updateBusinessTask('ops', 'ops-1', { status: '处理中' });
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(['/api/presales-tasks', '/api/delivery-tasks/delivery-1', '/api/ops-tasks/ops-1']);
   });
+
+  it('retries a transient GET failure once but does not retry writes', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ code: 'OK', data: [], message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await productRepository.tasks('bug');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    fetchMock.mockReset().mockResolvedValue(new Response('', { status: 503 }));
+    await expect(productRepository.createTask('bug', { title: '不应重试写入' })).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

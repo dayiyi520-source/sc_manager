@@ -6,20 +6,29 @@ export class ApiError extends Error { constructor(public status: number, public 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers); const token = sessionStorage.getItem(SESSION_TOKEN_KEY)
   headers.set('Accept','application/json'); if(init.body) headers.set('Content-Type','application/json'); if(token) headers.set('Authorization',`Bearer ${token}`)
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 8000)
-  const abortExternal = () => controller.abort()
-  init.signal?.addEventListener('abort', abortExternal, { once: true })
-  try {
-    const response = await fetch(`${API_BASE}${path}`,{...init, headers, signal: controller.signal})
-    clearTimeout(timer)
-    const payload = await response.json().catch(() => ({code:'INVALID_RESPONSE',message:'服务返回了无效数据',data:null})) as ApiResponse<T>
-    if(!response.ok){ if(response.status===401)sessionStorage.removeItem(SESSION_TOKEN_KEY); throw new ApiError(response.status,payload.code||'REQUEST_FAILED',payload.message||'请求失败') }
-    return payload.data
-  } catch (err) {
-    clearTimeout(timer)
-    throw err
-  } finally {
-    init.signal?.removeEventListener('abort', abortExternal)
+  const method = (init.method || 'GET').toUpperCase()
+  const canRetry = method === 'GET' || method === 'HEAD'
+  for (let attempt = 0; attempt < (canRetry ? 2 : 1); attempt += 1) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 8000)
+    const abortExternal = () => controller.abort()
+    init.signal?.addEventListener('abort', abortExternal, { once: true })
+    try {
+      const response = await fetch(`${API_BASE}${path}`,{...init, headers, signal: controller.signal})
+      const payload = await response.json().catch(() => ({code:'INVALID_RESPONSE',message:'服务返回了无效数据',data:null})) as ApiResponse<T>
+      if(!response.ok){
+        if (canRetry && attempt === 0 && [502, 503, 504].includes(response.status)) continue
+        if(response.status===401)sessionStorage.removeItem(SESSION_TOKEN_KEY)
+        throw new ApiError(response.status,payload.code||'REQUEST_FAILED',payload.message||'请求失败')
+      }
+      return payload.data
+    } catch (err) {
+      if (canRetry && attempt === 0 && !init.signal?.aborted && (err instanceof TypeError || (err instanceof DOMException && err.name === 'AbortError'))) continue
+      throw err
+    } finally {
+      clearTimeout(timer)
+      init.signal?.removeEventListener('abort', abortExternal)
+    }
   }
+  throw new Error('请求失败')
 }
