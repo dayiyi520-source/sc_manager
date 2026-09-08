@@ -4,6 +4,12 @@ import { readFileSync } from 'node:fs';
 const styles = readFileSync(new URL('./index.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
 describe('light workspace theme contract', () => {
+  it('excludes drawer backdrops from opaque light panel overrides', () => {
+    expect(styles).toContain('> div:not(.fixed):not(.drawer-backdrop) {');
+    expect(styles).not.toContain('> div:not(.fixed) {');
+    expect(styles).toContain('--bg-overlay: color-mix(in srgb, var(--color-black) 40%, transparent)');
+    expect(styles).toContain('--bg-overlay: color-mix(in srgb, var(--color-black) 70%, transparent)');
+  });
   it('normalizes dialogs and page controls inside the right workspace only', () => {
     expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed)');
     expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 :where(input, select, textarea)[class]');

@@ -192,7 +192,7 @@ export const Drawer: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-xs transition-opacity" onClick={onClose} />
+      <div className="drawer-backdrop absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-xs transition-opacity" onClick={onClose} />
       <div className="fixed inset-y-0 right-0 pl-10 max-w-full flex">
         <div
         className={`w-screen ${width} bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl border-l border-[var(--border-main)] flex flex-col`}

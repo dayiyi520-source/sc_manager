@@ -44,6 +44,7 @@ export type SubMenuId =
   // 产研管理
   | 'prod_planning'
   | 'prod_req_tasks'
+  | 'prod_design_tasks'
   | 'prod_reqs'
   | 'prod_versions'
   | 'prod_lines'

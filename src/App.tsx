@@ -135,6 +135,8 @@ const MainContent: React.FC = () => {
       case 'prod_req_tasks':
       case 'prod_reqs':
         return <RequirementTasksView />;
+      case 'prod_design_tasks':
+        return <RequirementTasksView itemLabel="设计任务" />;
       case 'prod_req_pool':
       case 'prod_pool':
         return <RequirementPoolView />;
@@ -225,7 +227,7 @@ const MainContent: React.FC = () => {
               <span className="tech-accent-text font-medium">{currentSubMenu}</span>
             </div>
           </div>
-          {routedTabId === 'prod_req_tasks' && <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks') && <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
             <span>产品线</span>
             <div className="w-44"><SearchableSelect label="产品线" hideLabel value={productLineFilter === 'all' ? '全部产品线' : productLines.find((productLine) => productLine.id === productLineFilter)?.name || ''} options={['全部产品线', ...productLines.map((productLine) => productLine.name)]} onChange={(name) => setProductLineFilter(name === '全部产品线' ? 'all' : productLines.find((productLine) => productLine.name === name)?.id || 'all')} placeholder="全部产品线" clearable /></div>
           </div>}
@@ -240,7 +242,7 @@ const MainContent: React.FC = () => {
         )}
         <Suspense fallback={<div className="dark-panel flex min-h-80 items-center justify-center rounded-lg text-sm text-[var(--text-muted)]">正在加载页面…</div>}>
           <div className="animate-in fade-in duration-200">
-            {routedTabId === 'prod_req_tasks' ? <RequirementTasksView productLineFilter={productLineFilter} /> : renderView()}
+            {routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' ? <RequirementTasksView key={routedTabId} productLineFilter={productLineFilter} itemLabel={routedTabId === 'prod_design_tasks' ? '设计任务' : '需求任务'} /> : renderView()}
           </div>
         </Suspense>
       </div>

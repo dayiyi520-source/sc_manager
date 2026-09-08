@@ -137,6 +137,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'prod_lines', title: '产品线', mainMenuId: 'product', icon: 'Box' },
       { id: 'prod_versions', title: '版本迭代', mainMenuId: 'product', icon: 'GitBranch' },
       { id: 'prod_req_tasks', title: '需求任务', mainMenuId: 'product', icon: 'ListTodo', badge: '云效流', badgeType: 'default' },
+      { id: 'prod_design_tasks', title: '设计任务', mainMenuId: 'product', icon: 'Edit' },
       { id: 'prod_rd_tasks', title: '研发任务', mainMenuId: 'product', icon: 'Code' },
       { id: 'prod_bugs', title: '缺陷管理', mainMenuId: 'product', icon: 'Bug', badge: 3, badgeType: 'danger' },
       { id: 'prod_reviews', title: '复盘管理', mainMenuId: 'product', icon: 'Archive' },

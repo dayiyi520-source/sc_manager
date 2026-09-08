@@ -2,6 +2,7 @@
 
 @layer base {
   :root {
+    --bg-overlay: color-mix(in srgb, var(--color-black) 70%, transparent);
     --bg-main: #0C0F13;
     --bg-nav: #0B111A;
     --bg-surface: #121923;
@@ -28,6 +29,7 @@
   }
 
   html:not(.dark) {
+    --bg-overlay: color-mix(in srgb, var(--color-black) 40%, transparent);
     --bg-main: #F5F6F8;
     --bg-nav: #001529;
     --bg-surface: #FFFFFF;
@@ -407,17 +409,17 @@ html:not(.dark) .product-line-detail button[class*="bg-[#2F66F6]"] {
 
 /* Right-workspace dialogs share the light surface contract. Navigation chrome
  * is deliberately excluded so the dark sidebar remains unchanged in light mode. */
-html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed) {
+html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed):not(.drawer-backdrop) {
   background: var(--bg-card) !important;
   color: var(--text-body) !important;
   border-color: var(--border-main) !important;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
 }
-html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed) > div {
+html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed):not(.drawer-backdrop) > div {
   border-color: var(--border-main) !important;
 }
-html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed) > div:first-child,
-html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed) > div:last-child {
+html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed):not(.drawer-backdrop) > div:first-child,
+html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed):not(.drawer-backdrop) > div:last-child {
   background: var(--bg-surface-soft) !important;
   color: var(--text-primary) !important;
   border-color: var(--border-main) !important;

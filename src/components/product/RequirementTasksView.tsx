@@ -412,7 +412,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         sourceWorkOrderTitles: candidateOptions.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title),
         media: formMedia
       });
-      addToast('success', '需求任务信息已更新');
+      addToast('success', `${itemLabel}信息已更新`);
     } else {
       addRequirementTask({
         title: formTitle,
@@ -734,7 +734,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                   </tr>
                   </React.Fragment>
                 ))}
-                {pagedTasks.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">没有符合当前搜索、过滤或分组条件的需求</td></tr>}
+                {pagedTasks.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">没有符合当前搜索、过滤或分组条件的{itemLabel === '需求任务' ? '需求' : itemLabel}</td></tr>}
               </tbody>
             </table>
           </div>
