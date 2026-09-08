@@ -92,6 +92,11 @@ public class WorkOrderMapper {
         return jdbc.queryForList("SELECT id_ AS id,tenant_id_ AS tenantId FROM t_requirement_work_item WHERE delete_flag_=0 AND sync_status_ IN ('PENDING','FAILED') AND retry_count_<5 AND (next_retry_time_ IS NULL OR next_retry_time_<=NOW()) ORDER BY COALESCE(next_retry_time_,create_time_) LIMIT ?", limit);
     }
 
+    public int orphanCount() {
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM t_requirement_work_item w LEFT JOIN t_product_requirement r ON r.id_=w.requirement_id_ AND r.tenant_id_=w.tenant_id_ AND r.delete_flag_=0 WHERE w.delete_flag_=0 AND r.id_ IS NULL", Integer.class);
+        return count == null ? 0 : count;
+    }
+
     public int retryableFailures(String tenantId) {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM t_requirement_work_item WHERE tenant_id_=? AND delete_flag_=0 AND sync_status_ IN ('PENDING','FAILED') AND retry_count_<5", Integer.class, tenantId);
         return count == null ? 0 : count;

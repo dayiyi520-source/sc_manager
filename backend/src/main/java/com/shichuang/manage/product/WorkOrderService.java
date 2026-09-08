@@ -67,6 +67,10 @@ public class WorkOrderService {
         return mapper.dueRetries(limit);
     }
 
+    public int orphanCount() {
+        return mapper.orphanCount();
+    }
+
     public int retryableFailures(String tenantId) {
         return mapper.retryableFailures(tenantId);
     }
