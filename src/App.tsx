@@ -126,8 +126,9 @@ const MainContent: React.FC = () => {
         return <CRMBidReviewView />;
       case 'crm_contracts':
         return <CRMContractsView />;
+      case 'crm_presales_tasks':
       case 'crm_presales_tickets':
-        return <RequirementWorkItemsView type="presales" />;
+        return <RequirementTasksView itemLabel="售前任务" taskKind="presales" />;
 
       // Product & Dev
       case 'prod_planning':
@@ -136,7 +137,7 @@ const MainContent: React.FC = () => {
       case 'prod_reqs':
         return <RequirementTasksView />;
       case 'prod_design_tasks':
-        return <RequirementTasksView itemLabel="设计任务" />;
+        return <RequirementTasksView itemLabel="设计任务" taskKind="design" />;
       case 'prod_req_pool':
       case 'prod_pool':
         return <RequirementPoolView />;
@@ -146,9 +147,9 @@ const MainContent: React.FC = () => {
         return <ProductLinesView />;
       case 'prod_rd_tasks':
       case 'prod_dev_tasks':
-        return <RequirementTasksView itemLabel="研发任务" />;
+        return <RequirementTasksView itemLabel="研发任务" taskKind="dev" />;
       case 'prod_bugs':
-        return <RequirementTasksView itemLabel="缺陷管理" />;
+        return <RequirementTasksView itemLabel="缺陷管理" taskKind="bug" />;
       case 'prod_reviews':
       case 'prod_review':
         return <ProductReviewView />;
@@ -176,7 +177,10 @@ const MainContent: React.FC = () => {
       case 'ops_milestones':
         return <MilestoneScheduleView />;
       case 'proj_delivery_tickets':
-        return <RequirementWorkItemsView type="delivery" />;
+      case 'proj_delivery_tasks':
+        return <RequirementTasksView itemLabel="交付任务" taskKind="delivery" />;
+      case 'proj_ops_tasks':
+        return <RequirementTasksView itemLabel="运维任务" taskKind="ops" />;
       case 'ops_deliverables':
         return <DeliverablesView />;
       case 'ops_changes':
@@ -242,7 +246,7 @@ const MainContent: React.FC = () => {
         )}
         <Suspense fallback={<div className="dark-panel flex min-h-80 items-center justify-center rounded-lg text-sm text-[var(--text-muted)]">正在加载页面…</div>}>
           <div className="animate-in fade-in duration-200">
-            {routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' ? <RequirementTasksView key={routedTabId} productLineFilter={productLineFilter} itemLabel={routedTabId === 'prod_design_tasks' ? '设计任务' : '需求任务'} /> : renderView()}
+            {routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' ? <RequirementTasksView key={routedTabId} productLineFilter={productLineFilter} taskKind={routedTabId === 'prod_design_tasks' ? 'design' : 'requirement'} itemLabel={routedTabId === 'prod_design_tasks' ? '设计任务' : '需求任务'} /> : renderView()}
           </div>
         </Suspense>
       </div>

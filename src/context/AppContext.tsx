@@ -126,7 +126,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'crm_winning_engagement', title: '中标接洽', mainMenuId: 'crm', icon: 'Award', badge: 3, badgeType: 'success' },
       { id: 'crm_bidding_review', title: '招标复盘', mainMenuId: 'crm', icon: 'RefreshCw' },
       { id: 'crm_contracts', title: '合同管理', mainMenuId: 'crm', icon: 'FileText' },
-      { id: 'crm_presales_tickets', title: '售前工单', mainMenuId: 'crm', icon: 'Ticket' }
+      { id: 'crm_presales_tasks', title: '售前任务', mainMenuId: 'crm', icon: 'Ticket' }
     ]
   },
   {
@@ -164,7 +164,8 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     subMenus: [
       { id: 'proj_list', title: '项目列表', mainMenuId: 'project', icon: 'FolderGit2' },
       { id: 'proj_config', title: '里程碑计划', mainMenuId: 'project', icon: 'Settings2' },
-      { id: 'proj_delivery_tickets', title: '交付工单', mainMenuId: 'project', icon: 'ClipboardCheck' }
+      { id: 'proj_delivery_tasks', title: '交付任务', mainMenuId: 'project', icon: 'ClipboardCheck' },
+      { id: 'proj_ops_tasks', title: '运维任务', mainMenuId: 'project', icon: 'Server' }
     ]
   },
   {
@@ -219,6 +220,7 @@ export interface AppContextType {
   activeTabId: SubMenuId;
   openTabs: PageTab[];
   sidebarCollapsed: boolean;
+  mobileSidebarOpen: boolean;
   currentUser: CurrentUser;
   theme: 'light' | 'dark';
   globalSearchOpen: boolean;
@@ -236,6 +238,7 @@ export interface AppContextType {
   openPageTab: (id: string) => void;
   closePageTab: (id: SubMenuId) => void;
   toggleSidebar: () => void;
+  toggleMobileSidebar: () => void;
   setCurrentUserRole: (role: CurrentUser['role']) => void;
   setGlobalSearchOpen: (open: boolean) => void;
   toggleTheme: () => void;
@@ -275,6 +278,8 @@ export interface AppContextType {
   setProductLines: React.Dispatch<React.SetStateAction<ProductLine[]>>;
   requirementTasks: RequirementTask[];
   setRequirementTasks: React.Dispatch<React.SetStateAction<RequirementTask[]>>;
+  designTasks: RequirementTask[];
+  setDesignTasks: React.Dispatch<React.SetStateAction<RequirementTask[]>>;
   versions: VersionIteration[];
   setVersions: React.Dispatch<React.SetStateAction<VersionIteration[]>>;
   bugs: DefectBug[];
@@ -345,6 +350,8 @@ export interface AppContextType {
   updateVersion: (id: string, updates: Partial<VersionIteration>) => void;
   addRequirementTask: (task: Partial<RequirementTask>) => Promise<boolean>;
   updateRequirementTask: (id: string, updates: Partial<RequirementTask>) => void;
+  addDesignTask: (task: Partial<RequirementTask>) => Promise<boolean>;
+  updateDesignTask: (id: string, updates: Partial<RequirementTask>) => void;
   addRequirementTaskComment: (id: string, content: string) => void;
   addRequirementToPool: (item: Partial<RequirementPoolItem>) => void;
   addRequirementPoolItem: (item: Partial<RequirementPoolItem>) => void;
@@ -405,7 +412,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [openTabs, setOpenTabs] = useState<PageTab[]>([
     { id: 'wb_my_tasks', title: '我的任务', mainMenuId: 'workbench', iconName: 'CheckSquare', closable: false }
   ]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1200);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const syncSidebarForViewport = () => {
+      if (window.innerWidth < 1200) {
+        setSidebarCollapsed(true);
+        if (window.innerWidth < 900) setMobileSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', syncSidebarForViewport);
+    return () => window.removeEventListener('resize', syncSidebarForViewport);
+  }, []);
   const initialSession = readSession();
   const [currentUser, setCurrentUser] = useState<CurrentUser>(initialSession?.user || CURRENT_USERS[0]);
   const [crmSessionToken, setCrmSessionToken] = useState(initialSession?.token || '');
@@ -457,6 +476,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
     return INITIAL_REQUIREMENT_TASKS.map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: '', versionName: '' }));
   });
+  const [designTasks, setDesignTasks] = useState<RequirementTask[]>([]);
 
   useEffect(() => {
     try {
@@ -528,6 +548,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const followUpQuery = useQuery({ queryKey:['crm','follow-ups',crmSessionToken], queryFn:()=>crmRepository.followUps({page:1,pageSize:100}), enabled:crmEnabled });
   const contractQuery = useQuery({ queryKey:['crm','contracts',crmSessionToken], queryFn:()=>crmRepository.contracts({page:1,pageSize:100}), enabled:crmEnabled });
   const requirementQuery = useQuery({ queryKey:['requirements',crmSessionToken], queryFn:()=>requirementRepository.list({page:1,pageSize:100}), enabled:requirementBackendEnabled });
+  const designQuery = useQuery({ queryKey:['design-tasks',crmSessionToken], queryFn:()=>productRepository.designTasks(), enabled:requirementBackendEnabled });
   const productLineQuery = useQuery({ queryKey:['product-lines',crmSessionToken], queryFn:()=>productRepository.productLines(), enabled:requirementBackendEnabled });
   const bugQuery = useQuery({ queryKey:['product-bugs',crmSessionToken], queryFn:()=>productRepository.tasks('bug'), enabled:requirementBackendEnabled });
   const devTaskQuery = useQuery({ queryKey:['product-dev-tasks',crmSessionToken], queryFn:()=>productRepository.tasks('dev'), enabled:requirementBackendEnabled });
@@ -557,6 +578,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
   },[requirementQuery.data]);
+  useEffect(()=>{ if (Array.isArray(designQuery.data)) setDesignTasks(designQuery.data.map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: '', versionName: '' }))); },[designQuery.data]);
   useEffect(()=>{ if (productLineQuery.data?.length) setProductLines(productLineQuery.data); },[productLineQuery.data]);
   useEffect(()=>{ if (bugQuery.data?.length) setBugs(bugQuery.data as DefectBug[]); },[bugQuery.data]);
   useEffect(()=>{ if (devTaskQuery.data?.length) setDevTasks(devTaskQuery.data as DevTask[]); },[devTaskQuery.data]);
@@ -663,6 +685,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => !prev);
   };
+  const toggleMobileSidebar = () => setMobileSidebarOpen((prev) => !prev);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
@@ -839,6 +862,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);
+    return true;
+  };
+
+  const addDesignTask = async (task: Partial<RequirementTask>) => {
+    const newTask: RequirementTask = { ...task, id: `design-${Date.now()}`, title: task.title || '新建设计任务', description: task.description || '', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, productLineName: task.productLineName || '师创智联协同OS', versionName: task.versionName || '', estimatedHours: task.estimatedHours || 0, dueDate: task.dueDate || '' };
+    setDesignTasks((prev) => [newTask, ...prev]);
+    if (requirementBackendEnabled) { try { await productRepository.createDesignTask(newTask); await designQuery.refetch(); } catch (error) { addToast('error', '设计任务保存失败', error instanceof Error ? error.message : '请稍后重试'); } }
     return true;
   };
 
@@ -1492,6 +1522,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     if (dataMode === 'remote' && current) requirementRepository.update(id, { ...updates, version: (current as RequirementTask & { version?: number }).version }).catch((error) => addToast('error', '需求同步失败', error instanceof Error ? error.message : '请稍后重试'));
   };
+  const updateDesignTask = (id: string, updates: Partial<RequirementTask>) => {
+    setDesignTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
+    if (requirementBackendEnabled) void productRepository.updateDesignTask(id, updates as Record<string, unknown>).then(() => designQuery.refetch()).catch((error) => addToast('error', '设计任务同步失败', error instanceof Error ? error.message : '请稍后重试'));
+  };
 
   const addRequirementTaskComment = (id: string, content: string) => {
     const trimmed = content.trim();
@@ -1643,6 +1677,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeTabId,
         openTabs,
         sidebarCollapsed,
+        mobileSidebarOpen,
         currentUser,
         theme,
         globalSearchOpen,
@@ -1657,6 +1692,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openPageTab,
         closePageTab,
         toggleSidebar,
+        toggleMobileSidebar,
         setCurrentUserRole,
         setGlobalSearchOpen,
         toggleTheme,
@@ -1694,6 +1730,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setProductLines,
         requirementTasks,
         setRequirementTasks,
+        designTasks,
+        setDesignTasks,
         versions,
         setVersions,
         bugs,
@@ -1757,6 +1795,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateVersion,
         addRequirementTask,
         updateRequirementTask,
+        addDesignTask,
+        updateDesignTask,
         addRequirementTaskComment,
         addRequirementToPool,
         addRequirementPoolItem: addRequirementToPool,

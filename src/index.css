@@ -610,6 +610,36 @@ html:not(.dark) .tech-shell [class*="bg-blue-500/10"] {
   color: var(--icon-blue-text) !important;
   border-color: var(--icon-blue-border) !important;
 }
+/* Plain Tailwind pastel icon backgrounds also need an explicit light-mode
+   palette; otherwise legacy components can fall back to the dark icon tone. */
+html:not(.dark) .tech-shell [class*="bg-blue-50"] {
+  background-color: var(--icon-blue-bg) !important;
+  color: var(--icon-blue-text) !important;
+  border-color: var(--icon-blue-border) !important;
+}
+html:not(.dark) .tech-shell [class*="bg-rose-50"],
+html:not(.dark) .tech-shell [class*="bg-pink-50"] {
+  background-color: var(--icon-danger-bg) !important;
+  color: var(--icon-danger-text) !important;
+  border-color: var(--icon-danger-border) !important;
+}
+html:not(.dark) .tech-shell [class*="bg-emerald-50"] {
+  background-color: var(--icon-green-bg) !important;
+  color: var(--icon-green-text) !important;
+  border-color: var(--icon-green-border) !important;
+}
+html:not(.dark) .tech-shell [class*="bg-indigo-50"],
+html:not(.dark) .tech-shell [class*="bg-purple-50"] {
+  background-color: var(--icon-purple-bg) !important;
+  color: var(--icon-purple-text) !important;
+  border-color: var(--icon-purple-border) !important;
+}
+html:not(.dark) .tech-shell [class*="bg-amber-50"],
+html:not(.dark) .tech-shell [class*="bg-orange-50"] {
+  background-color: var(--icon-amber-bg) !important;
+  color: var(--icon-amber-text) !important;
+  border-color: var(--icon-amber-border) !important;
+}
 html:not(.dark) .tech-shell [class*="bg-emerald-500/10"],
 html:not(.dark) .tech-shell [class*="bg-emerald-500/15"] {
   background-color: var(--icon-green-bg) !important;
@@ -848,7 +878,18 @@ html:not(.dark) .tech-brand-panel .text-white {
 
 @media (max-width: 899px) {
   .tech-sidebar {
-    display: none !important;
+    display: flex !important;
+    position: fixed;
+    inset: 70px auto 0 0;
+    width: 260px !important;
+    transform: translateX(-100%);
+    box-shadow: 12px 0 30px rgba(0,0,0,.2);
+  }
+  .tech-sidebar.mobile-sidebar-open {
+    transform: translateX(0);
+  }
+  .tech-sidebar:not(.mobile-sidebar-open) {
+    pointer-events: none;
   }
 
   .tech-header {
@@ -858,6 +899,26 @@ html:not(.dark) .tech-brand-panel .text-white {
   .tech-brand-panel {
     width: 68px !important;
   }
+  .mobile-menu-button { display: inline-flex; }
+}
+
+.mobile-menu-button { display: none; }
+
+@media (max-width: 767px) {
+  .version-detail-layout { display: flex !important; flex-direction: column; }
+  .version-detail-layout > aside { max-height: 220px; border-right: 0; border-bottom: 1px solid var(--border-main); }
+  .version-planning-layout { display: flex !important; flex-direction: column; min-height: 0 !important; }
+  .version-planning-layout > section { min-height: 300px; }
+  .version-toolbar { width: 100%; justify-content: flex-start; margin-left: 0 !important; }
+  .version-toolbar > * { flex: 1 1 140px; min-width: 0; }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .version-planning-layout { grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr); }
+}
+
+@media (min-width: 1200px) {
+  .tech-sidebar { width: 188px !important; }
 }
 
 .tech-logo {

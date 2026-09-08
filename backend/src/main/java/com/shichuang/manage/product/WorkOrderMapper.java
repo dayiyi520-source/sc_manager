@@ -15,10 +15,14 @@ public class WorkOrderMapper {
 
     public void create(String tenantId, String taskType, String id, String requirementId, String title, String assignee, String note, String operator) {
         String table = table(taskType);
-        if ("产品需求".equals(taskType) || "数据需求".equals(taskType) || "设计任务".equals(taskType) || "研发任务".equals(taskType) || "技术问题".equals(taskType)) {
+        if ("产品需求".equals(taskType) || "数据需求".equals(taskType)) {
             jdbc.update("INSERT INTO " + table + " (id_,tenant_id_,requirement_id_,task_type_,title_,assignee_name_,note_,status_,create_by_,update_by_,version_,create_time_,update_time_) VALUES (?,?,?,?,?,?,?,'待处理',?,?,0,NOW(),NOW())", id, tenantId, requirementId, taskType, title, assignee, note, operator, operator);
+        } else if ("缺陷管理".equals(taskType) || "bug修复".equals(taskType) || "Bug修复".equals(taskType)) {
+            jdbc.update("INSERT INTO t_product_bug (id_,tenant_id_,requirement_id_,code_,title_,description_,assignee_name_,owner_name_,status_,create_by_,update_by_,create_time_,update_time_,delete_flag_) VALUES (?,?,?,CONCAT('BUG-',UNIX_TIMESTAMP()),?,?,?,?,'待修复',?,?,NOW(),NOW(),0)", id, tenantId, requirementId, title, note, assignee, assignee, operator, operator);
+        } else if ("研发任务".equals(taskType) || "技术问题".equals(taskType)) {
+            jdbc.update("INSERT INTO t_product_dev_task (id_,tenant_id_,code_,title_,description_,developer_name_,owner_name_,status_,create_by_,update_by_,create_time_,update_time_,delete_flag_) VALUES (?,?,CONCAT('DEV-',UNIX_TIMESTAMP()),?,?,?,?,'开发中',?,?,NOW(),NOW(),0)", id, tenantId, title, note, assignee, assignee, operator, operator);
         } else {
-            jdbc.update("INSERT INTO " + table + " (id_,tenant_id_,requirement_id_,title_,assignee_name_,note_,status_,create_by_,update_by_,version_,create_time_,update_time_) VALUES (?,?,?,?,?,?,'待处理',?,?,0,NOW(),NOW())", id, tenantId, requirementId, title, assignee, note, operator, operator);
+            jdbc.update("INSERT INTO " + table + " (id_,tenant_id_,code_,title_,description_,status_,priority_,owner_name_,creator_name_,estimated_hours_,actual_hours_,due_date_,create_by_,update_by_,create_time_,update_time_,delete_flag_,version_,work_item_kind_) VALUES (?, ?, CONCAT(?, '-', UNIX_TIMESTAMP()), ?, ?, '待处理', '中', ?, ?, 0, 0, NULL, ?, ?, NOW(), NOW(), 0, 0, ?)", id, tenantId, taskType, title, note, assignee, operator, operator, taskType);
         }
     }
 
@@ -95,9 +99,11 @@ public class WorkOrderMapper {
 
     private static String table(String taskType) {
         return switch (taskType) {
-            case "售前任务", "售前支持" -> "t_crm_presales_ticket";
-            case "交付任务", "运维任务", "项目交付", "交付支持", "运维部署" -> "t_project_delivery_ticket";
-            case "产品需求", "数据需求", "设计任务", "研发任务", "技术问题" -> "t_product_requirement_task";
+            case "售前任务", "售前支持" -> "t_crm_presales_task";
+            case "交付任务", "项目交付", "交付支持" -> "t_project_delivery_task";
+            case "运维任务", "运维部署" -> "t_project_ops_task";
+            case "设计任务" -> "t_product_design_task";
+            case "产品需求", "数据需求" -> "t_product_requirement_task";
             case "缺陷管理", "bug修复", "Bug修复" -> "t_product_bug";
             default -> throw new IllegalArgumentException("请选择有效任务类型");
         };

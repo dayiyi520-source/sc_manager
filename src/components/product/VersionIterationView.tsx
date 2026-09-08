@@ -454,7 +454,7 @@ export const VersionIterationView: React.FC = () => {
       { key: 'bugs', label: '缺陷', count: selectedBugs.length, icon: <Bug className="h-4 w-4" /> }
     ];
     return (
-      <div className="grid min-h-[620px] grid-cols-[250px_minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]">
+      <div className="version-detail-layout grid min-h-[620px] grid-cols-[250px_minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]">
         <aside className="flex min-h-0 flex-col border-r border-[var(--border-main)] bg-[var(--bg-surface-soft)]">
           <div className="flex h-12 items-center justify-between border-b border-[var(--border-main)] px-4">
             <span className="font-semibold text-[var(--text-primary)]">迭代目录</span>
@@ -522,7 +522,7 @@ export const VersionIterationView: React.FC = () => {
   };
 
   const renderPlanning = () => (
-    <div className="grid min-h-[620px] grid-cols-[minmax(360px,1fr)_minmax(420px,1.1fr)] gap-3">
+    <div className="version-planning-layout grid min-h-[620px] grid-cols-[minmax(360px,1fr)_minmax(420px,1.1fr)] gap-3">
       <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]">
         <div className="flex h-12 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4">
           <span className="font-semibold text-[var(--text-primary)]">待规划工作项 · {unplannedRequirements.length}</span>
@@ -558,7 +558,7 @@ export const VersionIterationView: React.FC = () => {
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex items-center">{tabButton('list', '列表')}{tabButton('detail', '详情')}{tabButton('planning', '规划')}</div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="version-toolbar ml-auto flex flex-wrap items-center justify-end gap-2">
           <div className="w-44">
             <SearchableSelect
               label="产品线"

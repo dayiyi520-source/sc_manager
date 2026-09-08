@@ -30,14 +30,15 @@ public class RequirementService {
         this.objectMapper = objectMapper;
     }
 
-    public PageResult<Map<String, Object>> list(int page, int pageSize, String keyword, String productLine, String department, String priority, String status) {
+    public PageResult<Map<String, Object>> list(int page, int pageSize, String keyword, String productLine, String department, String priority, String status, String workItemKind) {
         int currentPage = Math.max(1, page);
         int size = Math.min(100, Math.max(1, pageSize));
         int offset = (currentPage - 1) * size;
         String tenantId = RequestContext.tenantId();
         String like = "%" + keyword.trim() + "%";
-        String where = "tenant_id_=? AND delete_flag_=0 AND (title_ LIKE ? OR description_ LIKE ? OR owner_name_ LIKE ? OR product_line_name_ LIKE ? OR department_ LIKE ?) AND (?='' OR product_line_name_=?) AND (?='' OR department_=?) AND (?='' OR priority_=?) AND (?='' OR status_=?)";
-        Object[] args = { tenantId, like, like, like, like, like, productLine, productLine, department, department, priority, priority, status, status };
+        String kind = "design".equalsIgnoreCase(workItemKind) ? "design" : "requirement";
+        String where = "tenant_id_=? AND delete_flag_=0 AND work_item_kind_=? AND (title_ LIKE ? OR description_ LIKE ? OR owner_name_ LIKE ? OR product_line_name_ LIKE ? OR department_ LIKE ?) AND (?='' OR product_line_name_=?) AND (?='' OR department_=?) AND (?='' OR priority_=?) AND (?='' OR status_=?)";
+        Object[] args = { tenantId, kind, like, like, like, like, like, productLine, productLine, department, department, priority, priority, status, status };
         return new PageResult<>(mapper.list(where, args, size, offset), currentPage, size, mapper.count(where, args));
     }
 
@@ -262,10 +263,12 @@ public class RequirementService {
 
     private static String targetPage(String type) {
         return switch (type) {
-            case "售前任务", "售前支持" -> "crm_presales_tickets";
-            case "产品需求", "数据需求", "设计任务" -> "prod_req_tasks";
+            case "售前任务", "售前支持" -> "crm_presales_tasks";
+            case "产品需求", "数据需求" -> "prod_req_tasks";
+            case "设计任务" -> "prod_design_tasks";
             case "缺陷管理", "bug修复", "Bug修复" -> "prod_bugs";
-            case "交付任务", "运维任务", "项目交付", "运维部署" -> "proj_delivery_tickets";
+            case "交付任务", "项目交付", "交付支持" -> "proj_delivery_tasks";
+            case "运维任务", "运维部署" -> "proj_ops_tasks";
             case "研发任务", "技术问题" -> "prod_rd_tasks";
             default -> "prod_req_tasks";
         };

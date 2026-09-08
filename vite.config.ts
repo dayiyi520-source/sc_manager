@@ -15,7 +15,7 @@ function devApiMockPlugin() {
         }
 
         // 1. Mock /api/auth/dev-login
-        if (url.startsWith('/api/auth/dev-login') && req.method === 'POST') {
+        if (process.env.VITE_USE_MOCK_AUTH === 'true' && url.startsWith('/api/auth/dev-login') && req.method === 'POST') {
           let body = '';
           req.on('data', (chunk: any) => { body += chunk; });
           req.on('end', () => {
@@ -49,7 +49,7 @@ function devApiMockPlugin() {
         }
 
         // 2. Mock /api/auth/dev-accounts
-        if (url.startsWith('/api/auth/dev-accounts')) {
+        if (process.env.VITE_USE_MOCK_AUTH === 'true' && url.startsWith('/api/auth/dev-accounts')) {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({
             code: 'SUCCESS',
@@ -66,7 +66,7 @@ function devApiMockPlugin() {
         }
 
         // 3. Mock /api/requirements/departments
-        if (url.startsWith('/api/requirements/departments')) {
+        if (process.env.VITE_USE_MOCK_AUTH === 'true' && url.startsWith('/api/requirements/departments')) {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({
             code: 'SUCCESS',
@@ -82,20 +82,9 @@ function devApiMockPlugin() {
           return;
         }
 
-        // If an explicit backend URL is provided, let proxy handle it
-        if (process.env.VITE_BACKEND_URL) {
-          return next();
-        }
-
-        // Otherwise return a clean 503 response without invoking http-proxy socket connection
-        res.statusCode = 503;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-          code: 'SERVICE_UNAVAILABLE',
-          message: '后端服务未启动，已自动接入前端本地 Mock 模式',
-          data: null,
-          requestId: 'offline-fallback'
-        }));
+        // 其余接口交给 Vite proxy 转发到本地 Spring Boot；后端不可用时由
+        // proxy error handler 返回 503，避免后端启动后仍被前端 Mock 拦截。
+        return next();
       });
     }
   };

@@ -10,12 +10,17 @@ import {
   Layers,
   FileCheck,
   Briefcase,
+  ArrowRight,
+  List,
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { CURRENT_USERS } from '../../data/mockData';
 import { useAppAuth } from '../../hooks/useAppAuth';
+import { clearSession } from '../../services/session';
+import { useNavigate } from 'react-router-dom';
 
 export const Header: React.FC = () => {
+  const navigate = useNavigate();
   const { currentUser, setCurrentUserRole } = useAppAuth();
   const {
     theme,
@@ -23,7 +28,8 @@ export const Header: React.FC = () => {
     openPageTab,
     approvals,
     requirementTasks,
-    sidebarCollapsed
+    sidebarCollapsed,
+    toggleMobileSidebar
   } = useApp();
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -80,6 +86,7 @@ export const Header: React.FC = () => {
 
       {/* Right: Notifications and account controls */}
       <div className="flex min-w-0 flex-1 items-center justify-end gap-2.5 px-4">
+        <button type="button" onClick={toggleMobileSidebar} className="mobile-menu-button mr-auto rounded-md p-2 text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]" aria-label="打开导航菜单"><List className="h-4 w-4" /></button>
         {/* Notifications Popover */}
         <div className="relative" ref={notifRef}>
           <button
@@ -265,6 +272,21 @@ export const Header: React.FC = () => {
                     {currentUser.role === u.role && <UserCheck className="w-4 h-4 text-[var(--warning)]" />}
                   </button>
                 ))}
+              </div>
+
+              <div className="mt-2 border-t border-[var(--border-main)] pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearSession();
+                    setUserMenuOpen(false);
+                    navigate('/login', { replace: true });
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-left text-[var(--text-body)] hover:bg-[var(--bg-elevated)] hover:text-[var(--danger)] transition-colors"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  <span>退出登录</span>
+                </button>
               </div>
             </div>
           )}

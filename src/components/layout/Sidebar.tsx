@@ -16,8 +16,11 @@ export const Sidebar: React.FC = () => {
     activeTabId,
     openPageTab,
     sidebarCollapsed,
-    toggleSidebar
+    toggleSidebar,
+    mobileSidebarOpen,
+    toggleMobileSidebar
   } = useApp();
+  const visuallyCollapsed = sidebarCollapsed && !mobileSidebarOpen;
 
   // Keep all groups expanded by default
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -39,8 +42,8 @@ export const Sidebar: React.FC = () => {
   return (
     <aside
       className={`tech-sidebar h-full text-[var(--text-body)] border-r flex flex-col transition-all duration-300 shrink-0 select-none z-40 ${
-        sidebarCollapsed ? 'w-16' : 'w-60'
-      }`}
+        visuallyCollapsed ? 'w-16' : 'w-60'
+      } ${mobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}
     >
       {/* Navigation Menu List */}
       <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1.5 text-xs custom-scrollbar">
@@ -50,7 +53,7 @@ export const Sidebar: React.FC = () => {
 
           return (
             <div key={group.id} className="space-y-0.5">
-              {!sidebarCollapsed ? (
+              {!visuallyCollapsed ? (
                 /* 国内中后台标准一级主菜单：13px 中等加粗，层级鲜明，高可辨识度 */
                 <button
                   onClick={() => toggleGroup(group.id)}
@@ -87,10 +90,10 @@ export const Sidebar: React.FC = () => {
               )}
 
               {/* 二级子菜单：具有明显的层级缩进 (pl-8) 和引导视觉线 */}
-              {(isExpanded || sidebarCollapsed) && (
+              {(isExpanded || visuallyCollapsed) && (
                 <div
                   className={`space-y-0.5 ${
-                    !sidebarCollapsed ? 'relative ml-3.5 pl-3 border-l border-[var(--border-main)] my-1' : ''
+                    !visuallyCollapsed ? 'relative ml-3.5 pl-3 border-l border-[var(--border-main)] my-1' : ''
                   }`}
                 >
                   {group.subMenus.map((sub) => {
@@ -100,10 +103,10 @@ export const Sidebar: React.FC = () => {
                       <button
                         key={sub.id}
                         id={`menu-${sub.id}`}
-                        onClick={() => openPageTab(sub.id as SubMenuId)}
-                        title={sidebarCollapsed ? `${group.title} · ${sub.title}` : undefined}
+                        onClick={() => { openPageTab(sub.id as SubMenuId); if (mobileSidebarOpen) toggleMobileSidebar(); }}
+                        title={visuallyCollapsed ? `${group.title} · ${sub.title}` : undefined}
                         className={`w-full flex items-center rounded-md transition-all text-left ${
-                          sidebarCollapsed
+                          visuallyCollapsed
                             ? 'justify-center p-2.5 my-1'
                             : 'px-2.5 py-1.5'
                         } ${
@@ -119,7 +122,7 @@ export const Sidebar: React.FC = () => {
                               isActive ? 'tech-accent-text' : 'text-[var(--text-muted)]'
                             }`}
                           />
-                          {!sidebarCollapsed && (
+                          {!visuallyCollapsed && (
                             <span className="text-[13px] truncate">{sub.title}</span>
                           )}
                         </div>
@@ -141,7 +144,7 @@ export const Sidebar: React.FC = () => {
           onClick={toggleSidebar}
           className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
         >
-          {sidebarCollapsed ? (
+          {visuallyCollapsed ? (
             <PanelLeftOpen className="w-4 h-4" />
           ) : (
             <>

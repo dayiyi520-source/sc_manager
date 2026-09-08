@@ -22,7 +22,7 @@ public class RequirementController {
 
     @Operation(summary = "分页查询需求")
     @GetMapping
-    public ApiResponse<PageResult<Map<String,Object>>> list(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="100") int pageSize,@RequestParam(defaultValue="") String keyword,@RequestParam(defaultValue="") String productLine,@RequestParam(defaultValue="") String department,@RequestParam(defaultValue="") String priority,@RequestParam(defaultValue="") String status){return ApiResponse.ok(service.list(page,pageSize,keyword,productLine,department,priority,status));}
+    public ApiResponse<PageResult<Map<String,Object>>> list(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="100") int pageSize,@RequestParam(defaultValue="") String keyword,@RequestParam(defaultValue="") String productLine,@RequestParam(defaultValue="") String department,@RequestParam(defaultValue="") String priority,@RequestParam(defaultValue="") String status,@RequestParam(defaultValue="requirement") String workItemKind){return ApiResponse.ok(service.list(page,pageSize,keyword,productLine,department,priority,status,workItemKind));}
     @GetMapping("/departments") public ApiResponse<List<Map<String,Object>>> departments(){return ApiResponse.ok(service.departments());}
     @Operation(summary = "查询需求详情及流转记录")
     @GetMapping("/{id}") public ApiResponse<Map<String,Object>> detail(@PathVariable String id){return ApiResponse.ok(service.detail(id));}

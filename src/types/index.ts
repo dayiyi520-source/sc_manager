@@ -40,6 +40,7 @@ export type SubMenuId =
   | 'crm_bidding_review'
   | 'crm_bid_review'
   | 'crm_contracts'
+  | 'crm_presales_tasks'
   | 'crm_presales_tickets'
   // 产研管理
   | 'prod_planning'
@@ -85,6 +86,8 @@ export type SubMenuId =
   // 项目管理
   | 'proj_list'
   | 'proj_config'
+  | 'proj_delivery_tasks'
+  | 'proj_ops_tasks'
   | 'proj_delivery_tickets';
 
 export interface PageTab {

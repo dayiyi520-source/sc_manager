@@ -20,6 +20,7 @@ import { SearchableSelect } from '../common/SearchableSelect';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
 import { requirementRepository } from '../../services/requirementRepository';
+import { productRepository } from '../../services/productRepository';
 
 type DateFieldProps = {
   label: string;
@@ -138,11 +139,14 @@ const WorkOrderPicker: React.FC<{
   </div>;
 };
 
-export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLabel?: string }> = ({ productLineFilter = 'all', itemLabel = '需求任务' }) => {
+export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLabel?: string; taskKind?: 'requirement' | 'design' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops' }> = ({ productLineFilter = 'all', itemLabel = '需求任务', taskKind = 'requirement' }) => {
   const {
     requirementTasks,
+    designTasks,
     addRequirementTask,
     updateRequirementTask,
+    addDesignTask,
+    updateDesignTask,
     productLines,
     versions,
     customers,
@@ -157,6 +161,52 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     addToast,
     addRequirementTaskComment
   } = useApp();
+  const [businessTasks, setBusinessTasks] = useState<RequirementTask[]>([]);
+  const [specialTasks, setSpecialTasks] = useState<RequirementTask[]>([]);
+  const isBusinessTask = taskKind === 'presales' || taskKind === 'delivery' || taskKind === 'ops';
+  const isSpecialTask = taskKind === 'bug' || taskKind === 'dev';
+  useEffect(() => {
+    if (!isBusinessTask) { setBusinessTasks([]); return; }
+    productRepository.businessTasks(taskKind).then(setBusinessTasks).catch(() => setBusinessTasks([]));
+  }, [isBusinessTask, taskKind]);
+  useEffect(() => {
+    if (taskKind === 'bug') setSpecialTasks(bugs.map((item: DefectBug) => ({ ...item, ownerName: item.ownerName || item.assignee || '', expectedGoal: '', dueDate: '', priority: item.priority || '中', versionName: item.versionName || '', productLineName: item.productLineName || '', description: item.description || '', status: item.status || '待修复' })) as RequirementTask[]);
+    else if (taskKind === 'dev') setSpecialTasks(devTasks.map((item: DevTask) => ({ ...item, ownerName: item.developer || '', expectedGoal: '', dueDate: '', priority: item.priority || '中', versionName: item.versionName || '', productLineName: item.productLineName || '', description: item.description || '', status: item.status || '开发中' })) as RequirementTask[]);
+    else setSpecialTasks([]);
+  }, [taskKind, bugs, devTasks]);
+  const activeTasks = taskKind === 'design' ? designTasks : isBusinessTask ? businessTasks : isSpecialTask ? specialTasks : requirementTasks;
+  const addTask = async (task: Partial<RequirementTask>) => {
+    if (taskKind === 'design') return addDesignTask(task);
+    if (isBusinessTask) {
+      const optimistic: RequirementTask = { ...task, id: `${taskKind}-${Date.now()}`, title: task.title || `新建${itemLabel}`, description: task.description || '', expectedGoal: task.expectedGoal || '', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, productLineName: task.productLineName || '', versionName: task.versionName || '', estimatedHours: task.estimatedHours || 0, dueDate: task.dueDate || '' };
+      setBusinessTasks((prev) => [optimistic, ...prev]);
+      try { await productRepository.createBusinessTask(taskKind, optimistic); setBusinessTasks(await productRepository.businessTasks(taskKind)); return true; }
+      catch (error) { setBusinessTasks((prev) => prev.filter((item) => item.id !== optimistic.id)); addToast('error', `${itemLabel}保存失败`, error instanceof Error ? error.message : '请稍后重试'); return false; }
+    }
+    if (isSpecialTask) {
+      const optimistic = { ...task, id: `${taskKind}-${Date.now()}`, title: task.title || `新建${itemLabel}`, description: task.description || '', ownerName: task.ownerName || currentUser.name, status: task.status || (taskKind === 'bug' ? '待修复' : '开发中'), priority: task.priority || '中', productLineName: task.productLineName || '', versionName: task.versionName || '', expectedGoal: '', dueDate: '' } as RequirementTask;
+      setSpecialTasks((prev) => [optimistic, ...prev]);
+      const body = taskKind === 'bug' ? { ...task, assigneeName: task.ownerName } : { ...task, developer: task.ownerName };
+      try { await productRepository.createTask(taskKind, body as Partial<DefectBug> | Partial<DevTask>); return true; }
+      catch (error) { setSpecialTasks((prev) => prev.filter((item) => item.id !== optimistic.id)); addToast('error', `${itemLabel}保存失败`, error instanceof Error ? error.message : '请稍后重试'); return false; }
+    }
+    return addRequirementTask(task);
+  };
+  const updateTask = (id: string, updates: Partial<RequirementTask>) => {
+    if (taskKind === 'design') return updateDesignTask(id, updates);
+    if (isBusinessTask) {
+      setBusinessTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
+      void productRepository.updateBusinessTask(taskKind, id, updates as Record<string, unknown>).catch((error) => addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试'));
+      return;
+    }
+    if (isSpecialTask) {
+      setSpecialTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
+      const body = taskKind === 'bug' ? { ...updates, assigneeName: updates.ownerName } : { ...updates, developer: updates.ownerName };
+      void productRepository.updateTask(taskKind, id, body as Record<string, unknown>).catch((error) => addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试'));
+      return;
+    }
+    return updateRequirementTask(id, updates);
+  };
 
   const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -192,10 +242,11 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
 
   useEffect(() => {
     if (!selectedTask) return;
+    if (isBusinessTask || taskKind === 'design') return;
     requirementRepository.detail(selectedTask.id)
       .then((detail) => setSelectedTask((current) => current?.id === detail.id ? { ...current, ...detail } : current))
       .catch(() => undefined);
-  }, [selectedTask?.id]);
+  }, [selectedTask?.id, isBusinessTask, taskKind]);
 
   const localCandidates = useMemo<RequirementWorkOrderCandidate[]>(() => [
     ...requirementTasks.map((item) => ({ id: item.id, type: 'requirement' as const, typeLabel: '需求', title: item.title, code: item.code, ownerName: item.ownerName, productLineName: item.productLineName, status: item.status, summary: item.description })),
@@ -218,7 +269,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
 
   const saveDetailUpdates = (updates: Partial<RequirementTask>) => {
     if (!selectedTask) return;
-    updateRequirementTask(selectedTask.id, updates);
+    updateTask(selectedTask.id, updates);
     setSelectedTask((current) => current ? { ...current, ...updates } : current);
   };
 
@@ -381,7 +432,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     event.target.value = '';
   };
 
-  const handleSaveTask = (e: React.FormEvent) => {
+  const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim()) {
       addToast('warning', `请填写${itemLabel}名称`);
@@ -390,7 +441,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     const selectedProductLine = productLines.find((line) => line.name === formProductLineName);
     const selectedVersion = versions.find((version) => version.name === formVersionName);
     if (editingTask) {
-      updateRequirementTask(editingTask.id, {
+      updateTask(editingTask.id, {
         title: formTitle,
         description: formDescription,
         descriptionHtml: formDescriptionHtml,
@@ -414,7 +465,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       });
       addToast('success', `${itemLabel}信息已更新`);
     } else {
-      addRequirementTask({
+      const saved = await addTask({
         title: formTitle,
         description: formDescription,
         productLineId: selectedProductLine?.id,
@@ -437,13 +488,13 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         sourceWorkOrderTitles: candidateOptions.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title),
         media: formMedia
       });
-      addToast('success', '敏捷需求已创建', '已自动同步录入云效需求池与版本规划');
+      if (saved !== false) addToast('success', taskKind === 'design' ? '设计任务已写入' : isBusinessTask ? `${itemLabel}已写入` : '需求任务已写入', taskKind === 'design' ? '已保存到设计任务数据表' : isBusinessTask ? `已保存到${itemLabel}数据表` : '已自动同步录入云效需求池与版本规划');
     }
     setIsModalOpen(false);
   };
 
   const handleSaveAndContinue = (e: React.MouseEvent) => {
-    handleSaveTask(e as unknown as React.FormEvent);
+    void handleSaveTask(e as unknown as React.FormEvent);
     if (formTitle.trim()) window.setTimeout(openAddModal, 0);
   };
 
@@ -499,7 +550,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     matchesDateFilter(task.plannedStartDate, filters.plannedStartDate) &&
     matchesMultiFilter(task.ccNames || [], filters.cc)
   );
-  const productLineTasks = productLineFilter === 'all' ? requirementTasks : requirementTasks.filter((task) => task.productLineId === productLineFilter);
+  const productLineTasks = productLineFilter === 'all' ? activeTasks : activeTasks.filter((task) => task.productLineId === productLineFilter);
   const baseTasks = productLineTasks.filter((task) => categoryMatch(task, activeTab));
   const filteredTasks = baseTasks.filter((task) => {
     const titlePart = searchQuery.trim().toLocaleLowerCase();
@@ -704,7 +755,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                       <button type="button" onClick={() => setSelectedTask(t)} className="line-clamp-2 max-w-[320px] text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]" title={t.title}>{t.title}</button>
                     </td>
                     <td className="py-3.5 px-4">
-                      <InlineEditableSelect value={t.status} options={STAGES} tone="status" onChange={(status) => updateRequirementTask(t.id, { status })} />
+                      <InlineEditableSelect value={t.status} options={STAGES} tone="status" onChange={(status) => updateTask(t.id, { status })} />
                     </td>
                     <td className="py-3.5 px-4">
                       <StatusTag status={normalizePriority(t.priority)} />
@@ -713,7 +764,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                       <span className="line-clamp-2" title={`${t.productLineName || '未设置'} · ${t.versionName || '未关联'}`}>{t.productLineName || '未设置'} · <span className="font-mono text-blue-600">{t.versionName || '未关联'}</span></span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-500">
-                      <InlineEditableSelect value={t.ownerName} options={employees} onChange={(ownerName) => updateRequirementTask(t.id, { ownerName })} />
+                      <InlineEditableSelect value={t.ownerName} options={employees} onChange={(ownerName) => updateTask(t.id, { ownerName })} />
                     </td>
                     <td className="py-3.5 px-4 text-slate-500">
                       {t.creatorName || currentUser.name}
