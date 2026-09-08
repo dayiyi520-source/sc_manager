@@ -7,9 +7,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const headers = new Headers(init.headers); const token = sessionStorage.getItem(SESSION_TOKEN_KEY)
   headers.set('Accept','application/json'); if(init.body) headers.set('Content-Type','application/json'); if(token) headers.set('Authorization',`Bearer ${token}`)
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 2500)
+  const timer = setTimeout(() => controller.abort(), 8000)
+  const abortExternal = () => controller.abort()
+  init.signal?.addEventListener('abort', abortExternal, { once: true })
   try {
-    const response = await fetch(`${API_BASE}${path}`,{...init, headers, signal: init.signal || controller.signal})
+    const response = await fetch(`${API_BASE}${path}`,{...init, headers, signal: controller.signal})
     clearTimeout(timer)
     const payload = await response.json().catch(() => ({code:'INVALID_RESPONSE',message:'服务返回了无效数据',data:null})) as ApiResponse<T>
     if(!response.ok){ if(response.status===401)sessionStorage.removeItem(SESSION_TOKEN_KEY); throw new ApiError(response.status,payload.code||'REQUEST_FAILED',payload.message||'请求失败') }
@@ -17,5 +19,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   } catch (err) {
     clearTimeout(timer)
     throw err
+  } finally {
+    init.signal?.removeEventListener('abort', abortExternal)
   }
 }
