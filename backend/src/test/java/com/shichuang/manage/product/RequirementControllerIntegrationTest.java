@@ -424,6 +424,17 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
         }
     }
 
+    @Test
+    void validatesStandaloneTaskTitleBeforeDatabaseWrite() throws Exception {
+        String token = loginToken();
+        mockMvc.perform(post("/api/bugs")
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"title\":\"   \"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
     private int createWorkItemStatus(String token, String requirementId, CountDownLatch start) throws Exception {
         start.await();
         return mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
