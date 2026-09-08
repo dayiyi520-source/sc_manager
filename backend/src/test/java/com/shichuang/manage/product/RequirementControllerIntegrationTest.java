@@ -396,6 +396,29 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
         cleanupRequirement(requirementId);
     }
 
+    @Test
+    void blocksInvalidTaskTargetAndUnauthorizedProductWrite() throws Exception {
+        String token = loginToken();
+        String requirementId = createRequirement(token, "集成测试权限校验-" + System.nanoTime());
+        try {
+            mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType("application/json")
+                    .content("{\"taskType\":\"其他问题\",\"assigneeName\":\"张瑞\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+            String salesToken = tokens.issue("user-sales-write", "sales_director", "local-tenant", "销售总监");
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/requirements/{id}", requirementId)
+                    .header("Authorization", "Bearer " + salesToken)
+                    .contentType("application/json")
+                    .content("{\"title\":\"无权修改\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        } finally {
+            cleanupRequirement(requirementId);
+        }
+    }
+
     private int createWorkItemStatus(String token, String requirementId, CountDownLatch start) throws Exception {
         start.await();
         return mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)

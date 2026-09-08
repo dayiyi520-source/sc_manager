@@ -39,8 +39,8 @@ class CrmControllerIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total", greaterThanOrEqualTo(7)))
             .andExpect(jsonPath("$.data.items[*].eventType", hasItem("客户建立")))
-            .andExpect(jsonPath("$.data.items[*].eventType", hasItem("售前工单")))
-            .andExpect(jsonPath("$.data.items[*].eventType", hasItem("交付工单")))
+            .andExpect(jsonPath("$.data.items[*].eventType", hasItem("售前任务")))
+            .andExpect(jsonPath("$.data.items[*].eventType", hasItem("交付任务")))
             .andExpect(jsonPath("$.data.items[*].customerId", hasItem("c-1")));
 
         String otherTenantToken = tokens.issue("user-journey-other", "admin", "tenant-journey-b", "其他租户管理员");
