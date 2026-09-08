@@ -173,7 +173,7 @@ class CrmControllerIntegrationTest extends AbstractApiIntegrationTest {
                 .contentType("application/json")
                 .content("{\"taskType\":\"交付支持\",\"assigneeName\":\"王浩然\",\"note\":\"交付关联\"}"))
             .andExpect(status().isCreated());
-        Number deliveryCount = jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_ticket WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Number.class, deliveryRequirementId);
+        Number deliveryCount = jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Number.class, deliveryRequirementId);
         assertTrue(deliveryCount != null && deliveryCount.intValue() == 1);
     }
 
