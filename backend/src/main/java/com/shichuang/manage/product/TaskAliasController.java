@@ -17,6 +17,8 @@ public class TaskAliasController {
 
     @GetMapping("/api/bugs") public ApiResponse<List<Map<String,Object>>> bugs() { return list("t_product_bug", "assignee_name_"); }
     @GetMapping("/api/dev-tasks") public ApiResponse<List<Map<String,Object>>> devTasks() { return list("t_product_dev_task", "developer_name_"); }
+    @GetMapping("/api/bugs/{id}") public ApiResponse<Map<String,Object>> bug(@PathVariable String id) { return detail("t_product_bug", "assignee_name_", id); }
+    @GetMapping("/api/dev-tasks/{id}") public ApiResponse<Map<String,Object>> dev(@PathVariable String id) { return detail("t_product_dev_task", "developer_name_", id); }
     @PostMapping("/api/bugs") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createBug(@RequestBody Map<String,Object> body) { return create("bug", body); }
     @PostMapping("/api/dev-tasks") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createDev(@RequestBody Map<String,Object> body) { return create("dev", body); }
     @PutMapping("/api/bugs/{id}") public ApiResponse<Void> updateBug(@PathVariable String id,@RequestBody Map<String,Object> body) { return update("t_product_bug", id, body); }
@@ -24,6 +26,11 @@ public class TaskAliasController {
 
     private ApiResponse<List<Map<String,Object>>> list(String table, String ownerColumn) {
         return ApiResponse.ok(jdbc.queryForList("SELECT id_ AS id,code_ AS code,title_ AS title,description_ AS description,product_line_id_ AS productLineId,product_line_name_ AS productLineName,version_name_ AS versionName,status_ AS status," + ownerColumn + " AS ownerName," + ownerColumn + " AS assigneeName,create_by_ AS creatorName,create_time_ AS createdAt FROM " + table + " WHERE tenant_id_=? AND delete_flag_=0 ORDER BY create_time_ DESC", RequestContext.tenantId()));
+    }
+    private ApiResponse<Map<String,Object>> detail(String table, String ownerColumn, String id) {
+        List<Map<String,Object>> rows = jdbc.queryForList("SELECT id_ AS id,code_ AS code,title_ AS title,description_ AS description,product_line_id_ AS productLineId,product_line_name_ AS productLineName,version_name_ AS versionName,status_ AS status," + ownerColumn + " AS ownerName," + ownerColumn + " AS assigneeName,create_by_ AS creatorName,create_time_ AS createdAt FROM " + table + " WHERE id_=? AND tenant_id_=? AND delete_flag_=0", id, RequestContext.tenantId());
+        if (rows.isEmpty()) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "工作项不存在");
+        return ApiResponse.ok(rows.get(0));
     }
     private ApiResponse<Map<String,Object>> create(String type, Map<String,Object> body) {
         String table = "bug".equals(type) ? "t_product_bug" : "t_product_dev_task";

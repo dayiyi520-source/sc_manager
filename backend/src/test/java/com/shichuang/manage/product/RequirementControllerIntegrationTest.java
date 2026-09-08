@@ -82,8 +82,12 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
     void writesEveryTaskTypeToItsDownstreamRecord() throws Exception {
         String token = loginToken();
         Map<String, String> downstreamTables = Map.of(
-            "售前支持", "t_crm_presales_ticket",
-            "交付支持", "t_project_delivery_ticket",
+            "售前任务", "t_crm_presales_task",
+            "交付任务", "t_project_delivery_task",
+            "运维任务", "t_project_ops_task",
+            "设计任务", "t_product_design_task",
+            "缺陷管理", "t_product_bug",
+            "研发任务", "t_product_dev_task",
             "产品需求", "t_product_requirement_task",
             "Bug修复", "t_product_bug"
         );
@@ -254,8 +258,8 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
     @Test
     void verifiesRequirementIntegrityIndexesAuditColumnsAndAssociations() {
         Map<String, Integer> auditColumns = Map.of(
-            "t_crm_presales_ticket", 1,
-            "t_project_delivery_ticket", 1,
+            "t_crm_presales_task", 1,
+            "t_project_delivery_task", 1,
             "t_product_requirement_task", 1,
             "t_product_bug", 1,
             "t_product_requirement_event", 1
@@ -266,8 +270,8 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
         });
         assertTrue(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='t_product_requirement' AND index_name='idx_requirement_tenant_department_status'", Integer.class) > 0);
         assertTrue(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='t_product_requirement' AND index_name='idx_requirement_tenant_priority_status'", Integer.class) > 0);
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_crm_presales_ticket t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_ticket t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_crm_presales_task t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_requirement_task t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_bug t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
     }
@@ -282,15 +286,15 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
                 .content("{\"taskType\":\"交付支持\",\"assigneeName\":\"张瑞\",\"note\":\"重试\"}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String workItemId = objectMapper.readTree(response).path("data").path("id").asText();
-        jdbc.update("DELETE FROM t_project_delivery_ticket WHERE id_=?", workItemId);
+        jdbc.update("DELETE FROM t_project_delivery_task WHERE id_=?", workItemId);
         mockMvc.perform(post("/api/requirements/work-items/{id}/retry", workItemId)
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.syncStatus").value("SUCCESS"));
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_ticket WHERE id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, workItemId));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task WHERE id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, workItemId));
         mockMvc.perform(post("/api/requirements/work-items/{id}/retry", workItemId)
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk());
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_ticket WHERE id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, workItemId));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task WHERE id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, workItemId));
     }
 
     @Test
@@ -356,8 +360,8 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
 
     private void cleanupRequirement(String requirementId) {
         jdbc.update("DELETE FROM t_product_requirement_event WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_crm_presales_ticket WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_project_delivery_ticket WHERE requirement_id_=?", requirementId);
+        jdbc.update("DELETE FROM t_crm_presales_task WHERE requirement_id_=?", requirementId);
+        jdbc.update("DELETE FROM t_project_delivery_task WHERE requirement_id_=?", requirementId);
         jdbc.update("DELETE FROM t_product_requirement_task WHERE requirement_id_=?", requirementId);
         jdbc.update("DELETE FROM t_product_bug WHERE requirement_id_=?", requirementId);
         jdbc.update("DELETE FROM t_requirement_work_item WHERE requirement_id_=?", requirementId);

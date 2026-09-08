@@ -20,9 +20,9 @@ public class WorkOrderMapper {
         } else if ("缺陷管理".equals(taskType) || "bug修复".equals(taskType) || "Bug修复".equals(taskType)) {
             jdbc.update("INSERT INTO t_product_bug (id_,tenant_id_,requirement_id_,code_,title_,description_,assignee_name_,owner_name_,status_,create_by_,update_by_,create_time_,update_time_,delete_flag_) VALUES (?,?,?,CONCAT('BUG-',UNIX_TIMESTAMP()),?,?,?,?,'待修复',?,?,NOW(),NOW(),0)", id, tenantId, requirementId, title, note, assignee, assignee, operator, operator);
         } else if ("研发任务".equals(taskType) || "技术问题".equals(taskType)) {
-            jdbc.update("INSERT INTO t_product_dev_task (id_,tenant_id_,code_,title_,description_,developer_name_,owner_name_,status_,create_by_,update_by_,create_time_,update_time_,delete_flag_) VALUES (?,?,CONCAT('DEV-',UNIX_TIMESTAMP()),?,?,?,?,'开发中',?,?,NOW(),NOW(),0)", id, tenantId, title, note, assignee, assignee, operator, operator);
+            jdbc.update("INSERT INTO t_product_dev_task (id_,tenant_id_,requirement_id_,code_,title_,description_,developer_name_,owner_name_,status_,create_by_,update_by_,create_time_,update_time_,delete_flag_) VALUES (?,?,?,CONCAT('DEV-',UNIX_TIMESTAMP()),?,?,?,?,'开发中',?,?,NOW(),NOW(),0)", id, tenantId, requirementId, title, note, assignee, assignee, operator, operator);
         } else {
-            jdbc.update("INSERT INTO " + table + " (id_,tenant_id_,code_,title_,description_,status_,priority_,owner_name_,creator_name_,estimated_hours_,actual_hours_,due_date_,create_by_,update_by_,create_time_,update_time_,delete_flag_,version_,work_item_kind_) VALUES (?, ?, CONCAT(?, '-', UNIX_TIMESTAMP()), ?, ?, '待处理', '中', ?, ?, 0, 0, NULL, ?, ?, NOW(), NOW(), 0, 0, ?)", id, tenantId, taskType, title, note, assignee, operator, operator, taskType);
+            jdbc.update("INSERT INTO " + table + " (id_,tenant_id_,requirement_id_,code_,title_,description_,status_,priority_,owner_name_,creator_name_,version_name_,product_line_name_,estimated_hours_,actual_hours_,due_date_,create_by_,update_by_,create_time_,update_time_,delete_flag_,version_,work_item_kind_) VALUES (?, ?, ?, CONCAT(?, '-', UNIX_TIMESTAMP()), ?, ?, '待处理', '中', ?, ?, '', '', 0, 0, CURRENT_DATE(), ?, ?, NOW(), NOW(), 0, 0, ?)", id, tenantId, requirementId, taskType, title, note, assignee, operator, operator, operator, taskType);
         }
     }
 
@@ -105,6 +105,7 @@ public class WorkOrderMapper {
             case "设计任务" -> "t_product_design_task";
             case "产品需求", "数据需求" -> "t_product_requirement_task";
             case "缺陷管理", "bug修复", "Bug修复" -> "t_product_bug";
+            case "研发任务", "技术问题" -> "t_product_dev_task";
             default -> throw new IllegalArgumentException("请选择有效任务类型");
         };
     }

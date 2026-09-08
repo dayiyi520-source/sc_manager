@@ -440,6 +440,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
 }
     const selectedProductLine = productLines.find((line) => line.name === formProductLineName);
     const selectedVersion = versions.find((version) => version.name === formVersionName);
+    let saveSucceeded = true;
     if (editingTask) {
       updateTask(editingTask.id, {
         title: formTitle,
@@ -488,9 +489,10 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         sourceWorkOrderTitles: candidateOptions.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title),
         media: formMedia
       });
-      if (saved !== false) addToast('success', taskKind === 'design' ? '设计任务已写入' : isBusinessTask ? `${itemLabel}已写入` : '需求任务已写入', taskKind === 'design' ? '已保存到设计任务数据表' : isBusinessTask ? `已保存到${itemLabel}数据表` : '已自动同步录入云效需求池与版本规划');
+      saveSucceeded = saved !== false;
+      if (saveSucceeded) addToast('success', taskKind === 'design' ? '设计任务已写入' : isBusinessTask ? `${itemLabel}已写入` : '需求任务已写入', taskKind === 'design' ? '已保存到设计任务数据表' : isBusinessTask ? `已保存到${itemLabel}数据表` : '已自动同步录入云效需求池与版本规划');
     }
-    setIsModalOpen(false);
+    if (saveSucceeded) setIsModalOpen(false);
   };
 
   const handleSaveAndContinue = (e: React.MouseEvent) => {

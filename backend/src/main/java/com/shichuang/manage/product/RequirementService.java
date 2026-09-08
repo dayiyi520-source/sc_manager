@@ -169,7 +169,7 @@ public class RequirementService {
         String assignee = text(body, "assigneeName");
         String note = text(body, "note");
         String status = String.valueOf(current.get("status"));
-        if (!Set.of("产品需求", "数据需求", "缺陷管理", "设计任务", "售前任务", "交付任务", "运维任务", "研发任务", "bug修复", "Bug修复", "售前支持", "项目交付", "交付支持", "运维部署", "技术问题", "其他问题").contains(type)) throw new IllegalArgumentException("请选择有效任务类型");
+        if (!Set.of("产品需求", "数据需求", "缺陷管理", "设计任务", "售前任务", "交付任务", "运维任务", "研发任务", "bug修复", "Bug修复", "售前支持", "项目交付", "交付支持", "运维部署", "技术问题").contains(type)) throw new IllegalArgumentException("请选择有效任务类型");
         if (assignee.isBlank()) throw new IllegalArgumentException("请选择下一步负责人");
         if (!RequirementStatusPolicy.canCreateWorkItem(status)) throw new IllegalArgumentException("当前需求状态不允许转任务");
         if (mapper.activeWorkItems(tenantId, id) > 0) throw new IllegalArgumentException("该需求已有处理中任务");
@@ -212,7 +212,7 @@ public class RequirementService {
         int size = Math.min(100, Math.max(1, pageSize));
         String normalizedType = safe(taskType);
         String normalizedStatus = safe(syncStatus).toUpperCase();
-        if (!normalizedType.isBlank() && !Set.of("产品需求", "数据需求", "缺陷管理", "设计任务", "售前任务", "交付任务", "运维任务", "研发任务", "bug修复", "Bug修复", "售前支持", "项目交付", "交付支持", "运维部署", "技术问题", "其他问题").contains(normalizedType)) {
+        if (!normalizedType.isBlank() && !Set.of("产品需求", "数据需求", "缺陷管理", "设计任务", "售前任务", "交付任务", "运维任务", "研发任务", "bug修复", "Bug修复", "售前支持", "项目交付", "交付支持", "运维部署", "技术问题").contains(normalizedType)) {
             throw new IllegalArgumentException("请选择有效任务类型");
         }
         if (!normalizedStatus.isBlank() && !Set.of("PENDING", "SUCCESS", "FAILED").contains(normalizedStatus)) {
