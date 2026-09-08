@@ -1,0 +1,6 @@
+{
+  "name": "师创管理后台",
+  "description": "基于业务全流程的数字化管理后台原型系统，覆盖工作台、目标OKR与绩效、知识库、客户与商机CRM、产品研发与缺陷、招投标与合同、审批中心、项目与运维管理等全部核心交互模块。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
