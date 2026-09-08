@@ -2,6 +2,8 @@ package com.shichuang.manage.product;
 
 import com.shichuang.manage.api.ApiResponse;
 import com.shichuang.manage.auth.RequestContext;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,7 +15,8 @@ import java.util.*;
 @Profile("local")
 public class TaskAliasController {
     private final JdbcTemplate jdbc;
-    public TaskAliasController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final ObjectMapper objectMapper;
+    public TaskAliasController(JdbcTemplate jdbc, ObjectMapper objectMapper) { this.jdbc = jdbc; this.objectMapper = objectMapper; }
 
     @GetMapping("/api/bugs") public ApiResponse<List<Map<String,Object>>> bugs() { return list("t_product_bug", "assignee_name_"); }
     @GetMapping("/api/dev-tasks") public ApiResponse<List<Map<String,Object>>> devTasks() { return list("t_product_dev_task", "developer_name_"); }
@@ -35,9 +38,20 @@ public class TaskAliasController {
     private ApiResponse<Map<String,Object>> create(String type, Map<String,Object> body) {
         String table = "bug".equals(type) ? "t_product_bug" : "t_product_dev_task";
         String id = UUID.randomUUID().toString(); String code = ("bug".equals(type) ? "BUG-" : "DEV-") + System.currentTimeMillis(); String source = String.valueOf(body.getOrDefault("sourceWorkOrderIds", "[]"));
-        if ("bug".equals(type)) jdbc.update("INSERT INTO t_product_bug(id_,tenant_id_,code_,title_,description_,product_line_id_,product_line_name_,version_name_,type_,severity_,assignee_name_,status_,source_work_order_ids_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,CAST(? AS JSON),?,?,NOW(),NOW())", id,RequestContext.tenantId(),code,body.get("title"),body.get("description"),body.get("productLineId"),body.get("productLineName"),body.get("versionName"),body.get("type"),body.get("severity"),body.get("assigneeName"),body.getOrDefault("status","待修复"),source,RequestContext.userId(),RequestContext.userId());
-        else jdbc.update("INSERT INTO t_product_dev_task(id_,tenant_id_,code_,title_,description_,product_line_id_,product_line_name_,version_name_,repo_,branch_,developer_name_,estimated_hours_,status_,source_work_order_ids_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,CAST(? AS JSON),?,?,NOW(),NOW())", id,RequestContext.tenantId(),code,body.get("title"),body.get("description"),body.get("productLineId"),body.get("productLineName"),body.get("versionName"),body.get("repo"),body.get("branch"),body.get("developer"),body.getOrDefault("estimatedHours",0),body.getOrDefault("status","开发中"),source,RequestContext.userId(),RequestContext.userId());
+        String sourceTitles = json(body, "sourceWorkOrderTitles", "[]");
+        String media = json(body, "media", "[]");
+        Object requirementId = body.get("requirementId");
+        if ("bug".equals(type)) jdbc.update("INSERT INTO t_product_bug(id_,tenant_id_,requirement_id_,code_,title_,description_,description_html_,expected_goal_,priority_,product_line_id_,product_line_name_,version_name_,type_,severity_,assignee_name_,owner_name_,creator_name_,department_,customer_id_,customer_name_,estimated_hours_,actual_hours_,due_date_,media_,status_,source_work_order_ids_,source_work_order_titles_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CAST(? AS JSON),?,CAST(? AS JSON),CAST(? AS JSON),?,?,NOW(),NOW())", id,RequestContext.tenantId(),requirementId,code,body.get("title"),body.get("description"),body.get("descriptionHtml"),body.get("expectedGoal"),body.get("priority"),body.get("productLineId"),body.get("productLineName"),body.get("versionName"),body.get("type"),body.get("severity"),body.get("assigneeName"),body.get("assigneeName"),RequestContext.operatorName(),body.get("department"),body.get("customerId"),body.get("customerName"),body.getOrDefault("estimatedHours",0),body.getOrDefault("actualHours",0),body.get("dueDate"),media,body.getOrDefault("status","待修复"),source,sourceTitles,RequestContext.userId(),RequestContext.userId());
+        else jdbc.update("INSERT INTO t_product_dev_task(id_,tenant_id_,requirement_id_,code_,title_,description_,description_html_,expected_goal_,priority_,product_line_id_,product_line_name_,version_name_,repo_,branch_,developer_name_,owner_name_,creator_name_,department_,customer_id_,customer_name_,estimated_hours_,actual_hours_,due_date_,media_,status_,source_work_order_ids_,source_work_order_titles_,create_by_,update_by_,create_time_,update_time_,version_) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CAST(? AS JSON),?,CAST(? AS JSON),CAST(? AS JSON),?,?,NOW(),NOW(),0)", id,RequestContext.tenantId(),requirementId,code,body.get("title"),body.get("description"),body.get("descriptionHtml"),body.get("expectedGoal"),body.get("priority"),body.get("productLineId"),body.get("productLineName"),body.get("versionName"),body.get("repo"),body.get("branch"),body.get("developer"),body.get("developer"),RequestContext.operatorName(),body.get("department"),body.get("customerId"),body.get("customerName"),body.getOrDefault("estimatedHours",0),body.getOrDefault("actualHours",0),body.get("dueDate"),media,body.getOrDefault("status","开发中"),source,sourceTitles,RequestContext.userId(),RequestContext.userId());
         return ApiResponse.ok(Map.of("id", id, "code", code));
+    }
+
+    private String json(Map<String,Object> body, String key, String fallback) {
+        Object value = body.get(key);
+        if (value == null) return fallback;
+        if (value instanceof String string) return string.isBlank() ? fallback : string;
+        try { return objectMapper.writeValueAsString(value); }
+        catch (JsonProcessingException error) { throw new IllegalArgumentException(key + "格式无效"); }
     }
     private ApiResponse<Void> update(String table, String id, Map<String,Object> body) {
         int count = jdbc.update("UPDATE " + table + " SET title_=COALESCE(?,title_),description_=COALESCE(?,description_),expected_goal_=COALESCE(?,expected_goal_),priority_=COALESCE(?,priority_),status_=COALESCE(?,status_),estimated_hours_=COALESCE(?,estimated_hours_),actual_hours_=COALESCE(?,actual_hours_),due_date_=COALESCE(?,due_date_),update_by_=?,update_time_=NOW(),version_=version_+1 WHERE id_=? AND tenant_id_=? AND delete_flag_=0", body.get("title"),body.get("description"),body.get("expectedGoal"),body.get("priority"),body.get("status"),body.get("estimatedHours"),body.get("actualHours"),body.get("dueDate"),RequestContext.userId(),id,RequestContext.tenantId());

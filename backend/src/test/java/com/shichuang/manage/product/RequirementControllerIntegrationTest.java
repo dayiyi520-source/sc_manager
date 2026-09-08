@@ -109,6 +109,53 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void routesOtherProblemSourceToSelectedDesignTask() throws Exception {
+        String token = loginToken();
+        String title = "其他问题转设计任务-" + System.nanoTime();
+        String response = mockMvc.perform(post("/api/requirements")
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"title\":\"" + title + "\",\"workOrderType\":\"其他问题\",\"productLineId\":\"pl-1\",\"productLineName\":\"师创智联协同OS\",\"department\":\"产品中心\",\"customerId\":\"c-1\",\"customerName\":\"国家电网华东分部数智调度中心\",\"description\":\"需要设计物料\"}"))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        String requirementId = objectMapper.readTree(response).path("data").path("id").asText();
+        try {
+            String workItemResponse = mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType("application/json")
+                    .content("{\"taskType\":\"设计任务\",\"assigneeName\":\"张瑞\",\"note\":\"请完成物料设计\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.taskType").value("设计任务"))
+                .andReturn().getResponse().getContentAsString();
+            String workItemId = objectMapper.readTree(workItemResponse).path("data").path("id").asText();
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_design_task WHERE id_=? AND requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, workItemId, requirementId));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_requirement_task WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, requirementId));
+        } finally {
+            cleanupRequirement(requirementId);
+        }
+    }
+
+    @Test
+    void isolatesBugAndDevDetailsByTenant() throws Exception {
+        String localToken = loginToken();
+        String bugResponse = mockMvc.perform(post("/api/bugs")
+                .header("Authorization", "Bearer " + localToken)
+                .contentType("application/json")
+                .content("{\"title\":\"租户隔离缺陷\",\"descriptionHtml\":\"<p>详情</p>\",\"expectedGoal\":\"可复现并修复\",\"priority\":\"高\",\"assigneeName\":\"张瑞\",\"sourceWorkOrderTitles\":[\"工单A\"]}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String bugId = objectMapper.readTree(bugResponse).path("data").path("id").asText();
+        String otherTenantToken = tokens.issue("user-detail-other", "admin", "tenant-detail-b", "其他租户管理员");
+        try {
+            mockMvc.perform(get("/api/bugs/{id}", bugId).header("Authorization", "Bearer " + otherTenantToken))
+                .andExpect(status().isNotFound());
+            assertEquals("可复现并修复", jdbc.queryForObject("SELECT expected_goal_ FROM t_product_bug WHERE id_=?", String.class, bugId));
+            assertEquals("<p>详情</p>", jdbc.queryForObject("SELECT description_html_ FROM t_product_bug WHERE id_=?", String.class, bugId));
+        } finally {
+            jdbc.update("DELETE FROM t_product_bug WHERE id_=?", bugId);
+        }
+    }
+
+    @Test
     void rejectsMissingReasonAndDuplicateActiveWorkItem() throws Exception {
         String token = loginToken();
         String requirementId = createRequirement(token, "集成测试校验-" + System.nanoTime());
@@ -364,6 +411,7 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
         jdbc.update("DELETE FROM t_project_delivery_task WHERE requirement_id_=?", requirementId);
         jdbc.update("DELETE FROM t_product_requirement_task WHERE requirement_id_=?", requirementId);
         jdbc.update("DELETE FROM t_product_bug WHERE requirement_id_=?", requirementId);
+        jdbc.update("DELETE FROM t_product_design_task WHERE requirement_id_=?", requirementId);
         jdbc.update("DELETE FROM t_requirement_work_item WHERE requirement_id_=?", requirementId);
         jdbc.update("DELETE FROM t_product_requirement WHERE id_=?", requirementId);
     }
