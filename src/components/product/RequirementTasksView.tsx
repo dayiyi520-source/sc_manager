@@ -19,17 +19,9 @@ import { RichTextEditor } from './RichTextEditor';
 import { SearchableSelect } from '../common/SearchableSelect';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
+import { DateField } from '../common/DateField';
 import { requirementRepository } from '../../services/requirementRepository';
 import { productRepository } from '../../services/productRepository';
-
-type DateFieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  disabled?: boolean;
-  error?: string;
-};
 
 type RequirementFilterState = {
   title: { operator: TextFilterOperator; value: string };
@@ -65,31 +57,7 @@ const normalizePriority = (priority: string) => ({
   'P3-低优': '低'
 }[priority] || priority);
 
-const DateField: React.FC<DateFieldProps> = ({ label, value, onChange, required = false, disabled = false, error }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  return <div className="block text-[var(--text-muted)]">
-    <label>{label}{required && ' *'}</label>
-    <span className="group relative mt-1 block h-8">
-      <span className={`pointer-events-none absolute inset-0 flex items-center justify-between rounded-lg border bg-[var(--bg-surface)] px-3 ${value ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'} ${error ? 'border-[var(--danger)]' : 'border-[var(--border-main)]'} ${disabled ? 'opacity-60' : 'group-hover:border-[var(--border-subtle)]'}`}>
-        <span className="truncate">{value || '请选择日期'}</span>
-        <Calendar className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
-      </span>
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onClick={() => inputRef.current?.showPicker?.()}
-        aria-label={label}
-        required={required}
-        disabled={disabled}
-        className="absolute inset-0 h-8 w-full cursor-pointer rounded-lg border border-transparent bg-transparent text-transparent opacity-0 outline-none disabled:cursor-not-allowed"
-      />
-    </span>
-    {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
-  </div>;
-};
+// DateField is shared with all task and work-order forms.
 
 const DetailField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div>
@@ -107,7 +75,7 @@ const DetailTextInput: React.FC<{ label: string; value: string; onSave: (value: 
   return <label className="block text-[var(--text-muted)]"><span>{label}</span>{multiline ? <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} rows={4} className="mt-1 min-h-24 w-full resize-y rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 py-2 leading-6 text-[var(--text-primary)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20" /> : <input value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} className="mt-1 h-8 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 text-[var(--text-primary)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20" />}</label>;
 };
 
-const DetailDateInput: React.FC<{ label: string; value?: string; onSave: (value: string) => void }> = ({ label, value = '', onSave }) => <label className="block text-[var(--text-muted)]"><span>{label}</span><input type="date" value={value} onChange={(e) => onSave(e.target.value)} onBlur={(e) => onSave(e.target.value)} className="mt-1 h-8 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 text-[var(--text-primary)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20" /></label>;
+const DetailDateInput: React.FC<{ label: string; value?: string; onSave: (value: string) => void }> = ({ label, value = '', onSave }) => <DateField label={label} value={value} onChange={onSave} />;
 
 const WORK_ORDER_TYPES: Array<{ key: RequirementWorkOrderType; label: string }> = [
   { key: 'requirement', label: '需求' }, { key: 'task', label: '任务' }, { key: 'bug', label: '缺陷' },
@@ -123,9 +91,11 @@ const WorkOrderPicker: React.FC<{
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [type, setType] = useState<RequirementWorkOrderType | 'all'>('all');
-  const filtered = candidates.filter((item) => (type === 'all' || item.type === type) && (!keyword.trim() || [item.title, item.code, item.ownerName, item.summary].filter(Boolean).join(' ').toLowerCase().includes(keyword.trim().toLowerCase())));
-  const selected = selectedIds.map((id) => candidates.find((item) => item.id === id) || { id, title: id, typeLabel: '工单' } as RequirementWorkOrderCandidate);
-  const toggle = (id: string) => onChange(selectedIds.includes(id) ? selectedIds.filter((item) => item !== id) : [...selectedIds, id]);
+  const safeSelectedIds = Array.isArray(selectedIds) ? selectedIds.filter(Boolean) : [];
+  const safeCandidates = (Array.isArray(candidates) ? candidates : []).filter((item): item is RequirementWorkOrderCandidate => Boolean(item && item.id)).map((item) => ({ ...item, title: item.title || item.id, typeLabel: item.typeLabel || '工单' }));
+  const filtered = safeCandidates.filter((item) => (type === 'all' || item.type === type) && (!keyword.trim() || [item.title, item.code, item.ownerName, item.summary].filter(Boolean).join(' ').toLowerCase().includes(keyword.trim().toLowerCase())));
+  const selected = safeSelectedIds.map((id) => safeCandidates.find((item) => item.id === id) || { id, title: id, typeLabel: '工单' } as RequirementWorkOrderCandidate);
+  const toggle = (id: string) => onChange(safeSelectedIds.includes(id) ? safeSelectedIds.filter((item) => item !== id) : [...safeSelectedIds, id]);
   return <div className="space-y-2">
     <button type="button" onClick={() => setOpen((value) => !value)} className="flex h-9 w-full items-center justify-between rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 text-left text-[var(--text-body)] hover:border-[var(--primary)]">
       <span>{selected.length ? `已关联 ${selected.length} 条工单` : placeholder}</span><span className="text-[var(--text-muted)]">{open ? '收起' : '选择'}</span>
@@ -133,8 +103,8 @@ const WorkOrderPicker: React.FC<{
     {selected.length > 0 && <div className="flex flex-wrap gap-1.5">{selected.map((item) => <span key={item.id} className="inline-flex max-w-full items-center gap-1 rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]"><span className="max-w-48 truncate">{item.title}</span><button type="button" onClick={() => toggle(item.id)} aria-label={`移除${item.title}`}><X className="h-3 w-3" /></button></span>)}</div>}
     {open && <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 shadow-sm">
       <div className="flex items-center gap-2"><input autoFocus value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索标题、编号、负责人" className="h-8 min-w-0 flex-1 rounded-md border border-[var(--border-main)] bg-transparent px-2 text-xs outline-none focus:border-[var(--primary)]" /><button type="button" onClick={() => setOpen(false)} className="text-xs text-[var(--text-muted)]">关闭</button></div>
-      <div className="mt-3 flex flex-wrap gap-1.5">{[{ key: 'all' as const, label: '全部' }, ...WORK_ORDER_TYPES].map((item) => <button type="button" key={item.key} onClick={() => setType(item.key)} className={`rounded-md px-2 py-1 text-[11px] ${type === item.key ? 'bg-[var(--primary)] text-white' : 'bg-[var(--bg-surface-soft)] text-[var(--text-muted)]'}`}>{item.label} {item.key !== 'all' && <span>({candidates.filter((candidate) => candidate.type === item.key).length})</span>}</button>)}</div>
-      <div className="mt-3 max-h-56 space-y-1 overflow-auto">{filtered.length ? filtered.map((item) => <button type="button" key={item.id} onClick={() => toggle(item.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--bg-surface-soft)]"><span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${selectedIds.includes(item.id) ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border-main)]'}`}>{selectedIds.includes(item.id) && <Check className="h-3 w-3" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs text-[var(--text-primary)]">{item.title}</span><span className="block truncate text-[11px] text-[var(--text-muted)]">{item.typeLabel}{item.code ? ` · ${item.code}` : ''}{item.ownerName ? ` · ${item.ownerName}` : ''}{item.productLineName ? ` · ${item.productLineName}` : ''}</span></span></button>) : <p className="py-6 text-center text-xs text-[var(--text-muted)]">暂无匹配工单</p>}</div>
+      <div className="mt-3 flex flex-wrap gap-1.5">{[{ key: 'all' as const, label: '全部' }, ...WORK_ORDER_TYPES].map((item) => <button type="button" key={item.key} onClick={() => setType(item.key)} className={`rounded-md px-2 py-1 text-[11px] ${type === item.key ? 'bg-[var(--primary)] text-white' : 'bg-[var(--bg-surface-soft)] text-[var(--text-muted)]'}`}>{item.label} {item.key !== 'all' && <span>({safeCandidates.filter((candidate) => candidate.type === item.key).length})</span>}</button>)}</div>
+      <div className="mt-3 max-h-56 space-y-1 overflow-auto">{filtered.length ? filtered.map((item) => <button type="button" key={item.id} onClick={() => toggle(item.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--bg-surface-soft)]"><span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${safeSelectedIds.includes(item.id) ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border-main)]'}`}>{safeSelectedIds.includes(item.id) && <Check className="h-3 w-3" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs text-[var(--text-primary)]">{item.title}</span><span className="block truncate text-[11px] text-[var(--text-muted)]">{item.typeLabel}{item.code ? ` · ${item.code}` : ''}{item.ownerName ? ` · ${item.ownerName}` : ''}{item.productLineName ? ` · ${item.productLineName}` : ''}</span></span></button>) : <p className="py-6 text-center text-xs text-[var(--text-muted)]">暂无匹配工单</p>}</div>
     </div>}
   </div>;
 };
@@ -259,10 +229,11 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
 
   const candidateOptions = remoteCandidates.length ? remoteCandidates.filter((item) => item.id !== selectedTask?.id) : localCandidates;
   useEffect(() => {
-    requirementRepository.workOrderCandidates({ requirementId: selectedTask?.id || '', limit: 200 }).then(setRemoteCandidates).catch(() => setRemoteCandidates([]));
+    requirementRepository.workOrderCandidates({ requirementId: selectedTask?.id || '', limit: 200 }).then((items) => setRemoteCandidates(Array.isArray(items) ? items : [])).catch(() => setRemoteCandidates([]));
   }, [selectedTask?.id]);
 
   const updateLinkedWorkOrders = (ids: string[]) => {
+    if (!selectedTask) return;
     const titles = ids.map((id) => candidateOptions.find((item) => item.id === id)?.title || id);
     saveDetailUpdates({ sourceWorkOrderIds: ids, sourceWorkOrderTitles: titles });
   };
@@ -317,6 +288,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const [formPlannedStartDate, setFormPlannedStartDate] = useState('');
   const [formExpectedCompleteDate, setFormExpectedCompleteDate] = useState('');
   const [selectedWorkOrderIds, setSelectedWorkOrderIds] = useState<string[]>([]);
+  const [selectedRequirementTaskIds, setSelectedRequirementTaskIds] = useState<string[]>([]);
   const [formMedia, setFormMedia] = useState<RequirementMedia[]>([]);
   const descriptionEditor = useRef<HTMLDivElement>(null);
   const [formDescriptionHtml, setFormDescriptionHtml] = useState('');
@@ -364,6 +336,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setFormPlannedStartDate('');
     setFormExpectedCompleteDate('');
     setSelectedWorkOrderIds([]);
+    setSelectedRequirementTaskIds([]);
     setFormMedia([]);
     setIsModalOpen(true);
   };
@@ -386,6 +359,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setFormCcNames(requirementTaskDraft.ccNames || []);
     setFormPlannedStartDate(requirementTaskDraft.plannedStartDate || '');
     setSelectedWorkOrderIds(requirementTaskDraft.sourceWorkOrderIds || []);
+    setSelectedRequirementTaskIds(requirementTaskDraft.requirementId ? [requirementTaskDraft.requirementId] : []);
     setFormEstimatedHours(40);
     setFormMedia([]);
     setIsModalOpen(true);
@@ -410,6 +384,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setFormPlannedStartDate(task.plannedStartDate || '');
     setFormExpectedCompleteDate(task.expectedCompleteDate || '');
     setSelectedWorkOrderIds(task.sourceWorkOrderIds || []);
+    setSelectedRequirementTaskIds(task.requirementId ? [task.requirementId] : []);
     setFormMedia(task.media || []);
     setIsModalOpen(true);
   };
@@ -462,6 +437,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         expectedCompleteDate: formExpectedCompleteDate,
         sourceWorkOrderIds: selectedWorkOrderIds,
         sourceWorkOrderTitles: candidateOptions.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title),
+        requirementId: selectedRequirementTaskIds[0] || '',
         media: formMedia
       });
       addToast('success', `${itemLabel}信息已更新`);
@@ -487,6 +463,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         expectedCompleteDate: formExpectedCompleteDate,
         sourceWorkOrderIds: selectedWorkOrderIds,
         sourceWorkOrderTitles: candidateOptions.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title),
+        requirementId: selectedRequirementTaskIds[0] || '',
         media: formMedia
       });
       saveSucceeded = saved !== false;
@@ -552,7 +529,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     matchesDateFilter(task.plannedStartDate, filters.plannedStartDate) &&
     matchesMultiFilter(task.ccNames || [], filters.cc)
   );
-  const productLineTasks = productLineFilter === 'all' ? activeTasks : activeTasks.filter((task) => task.productLineId === productLineFilter);
+  const selectedProductLine = productLines.find((line) => line.id === productLineFilter);
+  const productLineTasks = productLineFilter === 'all' ? activeTasks : activeTasks.filter((task) => task.productLineId === productLineFilter || task.productLineName === selectedProductLine?.name);
   const baseTasks = productLineTasks.filter((task) => categoryMatch(task, activeTab));
   const filteredTasks = baseTasks.filter((task) => {
     const titlePart = searchQuery.trim().toLocaleLowerCase();
@@ -958,7 +936,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
               <RichTextEditor editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} placeholder="详细记录需求背景、业务场景和实现说明..." />
             </div>
 
-            <label className="block text-[var(--text-muted)]"><span>关联工单中心</span><WorkOrderPicker candidates={candidateOptions.filter((item) => item.id !== editingTask?.id)} selectedIds={selectedWorkOrderIds} onChange={setSelectedWorkOrderIds} placeholder="请选择该需求所关联的工单任务" /></label>
+            <label className="block text-[var(--text-muted)]"><span>关联对象</span><WorkOrderPicker candidates={candidateOptions.filter((item) => item.id !== editingTask?.id)} selectedIds={[...selectedRequirementTaskIds, ...selectedWorkOrderIds]} onChange={(ids) => { const selectedId = ids.slice(-1)[0] || ''; const selectedItem = candidateOptions.find((item) => item.id === selectedId); setSelectedRequirementTaskIds(selectedItem?.type === 'requirement' ? [selectedId] : []); setSelectedWorkOrderIds(selectedItem && selectedItem.type !== 'requirement' ? [selectedId] : []); }} placeholder="请选择关联需求或工单" /></label>
           </div>
         </form>
       </WorkItemCreatePanel>

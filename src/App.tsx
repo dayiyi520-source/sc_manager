@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { AppProvider, MENU_GROUPS, useApp } from './context/AppContext';
 import { useAppNavigation } from './hooks/useAppNavigation';
 import { Header } from './components/layout/Header';
@@ -83,6 +83,13 @@ const MainContent: React.FC = () => {
   const currentMainMenu = currentGroup?.title || '工作台';
   const currentSubMenu = currentTab?.title || '业务模块';
   const [productLineFilter, setProductLineFilter] = useState('all');
+  useEffect(() => {
+    const pending = sessionStorage.getItem('shichuang.productLineFilter');
+    if (pending) {
+      setProductLineFilter(pending);
+      sessionStorage.removeItem('shichuang.productLineFilter');
+    }
+  }, [routedTabId]);
 
   const renderView = () => {
     switch (routedTabId) {
@@ -145,9 +152,9 @@ const MainContent: React.FC = () => {
         return <ProductLinesView />;
       case 'prod_rd_tasks':
       case 'prod_dev_tasks':
-        return <RequirementTasksView itemLabel="研发任务" taskKind="dev" />;
+        return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="研发任务" taskKind="dev" />;
       case 'prod_bugs':
-        return <RequirementTasksView itemLabel="缺陷管理" taskKind="bug" />;
+        return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="缺陷管理" taskKind="bug" />;
       case 'prod_reviews':
       case 'prod_review':
         return <ProductReviewView />;

@@ -5,7 +5,7 @@ import java.util.Set;
 final class RequirementStatusPolicy {
     private static final Set<String> HOLDABLE = Set.of("待处理");
     private static final Set<String> REJECTABLE = Set.of("待处理", "已搁置");
-    private static final Set<String> ASSIGNABLE = Set.of("待处理", "已搁置");
+    private static final Set<String> ASSIGNABLE = Set.of("待处理", "已搁置", "处理中");
 
     private RequirementStatusPolicy() {
     }

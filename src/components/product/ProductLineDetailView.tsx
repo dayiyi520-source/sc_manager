@@ -31,6 +31,7 @@ import { ProductLine, ProductItemInLine, VersionIteration } from '../../types';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { CreateVersionModal } from './CreateVersionModal';
 import { ManageMembersModal } from './ManageMembersModal';
+import { SearchableSelect } from '../common/SearchableSelect';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -49,6 +50,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     bugs,
     devTasks,
     requirementTasks,
+    currentUser,
     addToast
   } = useApp();
 
@@ -147,6 +149,12 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     addToast('info', `已移除产品 ${name}`);
   };
 
+  const resetLeadForm = () => {
+    setLeadReqOwner(productLine.requirementOwner || productLine.owner || '');
+    setLeadTechOwner(productLine.techOwner || '');
+    setLeadTestOwner(productLine.testOwner || '');
+  };
+
   // Handle Save Leads
   const handleSaveLeads = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,20 +180,13 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             <ArrowLeft className="w-3.5 h-3.5" />
             返回产品线矩阵
           </button>
-          <div className="text-xs text-[#7C8796] flex items-center gap-1.5">
-            <span>产品与研发</span>
-            <span>/</span>
-            <span>产品线架构</span>
-            <span>/</span>
-            <span className="text-[#F8FAFC] font-medium">{productLine.name}</span>
-          </div>
         </div>
 
         {/* Header Action Buttons */}
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setIsEditLeadsOpen(true)}
+            onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#18212C] hover:bg-[#202936] text-[#A5ADBA] hover:text-[#F8FAFC] rounded-lg text-xs font-semibold border border-[#2C3440] transition-colors"
           >
             <UserCheck className="w-3.5 h-3.5 text-[#6EA0FF]" />
@@ -221,7 +222,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       {/* Hero Overview Banner with Cover */}
       <div className="product-line-hero relative rounded-2xl border border-[#2C3440] overflow-hidden bg-[#121923] shadow-lg">
         {/* Cover Background Graphic */}
-        <div className="product-line-hero-cover h-44 w-full relative overflow-hidden bg-slate-900">
+        <div className="hidden">
           {productLine.coverImage ? (
             <img
               src={productLine.coverImage}
@@ -271,7 +272,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </div>
 
         {/* Banner Content Body */}
-        <div className="product-line-hero-body p-6 -mt-12 relative z-10 space-y-4">
+        <div className="product-line-hero-body p-6 relative z-10 space-y-4">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold text-[#F8FAFC]">{productLine.name}</h2>
@@ -291,7 +292,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <span>产研核心指挥体系 (三大关键责任人)</span>
               <button
                 type="button"
-                onClick={() => setIsEditLeadsOpen(true)}
+                onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }}
                 className="text-[#2F66F6] hover:text-[#6EA0FF] font-semibold flex items-center gap-1"
               >
                 <Edit3 className="w-3 h-3" />
@@ -890,13 +891,13 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       {/* Modal 2: Edit Leads Modal */}
       <Modal
         isOpen={isEditLeadsOpen}
-        onClose={() => setIsEditLeadsOpen(false)}
+        onClose={() => { resetLeadForm(); setIsEditLeadsOpen(false); }}
         title={`配置产研核心负责人 - ${productLine.name}`}
         footer={
           <>
             <button
               type="button"
-              onClick={() => setIsEditLeadsOpen(false)}
+              onClick={() => { resetLeadForm(); setIsEditLeadsOpen(false); }}
               className="px-4 py-2 bg-[#18212C] text-[#A5ADBA] rounded-lg text-xs font-semibold"
             >
               取消
@@ -917,14 +918,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-purple-400" />
               需求负责人 (Product Owner / PO) *
             </label>
-            <input
-              type="text"
-              required
-              value={leadReqOwner}
-              onChange={(e) => setLeadReqOwner(e.target.value)}
-              placeholder="如：张瑞 (产品总监)"
-              className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC]"
-            />
+            <SearchableSelect label="需求负责人 (Product Owner / PO)" required value={leadReqOwner} options={Array.from(new Set([currentUser.name, productLine.owner, productLine.ownerName, leadReqOwner, ...requirementTasks.map((task) => task.ownerName)].filter(Boolean) as string[]))} onChange={setLeadReqOwner} placeholder="搜索并选择负责人" />
             <p className="text-[11px] text-[#7C8796] mt-1">负责业务调研、PRD规划评审与需求优先级排序</p>
           </div>
 
@@ -933,14 +927,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-[#2F66F6]" />
               技术负责人 (Tech Lead / 架构师) *
             </label>
-            <input
-              type="text"
-              required
-              value={leadTechOwner}
-              onChange={(e) => setLeadTechOwner(e.target.value)}
-              placeholder="如：王浩然 (技术委员会主席)"
-              className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC]"
-            />
+            <SearchableSelect label="技术负责人 (Tech Lead / 架构师)" required value={leadTechOwner} options={Array.from(new Set([currentUser.name, leadTechOwner, ...devTasks.map((task) => task.developer)].filter(Boolean) as string[]))} onChange={setLeadTechOwner} placeholder="搜索并选择负责人" />
             <p className="text-[11px] text-[#7C8796] mt-1">负责技术选型、架构高可用审查与研发任务攻坚</p>
           </div>
 
@@ -949,14 +936,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               测试负责人 (QA Lead / 质量主管) *
             </label>
-            <input
-              type="text"
-              required
-              value={leadTestOwner}
-              onChange={(e) => setLeadTestOwner(e.target.value)}
-              placeholder="如：陈小敏 (资深QA主管)"
-              className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC]"
-            />
+            <SearchableSelect label="测试负责人 (QA Lead / 质量主管)" required value={leadTestOwner} options={Array.from(new Set([currentUser.name, leadTestOwner, ...bugs.map((bug) => bug.assignee)].filter(Boolean) as string[]))} onChange={setLeadTestOwner} placeholder="搜索并选择负责人" />
             <p className="text-[11px] text-[#7C8796] mt-1">负责版本封版验收、自动化测试回归与缺陷归零把控</p>
           </div>
         </form>

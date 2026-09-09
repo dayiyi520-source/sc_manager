@@ -42,6 +42,7 @@ export const BugManagementView: React.FC = () => {
   const [formDescriptionHtml, setFormDescriptionHtml] = useState('');
 
   const [selectedBug, setSelectedBug] = useState<BugItem | null>(null);
+  const [detailTab, setDetailTab] = useState<'overview' | 'requirement'>('overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBug, setEditingBug] = useState<BugItem | null>(null);
 
@@ -60,6 +61,7 @@ export const BugManagementView: React.FC = () => {
   const [formSteps, setFormSteps] = useState('');
   const [formStatus, setFormStatus] = useState<BugItem['status']>('待修复');
   const [selectedWorkOrderIds, setSelectedWorkOrderIds] = useState<string[]>([]);
+  const [selectedRequirementId, setSelectedRequirementId] = useState('');
   const [workOrderQuery, setWorkOrderQuery] = useState('');
   const availableWorkOrders = useMemo(() => requirementTasks.filter((item) => item.status === '待处理' && item.workOrderType === '线上问题'), [requirementTasks]);
   const filteredWorkOrders = useMemo(() => availableWorkOrders.filter((item) => item.title.toLocaleLowerCase().includes(workOrderQuery.trim().toLocaleLowerCase())), [availableWorkOrders, workOrderQuery]);
@@ -80,6 +82,7 @@ export const BugManagementView: React.FC = () => {
     setFormSteps('');
     setFormStatus('待修复');
     setSelectedWorkOrderIds([]);
+    setSelectedRequirementId('');
     setWorkOrderQuery('');
     setIsModalOpen(true);
   };
@@ -100,6 +103,7 @@ export const BugManagementView: React.FC = () => {
     setFormSteps('1. 登录管理端\n2. 触发对应操作\n3. 观察返回异常');
     setFormStatus(bug.status);
     setSelectedWorkOrderIds(bug.sourceWorkOrderIds || []);
+    setSelectedRequirementId(bug.requirementId || '');
     setWorkOrderQuery('');
     setIsModalOpen(true);
   };
@@ -125,6 +129,7 @@ export const BugManagementView: React.FC = () => {
         description: formDescription
         ,sourceWorkOrderIds: selectedWorkOrderIds
         ,sourceWorkOrderTitles: availableWorkOrders.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title)
+        ,requirementId: selectedRequirementId
       });
       addToast('success', '缺陷记录已更新');
     } else {
@@ -144,6 +149,7 @@ export const BugManagementView: React.FC = () => {
         description: formDescription
         ,sourceWorkOrderIds: selectedWorkOrderIds
         ,sourceWorkOrderTitles: availableWorkOrders.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title)
+        ,requirementId: selectedRequirementId
       });
     }
     setIsModalOpen(false);
@@ -312,7 +318,7 @@ export const BugManagementView: React.FC = () => {
                   <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-[11px] text-slate-400">{bug.code || `BUG-${bug.id}`}</span>
-                      <button type="button" onClick={() => setSelectedBug(bug)} className="text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">{bug.title}</button>
+                      <button type="button" onClick={() => { setSelectedBug(bug); setDetailTab('overview'); }} className="text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">{bug.title}</button>
                     </div>
                   </td>
                   <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
@@ -340,7 +346,7 @@ export const BugManagementView: React.FC = () => {
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => setSelectedBug(bug)}
+                        onClick={() => { setSelectedBug(bug); setDetailTab('overview'); }}
                         className="inline-flex items-center gap-1 text-[var(--active-text)] hover:text-[var(--primary-hover)]"
                       >
                         详情 <ArrowRight className="w-3.5 h-3.5" />
@@ -385,12 +391,15 @@ export const BugManagementView: React.FC = () => {
           </div>}
         >
           <div className="w-full space-y-5 text-xs">
+            <div className="flex items-center gap-5 border-b border-[var(--border-main)]"><button type="button" onClick={() => setDetailTab('overview')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'overview' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>缺陷详情</button><button type="button" onClick={() => setDetailTab('requirement')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'requirement' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>关联需求</button></div>
+            {detailTab === 'requirement' ? <DetailField label="关联需求">{requirementTasks.find((item) => item.id === selectedBug.requirementId)?.title || '未关联需求'}</DetailField> : <>
             <DetailField label="缺陷编号"><span className="font-mono">{selectedBug.code || '未设置'}</span></DetailField>
             <DetailField label="缺陷名称"><span className="font-medium">{selectedBug.title}</span></DetailField>
             <DetailField label="复现步骤 / 缺陷描述"><p className="min-h-28 whitespace-pre-wrap break-words leading-6">{selectedBug.description || '未填写缺陷描述'}</p></DetailField>
             <DetailField label="关联工单">
               {selectedBug.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedBug.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : '未关联工单'}
             </DetailField>
+            </>}
           </div>
         </WorkItemCreatePanel>
       )}
@@ -425,6 +434,7 @@ export const BugManagementView: React.FC = () => {
           <SearchableSelect label="优先级" required value={formPriority} options={['紧急', '高', '中', '低']} onChange={(value) => setFormPriority(value as NonNullable<BugItem['priority']>)} placeholder="请选择优先级" />
           <SearchableSelect label="缺陷类型" value={formType} options={['功能缺陷', '性能缺陷', 'UI交互', '安全漏洞', '环境配置']} onChange={setFormType} placeholder="请选择缺陷类型" clearable />
           <SearchableSelect label="责任处理人" required value={formAssignee} options={employees} onChange={setFormAssignee} placeholder="搜索并选择处理人" />
+          <SearchableSelect label="关联需求任务" value={selectedRequirementId} options={requirementTasks.map((task) => task.title)} onChange={(title) => setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')} placeholder="请选择关联需求任务" clearable />
           <SearchableSelect label="参与人" value={formCc} options={employees} onChange={setFormCc} placeholder="搜索并选择参与人" clearable />
           <label className="block text-[var(--text-muted)]">所属环境<input value={formEnv} onChange={(e) => setFormEnv(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" /></label>
           <div className="border-t border-[var(--border-main)] pt-4"><label className="block text-[var(--text-muted)]">关联工单中心（线上问题）</label><input value={workOrderQuery} onChange={(e) => setWorkOrderQuery(e.target.value)} placeholder="搜索线上问题工单" className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" />{workOrderQuery.trim() && <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">{filteredWorkOrders.filter((item) => !selectedWorkOrderIds.includes(item.id)).map((item) => <button type="button" key={item.id} onClick={() => { setSelectedWorkOrderIds((ids) => [...ids, item.id]); setWorkOrderQuery(''); }} className="block w-full rounded p-2 text-left text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)]">{item.title}</button>)}</div>}<div className="mt-2 flex flex-wrap gap-1">{selectedWorkOrderIds.map((id) => { const item = availableWorkOrders.find((candidate) => candidate.id === id); return <span key={id} className="inline-flex items-center gap-1 rounded bg-[var(--bg-surface-soft)] px-2 py-1 text-[11px]">{item?.title || id}<button type="button" aria-label={`移除关联工单${item?.title || id}`} onClick={() => setSelectedWorkOrderIds((ids) => ids.filter((value) => value !== id))}>×</button></span>; })}</div></div>

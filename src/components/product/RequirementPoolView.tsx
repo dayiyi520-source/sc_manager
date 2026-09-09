@@ -37,6 +37,7 @@ import { useApp } from "../../context/AppContext";
 import { StatCard, StatusTag, Drawer, Modal } from "../common/UIComponents";
 import { requirementRepository } from "../../services/requirementRepository";
 import { RequirementActionButtons } from "./RequirementActionButtons";
+import { WorkflowAssigneeSelect } from "./WorkflowAssigneeSelect";
 import { RichTextEditor } from "./RichTextEditor";
 import type {
   EmployeeOption,
@@ -50,6 +51,7 @@ import type {
 import { sanitizeHtml } from "../../utils/sanitizeHtml";
 import { getRejectReasonsForType } from "../../constants/rejectReasons";
 import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
+import { DateField } from "../common/DateField";
 
 const statuses: RequirementTask["status"][] = [
   "待处理",
@@ -105,6 +107,7 @@ const eventMetadata = (value: unknown): Record<string, string> => {
   if (typeof value !== "string") return {};
   try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed : {}; } catch { return {}; }
 };
+
 
 export const isWorkOrderInScope = (
   item: Pick<RequirementTask, "ownerName" | "creatorName">,
@@ -176,10 +179,9 @@ export const RequirementPoolView: React.FC = () => {
   const [workOpen, setWorkOpen] = useState(false);
   const [workflowAction, setWorkflowAction] = useState<"convert" | "reassign" | "memo">("convert");
   const [subTasks, setSubTasks] = useState<Array<{ taskType: RequirementTaskType | ""; assignee: string; expectedDueDate: string; note: string }>>([{ taskType: "", assignee: "", expectedDueDate: "", note: "" }]);
-  const [workType, setWorkType] = useState<RequirementTaskType | "">("");
-  const [assignee, setAssignee] = useState("");
-  const [expectedDueDate, setExpectedDueDate] = useState("");
-  const [note, setNote] = useState("");
+  const [reassignAssignee, setReassignAssignee] = useState("");
+  const [reassignReason, setReassignReason] = useState("");
+  const [memoContent, setMemoContent] = useState("");
   const [reasonType, setReasonType] = useState<"hold" | "reject" | null>(null);
   const [reason, setReason] = useState("");
   const [rejectCategory, setRejectCategory] = useState("");
@@ -309,72 +311,41 @@ export const RequirementPoolView: React.FC = () => {
     const now = new Date().toISOString();
 
     if (workflowAction === "convert") {
-      if (!workType) {
+      const invalidTask = subTasks.find((task) => !task.taskType);
+      if (invalidTask) {
         addToast("warning", "请选择任务类型");
         return;
       }
-      const selectedAssignee = employees.find((item) => item.name.trim().toLocaleLowerCase() === assignee.trim().toLocaleLowerCase());
-      if (!selectedAssignee) {
-        addToast("warning", "请选择下一步负责人", "请输入负责人姓名并从下拉列表中选择");
+      const taskInputs = subTasks.map((task) => ({ task, assignee: employees.find((item) => item.name.trim().toLocaleLowerCase() === task.assignee.trim().toLocaleLowerCase()) }));
+      if (taskInputs.some(({ assignee }) => !assignee)) {
+        addToast("warning", "请选择任务负责人", "请输入负责人姓名并从下拉列表中选择");
         return;
       }
-      if (workType === "产品需求") {
-        setRequirementTaskDraft({
-          title: selected.title,
-          description: selected.description,
-          expectedGoal: selected.expectedGoal || eventMetadata(selected.specialFields).expectedResult,
-          ownerName: selectedAssignee.name,
-          priority: selected.priority,
-          productLineName: selected.productLineName,
-          customerName: selected.customerName,
-          dueDate: expectedDueDate || selected.dueDate,
-          sourceWorkOrderIds: [selected.id],
-          requirementType: "业务需求",
-        });
-        setRequirementTasks((list) => list.map((item) => item.id === selected.id ? { ...item, status: "处理中" as RequirementTask["status"], assignedOwnerName: selectedAssignee.name } : item));
-        setSelected((item) => item ? { ...item, status: "处理中" as RequirementTask["status"], assignedOwnerName: selectedAssignee.name } : item);
+      const singleTask = taskInputs[0];
+      if (subTasks.length === 1 && singleTask.task.taskType === "产品需求") {
+        setRequirementTaskDraft({ title: selected.title, description: singleTask.task.note || selected.description, expectedGoal: selected.expectedGoal || eventMetadata(selected.specialFields).expectedResult, ownerName: singleTask.assignee!.name, priority: selected.priority, productLineName: selected.productLineName, customerName: selected.customerName, dueDate: singleTask.task.expectedDueDate || selected.dueDate, sourceWorkOrderIds: [selected.id], requirementType: "业务需求" });
+        setRequirementTasks((list) => list.map((item) => item.id === selected.id ? { ...item, status: "处理中" as RequirementTask["status"], assignedOwnerName: singleTask.assignee!.name } : item));
+        setSelected((item) => item ? { ...item, status: "处理中" as RequirementTask["status"], assignedOwnerName: singleTask.assignee!.name } : item);
         setWorkOpen(false);
         openPageTab("prod_req_tasks");
         addToast("success", "已打开需求任务创建界面", "工单信息已自动带入，请确认后保存");
         return;
       }
-      const localItem: RequirementWorkItem = {
-        id: `work-${Date.now()}`,
-        requirementId: selected.id,
-        taskType: workType,
-        title: selected.title,
-        assigneeName: selectedAssignee.name,
-        note,
-        status: "待处理",
-        createdAt: now,
-      };
-
-      let persisted = true;
+      let results: Array<{ task: typeof singleTask.task; assignee: NonNullable<typeof singleTask.assignee>; result: Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }>;
       try {
-        const result = await requirementRepository.createWorkItem(selected.id, {
-          taskType: workType,
-          assigneeName: selectedAssignee.name,
-          note,
-        });
-        localItem.id = result.id;
-        if (result.syncStatus === "FAILED") persisted = false;
+        results = await Promise.all(taskInputs.map(async ({ task, assignee }) => ({ task, assignee: assignee!, result: await requirementRepository.createWorkItem(selected.id, { taskType: task.taskType!, assigneeName: assignee!.name, note: task.note }) })));
       } catch {
-        persisted = false;
-      }
-      if (!persisted) {
-        addToast(
-          "error",
-          "下游任务同步失败",
-          "需求已保留为处理中，请在详情中重试同步",
-        );
+        addToast("error", "下游任务同步失败", "已创建的任务会保留在关联工单中，请在详情中重试失败任务");
         return;
       }
+      const localItems: RequirementWorkItem[] = results.map(({ task, assignee, result }) => ({ id: result.id, requirementId: selected.id, taskType: task.taskType!, title: selected.title, assigneeName: assignee.name, note: task.note, status: "待处理", createdAt: now }));
+      const primary = results[0];
       const next = {
         ...selected,
         status: "处理中" as RequirementTask["status"],
-        taskType: workType,
-        assignedOwnerName: selectedAssignee.name,
-        assignedNote: note,
+        taskType: primary.task.taskType,
+        assignedOwnerName: primary.assignee.name,
+        assignedNote: primary.task.note,
         events: [
           ...(selected.events || []),
           {
@@ -382,7 +353,7 @@ export const RequirementPoolView: React.FC = () => {
             eventType: "转任务",
             fromStatus: selected.status,
             toStatus: "处理中",
-            reason: note,
+            reason: primary.task.note,
             operatorName: currentUser.name,
             createdAt: now,
           },
@@ -392,22 +363,17 @@ export const RequirementPoolView: React.FC = () => {
         list.map((item) => (item.id === selected.id ? next : item)),
       );
       setSelected(next);
-      setWorkItems((list) => [localItem, ...list]);
+      setWorkItems((list) => [...localItems, ...list]);
       setEvents((list) => [...list, next.events![next.events!.length - 1]]);
       setWorkOpen(false);
-      openPageTab(taskTargetPages[workType]);
-      addToast(
-        "success",
-        "已创建下游工单",
-        persisted ? `${workType}记录已生成` : "后端暂不可用，已在当前会话记录",
-      );
+      addToast("success", "已创建下游工单", `已生成 ${localItems.length} 条任务，关联工单已自动建立`);
     } else if (workflowAction === "reassign") {
-      const selectedAssignee = employees.find((item) => item.name.trim().toLocaleLowerCase() === assignee.trim().toLocaleLowerCase());
+      const selectedAssignee = employees.find((item) => item.name.trim().toLocaleLowerCase() === reassignAssignee.trim().toLocaleLowerCase());
       if (!selectedAssignee) {
         addToast("warning", "请选择新的转派负责人", "请输入负责人姓名并从下拉列表中选择");
         return;
       }
-      if (!note.trim()) {
+      if (!reassignReason.trim()) {
         addToast("warning", "请输入转派原因说明");
         return;
       }
@@ -422,7 +388,7 @@ export const RequirementPoolView: React.FC = () => {
             eventType: "转派",
             fromStatus: selected.status,
             toStatus: "处理中",
-            reason: `转派给 ${selectedAssignee.name}：${note.trim()}`,
+            reason: `转派给 ${selectedAssignee.name}：${reassignReason.trim()}`,
             operatorName: currentUser.name,
             createdAt: now,
           },
@@ -433,7 +399,7 @@ export const RequirementPoolView: React.FC = () => {
       setWorkOpen(false);
       addToast("success", "工单转派成功", `已成功转派给 ${selectedAssignee.name}`);
     } else if (workflowAction === "memo") {
-      if (!note.trim()) {
+      if (!memoContent.trim()) {
         addToast("warning", "请输入个人备忘录内容");
         return;
       }
@@ -447,7 +413,7 @@ export const RequirementPoolView: React.FC = () => {
             eventType: "个人备忘录",
             fromStatus: selected.status,
             toStatus: "已完成",
-            reason: note.trim(),
+            reason: memoContent.trim(),
             operatorName: currentUser.name,
             createdAt: now,
           },
@@ -595,7 +561,7 @@ export const RequirementPoolView: React.FC = () => {
   const fieldClass =
     "mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20";
   const selectFieldClass = (value: string) =>
-    `mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 ${value ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`;
+    `mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 ${value ? "text-[var(--text-primary)]" : "!text-[var(--text-muted)]"}`;
   const filterClass =
     "h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)]";
   const fields = <div className="work-order-form grid grid-cols-1 gap-4">
@@ -618,10 +584,7 @@ export const RequirementPoolView: React.FC = () => {
           {["紧急", "高", "中", "低"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}
         </select>
       </label>
-      <label className="text-xs text-[var(--text-muted)]">
-        期望完成时间
-        <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={fieldClass} />
-      </label>
+      <DateField label="期望完成时间" value={dueDate} onChange={setDueDate} />
     </div>
     {workOrderType && (
       <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
@@ -892,7 +855,7 @@ export const RequirementPoolView: React.FC = () => {
               <RequirementActionButtons
                 status={selected.status}
                 hasWorkItem={taskLocked}
-                onWork={() => { setWorkflowAction("convert"); setWorkType(""); setAssignee(""); setNote(""); setExpectedDueDate(selected?.dueDate || ""); setWorkOpen(true); }}
+                onWork={() => { setWorkflowAction("convert"); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "" }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setWorkOpen(true); }}
                 onHold={() => setReasonType("hold")}
                 onReject={() => setReasonType("reject")}
               />
@@ -1002,13 +965,14 @@ export const RequirementPoolView: React.FC = () => {
         isOpen={workOpen}
         onClose={() => setWorkOpen(false)}
         title="工单流转"
+        maxWidth="4xl"
       >
         <form onSubmit={handleWorkflowSubmit} className="space-y-4">
           <label className="block text-xs text-[var(--text-muted)]">
             流转类型 *
             <select
               value={workflowAction}
-              onChange={(e) => setWorkflowAction(e.target.value as any)}
+              onChange={(e) => setWorkflowAction(e.target.value as typeof workflowAction)}
               className={fieldClass}
               required
             >
@@ -1021,18 +985,18 @@ export const RequirementPoolView: React.FC = () => {
           {workflowAction === "convert" && (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[var(--text-primary)]">下游任务列表 ({subTasks.length})</span>
+                <span className="text-xs font-semibold text-[var(--text-primary)]">任务配置 ({subTasks.length})</span>
                 <button
                   type="button"
                   onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "" }])}
                   className="px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border-main)] text-xs text-[var(--primary)] font-medium hover:bg-[var(--bg-hover)]"
                 >
-                  + 增加一行任务
+                  + 增加任务
                 </button>
               </div>
               {subTasks.map((t, idx) => (
-                <div key={idx} className="p-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] space-y-3 relative">
-                  <div className="flex items-center justify-between">
+                <div key={idx} className="p-4 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] relative">
+                  <div className="mb-4 flex items-center justify-between border-b border-[var(--border-main)] pb-4">
                     <span className="text-[11px] font-semibold text-[var(--text-muted)]">任务 #{idx + 1}</span>
                     {subTasks.length > 1 && (
                       <button
@@ -1044,7 +1008,8 @@ export const RequirementPoolView: React.FC = () => {
                       </button>
                     )}
                   </div>
-                  <label className="block text-xs text-[var(--text-muted)]">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
+                  <label className="block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-3">
                     任务类型 *
                     <select
                       value={t.taskType}
@@ -1061,23 +1026,17 @@ export const RequirementPoolView: React.FC = () => {
                       ))}
                     </select>
                   </label>
-                  <SearchSelect
-                    label="下一步负责人 *"
+                  <div className="min-w-0 lg:col-span-3 [&>label]:block">
+                  <WorkflowAssigneeSelect
+                    label="任务负责人 *"
                     value={t.assignee}
                     options={employees.map((item) => item.name)}
                     placeholder="输入负责人姓名搜索并选择"
                     onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))}
                   />
-                  <label className="block text-xs text-[var(--text-muted)]">
-                    期望完成时间
-                    <input
-                      type="date"
-                      value={t.expectedDueDate}
-                      onChange={(e) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, expectedDueDate: e.target.value } : item))}
-                      className="mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs"
-                    />
-                  </label>
-                  <label className="block text-xs text-[var(--text-muted)]">
+                  </div>
+                  <DateField label="期望完成时间" value={t.expectedDueDate} onChange={(value) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, expectedDueDate: value } : item))} />
+                  <label className="block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-4">
                     任务描述
                     <input
                       type="text"
@@ -1087,6 +1046,7 @@ export const RequirementPoolView: React.FC = () => {
                       className="mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs"
                     />
                   </label>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1094,12 +1054,12 @@ export const RequirementPoolView: React.FC = () => {
 
           {workflowAction === "reassign" && (
             <>
-              <SearchSelect label="转派给负责人 *" value={subTasks[0]?.assignee || ""} options={employees.map((item) => item.name)} placeholder="输入新负责人姓名搜索并选择" onChange={(val) => setSubTasks([{ ...subTasks[0], assignee: val }])} />
+              <WorkflowAssigneeSelect label="转派给负责人 *" value={reassignAssignee} options={employees.map((item) => item.name)} placeholder="输入新负责人姓名搜索并选择" onChange={setReassignAssignee} />
               <label className="block text-xs text-[var(--text-muted)]">
                 转派原因说明 *
                 <textarea
-                  value={subTasks[0]?.note || ""}
-                  onChange={(e) => setSubTasks([{ ...subTasks[0], note: e.target.value }])}
+                  value={reassignReason}
+                  onChange={(e) => setReassignReason(e.target.value)}
                   rows={3}
                   placeholder="请输入转派原因及交接说明..."
                   className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs"
@@ -1114,8 +1074,8 @@ export const RequirementPoolView: React.FC = () => {
               <label className="block text-xs text-[var(--text-muted)]">
                 个人备忘内容 *
                 <textarea
-                  value={subTasks[0]?.note || ""}
-                  onChange={(e) => setSubTasks([{ ...subTasks[0], note: e.target.value }])}
+                  value={memoContent}
+                  onChange={(e) => setMemoContent(e.target.value)}
                   rows={4}
                   placeholder="记录个人备忘信息或处理心得..."
                   className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs"

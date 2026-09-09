@@ -1,0 +1,133 @@
+{
+  "plugin": "stringplugin",
+  "configVersion": "0.1.44",
+  "minimumPluginVersion": "0.1.44",
+  "stack": {
+    "frontend": {
+      "framework": "vue",
+      "language": "javascript",
+      "ui": "@string/string-framework-v3"
+    },
+    "backend": {
+      "language": "java",
+      "framework": "spring-boot",
+      "frameworkVersion": "3.5.x",
+      "buildTool": "maven",
+      "javaVersion": "17",
+      "springCloudVersion": "2025.0.2",
+      "springCloudAlibabaVersion": "2025.0.0.0",
+      "orm": "mybatis-plus",
+      "ormVersion": "3.5.15",
+      "connectionPool": "druid",
+      "connectionPoolVersion": "1.2.27",
+      "jsonLibrary": "fastjson2",
+      "jsonLibraryVersion": "2.0.60",
+      "dynamicDatasourceVersion": "4.5.0",
+      "authentication": "JWT 0.9.1 + Redis Token",
+      "apiDocumentation": "OpenAPI 3",
+      "configurationCenter": "Nacos"
+    },
+    "database": {
+      "type": "mysql",
+      "version": "9.3",
+      "cloud": "aliyun-rds"
+    }
+  },
+  "conventions": {
+    "frontendRoot": "frontend",
+    "backendRoot": "backend",
+    "databaseRoot": "database",
+    "prdPath": "docs/prd.md",
+    "apiPrefix": "/api",
+    "tableNameStyle": "snake_case"
+  },
+  "codeStandards": {
+    "frontend": {
+      "path": ".enterprise-app-factory/standards/WEB_SPEC.md",
+      "source": "references/standards/WEB_SPEC.md"
+    }
+  },
+  "frameworkBundle": {
+    "packageName": "@string/string-framework-v3",
+    "version": "1.0.83",
+    "path": ".enterprise-app-factory/vendor/string-framework-v3",
+    "installOnBootstrap": true
+  },
+  "browserPreview": {
+    "viewportWidth": 1920,
+    "viewportHeight": 1080,
+    "allowExplicitUserOverride": true
+  },
+  "versioning": {
+    "mode": "latest-code-version-context",
+    "statePath": ".enterprise-app-factory/project.json",
+    "releaseTagPrefix": "version/",
+    "prdPathPattern": "docs/prd/{version}.md",
+    "initialBranch": "master"
+  },
+  "prd": {
+    "requiredForEveryCodeChange": true,
+    "schemaVersion": "2.3",
+    "updateMode": "module-upsert",
+    "appendOnlyByDefault": false,
+    "style": "product-only",
+    "reference": "references/prd_writer.md",
+    "excludeTechnicalImplementation": true,
+    "writerSkill": "prd-writer",
+    "registryPath": ".enterprise-app-factory/prd/registry.json",
+    "fastValidateAfterUpdate": true,
+    "lintAfterUpdate": false,
+    "deepReviewOnDemand": true
+  },
+  "deployment": {
+    "mode": "script-per-project",
+    "scriptPath": "scripts/deploy-production.sh",
+    "runbookPath": "docs/deployment/production.md",
+    "createDraftOnBootstrap": true,
+    "reuseExistingScript": true,
+    "recordAfterSuccessfulDeploy": true,
+    "database": {
+      "target": "aliyun-rds",
+      "mode": "verify",
+      "executionHost": "deploy-server",
+      "sameHostUseLoopback": true,
+      "allowRootApplicationUser": true,
+      "applicationCredentialSource": "admin",
+      "databaseIdentityPath": ".enterprise-app-factory/deployment/database.json"
+    },
+    "nginx": {
+      "mode": "project-subpath",
+      "routeStatePath": ".enterprise-app-factory/deployment/nginx-route.json",
+      "registryPath": "/etc/eaf-deploy/nginx-routes.json",
+      "frontendPathTemplate": "/{slug}/",
+      "apiPathTemplate": "/{slug}/api/",
+      "requireDedicatedRoute": true
+    }
+  },
+  "secretManagement": {
+    "mode": "centralized",
+    "authorizationMode": "network-restricted",
+    "endpoint": "http://8.145.63.100/codex/secrets/resolve",
+    "endpointEnv": "EAF_SECRET_URL",
+    "localFallbackEnv": "EAF_SECRETS_FILE",
+    "outputEnvPath": ".enterprise-app-factory/secrets/runtime.env",
+    "secretRefs": {
+      "ALIYUN_DB_HOST": "aliyun/rds/default/host",
+      "ALIYUN_DB_PORT": "aliyun/rds/default/port",
+      "ALIYUN_DB_NAME": "aliyun/rds/default/database",
+      "ALIYUN_DB_USERNAME": "aliyun/rds/default/adminUsername",
+      "ALIYUN_DB_PASSWORD": "aliyun/rds/default/adminPassword",
+      "DEPLOY_SERVER_HOST": "aliyun/ecs/default/host",
+      "DEPLOY_SERVER_SSH_PORT": "aliyun/ecs/default/sshPort",
+      "DEPLOY_SERVER_SSH_USER": "aliyun/ecs/default/sshUser",
+      "DEPLOY_SERVER_SSH_PASSWORD": "aliyun/ecs/default/sshPassword",
+      "DEPLOY_WEB_ROOT": "aliyun/ecs/default/webRoot",
+      "DEPLOY_RELEASE_ROOT": "aliyun/ecs/default/releaseRoot",
+      "DEPLOY_BACKEND_ROOT": "aliyun/ecs/default/backendRoot"
+    },
+    "optionalSecretRefs": {
+      "ALIYUN_DB_ADMIN_USERNAME": "aliyun/rds/default/adminUsername",
+      "ALIYUN_DB_ADMIN_PASSWORD": "aliyun/rds/default/adminPassword"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Search, X } from './octicons-compat';
 
 export type SearchableSelectProps = {
@@ -43,6 +44,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   hideTrigger = false
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const [internalOpen, setInternalOpen] = useState(false);
   const [query, setQuery] = useState('');
   const normalizedOptions = useMemo(() => Array.from(new Set(options.filter(Boolean))), [options]);
@@ -59,7 +63,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
@@ -71,6 +76,19 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       setOpen(true);
     }
   };
+  useEffect(() => {
+    if (!open || (!triggerRef.current && !hideTrigger && !rootRef.current)) return;
+    const updatePosition = () => {
+      const rect = (triggerRef.current || rootRef.current)!.getBoundingClientRect();
+      const height = Math.min(320, Math.max(96, filteredOptions.length * 36 + 52));
+      const above = rect.bottom + height > window.innerHeight && rect.top > height;
+      setMenuStyle({ position: 'fixed', left: rect.left, width: rect.width, top: above ? Math.max(8, rect.top - height - 4) : rect.bottom + 4, zIndex: 1200 });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => { window.removeEventListener('resize', updatePosition); window.removeEventListener('scroll', updatePosition, true); };
+  }, [open, filteredOptions.length]);
 
   return (
     <div ref={rootRef} className="relative text-xs">
@@ -80,6 +98,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           type="button"
           disabled={disabled}
           aria-expanded={open}
+          ref={triggerRef}
           onClick={openMenu}
           className={`${hideLabel ? '' : 'mt-1'} flex h-8 w-full items-center justify-between rounded-lg border bg-[var(--bg-surface)] px-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${error ? 'border-red-500' : 'border-[var(--border-main)]'} ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-[var(--border-strong)]'} ${currentValues.length ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}
         >
@@ -92,8 +111,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
       </label>}
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--bg-card)] shadow-xl">
+      {open && createPortal(
+        <div ref={menuRef} style={menuStyle} className="overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[var(--bg-card)] shadow-xl">
           <div className="dropdown-search-row flex h-9 items-center gap-2 border-b border-[var(--border-main)] px-2.5">
             <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
             <input
@@ -101,13 +120,13 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="输入关键词搜索"
-              className="app-dropdown-search h-8 min-w-0 flex-1 bg-transparent text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+              className="app-dropdown-search h-8 min-w-0 flex-1 bg-transparent text-xs text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)]"
             />
             {query && <button type="button" aria-label="清除搜索" onClick={() => setQuery('')} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X className="h-4 w-4" /></button>}
           </div>
           <div className="max-h-52 overflow-y-auto p-1">
             {clearable && (multiple ? currentValues.length > 0 : value) && <button type="button" onClick={() => { multiple ? onChangeMultiple?.([]) : onChange(''); setOpen(false); }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-[var(--text-muted)] hover:bg-[var(--bg-surface-soft)]">暂不关联</button>}
-            {filteredOptions.length === 0 ? <p className="px-3 py-4 text-center text-[var(--text-muted)]">{emptyText}</p> : filteredOptions.map((option) => (
+            {filteredOptions.length === 0 ? <p className="px-3 py-4 text-center text-xs text-[var(--text-muted)]">{emptyText}</p> : filteredOptions.map((option) => (
               <button type="button" key={option} onClick={() => {
                 if (multiple) {
                   const nextValues = currentValues.includes(option) ? currentValues.filter((item) => item !== option) : [...currentValues, option];
@@ -117,13 +136,13 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   setOpen(false);
                 }
                 setQuery('');
-              }} className="dropdown-menu-option flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-soft)]">
+              }} className="dropdown-menu-option flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs text-[var(--text-body)] transition-colors hover:bg-[var(--bg-surface-soft)]">
                 <span className="min-w-0 truncate">{option}</span>
                 {currentValues.includes(option) && <Check className="h-4 w-4 shrink-0 text-[var(--primary)]" />}
               </button>
             ))}
           </div>
-        </div>
+        </div>, document.body
       )}
       {multiple && !compact && currentValues.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">
         {currentValues.map((selectedValue) => <span key={selectedValue} className="inline-flex max-w-full items-center gap-1 rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">

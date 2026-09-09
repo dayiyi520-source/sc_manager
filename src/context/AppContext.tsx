@@ -868,7 +868,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addDesignTask = async (task: Partial<RequirementTask>) => {
     const newTask: RequirementTask = { ...task, id: `design-${Date.now()}`, title: task.title || '新建设计任务', description: task.description || '', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, productLineName: task.productLineName || '师创智联协同OS', versionName: task.versionName || '', estimatedHours: task.estimatedHours || 0, dueDate: task.dueDate || '' };
     if (requirementBackendEnabled) {
-      try { await productRepository.createDesignTask(newTask); await designQuery.refetch(); }
+      try { await productRepository.createDesignTask({ ...newTask, requirementId: task.requirementId || '' }); await designQuery.refetch(); }
       catch (error) { addToast('error', '设计任务保存失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
     } else setDesignTasks((prev) => [newTask, ...prev]);
     return true;

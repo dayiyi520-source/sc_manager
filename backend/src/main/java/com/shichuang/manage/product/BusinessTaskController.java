@@ -22,13 +22,13 @@ public class BusinessTaskController {
     @Operation(summary = "查询业务任务列表")
     @GetMapping({"/api/presales-tasks", "/api/delivery-tasks", "/api/ops-tasks"})
     public ApiResponse<List<Map<String,Object>>> list(@RequestHeader(value="X-Task-Type", required=false) String header, jakarta.servlet.http.HttpServletRequest request) {
-        return ApiResponse.ok(jdbc.queryForList(selectSql() + " FROM " + table(request.getRequestURI()) + " WHERE tenant_id_=? AND delete_flag_=0 ORDER BY create_time_ DESC", RequestContext.tenantId()));
+        return ApiResponse.ok(jdbc.queryForList(selectSql() + " FROM " + table(request.getRequestURI()) + " t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ AND r.delete_flag_=0 WHERE t.tenant_id_=? AND t.delete_flag_=0 ORDER BY t.create_time_ DESC", RequestContext.tenantId()));
     }
 
     @Operation(summary = "查询业务任务详情")
     @GetMapping({"/api/presales-tasks/{id}", "/api/delivery-tasks/{id}", "/api/ops-tasks/{id}"})
     public ApiResponse<Map<String,Object>> detail(@PathVariable String id, jakarta.servlet.http.HttpServletRequest request) {
-        List<Map<String,Object>> rows = jdbc.queryForList(selectSql() + " FROM " + table(request.getRequestURI()) + " WHERE id_=? AND tenant_id_=? AND delete_flag_=0", id, RequestContext.tenantId());
+        List<Map<String,Object>> rows = jdbc.queryForList(selectSql() + " FROM " + table(request.getRequestURI()) + " t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ AND r.delete_flag_=0 WHERE t.id_=? AND t.tenant_id_=? AND t.delete_flag_=0", id, RequestContext.tenantId());
         if (rows.isEmpty()) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在");
         return ApiResponse.ok(rows.get(0));
     }
@@ -54,7 +54,7 @@ public class BusinessTaskController {
     }
     private static String table(String uri) { if (uri.startsWith("/api/presales")) return "t_crm_presales_task"; if (uri.startsWith("/api/delivery")) return "t_project_delivery_task"; return "t_project_ops_task"; }
     private static String prefix(String uri) { if (uri.startsWith("/api/presales")) return "PRESALES"; if (uri.startsWith("/api/delivery")) return "DELIVERY"; return "OPS"; }
-    private static String selectSql() { return "SELECT id_ AS id,code_ AS code,title_ AS title,description_ AS description,expected_goal_ AS expectedGoal,status_ AS status,priority_ AS priority,owner_name_ AS ownerName,creator_name_ AS creatorName,department_ AS department,version_id_ AS versionId,version_name_ AS versionName,product_line_id_ AS productLineId,product_line_name_ AS productLineName,customer_id_ AS customerId,customer_name_ AS customerName,estimated_hours_ AS estimatedHours,actual_hours_ AS actualHours,due_date_ AS dueDate,create_time_ AS createdAt,version_ AS version,work_item_kind_ AS workItemKind"; }
+    private static String selectSql() { return "SELECT t.id_ AS id,t.code_ AS code,t.title_ AS title,t.description_ AS description,t.expected_goal_ AS expectedGoal,t.status_ AS status,t.priority_ AS priority,t.owner_name_ AS ownerName,t.creator_name_ AS creatorName,t.department_ AS department,t.version_id_ AS versionId,t.version_name_ AS versionName,t.product_line_id_ AS productLineId,t.product_line_name_ AS productLineName,t.customer_id_ AS customerId,t.customer_name_ AS customerName,t.estimated_hours_ AS estimatedHours,t.actual_hours_ AS actualHours,t.due_date_ AS dueDate,t.create_time_ AS createdAt,t.version_ AS version,t.work_item_kind_ AS workItemKind,t.requirement_id_ AS requirementId,CASE WHEN t.requirement_id_ IS NULL THEN JSON_ARRAY() ELSE JSON_ARRAY(t.requirement_id_) END AS sourceWorkOrderIds,CASE WHEN r.id_ IS NULL THEN JSON_ARRAY() ELSE JSON_ARRAY(r.title_) END AS sourceWorkOrderTitles"; }
     private static String text(Map<String,Object> b,String k){return Objects.toString(b.get(k),"").trim();}
     private static String textOr(Map<String,Object> b,String k,String d){String v=text(b,k);return v.isBlank()?d:v;}
 }

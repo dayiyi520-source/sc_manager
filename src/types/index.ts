@@ -469,6 +469,7 @@ export interface RequirementTask {
   specialFields?: Record<string, string | number | null> | string;
   sourceWorkOrderIds?: string[];
   sourceWorkOrderTitles?: string[];
+  requirementId?: string;
   requirementType?: string;
   ccNames?: string[];
   plannedStartDate?: string;
@@ -619,6 +620,7 @@ export interface DefectBug {
   stepsToReproduce?: string;
   sourceWorkOrderIds?: string[];
   sourceWorkOrderTitles?: string[];
+  requirementId?: string;
 }
 export type BugRecord = DefectBug;
 export type BugItem = DefectBug;
@@ -654,6 +656,7 @@ export interface DevTask {
   estimatedHours: number;
   spentHours: number;
   dueDate: string;
+  requirementId?: string;
 }
 
 // 审批中心

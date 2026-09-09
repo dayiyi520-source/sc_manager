@@ -1,0 +1,11 @@
+{
+  "plugin": "stringplugin",
+  "installedPluginVersion": "0.1.44+codex.20260904073000",
+  "loadedPluginVersion": "0.1.44+codex.20260904073000",
+  "syncedConfigVersion": "0.1.44",
+  "versionSource": "https://gitee.com/api/v5/repos/chen_yu_zhang/product_plugin/contents/version.json?ref=master",
+  "configSource": "https://gitee.com/api/v5/repos/chen_yu_zhang/product_plugin/contents/config.json?ref=master",
+  "releaseNotesSource": "https://gitee.com/api/v5/repos/chen_yu_zhang/product_plugin/contents/releases.json?ref=master",
+  "syncedAt": "2026-09-09T03:28:15.020328+00:00",
+  "pluginUpdatePendingActivation": false
+}

@@ -23,7 +23,7 @@ import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
 
 export const DevTasksView: React.FC = () => {
-  const { devTasks, addDevTask, updateDevTask, addToast } = useApp();
+  const { devTasks, requirementTasks, addDevTask, updateDevTask, addToast } = useApp();
   const employees = Array.from(new Set(devTasks.map((task) => task.developer).filter(Boolean)));
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,6 +34,7 @@ export const DevTasksView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<DevTask | null>(null);
+  const [detailTab, setDetailTab] = useState<'overview' | 'requirement'>('overview');
   const [formTitle, setFormTitle] = useState('');
   const [formRepo, setFormRepo] = useState('');
   const [formBranch, setFormBranch] = useState('');
@@ -43,6 +44,7 @@ export const DevTasksView: React.FC = () => {
   const descriptionEditor = useRef<HTMLDivElement>(null);
   const [formDescription, setFormDescription] = useState('');
   const [formDescriptionHtml, setFormDescriptionHtml] = useState('');
+  const [formRequirementId, setFormRequirementId] = useState('');
   const openAddModal = () => {
     setFormTitle('');
     setFormRepo('');
@@ -52,6 +54,7 @@ export const DevTasksView: React.FC = () => {
     setFormHours('');
     setFormDescription('');
     setFormDescriptionHtml('');
+    setFormRequirementId('');
     setIsModalOpen(true);
   };
 
@@ -86,6 +89,7 @@ export const DevTasksView: React.FC = () => {
       commitsCount: 3,
       spentHours: 4,
       estimatedHours: Number(formHours)
+      ,requirementId: formRequirementId
     });
     setIsModalOpen(false);
   };
@@ -189,7 +193,7 @@ export const DevTasksView: React.FC = () => {
                 <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
                   <div className="flex items-center gap-2">
                     <FileCode2 className="w-4 h-4 text-blue-500 shrink-0" />
-                    <button type="button" onClick={() => setSelectedTask(task)} className="text-left hover:text-blue-600">{task.title}</button>
+                    <button type="button" onClick={() => { setSelectedTask(task); setDetailTab('overview'); }} className="text-left hover:text-blue-600">{task.title}</button>
                   </div>
                 </td>
                 <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">{task.repo}</td>
@@ -216,7 +220,7 @@ export const DevTasksView: React.FC = () => {
                 <td className="py-3.5 px-4 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <button
-                      onClick={() => setSelectedTask(task)}
+                      onClick={() => { setSelectedTask(task); setDetailTab('overview'); }}
                       className="px-2 py-1 text-[var(--active-text)] hover:text-[var(--primary-hover)] rounded font-medium text-xs"
                     >
                       详情
@@ -272,8 +276,11 @@ export const DevTasksView: React.FC = () => {
           </div>}
         >
           <div className="w-full space-y-5 text-xs">
+            <div className="flex items-center gap-5 border-b border-[var(--border-main)]"><button type="button" onClick={() => setDetailTab('overview')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'overview' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>任务详情</button><button type="button" onClick={() => setDetailTab('requirement')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'requirement' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>关联需求</button></div>
+            {detailTab === 'requirement' ? <DetailField label="关联需求">{requirementTasks.find((item) => item.id === selectedTask.requirementId)?.title || '未关联需求'}</DetailField> : <>
             <DetailField label="研发任务名称"><span className="font-medium">{selectedTask.title}</span></DetailField>
             <DetailField label="任务描述"><p className="min-h-28 whitespace-pre-wrap break-words leading-6">{selectedTask.description || '未填写任务描述'}</p></DetailField>
+            </>}
           </div>
         </WorkItemCreatePanel>
       )}
@@ -324,6 +331,7 @@ export const DevTasksView: React.FC = () => {
           </div>
 
           <div className="col-span-2"><label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">任务描述</label><RichTextEditor editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} /></div>
+          <SearchableSelect label="关联需求任务" value={formRequirementId} options={requirementTasks.map((task) => task.title)} onChange={(title) => setFormRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')} placeholder="请选择关联需求任务" clearable />
 
         </form>
       </WorkItemCreatePanel>
