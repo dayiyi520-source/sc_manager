@@ -1,0 +1,7 @@
+{
+  "slug": "manage-admin",
+  "frontendPath": "/manage-admin/",
+  "apiPath": "/manage-admin/api/",
+  "serverHost": "103.236.98.125",
+  "status": "active"
+}

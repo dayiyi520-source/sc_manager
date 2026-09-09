@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-Status: draft
+Status: verified
 
 Canonical deployment script:
 
@@ -16,4 +16,12 @@ Rules:
 - Load deployment values from `.enterprise-app-factory/secrets/runtime.env` or existing environment variables.
 - After a deployment succeeds, update this runbook with the verified command, required preconditions, rollback notes, and last success date.
 
-Last successful deploy: TBD
+Last successful deploy: 2026-09-09
+
+Verified deployment:
+
+- Frontend: `/manage-admin/`
+- API: `/manage-admin/api/`
+- Backend service: `manage-admin.service` on port `18082`
+- Database: `eaf_manage_admin`
+- Existing root and `/tongren/` routes remain unchanged
