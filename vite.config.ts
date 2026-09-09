@@ -92,6 +92,7 @@ function devApiMockPlugin() {
 
 export default defineConfig(() => {
   return {
+    base: process.env.VITE_BASE_PATH || '/',
     plugins: [devApiMockPlugin(), react(), tailwindcss()],
     test: {
       environment: 'node',
