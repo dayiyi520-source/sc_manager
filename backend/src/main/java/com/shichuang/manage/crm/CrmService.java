@@ -184,6 +184,13 @@ public class CrmService {
     public PageResult<Map<String,Object>> engagements(int page, int pageSize) { int p=Math.max(1,page), s=Math.min(100,Math.max(1,pageSize)); return new PageResult<>(mapper.findEngagements(s,(p-1)*s),p,s,mapper.countEngagements()); }
     public PageResult<Map<String,Object>> projects(int page, int pageSize) { int p=Math.max(1,page), s=Math.min(100,Math.max(1,pageSize)); return new PageResult<>(mapper.findProjects(s,(p-1)*s),p,s,mapper.countProjects()); }
 
+    public Map<String,Object> project(String id) {
+        Map<String,Object> item = mapper.findProject(id);
+        if (item == null) throw notFound("项目不存在");
+        return item;
+    }
+    public void updateProject(String id, Map<String,Object> body) { if (mapper.updateProject(id, body) == 0) throw conflict("项目已变化，请刷新后重试"); }
+
     public PageResult<Map<String, Object>> followUps(int page, int pageSize, String keyword, String customerId, String opportunityId, String from, String to) {
         int normalizedPage = Math.max(1, page);
         int normalizedSize = Math.min(100, Math.max(1, pageSize));

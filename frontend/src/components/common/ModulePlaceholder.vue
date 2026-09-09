@@ -1,0 +1,2 @@
+<script setup lang="ts">defineProps<{kicker:string;title:string;description:string;features?:string[]}>();</script>
+<template><section class="crm-view"><div class="section-heading"><div><span class="eyebrow">{{kicker}}</span><h2>{{title}}</h2></div><span class="tag">Vue</span></div><p class="muted">{{description}}</p><div class="card-grid"><article v-for="feature in features||[]" :key="feature" class="summary-card"><strong>{{feature}}</strong><span>页面结构已迁移，接口待后续接入</span></article></div></section></template>

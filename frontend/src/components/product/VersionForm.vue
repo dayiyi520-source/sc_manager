@@ -1,0 +1,12 @@
+<script setup lang="ts">
+import {onMounted, reactive, ref, watch} from 'vue';
+import {productRepository} from '../../services/productRepository';
+type VersionValue = Record<string, unknown>;
+const props = defineProps<{modelValue?: VersionValue | null}>();
+const emit = defineEmits<{save: [value: VersionValue]; cancel: []}>();
+const form = reactive({code: '', name: '', productLineId: '', startDate: '', endDate: '', status: '', content: '', linkedRequirementIds: [] as string[]}); const requirements = ref<Array<Record<string,unknown>>>([]);
+const productLines = ref<Array<{value: string; label: string}>>([]); const loading = ref(true);
+watch(() => props.modelValue, value => Object.assign(form, {code: '', name: '', productLineId: '', startDate: '', endDate: '', status: '', content: '', ...(value || {})}), {immediate: true});
+onMounted(async () => {try {const [lines, reqs] = await Promise.all([productRepository.productLines(), productRepository.requirementOptions()]); requirements.value = reqs; productLines.value = lines.map(item => ({value: String(item.id || ''), label: String(item.name || item.code || item.id || '')})).filter(item => item.value);} finally {loading.value = false;}});
+</script>
+<template><form class="work-item-form" @submit.prevent="emit('save', {...form})"><label>版本名称<input v-model="form.name" required placeholder="请输入版本名称" /></label><label>版本编号<input v-model="form.code" placeholder="请输入版本编号" /></label><label>产品线<select v-model="form.productLineId" required :disabled="loading"><option value="" disabled>{{ loading ? '正在加载产品线…' : '请选择产品线' }}</option><option v-for="line in productLines" :key="line.value" :value="line.value">{{ line.label }}</option></select></label><div class="form-grid"><label>开始日期<input v-model="form.startDate" type="date" /></label><label>结束日期<input v-model="form.endDate" type="date" /></label></div><label>状态<select v-model="form.status"><option value="" disabled>请选择状态</option><option>待开始</option><option>进行中</option><option>已完成</option></select></label><label>关联需求<select v-model="form.linkedRequirementIds" multiple><option v-for="item in requirements" :key="String(item.id)" :value="String(item.id)">{{item.code||item.title}}</option></select></label><label>版本内容<textarea v-model="form.content" rows="4" placeholder="请输入版本内容" /></label><div class="form-actions"><button type="button" class="secondary" @click="emit('cancel')">取消</button><button type="submit" class="primary">保存</button></div></form></template>

@@ -1,0 +1,2 @@
+<script setup lang="ts">import {ref} from 'vue';defineProps<{placeholder?:string;saving?:boolean}>();const emit=defineEmits<{submit:[content:string]}>();const content=ref('');const submit=()=>{if(content.value.trim()){emit('submit',content.value.trim());content.value=''}};</script>
+<template><div class="comment-editor"><textarea v-model="content" rows="3" :placeholder="placeholder||'请输入内容…'"/><button class="primary" :disabled="saving" @click="submit">{{saving?'提交中…':'提交'}}</button></div></template>

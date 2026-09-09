@@ -1,0 +1,2 @@
+<script setup lang="ts">defineProps<{files?:Array<{name:string;url?:string;size?:string}>}>();</script>
+<template><div class="attachments"><h4>附件</h4><p v-if="!files?.length" class="muted">暂无附件</p><ul v-else><li v-for="file in files" :key="file.name"><a v-if="file.url" :href="file.url" target="_blank" rel="noreferrer">{{file.name}}</a><span v-else>{{file.name}}</span><small v-if="file.size">{{file.size}}</small></li></ul></div></template>

@@ -1,0 +1,5 @@
+<script setup lang="ts">
+import {computed} from 'vue'; import {useQuery} from '@tanstack/vue-query'; import {crmRepository} from '../../services/crmRepository';
+const query=useQuery({queryKey:['crm-dashboard'],queryFn:crmRepository.dashboard}); const metrics=computed(()=>query.data.value||{customerCount:0,opportunityCount:0,opportunityAmount:0,winRate:0}); const refresh=()=>{void query.refetch()};
+</script>
+<template><section class="crm-view"><div class="section-heading"><div><span class="eyebrow">CRM DASHBOARD</span><h2>客户与商机数据看板</h2></div><button class="secondary" @click="refresh">刷新数据</button></div><div v-if="query.isPending" class="state">正在加载数据…</div><div v-else-if="query.isError" class="state error">数据加载失败。</div><div v-else class="metric-grid"><article><span>客户数</span><strong>{{metrics.customerCount}}</strong><small>家</small></article><article><span>商机数</span><strong>{{metrics.opportunityCount}}</strong><small>个</small></article><article><span>商机总额</span><strong>¥{{metrics.opportunityAmount}}</strong><small>元</small></article><article><span>赢单率</span><strong>{{metrics.winRate}}%</strong><small>综合转化</small></article></div></section></template>

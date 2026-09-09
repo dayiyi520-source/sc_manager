@@ -118,6 +118,11 @@ public class CrmController {
     @GetMapping("/projects")
     public ApiResponse<PageResult<Map<String,Object>>> projects(@RequestParam(defaultValue="1") int page, @RequestParam(defaultValue="20") int pageSize) { return ApiResponse.ok(service.projects(page,pageSize)); }
 
+    @GetMapping("/projects/{id}")
+    public ApiResponse<Map<String,Object>> project(@PathVariable String id) { return ApiResponse.ok(service.project(id)); }
+    @PutMapping("/projects/{id}")
+    public ApiResponse<Void> updateProject(@PathVariable String id, @RequestBody Map<String,Object> body) { service.updateProject(id, body); return ApiResponse.ok(null); }
+
     @GetMapping("/follow-ups")
     public ApiResponse<PageResult<Map<String, Object>>> followUps(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int pageSize, @RequestParam(defaultValue = "") String keyword, @RequestParam(defaultValue = "") String customerId, @RequestParam(defaultValue = "") String opportunityId, @RequestParam(defaultValue = "") String from, @RequestParam(defaultValue = "") String to) {
         return ApiResponse.ok(service.followUps(page, pageSize, keyword, customerId, opportunityId, from, to));

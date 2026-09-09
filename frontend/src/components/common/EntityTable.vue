@@ -1,0 +1,2 @@
+<script setup lang="ts">defineProps<{columns:string[];rows:Array<Record<string,unknown>>;cell:(row:Record<string,unknown>,index:number)=>unknown}>(); const emit=defineEmits<{select:[row:Record<string,unknown>]}>();</script>
+<template><div class="table-wrap"><table><thead><tr><th v-for="column in columns" :key="column">{{column}}</th></tr></thead><tbody><tr v-for="row in rows" :key="String(row.id)" @click="emit('select',row)"><td v-for="(_,index) in columns" :key="index">{{cell(row,index)}}</td></tr></tbody></table></div></template>
