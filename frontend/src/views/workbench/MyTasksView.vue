@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import {computed, ref} from 'vue';
 import {useRouter} from 'vue-router';
-import PageHeader from '../../components/common/PageHeader.vue';
-import SegmentTabs from '../../components/common/SegmentTabs.vue';
-import EmptyState from '../../components/common/EmptyState.vue';
-import StatusTag from '../../components/common/StatusTag.vue';
 import {workbenchRepository} from '../../services/workbenchRepository';
 
 const router = useRouter();
@@ -26,11 +22,10 @@ const approvals = computed(() => {
   const items = data.value.approvals;
   if (approvalTab.value === 'pending') return items.filter(a => a.status === '待审批');
   if (approvalTab.value === 'my_apply') return items.filter(a => a.applicant === '当前用户');
-  if (approvalTab.value === 'cc_me') return items; // 抄送我的，暂时返回全部
-  return items.filter(a => a.status !== '待审批'); // 已审批
+  return items.filter(a => a.status !== '待审批');
 });
 
-// Feed data with full structure
+// Feed data
 interface FeedItem {
   id: number;
   time: string;
@@ -41,502 +36,570 @@ interface FeedItem {
 
 const feedData: Record<string, FeedItem[]> = {
   dynamic: [
-    { id: 1, time: '10分钟前', title: '师创智联OS V3.5.2 已发布至预发环境', content: '研发一组完成了达梦DM8方言兼容层自动化单元测试，通过率100%。' },
-    { id: 2, time: '1小时前', title: '研发任务筛选能力进入验收', content: '商务大客户部提交【国家电网华东二期扩容】合同用印审批。' },
-    { id: 3, time: '3小时前', title: '商务合同审批通过', content: '合同标的额480万元，已进入平台技术委员会审批节点。' }
+    { id: 1, time: '10分钟前', title: '师创智联OS V3.5.2 成功构建并发布至预发回归环境', content: '研发一组完成了达梦DM8方言兼容层自动化单元测试，通过率100%。' },
+    { id: 2, time: '1小时前', title: '商务大客户部提交【国家电网华东二期扩容】合同用印审批', content: '合同标的额480万元，已进入平台技术委员会审批节点。' }
   ],
   feedback: [
-    { id: 4, time: '今天 09:30', title: '客户评价：申通智联上海分拨中心', content: '"新版移动端PDA扫码响应非常迅速，尤其在地下弱网环境下没有丢单，给一线员工减轻了极大负担，点赞！"', customer: '申通智联' },
-    { id: 5, time: '昨天 17:40', title: '产品体验吐槽反馈', content: '"3D数字孪生看板在4K超宽屏显示器上有微距错位，希望在9月10日正式述标前能够修复完毕。"', customer: '智行新能源' }
+    { id: 4, time: '今天 09:30', title: '客户评价：申通智联上海分拨中心', content: '"新版移动端PDA扫码响应非常迅速，点赞！"', customer: '申通智联' }
   ],
   supervise: [
-    { id: 6, time: '今天 09:20', title: '跟进国家电网二期合同用印审批', content: '请在今日 18:00 前补充法务确认单，并同步商务运营部。', customer: '国家电网华东分部' },
-    { id: 7, time: '昨天 16:10', title: '完成智行新能源现场述标材料复核', content: '技术标与演示环境待技术负责人确认，截止 9 月 8 日 12:00。', customer: '智行新能源' }
+    { id: 6, time: '今天 09:20', title: '跟进国家电网二期合同用印审批', content: '请在今日 18:00 前补充法务确认单。', customer: '国家电网华东分部' }
   ]
 };
 
 const currentFeeds = computed(() => feedData[feedTab.value] || []);
-
-// My OKRs with KRs
 const myOkrs = computed(() => data.value.okrs.filter(x => x.category === 'my'));
-
-// Mock customers count
-const customersCount = 12;
+const customersCount = 6;
 
 const go = (id: string) => router.push(`/app/${id}`);
 </script>
 
 <template>
-  <section class="workbench-view">
-    <PageHeader 
-      eyebrow="WORKBENCH" 
-      title="我的工作台" 
-      description="聚合待办、审批、目标和近期业务动态。"
-    >
-      <template #actions>
-        <button class="secondary" @click="go('wb_work_orders')">进入工单中心</button>
-      </template>
-    </PageHeader>
+  <div class="my-tasks-view">
+    <!-- 顶部统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card blue" @click="go('prod_req_tasks')">
+        <div class="stat-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-label">待办事项</div>
+          <div class="stat-value">
+            <span class="stat-number">{{ data.tasks.filter(x => x.status !== '已完成').length }}</span>
+            <span class="stat-unit">项</span>
+          </div>
+        </div>
+      </div>
 
-    <!-- Top 4 Core Metrics -->
-    <div class="metric-grid compact">
-      <article @click="go('prod_req_tasks')">
-        <span>待办事项</span>
-        <strong>{{ data.tasks.filter(x => x.status !== '已完成').length }}</strong>
-        <small>项</small>
-      </article>
-      <article @click="go('approval_center')">
-        <span>待办审批</span>
-        <strong>{{ data.approvals.filter(x => x.status === '待审批').length }}</strong>
-        <small>单</small>
-      </article>
-      <article @click="go('crm_customers')">
-        <span>跟进客户数</span>
-        <strong>{{ customersCount }}</strong>
-        <small>家</small>
-      </article>
-      <article @click="go('crm_opportunities')">
-        <span>商机总额</span>
-        <strong>1443</strong>
-        <small>万元</small>
-      </article>
+      <div class="stat-card rose" @click="go('approval_center')">
+        <div class="stat-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-label">待办审批</div>
+          <div class="stat-value">
+            <span class="stat-number">{{ data.approvals.filter(x => x.status === '待审批').length }}</span>
+            <span class="stat-unit">单</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-card purple" @click="go('crm_customers')">
+        <div class="stat-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-label">跟进客户数</div>
+          <div class="stat-value">
+            <span class="stat-number">{{ customersCount }}</span>
+            <span class="stat-unit">家</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-card green" @click="go('crm_opportunities')">
+        <div class="stat-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-label">商机总额</div>
+          <div class="stat-value">
+            <span class="stat-number">1,443</span>
+            <span class="stat-unit">万元</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Main Dashboard Grid -->
-    <div class="dashboard-grid">
-      <!-- Card 1: 待办中心 -->
-      <article class="panel">
-        <div class="panel-head">
-          <h3>待办中心</h3>
-          <button class="link-button" @click="go('prod_req_tasks')">查看全部</button>
+    <!-- 主要内容区 -->
+    <div class="main-grid">
+      <!-- 左侧：待办中心 -->
+      <div class="card large">
+        <div class="card-header">
+          <div class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            待办中心
+          </div>
+          <div class="tabs">
+            <button :class="{active: taskTab === 'pending'}" @click="taskTab = 'pending'">
+              待处理 ({{ tasks.length }})
+            </button>
+            <button :class="{active: taskTab === 'done'}" @click="taskTab = 'done'">
+              已完成 ({{ data.tasks.filter(x => x.status === '已完成').length }})
+            </button>
+          </div>
         </div>
-        <SegmentTabs 
-          v-model="taskTab" 
-          :items="[
-            { key: 'pending', label: '待处理', count: data.tasks.filter(x => x.status !== '已完成').length },
-            { key: 'done', label: '已完成', count: data.tasks.filter(x => x.status === '已完成').length }
-          ]"
-        />
-        <div v-if="tasks.length" class="stack-list">
-          <button 
-            v-for="item in tasks.slice(0, 4)" 
-            :key="item.id" 
-            class="list-row" 
-            @click="go('prod_req_tasks')"
-          >
-            <span>
-              <strong>{{ item.title }}</strong>
-              <small>{{ item.productLine }} · 截止 {{ item.dueDate }}</small>
-            </span>
-            <StatusTag :status="item.priority" />
-          </button>
-        </div>
-        <EmptyState v-else title="暂无任务" />
-      </article>
-
-      <!-- Card 2: 审批流程 -->
-      <article class="panel">
-        <div class="panel-head">
-          <h3>审批流程</h3>
-          <button class="link-button" @click="go('approval_center')">查看全部</button>
-        </div>
-        <SegmentTabs 
-          v-model="approvalTab" 
-          :items="[
-            { key: 'pending', label: '待审批', count: data.approvals.filter(x => x.status === '待审批').length },
-            { key: 'my_apply', label: '我发起' },
-            { key: 'cc_me', label: '抄送我' },
-            { key: 'approved', label: '已审批' }
-          ]"
-        />
-        <div v-if="approvals.length" class="stack-list">
-          <button 
-            v-for="item in approvals.slice(0, 4)" 
-            :key="item.id" 
-            class="list-row" 
-            @click="go('approval_center')"
-          >
-            <span>
-              <strong>{{ item.title }}</strong>
-              <small>{{ item.applicant }} · {{ item.createdAt }}</small>
-            </span>
-            <StatusTag :status="item.status" />
-          </button>
-        </div>
-        <EmptyState v-else title="暂无审批" />
-      </article>
-
-      <!-- Card 3: 我的 OKR -->
-      <article class="panel">
-        <div class="panel-head">
-          <h3>我的 OKR</h3>
-          <button class="link-button" @click="go('wb_okr_perf')">目标详情</button>
-        </div>
-        <div class="okr-list">
-          <div v-for="okr in myOkrs" :key="okr.id" class="okr-item">
-            <div class="okr-header">
-              <strong>{{ okr.objective }}</strong>
-              <span class="okr-progress">{{ okr.progress }}%</span>
-            </div>
-            <div class="progress">
-              <i :style="{ width: `${okr.progress}%` }" />
-            </div>
-            <small class="okr-deadline">截止 {{ okr.deadline }}</small>
-            
-            <!-- KR list -->
-            <div v-if="okr.keyResults && okr.keyResults.length" class="kr-list">
-              <div 
-                v-for="(kr, idx) in okr.keyResults" 
-                :key="kr.id" 
-                class="kr-item"
-              >
-                <div class="kr-content">
-                  <span class="kr-label">KR{{ idx + 1 }}: {{ kr.content }}</span>
-                  <span class="kr-progress">{{ kr.progress }}%</span>
-                </div>
-                <div class="kr-meta">
-                  <span>权重: {{ kr.weight }}%</span>
-                  <span>截止: {{ kr.deadline }}</span>
-                </div>
+        <div class="card-body">
+          <div v-for="task in tasks.slice(0, 5)" :key="task.id" class="list-item">
+            <div class="item-content">
+              <div class="item-title">{{ task.title }}</div>
+              <div class="item-meta">
+                <span>需求编号：{{ task.id }}</span>
+                <span>·</span>
+                <span>负责人：{{ task.productLine }}</span>
+                <span>·</span>
+                <span>截止：{{ task.dueDate }}</span>
               </div>
             </div>
+            <button class="btn-primary-sm" @click="go('prod_req_tasks')">去处理</button>
           </div>
         </div>
-      </article>
+      </div>
 
-      <!-- Card 4: 动态与评价 -->
-      <article class="panel">
-        <div class="panel-head">
-          <h3>动态与评价</h3>
+      <!-- 右侧：审批中心 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+            审批中心
+          </div>
+          <div class="tabs">
+            <button :class="{active: approvalTab === 'pending'}" @click="approvalTab = 'pending'">待审批</button>
+            <button :class="{active: approvalTab === 'my_apply'}" @click="approvalTab = 'my_apply'">我申请的</button>
+            <button :class="{active: approvalTab === 'done'}" @click="approvalTab = 'done'">已处理</button>
+          </div>
         </div>
-        <SegmentTabs 
-          v-model="feedTab" 
-          :items="[
-            { key: 'dynamic', label: '产品动态' },
-            { key: 'feedback', label: '评价反馈' },
-            { key: 'supervise', label: '督办事项' }
-          ]"
-        />
-        <div class="feed-timeline">
-          <div 
-            v-for="feed in currentFeeds" 
-            :key="feed.id" 
-            class="feed-item"
-            :class="{ 'is-dynamic': feedTab === 'dynamic' }"
-          >
-            <time>{{ feed.time }}</time>
-            <div class="feed-content">
-              <strong>{{ feed.title }}</strong>
-              <p>{{ feed.content }}</p>
-              <small v-if="feed.customer">{{ feed.customer }}</small>
+        <div class="card-body">
+          <div v-for="approval in approvals.slice(0, 5)" :key="approval.id" class="list-item">
+            <div class="item-content">
+              <div class="item-title">{{ approval.title }}</div>
+              <div class="item-meta">
+                <span>申请人：{{ approval.applicant }}</span>
+              </div>
+            </div>
+            <button class="btn-primary-sm" @click="go('approval_center')">查看</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部区域 -->
+    <div class="bottom-grid">
+      <!-- 左侧：我的OKR进度 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            我的OKR进度
+          </div>
+          <a href="#" class="link-sm" @click.prevent="go('wb_okr_perf')">查看详情 →</a>
+        </div>
+        <div class="card-body">
+          <div v-for="okr in myOkrs" :key="okr.id" class="okr-section">
+            <div class="okr-header">
+              <div class="okr-title">{{ okr.objective }}</div>
+              <div class="okr-progress">{{ okr.progress }}%</div>
+            </div>
+            <div class="okr-period">{{ okr.cycle }} · 截止：{{ okr.deadline }}</div>
+            
+            <div v-for="kr in okr.keyResults" :key="kr.id" class="kr-item">
+              <div class="kr-header">
+                <div class="kr-title">{{ kr.content }}</div>
+                <div class="kr-progress">{{ kr.progress }}%</div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{width: `${kr.progress}%`}"></div>
+              </div>
+              <div class="kr-meta">权重：{{ kr.weight }}% · 截止：{{ kr.deadline }}</div>
             </div>
           </div>
         </div>
-      </article>
+      </div>
+
+      <!-- 右侧：动态与评价 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            动态与评价
+          </div>
+          <div class="tabs">
+            <button :class="{active: feedTab === 'dynamic'}" @click="feedTab = 'dynamic'">产品动态</button>
+            <button :class="{active: feedTab === 'feedback'}" @click="feedTab = 'feedback'">评价吐槽</button>
+            <button :class="{active: feedTab === 'supervise'}" @click="feedTab = 'supervise'">督办事项</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div v-for="feed in currentFeeds" :key="feed.id" class="feed-item">
+            <div class="feed-time">{{ feed.time }}</div>
+            <div class="feed-title">{{ feed.title }}</div>
+            <div class="feed-content">{{ feed.content }}</div>
+          </div>
+        </div>
+      </div>
     </div>
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.workbench-view {
+.my-tasks-view {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 24px;
 }
 
-.metric-grid.compact {
+/* 统计卡片 */
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
 }
 
-.metric-grid article {
+.stat-card {
   display: flex;
-  flex-direction: column;
-  padding: 1.25rem;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-main);
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.metric-grid article:hover {
-  border-color: #2F66F6;
-  box-shadow: 0 4px 12px rgba(47, 102, 246, 0.1);
+.stat-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
-.metric-grid article span {
-  font-size: 0.875rem;
-  color: #64748b;
-  margin-bottom: 0.5rem;
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.metric-grid article strong {
-  font-size: 2rem;
+.stat-card.blue .stat-icon {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3B82F6;
+}
+
+.stat-card.rose .stat-icon {
+  background: rgba(251, 113, 133, 0.1);
+  color: #FB7185;
+}
+
+.stat-card.purple .stat-icon {
+  background: rgba(168, 85, 247, 0.1);
+  color: #A855F7;
+}
+
+.stat-card.green .stat-icon {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22C55E;
+}
+
+.stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.stat-number {
+  font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
+  line-height: 1;
 }
 
-.metric-grid article small {
-  font-size: 0.75rem;
-  color: #94a3b8;
+.stat-unit {
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
-.dashboard-grid {
+/* 主要网格布局 */
+.main-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
 }
 
-.panel {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
+.main-grid .card.large {
+  grid-column: span 1;
+}
+
+.bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* 卡片 */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-main);
+  border-radius: 12px;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 
-.panel-head {
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-main);
+  gap: 16px;
 }
 
-.panel-head h3 {
-  font-size: 0.875rem;
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
-.link-button {
-  font-size: 0.75rem;
-  color: #2F66F6;
-  background: none;
+.card-title svg {
+  color: var(--primary);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-surface);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.tabs button {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
   border: none;
+  border-radius: 6px;
   cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  transition: background 0.2s;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 
-.link-button:hover {
-  background: #eff6ff;
+.tabs button:hover {
+  color: var(--text-primary);
 }
 
-.stack-list {
-  display: flex;
-  flex-direction: column;
-  max-height: 320px;
-  overflow-y: auto;
+.tabs button.active {
+  background: var(--bg-card);
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.list-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
-  cursor: pointer;
-  text-align: left;
-  background: none;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  transition: background 0.2s;
-}
-
-.list-row:hover {
-  background: #f8fafc;
-}
-
-.list-row span {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.list-row strong {
-  font-size: 0.875rem;
-  color: #0f172a;
+.link-sm {
+  font-size: 12px;
+  color: var(--primary);
+  text-decoration: none;
   font-weight: 500;
 }
 
-.list-row small {
-  font-size: 0.75rem;
-  color: #64748b;
+.link-sm:hover {
+  color: var(--primary-hover);
 }
 
-.okr-list {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+.card-body {
+  padding: 0;
 }
 
-.okr-item {
+/* 列表项 */
+.list-item {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-main);
+  transition: background 0.2s;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.list-item:hover {
+  background: var(--bg-surface-soft);
+}
+
+.item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.btn-primary-sm {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  background: var(--primary);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-primary-sm:hover {
+  background: var(--primary-hover);
+}
+
+/* OKR 区域 */
+.okr-section {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-main);
+}
+
+.okr-section:last-child {
+  border-bottom: none;
 }
 
 .okr-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-.okr-header strong {
-  font-size: 0.875rem;
-  color: #0f172a;
+.okr-title {
+  font-size: 15px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .okr-progress {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #2F66F6;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
 }
 
-.progress {
-  height: 0.5rem;
-  background: #f1f5f9;
-  border-radius: 0.25rem;
-  overflow: hidden;
-}
-
-.progress i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #2F66F6, #60a5fa);
-  border-radius: 0.25rem;
-  transition: width 0.3s;
-}
-
-.okr-deadline {
-  font-size: 0.75rem;
-  color: #64748b;
-}
-
-.kr-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-  padding-left: 1rem;
-  border-left: 2px solid #e2e8f0;
+.okr-period {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
 }
 
 .kr-item {
-  background: #f8fafc;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg-surface-soft);
+  border-radius: 8px;
 }
 
-.kr-content {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.kr-label {
-  font-size: 0.8125rem;
-  color: #475569;
-  flex: 1;
-}
-
-.kr-progress {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #2F66F6;
-}
-
-.kr-meta {
+.kr-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.6875rem;
-  color: #94a3b8;
+  margin-bottom: 8px;
 }
 
-.feed-timeline {
-  padding: 1.5rem;
-  max-height: 320px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+.kr-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
+.kr-progress {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.progress-bar {
+  height: 6px;
+  background: var(--bg-surface);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.kr-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 动态列表 */
 .feed-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-main);
 }
 
 .feed-item:last-child {
   border-bottom: none;
-  padding-bottom: 0;
 }
 
-.feed-item.is-dynamic {
-  position: relative;
-  padding-left: 1.5rem;
+.feed-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
 }
 
-.feed-item.is-dynamic::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.25rem;
-  width: 0.625rem;
-  height: 0.625rem;
-  background: #2F66F6;
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 0 0 1px #2F66F6;
-}
-
-.feed-item time {
-  font-size: 0.6875rem;
-  color: #94a3b8;
+.feed-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 6px;
 }
 
 .feed-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.6;
 }
 
-.feed-content strong {
-  font-size: 0.875rem;
-  color: #0f172a;
-  font-weight: 600;
-}
-
-.feed-content p {
-  font-size: 0.8125rem;
-  color: #475569;
-  line-height: 1.5;
-}
-
-.feed-content small {
-  font-size: 0.6875rem;
-  color: #94a3b8;
-}
-
+/* 响应式 */
 @media (max-width: 1024px) {
-  .dashboard-grid {
+  .main-grid,
+  .bottom-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .main-grid .card.large {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tabs {
+    overflow-x: auto;
   }
 }
 </style>
