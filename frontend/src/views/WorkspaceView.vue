@@ -3,7 +3,7 @@ import {computed, ref} from 'vue';
 import {useRoute, useRouter} from 'vue-router';
 import {useSessionStore} from '../stores/session';
 import {useTheme} from '../composables/useTheme';
-import {MENU_GROUPS} from '../config/menuConfig';
+import {MENU_GROUPS, type MenuGroup} from '../config/menuConfig';
 import DynamicIcon from '../components/common/DynamicIcon.vue';
 import CrmDashboardView from './crm/CrmDashboardView.vue';
 import CrmCustomersView from './crm/CrmCustomersView.vue';
@@ -31,14 +31,22 @@ const store = useSessionStore();
 const {theme, toggleTheme} = useTheme();
 const collapsed = ref(false);
 const mobileSidebarOpen = ref(false);
-const openTabs = ref([{id: 'wb_my_tasks', title: '我的任务'}]);
+const openTabs = ref([{id: 'wb_my_tasks', title: '我的任务', icon: 'CheckSquare'}]);
 const activeId = computed(() => String(route.params.viewId || 'wb_my_tasks'));
-const activeTitle = computed(() => {
+
+// 获取当前菜单项信息
+const currentMenuItem = computed(() => {
   for (const group of MENU_GROUPS) {
     const item = group.subMenus.find(m => m.id === activeId.value);
-    if (item) return item.title;
+    if (item) return { item, group };
   }
-  return '工作台';
+  return null;
+});
+
+const activeTitle = computed(() => currentMenuItem.value?.item.title || '工作台');
+const breadcrumb = computed(() => {
+  if (!currentMenuItem.value) return '';
+  return `${currentMenuItem.value.group.title} / ${currentMenuItem.value.item.title}`;
 });
 
 // 展开的分组
@@ -54,8 +62,10 @@ function toggleGroup(groupId: string) {
   expandedGroups.value[groupId] = !expandedGroups.value[groupId];
 }
 
-function open(id: string, title: string) {
-  if (!openTabs.value.some((tab) => tab.id === id)) openTabs.value.push({id, title});
+function open(id: string, title: string, icon: string) {
+  if (!openTabs.value.some((tab) => tab.id === id)) {
+    openTabs.value.push({id, title, icon});
+  }
   router.push(`/app/${id}`);
   if (mobileSidebarOpen.value) mobileSidebarOpen.value = false;
 }
@@ -70,8 +80,20 @@ function closeTab(id: string) {
   }
 }
 
-function getGroupIconClass(group: any) {
-  const isActive = group.subMenus.some((m: any) => m.id === activeId.value);
+function closeOtherTabs() {
+  const currentTab = openTabs.value.find(tab => tab.id === activeId.value);
+  if (currentTab) {
+    openTabs.value = [currentTab];
+  }
+}
+
+function refreshPage() {
+  // 触发页面刷新 - 可以通过重新加载组件或调用刷新方法
+  window.location.reload();
+}
+
+function getGroupIconClass(group: MenuGroup) {
+  const isActive = group.subMenus.some((m) => m.id === activeId.value);
   return isActive ? 'group-icon active-icon' : 'group-icon';
 }
 
@@ -133,7 +155,7 @@ function getSubIconClass(subId: string) {
             <button
               v-for="sub in group.subMenus"
               :key="sub.id"
-              @click="open(sub.id, sub.title)"
+              @click="open(sub.id, sub.title, sub.icon)"
               :class="['sub-menu-item', {active: activeId === sub.id}]"
               :title="collapsed ? `${group.title} · ${sub.title}` : undefined"
             >
@@ -158,10 +180,11 @@ function getSubIconClass(subId: string) {
 
     <!-- 主内容区 -->
     <div class="workspace-main">
-      <!-- 顶部栏 -->
-      <header class="tech-header">
-        <button class="mobile-menu" @click="mobileSidebarOpen = !mobileSidebarOpen">☰</button>
-        <strong class="page-title">{{ activeTitle }}</strong>
+      <!-- 面包屑导航 -->
+      <header class="breadcrumb-bar">
+        <div class="breadcrumb-content">
+          <span class="breadcrumb-text">{{ breadcrumb }}</span>
+        </div>
         <div class="header-actions">
           <button 
             class="icon-btn theme-toggle" 
@@ -177,21 +200,41 @@ function getSubIconClass(subId: string) {
 
       <!-- 标签页 -->
       <div class="tabs-bar">
-        <button
-          v-for="tab in openTabs"
-          :key="tab.id"
-          :class="['tab-item', {active: activeId === tab.id}]"
-          @click="router.push(`/app/${tab.id}`)"
-        >
-          <span class="tab-title">{{ tab.title }}</span>
-          <span
-            v-if="openTabs.length > 1"
-            class="tab-close"
-            @click.stop="closeTab(tab.id)"
+        <div class="tabs-list">
+          <button
+            v-for="tab in openTabs"
+            :key="tab.id"
+            :class="['tab-item', {active: activeId === tab.id}]"
+            @click="router.push(`/app/${tab.id}`)"
           >
-            ×
-          </span>
-        </button>
+            <DynamicIcon :name="tab.icon" class="tab-icon" :size="14" />
+            <span class="tab-title">{{ tab.title }}</span>
+            <button
+              v-if="openTabs.length > 1"
+              class="tab-close"
+              @click.stop="closeTab(tab.id)"
+              :title="`关闭 ${tab.title}`"
+            >
+              <DynamicIcon name="X" :size="12" />
+            </button>
+          </button>
+        </div>
+        <div class="tabs-actions">
+          <button 
+            class="action-btn" 
+            @click="refreshPage"
+            title="刷新当前页面"
+          >
+            <DynamicIcon name="RefreshCw" :size="14" />
+          </button>
+          <button 
+            class="action-btn" 
+            @click="closeOtherTabs"
+            title="关闭其他标签页"
+          >
+            <DynamicIcon name="X" :size="14" />
+          </button>
+        </div>
       </div>
 
       <!-- 内容区 -->
@@ -448,6 +491,7 @@ function getSubIconClass(subId: string) {
   text-align: left;
 }
 
+/* 侧边栏底部 */
 .sidebar-footer {
   padding: 12px;
   border-top: 1px solid var(--border-main);
@@ -492,9 +536,9 @@ function getSubIconClass(subId: string) {
   min-width: 0;
 }
 
-/* 顶部栏 */
-.tech-header {
-  height: 56px;
+/* 面包屑导航 */
+.breadcrumb-bar {
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -504,20 +548,15 @@ function getSubIconClass(subId: string) {
   flex-shrink: 0;
 }
 
-.mobile-menu {
-  display: none;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 8px;
+.breadcrumb-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.page-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
+.breadcrumb-text {
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .header-actions {
@@ -527,8 +566,8 @@ function getSubIconClass(subId: string) {
 }
 
 .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -537,7 +576,7 @@ function getSubIconClass(subId: string) {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .icon-btn:hover {
@@ -546,12 +585,12 @@ function getSubIconClass(subId: string) {
 }
 
 .user-name {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-body);
 }
 
 .btn-logout {
-  padding: 6px 16px;
+  padding: 5px 14px;
   background: transparent;
   border: 1px solid var(--border-main);
   border-radius: 6px;
@@ -570,18 +609,28 @@ function getSubIconClass(subId: string) {
 /* 标签页 */
 .tabs-bar {
   display: flex;
-  gap: 4px;
-  padding: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  height: 44px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-main);
-  overflow-x: auto;
   flex-shrink: 0;
+}
+
+.tabs-list {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  flex: 1;
+  min-width: 0;
 }
 
 .tab-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 6px 12px;
   background: transparent;
   border: none;
@@ -591,6 +640,7 @@ function getSubIconClass(subId: string) {
   transition: all 0.2s;
   white-space: nowrap;
   font-size: 13px;
+  flex-shrink: 0;
 }
 
 .tab-item:hover {
@@ -603,25 +653,69 @@ function getSubIconClass(subId: string) {
   color: white;
 }
 
+.tab-icon {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.tab-item.active .tab-icon {
+  opacity: 1;
+}
+
 .tab-title {
   user-select: none;
 }
 
 .tab-close {
-  width: 16px;
-  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 16px;
+  height: 16px;
   border-radius: 3px;
-  font-size: 16px;
-  line-height: 1;
-  opacity: 0.7;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.2s;
+  padding: 0;
+  margin-left: 2px;
 }
 
 .tab-close:hover {
   opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.tab-item.active .tab-close:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.tabs-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--border-main);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.action-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 /* 内容区 */
@@ -646,8 +740,16 @@ function getSubIconClass(subId: string) {
     left: 0;
   }
 
-  .mobile-menu {
-    display: block;
+  .breadcrumb-bar {
+    padding: 0 16px;
+  }
+
+  .tabs-bar {
+    padding: 0 12px;
+  }
+
+  .content-area {
+    padding: 16px;
   }
 }
 </style>

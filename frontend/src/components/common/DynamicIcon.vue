@@ -27,7 +27,9 @@ import {
   Boxes,
   ChevronDown,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  RefreshCw,
+  X
 } from 'lucide-vue-next';
 
 const props = defineProps<{
@@ -63,7 +65,9 @@ const iconMap: Record<string, any> = {
   Boxes,
   ChevronDown,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  RefreshCw,
+  X
 };
 
 const IconComponent = computed(() => iconMap[props.name] || Box);
