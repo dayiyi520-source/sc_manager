@@ -1,50 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Plus, Calendar, GitBranch, ListTodo, Bug } from 'lucide-vue-next';
+import { Plus, Calendar, GitBranch, ListTodo, Bug as BugIcon } from 'lucide-vue-next';
 import { useQuery } from '@tanstack/vue-query';
-
-interface Version {
-  id: string;
-  name: string;
-  code?: string;
-  status: string;
-  releaseDate?: string;
-  productLineId?: string;
-  productLineName?: string;
-  requirementsCount?: number;
-  completedReqCount?: number;
-  tasksCount?: number;
-  bugsCount?: number;
-}
-
-interface RequirementTask {
-  id: string;
-  title: string;
-  status: string;
-  ownerName: string;
-  priority: string;
-  versionId?: string;
-  versionName?: string;
-}
-
-interface DevTask {
-  id: string;
-  title: string;
-  status: string;
-  developer?: string;
-  priority: string;
-  versionName?: string;
-}
-
-interface BugItem {
-  id: string;
-  title: string;
-  status: string;
-  assignee?: string;
-  severity: string;
-  versionName?: string;
-  createdAt?: string;
-}
+import type { Version, RequirementTask, DevTask, Bug } from '../../types/product';
 
 const props = defineProps<{
   productLineId?: string;
@@ -66,7 +24,7 @@ const devTasksQuery = useQuery<DevTask[]>({
   queryFn: async () => []
 });
 
-const bugsQuery = useQuery<BugItem[]>({
+const bugsQuery = useQuery<Bug[]>({
   queryKey: ['bugs'],
   queryFn: async () => []
 });
@@ -131,7 +89,7 @@ const versionTasks = computed(() => {
 
 const versionBugs = computed(() => {
   if (!selectedVersion.value) return [];
-  return bugs.value.filter((b: BugItem) => 
+  return bugs.value.filter((b: Bug) => 
     b.versionName === selectedVersion.value?.name
   );
 });
@@ -231,7 +189,7 @@ function backToList() {
                 <span>{{ version.requirementsCount || 0 }} 需求</span>
               </div>
               <div class="stat">
-                <Bug :size="14" />
+                <BugIcon :size="14" />
                 <span>{{ version.bugsCount || 0 }} 缺陷</span>
               </div>
             </div>

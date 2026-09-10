@@ -2,27 +2,11 @@
 import { ref, computed, watch } from 'vue';
 import { Search, Filter, Plus, X } from 'lucide-vue-next';
 import { useQuery } from '@tanstack/vue-query';
+import type { RequirementTask, TaskKind } from '../../types/product';
 import RequirementTaskModal from '../../components/product/RequirementTaskModal.vue';
 
-interface RequirementTask {
-  id?: string;
-  title: string;
-  description?: string;
-  status?: string;
-  priority?: string;
-  ownerName?: string;
-  creatorName?: string;
-  productLineName?: string;
-  versionName?: string;
-  customerName?: string;
-  plannedStartDate?: string;
-  dueDate?: string;
-  createdAt?: string;
-  estimatedHours?: number;
-}
-
 const props = defineProps<{
-  kind?: 'requirement' | 'design' | 'dev' | 'bug';
+  kind?: TaskKind;
   productLineId?: string;
 }>();
 
@@ -43,7 +27,10 @@ const itemLabel = computed(() => {
     case 'design': return '设计任务';
     case 'dev': return '研发任务';
     case 'bug': return '缺陷';
-    default: return '需求任务';
+const props = defineProps<{
+  kind?: TaskKind;
+  productLineId?: string;
+}>();
   }
 });
 

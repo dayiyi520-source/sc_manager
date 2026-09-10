@@ -2,27 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { X } from 'lucide-vue-next';
 import RichTextEditor from './RichTextEditor.vue';
-
-interface RequirementTask {
-  id?: string;
-  title: string;
-  description?: string;
-  descriptionHtml?: string;
-  expectedGoal?: string;
-  status?: string;
-  priority?: string;
-  ownerName?: string;
-  creatorName?: string;
-  productLineName?: string;
-  versionName?: string;
-  customerName?: string;
-  plannedStartDate?: string;
-  dueDate?: string;
-  createdAt?: string;
-  estimatedHours?: number;
-  requirementType?: string;
-  expectedCompleteDate?: string;
-}
+import type { RequirementTask } from '../../types/product';
 
 interface Props {
   open: boolean;
