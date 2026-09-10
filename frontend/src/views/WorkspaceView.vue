@@ -93,7 +93,6 @@ function getSubIconClass(subId: string) {
         <div v-if="!collapsed" class="tech-logo">SC</div>
         <div v-if="!collapsed" class="brand-text">
           <div class="brand-title">师创管理后台</div>
-          <div class="brand-subtitle">Vue 迁移版</div>
         </div>
       </div>
 
@@ -286,17 +285,12 @@ function getSubIconClass(subId: string) {
 }
 
 .brand-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #FFFFFF;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.brand-subtitle {
-  font-size: 11px;
-  color: var(--text-muted);
 }
 
 /* 导航菜单 */
@@ -307,7 +301,7 @@ function getSubIconClass(subId: string) {
 }
 
 .menu-group {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 /* 一级菜单标题 */
@@ -316,7 +310,7 @@ function getSubIconClass(subId: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -326,14 +320,11 @@ function getSubIconClass(subId: string) {
 }
 
 .group-header:hover {
-  background: var(--bg-surface);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .group-header.active {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .group-header-content {
@@ -344,21 +335,21 @@ function getSubIconClass(subId: string) {
 }
 
 .group-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: #6B7280;
   transition: color 0.2s;
 }
 
 .group-icon.active-icon {
-  color: var(--warning);
+  color: #F59E0B;
 }
 
 .group-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: #FFFFFF;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -369,6 +360,7 @@ function getSubIconClass(subId: string) {
   height: 14px;
   transition: transform 0.2s;
   flex-shrink: 0;
+  color: #6B7280;
 }
 
 .chevron.rotated {
@@ -391,9 +383,11 @@ function getSubIconClass(subId: string) {
 .sub-menu-list {
   position: relative;
   margin-left: 14px;
-  padding-left: 12px;
-  border-left: 1px solid var(--border-main);
+  padding-left: 14px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 .sub-menu-list.collapsed {
@@ -406,15 +400,16 @@ function getSubIconClass(subId: string) {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 10px;
+  padding: 8px 12px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
-  color: var(--text-muted);
+  color: #9CA3AF;
   margin-bottom: 2px;
+  font-size: 14px;
 }
 
 .tech-sidebar.collapsed .sub-menu-item {
@@ -424,63 +419,69 @@ function getSubIconClass(subId: string) {
 }
 
 .sub-menu-item:hover {
-  background: var(--bg-surface);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+  color: #E5E7EB;
 }
 
 .sub-menu-item.active {
-  background: var(--primary);
-  color: white;
+  background: #1E40AF;
+  color: #FFFFFF;
   font-weight: 500;
 }
 
 .sub-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: #6B7280;
   transition: color 0.2s;
+}
+
+.sub-menu-item:hover .sub-icon {
+  color: #9CA3AF;
 }
 
 .sub-menu-item.active .sub-icon,
 .sub-icon.active {
-  color: white;
+  color: #FFFFFF;
 }
 
 .sub-title {
-  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  text-align: left;
 }
 
 .badge {
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
+  line-height: 1.4;
 }
 
 .badge.default {
-  background: var(--bg-elevated);
-  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.1);
+  color: #9CA3AF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .badge.success {
-  background: rgba(34, 197, 94, 0.2);
-  color: var(--success);
+  background: rgba(16, 185, 129, 0.15);
+  color: #10B981;
 }
 
 .badge.warning {
-  background: rgba(250, 204, 21, 0.2);
-  color: var(--warning);
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
 }
 
 .badge.danger {
-  background: rgba(242, 109, 91, 0.2);
-  color: var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
 }
 
 /* 侧边栏底部 */
@@ -497,18 +498,18 @@ function getSubIconClass(subId: string) {
   gap: 8px;
   padding: 8px 12px;
   background: transparent;
-  border: 1px solid var(--border-main);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
-  color: var(--text-body);
+  color: #9CA3AF;
   cursor: pointer;
   transition: all 0.2s;
   font-size: 13px;
 }
 
 .collapse-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.05);
+  color: #E5E7EB;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .tech-sidebar.collapsed .collapse-btn {
