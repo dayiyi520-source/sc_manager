@@ -1,0 +1,151 @@
+/* 统一主题样式 - 与 React 版本保持一致 */
+
+:root {
+  /* 深色主题（默认） */
+  --bg-overlay: color-mix(in srgb, #000000 70%, transparent);
+  --bg-main: #0C0F13;
+  --bg-page: #0C0F13;
+  --bg-nav: #0B111A;
+  --bg-surface: #121923;
+  --bg-surface-soft: #151A22;
+  --bg-card: #0D1620;
+  --bg-elevated: #18212C;
+  --border-main: #2C3440;
+  --border-subtle: #3A4655;
+  --border-strong: #3A4655;
+  --primary: #2F66F6;
+  --primary-hover: #3B73FF;
+  --active-text: #6EA0FF;
+  --success: #22C55E;
+  --warning: #FACC15;
+  --danger: #F26D5B;
+  --cam-cyan: #35C7E8;
+  --actor-green: #4CD37D;
+  --ai-indigo: #8B9CFF;
+  --accent-gold: var(--warning);
+  --accent-gold-hover: #FDE047;
+  --accent-gold-dim: rgba(250, 204, 21, 0.12);
+  --text-primary: #F8FAFC;
+  --text-body: #A5ADBA;
+  --text-muted: #7C8796;
+  
+  /* 字体 */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* 浅色主题 */
+html:not(.dark) {
+  --bg-overlay: color-mix(in srgb, #000000 40%, transparent);
+  --bg-main: #F5F6F8;
+  --bg-page: #F5F6F8;
+  --bg-nav: #001529;
+  --bg-surface: #FFFFFF;
+  --bg-surface-soft: #F7F8FA;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --border-main: #E5E7EB;
+  --border-subtle: #D1D5DB;
+  --border-strong: #D1D5DB;
+  --primary: #1677FF;
+  --primary-hover: #4096FF;
+  --active-text: #1677FF;
+  --success: #16A34A;
+  --warning: #D97706;
+  --danger: #DC2626;
+  --cam-cyan: #0891B2;
+  --actor-green: #16A34A;
+  --ai-indigo: #4F46E5;
+  --accent-gold: var(--warning);
+  --accent-gold-hover: #B45309;
+  --accent-gold-dim: rgba(217, 119, 6, 0.12);
+  --text-primary: #111827;
+  --text-body: #374151;
+  --text-muted: #6B7280;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-body);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  letter-spacing: 0;
+}
+
+/* 按钮基础样式 */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 输入框基础样式 */
+input, select, textarea {
+  font-family: inherit;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(47, 102, 246, 0.2);
+}
+
+/* 表格样式 */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+td {
+  color: var(--text-primary);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-subtle);
+}
+
+/* 通用工具类 */
+.text-primary { color: var(--text-primary); }
+.text-body { color: var(--text-body); }
+.text-muted { color: var(--text-muted); }
+.bg-main { background: var(--bg-main); }
+.bg-card { background: var(--bg-card); }
+.bg-surface { background: var(--bg-surface); }
+.border-main { border-color: var(--border-main); }

@@ -2,6 +2,7 @@
 import {computed, ref} from 'vue';
 import {useRoute, useRouter} from 'vue-router';
 import {useSessionStore} from '../stores/session';
+import {useTheme} from '../composables/useTheme';
 import CrmDashboardView from './crm/CrmDashboardView.vue';
 import CrmCustomersView from './crm/CrmCustomersView.vue';
 import CrmPipelineView from './crm/CrmPipelineView.vue';
@@ -75,6 +76,7 @@ const groups: MenuGroup[] = [
 const route = useRoute();
 const router = useRouter();
 const store = useSessionStore();
+const {theme, toggleTheme} = useTheme();
 const collapsed = ref(false);
 const openTabs = ref([{id: 'wb_my_tasks', title: '我的任务'}]);
 const activeId = computed(() => String(route.params.viewId || 'wb_my_tasks'));
@@ -111,6 +113,13 @@ function open(id: string, title: string) {
         <button class="mobile-menu" @click="collapsed=!collapsed">☰</button>
         <strong>{{ activeTitle }}</strong>
         <div class="account">
+          <button 
+            class="theme-toggle" 
+            @click="toggleTheme"
+            :title="theme === 'light' ? '切换为暗色模式' : '切换为亮色模式'"
+          >
+            {{ theme === 'light' ? '🌙' : '☀️' }}
+          </button>
           <span>{{ store.user?.name }}</span>
           <button @click="store.logout(); router.push('/login')">退出</button>
         </div>
@@ -152,3 +161,36 @@ function open(id: string, title: string) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.workspace { display: flex; height: 100vh; }
+.sidebar { background: var(--bg-nav); color: var(--text-primary); width: 200px; display: flex; flex-direction: column; transition: width 0.3s; border-right: 1px solid var(--border-main); }
+.sidebar.collapsed { width: 60px; }
+.sidebar .brand { padding: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; border-bottom: 1px solid var(--border-main); }
+.sidebar nav { flex: 1; overflow-y: auto; padding: 8px; }
+.sidebar nav section { margin-bottom: 16px; }
+.sidebar nav h3 { font-size: 12px; color: var(--text-muted); margin: 8px 0; text-transform: uppercase; }
+.sidebar nav button { display: block; width: 100%; text-align: left; padding: 8px 12px; background: transparent; border: none; color: var(--text-body); cursor: pointer; border-radius: 6px; transition: all 0.2s; }
+.sidebar nav button:hover { background: var(--bg-surface); color: var(--text-primary); }
+.sidebar nav button.active { background: var(--primary); color: white; }
+.sidebar .collapse { margin: 8px; padding: 8px; background: transparent; border: 1px solid var(--border-main); color: var(--text-body); cursor: pointer; border-radius: 6px; }
+.workspace-main { flex: 1; display: flex; flex-direction: column; background: var(--bg-page); }
+.topbar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--bg-surface); border-bottom: 1px solid var(--border-main); }
+.topbar strong { font-size: 16px; color: var(--text-primary); }
+.topbar .mobile-menu { display: none; background: transparent; border: none; color: var(--text-primary); font-size: 20px; cursor: pointer; }
+.topbar .account { display: flex; align-items: center; gap: 12px; }
+.topbar .account span { color: var(--text-body); }
+.topbar .account button { padding: 6px 12px; background: transparent; border: 1px solid var(--border-main); color: var(--text-body); cursor: pointer; border-radius: 6px; transition: all 0.2s; }
+.topbar .account button:hover { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--border-strong); }
+.topbar .account .theme-toggle { font-size: 18px; padding: 6px 10px; }
+.tabs { display: flex; gap: 4px; padding: 8px 16px; background: var(--bg-surface); border-bottom: 1px solid var(--border-main); overflow-x: auto; }
+.tabs button { padding: 6px 12px; background: transparent; border: none; color: var(--text-body); cursor: pointer; border-radius: 6px; white-space: nowrap; transition: all 0.2s; }
+.tabs button:hover { background: var(--bg-elevated); color: var(--text-primary); }
+.tabs button.active { background: var(--primary); color: white; }
+.content { flex: 1; overflow-y: auto; padding: 16px; }
+@media (max-width: 768px) {
+  .sidebar { position: fixed; z-index: 100; height: 100%; }
+  .sidebar:not(.collapsed) { width: 240px; }
+  .topbar .mobile-menu { display: block; }
+}
+</style>
