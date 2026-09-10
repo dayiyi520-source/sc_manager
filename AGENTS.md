@@ -163,6 +163,92 @@ This project uses the stringplugin team plugin. Follow these rules before creati
 - Do not commit `.enterprise-app-factory/secrets/runtime.env`, local secret JSON files, server passwords, database passwords, or personal tokens.
 <!-- ENTERPRISE_APP_FACTORY_END -->
 
-## 前端视觉规范
 
-前端页面与组件必须遵循 `docs/AIEDIT_UI_DESIGN_SPECIFICATION.md`。该文档是本项目的视觉基线，优先级高于历史页面中的旧色值和旧组件样式；新增或修改界面时复用其中的 Token、排版、间距、圆角、状态和响应式规则。
+## 统一开发规范
+
+开发时必须同时遵守以下两份文档，它们共同构成本项目的完整规范体系：
+
+### 1. 视觉设计基线（最高优先级）
+
+**文档**：`docs/AIEDIT_UI_DESIGN_SPECIFICATION.md`
+
+**适用范围**：
+- 颜色系统（暗色主题，专业工作台风格）
+- 字体排印与层级（字号、字重、行高、等宽字体）
+- 间距、圆角与阴影（8pt 栅格、elevation 层级）
+- 布局架构（栅格系统、响应式断点）
+- 交互反馈与状态机（4 态：Normal/Hover/Active/Disabled）
+- 专业模块色彩语义（Success/Warning/Danger/3D/QTE/AI 等）
+
+**强制规则**：
+- 所有颜色必须使用 AIEDIT 定义的 Design Token（禁止硬编码 HEX 值）
+- 页面底色 `#0C0F13`，主面板 `#121923`，品牌主色 `#2F66F6`
+- 字体必须遵循固定字阶（24/18/16/14/12/11px）
+- 间距必须使用 4/8/12/16/24/32px 步长
+- 所有组件必须提供 4 种完整状态
+
+### 2. 技术开发规范（次于视觉规范）
+
+**文档**：`docs/management-backend-development-spec.md`
+
+**适用范围**：
+- 前端技术栈：React 19、Ant Design 5.x、React Query、React Router
+- 组件库使用规范：Ant Design 组件调用、业务组件封装原则
+- Design Token 适配：通过 Ant Design ConfigProvider 覆盖默认主题
+- 图标体系：@ant-design/icons（UI 控件）+ @primer/octicons-react（技术/品牌）
+- 后端架构：Java 17、Spring Boot 3.5.x、MyBatis-Plus、MySQL 9.3
+- 数据库设计：表结构、迁移、索引、审计字段
+- 权限与安全：租户隔离、RBAC、数据范围控制
+- 测试与验收：Vitest、React Testing Library、单元测试、集成测试
+- 开发流程：需求分析、功能完成定义、代码质量标准
+
+**强制规则**：
+- 禁止新增 `lucide-react`（使用 Ant Design Icons 或 Octicons）
+- 禁止 `window.alert/confirm/prompt`（使用 Ant Design Modal/message）
+- 禁止硬编码颜色/样式（必须通过 Design Token）
+- 禁止页面直接使用 fetch/axios（必须通过 API 层）
+- 后端必须校验：租户、权限、状态、版本、软删除
+- 所有数据必须持久化（生产环境禁止前端 Mock）
+
+### 3. 冲突解决原则
+
+当两份文档出现冲突时，按以下规则处理：
+
+| 冲突类型 | 优先文档 | 说明 |
+|---------|---------|------|
+| 颜色值、色板定义 | AIEDIT_UI_DESIGN_SPECIFICATION | 视觉表现为准 |
+| 字体大小、字重、行高 | AIEDIT_UI_DESIGN_SPECIFICATION | 视觉表现为准 |
+| 间距、圆角、阴影 | AIEDIT_UI_DESIGN_SPECIFICATION | 视觉表现为准 |
+| React/Ant Design 用法 | management-backend-development-spec | 技术实现为准 |
+| 组件库选择与封装 | management-backend-development-spec | 技术实现为准 |
+| 后端架构与数据库 | management-backend-development-spec | 技术实现为准 |
+| 测试框架与流程 | management-backend-development-spec | 技术实现为准 |
+
+### 4. Ant Design 主题适配要求
+
+由于 Ant Design 默认为浅色主题，必须通过以下方式适配 AIEDIT 暗色风格。
+
+**在应用根组件中配置 ConfigProvider**，将 AIEDIT Design Token 映射到 Ant Design 主题系统，确保所有 Ant Design 组件自动应用暗色风格和品牌色。
+
+**Tailwind 配置必须与 Design Token 对齐**，在 `tailwind.config.js` 中同步 AIEDIT 色板，避免两套主题互相冲突。Tailwind 仅用于布局和间距，不用于组件样式覆盖。
+
+### 5. 开发检查清单
+
+在开始任何新功能开发前，必须确认：
+
+- [ ] 已阅读 AIEDIT_UI_DESIGN_SPECIFICATION 的颜色和间距规范
+- [ ] 已阅读 management-backend-development-spec 的相关技术章节
+- [ ] 已配置 Ant Design ConfigProvider 适配暗色主题
+- [ ] 已在 Tailwind 中同步 Design Token
+- [ ] 已明确功能的业务规则和数据契约
+- [ ] 已确认组件的 4 种状态设计（Normal/Hover/Loading/Error）
+- [ ] 已规划后端的权限校验和数据验证逻辑
+
+### 6. 总结
+
+- **视觉设计**：AIEDIT 定义颜色、字体、间距等视觉元素
+- **技术实现**：management-spec 定义 React、Ant Design、后端架构
+- **主题适配**：通过 ConfigProvider + Tailwind 统一 Design Token
+- **禁止行为**：硬编码颜色、混用图标库、跳过状态设计、前端 Mock 生产数据
+
+遵守这两份文档，确保项目在视觉一致性和技术规范性上达到生产级标准。

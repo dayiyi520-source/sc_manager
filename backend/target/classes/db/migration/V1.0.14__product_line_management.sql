@@ -1,0 +1,52 @@
+CREATE TABLE IF NOT EXISTS t_product_line (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  code_ VARCHAR(64) NOT NULL,
+  name_ VARCHAR(255) NOT NULL,
+  description_ TEXT,
+  owner_name_ VARCHAR(128),
+  website_ VARCHAR(512),
+  cover_image_ LONGTEXT,
+  status_ VARCHAR(16) NOT NULL DEFAULT '启用中',
+  current_version_ VARCHAR(64) NOT NULL DEFAULT '1.0.0',
+  create_by_ VARCHAR(36) NOT NULL,
+  update_by_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  version_ INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_product_line_tenant_code (tenant_id_, code_)
+);
+CREATE TABLE IF NOT EXISTS t_product_line_member (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  product_line_id_ VARCHAR(36) NOT NULL,
+  user_id_ VARCHAR(36),
+  member_name_ VARCHAR(128) NOT NULL,
+  role_ VARCHAR(64),
+  create_by_ VARCHAR(36) NOT NULL,
+  update_by_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  KEY idx_product_line_member (tenant_id_, product_line_id_)
+);
+CREATE TABLE IF NOT EXISTS t_product_line_version (
+  id_ VARCHAR(36) PRIMARY KEY,
+  tenant_id_ VARCHAR(36) NOT NULL,
+  product_line_id_ VARCHAR(36) NOT NULL,
+  code_ VARCHAR(64) NOT NULL,
+  name_ VARCHAR(255) NOT NULL,
+  start_date_ DATE,
+  end_date_ DATE,
+  content_ TEXT,
+  status_ VARCHAR(16) NOT NULL DEFAULT '待开始',
+  linked_requirement_ids_ JSON,
+  create_by_ VARCHAR(36) NOT NULL,
+  update_by_ VARCHAR(36) NOT NULL,
+  create_time_ DATETIME NOT NULL,
+  update_time_ DATETIME NOT NULL,
+  delete_flag_ TINYINT NOT NULL DEFAULT 0,
+  version_ INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_product_line_version (tenant_id_, product_line_id_, code_)
+);

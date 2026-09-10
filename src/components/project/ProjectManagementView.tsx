@@ -13,7 +13,6 @@ import {
   User,
   ArrowRight,
   ShieldCheck,
-  FileCheck,
   ChevronRight
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
@@ -122,7 +121,6 @@ export const ProjectManagementView: React.FC = () => {
           subText="智行新能源定制化"
           icon={<AlertTriangle className="w-5 h-5" />}
           iconBgColor="bg-rose-50 text-rose-600 dark:bg-rose-950/50"
-          onClick={() => openPageTab('ops_risks')}
         />
         <StatCard
           title="交付工时与人效达成"
@@ -282,16 +280,6 @@ export const ProjectManagementView: React.FC = () => {
           width="max-w-2xl"
           footer={
             <>
-              <button
-                onClick={() => {
-                  setSelectedProjectIdForDetail(null);
-                  openPageTab('ops_deliverables');
-                }}
-                className="px-3 py-2 bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 rounded-lg text-xs font-semibold flex items-center gap-1"
-              >
-                <FileCheck className="w-3.5 h-3.5" />
-                交付物归档清单
-              </button>
               {activeProject.stage !== '终验维保' && (
                 <button
                   onClick={() => advanceProjectStage(activeProject.id)}

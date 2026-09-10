@@ -5,12 +5,12 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RequirementActionButtons } from './RequirementActionButtons';
 import { isWorkOrderInScope, RequirementPoolView } from './RequirementPoolView';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '@/context/AppContext';
 import { requirementRepository } from '../../services/requirementRepository';
 import type { RequirementTask } from '../../types';
 
-vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
-vi.mock('../../services/requirementRepository', () => ({ requirementRepository: { employees: vi.fn(), detail: vi.fn(), createWorkItem: vi.fn() } }));
+vi.mock('@/context/AppContext', () => ({ useApp: vi.fn() }));
+vi.mock('@/services/requirementRepository', () => ({ requirementRepository: { employees: vi.fn(), detail: vi.fn(), createWorkItem: vi.fn() } }));
 afterEach(cleanup);
 
 describe('work-order workflow form regression', () => {

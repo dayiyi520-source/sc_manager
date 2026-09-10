@@ -607,7 +607,7 @@ export const CRMCustomersView: React.FC = () => {
                     <button
                       onClick={() => {
                         setSelectedCustomerIdForDetail(null);
-                        openPageTab('prod_req_pool');
+                        openPageTab('wb_work_order');
                       }}
                       className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium"
                     >

@@ -13,7 +13,7 @@ import {
   ArrowRight,
   List,
 } from '@/components/common/octicons-compat';
-import { useApp } from '../../context/AppContext';
+import { useApp, MENU_GROUPS } from '../../context/AppContext';
 import { CURRENT_USERS } from '../../data/mockData';
 import { useAppAuth } from '../../hooks/useAppAuth';
 import { clearSession } from '../../services/session';
@@ -29,8 +29,16 @@ export const Header: React.FC = () => {
     approvals,
     requirementTasks,
     sidebarCollapsed,
-    toggleMobileSidebar
+    toggleMobileSidebar,
+    openTabs,
+    activeTabId
   } = useApp();
+  
+  // 面包屑逻辑
+  const currentTab = openTabs.find((t) => t.id === activeTabId) || openTabs[0];
+  const currentGroup = MENU_GROUPS.find((group) => group.subMenus.some((menu) => menu.id === activeTabId));
+  const currentMainMenu = currentGroup?.title || '工作台';
+  const currentSubMenu = currentTab?.title || '业务模块';
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -82,6 +90,13 @@ export const Header: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 px-4 text-xs text-[var(--text-muted)]">
+        <span>{currentMainMenu}</span>
+        <span>/</span>
+        <span className="tech-accent-text font-medium">{currentSubMenu}</span>
       </div>
 
       {/* Right: Notifications and account controls */}

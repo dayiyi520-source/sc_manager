@@ -1,342 +1,354 @@
 import React, { useState } from 'react';
-import {
-  Users,
-  Search,
-  Filter,
-  Plus,
-  Mail,
-  Phone,
-  Building,
-  Shield,
-  CheckCircle2,
-  UserCheck,
-  Briefcase
-} from '@/components/common/octicons-compat';
+import { Button, Space, Avatar } from 'antd';
+import { PlusOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
+import { Users, Building, Shield, UserCheck, Briefcase } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { StatCard, StatusTag, Modal } from '../common/UIComponents';
+import {
+  PageHeader,
+  SearchBar,
+  FilterPanel,
+  DataTable,
+  StatusBadge,
+  FormModal,
+  FormInput,
+  FormSelect,
+  message,
+} from '@/components/common';
+import { StatCard } from '@/components/common/UIComponents';
+
+interface TeamMember {
+  id: string;
+  name: string;
+  title: string;
+  dept: string;
+  phone: string;
+  email: string;
+  status: 'active' | 'inactive';
+}
 
 export const TeamOrgView: React.FC = () => {
   const { addToast } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState<string>('all');
+  const [filterOpen, setFilterOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [members, setMembers] = useState([
+  // 表单状态
+  const [formData, setFormData] = useState({
+    name: '',
+    title: '',
+    dept: '',
+    phone: '',
+    email: '',
+  });
+
+  const [members, setMembers] = useState<TeamMember[]>([
     {
       id: 'm-1',
       name: '陈志远',
       title: '华东区商务总经理',
       dept: '商务大区与市场部',
       phone: '138-0011-8899',
-      email: 'chenzy@shichuang.com',
-      role: '大区销售总监',
-      status: '在职',
-      projectsCount: 4
+      email: 'chen.zhiyuan@shichuang.com',
+      status: 'active'
     },
     {
       id: 'm-2',
-      name: '李天成',
-      title: '首席信创架构师',
-      dept: '产研技术中台',
+      name: '王雪琴',
+      title: '交付副总监',
+      dept: '工程交付与运维部',
       phone: '139-2233-4455',
-      email: 'litc@shichuang.com',
-      role: '技术总监/架构师',
-      status: '在职',
-      projectsCount: 6
+      email: 'wang.xueqin@shichuang.com',
+      status: 'active'
     },
     {
       id: 'm-3',
-      name: '王雪琴',
-      title: '交付副总监 (PMP)',
-      dept: '工程交付与运营中心',
-      phone: '137-5566-7788',
-      email: 'wangxq@shichuang.com',
-      role: '高级项目总监',
-      status: '在职',
-      projectsCount: 5
+      name: '李天成',
+      title: '首席架构师',
+      dept: '产品研发与技术中心',
+      phone: '186-5566-7788',
+      email: 'li.tiancheng@shichuang.com',
+      status: 'active'
     },
     {
       id: 'm-4',
+      name: '张美玲',
+      title: '高级产品经理',
+      dept: '产品研发与技术中心',
+      phone: '151-9988-7766',
+      email: 'zhang.meiling@shichuang.com',
+      status: 'active'
+    },
+    {
+      id: 'm-5',
+      name: '刘建国',
+      title: '财务经理',
+      dept: '财务与资金管理部',
+      phone: '136-7788-5544',
+      email: 'liu.jianguo@shichuang.com',
+      status: 'active'
+    },
+    {
+      id: 'm-6',
       name: '赵敏',
-      title: 'QA测试主管',
-      dept: '质量保障与测试部',
-      phone: '136-7788-9900',
-      email: 'zhaomin@shichuang.com',
-      role: '测试架构师',
-      status: '在职',
-      projectsCount: 3
+      title: '人力资源主管',
+      dept: '综合行政与人事部',
+      phone: '158-3344-2211',
+      email: 'zhao.min@shichuang.com',
+      status: 'active'
     }
   ]);
 
-  const [formName, setFormName] = useState('');
-  const [formTitle, setFormTitle] = useState('');
-  const [formDept, setFormDept] = useState('商务大区与市场部');
-  const [formPhone, setFormPhone] = useState('');
-  const [formEmail, setFormEmail] = useState('');
+  // 部门列表
+  const departments = [
+    { value: 'all', label: '全部部门' },
+    { value: '商务大区与市场部', label: '商务大区与市场部' },
+    { value: '工程交付与运维部', label: '工程交付与运维部' },
+    { value: '产品研发与技术中心', label: '产品研发与技术中心' },
+    { value: '财务与资金管理部', label: '财务与资金管理部' },
+    { value: '综合行政与人事部', label: '综合行政与人事部' },
+  ];
 
+  // 职位选项
+  const titleOptions = [
+    { value: '总监', label: '总监' },
+    { value: '经理', label: '经理' },
+    { value: '主管', label: '主管' },
+    { value: '架构师', label: '架构师' },
+    { value: '产品经理', label: '产品经理' },
+    { value: '工程师', label: '工程师' },
+  ];
+
+  // 筛选逻辑
   const filteredMembers = members.filter((m) => {
-    const matchQ =
+    const matchesSearch = !searchQuery || 
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchDept = deptFilter === 'all' || m.dept === deptFilter;
-    return matchQ && matchDept;
+      m.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDept = deptFilter === 'all' || m.dept === deptFilter;
+    return matchesSearch && matchesDept;
   });
 
-  const handleSaveMember = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formName.trim()) {
-      addToast('warning', '请填写员工姓名');
-      return;
-    }
+  // 统计数据
+  const stats = {
+    total: members.length,
+    active: members.filter((m) => m.status === 'active').length,
+    departments: new Set(members.map((m) => m.dept)).size,
+  };
 
-    setMembers([
-      {
-        id: `m-${Date.now()}`,
-        name: formName,
-        title: formTitle || '专业工程师',
-        dept: formDept,
-        phone: formPhone || '138-0000-0000',
-        email: formEmail || `${formName.toLowerCase()}@shichuang.com`,
-        role: '业务专员',
-        status: '在职',
-        projectsCount: 1
-      },
-      ...members
-    ]);
-    setIsModalOpen(false);
-    addToast('success', '已成功录入员工组织信息');
+  // 表格列定义
+  const columns = [
+    {
+      title: '姓名',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string) => (
+        <div className="flex items-center gap-2">
+          <Avatar size="small" style={{ backgroundColor: '#2F66F6' }}>
+            {name.charAt(0)}
+          </Avatar>
+          <span className="font-medium">{name}</span>
+        </div>
+      ),
+    },
+    {
+      title: '职位',
+      dataIndex: 'title',
+      key: 'title',
+    },
+    {
+      title: '部门',
+      dataIndex: 'dept',
+      key: 'dept',
+      render: (dept: string) => (
+        <div className="flex items-center gap-1.5 text-[var(--text-body)]">
+          <Building size={14} />
+          <span>{dept}</span>
+        </div>
+      ),
+    },
+    {
+      title: '联系方式',
+      key: 'contact',
+      render: (_: any, record: TeamMember) => (
+        <div className="space-y-1 text-xs">
+          <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
+            <PhoneOutlined />
+            <span>{record.phone}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
+            <MailOutlined />
+            <span>{record.email}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <StatusBadge
+          status={status === 'active' ? 'success' : 'default'}
+          text={status === 'active' ? '在职' : '离职'}
+        />
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: () => (
+        <Space size="small">
+          <Button type="link" size="small">编辑</Button>
+          <Button type="link" size="small" danger>删除</Button>
+        </Space>
+      ),
+    },
+  ];
+
+  // 提交表单
+  const handleSubmit = async (values: any) => {
+    const newMember: TeamMember = {
+      id: `m-${Date.now()}`,
+      name: values.name,
+      title: values.title,
+      dept: values.dept,
+      phone: values.phone,
+      email: values.email,
+      status: 'active',
+    };
+    setMembers([...members, newMember]);
+    message.success('成员添加成功');
+    addToast('success', '成员添加成功', `${values.name} 已加入团队`);
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
-      {/* 4 Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="公司在职团队规模"
-          value={members.length + 38}
-          unit="人"
-          subText="全职研发与交付专家"
-          icon={<Users className="w-5 h-5" />}
-        />
-        <StatCard
-          title="核心信创研发专家"
-          value="24"
-          unit="人"
-          change="技术占比 57%"
-          isPositive={true}
-          subText="达梦/统信内核调优"
-          icon={<Briefcase className="w-5 h-5" />}
-          iconBgColor="bg-blue-50 text-blue-600 dark:bg-blue-950/50"
-        />
-        <StatCard
-          title="持有 PMP 认证项目经理"
-          value="8"
-          unit="人"
-          change="标准化管控"
-          isPositive={true}
-          subText="国家电网交付保障"
-          icon={<Shield className="w-5 h-5" />}
-          iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50"
-        />
-        <StatCard
-          title="商务大区与方案总监"
-          value="10"
-          unit="人"
-          subText="覆盖华东、华北、华南"
-          icon={<UserCheck className="w-5 h-5" />}
-          iconBgColor="bg-purple-50 text-purple-600 dark:bg-purple-950/50"
-        />
-      </div>
-
-      {/* Toolbar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索员工姓名 / 职位 / 邮箱..."
-              className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white w-64"
-            />
-          </div>
-
-          <select
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+    <div className="space-y-6">
+      {/* 页面头部 */}
+      <PageHeader
+        title="团队与组织"
+        subtitle={`共 ${stats.total} 名成员，${stats.departments} 个部门`}
+        actions={[
+          <Button
+            key="add"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setIsModalOpen(true)}
           >
-            <option value="all">所有部门</option>
-            <option value="商务大区与市场部">商务大区与市场部</option>
-            <option value="产研技术中台">产研技术中台</option>
-            <option value="工程交付与运营中心">工程交付与运营中心</option>
-            <option value="质量保障与测试部">质量保障与测试部</option>
-          </select>
-        </div>
+            添加成员
+          </Button>,
+        ]}
+      />
 
-        <button
-          id="btn-add-team-member"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          录入组织员工
-        </button>
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <StatCard
+          title="团队总人数"
+          value={stats.total}
+          suffix="人"
+          prefix={<Users className="w-4 h-4" />}
+        />
+        <StatCard
+          title="在职人员"
+          value={stats.active}
+          suffix="人"
+          prefix={<UserCheck className="w-4 h-4" />}
+        />
+        <StatCard
+          title="部门数量"
+          value={stats.departments}
+          suffix="个"
+          prefix={<Building className="w-4 h-4" />}
+        />
+        <StatCard
+          title="权限角色"
+          value={5}
+          suffix="个"
+          prefix={<Shield className="w-4 h-4" />}
+        />
       </div>
 
-      {/* Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredMembers.map((m) => (
-          <div
-            key={m.id}
-            className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-4 text-xs"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                  {m.name.slice(0, 1)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-slate-900 dark:text-white">{m.name}</span>
-                    <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-medium text-[11px]">
-                      {m.role}
-                    </span>
-                  </div>
-                  <span className="text-slate-500 block text-[11px] mt-0.5">
-                    {m.title} · {m.dept}
-                  </span>
-                </div>
-              </div>
+      {/* 搜索和表格 */}
+      <div className="bg-[var(--bg-surface)] p-4 rounded-lg space-y-4">
+        <SearchBar
+          placeholder="搜索成员姓名、职位"
+          value={searchQuery}
+          onChange={setSearchQuery}
+          showFilter
+          onFilterClick={() => setFilterOpen(true)}
+          filterActive={deptFilter !== 'all'}
+        />
 
-              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 text-[11px] font-medium">
-                {m.status}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-lg text-slate-600 dark:text-slate-300">
-              <div className="flex items-center gap-2">
-                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                <span>{m.phone}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Mail className="w-3.5 h-3.5 text-slate-400" />
-                <span>{m.email}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-              <span>当前负责关联项目：{m.projectsCount} 个</span>
-              <button
-                onClick={() => addToast('info', '权限已配置', `已核验 ${m.name} 的RBAC系统访问凭证`)}
-                className="text-blue-600 hover:text-blue-700 font-semibold"
-              >
-                配置角色与权限 &gt;
-              </button>
-            </div>
-          </div>
-        ))}
+        <DataTable
+          columns={columns}
+          dataSource={filteredMembers}
+          rowKey="id"
+          emptyText="暂无团队成员"
+          emptyDescription="点击右上角按钮添加团队成员"
+        />
       </div>
 
-      {/* Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="录入新员工组织档案"
-        footer={
-          <>
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSaveMember}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs"
-            >
-              保存员工
-            </button>
-          </>
-        }
+      {/* 筛选面板 */}
+      <FilterPanel
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        onReset={() => {
+          setDeptFilter('all');
+          message.info('已重置筛选条件');
+        }}
+        onApply={() => {
+          setFilterOpen(false);
+          message.success('已应用筛选');
+        }}
       >
-        <form onSubmit={handleSaveMember} className="space-y-4 text-xs">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                员工姓名 *
-              </label>
-              <input
-                type="text"
-                required
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder="如：张立强"
-                className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                职位职级 *
-              </label>
-              <input
-                type="text"
-                required
-                value={formTitle}
-                onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="如：资深信创研发工程师"
-                className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
-          </div>
+        <FormSelect
+          label="部门"
+          value={deptFilter}
+          onChange={(value) => setDeptFilter(value as string)}
+          options={departments}
+          placeholder="选择部门"
+        />
+      </FilterPanel>
 
-          <div>
-            <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-              所属部门 *
-            </label>
-            <select
-              value={formDept}
-              onChange={(e) => setFormDept(e.target.value)}
-              className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-            >
-              <option value="商务大区与市场部">商务大区与市场部</option>
-              <option value="产研技术中台">产研技术中台</option>
-              <option value="工程交付与运营中心">工程交付与运营中心</option>
-              <option value="质量保障与测试部">质量保障与测试部</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                联系手机
-              </label>
-              <input
-                type="text"
-                value={formPhone}
-                onChange={(e) => setFormPhone(e.target.value)}
-                placeholder="138-xxxx-xxxx"
-                className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                企业邮箱
-              </label>
-              <input
-                type="email"
-                value={formEmail}
-                onChange={(e) => setFormEmail(e.target.value)}
-                placeholder="xxx@shichuang.com"
-                className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
-          </div>
-        </form>
-      </Modal>
+      {/* 添加成员弹窗 */}
+      <FormModal
+        title="添加团队成员"
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleSubmit}
+      >
+        <FormInput
+          label="姓名"
+          name="name"
+          required
+          placeholder="请输入姓名"
+        />
+        <FormInput
+          label="职位"
+          name="title"
+          required
+          placeholder="请输入职位"
+        />
+        <FormSelect
+          label="所属部门"
+          name="dept"
+          required
+          options={departments.filter(d => d.value !== 'all')}
+          placeholder="选择部门"
+        />
+        <FormInput
+          label="手机号"
+          name="phone"
+          required
+          placeholder="138-xxxx-xxxx"
+        />
+        <FormInput
+          label="企业邮箱"
+          name="email"
+          required
+          placeholder="xxx@shichuang.com"
+        />
+      </FormModal>
     </div>
   );
 };

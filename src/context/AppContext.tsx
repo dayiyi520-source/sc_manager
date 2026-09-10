@@ -106,7 +106,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'wb_my_tasks', title: '我的任务', mainMenuId: 'workbench', icon: 'CheckSquare', badge: 4, badgeType: 'danger' },
       { id: 'wb_okr_perf', title: '目标与绩效', mainMenuId: 'workbench', icon: 'Target' },
       { id: 'wb_knowledge', title: '知识库', mainMenuId: 'workbench', icon: 'BookOpen' },
-      { id: 'prod_req_pool', title: '工单中心', mainMenuId: 'workbench', icon: 'Database' }
+      { id: 'wb_work_order', title: '工单中心', mainMenuId: 'workbench', icon: 'Database' }
     ]
   },
   {
@@ -169,31 +169,6 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     ]
   },
   {
-    id: 'operations',
-    title: '运维与交付',
-    icon: 'Server',
-    subMenus: [
-      { id: 'ops_overview', title: '运维大盘与监控', mainMenuId: 'operations', icon: 'Activity' },
-      { id: 'ops_deliverables', title: '交付物归档', mainMenuId: 'operations', icon: 'FileCheck' },
-      { id: 'ops_changes', title: '变更管理', mainMenuId: 'operations', icon: 'Sliders' },
-      { id: 'ops_risks', title: '风险与预警', mainMenuId: 'operations', icon: 'AlertTriangle' },
-      { id: 'ops_cust_review', title: '客户评价与满意度', mainMenuId: 'operations', icon: 'Users' },
-      { id: 'ops_ops_review', title: '交付经营核算', mainMenuId: 'operations', icon: 'TrendingUp' }
-    ]
-  },
-  {
-    id: 'finance',
-    title: '财务管理',
-    icon: 'DollarSign',
-    subMenus: [
-      { id: 'fin_overview', title: '财务大盘', mainMenuId: 'finance', icon: 'PieChart' },
-      { id: 'fin_receivables', title: '应收回款', mainMenuId: 'finance', icon: 'CreditCard' },
-      { id: 'fin_payables', title: '应付账款', mainMenuId: 'finance', icon: 'FileSpreadsheet' },
-      { id: 'fin_invoices', title: '发票管理', mainMenuId: 'finance', icon: 'Receipt' },
-      { id: 'fin_cost_profit', title: '成本利润核算', mainMenuId: 'finance', icon: 'BarChart3' }
-    ]
-  },
-  {
     id: 'system',
     title: '系统与组织',
     icon: 'Settings',
@@ -209,7 +184,7 @@ const ALIAS_MAP: Record<string, SubMenuId> = {
   'crm_bid_review': 'crm_bidding_review',
   'prod_reqs': 'prod_req_tasks',
   'prod_dev_tasks': 'prod_rd_tasks',
-  'prod_pool': 'prod_req_pool',
+  'prod_pool': 'wb_work_order',
   'prod_review': 'prod_reviews',
   'ops_projects': 'proj_list',
   'ops_milestones': 'proj_config',
@@ -840,7 +815,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id: `event-${Date.now()}`,
         eventType: '提需求',
         operatorName: currentUser.name,
-        createdAt
+        createdAt,
+        metadata: {
+          assigneeName: task.ownerName || currentUser.name
+        }
       }],
       category: 'my_responsible',
       todoList: task.todoList || [

@@ -1,0 +1,2 @@
+ALTER TABLE t_crm_lead
+  MODIFY COLUMN status_ VARCHAR(32) NOT NULL DEFAULT '待确认';

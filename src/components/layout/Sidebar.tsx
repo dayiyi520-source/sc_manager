@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   ChevronDown,
-  ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
   Command
 } from '@/components/common/octicons-compat';
 import { useApp, MENU_GROUPS } from '../../context/AppContext';
-import { DynamicIcon } from '../common/IconHelper';
+import { getAntdIcon } from '../common/AntdIconMap';
 import { SubMenuId } from '../../types';
 
 export const Sidebar: React.FC = () => {
@@ -73,12 +72,11 @@ export const Sidebar: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <DynamicIcon
-                      name={group.icon}
-                      className={`w-4 h-4 shrink-0 transition-colors ${
+                    <span className={`flex items-center justify-center w-4 h-4 shrink-0 transition-colors ${
                         isAnyChildActive ? 'text-[var(--warning)]' : 'text-[var(--text-muted)]'
-                      }`}
-                    />
+                      }`} style={{ fontSize: 16 }}>
+                      {getAntdIcon(group.icon)}
+                    </span>
                     <span className="text-[13px] font-medium tracking-normal text-slate-200">
                       {group.title}
                     </span>
@@ -125,12 +123,11 @@ export const Sidebar: React.FC = () => {
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <DynamicIcon
-                            name={sub.icon}
-                            className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                          <span className={`flex items-center justify-center w-3.5 h-3.5 shrink-0 transition-colors ${
                               isActive ? 'tech-accent-text' : 'text-[var(--text-muted)]'
-                            }`}
-                          />
+                            }`} style={{ fontSize: 14 }}>
+                            {getAntdIcon(sub.icon)}
+                          </span>
                           {!visuallyCollapsed && (
                             <span className="text-[13px] truncate">{sub.title}</span>
                           )}

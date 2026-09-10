@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.shichuang.manage.crm.CrmControllerIntegrationTest
+-------------------------------------------------------------------------------
+Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 10.77 s -- in com.shichuang.manage.crm.CrmControllerIntegrationTest

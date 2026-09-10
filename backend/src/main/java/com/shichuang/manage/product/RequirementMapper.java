@@ -128,7 +128,7 @@ public class RequirementMapper {
     }
 
     int assignWorkItem(String tenantId, String operatorId, String id, String from, String type, String workId, String assignee, String note) {
-        return jdbc.update("UPDATE t_product_requirement SET status_='处理中',task_type_=CASE WHEN status_='处理中' THEN task_type_ ELSE ? END,task_id_=CASE WHEN status_='处理中' THEN task_id_ ELSE ? END,assigned_owner_name_=?,assigned_note_=?,owner_name_=?,update_by_=?,version_=version_+1,update_time_=NOW() WHERE id_=? AND tenant_id_=? AND delete_flag_=0 AND (status_=? OR status_='处理中')", type, workId, assignee, note, assignee, operatorId, id, tenantId, from);
+        return jdbc.update("UPDATE t_product_requirement SET status_='处理中',task_type_=?,task_id_=?,assigned_owner_name_=?,assigned_note_=?,owner_name_=?,update_by_=?,version_=version_+1,update_time_=NOW() WHERE id_=? AND tenant_id_=? AND delete_flag_=0 AND (status_=? OR status_='处理中')", type, workId, assignee, note, assignee, operatorId, id, tenantId, from);
     }
 
     int activeWorkItems(String tenantId, String id) {

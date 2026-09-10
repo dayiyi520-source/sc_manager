@@ -1,6 +1,8 @@
 import React from 'react';
 import { X, AlertCircle, CheckCircle2, Info, AlertTriangle, ArrowUpRight, ArrowDownRight } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
+import { Card, Statistic } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
 export const FORM_CONTROL_CLASS = 'w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-2.5 text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none';
 
@@ -12,80 +14,84 @@ export const FormField: React.FC<{ label: string; required?: boolean; className?
 );
 
 export interface StatCardProps {
-  id?: string;
   title: string;
-  value: string | number;
+  value: number | string;
   unit?: string;
-  change?: string;
-  isPositive?: boolean;
   subText?: string;
-  icon: React.ReactNode;
-  iconBgColor?: string;
-  onClick?: () => void;
+  icon?: React.ReactNode;
+  prefix?: React.ReactNode;
+  suffix?: React.ReactNode;
+  trend?: 'up' | 'down';
+  trendValue?: string;
+  description?: string;
+  loading?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
 export const StatCard: React.FC<StatCardProps> = ({
-  id,
   title,
   value,
   unit,
-  change,
-  isPositive = true,
   subText,
   icon,
-  iconBgColor = 'bg-blue-950/40 text-blue-300 border border-blue-800/60',
+  prefix,
+  suffix,
+  trend,
+  trendValue,
+  description,
+  loading = false,
+  className,
   onClick,
-  className = ''
 }) => {
-  const tone = iconBgColor.includes('rose') || iconBgColor.includes('pink')
-    ? 'pink'
-    : iconBgColor.includes('amber') || iconBgColor.includes('orange')
-    ? 'orange'
-    : iconBgColor.includes('emerald') || iconBgColor.includes('green')
-    ? 'green'
-    : iconBgColor.includes('purple') || iconBgColor.includes('indigo')
-    ? 'purple'
-    : 'blue';
-
+  const CardComponent = Card as any;
+  
   return (
-    <div
-      id={id}
+    <CardComponent
+      loading={loading}
+      className={`stat-card ${className || ''}`}
+      bordered={false}
       onClick={onClick}
-      className={`tech-stat-card tech-tone-${tone} border rounded-lg p-5 transition-all ${
-        onClick ? 'cursor-pointer' : ''
-      } ${className}`}
+      hoverable={!!onClick}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-400">{title}</span>
-        <div className={`tech-stat-icon p-2.5 rounded-md ${iconBgColor}`}>{icon}</div>
-      </div>
-      <div className="mt-2 flex items-baseline gap-1.5">
-        <span className="text-2xl font-serif font-bold tracking-tight text-[var(--text-primary)]">
-          {value}
-        </span>
-        {unit && <span className="text-xs font-normal text-slate-400">{unit}</span>}
-      </div>
-      {(change || subText) && (
-        <div className="mt-2 flex items-center gap-1.5 text-xs">
-          {change && (
-            <span
-              className={`inline-flex items-center font-medium font-mono ${
-                isPositive ? 'text-emerald-400' : 'text-rose-400'
-              }`}
-            >
-              {isPositive ? (
-                <ArrowUpRight className="w-3.5 h-3.5 mr-0.5 inline" />
-              ) : (
-                <ArrowDownRight className="w-3.5 h-3.5 mr-0.5 inline" />
-              )}
-              {change}
-            </span>
+      <div className="space-y-2">
+        <div className="flex items-start justify-between">
+          <div className="text-sm text-[var(--text-muted)]">{title}</div>
+          {icon && (
+            <div className="flex items-center justify-center text-[var(--primary)]" style={{ fontSize: 20 }}>
+              {icon}
+            </div>
           )}
-          {subText && <span className="text-slate-500">{subText}</span>}
         </div>
-      )}
-    </div>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-baseline gap-1">
+            <Statistic
+              value={value}
+              prefix={prefix}
+              suffix={suffix || unit}
+              valueStyle={{ 
+                fontSize: '24px', 
+                fontWeight: 600,
+                color: 'var(--text-primary)'
+              }}
+            />
+          </div>
+          {(subText || trend || trendValue || description) && (
+            <div className="flex items-center gap-2 text-xs">
+              {trend && (
+                <span className={trend === 'up' ? 'text-[var(--success)]' : 'text-[var(--danger)]'}>
+                  {trend === 'up' ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+                  {trendValue}
+                </span>
+              )}
+              {(description || subText) && (
+                <span className="text-[var(--text-muted)]">{description || subText}</span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </CardComponent>
   );
 };
 

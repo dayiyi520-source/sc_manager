@@ -1,0 +1,6 @@
+com\shichuang\manage\support\AbstractApiIntegrationTest.class
+com\shichuang\manage\auth\LocalAuthFilterTest.class
+com\shichuang\manage\product\RequirementControllerIntegrationTest.class
+com\shichuang\manage\product\RequirementStatusPolicyTest.class
+com\shichuang\manage\auth\TokenServiceTest.class
+com\shichuang\manage\crm\CrmControllerIntegrationTest.class

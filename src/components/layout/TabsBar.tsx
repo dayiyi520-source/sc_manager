@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, RotateCcw, MoreHorizontal, Layers } from '@/components/common/octicons-compat';
+import { X } from '@/components/common/octicons-compat';
+import { ReloadOutlined, CloseOutlined } from '@ant-design/icons';
 import { useApp } from '../../context/AppContext';
 import { DynamicIcon } from '../common/IconHelper';
 
@@ -22,7 +23,7 @@ export const TabsBar: React.FC = () => {
 
   return (
     <div className="tech-tabs h-9 border-b px-3 flex items-center justify-between select-none overflow-x-auto">
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1 flex-1 min-w-0">
         {openTabs.map((tab) => {
           const isActive = activeTabId === tab.id;
           return (
@@ -63,14 +64,14 @@ export const TabsBar: React.FC = () => {
           title="刷新当前页面"
           className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-surface)] transition-colors"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <ReloadOutlined style={{ fontSize: 14 }} />
         </button>
         <button
           onClick={handleCloseOthers}
           title="关闭其他标签页"
           className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-surface)] transition-colors text-[11px] flex items-center gap-1"
         >
-          <Layers className="w-3.5 h-3.5" />
+          <CloseOutlined style={{ fontSize: 14 }} />
         </button>
       </div>
     </div>

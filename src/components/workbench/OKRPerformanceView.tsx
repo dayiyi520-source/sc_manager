@@ -9,53 +9,55 @@ import {
   CheckCircle2,
   AlertCircle,
   MessageSquare,
-  Sparkles,
   Send,
-  Sliders,
   ChevronRight,
-  Filter
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
-import { OKRItem, PerformanceReview } from '../../types';
+import { StatusBadge, FormInput, FormTextarea, message } from '@/components/common';
+import { OKRItem } from '../../types';
+
+type MainTabType = 'okrs' | 'reviews';
+type OkrCategoryType = 'my' | 'supervisor' | 'subordinate' | 'department' | 'other_dept';
+type ReviewSubTabType = 'write' | 'my' | 'received';
+type ReviewType = 'week' | 'month';
 
 export const OKRPerformanceView: React.FC = () => {
-  const { okrs, addOKR, performances, addPerformanceReview, currentUser, addToast } = useApp();
+  const { okrs, addOKR, performances, addPerformanceReview, currentUser } = useApp();
 
-  const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
-
-  // OKR Sub Tabs: 我的OKR、直属上级、直属下级、我部门的、其他部门
-  const [okrCategoryTab, setOkrCategoryTab] = useState<
-    'my' | 'supervisor' | 'subordinate' | 'department' | 'other_dept'
-  >('my');
+  const [mainTab, setMainTab] = useState<MainTabType>('okrs');
+  const [okrCategoryTab, setOkrCategoryTab] = useState<OkrCategoryType>('my');
   const [selectedCycle, setSelectedCycle] = useState('2026-09');
-
-  // Review Sub Tabs: 写总结、我的总结、我收到的
-  const [reviewSubTab, setReviewSubTab] = useState<'write' | 'my' | 'received'>('write');
+  const [reviewSubTab, setReviewSubTab] = useState<ReviewSubTabType>('write');
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
 
-  // Add OKR Modal State
+  // 新增OKR表单状态
   const [isAddOkrOpen, setIsAddOkrOpen] = useState(false);
-  const [newOkrCycle, setNewOkrCycle] = useState('2026-09');
-  const [newOkrAlignTo, setNewOkrAlignTo] = useState('公司年度战略目标：突破智能协同千万级标杆市场');
-  const [newOkrObjective, setNewOkrObjective] = useState('');
-  const [newOkrWeight, setNewOkrWeight] = useState(40);
-  const [newOkrDeadline, setNewOkrDeadline] = useState('2026-09-30');
-  const [newKr1Content, setNewKr1Content] = useState('');
-  const [newKr1Weight, setNewKr1Weight] = useState(50);
-  const [newKr2Content, setNewKr2Content] = useState('');
-  const [newKr2Weight, setNewKr2Weight] = useState(50);
+  const [newOkrForm, setNewOkrForm] = useState({
+    cycle: '2026-09',
+    alignTo: '公司年度战略目标:突破智能协同千万级标杆市场',
+    objective: '',
+    weight: 40,
+    deadline: '2026-09-30',
+    kr1Content: '',
+    kr1Weight: 50,
+    kr2Content: '',
+    kr2Weight: 50,
+  });
 
-  // Write Review Form State
-  const [reviewType, setReviewType] = useState<'week' | 'month'>('month');
-  const [reviewCycleName, setReviewCycleName] = useState('2026年8月月度复盘总结');
-  const [reviewSummary, setReviewSummary] = useState('');
-  const [reviewUncompleted, setReviewUncompleted] = useState('');
-  const [reviewSelfScore, setReviewSelfScore] = useState(90);
-  const [reviewSuggestions, setReviewSuggestions] = useState('');
-  const [reviewHelpNeeded, setReviewHelpNeeded] = useState('');
-  const [reviewSendTo, setReviewSendTo] = useState('总经办, 部门主管');
+  // 复盘总结表单状态
+  const [reviewForm, setReviewForm] = useState({
+    type: 'month' as ReviewType,
+    cycleName: '2026年8月月度复盘总结',
+    summary: '',
+    uncompleted: '',
+    selfScore: 90,
+    suggestions: '',
+    helpNeeded: '',
+    sendTo: '总经办, 部门主管',
+  });
 
+  // 筛选OKR
   const matchesCategory = (o: OKRItem) => {
     if (okrCategoryTab === 'my') return o.category === 'my';
     if (okrCategoryTab === 'supervisor') return o.category === 'supervisor' || o.department.includes('总经办');
@@ -65,578 +67,659 @@ export const OKRPerformanceView: React.FC = () => {
   };
   const filteredOkrs = okrs.filter((o) => o.cycle === selectedCycle && matchesCategory(o));
 
+  // 统计数据
+  const totalOkrs = okrs.length;
+  const avgProgress = okrs.length > 0
+    ? Math.round(okrs.reduce((sum, o) => sum + o.progress, 0) / okrs.length)
+    : 0;
+  const completedOkrs = okrs.filter((o) => o.progress >= 100).length;
+  const pendingReviews = performances.filter((p) => p.status === '待审阅').length;
+
+  // Tab按钮组件
+  const TabButton: React.FC<{
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+  }> = ({ active, onClick, children }) => (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+        active
+          ? 'bg-[var(--primary)] text-white shadow-sm'
+          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)]'
+      }`}
+    >
+      {children}
+    </button>
+  );
+
+  const SmallTabButton: React.FC<{
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+  }> = ({ active, onClick, children }) => (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 rounded-md font-medium text-xs transition-colors ${
+        active
+          ? 'bg-[var(--bg-surface)] text-[var(--primary)] shadow-sm'
+          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+      }`}
+    >
+      {children}
+    </button>
+  );
+
+  // 保存OKR
   const handleSaveOkr = () => {
-    if (!newOkrObjective.trim()) {
-      addToast('warning', '请填写目标(O)内容');
+    if (!newOkrForm.objective.trim()) {
+      message.warning('请填写目标(O)内容');
       return;
     }
     addOKR({
-      cycle: newOkrCycle,
-      objective: newOkrObjective,
-      weight: Number(newOkrWeight),
-      deadline: newOkrDeadline,
-      alignTo: newOkrAlignTo,
+      cycle: newOkrForm.cycle,
+      objective: newOkrForm.objective,
+      weight: newOkrForm.weight,
+      deadline: newOkrForm.deadline,
+      alignTo: newOkrForm.alignTo,
       keyResults: [
         {
           id: `kr-${Date.now()}-1`,
-          content: newKr1Content || '按时按质推进关键业务指标达成',
+          content: newOkrForm.kr1Content || '按时按质推进关键业务指标达成',
           progress: 0,
-          weight: Number(newKr1Weight),
-          deadline: newOkrDeadline
+          weight: newOkrForm.kr1Weight,
+          deadline: newOkrForm.deadline
         },
         {
           id: `kr-${Date.now()}-2`,
-          content: newKr2Content || '保障团队协同与客户满意度不低于90分',
+          content: newOkrForm.kr2Content || '保障团队协同与客户满意度不低于90分',
           progress: 0,
-          weight: Number(newKr2Weight),
-          deadline: newOkrDeadline
+          weight: newOkrForm.kr2Weight,
+          deadline: newOkrForm.deadline
         }
       ]
     });
     setIsAddOkrOpen(false);
-    setNewOkrObjective('');
-    setNewKr1Content('');
-    setNewKr2Content('');
+    setNewOkrForm({
+      ...newOkrForm,
+      objective: '',
+      kr1Content: '',
+      kr2Content: '',
+    });
+    message.success('OKR创建成功');
   };
 
+  // 提交复盘总结
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reviewSummary.trim()) {
-      addToast('warning', '请填写本期总结核心内容');
+    if (!reviewForm.summary.trim()) {
+      message.warning('请填写本期总结核心内容');
       return;
     }
     addPerformanceReview({
-      type: reviewType,
-      cycleName: reviewCycleName,
-      summary: reviewSummary,
-      uncompletedReason: reviewUncompleted,
-      selfScore: Number(reviewSelfScore),
-      suggestions: reviewSuggestions,
-      helpNeeded: reviewHelpNeeded,
-      sendTo: reviewSendTo.split(',').map((s) => s.trim())
+      type: reviewForm.type,
+      cycleName: reviewForm.cycleName,
+      summary: reviewForm.summary,
+      uncompletedReason: reviewForm.uncompleted,
+      selfScore: reviewForm.selfScore,
+      suggestions: reviewForm.suggestions,
+      helpNeeded: reviewForm.helpNeeded,
+      sendTo: reviewForm.sendTo.split(',').map((s) => s.trim())
     });
     setReviewSubTab('my');
     setIsReviewFormOpen(false);
+    message.success('复盘总结提交成功');
   };
 
-  const openReviewForm = (type: 'week' | 'month') => {
-    setReviewType(type);
-    setReviewCycleName(type === 'week' ? '2026年第36周复盘总结' : '2026年8月月度复盘总结');
+  const openReviewForm = (type: ReviewType) => {
+    setReviewForm({
+      ...reviewForm,
+      type,
+      cycleName: type === 'week' ? '2026年第36周复盘总结' : '2026年8月月度复盘总结',
+    });
     setIsReviewFormOpen(true);
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
-      {/* Top Main Navigation Tabs */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
-          <button
-            id="tab-okrs"
-            onClick={() => setMainTab('okrs')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              mainTab === 'okrs'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
+    <div className="space-y-6">
+      {/* 顶部主导航 */}
+      <div className="flex items-center gap-3 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-2">
+        <TabButton
+          active={mainTab === 'okrs'}
+          onClick={() => setMainTab('okrs')}
+        >
+          <div className="flex items-center gap-2">
             <Target className="w-4 h-4" />
-            目标 OKRs
-          </button>
-          <button
-            id="tab-reviews"
-            onClick={() => {
-              setMainTab('reviews');
-              setIsReviewFormOpen(false);
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              mainTab === 'reviews'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            复盘总结
-          </button>
-        </div>
-
-        {mainTab === 'okrs' && (
-          <div className="flex items-center gap-3">
-            <select
-              value={selectedCycle}
-              onChange={(e) => setSelectedCycle(e.target.value)}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-            >
-              <option value="2026-09">2026年09月（当前月份）</option>
-              <option value="2026-08">2026年08月（上月）</option>
-              <option value="2026-07">2026年07月（已归档）</option>
-              <option value="2026-06">2026年06月（已归档）</option>
-            </select>
-
-            <button
-              id="btn-add-okr"
-              onClick={() => setIsAddOkrOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              添加目标
-            </button>
+            OKR目标管理
           </div>
-        )}
+        </TabButton>
+        <TabButton
+          active={mainTab === 'reviews'}
+          onClick={() => setMainTab('reviews')}
+        >
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4" />
+            绩效复盘总结
+          </div>
+        </TabButton>
       </div>
 
-      {/* Main Tab 1: OKRs */}
+      {/* OKR目标管理 */}
       {mainTab === 'okrs' && (
-        <div className="space-y-6">
-          {/* Sub Navigation */}
-          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 text-xs">
-            <button
-              onClick={() => setOkrCategoryTab('my')}
-              className={`pb-2.5 px-3 font-medium transition-colors border-b-2 ${
-                okrCategoryTab === 'my'
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              我的 OKR
-            </button>
-            <button
-              onClick={() => setOkrCategoryTab('supervisor')}
-              className={`pb-2.5 px-3 font-medium transition-colors border-b-2 ${
-                okrCategoryTab === 'supervisor'
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              直属上级 OKR
-            </button>
-            <button
-              onClick={() => setOkrCategoryTab('subordinate')}
-              className={`pb-2.5 px-3 font-medium transition-colors border-b-2 ${
-                okrCategoryTab === 'subordinate'
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              直属下级 OKR
-            </button>
-            <button
-              onClick={() => setOkrCategoryTab('department')}
-              className={`pb-2.5 px-3 font-medium transition-colors border-b-2 ${
-                okrCategoryTab === 'department'
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              我部门的 OKR
-            </button>
-            <button
-              onClick={() => setOkrCategoryTab('other_dept')}
-              className={`pb-2.5 px-3 font-medium transition-colors border-b-2 ${
-                okrCategoryTab === 'other_dept'
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-            >
-              跨部门协同 OKR
-            </button>
+        <>
+          {/* 核心指标 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="OKR总数"
+              value={totalOkrs}
+              unit="个"
+              icon={<Target className="w-5 h-5" />}
+              iconBgColor="bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+            />
+            <StatCard
+              title="平均完成率"
+              value={avgProgress}
+              unit="%"
+              icon={<TrendingUp className="w-5 h-5" />}
+              iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
+            />
+            <StatCard
+              title="已达成"
+              value={completedOkrs}
+              unit="个"
+              icon={<CheckCircle2 className="w-5 h-5" />}
+              iconBgColor="bg-green-50 text-green-600 dark:bg-green-950/50 dark:text-green-400"
+            />
+            <StatCard
+              title="待审阅总结"
+              value={pendingReviews}
+              unit="份"
+              icon={<FileSpreadsheet className="w-5 h-5" />}
+              iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400"
+            />
           </div>
 
-          {okrCategoryTab === 'my' && isAddOkrOpen && (
-            <form
-              onSubmit={(event) => { event.preventDefault(); handleSaveOkr(); }}
-              className="rounded-xl border border-blue-500 bg-white dark:bg-slate-900 shadow-xs overflow-hidden"
-            >
-              <div className="flex items-center justify-between px-5 py-3 bg-blue-50/70 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800/60 text-xs">
-                <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">O1</span><span className="font-semibold text-slate-800 dark:text-slate-200">添加目标</span><span className="text-slate-400">{newOkrCycle.replace('-', '年')}月</span></div>
-                <span className="text-slate-400">填写完成后提交主管确认</span>
-              </div>
-              <div className="p-5 space-y-4 text-xs">
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_140px] gap-3">
-                  <input type="text" required value={newOkrObjective} onChange={(e) => setNewOkrObjective(e.target.value)} placeholder="输入目标名称：明确你想要达成什么，不写含糊概括的目标" className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-                  <select value={newOkrCycle} onChange={(e) => setNewOkrCycle(e.target.value)} className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"><option value="2026-09">2026年09月</option><option value="2026-08">2026年08月</option><option value="2026-07">2026年07月</option></select>
-                  <input type="number" value={newOkrWeight} onChange={(e) => setNewOkrWeight(Number(e.target.value))} min="0" max="100" placeholder="权重 %" className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
+          {/* OKR分类标签 */}
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-[var(--text-primary)]">查看范围:</span>
+                <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5 gap-1 flex-wrap">
+                  <SmallTabButton
+                    active={okrCategoryTab === 'my'}
+                    onClick={() => setOkrCategoryTab('my')}
+                  >
+                    我的OKR
+                  </SmallTabButton>
+                  <SmallTabButton
+                    active={okrCategoryTab === 'supervisor'}
+                    onClick={() => setOkrCategoryTab('supervisor')}
+                  >
+                    直属上级
+                  </SmallTabButton>
+                  <SmallTabButton
+                    active={okrCategoryTab === 'subordinate'}
+                    onClick={() => setOkrCategoryTab('subordinate')}
+                  >
+                    直属下级
+                  </SmallTabButton>
+                  <SmallTabButton
+                    active={okrCategoryTab === 'department'}
+                    onClick={() => setOkrCategoryTab('department')}
+                  >
+                    我部门的
+                  </SmallTabButton>
+                  <SmallTabButton
+                    active={okrCategoryTab === 'other_dept'}
+                    onClick={() => setOkrCategoryTab('other_dept')}
+                  >
+                    其他部门
+                  </SmallTabButton>
                 </div>
-                <input type="text" value={newOkrAlignTo} onChange={(e) => setNewOkrAlignTo(e.target.value)} placeholder="+ 选择对齐目标" className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-                <textarea rows={2} value={newKr1Content} onChange={(e) => setNewKr1Content(e.target.value)} placeholder="KR1 关键结果：遵循 SMART 原则，具体、可衡量、可达成、相关性、时效性" className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-                <input type="date" value={newOkrDeadline} onChange={(e) => setNewOkrDeadline(e.target.value)} className="w-full md:w-56 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800"><button type="button" onClick={() => setIsAddOkrOpen(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">取消</button><button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">提交主管确认</button></div>
               </div>
-            </form>
-          )}
 
-          {/* OKR Cards List */}
-          <div className="space-y-4">
-            {filteredOkrs.length === 0 ? (
-              <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
-                <div className="review-empty-icon mb-4 flex items-center justify-center"><Target className="h-9 w-9 text-blue-600 dark:text-blue-400" /></div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">本月暂无目标</h3>
-                <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">当前月份还没有填写 OKR，点击右上角“添加目标”开始设定。</p>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedCycle}
+                  onChange={(e) => setSelectedCycle(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-lg"
+                >
+                  <option value="2026-09">2026年9月</option>
+                  <option value="2026-08">2026年8月</option>
+                  <option value="2026-Q3">2026年Q3</option>
+                </select>
+                <button
+                  onClick={() => setIsAddOkrOpen(true)}
+                  className="flex items-center gap-2 px-4 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white rounded-lg font-semibold text-sm transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  新增OKR
+                </button>
               </div>
-            ) : filteredOkrs.map((okr, oIdx) => (
-              <div
-                key={okr.id}
-                className="tech-list-item bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-4"
-              >
-                {/* Header of OKR */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs font-bold">
-                        O{oIdx + 1}
-                      </span>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                        {okr.objective}
-                      </h3>
-                    </div>
-                    {okr.alignTo && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 rounded text-[10px]">
-                          对齐目标
-                        </span>
-                        <span>{okr.alignTo}</span>
-                      </div>
-                    )}
-                  </div>
+            </div>
 
-                  <div className="flex items-center gap-4 shrink-0">
-                    <div className="text-right">
-                      <div className="text-xs text-slate-400">综合进度</div>
-                      <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{okr.progress}%</div>
-                    </div>
-                    <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
-                      <div className="text-xs text-slate-400">责任人 / 周期</div>
-                      <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        {okr.ownerName} ({okr.cycle})
-                      </div>
-                    </div>
-                  </div>
+            {/* OKR列表 */}
+            <div className="space-y-4">
+              {filteredOkrs.length === 0 ? (
+                <div className="text-center py-12 text-[var(--text-muted)]">
+                  <Target className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <div className="text-sm">该筛选条件下暂无OKR</div>
                 </div>
-
-                {/* Progress bar */}
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+              ) : (
+                filteredOkrs.map((okr) => (
                   <div
-                    className="bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${okr.progress}%` }}
-                  />
-                </div>
-
-                {/* Key Results list */}
-                <div className="space-y-2 pt-2">
-                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    支撑关键成果 (Key Results)
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {okr.keyResults.map((kr, idx) => (
-                      <div
-                        key={kr.id}
-                        className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800 space-y-2 text-xs"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">
-                            KR{idx + 1}: {kr.content}
+                    key={okr.id}
+                    className="p-5 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl space-y-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <span className="font-bold text-base text-[var(--text-primary)]">
+                            {okr.objective}
                           </span>
-                          <span className="font-bold text-blue-600 dark:text-blue-400 shrink-0">
-                            {kr.progress}%
-                          </span>
+                          <StatusBadge status={okr.progress >= 100 ? '已达成' : '进行中'} />
                         </div>
-                        <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className="bg-blue-600 h-full rounded-full"
-                            style={{ width: `${kr.progress}%` }}
-                          />
+                        <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] flex-wrap">
+                          <span>负责人: {okr.owner}</span>
+                          <span>•</span>
+                          <span>部门: {okr.department}</span>
+                          <span>•</span>
+                          <span>周期: {okr.cycle}</span>
+                          <span>•</span>
+                          <span>截止: {okr.deadline}</span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                          <span>权重: {kr.weight}%</span>
-                          <span>截止: {kr.deadline}</span>
+                        {okr.alignTo && (
+                          <div className="mt-2 text-xs text-[var(--text-body)]">
+                            对齐: {okr.alignTo}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-[var(--primary)]">
+                          {okr.progress}%
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] mt-1">
+                          权重 {okr.weight}%
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+                    </div>
 
-      {/* Main Tab 2: 目标复盘总结 */}
-      {mainTab === 'reviews' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 text-xs">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setReviewSubTab('write');
-                  setIsReviewFormOpen(false);
-                }}
-                className={`pb-2.5 px-3 font-semibold transition-colors border-b-2 ${
-                  reviewSubTab === 'write'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                写复盘总结
-              </button>
-              <button
-                onClick={() => setReviewSubTab('my')}
-                className={`pb-2.5 px-3 font-semibold transition-colors border-b-2 ${
-                  reviewSubTab === 'my'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                我的复盘列表 ({performances.filter((p) => p.author === currentUser.name).length})
-              </button>
-              <button
-                onClick={() => setReviewSubTab('received')}
-                className={`pb-2.5 px-3 font-semibold transition-colors border-b-2 ${
-                  reviewSubTab === 'received'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                我收到的复盘 ({performances.length})
-              </button>
+                    {/* 关键结果 */}
+                    <div className="space-y-3">
+                      {okr.keyResults.map((kr, idx) => (
+                        <div
+                          key={kr.id}
+                          className="p-3 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-lg space-y-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-sm text-[var(--text-primary)] font-medium">
+                              KR{idx + 1}: {kr.content}
+                            </span>
+                            <span className="font-semibold text-[var(--text-primary)] shrink-0">
+                              {kr.progress}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-[var(--bg-main)] rounded-full h-2 overflow-hidden">
+                            <div
+                              className="h-full bg-[var(--primary)] rounded-full transition-all"
+                              style={{ width: `${kr.progress}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                            <span>权重: {kr.weight}%</span>
+                            <span>截止: {kr.deadline}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
+        </>
+      )}
 
-          {/* Subtab: 写总结 */}
-          {reviewSubTab === 'write' && !isReviewFormOpen && (
-            <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
-              <div className="review-empty-icon mb-4 flex items-center justify-center">
-                <FileSpreadsheet className="h-9 w-9 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">暂无需要填写的总结</h3>
-              <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                选择复盘周期后开始记录本阶段的工作成果与改进计划
-              </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => openReviewForm('week')}
-                  className="tech-button-secondary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all"
+      {/* 绩效复盘总结 */}
+      {mainTab === 'reviews' && (
+        <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5">
+                <SmallTabButton
+                  active={reviewSubTab === 'write'}
+                  onClick={() => setReviewSubTab('write')}
                 >
-                  <Calendar className="h-3.5 w-3.5" />
-                  周复盘
+                  写总结
+                </SmallTabButton>
+                <SmallTabButton
+                  active={reviewSubTab === 'my'}
+                  onClick={() => setReviewSubTab('my')}
+                >
+                  我的总结
+                </SmallTabButton>
+                <SmallTabButton
+                  active={reviewSubTab === 'received'}
+                  onClick={() => setReviewSubTab('received')}
+                >
+                  我收到的
+                </SmallTabButton>
+              </div>
+            </div>
+
+            {reviewSubTab === 'write' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openReviewForm('week')}
+                  className="px-4 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white rounded-lg font-semibold text-sm transition-colors"
+                >
+                  周报复盘
                 </button>
                 <button
-                  type="button"
                   onClick={() => openReviewForm('month')}
-                  className="tech-button-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all"
+                  className="px-4 py-1.5 bg-[var(--success)] hover:bg-[var(--success)]/90 text-white rounded-lg font-semibold text-sm transition-colors"
                 >
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
                   月度复盘
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {reviewSubTab === 'write' && isReviewFormOpen && (
-            <form
-              onSubmit={handleSubmitReview}
-              className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-5 text-xs max-w-4xl"
-            >
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  填写周期复盘与述职报告
-                </h3>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="rtype"
-                      checked={reviewType === 'week'}
-                      onChange={() => {
-                        setReviewType('week');
-                        setReviewCycleName('2026年第36周复盘总结');
-                      }}
-                      className="text-blue-600"
-                    />
-                    <span>周工作总结</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="rtype"
-                      checked={reviewType === 'month'}
-                      onChange={() => {
-                        setReviewType('month');
-                        setReviewCycleName('2026年8月月度复盘总结');
-                      }}
-                      className="text-blue-600"
-                    />
-                    <span>月度复盘述职</span>
-                  </label>
-                </div>
-              </div>
+          <div className="p-5">
+            {/* 写总结表单 */}
+            {reviewSubTab === 'write' && isReviewFormOpen && (
+              <form onSubmit={handleSubmitReview} className="space-y-4">
+                <FormInput
+                  label="复盘周期名称"
+                  value={reviewForm.cycleName}
+                  onChange={(e) => setReviewForm({ ...reviewForm, cycleName: e.target.value })}
+                  placeholder="例: 2026年8月月度复盘总结"
+                  required
+                />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    总结周期名称 *
-                  </label>
-                  <input
-                    type="text"
-                    value={reviewCycleName}
-                    onChange={(e) => setReviewCycleName(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    个人绩效自评得分 (0-100分) *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={reviewSelfScore}
-                    onChange={(e) => setReviewSelfScore(Number(e.target.value))}
-                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  本月 / 本周核心工作总结 *
-                </label>
-                <textarea
+                <FormTextarea
+                  label="本期总结核心内容"
+                  value={reviewForm.summary}
+                  onChange={(e) => setReviewForm({ ...reviewForm, summary: e.target.value })}
+                  placeholder="回顾本期关键任务完成情况、核心业绩指标、团队协作亮点..."
                   rows={4}
                   required
-                  value={reviewSummary}
-                  onChange={(e) => setReviewSummary(e.target.value)}
-                  placeholder="详细列举本周期主导完成的重点事项、突破成果及交付里程碑..."
-                  className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
-              </div>
 
-              <div>
-                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  本月 / 本周未完成任务说明及原因归因分析
-                </label>
-                <textarea
+                <FormTextarea
+                  label="未完成事项说明"
+                  value={reviewForm.uncompleted}
+                  onChange={(e) => setReviewForm({ ...reviewForm, uncompleted: e.target.value })}
+                  placeholder="说明未按期完成的事项及原因..."
                   rows={2}
-                  value={reviewUncompleted}
-                  onChange={(e) => setReviewUncompleted(e.target.value)}
-                  placeholder="未达标事项、滞后原因分析与下阶段补救措施..."
-                  className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    对公司管理意见或建议
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={reviewSuggestions}
-                    onChange={(e) => setReviewSuggestions(e.target.value)}
-                    placeholder="业务协同、流程机制或研发支持建议..."
-                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                      自评分 (0-100)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={reviewForm.selfScore}
+                      onChange={(e) => setReviewForm({ ...reviewForm, selfScore: Number(e.target.value) })}
+                      className="w-full px-3 py-2 border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-lg"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    需要协助 / 协调事项
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={reviewHelpNeeded}
-                    onChange={(e) => setReviewHelpNeeded(e.target.value)}
-                    placeholder="需要跨部门支持、预算资源或高管协调事项..."
-                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  发送参与人 (多个逗号隔开)
-                </label>
-                <input
-                  type="text"
-                  value={reviewSendTo}
-                  onChange={(e) => setReviewSendTo(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                <FormTextarea
+                  label="改进建议与下期计划"
+                  value={reviewForm.suggestions}
+                  onChange={(e) => setReviewForm({ ...reviewForm, suggestions: e.target.value })}
+                  placeholder="针对本期不足提出改进措施,以及下期工作重点..."
+                  rows={3}
                 />
+
+                <FormTextarea
+                  label="需要协助/协调事项"
+                  value={reviewForm.helpNeeded}
+                  onChange={(e) => setReviewForm({ ...reviewForm, helpNeeded: e.target.value })}
+                  placeholder="需要跨部门支持、预算资源或高管协调事项..."
+                  rows={2}
+                />
+
+                <FormInput
+                  label="发送参与人 (多个逗号隔开)"
+                  value={reviewForm.sendTo}
+                  onChange={(e) => setReviewForm({ ...reviewForm, sendTo: e.target.value })}
+                  placeholder="总经办, 部门主管"
+                />
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsReviewFormOpen(false)}
+                    className="px-5 py-2.5 border border-[var(--border-main)] text-[var(--text-primary)] rounded-lg font-semibold text-sm hover:bg-[var(--bg-surface-soft)] transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white rounded-lg font-semibold text-sm transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                    提交复盘总结
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {reviewSubTab === 'write' && !isReviewFormOpen && (
+              <div className="text-center py-12 text-[var(--text-muted)]">
+                <FileSpreadsheet className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <div className="text-sm mb-4">选择周报或月度复盘开始填写总结</div>
               </div>
+            )}
 
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs shadow-xs transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                  提交复盘总结
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Subtab: 看总结 */}
-          {(reviewSubTab === 'my' || reviewSubTab === 'received') && (
-            <div className="space-y-4">
-              {performances.map((perf) => (
-                <div
-                  key={perf.id}
-                  className="tech-list-item bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-3 text-xs"
-                >
-                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">
-                          {perf.cycleName}
-                        </span>
-                        <StatusTag status={perf.status} />
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        述职人：{perf.author} ({perf.authorDept}) · 提交时间：{perf.createdAt}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="text-slate-400 text-[11px]">自评分</span>
-                        <div className="font-bold text-blue-600 text-sm">{perf.selfScore}分</div>
-                      </div>
-                      {perf.leaderScore && (
-                        <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-3">
-                          <span className="text-slate-400 text-[11px]">领导考评分</span>
-                          <div className="font-bold text-emerald-600 text-sm">{perf.leaderScore}分</div>
+            {/* 查看总结列表 */}
+            {(reviewSubTab === 'my' || reviewSubTab === 'received') && (
+              <div className="space-y-4">
+                {performances.length === 0 ? (
+                  <div className="text-center py-12 text-[var(--text-muted)]">
+                    <FileSpreadsheet className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <div className="text-sm">暂无复盘总结</div>
+                  </div>
+                ) : (
+                  performances.map((perf) => (
+                    <div
+                      key={perf.id}
+                      className="p-5 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl space-y-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between border-b border-[var(--border-main)] pb-3 gap-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-base text-[var(--text-primary)]">
+                              {perf.cycleName}
+                            </span>
+                            <StatusBadge status={perf.status} />
+                          </div>
+                          <div className="text-xs text-[var(--text-muted)]">
+                            述职人: {perf.author} ({perf.authorDept}) · 提交时间: {perf.createdAt}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <div>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">工作成果总结：</span>
-                      <p className="text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{perf.summary}</p>
-                    </div>
-
-                    {perf.uncompletedReason && (
-                      <div>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">未完成事项说明：</span>
-                        <p className="text-slate-600 dark:text-slate-300 mt-0.5">{perf.uncompletedReason}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <span className="text-xs text-[var(--text-muted)]">自评分</span>
+                            <div className="font-bold text-[var(--primary)] text-lg">
+                              {perf.selfScore}分
+                            </div>
+                          </div>
+                          {perf.leaderScore && (
+                            <div className="text-right border-l border-[var(--border-main)] pl-3">
+                              <span className="text-xs text-[var(--text-muted)]">领导考评分</span>
+                              <div className="font-bold text-[var(--success)] text-lg">
+                                {perf.leaderScore}分
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
 
-                    {perf.feedback && (
-                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-lg text-emerald-800 dark:text-emerald-300">
-                        <span className="font-semibold">主管批复与评价：</span>
-                        <p className="mt-0.5">{perf.feedback}</p>
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="font-semibold text-[var(--text-primary)]">工作成果总结:</span>
+                          <p className="text-[var(--text-body)] mt-1 leading-relaxed">
+                            {perf.summary}
+                          </p>
+                        </div>
+
+                        {perf.uncompletedReason && (
+                          <div>
+                            <span className="font-semibold text-[var(--text-primary)]">未完成事项说明:</span>
+                            <p className="text-[var(--text-body)] mt-1">{perf.uncompletedReason}</p>
+                          </div>
+                        )}
+
+                        {perf.feedback && (
+                          <div className="p-3 bg-[var(--success)]/10 border border-[var(--success)]/30 rounded-lg">
+                            <span className="font-semibold text-[var(--success)]">主管批复与评价:</span>
+                            <p className="text-[var(--text-body)] mt-1">{perf.feedback}</p>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
+      {/* 新增OKR模态框 */}
+      {isAddOkrOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 bg-[var(--bg-surface)] z-10">
+              <h3 className="text-lg font-bold text-[var(--text-primary)]">新增OKR</h3>
+              <button
+                onClick={() => setIsAddOkrOpen(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormInput
+                  label="周期"
+                  value={newOkrForm.cycle}
+                  onChange={(e) => setNewOkrForm({ ...newOkrForm, cycle: e.target.value })}
+                />
+                <FormInput
+                  label="截止日期"
+                  type="date"
+                  value={newOkrForm.deadline}
+                  onChange={(e) => setNewOkrForm({ ...newOkrForm, deadline: e.target.value })}
+                />
+              </div>
+
+              <FormInput
+                label="对齐上级目标"
+                value={newOkrForm.alignTo}
+                onChange={(e) => setNewOkrForm({ ...newOkrForm, alignTo: e.target.value })}
+              />
+
+              <FormTextarea
+                label="目标(O) *"
+                value={newOkrForm.objective}
+                onChange={(e) => setNewOkrForm({ ...newOkrForm, objective: e.target.value })}
+                placeholder="输入本周期核心目标..."
+                rows={2}
+                required
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                  权重 (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={newOkrForm.weight}
+                  onChange={(e) => setNewOkrForm({ ...newOkrForm, weight: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-lg"
+                />
+              </div>
+
+              <div className="border-t border-[var(--border-main)] pt-4">
+                <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
+                  关键结果 (Key Results)
+                </h4>
+
+                <div className="space-y-4">
+                  <div>
+                    <FormInput
+                      label="KR1 内容"
+                      value={newOkrForm.kr1Content}
+                      onChange={(e) => setNewOkrForm({ ...newOkrForm, kr1Content: e.target.value })}
+                      placeholder="具体可量化的关键结果..."
+                    />
+                    <div className="mt-2">
+                      <label className="block text-xs text-[var(--text-muted)] mb-1">权重 (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={newOkrForm.kr1Weight}
+                        onChange={(e) => setNewOkrForm({ ...newOkrForm, kr1Weight: Number(e.target.value) })}
+                        className="w-full px-3 py-2 text-sm border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <FormInput
+                      label="KR2 内容"
+                      value={newOkrForm.kr2Content}
+                      onChange={(e) => setNewOkrForm({ ...newOkrForm, kr2Content: e.target.value })}
+                      placeholder="具体可量化的关键结果..."
+                    />
+                    <div className="mt-2">
+                      <label className="block text-xs text-[var(--text-muted)] mb-1">权重 (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={newOkrForm.kr2Weight}
+                        onChange={(e) => setNewOkrForm({ ...newOkrForm, kr2Weight: Number(e.target.value) })}
+                        className="w-full px-3 py-2 text-sm border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-lg"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 sticky bottom-0 bg-[var(--bg-surface)] pb-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddOkrOpen(false)}
+                  className="px-5 py-2.5 border border-[var(--border-main)] text-[var(--text-primary)] rounded-lg font-semibold text-sm hover:bg-[var(--bg-surface-soft)] transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSaveOkr}
+                  className="px-5 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white rounded-lg font-semibold text-sm transition-colors"
+                >
+                  保存OKR
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

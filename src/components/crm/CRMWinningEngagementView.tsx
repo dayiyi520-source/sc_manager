@@ -268,7 +268,7 @@ export const CRMWinningEngagementView: React.FC = () => {
       addToast(
         'success',
         '签约完成！项目已自动流转至【项目交付】与【需求池】',
-        `系统已自动在【项目交付】(proj_list) 建立交付大盘，并在【需求池】(prod_req_pool) 增配了指向产品团队的接洽实施任务！`
+        `系统已自动在【项目交付】(proj_list) 建立交付大盘，并在【需求池】(wb_work_order) 增配了指向产品团队的接洽实施任务！`
       );
     } else {
       addToast('success', `接洽阶段已更新为【${nextStage}】`);
@@ -562,7 +562,7 @@ export const CRMWinningEngagementView: React.FC = () => {
                 </div>
 
                 <p className="text-xs text-emerald-100/90 leading-relaxed">
-                  按照【中标接洽端到端规范】：该项目状态为“已签约”后，系统已自动联动流转至<strong>【项目交付】(proj_list)</strong>，同时自动在<strong>【需求池】(prod_req_pool)</strong> 中新增了指向产品团队的实施任务。
+                  按照【中标接洽端到端规范】：该项目状态为“已签约”后，系统已自动联动流转至<strong>【项目交付】(proj_list)</strong>，同时自动在<strong>【需求池】(wb_work_order)</strong> 中新增了指向产品团队的实施任务。
                 </p>
 
                 <div className="flex items-center gap-3 pt-1">
@@ -582,7 +582,7 @@ export const CRMWinningEngagementView: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setSelectedEng(null);
-                      openPageTab('prod_req_pool', '需求池');
+                      openPageTab('wb_work_order', '需求池');
                     }}
                     className="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs flex items-center gap-1 shadow-sm cursor-pointer transition-colors"
                   >

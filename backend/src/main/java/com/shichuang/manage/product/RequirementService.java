@@ -172,6 +172,7 @@ public class RequirementService {
         if (!TaskTypes.isValidTarget(type)) throw new IllegalArgumentException("请选择有效任务类型");
         if (assignee.isBlank()) throw new IllegalArgumentException("请选择下一步负责人");
         if (!RequirementStatusPolicy.canCreateWorkItem(status)) throw new IllegalArgumentException("当前需求状态不允许转任务");
+        if (mapper.activeWorkItems(tenantId, id) > 0) throw new IllegalArgumentException("当前需求已有进行中的工作项");
         String title = defaultText(body, "title", String.valueOf(current.get("title")));
         String workId = UUID.randomUUID().toString();
         mapper.insertWorkItem(tenantId, workId, id, type, title, assignee, note, RequestContext.userId());

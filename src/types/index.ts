@@ -16,8 +16,6 @@ export type MainMenuId =
   | 'product' 
   | 'approval' 
   | 'project' 
-  | 'operations'
-  | 'finance'
   | 'system';
 
 export type SubMenuId =
@@ -52,8 +50,8 @@ export type SubMenuId =
   | 'prod_rd_tasks'
   | 'prod_dev_tasks'
   | 'prod_bugs'
-  | 'prod_req_pool'
-  | 'prod_pool'
+  | 'wb_work_order'
+
   | 'prod_reviews'
   | 'prod_review'
   // 审批中心
@@ -64,21 +62,9 @@ export type SubMenuId =
   | 'comp_asset'
   | 'comp_invoice'
   | 'comp_payment'
-  // 运维管理
-  | 'ops_overview'
+  // 项目管理兼容别名
   | 'ops_projects'
   | 'ops_milestones'
-  | 'ops_deliverables'
-  | 'ops_changes'
-  | 'ops_risks'
-  | 'ops_cust_review'
-  | 'ops_ops_review'
-  // 财务
-  | 'fin_overview'
-  | 'fin_receivables'
-  | 'fin_payables'
-  | 'fin_invoices'
-  | 'fin_cost_profit'
   // 知识与组织
   | 'know_base'
   | 'team_org'
