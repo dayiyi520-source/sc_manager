@@ -36,6 +36,7 @@ const categoryStats = computed(() => {
 });
 
 const recentDocs = computed(() => data.value.documents.slice(0, 5));
+const favoriteDocs = computed(() => data.value.documents.filter(d => d.favorite).slice(0, 4));
 
 const persist=()=>workbenchRepository.save(data.value);
 const toggle=(item:KnowledgeDocument)=>{item.favorite=!item.favorite;persist()};
@@ -83,30 +84,55 @@ const searchAndSwitch = () => { mode.value = 'center'; };
         </article>
       </div>
 
-      <!-- 最近更新 -->
-      <h3 class="section-title">最近更新<span class="subtitle">本周更新 {{recentDocs.length}} 篇</span></h3>
-      <div class="recent-list">
-        <article v-for="item in recentDocs" :key="item.id" class="recent-item" @click="selected=item">
-          <div class="item-icon">
-            <span>📄</span>
+      <!-- 最近更新和我的收藏并排 -->
+      <div class="home-columns">
+        <!-- 最近更新 -->
+        <div class="column-main">
+          <h3 class="section-title">最近更新<span class="subtitle">本周更新 {{recentDocs.length}} 篇</span></h3>
+          <div class="recent-list">
+            <article v-for="item in recentDocs" :key="item.id" class="recent-item" @click="selected=item">
+              <div class="item-icon">
+                <span>📄</span>
+              </div>
+              <div class="item-content">
+                <div class="item-header">
+                  <h4>{{item.title}}</h4>
+                  <button class="fav-btn" @click.stop="toggle(item)">{{item.favorite ? '★' : '☆'}}</button>
+                </div>
+                <p class="item-meta">
+                  <StatusTag :status="item.category"/>
+                  <span>{{item.author}}</span>
+                  <span>{{item.updatedAt}}</span>
+                  <span>阅读 {{item.views}}</span>
+                </p>
+              </div>
+            </article>
           </div>
-          <div class="item-content">
-            <div class="item-header">
+        </div>
+
+        <!-- 我的收藏 -->
+        <div class="column-side">
+          <h3 class="section-title">
+            <span style="display:flex;align-items:center;gap:6px;">
+              <span>⭐</span>
+              <span>我的收藏 ({{favoriteDocs.length}})</span>
+            </span>
+          </h3>
+          <div v-if="favoriteDocs.length" class="favorite-list">
+            <article v-for="item in favoriteDocs" :key="item.id" class="favorite-item" @click="selected=item">
               <h4>{{item.title}}</h4>
-              <button class="fav-btn" @click.stop="toggle(item)">{{item.favorite ? '★' : '☆'}}</button>
-            </div>
-            <p class="item-meta">
-              <StatusTag :status="item.category"/>
-              <span>{{item.author}}</span>
-              <span>{{item.updatedAt}}</span>
-              <span>阅读 {{item.views}}</span>
-            </p>
+              <p class="fav-meta">
+                <StatusTag :status="item.category"/>
+                <span>收藏于 {{item.updatedAt}}</span>
+              </p>
+            </article>
           </div>
-        </article>
+          <EmptyState v-else title="暂无收藏" description="收藏文档后会显示在这里" style="padding: 40px 20px;"/>
+        </div>
       </div>
     </div>
 
-    <!-- 文档中心 -->
+    <!-- 知识中心 - 列表形式 -->
     <template v-else>
       <SearchFilterBar v-model="keyword" placeholder="搜索标题、作者、标签或摘要" :count="rows.length">
         <select v-model="category">
@@ -117,18 +143,30 @@ const searchAndSwitch = () => { mode.value = 'center'; };
         </label>
       </SearchFilterBar>
       
-      <div v-if="rows.length" class="document-grid">
-        <article v-for="item in rows" :key="item.id" @click="selected=item">
-          <div class="document-meta">
-            <StatusTag :status="item.category"/>
-            <button class="favorite" @click.stop="toggle(item)">{{item.favorite?'★':'☆'}}</button>
+      <div v-if="rows.length" class="document-list">
+        <article v-for="item in rows" :key="item.id" class="document-list-item" @click="selected=item">
+          <div class="doc-icon">
+            <span>📄</span>
           </div>
-          <h3>{{item.title}}</h3>
-          <p>{{item.summary}}</p>
-          <div class="tag-list">
-            <span v-for="tag in item.tags" :key="tag">{{tag}}</span>
+          <div class="doc-content">
+            <div class="doc-header">
+              <h3>{{item.title}}</h3>
+              <button class="fav-btn" @click.stop="toggle(item)">{{item.favorite?'★':'☆'}}</button>
+            </div>
+            <p class="doc-summary">{{item.summary}}</p>
+            <div class="doc-footer">
+              <div class="doc-meta">
+                <StatusTag :status="item.category"/>
+                <span>{{item.author}}</span>
+                <span>{{item.version}}</span>
+                <span>更新于 {{item.updatedAt}}</span>
+                <span>阅读 {{item.views}}</span>
+              </div>
+              <div class="doc-tags" v-if="item.tags.length">
+                <span v-for="tag in item.tags" :key="tag" class="doc-tag">{{tag}}</span>
+              </div>
+            </div>
           </div>
-          <small>{{item.author}} · {{item.version}} · {{item.views}} 次浏览</small>
         </article>
       </div>
       <EmptyState v-else title="没有匹配的文档" description="请调整搜索词或筛选条件。"/>
@@ -359,6 +397,31 @@ const searchAndSwitch = () => { mode.value = 'center'; };
   color: var(--text-body);
 }
 
+/* 首页两栏布局 */
+.home-columns {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+}
+
+@media (max-width: 1200px) {
+  .home-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.column-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.column-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 /* 最近更新列表 */
 .recent-list {
   display: flex;
@@ -441,5 +504,137 @@ const searchAndSwitch = () => { mode.value = 'center'; };
 .item-meta span {
   display: flex;
   align-items: center;
+}
+
+/* 我的收藏 */
+.favorite-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.favorite-item {
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-main);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.favorite-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+}
+
+.favorite-item h4 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.fav-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* 知识中心 - 列表形式 */
+.document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.document-list-item {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-main);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.document-list-item:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.doc-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  font-size: 24px;
+}
+
+.doc-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.doc-header h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.doc-summary {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.doc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.doc-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.doc-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.doc-tag {
+  padding: 3px 8px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-body);
 }
 </style>
