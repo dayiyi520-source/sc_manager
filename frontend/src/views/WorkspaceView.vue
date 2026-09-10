@@ -628,14 +628,14 @@ function getSubIconClass(subId: string) {
 }
 
 .tab-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 8px 16px;
   background: transparent;
   border: none;
-  border-radius: 6px;
-  color: var(--text-body);
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -644,22 +644,37 @@ function getSubIconClass(subId: string) {
 }
 
 .tab-item:hover {
-  background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
 .tab-item.active {
+  color: var(--primary);
+  background: transparent;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
   background: var(--primary);
-  color: white;
 }
 
 .tab-icon {
   flex-shrink: 0;
-  opacity: 0.8;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.tab-item:hover .tab-icon {
+  opacity: 0.9;
 }
 
 .tab-item.active .tab-icon {
   opacity: 1;
+  color: var(--primary);
 }
 
 .tab-title {
@@ -676,7 +691,7 @@ function getSubIconClass(subId: string) {
   background: transparent;
   border: none;
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 0.5;
   transition: all 0.2s;
   padding: 0;
   margin-left: 2px;
@@ -684,13 +699,17 @@ function getSubIconClass(subId: string) {
 
 .tab-close:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--bg-elevated);
+}
+
+.tab-item.active .tab-close {
+  opacity: 0.6;
 }
 
 .tab-item.active .tab-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+  opacity: 1;
+  background: var(--bg-elevated);
 }
-
 .tabs-actions {
   display: flex;
   gap: 4px;
