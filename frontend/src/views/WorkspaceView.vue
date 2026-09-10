@@ -18,6 +18,9 @@ import MyTasksView from './workbench/MyTasksView.vue';
 import OkrPerformanceView from './workbench/OkrPerformanceView.vue';
 import KnowledgeBaseView from './workbench/KnowledgeBaseView.vue';
 import WorkOrderCenterView from './workbench/WorkOrderCenterView.vue';
+import RequirementTasksView from './product/RequirementTasksView.vue';
+import VersionIterationView from './product/VersionIterationView.vue';
+import ProductLineDetailView from './product/ProductLineDetailView.vue';
 
 type MenuItem = [string, string];
 type MenuGroup = {title: string; items: MenuItem[]};
@@ -134,8 +137,8 @@ function open(id: string, title: string) {
           :kind="activeId === 'crm_leads' ? 'leads' : activeId === 'crm_opportunities' ? 'opportunities' : activeId === 'crm_followups' ? 'followUps' : 'contracts'"
         />
         <ProductLinesView v-else-if="activeId === 'prod_lines'" />
-        <ProductListView v-else-if="activeId === 'prod_versions'" kind="versions" />
-        <ProductListView v-else-if="activeId === 'prod_req_tasks'" kind="requirements" />
+        <VersionIterationView v-else-if="activeId === 'prod_versions'" />
+        <RequirementTasksView v-else-if="activeId === 'prod_req_tasks'" kind="requirement" />
         <WorkItemListView v-else-if="activeId === 'prod_design_tasks'" kind="design" />
         <WorkItemListView v-else-if="activeId === 'prod_rd_tasks'" kind="dev" />
         <WorkItemListView v-else-if="activeId === 'prod_bugs'" kind="bug" />
