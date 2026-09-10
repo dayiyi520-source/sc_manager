@@ -1,0 +1,2 @@
+<script setup lang="ts">defineProps<{items:Array<{key:string;label:string;count?:number}>;modelValue:string}>();defineEmits<{'update:modelValue':[value:string]}>();</script>
+<template><div class="segment-tabs"><button v-for="item in items" :key="item.key" :class="{active:modelValue===item.key}" @click="$emit('update:modelValue',item.key)">{{item.label}}<span v-if="item.count!==undefined">{{item.count}}</span></button></div></template>

@@ -1,0 +1,4 @@
+import {beforeEach,describe,expect,it} from 'vitest';import {workbenchRepository} from './workbenchRepository';
+const memory=new Map<string,string>();
+Object.defineProperty(globalThis,'localStorage',{value:{getItem:(key:string)=>memory.get(key)??null,setItem:(key:string,value:string)=>memory.set(key,value),removeItem:(key:string)=>memory.delete(key)}});
+describe('workbenchRepository',()=>{beforeEach(()=>memory.clear());it('returns independent seed data',()=>{const first=workbenchRepository.load();first.tasks[0].title='changed';expect(workbenchRepository.load().tasks[0].title).not.toBe('changed')});it('persists workbench edits',()=>{const data=workbenchRepository.load();data.workOrders[0].status='已采纳';workbenchRepository.save(data);expect(workbenchRepository.load().workOrders[0].status).toBe('已采纳')})});
