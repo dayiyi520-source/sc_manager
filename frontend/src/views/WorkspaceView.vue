@@ -142,12 +142,6 @@ function getSubIconClass(subId: string) {
                 :class="getSubIconClass(sub.id)"
               />
               <span v-if="!collapsed" class="sub-title">{{ sub.title }}</span>
-              <span
-                v-if="!collapsed && sub.badge"
-                :class="['badge', sub.badgeType || 'default']"
-              >
-                {{ sub.badge }}
-              </span>
             </button>
           </div>
         </div>
@@ -454,37 +448,6 @@ function getSubIconClass(subId: string) {
   text-align: left;
 }
 
-.badge {
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  flex-shrink: 0;
-  line-height: 1.4;
-}
-
-.badge.default {
-  background: rgba(255, 255, 255, 0.1);
-  color: #9CA3AF;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.badge.success {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10B981;
-}
-
-.badge.warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: #F59E0B;
-}
-
-.badge.danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: #EF4444;
-}
-
-/* 侧边栏底部 */
 .sidebar-footer {
   padding: 12px;
   border-top: 1px solid var(--border-main);
