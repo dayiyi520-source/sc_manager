@@ -2,14 +2,15 @@
 import { ref, computed, watch } from 'vue';
 import { Search, Filter, Plus, X } from 'lucide-vue-next';
 import { useQuery } from '@tanstack/vue-query';
+import RequirementTaskModal from '../../components/product/RequirementTaskModal.vue';
 
 interface RequirementTask {
-  id: string;
+  id?: string;
   title: string;
   description?: string;
-  status: string;
-  priority: string;
-  ownerName: string;
+  status?: string;
+  priority?: string;
+  ownerName?: string;
   creatorName?: string;
   productLineName?: string;
   versionName?: string;
@@ -84,17 +85,17 @@ const filteredTasks = computed(() => {
   
   // 负责人筛选
   if (selectedOwners.value.length > 0) {
-    result = result.filter((t: RequirementTask) => selectedOwners.value.includes(t.ownerName));
+    result = result.filter((t: RequirementTask) => t.ownerName && selectedOwners.value.includes(t.ownerName));
   }
   
   // 状态筛选
   if (selectedStatuses.value.length > 0) {
-    result = result.filter((t: RequirementTask) => selectedStatuses.value.includes(t.status));
+    result = result.filter((t: RequirementTask) => t.status && selectedStatuses.value.includes(t.status));
   }
   
   // 优先级筛选
   if (selectedPriorities.value.length > 0) {
-    result = result.filter((t: RequirementTask) => selectedPriorities.value.includes(t.priority));
+    result = result.filter((t: RequirementTask) => t.priority && selectedPriorities.value.includes(t.priority));
   }
   
   return result;
@@ -116,6 +117,27 @@ const tabCounts = computed(() => ({
 // 详情抽屉
 const selectedTask = ref<RequirementTask | null>(null);
 const showCreateModal = ref(false);
+const editingTask = ref<RequirementTask | null>(null);
+const modalMode = ref<'create' | 'edit'>('create');
+
+function openCreateModal() {
+  editingTask.value = null;
+  modalMode.value = 'create';
+  showCreateModal.value = true;
+}
+
+function openEditModal(task: RequirementTask) {
+  editingTask.value = task;
+  modalMode.value = 'edit';
+  showCreateModal.value = true;
+}
+
+function handleSaveTask(task: RequirementTask) {
+  // TODO: 调用API保存任务
+  console.log('保存任务:', task);
+  showCreateModal.value = false;
+  // 这里应该刷新任务列表
+}
 
 function openDetail(task: RequirementTask) {
   selectedTask.value = task;
@@ -190,7 +212,7 @@ watch([activeTab, searchQuery, selectedOwners, selectedStatuses, selectedPriorit
           </span>
         </button>
         
-        <button class="create-btn" @click="showCreateModal = true">
+        <button class="create-btn" @click="openCreateModal">
           <Plus :size="16" />
           新建{{ itemLabel }}
         </button>
@@ -333,6 +355,15 @@ watch([activeTab, searchQuery, selectedOwners, selectedStatuses, selectedPriorit
       </div>
     </div>
   </div>
+
+    <!-- 创建/编辑模态框 -->
+    <RequirementTaskModal
+      :open="showCreateModal"
+      :task="editingTask"
+      :mode="modalMode"
+      @close="showCreateModal = false"
+      @save="handleSaveTask"
+    />
 </template>
 
 <style scoped>
