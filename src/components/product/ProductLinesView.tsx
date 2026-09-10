@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DatePicker, Cascader, Segmented } from "antd";
 import {
   Boxes,
   Search,
@@ -12,7 +13,6 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { StatusTag, Modal } from '../common/UIComponents';
-import { SearchableSelect } from '../common/SearchableSelect';
 import { ProductLine } from '../../types';
 import { ProductLineDetailView } from './ProductLineDetailView';
 import { ProductLineVersionModal } from './ProductLineVersionModal';
@@ -328,7 +328,17 @@ export const ProductLinesView: React.FC = () => {
           className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <SearchableSelect label="产品线负责人" required value={formOwner} options={ownerOptions} onChange={setFormOwner} placeholder="搜索并选择负责人" />
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">产品线负责人 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formOwner ? [formOwner] : undefined}
+              onChange={(value: any) => setFormOwner(value?.[0] || '')}
+              options={ownerOptions.map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="搜索并选择负责人"
+              className="w-full"
+            />
+          </div>
             <div>
               <label className="block font-semibold text-[#A5ADBA] mb-1 flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-[#2F66F6]" />

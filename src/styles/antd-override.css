@@ -1,0 +1,36 @@
+/* Ant Design 组件样式覆盖 */
+
+/* Segmented 分段控制器 - 选中态蓝色 */
+.ant-segmented .ant-segmented-item-selected {
+  color: #3b82f6 !important;
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+.ant-segmented .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #3b82f6 !important;
+  font-weight: 500;
+}
+
+/* Cascader 下拉框宽度 - 根据内容自适应，但不小于触发器宽度 */
+.ant-cascader-dropdown {
+  min-width: 100% !important;
+}
+
+.ant-cascader-menu {
+  min-width: 150px !important;
+}
+
+.ant-cascader-menu-item-content {
+  white-space: nowrap !important;
+}
+
+/* DatePicker 样式调整 */
+.ant-picker {
+  width: 100% !important;
+}
+
+/* 暗色模式适配 */
+.dark .ant-segmented .ant-segmented-item-selected {
+  color: #60a5fa !important;
+  background-color: rgba(96, 165, 250, 0.15) !important;
+}

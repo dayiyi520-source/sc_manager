@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { DatePicker, Cascader, Segmented } from "antd";
 import {
   FileCode2,
   GitBranch,
@@ -18,7 +19,6 @@ import { StatCard, StatusTag } from '../common/UIComponents';
 import { DevTask } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { RichTextEditor } from './RichTextEditor';
-import { SearchableSelect } from '../common/SearchableSelect';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
 
@@ -276,7 +276,16 @@ export const DevTasksView: React.FC = () => {
           </div>}
         >
           <div className="w-full space-y-5 text-xs">
-            <div className="flex items-center gap-5 border-b border-[var(--border-main)]"><button type="button" onClick={() => setDetailTab('overview')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'overview' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>任务详情</button><button type="button" onClick={() => setDetailTab('requirement')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'requirement' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>关联需求</button></div>
+            <div className="border-b border-[var(--border-main)] px-3 py-2">
+              <Segmented
+                value={detailTab}
+                onChange={(value) => setDetailTab(value as 'overview' | 'requirement')}
+                options={[
+                  { label: '任务详情', value: 'overview' },
+                  { label: '关联需求', value: 'requirement' },
+                ]}
+              />
+            </div>
             {detailTab === 'requirement' ? <DetailField label="关联需求">{requirementTasks.find((item) => item.id === selectedTask.requirementId)?.title || '未关联需求'}</DetailField> : <>
             <DetailField label="研发任务名称"><span className="font-medium">{selectedTask.title}</span></DetailField>
             <DetailField label="任务描述"><p className="min-h-28 whitespace-pre-wrap break-words leading-6">{selectedTask.description || '未填写任务描述'}</p></DetailField>
@@ -308,10 +317,40 @@ export const DevTasksView: React.FC = () => {
           </>
         }
         properties={<div className="space-y-4 text-xs">
-          <SearchableSelect label="目标代码仓" required value={formRepo} options={['shichuang-hub-backend', 'shichuang-crm-frontend', 'shichuang-gateway-core']} onChange={setFormRepo} placeholder="请选择目标代码仓" />
+          <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">目标代码仓 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formRepo ? [formRepo] : undefined}
+              onChange={(value: any) => setFormRepo(value?.[0] || '')}
+              options={['shichuang-hub-backend', 'shichuang-crm-frontend', 'shichuang-gateway-core'].map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="请选择目标代码仓"
+              className="w-full"
+            />
+          </div>
           <label className="block text-[var(--text-muted)]">特性分支 *<input required value={formBranch} onChange={(e) => setFormBranch(e.target.value)} placeholder="feat/feature-name" className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 font-mono text-[var(--text-primary)]" /></label>
-          <SearchableSelect label="责任开发者" required value={formDeveloper} options={employees} onChange={setFormDeveloper} placeholder="搜索并选择开发者" />
-          <SearchableSelect label="优先级" required value={formPriority} options={['紧急', '高', '中', '低']} onChange={(value) => setFormPriority(value as DevTask['priority'])} placeholder="请选择优先级" />
+          <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">责任开发者 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formDeveloper ? [formDeveloper] : undefined}
+              onChange={(value: any) => setFormDeveloper(value?.[0] || '')}
+              options={employees.map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="搜索并选择开发者"
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">优先级 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formPriority ? [formPriority] : undefined}
+              onChange={(value: any) => (value) => setFormPriority(value as DevTask['priority'])(value?.[0] || '')}
+              options={['紧急', '高', '中', '低'].map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="请选择优先级"
+              className="w-full"
+            />
+          </div>
           <label className="block text-[var(--text-muted)]">预计工时（小时）<input min="0" type="number" value={formHours} onChange={(e) => setFormHours(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" /></label>
         </div>}
       >
@@ -331,7 +370,17 @@ export const DevTasksView: React.FC = () => {
           </div>
 
           <div className="col-span-2"><label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">任务描述</label><RichTextEditor editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} /></div>
-          <SearchableSelect label="关联需求任务" value={formRequirementId} options={requirementTasks.map((task) => task.title)} onChange={(title) => setFormRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')} placeholder="请选择关联需求任务" clearable />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">关联需求任务</label>
+            <Cascader
+              showSearch allowClear
+              value={formRequirementId ? [formRequirementId] : undefined}
+              onChange={(value: any) => (title) => setFormRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')(value?.[0] || '')}
+              options={requirementTasks.map((task) => task.title).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
+              placeholder="请选择关联需求任务"
+              className="w-full"
+            />
+          </div>
 
         </form>
       </WorkItemCreatePanel>

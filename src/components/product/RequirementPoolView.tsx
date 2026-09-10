@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { DatePicker, Cascader, Segmented } from "antd";
+import dayjs from 'dayjs';
 import {
   Inbox,
   Search,
@@ -51,7 +53,6 @@ import type {
 import { sanitizeHtml } from "../../utils/sanitizeHtml";
 import { getRejectReasonsForType } from "../../constants/rejectReasons";
 import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
-import { DateField } from "../common/DateField";
 
 const statuses: RequirementTask["status"][] = [
   "待处理",
@@ -575,8 +576,33 @@ export const RequirementPoolView: React.FC = () => {
       />
     </label>
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      <SearchSelect label="负责人 *" value={ownerName} options={employees.map((item) => item.name)} placeholder="输入负责人姓名搜索并选择" onChange={setOwnerName} />
-      <SearchSelect label="关联客户" value={customerQuery} options={customers.map((item) => item.name)} placeholder="输入客户名称模糊搜索并选择" onChange={(name) => { setCustomerQuery(name); setCustomerId(customers.find((item) => item.name === name)?.id || ""); }} />
+      <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">负责人 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={ownerName ? [ownerName] : undefined}
+              onChange={(value) => setOwnerName(value?.[0] || '')}
+              options={employees.map((item) => ({ label: item.name, value: item.name }))}
+              placeholder="输入负责人姓名搜索并选择"
+              className="w-full"
+            />
+          </div>
+      <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">关联客户</label>
+            <Cascader
+              showSearch
+              allowClear
+              value={customerQuery ? [customerQuery] : undefined}
+              onChange={(value) => {
+                const name = value?.[0] || '';
+                setCustomerQuery(name);
+                setCustomerId(customers.find((item) => item.name === name)?.id || '');
+              }}
+              options={customers.map((item) => ({ label: item.name, value: item.name }))}
+              placeholder="输入客户名称模糊搜索并选择"
+              className="w-full"
+            />
+          </div>
       <label className="text-xs text-[var(--text-muted)]">
         优先级
         <select value={requirementPriority} onChange={(event) => setRequirementPriority(event.target.value as RequirementTask["priority"])} className={selectFieldClass(requirementPriority)}>
@@ -584,24 +610,72 @@ export const RequirementPoolView: React.FC = () => {
           {["紧急", "高", "中", "低"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}
         </select>
       </label>
-      <DateField label="期望完成时间" value={dueDate} onChange={setDueDate} />
+      <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">期望完成时间</label>
+            <DatePicker
+              value={dueDate ? dayjs(dueDate) : null}
+              onChange={(date) => setDueDate(date ? date.format('YYYY-MM-DD') : '')}
+              className="w-full"
+              placeholder="选择日期"
+            />
+          </div>
     </div>
     {workOrderType && (
       <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">业务参数设置</h3>
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
           {workOrderType === "客户诉求" && <>
-            <SearchSelect label="所属项目" value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入中标项目名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, projectName: value }))} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[var(--text-muted)]">所属项目</label>
+              <Cascader
+                showSearch
+                allowClear
+                value={specialFields.projectName ? [specialFields.projectName] : undefined}
+                onChange={(value) => setSpecialFields((current) => ({ ...current, projectName: value?.[0] || '' }))}
+                options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => ({ label: item.projectName || item.name || '', value: item.projectName || item.name || '' }))}
+                placeholder="输入中标项目名称搜索并选择"
+                className="w-full"
+              />
+            </div>
             <label className="text-xs text-[var(--text-muted)]">诉求类型<select value={specialFields.requestType || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, requestType: event.target.value }))} className={selectFieldClass(specialFields.requestType || "")}><option value="">请选择诉求类型</option>{["新功能","线上问题","数据需求","技术难题","其他"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
             <label className="text-xs text-[var(--text-muted)]">诉求来源<input value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(event) => setSpecialFields((current) => ({ ...current, requestSource: event.target.value }))} className={fieldClass} /></label>
           </>}
           {workOrderType === "线上问题" && <>
-            <SearchSelect label="关联产品" value={specialFields.productName || ""} options={productLines.map((item) => item.name)} placeholder="输入产品名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, productName: value }))} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[var(--text-muted)]">关联产品</label>
+              <Cascader
+                showSearch
+                allowClear
+                value={specialFields.productName ? [specialFields.productName] : undefined}
+                onChange={(value) => setSpecialFields((current) => ({ ...current, productName: value?.[0] || '' }))}
+                options={productLines.map((item) => ({ label: item.name, value: item.name }))}
+                placeholder="输入产品名称搜索并选择"
+                className="w-full"
+              />
+            </div>
             <label className="text-xs text-[var(--text-muted)]">严重程度<select value={specialFields.severity || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, severity: event.target.value }))} className={selectFieldClass(specialFields.severity || "")}><option value="">请选择严重程度</option>{["P0-阻断主流程","P1-功能逻辑异常","P2-一般缺陷","P3-轻微缺陷"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
             <label className="text-xs text-[var(--text-muted)]">发生频率<select value={specialFields.frequency || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, frequency: event.target.value }))} className={selectFieldClass(specialFields.frequency || "")}><option value="">请选择发生频率</option>{["必现（100%）","高频发生","偶现（特点条件）","环境相关偶发"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
           </>}
           {workOrderType === "售前支持" && <>
-            <SearchSelect label="关联商机" value={specialFields.opportunityName || ""} options={opportunities.filter((item) => opportunityStagesBeforeWin.has(item.stage)).map((item) => item.name)} placeholder="输入商机名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, opportunityName: value, opportunityId: opportunities.find((item) => item.name === value)?.id || "" }))} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[var(--text-muted)]">关联商机</label>
+              <Cascader
+                showSearch
+                allowClear
+                value={specialFields.opportunityName ? [specialFields.opportunityName] : undefined}
+                onChange={(value) => {
+                  const name = value?.[0] || '';
+                  setSpecialFields((current) => ({ 
+                    ...current, 
+                    opportunityName: name, 
+                    opportunityId: opportunities.find((item) => item.name === name)?.id || '' 
+                  }));
+                }}
+                options={opportunities.filter((item) => opportunityStagesBeforeWin.has(item.stage)).map((item) => ({ label: item.name, value: item.name }))}
+                placeholder="输入商机名称搜索并选择"
+                className="w-full"
+              />
+            </div>
             <label className="text-xs text-[var(--text-muted)]">支持类型<select value={specialFields.supportType || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, supportType: event.target.value }))} className={selectFieldClass(specialFields.supportType || "")}><option value="">请选择支持类型</option>{["现场演示/答疑","需求沟通","方案设计","招投标标书协同","商务洽谈"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
             <label className="text-xs text-[var(--text-muted)]">预计时长（天）<input type="number" min="0" value={specialFields.durationDays || ""} placeholder="请输入预计天数" onChange={(event) => setSpecialFields((current) => ({ ...current, durationDays: event.target.value }))} className={fieldClass} /></label>
           </>}
@@ -870,8 +944,14 @@ export const RequirementPoolView: React.FC = () => {
           }
         >
           <div className="mb-5 flex items-center gap-1 border-b border-[var(--border-main)]">
-            <button type="button" onClick={() => setDetailTab("info")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "info" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>工单信息</button>
-            <button type="button" onClick={() => setDetailTab("history")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "history" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>工单全历程</button>
+            <Segmented
+              value={detailTab}
+              onChange={(value) => setDetailTab(value as 'info' | 'history')}
+              options={[
+                { label: '工单信息', value: 'info' },
+                { label: '工单全历程', value: 'history' },
+              ]}
+            />
           </div>
           <div className={`space-y-5 text-sm ${detailTab === "history" ? "hidden" : ""}`}>
             <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4">

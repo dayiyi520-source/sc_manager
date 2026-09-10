@@ -1,76 +1,17 @@
-import React, { StrictMode, useEffect, useState } from 'react';
+import {StrictMode} from 'react';
+import "./styles/antd-override.css";
 import {createRoot} from 'react-dom/client';
-import {ConfigProvider, theme} from 'antd';
 import App from './App.tsx';
 import './index.css';
 import {BrowserRouter} from 'react-router-dom';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
-import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const queryClient = new QueryClient({defaultOptions:{queries:{retry:1,staleTime:15000}}});
 
-// 主题包装器组件 - 根据 .dark 类动态切换主题
-const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isDark, setIsDark] = useState(() => 
-    document.documentElement.classList.contains('dark')
-  );
-
-  useEffect(() => {
-    // 监听 dark 类的变化
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <ConfigProvider
-      theme={{
-        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-        token: {
-          // AIEDIT 品牌色
-          colorPrimary: '#2F66F6',
-          colorSuccess: '#22C55E',
-          colorWarning: '#FACC15',
-          colorError: '#F26D5B',
-          colorInfo: '#3B82F6',
-          
-          // 字体
-          fontSize: 14,
-          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          
-          // 圆角
-          borderRadius: 6,
-          borderRadiusLG: 8,
-          borderRadiusSM: 4,
-          
-          // 间距
-          paddingLG: 24,
-          padding: 16,
-          paddingSM: 12,
-          paddingXS: 8,
-        },
-      }}
-    >
-      {children}
-    </ConfigProvider>
-  );
-};
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ErrorBoundary>
-      <ThemeWrapper>
-        <QueryClientProvider client={queryClient}>
-          <BrowserRouter><App /></BrowserRouter>
-        </QueryClientProvider>
-      </ThemeWrapper>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter><App /></BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 );

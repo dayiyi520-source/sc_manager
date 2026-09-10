@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { DatePicker, Cascader, Segmented } from "antd";
 import {
   Bug,
   Search,
@@ -23,7 +24,6 @@ import { StatCard, StatusTag } from '../common/UIComponents';
 import { BugItem } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { RichTextEditor } from './RichTextEditor';
-import { SearchableSelect } from '../common/SearchableSelect';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
 
@@ -429,13 +429,83 @@ export const BugManagementView: React.FC = () => {
         }
         properties={<div className="space-y-4 text-xs">
           <SearchableSelect label="所属产品线" required value={formProductLine} options={productLines.map((pl) => pl.name)} onChange={(value) => { setFormProductLine(value); setFormVersion(''); }} placeholder="请选择所属产品线" />
-          <SearchableSelect label="关联版本" required value={formVersion} options={versions.filter((v) => !v.productLineName || v.productLineName === formProductLine).map((v) => v.name)} onChange={setFormVersion} placeholder="请选择关联版本" emptyText="该产品线暂无可选版本" />
-          <SearchableSelect label="严重程度" required value={formSeverity} options={['致命阻断', '严重缺陷', '一般问题', '轻微优化']} onChange={(value) => setFormSeverity(value as BugItem['severity'])} placeholder="请选择严重程度" />
-          <SearchableSelect label="优先级" required value={formPriority} options={['紧急', '高', '中', '低']} onChange={(value) => setFormPriority(value as NonNullable<BugItem['priority']>)} placeholder="请选择优先级" />
-          <SearchableSelect label="缺陷类型" value={formType} options={['功能缺陷', '性能缺陷', 'UI交互', '安全漏洞', '环境配置']} onChange={setFormType} placeholder="请选择缺陷类型" clearable />
-          <SearchableSelect label="责任处理人" required value={formAssignee} options={employees} onChange={setFormAssignee} placeholder="搜索并选择处理人" />
-          <SearchableSelect label="关联需求任务" value={selectedRequirementId} options={requirementTasks.map((task) => task.title)} onChange={(title) => setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')} placeholder="请选择关联需求任务" clearable />
-          <SearchableSelect label="参与人" value={formCc} options={employees} onChange={setFormCc} placeholder="搜索并选择参与人" clearable />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-primary)]">关联版本 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formVersion ? [formVersion] : undefined}
+              onChange={(value) => setFormVersion(value?.[0])}
+              options={versions.filter((v) => !v.productLineName || v.productLineName === formProductLine).map((v) => v.name).map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="请选择关联版本"
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-primary)]">严重程度 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formSeverity ? [formSeverity] : undefined}
+              onChange={(value) => value?.[0] => setFormSeverity(value as BugItem['severity'])}
+              options={[{ label: '致命阻断', value: '致命阻断' }, { label: '严重缺陷', value: '严重缺陷' }, { label: '一般问题', value: '一般问题' }, { label: '轻微优化', value: '轻微优化' }]}
+              placeholder="请选择严重程度"
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-primary)]">优先级 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formPriority ? [formPriority] : undefined}
+              onChange={(value) => value?.[0] => setFormPriority(value as NonNullable<BugItem['priority']>)}
+              options={[{ label: '紧急', value: '紧急' }, { label: '高', value: '高' }, { label: '中', value: '中' }, { label: '低', value: '低' }]}
+              placeholder="请选择优先级"
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">缺陷类型</label>
+            <Cascader
+              showSearch
+              allowClear value={formType ? [formType] : undefined}
+              onChange={(value) => setFormType(value?.[0])}
+              options={[{ label: '功能缺陷', value: '功能缺陷' }, { label: '性能缺陷', value: '性能缺陷' }, { label: 'UI交互', value: 'UI交互' }, { label: '安全漏洞', value: '安全漏洞' }, { label: '环境配置', value: '环境配置' }]}
+              placeholder="请选择缺陷类型"
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-primary)]">责任处理人 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formAssignee ? [formAssignee] : undefined}
+              onChange={(value) => setFormAssignee(value?.[0])}
+              options={employees}
+              placeholder="搜索并选择处理人"
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">关联需求任务</label>
+            <Cascader
+              showSearch
+              allowClear value={selectedRequirementId ? [selectedRequirementId] : undefined}
+              onChange={(value) => (title) => setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')(value?.[0])}
+              options={requirementTasks.map((task) => task.title).map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="请选择关联需求任务"
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">参与人</label>
+            <Cascader
+              showSearch
+              allowClear value={formCc ? [formCc] : undefined}
+              onChange={(value) => setFormCc(value?.[0])}
+              options={employees}
+              placeholder="搜索并选择参与人"
+              className="w-full"
+            />
+          </div>
           <label className="block text-[var(--text-muted)]">所属环境<input value={formEnv} onChange={(e) => setFormEnv(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" /></label>
           <div className="border-t border-[var(--border-main)] pt-4"><label className="block text-[var(--text-muted)]">关联工单中心（线上问题）</label><input value={workOrderQuery} onChange={(e) => setWorkOrderQuery(e.target.value)} placeholder="搜索线上问题工单" className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" />{workOrderQuery.trim() && <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">{filteredWorkOrders.filter((item) => !selectedWorkOrderIds.includes(item.id)).map((item) => <button type="button" key={item.id} onClick={() => { setSelectedWorkOrderIds((ids) => [...ids, item.id]); setWorkOrderQuery(''); }} className="block w-full rounded p-2 text-left text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)]">{item.title}</button>)}</div>}<div className="mt-2 flex flex-wrap gap-1">{selectedWorkOrderIds.map((id) => { const item = availableWorkOrders.find((candidate) => candidate.id === id); return <span key={id} className="inline-flex items-center gap-1 rounded bg-[var(--bg-surface-soft)] px-2 py-1 text-[11px]">{item?.title || id}<button type="button" aria-label={`移除关联工单${item?.title || id}`} onClick={() => setSelectedWorkOrderIds((ids) => ids.filter((value) => value !== id))}>×</button></span>; })}</div></div>
         </div>}

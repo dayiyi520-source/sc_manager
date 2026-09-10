@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { DatePicker, Cascader, Segmented } from "antd";
+import dayjs from 'dayjs';
 import {
   Search,
   Filter,
@@ -16,10 +18,8 @@ import { StatusTag } from '../common/UIComponents';
 import { DefectBug, DevTask, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { RichTextEditor } from './RichTextEditor';
-import { SearchableSelect } from '../common/SearchableSelect';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
-import { DateField } from '../common/DateField';
 import { requirementRepository } from '../../services/requirementRepository';
 import { productRepository } from '../../services/productRepository';
 
@@ -822,9 +822,15 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
             <DetailTextInput label="验收标准" value={selectedTask.expectedGoal || ''} onSave={(expectedGoal) => saveDetailUpdates({ expectedGoal })} multiline />
             <label className="block text-[var(--text-muted)]"><span>任务描述</span><div className="mt-1"><RichTextEditor editor={detailDescriptionEditor} value={detailDescription} htmlValue={detailDescriptionHtml} onInput={(text, html) => { setDetailDescription(text); setDetailDescriptionHtml(html); }} onBlur={() => saveDetailUpdates({ description: detailDescription, descriptionHtml: detailDescriptionHtml })} placeholder="详细记录需求背景、业务场景和实现说明..." /></div></label>
             <section className="border-t border-[var(--border-main)] pt-4">
-              <div className="mb-4 flex items-center gap-5 border-b border-[var(--border-main)]">
-                <button type="button" onClick={() => setDetailTab('activity')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'activity' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>动态 <span className="ml-1 text-[11px]">{selectedTask.events?.length || 0}</span></button>
-                <button type="button" onClick={() => setDetailTab('workOrders')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'workOrders' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>关联工单 <span className="ml-1 text-[11px]">{selectedTask.sourceWorkOrderIds?.length || 0}</span></button>
+              <div className="mb-4 border-b border-[var(--border-main)] px-3 py-2">
+                <Segmented
+                  value={detailTab}
+                  onChange={(value) => setDetailTab(value as 'activity' | 'workOrders')}
+                  options={[
+                    { label: `动态 · ${selectedTask.events?.length || 0}`, value: 'activity' },
+                    { label: `关联工单 · ${selectedTask.sourceWorkOrderIds?.length || 0}`, value: 'workOrders' },
+                  ]}
+                />
               </div>
               {detailTab === 'workOrders' ? (
                 <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={updateLinkedWorkOrders} placeholder="选择关联工单" />
@@ -877,15 +883,89 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         properties={<div className="space-y-6 text-xs">
           <section className="space-y-3">
             <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
-            <SearchableSelect label="需求类型" required value={formRequirementType} options={['业务需求', '产品优化', '技术需求', '合规需求']} onChange={setFormRequirementType} placeholder="请选择需求类型" />
-            <SearchableSelect label="负责人" required value={formOwnerName} options={employees} onChange={setFormOwnerName} placeholder="搜索并选择负责人" />
-            <SearchableSelect label="优先级" required value={formPriority} options={['紧急', '高', '中', '低']} onChange={(value) => setFormPriority(value as RequirementTask['priority'])} placeholder="请选择优先级" />
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">需求类型 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formRequirementType ? [formRequirementType] : undefined}
+              onChange={(value: any) => setFormRequirementType(value?.[0] || '')}
+              options={['业务需求', '产品优化', '技术需求', '合规需求'].map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="请选择需求类型"
+              className="w-full"
+            />
+          </div>
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">负责人 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formOwnerName ? [formOwnerName] : undefined}
+              onChange={(value: any) => setFormOwnerName(value?.[0] || '')}
+              options={employees.map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="搜索并选择负责人"
+              className="w-full"
+            />
+          </div>
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">优先级 <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={formPriority ? [formPriority] : undefined}
+              onChange={(value: any) => (value) => setFormPriority(value as RequirementTask['priority'])(value?.[0] || '')}
+              options={['紧急', '高', '中', '低'].map((opt: string) => ({ label: opt, value: opt }))}
+              placeholder="请选择优先级"
+              className="w-full"
+            />
+          </div>
             <SearchableSelect label="所属产品线" required value={formProductLineName} options={productLines.map((pl) => pl.name)} onChange={(value) => { setFormProductLineName(value); setFormVersionName(''); }} placeholder="请选择所属产品线" />
-            <DateField label="计划开始时间" value={formPlannedStartDate} onChange={setFormPlannedStartDate} required />
-            <DateField label="计划完成时间" value={formDueDate} onChange={setFormDueDate} required />
-            <DateField label="期望完成时间" value={formExpectedCompleteDate} onChange={setFormExpectedCompleteDate} />
-            <SearchableSelect label="迭代版本" value={formVersionName} options={versions.filter((v) => !v.productLineName || v.productLineName === formProductLineName).map((v) => v.name)} onChange={setFormVersionName} placeholder="暂不关联" clearable emptyText="该产品线暂无可选版本" />
-            <SearchableSelect label="关联客户" value={formCustomerName} options={customers.map((c) => c.name)} onChange={setFormCustomerName} placeholder="暂不关联" clearable />
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">计划开始时间 <span className="text-red-500">*</span></label>
+            <DatePicker
+              value={formPlannedStartDate ? dayjs(formPlannedStartDate) : null}
+              onChange={(date) => setFormPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')}
+              className="w-full"
+              placeholder="选择日期"
+            />
+          </div>
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">计划完成时间 <span className="text-red-500">*</span></label>
+            <DatePicker
+              value={formDueDate ? dayjs(formDueDate) : null}
+              onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')}
+              className="w-full"
+              placeholder="选择日期"
+            />
+          </div>
+            <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">期望完成时间</label>
+            <DatePicker
+              value={formExpectedCompleteDate ? dayjs(formExpectedCompleteDate) : null}
+              onChange={(date) => setFormExpectedCompleteDate(date ? date.format('YYYY-MM-DD') : '')}
+              className="w-full"
+              placeholder="选择日期"
+            />
+          </div>
+            <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">迭代版本</label>
+            <Cascader
+              showSearch allowClear
+              value={formVersionName ? [formVersionName] : undefined}
+              onChange={(value: any) => setFormVersionName(value?.[0] || '')}
+              options={versions.filter((v) => !v.productLineName || v.productLineName === formProductLineName).map((v) => v.name).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
+              placeholder="暂不关联"
+              className="w-full"
+            />
+          </div>
+            <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[var(--text-muted)]">关联客户</label>
+            <Cascader
+              showSearch allowClear
+              value={formCustomerName ? [formCustomerName] : undefined}
+              onChange={(value: any) => setFormCustomerName(value?.[0] || '')}
+              options={customers.map((c) => c.name).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
+              placeholder="暂不关联"
+              className="w-full"
+            />
+          </div>
             <SearchableSelect label="参与人" value="" options={employees.filter((name) => !formCcNames.includes(name))} onChange={(name) => setFormCcNames((items) => [...items, name])} placeholder="搜索并选择参与人" />
             {formCcNames.length > 0 && <div className="flex flex-wrap gap-1.5">{formCcNames.map((name) => <span key={name} className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{name}<button type="button" aria-label={`移除参与人${name}`} onClick={() => setFormCcNames((items) => items.filter((item) => item !== name))}><X className="h-3 w-3" /></button></span>)}</div>}
           </section>

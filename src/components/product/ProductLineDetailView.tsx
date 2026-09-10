@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DatePicker, Cascader, Segmented } from "antd";
 import {
   ArrowLeft,
   Boxes,
@@ -31,7 +32,6 @@ import { ProductLine, ProductItemInLine, VersionIteration } from '../../types';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { CreateVersionModal } from './CreateVersionModal';
 import { ManageMembersModal } from './ManageMembersModal';
-import { SearchableSelect } from '../common/SearchableSelect';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -918,7 +918,17 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-purple-400" />
               需求负责人 (Product Owner / PO) *
             </label>
-            <SearchableSelect label="需求负责人 (Product Owner / PO)" required value={leadReqOwner} options={Array.from(new Set([currentUser.name, productLine.owner, productLine.ownerName, leadReqOwner, ...requirementTasks.map((task) => task.ownerName)].filter(Boolean) as string[]))} onChange={setLeadReqOwner} placeholder="搜索并选择负责人" />
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">需求负责人 (Product Owner / PO) <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={leadReqOwner ? [leadReqOwner] : undefined}
+              onChange={(value: any) => setLeadReqOwner(value?.[0] || '')}
+              options={Array.from(new Set([currentUser.name, productLine.owner, productLine.ownerName, leadReqOwner, ...requirementTasks.map((task) => task.ownerName)].filter(Boolean) as string[])).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
+              placeholder="搜索并选择负责人"
+              className="w-full"
+            />
+          </div>
             <p className="text-[11px] text-[#7C8796] mt-1">负责业务调研、PRD规划评审与需求优先级排序</p>
           </div>
 
@@ -927,7 +937,17 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-[#2F66F6]" />
               技术负责人 (Tech Lead / 架构师) *
             </label>
-            <SearchableSelect label="技术负责人 (Tech Lead / 架构师)" required value={leadTechOwner} options={Array.from(new Set([currentUser.name, leadTechOwner, ...devTasks.map((task) => task.developer)].filter(Boolean) as string[]))} onChange={setLeadTechOwner} placeholder="搜索并选择负责人" />
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">技术负责人 (Tech Lead / 架构师) <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={leadTechOwner ? [leadTechOwner] : undefined}
+              onChange={(value: any) => setLeadTechOwner(value?.[0] || '')}
+              options={Array.from(new Set([currentUser.name, leadTechOwner, ...devTasks.map((task) => task.developer)].filter(Boolean) as string[])).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
+              placeholder="搜索并选择负责人"
+              className="w-full"
+            />
+          </div>
             <p className="text-[11px] text-[#7C8796] mt-1">负责技术选型、架构高可用审查与研发任务攻坚</p>
           </div>
 
@@ -936,7 +956,17 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               测试负责人 (QA Lead / 质量主管) *
             </label>
-            <SearchableSelect label="测试负责人 (QA Lead / 质量主管)" required value={leadTestOwner} options={Array.from(new Set([currentUser.name, leadTestOwner, ...bugs.map((bug) => bug.assignee)].filter(Boolean) as string[]))} onChange={setLeadTestOwner} placeholder="搜索并选择负责人" />
+            <div className="flex flex-col gap-1.5" required>
+            <label className="text-xs font-medium text-[var(--text-primary)]">测试负责人 (QA Lead / 质量主管) <span className="text-red-500">*</span></label>
+            <Cascader
+              showSearch
+              value={leadTestOwner ? [leadTestOwner] : undefined}
+              onChange={(value: any) => setLeadTestOwner(value?.[0] || '')}
+              options={Array.from(new Set([currentUser.name, leadTestOwner, ...bugs.map((bug) => bug.assignee)].filter(Boolean) as string[])).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
+              placeholder="搜索并选择负责人"
+              className="w-full"
+            />
+          </div>
             <p className="text-[11px] text-[#7C8796] mt-1">负责版本封版验收、自动化测试回归与缺陷归零把控</p>
           </div>
         </form>
