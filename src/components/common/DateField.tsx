@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
-import { Calendar } from './octicons-compat';
+import React from 'react';
+import { DatePicker } from 'antd';
+import dayjs, { Dayjs } from 'dayjs';
 
 export const DateField: React.FC<{
   label: string;
@@ -8,6 +9,34 @@ export const DateField: React.FC<{
   required?: boolean;
   disabled?: boolean;
 }> = ({ label, value, onChange, required = false, disabled = false }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-  return <div className="block text-xs leading-5 text-[var(--text-muted)]"><label className="block">{label}{required && ' *'}</label><span className="group relative mt-1 block h-8"><span className={`pointer-events-none absolute inset-0 flex items-center justify-between rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 ${value ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'} ${disabled ? 'opacity-60' : 'group-hover:border-[var(--border-subtle)]'}`}><span className="truncate text-xs leading-5">{value || '请选择日期'}</span><Calendar className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" /></span><input ref={inputRef} type="date" value={value} onChange={(event) => onChange(event.target.value)} onClick={() => inputRef.current?.showPicker?.()} aria-label={label} required={required} disabled={disabled} className="absolute inset-0 h-8 w-full cursor-pointer rounded-lg border border-transparent bg-transparent text-transparent opacity-0 outline-none disabled:cursor-not-allowed" /></span></div>;
+  // 将 YYYY-MM-DD 字符串转为 dayjs 对象
+  const dayjsValue = value ? dayjs(value, 'YYYY-MM-DD') : null;
+
+  // 处理日期选择变化
+  const handleChange = (date: Dayjs | null) => {
+    if (date) {
+      onChange(date.format('YYYY-MM-DD'));
+    } else {
+      onChange('');
+    }
+  };
+
+  return (
+    <div className="block text-xs leading-5 text-[var(--text-muted)]">
+      <label className="block mb-1">
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <DatePicker
+        value={dayjsValue}
+        onChange={handleChange}
+        format="YYYY-MM-DD"
+        placeholder="请选择日期"
+        disabled={disabled}
+        allowClear
+        className="w-full"
+        style={{ height: '32px' }}
+      />
+    </div>
+  );
 };
