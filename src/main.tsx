@@ -48,7 +48,8 @@ const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           
           // 字体
           fontSize: 14,
-          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          fontFamily: cssToken('--font-sans', 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'),
+          controlHeight: 32,
           
           // 圆角
           borderRadius: 6,

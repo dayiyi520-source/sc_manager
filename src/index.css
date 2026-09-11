@@ -2,6 +2,7 @@
 
 @layer base {
   :root {
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --bg-overlay: color-mix(in srgb, var(--color-black) 70%, transparent);
     --bg-main: #0C0F13;
     --bg-nav: #0B111A;
@@ -75,7 +76,7 @@
   body {
     background-color: var(--bg-main);
     color: var(--text-body);
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-sans);
     overflow-x: hidden;
   }
 
@@ -765,6 +766,22 @@ html:not(.dark) .tech-shell .work-item-panel {
   height: 32px !important;
 }
 
+/* DatePicker owns an inner input. Keep the trigger at the shared 32px height
+ * without applying that height a second time to its internal input. */
+.tech-shell .ant-picker {
+  min-height: 32px;
+  height: 32px;
+}
+
+.tech-shell :where(
+  .ant-picker .ant-picker-input > input,
+  .ant-select .ant-select-input,
+  .ant-input-number .ant-input-number-input
+) {
+  min-height: 0;
+  height: auto !important;
+}
+
 .tech-shell table tbody tr {
   height: 40px;
 }
@@ -1374,7 +1391,42 @@ html.dark .review-empty-icon {
 .work-order-form textarea::placeholder,
 .work-order-form [contenteditable="true"]::before {
   color: var(--text-muted) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 12px !important;
   opacity: 1;
+}
+
+.work-order-form {
+  --work-order-field-gap: 5px;
+}
+
+.work-order-form .work-order-field {
+  display: grid;
+  gap: var(--work-order-field-gap);
+}
+
+.work-order-form .form-date-field-label {
+  margin-bottom: var(--work-order-field-gap);
+}
+
+.work-order-form :where(
+  .ant-input,
+  .ant-input-number-input,
+  .ant-select-selection-item,
+  .ant-select-placeholder,
+  .ant-picker-input > input
+) {
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.work-order-form .ant-select-placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1;
+}
+
+.work-order-form .ant-input-number {
+  width: 100%;
 }
 .login-form input:focus { border-color: hsl(var(--shade-hue) 85% 65%); box-shadow: 0 0 0 3px hsl(var(--shade-hue) 85% 60% / .14), 0 0 18px hsl(var(--shade-hue) 85% 60% / .18); }
 .account-quick-picks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: -6px; }

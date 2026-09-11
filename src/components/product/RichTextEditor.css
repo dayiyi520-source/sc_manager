@@ -1,0 +1,15 @@
+.rich-text-editor .tox-tinymce { border: 0; border-radius: 0; }
+.rich-text-editor .tox-editor-header { border-bottom: 1px solid var(--border-main); box-shadow: none; padding: 3px 6px; }
+.rich-text-editor .tox-toolbar, .rich-text-editor .tox-toolbar__primary { background: var(--bg-card); }
+.rich-text-editor .tox-toolbar__group { border-color: var(--border-main); padding: 0 3px; }
+.rich-text-editor .tox-tbtn { height: 30px; color: var(--text-muted); border-radius: 4px; }
+.rich-text-editor .tox-tbtn:hover, .rich-text-editor .tox-tbtn--enabled { background: var(--bg-surface-soft); color: var(--text-primary); }
+.rich-text-editor .tox-tbtn--select { min-width: 58px; padding: 0 6px; }
+.rich-text-editor .tox-edit-area__iframe { background: var(--bg-card); }
+.rich-text-editor--work-order .tox-tinymce,
+.rich-text-editor--work-order .rich-text-editor__markdown { min-height: 480px; }
+
+@media (max-width: 768px) {
+  .rich-text-editor--work-order .tox-tinymce,
+  .rich-text-editor--work-order .rich-text-editor__markdown { min-height: 360px; }
+}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Input, InputNumber, Select } from "antd";
 import {
   Inbox,
   Search,
@@ -119,15 +120,48 @@ export const isWorkOrderInScope = (
     ? samePerson(item.creatorName, currentUserName)
     : samePerson(item.ownerName, currentUserName);
 
-const SearchSelect: React.FC<{ label: string; value: string; options: string[]; placeholder?: string; onChange: (value: string) => void }> = ({ label, value, options, placeholder, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const query = value.trim().toLocaleLowerCase();
-  const filtered = options.filter((item) => item.toLocaleLowerCase().includes(query)).slice(0, 8);
-  return <label className="relative text-xs text-[var(--text-muted)]">{label}
-    <input value={value} onFocus={() => setOpen(true)} onChange={(event) => { onChange(event.target.value); setOpen(true); }} onBlur={() => window.setTimeout(() => setOpen(false), 120)} placeholder={placeholder} className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20" />
-    {open && filtered.length > 0 && <div className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-[var(--border-strong)] bg-[var(--bg-elevated)] py-1 shadow-lg">{filtered.map((item) => <button type="button" key={item} onMouseDown={() => onChange(item)} className="block w-full px-3 py-2 text-left text-xs text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]">{item}</button>)}</div>}
-  </label>;
-};
+const toSelectOptions = (options: string[]) => Array.from(new Set(options.filter(Boolean))).map((item) => ({ label: item, value: item }));
+
+const SearchSelect: React.FC<{ label: string; value: string; options: string[]; placeholder?: string; onChange: (value: string) => void }> = ({ label, value, options, placeholder, onChange }) => (
+  <label className="work-order-field text-xs text-[var(--text-muted)]">
+    {label}
+    <Select
+      aria-label={label}
+      allowClear
+      className="w-full"
+      showSearch
+      optionFilterProp="label"
+      options={toSelectOptions(options)}
+      placeholder={placeholder}
+      size="middle"
+      value={value || undefined}
+      onChange={(nextValue) => onChange(nextValue ?? "")}
+    />
+  </label>
+);
+
+const WorkOrderSelect: React.FC<{ label: string; value: string; options: string[]; placeholder: string; onChange: (value: string) => void }> = ({ label, value, options, placeholder, onChange }) => (
+  <label className="work-order-field text-xs text-[var(--text-muted)]">
+    {label}
+    <Select
+      aria-label={label}
+      allowClear
+      className="w-full"
+      options={toSelectOptions(options)}
+      placeholder={placeholder}
+      size="middle"
+      value={value || undefined}
+      onChange={(nextValue) => onChange(nextValue ?? "")}
+    />
+  </label>
+);
+
+const WorkOrderInput: React.FC<{ label: string; value: string; placeholder: string; onChange: (value: string) => void }> = ({ label, value, placeholder, onChange }) => (
+  <label className="work-order-field text-xs text-[var(--text-muted)]">
+    {label}
+    <Input aria-label={label} className="w-full" placeholder={placeholder} size="middle" value={value} onChange={(event) => onChange(event.target.value)} />
+  </label>
+);
 
 
 
@@ -175,6 +209,7 @@ export const RequirementPoolView: React.FC = () => {
   const [description, setDescription] = useState("");
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [media, setMedia] = useState<RequirementMedia[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
   const [workOpen, setWorkOpen] = useState(false);
   const [workflowAction, setWorkflowAction] = useState<"convert" | "reassign" | "memo">("convert");
@@ -271,27 +306,32 @@ export const RequirementPoolView: React.FC = () => {
     }
     const customer = customers.find((item) => item.id === customerId)
       || customers.find((item) => item.name.trim().toLocaleLowerCase() === customerQuery.trim().toLocaleLowerCase());
-    const saved = await addRequirementTask({
-      title: title.trim(),
-      description: descriptionText,
-      descriptionHtml: descriptionHtml || editor.current?.innerHTML || "",
-      media,
-      ownerName: selectedEmployee.name,
-      department: selectedEmployee.department,
-      customerId: customer?.id || customerId || undefined,
-      customerName: customer?.name,
-      priority: requirementPriority || undefined,
-      workOrderType: workOrderType || "其他问题",
-      specialFields,
-      dueDate: dueDate || undefined,
-    });
-    if (!saved) return;
-    setCreating(false);
-    setTypeFilter(workOrderType || "all");
-    setFilterMode("type");
-    setScope("all");
-    setPage(1);
-    setTab("list");
+    setIsSubmitting(true);
+    try {
+      const saved = await addRequirementTask({
+        title: title.trim(),
+        description: descriptionText,
+        descriptionHtml: descriptionHtml || editor.current?.innerHTML || "",
+        media,
+        ownerName: selectedEmployee.name,
+        department: selectedEmployee.department,
+        customerId: customer?.id || customerId || undefined,
+        customerName: customer?.name,
+        priority: requirementPriority || undefined,
+        workOrderType: workOrderType || "其他问题",
+        specialFields,
+        dueDate: dueDate || undefined,
+      });
+      if (!saved) return;
+      setCreating(false);
+      setTypeFilter(workOrderType || "all");
+      setFilterMode("type");
+      setScope("all");
+      setPage(1);
+      setTab("list");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   const openDetail = async (item: RequirementTask) => {
     setSelected({ ...item, media: normalizeMedia(item.media) });
@@ -560,30 +600,14 @@ export const RequirementPoolView: React.FC = () => {
   const cardSubText = (count: number) => `今日新增 +${count}`;
   const fieldClass =
     "mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20";
-  const selectFieldClass = (value: string) =>
-    `mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 ${value ? "text-[var(--text-primary)]" : "!text-[var(--text-muted)]"}`;
   const filterClass =
     "h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)]";
   const fields = <div className="work-order-form grid grid-cols-1 gap-4">
-    <label className="text-xs text-[var(--text-muted)]">
-      工单标题 *
-      <input
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        placeholder="请输入工单标题，简明描述问题或诉求"
-        className={fieldClass}
-      />
-    </label>
+    <WorkOrderInput label="工单标题 *" value={title} onChange={setTitle} placeholder="请输入工单标题，简明描述问题或诉求" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <SearchSelect label="负责人 *" value={ownerName} options={employees.map((item) => item.name)} placeholder="输入负责人姓名搜索并选择" onChange={setOwnerName} />
       <SearchSelect label="关联客户" value={customerQuery} options={customers.map((item) => item.name)} placeholder="输入客户名称模糊搜索并选择" onChange={(name) => { setCustomerQuery(name); setCustomerId(customers.find((item) => item.name === name)?.id || ""); }} />
-      <label className="text-xs text-[var(--text-muted)]">
-        优先级
-        <select value={requirementPriority} onChange={(event) => setRequirementPriority(event.target.value as RequirementTask["priority"])} className={selectFieldClass(requirementPriority)}>
-          <option value="">请选择优先级</option>
-          {["紧急", "高", "中", "低"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}
-        </select>
-      </label>
+      <WorkOrderSelect label="优先级" value={requirementPriority} options={["紧急", "高", "中", "低"]} placeholder="请选择优先级" onChange={(value) => setRequirementPriority(value as RequirementTask["priority"])} />
       <DateField label="期望完成时间" value={dueDate} onChange={setDueDate} />
     </div>
     {workOrderType && (
@@ -592,35 +616,35 @@ export const RequirementPoolView: React.FC = () => {
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
           {workOrderType === "客户诉求" && <>
             <SearchSelect label="所属项目" value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入中标项目名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, projectName: value }))} />
-            <label className="text-xs text-[var(--text-muted)]">诉求类型<select value={specialFields.requestType || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, requestType: event.target.value }))} className={selectFieldClass(specialFields.requestType || "")}><option value="">请选择诉求类型</option>{["新功能","线上问题","数据需求","技术难题","其他"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
-            <label className="text-xs text-[var(--text-muted)]">诉求来源<input value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(event) => setSpecialFields((current) => ({ ...current, requestSource: event.target.value }))} className={fieldClass} /></label>
+            <WorkOrderSelect label="诉求类型" value={specialFields.requestType || ""} options={["新功能", "线上问题", "数据需求", "技术难题", "其他"]} placeholder="请选择诉求类型" onChange={(value) => setSpecialFields((current) => ({ ...current, requestType: value }))} />
+            <WorkOrderInput label="诉求来源" value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(value) => setSpecialFields((current) => ({ ...current, requestSource: value }))} />
           </>}
           {workOrderType === "线上问题" && <>
             <SearchSelect label="关联产品" value={specialFields.productName || ""} options={productLines.map((item) => item.name)} placeholder="输入产品名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, productName: value }))} />
-            <label className="text-xs text-[var(--text-muted)]">严重程度<select value={specialFields.severity || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, severity: event.target.value }))} className={selectFieldClass(specialFields.severity || "")}><option value="">请选择严重程度</option>{["P0-阻断主流程","P1-功能逻辑异常","P2-一般缺陷","P3-轻微缺陷"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
-            <label className="text-xs text-[var(--text-muted)]">发生频率<select value={specialFields.frequency || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, frequency: event.target.value }))} className={selectFieldClass(specialFields.frequency || "")}><option value="">请选择发生频率</option>{["必现（100%）","高频发生","偶现（特点条件）","环境相关偶发"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
+            <WorkOrderSelect label="严重程度" value={specialFields.severity || ""} options={["P0-阻断主流程", "P1-功能逻辑异常", "P2-一般缺陷", "P3-轻微缺陷"]} placeholder="请选择严重程度" onChange={(value) => setSpecialFields((current) => ({ ...current, severity: value }))} />
+            <WorkOrderSelect label="发生频率" value={specialFields.frequency || ""} options={["必现（100%）", "高频发生", "偶现（特点条件）", "环境相关偶发"]} placeholder="请选择发生频率" onChange={(value) => setSpecialFields((current) => ({ ...current, frequency: value }))} />
           </>}
           {workOrderType === "售前支持" && <>
             <SearchSelect label="关联商机" value={specialFields.opportunityName || ""} options={opportunities.filter((item) => opportunityStagesBeforeWin.has(item.stage)).map((item) => item.name)} placeholder="输入商机名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, opportunityName: value, opportunityId: opportunities.find((item) => item.name === value)?.id || "" }))} />
-            <label className="text-xs text-[var(--text-muted)]">支持类型<select value={specialFields.supportType || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, supportType: event.target.value }))} className={selectFieldClass(specialFields.supportType || "")}><option value="">请选择支持类型</option>{["现场演示/答疑","需求沟通","方案设计","招投标标书协同","商务洽谈"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
-            <label className="text-xs text-[var(--text-muted)]">预计时长（天）<input type="number" min="0" value={specialFields.durationDays || ""} placeholder="请输入预计天数" onChange={(event) => setSpecialFields((current) => ({ ...current, durationDays: event.target.value }))} className={fieldClass} /></label>
+            <WorkOrderSelect label="支持类型" value={specialFields.supportType || ""} options={["现场演示/答疑", "需求沟通", "方案设计", "招投标标书协同", "商务洽谈"]} placeholder="请选择支持类型" onChange={(value) => setSpecialFields((current) => ({ ...current, supportType: value }))} />
+            <label className="work-order-field text-xs text-[var(--text-muted)]">预计时长（天）<InputNumber aria-label="预计时长（天）" className="w-full" min={0} placeholder="请输入预计天数" size="middle" stringMode value={specialFields.durationDays || null} onChange={(value) => setSpecialFields((current) => ({ ...current, durationDays: value ?? "" }))} /></label>
           </>}
           {workOrderType === "交付支持" && <>
             <SearchSelect label="所属项目" value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入中标项目名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, projectName: value }))} />
-            <label className="text-xs text-[var(--text-muted)]">推进阶段<input value={specialFields.progressStage || ""} placeholder="请输入当前推进阶段" onChange={(event) => setSpecialFields((current) => ({ ...current, progressStage: event.target.value }))} className={fieldClass} /></label>
-            <label className="text-xs text-[var(--text-muted)]">其他说明<input value={specialFields.other || ""} placeholder="请输入其他交付说明" onChange={(event) => setSpecialFields((current) => ({ ...current, other: event.target.value }))} className={fieldClass} /></label>
+            <WorkOrderInput label="推进阶段" value={specialFields.progressStage || ""} placeholder="请输入当前推进阶段" onChange={(value) => setSpecialFields((current) => ({ ...current, progressStage: value }))} />
+            <WorkOrderInput label="其他说明" value={specialFields.other || ""} placeholder="请输入其他交付说明" onChange={(value) => setSpecialFields((current) => ({ ...current, other: value }))} />
           </>}
           {workOrderType === "其他问题" && <>
-            <label className="text-xs text-[var(--text-muted)]">问题来源<input value={specialFields.problemSource || ""} placeholder="请输入问题来源" onChange={(event) => setSpecialFields((current) => ({ ...current, problemSource: event.target.value }))} className={fieldClass} /></label>
-            <label className="text-xs text-[var(--text-muted)]">期望结果<input value={specialFields.expectedResult || ""} placeholder="请输入期望达到的结果" onChange={(event) => setSpecialFields((current) => ({ ...current, expectedResult: event.target.value }))} className={fieldClass} /></label>
-            <label className="text-xs text-[var(--text-muted)]">类型<select value={specialFields.problemType || ""} onChange={(event) => setSpecialFields((current) => ({ ...current, problemType: event.target.value }))} className={selectFieldClass(specialFields.problemType || "")}><option value="">请选择问题类型</option>{["意见反馈","方向研讨","其他"].map((item) => <option key={item} value={item} className="text-[var(--text-primary)]">{item}</option>)}</select></label>
+            <WorkOrderInput label="问题来源" value={specialFields.problemSource || ""} placeholder="请输入问题来源" onChange={(value) => setSpecialFields((current) => ({ ...current, problemSource: value }))} />
+            <WorkOrderInput label="期望结果" value={specialFields.expectedResult || ""} placeholder="请输入期望达到的结果" onChange={(value) => setSpecialFields((current) => ({ ...current, expectedResult: value }))} />
+            <WorkOrderSelect label="类型" value={specialFields.problemType || ""} options={["意见反馈", "方向研讨", "其他"]} placeholder="请选择问题类型" onChange={(value) => setSpecialFields((current) => ({ ...current, problemType: value }))} />
           </>}
         </div>
       </div>
     )}
     <div>
       <span className="text-xs text-[var(--text-muted)]">工单描述 *</span>
-      <RichTextEditor editor={editor} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} />
+      <RichTextEditor size="work-order" editor={editor} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} />
       <div className="mt-2 flex items-center gap-2">
         <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-body)]">
           <Paperclip className="h-4 w-4" />
@@ -691,30 +715,35 @@ export const RequirementPoolView: React.FC = () => {
             </div>
           ) : (
             <form onSubmit={save} className="space-y-5">
-              <div>
-                <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                  {workOrderType || "提工单"}
-                </h2>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  提交后将会自动通知到负责人
-                </p>
+              <div className="sticky -top-4 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-[var(--text-primary)]">
+                    {workOrderType || "提工单"}
+                  </h2>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    提交后将会自动通知到负责人
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => setCreating(false)}
+                    className="h-10 rounded-lg border border-[var(--border-main)] px-4 text-sm text-[var(--text-body)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSubmitting && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
+                    {isSubmitting ? "提交中…" : "提交工单"}
+                  </button>
+                </div>
               </div>
               {fields}
-              <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-4">
-                <button
-                  type="button"
-                  onClick={() => setCreating(false)}
-                  className="h-10 px-4 rounded-lg border border-[var(--border-main)] text-sm text-[var(--text-body)]"
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  className="h-10 px-4 rounded-lg bg-[var(--primary)] text-sm font-semibold text-white"
-                >
-                  提交工单
-                </button>
-              </div>
             </form>
           )}
         </section>

@@ -23,11 +23,12 @@ export const DateField: React.FC<{
 
   return (
     <div className="block">
-      <label className="block text-xs text-[var(--text-muted)] mb-1">
+      <label className="form-date-field-label block text-xs text-[var(--text-muted)] mb-1">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <DatePicker
+        aria-label={label}
         value={dayjsValue}
         onChange={handleChange}
         format="YYYY-MM-DD"

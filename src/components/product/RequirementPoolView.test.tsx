@@ -111,7 +111,9 @@ describe('work-order workflow form regression', () => {
     fireEvent.change(screen.getByLabelText('任务类型 *'), { target: { value: '产品需求' } });
     selectAssignee('任务负责人 *');
     fireEvent.change(screen.getByLabelText('任务描述'), { target: { value: '任务描述独立提交' } });
-    fireEvent.change(screen.getByLabelText('期望完成时间'), { target: { value: '2026-10-09' } });
+    const deadline = screen.getByLabelText('期望完成时间');
+    fireEvent.change(deadline, { target: { value: '2026-10-09' } });
+    fireEvent.keyDown(deadline, { key: 'Enter', code: 'Enter' });
     fireEvent.click(screen.getByRole('button', { name: '确认转任务' }));
     expect(setRequirementTaskDraft).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '陈雅婷', dueDate: '2026-10-09', description: '任务描述独立提交' }));
   });
