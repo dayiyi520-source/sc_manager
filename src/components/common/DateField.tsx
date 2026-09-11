@@ -34,7 +34,8 @@ export const DateField: React.FC<{
         placeholder="请选择日期"
         disabled={disabled}
         allowClear
-        className="w-full"
+        className="w-full h-10"
+        style={{ height: '40px' }}
       />
     </div>
   );
