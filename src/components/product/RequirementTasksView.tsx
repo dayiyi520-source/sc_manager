@@ -12,7 +12,7 @@ import {
   Sparkles,
   List
 } from '@/components/common/octicons-compat';
-import { MessageSquare, Paperclip, X } from 'lucide-react';
+import { MessageSquare, Paperclip, X } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
 import { SearchableSelect, DateField } from '../common';
@@ -651,7 +651,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           {/* 分类 */}
           <div className="app-segmented flex rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800">
             {([['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的']] as const).map(([key, label]) => (
-              <button key={key} onClick={() => setActiveTab(key)} className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-medium transition-colors ${activeTab === key ? 'border-slate-200/80 bg-white font-semibold text-[#1677FF] shadow-2xs dark:border-[#2C3440] dark:bg-[#121923] dark:text-[#6EA0FF]' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-[#7C8796] dark:hover:text-[#F8FAFC]'}`}>
+              <button key={key} onClick={() => setActiveTab(key)} className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-medium transition-colors ${activeTab === key ? 'border-slate-200/80 bg-white font-semibold text-[var(--primary)] shadow-2xs dark:border-[var(--border-main)] dark:bg-[var(--bg-surface)] dark:text-[var(--active-text)]' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-[var(--text-muted)] dark:hover:text-[var(--text-primary)]'}`}>
                 {label}·{tabCounts[key]}
               </button>
             ))}

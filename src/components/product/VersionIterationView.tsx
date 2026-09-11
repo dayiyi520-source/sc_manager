@@ -17,6 +17,7 @@ import {
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { Modal, StatusTag } from '../common/UIComponents';
+import { showDeleteConfirm } from '../common/Feedback';
 import { DefectBug, DevTask, RequirementTask, VersionIteration } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { SearchableSelect } from '../common';
@@ -28,7 +29,7 @@ type SelectedWorkItem =
   | { kind: 'task'; item: DevTask }
   | { kind: 'bug'; item: DefectBug };
 
-const avatarColors = ['#C084FC', '#FBBF24', '#60A5FA', '#34D399'];
+const avatarColors = ['var(--accent-purple)', 'var(--warning)', 'var(--primary)', 'var(--success)'];
 
 const normalize = (value?: string) => (value || '').trim().toLowerCase();
 
@@ -321,10 +322,15 @@ export const VersionIterationView: React.FC = () => {
   };
 
   const deleteVersion = (version: VersionIteration) => {
-    if (!window.confirm(`确定删除迭代“${version.name}”吗？删除后不可恢复。`)) return;
-    setVersions((current) => current.filter((item) => item.id !== version.id));
-    if (selectedId === version.id) setSelectedId('');
-    addToast('success', '迭代已删除', version.name);
+    showDeleteConfirm({
+      title: `确认删除迭代“${version.name}”？`,
+      content: '删除后不可恢复，请确认是否继续。',
+      onOk: () => {
+        setVersions((current) => current.filter((item) => item.id !== version.id));
+        if (selectedId === version.id) setSelectedId('');
+        addToast('success', '迭代已删除', version.name);
+      },
+    });
   };
 
   const openRequirement = (item: RequirementTask) => setSelectedWorkItem({ kind: 'requirement', item });

@@ -20,6 +20,7 @@
     --cam-cyan: #35C7E8;
     --actor-green: #4CD37D;
     --ai-indigo: #8B9CFF;
+    --accent-purple: #8B5CF6;
     --accent-gold: var(--warning);
     --accent-gold-hover: #FDE047;
     --accent-gold-dim: rgba(250, 204, 21, 0.12);
@@ -47,6 +48,7 @@
     --cam-cyan: #0891B2;
     --actor-green: #16A34A;
     --ai-indigo: #4F46E5;
+    --accent-purple: #7C3AED;
     --accent-gold: var(--warning);
     --accent-gold-hover: #B45309;
     --accent-gold-dim: rgba(217, 119, 6, 0.12);

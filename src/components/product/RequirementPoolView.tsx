@@ -33,7 +33,7 @@ import {
   AlignRight,
   Undo2,
   Redo2,
-} from "lucide-react";
+} from "../common/octicons-compat";
 import { Pagination } from "../common/Pagination";
 import { DateField } from '../common';
 import { useApp } from "../../context/AppContext";

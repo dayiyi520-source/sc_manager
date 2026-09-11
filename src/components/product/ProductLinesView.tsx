@@ -10,7 +10,7 @@ import {
   FileText,
   Bug,
   Code2,
-} from 'lucide-react';
+} from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { ProductLine } from '../../types';
@@ -149,22 +149,22 @@ export const ProductLinesView: React.FC = () => {
   return (
     <div className="product-lines-view space-y-6 animate-in fade-in duration-150">
       {/* Action Toolbar */}
-      <div className="product-lines-toolbar bg-[#121923] border border-[#2C3440] rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div className="product-lines-toolbar bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="relative flex-1 max-w-md">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#7C8796]" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="搜索产品线名称 / 编码 / 负责人..."
-            className="product-lines-search w-full pl-8 pr-3 py-1.5 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC] focus:outline-hidden focus:border-[#2F66F6]"
+            className="product-lines-search w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
           />
         </div>
 
         <button
           id="btn-add-product-line"
           onClick={() => { resetCreateForm(); setIsModalOpen(true); }}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg font-semibold shadow-xs transition-colors shrink-0"
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg font-semibold shadow-xs transition-colors shrink-0"
         >
           <Plus className="w-4 h-4" />
           新建产品线
@@ -179,20 +179,20 @@ export const ProductLinesView: React.FC = () => {
           return (
             <div
               key={pl.id}
-              className="product-line-card group bg-[#121923] border border-[#2C3440] rounded-lg overflow-hidden shadow-xs hover:border-[#2F66F6]/60 transition-colors duration-200 flex flex-col justify-between"
+              className="product-line-card group bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-lg overflow-hidden shadow-xs hover:border-[var(--primary)]/60 transition-colors duration-200 flex flex-col justify-between"
             >
               {/* Compact header: keep product identity visible without a decorative cover. */}
               <div
                 onClick={() => setSelectedProductLineId(pl.id)}
-                className="product-line-cover relative w-full overflow-hidden cursor-pointer border-b border-[#2C3440]"
+                className="product-line-cover relative w-full overflow-hidden cursor-pointer border-b border-[var(--border-main)]"
               >
                 <div className="flex items-center gap-3 p-4">
-                  <div className="product-line-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#2F66F6]/10 text-[#2F66F6]">
+                  <div className="product-line-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--primary)]/10 text-[var(--primary)]">
                     <Boxes className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <h4 className="truncate text-sm font-semibold text-[#F8FAFC] group-hover:text-[#6EA0FF] transition-colors">
+                      <h4 className="truncate text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--active-text)] transition-colors">
                         {pl.name}
                       </h4>
                       <StatusTag status={pl.health === '已停用' ? '已停用' : '启用中'} />
@@ -204,32 +204,32 @@ export const ProductLinesView: React.FC = () => {
               {/* Card Body */}
               <div onClick={() => setSelectedProductLineId(pl.id)} className="product-line-body flex flex-1 flex-col justify-between space-y-3 p-4 text-xs cursor-pointer">
                 {/* Meta info row: Owner & Website */}
-                <div className="space-y-2 text-[11px] text-[#7C8796]">
-                  <div className="flex items-center justify-between gap-3"><span>负责人</span><strong className="truncate font-medium text-[#A5ADBA]">{pl.owner || pl.ownerName || '未设置'}</strong></div>
-                  <div className="flex items-center justify-between gap-3"><span>当前版本</span><span className="font-mono text-[#A5ADBA]">{pl.currentVersion || 'V1.0.0'}</span></div>
-                  <div className="flex items-center justify-between gap-3"><span>版本数量</span><span className="text-[#A5ADBA]">{pl.versionCount || versions.filter((v) => v.productLineId === pl.id).length || 0} 个</span></div>
+                <div className="space-y-2 text-[11px] text-[var(--text-muted)]">
+                  <div className="flex items-center justify-between gap-3"><span>负责人</span><strong className="truncate font-medium text-[var(--text-body)]">{pl.owner || pl.ownerName || '未设置'}</strong></div>
+                  <div className="flex items-center justify-between gap-3"><span>当前版本</span><span className="font-mono text-[var(--text-body)]">{pl.currentVersion || 'V1.0.0'}</span></div>
+                  <div className="flex items-center justify-between gap-3"><span>版本数量</span><span className="text-[var(--text-body)]">{pl.versionCount || versions.filter((v) => v.productLineId === pl.id).length || 0} 个</span></div>
                 </div>
 
                 {/* Description */}
                 <p
                   onClick={() => setSelectedProductLineId(pl.id)}
-                  className="text-[#A5ADBA] leading-relaxed line-clamp-2 cursor-pointer border-t border-[#2C3440] pt-3"
+                  className="text-[var(--text-body)] leading-relaxed line-clamp-2 cursor-pointer border-t border-[var(--border-main)] pt-3"
                 >
                   {pl.description}
                 </p>
 
                 {/* 待办需求、缺陷和研发任务显示 (满足需求2 - 参考图设计) */}
-                <div className="grid grid-cols-3 gap-2 border-t border-[#2C3440] pt-3">
+                <div className="grid grid-cols-3 gap-2 border-t border-[var(--border-main)] pt-3">
                   {/* 待办需求 */}
                   <div
                     onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_req_tasks'); }}
-                    className="rounded-md px-1.5 py-2 text-center cursor-pointer bg-[#151A22] hover:bg-[#18212C] transition-colors"
+                    className="rounded-md px-1.5 py-2 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
                     <div className="flex items-center justify-center gap-1 text-purple-400 text-[11px] font-medium mb-0.5">
                       <FileText className="w-3 h-3" />
                       <span>待办需求</span>
                     </div>
-                    <span className="product-line-pending-req text-base font-bold font-mono text-[#F8FAFC]">
+                    <span className="product-line-pending-req text-base font-bold font-mono text-[var(--text-primary)]">
                       {stats.pendingReqs}
                     </span>
                   </div>
@@ -237,7 +237,7 @@ export const ProductLinesView: React.FC = () => {
                   {/* 待办缺陷 */}
                   <div
                     onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_bugs'); }}
-                    className="rounded-md px-1.5 py-2 text-center cursor-pointer bg-[#151A22] hover:bg-[#18212C] transition-colors"
+                    className="rounded-md px-1.5 py-2 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
                     <div className="flex items-center justify-center gap-1 text-red-400 text-[11px] font-medium mb-0.5">
                       <Bug className="w-3 h-3" />
@@ -251,7 +251,7 @@ export const ProductLinesView: React.FC = () => {
                   {/* 研发任务 */}
                   <div
                     onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_dev_tasks'); }}
-                    className="rounded-md px-1.5 py-2 text-center cursor-pointer bg-[#151A22] hover:bg-[#18212C] transition-colors"
+                    className="rounded-md px-1.5 py-2 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
                     <div className="flex items-center justify-center gap-1 text-emerald-400 text-[11px] font-medium mb-0.5">
                       <Code2 className="w-3 h-3" />
@@ -264,7 +264,7 @@ export const ProductLinesView: React.FC = () => {
                 </div>
 
                 {/* Footer Controls: 版本管理 & 成员管理 (满足需求2) */}
-                <div className="pt-2 border-t border-[#2C3440] flex items-center justify-between">
+                <div className="pt-2 border-t border-[var(--border-main)] flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -272,9 +272,9 @@ export const ProductLinesView: React.FC = () => {
                         e.stopPropagation();
                         setVersionModalLine(pl);
                       }}
-                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[#A5ADBA] hover:text-[#6EA0FF] font-semibold text-[11px] border border-[#2C3440] transition-colors"
+                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[var(--text-body)] hover:text-[var(--active-text)] font-semibold text-[11px] border border-[var(--border-main)] transition-colors"
                     >
-                      <Layers className="w-3.5 h-3.5 text-[#2F66F6]" />
+                      <Layers className="w-3.5 h-3.5 text-[var(--primary)]" />
                       <span>版本管理</span>
                     </button>
 
@@ -284,7 +284,7 @@ export const ProductLinesView: React.FC = () => {
                         e.stopPropagation();
                         setMemberModalLine(pl);
                       }}
-                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[#A5ADBA] hover:text-purple-400 font-semibold text-[11px] border border-[#2C3440] transition-colors"
+                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[var(--text-body)] hover:text-purple-400 font-semibold text-[11px] border border-[var(--border-main)] transition-colors"
                     >
                       <Users className="w-3.5 h-3.5 text-purple-400" />
                       <span>成员管理 ({pl.members?.length || 3})</span>
@@ -308,14 +308,14 @@ export const ProductLinesView: React.FC = () => {
             <button
               type="button"
               onClick={() => { resetCreateForm(); setIsModalOpen(false); }}
-              className="px-4 py-2 bg-[#18212C] text-[#A5ADBA] rounded-lg text-xs font-semibold hover:bg-[#202936] transition-colors"
+              className="px-4 py-2 bg-[var(--bg-elevated)] text-[var(--text-body)] rounded-lg text-xs font-semibold hover:bg-[var(--bg-elevated)] transition-colors"
             >
               取消
             </button>
             <button
               type="submit"
               form="create-product-line-form"
-              className="px-5 py-2 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold shadow-xs transition-colors"
+              className="px-5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs transition-colors"
             >
               保存并创建产品线
             </button>
@@ -340,8 +340,8 @@ export const ProductLinesView: React.FC = () => {
             />
           </div>
             <div>
-              <label className="block font-semibold text-[#A5ADBA] mb-1 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-[#2F66F6]" />
+              <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-[var(--primary)]" />
                 产品线网址 (官网/体验站)
               </label>
               <input
@@ -349,14 +349,14 @@ export const ProductLinesView: React.FC = () => {
                 value={formWebsite}
                 onChange={(e) => setFormWebsite(e.target.value)}
                 placeholder="请输入产品线网址"
-                className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC] focus:outline-hidden focus:border-[#2F66F6]"
+                className="w-full p-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
           </div>
 
           {/* 4. 产品线描述 */}
           <div>
-            <label className="block font-semibold text-[#A5ADBA] mb-1">
+            <label className="block font-semibold text-[var(--text-body)] mb-1">
               产品线描述与业务边界
             </label>
             <textarea
@@ -364,7 +364,7 @@ export const ProductLinesView: React.FC = () => {
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}
               placeholder="明确该产品线的技术架构、核心攻坚方向与支撑的企业应用生态..."
-              className="w-full p-2.5 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC] focus:outline-hidden focus:border-[#2F66F6] leading-relaxed"
+              className="w-full p-2.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)] leading-relaxed"
             />
           </div>
 

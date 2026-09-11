@@ -12,7 +12,7 @@ import {
   Strikethrough,
   Underline,
   Undo2,
-} from "lucide-react";
+} from "../common/octicons-compat";
 
 export const RichTextEditor: React.FC<{
   editor: React.RefObject<HTMLDivElement | null>;

@@ -11,7 +11,7 @@ import {
   Sparkles,
   ChevronRight,
   Filter
-} from 'lucide-react';
+} from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { ProductLine, VersionIteration, RequirementPoolItem } from '../../types';
 
@@ -147,8 +147,8 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
           </div>
 
           <div>
-            <label className="block font-semibold text-[#A5ADBA] mb-1.5">版本状态</label>
-            <select value={versionStatus} onChange={(e) => setVersionStatus(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC]">
+            <label className="block font-semibold text-[var(--text-body)] mb-1.5">版本状态</label>
+            <select value={versionStatus} onChange={(e) => setVersionStatus(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)]">
               <option value="待开始">待开始</option>
               <option value="迭代中">迭代中</option>
               <option value="已超时">已超时</option>
@@ -158,7 +158,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-[#7C8796] hover:text-[#F8FAFC] p-1.5 rounded-lg hover:bg-[#18212C] transition-colors"
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors"
           >
             ✕
           </button>
@@ -169,7 +169,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
           {/* Row 1: 版本名称 & 版本号 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
-              <label className="block font-semibold text-[#A5ADBA] mb-1.5">
+              <label className="block font-semibold text-[var(--text-body)] mb-1.5">
                 版本名称 <span className="text-red-400">*</span>
               </label>
               <input
@@ -178,11 +178,11 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                 value={versionName}
                 onChange={(e) => setVersionName(e.target.value)}
                 placeholder="例如：师创智联OS V3.6.0 (信创适配增强版)"
-                className="w-full px-3 py-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC] focus:outline-hidden focus:border-[#2F66F6]"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
             <div>
-              <label className="block font-semibold text-[#A5ADBA] mb-1.5">
+              <label className="block font-semibold text-[var(--text-body)] mb-1.5">
                 版本号 (Version Code) <span className="text-red-400">*</span>
               </label>
               <input
@@ -191,7 +191,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                 value={versionCode}
                 onChange={(e) => setVersionCode(e.target.value)}
                 placeholder="例如：V3.6.0"
-                className="w-full px-3 py-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#6EA0FF] font-mono font-bold uppercase focus:outline-hidden focus:border-[#2F66F6]"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--active-text)] font-mono font-bold uppercase focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
           </div>
@@ -199,8 +199,8 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
           {/* Row 2: 预计开始时间 & 预计结束时间 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-[#A5ADBA] mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[#2F66F6]" />
+              <label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-[var(--primary)]" />
                 预计开始时间 <span className="text-red-400">*</span>
               </label>
               <input
@@ -208,11 +208,11 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                 required
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC] focus:outline-hidden focus:border-[#2F66F6]"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
             <div>
-              <label className="block font-semibold text-[#A5ADBA] mb-1.5 flex items-center gap-1.5">
+              <label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
                 预计结束时间 (封版交付日) <span className="text-red-400">*</span>
               </label>
@@ -221,15 +221,15 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                 required
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC] focus:outline-hidden focus:border-[#2F66F6]"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
           </div>
 
           {/* Row 3: 版本内容 */}
           <div>
-            <label className="block font-semibold text-[#A5ADBA] mb-1.5 flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[#6EA0FF]" />
+            <label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-[var(--active-text)]" />
               版本内容 / 发版说明范围
             </label>
             <textarea
@@ -237,21 +237,21 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="请输入该版本的主要演进内容、核心里程碑目标、关键模块重构与对标交付场景..."
-              className="w-full px-3 py-2.5 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC] focus:outline-hidden focus:border-[#2F66F6] leading-relaxed"
+              className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)] leading-relaxed"
             />
           </div>
 
           {/* Row 4: 关联需求 (需求取自需求表 requirementPool) */}
-          <div className="border border-[#2C3440] rounded-xl p-4 bg-[#151A22]/50 space-y-3">
+          <div className="border border-[var(--border-main)] rounded-xl p-4 bg-[var(--bg-surface-soft)]/50 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-[#F8FAFC] text-xs">关联需求 (取自需求表)</span>
-                  <span className="px-2 py-0.5 rounded-full bg-[#2F66F6]/15 text-[#6EA0FF] text-[11px] font-mono font-bold">
+                  <span className="font-bold text-[var(--text-primary)] text-xs">关联需求 (取自需求表)</span>
+                  <span className="px-2 py-0.5 rounded-full bg-[var(--primary)]/15 text-[var(--active-text)] text-[11px] font-mono font-bold">
                     已选 {selectedReqIds.length} 项
                   </span>
                 </div>
-                <p className="text-[11px] text-[#7C8796] mt-0.5">
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                   勾选需求池中需要并入本版本迭代规划的业务与产品需求
                 </p>
               </div>
@@ -263,32 +263,32 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
             {/* Filter toolbar */}
             <div className="flex items-center gap-2 pt-1">
               <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#7C8796]" />
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                 <input
                   type="text"
                   value={reqSearch}
                   onChange={(e) => setReqSearch(e.target.value)}
                   placeholder="快速搜索需求标题 / 编号 / 客户..."
-                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[#2C3440] bg-[#121923] text-[#F8FAFC] text-xs"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-xs"
                 />
               </div>
-              <label className="flex items-center gap-1.5 text-[11px] text-[#A5ADBA] cursor-pointer shrink-0 select-none">
+              <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-body)] cursor-pointer shrink-0 select-none">
                 <input
                   type="checkbox"
                   checked={onlyCurrentLineReqs}
                   onChange={(e) => setOnlyCurrentLineReqs(e.target.checked)}
-                  className="rounded border-[#2C3440] text-[#2F66F6] focus:ring-0"
+                  className="rounded border-[var(--border-main)] text-[var(--primary)] focus:ring-0"
                 />
                 仅当前产品线
               </label>
             </div>
 
             {reqSearch.trim() && availableReqs.length > 0 && (
-              <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-[#2C3440]/60">
+              <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-[var(--border-main)]/60">
                 {availableReqs.map((req) => {
                   const isChecked = selectedReqIds.includes(req.id);
-                  return <button type="button" key={req.id} onClick={() => toggleReq(req.id)} className={`w-full text-left p-2.5 rounded-lg flex items-center gap-2 ${isChecked ? 'bg-[#2F66F6]/10 border border-[#2F66F6]/30' : 'hover:bg-[#18212C]/70 border border-transparent'}`}>
-                    <span className="font-mono text-[#6EA0FF] text-[11px]">{req.code || req.id}</span><span className="text-[#F8FAFC] truncate">{req.title}</span><span className="ml-auto text-[10px] text-[#7C8796]">{isChecked ? '已选择' : '选择'}</span>
+                  return <button type="button" key={req.id} onClick={() => toggleReq(req.id)} className={`w-full text-left p-2.5 rounded-lg flex items-center gap-2 ${isChecked ? 'bg-[var(--primary)]/10 border border-[var(--primary)]/30' : 'hover:bg-[var(--bg-elevated)]/70 border border-transparent'}`}>
+                    <span className="font-mono text-[var(--active-text)] text-[11px]">{req.code || req.id}</span><span className="text-[var(--text-primary)] truncate">{req.title}</span><span className="ml-auto text-[10px] text-[var(--text-muted)]">{isChecked ? '已选择' : '选择'}</span>
                   </button>;
                 })}
               </div>
@@ -297,10 +297,10 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
             {selectedReqs.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {selectedReqs.map((req) => (
-                  <span key={req.id} className="inline-flex items-center gap-1.5 rounded-lg border border-[#2F66F6]/40 bg-[#2F66F6]/10 px-2 py-1 text-[11px] text-[#A5ADBA]">
-                    <span className="font-mono text-[#6EA0FF]">{req.code || req.id}</span>
+                  <span key={req.id} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)]/40 bg-[var(--primary)]/10 px-2 py-1 text-[11px] text-[var(--text-body)]">
+                    <span className="font-mono text-[var(--active-text)]">{req.code || req.id}</span>
                     <span className="max-w-48 truncate">{req.title}</span>
-                    <button type="button" onClick={() => toggleReq(req.id)} className="text-[#7C8796] hover:text-red-400" aria-label={`移除${req.title}`}>×</button>
+                    <button type="button" onClick={() => toggleReq(req.id)} className="text-[var(--text-muted)] hover:text-red-400" aria-label={`移除${req.title}`}>×</button>
                   </span>
                 ))}
               </div>
@@ -308,9 +308,9 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
 
             {/* Requirements list，仅在输入搜索后展示 */}
             {false && (
-            <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-[#2C3440]/60">
+            <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-[var(--border-main)]/60">
               {availableReqs.length === 0 ? (
-                <div className="text-center py-6 text-[#7C8796] text-xs">
+                <div className="text-center py-6 text-[var(--text-muted)] text-xs">
                   暂无匹配的需求记录
                 </div>
               ) : (
@@ -322,22 +322,22 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                       onClick={() => toggleReq(req.id)}
                       className={`pt-2 first:pt-0 p-2.5 rounded-lg cursor-pointer transition-colors flex items-start gap-3 ${
                         isChecked
-                          ? 'bg-[#2F66F6]/10 border border-[#2F66F6]/30'
-                          : 'hover:bg-[#18212C]/70 border border-transparent'
+                          ? 'bg-[var(--primary)]/10 border border-[var(--primary)]/30'
+                          : 'hover:bg-[var(--bg-elevated)]/70 border border-transparent'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => {}} // handled by parent div
-                        className="mt-0.5 rounded border-[#2C3440] text-[#2F66F6] focus:ring-0 cursor-pointer"
+                        className="mt-0.5 rounded border-[var(--border-main)] text-[var(--primary)] focus:ring-0 cursor-pointer"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono font-bold text-[#6EA0FF] text-[11px]">
+                          <span className="font-mono font-bold text-[var(--active-text)] text-[11px]">
                             {req.code || req.id}
                           </span>
-                          <span className="font-medium text-[#F8FAFC] truncate">
+                          <span className="font-medium text-[var(--text-primary)] truncate">
                             {req.title}
                           </span>
                           <span
@@ -351,19 +351,19 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                           >
                             {req.priority}
                           </span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-[#18212C] text-[#A5ADBA]">
+                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-[var(--bg-elevated)] text-[var(--text-body)]">
                             {req.status}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 text-[11px] text-[#7C8796] mt-1">
+                        <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)] mt-1">
                           {req.productLineName && (
-                            <span>产品线: <span className="text-[#A5ADBA]">{req.productLineName}</span></span>
+                            <span>产品线: <span className="text-[var(--text-body)]">{req.productLineName}</span></span>
                           )}
                           {req.customerName && (
-                            <span>客户: <span className="text-[#A5ADBA]">{req.customerName}</span></span>
+                            <span>客户: <span className="text-[var(--text-body)]">{req.customerName}</span></span>
                           )}
                           {req.submitter && (
-                            <span>提报人: <span className="text-[#A5ADBA]">{req.submitter}</span></span>
+                            <span>提报人: <span className="text-[var(--text-body)]">{req.submitter}</span></span>
                           )}
                         </div>
                       </div>
@@ -376,22 +376,22 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
         </form>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[#2C3440] flex items-center justify-between bg-[#151A22]/80">
-          <div className="text-xs text-[#7C8796]">
-            创建后版本将进入 <span className="text-[#6EA0FF] font-medium">规划中</span> 状态并自动同步至研发迭代矩阵
+        <div className="px-6 py-4 border-t border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]/80">
+          <div className="text-xs text-[var(--text-muted)]">
+            创建后版本将进入 <span className="text-[var(--active-text)] font-medium">规划中</span> 状态并自动同步至研发迭代矩阵
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-[#18212C] hover:bg-[#202936] text-[#A5ADBA] rounded-lg text-xs font-semibold transition-colors"
+              className="px-4 py-2 bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated)] text-[var(--text-body)] rounded-lg text-xs font-semibold transition-colors"
             >
               取消
             </button>
             <button
               type="submit"
               form="create-version-form"
-              className="flex items-center gap-1.5 px-5 py-2 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold shadow-xs transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs transition-colors"
             >
               <Check className="w-3.5 h-3.5" />
               立即创建版本

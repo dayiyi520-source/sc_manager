@@ -12,3 +12,7 @@ export * from './Feedback';
 
 // 业务组件
 export * from './Business';
+
+// Legacy business dashboard primitives that are still shared by example pages.
+export { StatCard } from './UIComponents';
+export type { StatCardProps } from './UIComponents';

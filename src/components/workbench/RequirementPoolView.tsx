@@ -31,7 +31,7 @@ import {
   AlignRight,
   Undo2,
   Redo2,
-} from "lucide-react";
+} from "../common/octicons-compat";
 import { Pagination } from "../common/Pagination";
 import { useApp } from "../../context/AppContext";
 import { StatCard, StatusTag, Drawer, Modal } from "../common/UIComponents";

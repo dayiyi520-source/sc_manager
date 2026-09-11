@@ -4,9 +4,9 @@
   "minimumPluginVersion": "0.1.44",
   "stack": {
     "frontend": {
-      "framework": "vue",
-      "language": "javascript",
-      "ui": "@string/string-framework-v3"
+      "framework": "react",
+      "language": "typescript",
+      "ui": "antd"
     },
     "backend": {
       "language": "java",
@@ -34,7 +34,7 @@
     }
   },
   "conventions": {
-    "frontendRoot": "frontend",
+    "frontendRoot": ".",
     "backendRoot": "backend",
     "databaseRoot": "database",
     "prdPath": "docs/prd.md",

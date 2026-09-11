@@ -43,18 +43,18 @@ export const ProductPlanningView: React.FC = () => {
 
   // Bug Severity Distribution Data
   const bugSeverityData = [
-    { name: '致命阻断', value: 1, color: '#EF4444' },
-    { name: '严重缺陷', value: 3, color: '#F97316' },
-    { name: '一般问题', value: 6, color: '#3B82F6' },
-    { name: '轻微优化', value: 4, color: '#10B981' }
+    { name: '致命阻断', value: 1, color: 'var(--danger)' },
+    { name: '严重缺陷', value: 3, color: 'var(--warning)' },
+    { name: '一般问题', value: 6, color: 'var(--primary)' },
+    { name: '轻微优化', value: 4, color: 'var(--success)' }
   ];
 
   // Bug Status Distribution
   const bugStatusData = [
-    { name: '待修复', count: 4, color: '#F59E0B' },
-    { name: '修复中', count: 5, color: '#3B82F6' },
-    { name: '待验证', count: 3, color: '#8B5CF6' },
-    { name: '已关闭', count: 18, color: '#10B981' }
+    { name: '待修复', count: 4, color: 'var(--warning)' },
+    { name: '修复中', count: 5, color: 'var(--primary)' },
+    { name: '待验证', count: 3, color: 'var(--accent-purple)' },
+    { name: '已关闭', count: 18, color: 'var(--success)' }
   ];
 
   // Requirements metrics for active version

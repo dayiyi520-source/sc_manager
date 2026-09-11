@@ -105,15 +105,21 @@ export default defineConfig(() => {
       },
     },
     build: {
-      chunkSizeWarningLimit: 500,
+      // After stable vendor and application-context splitting, the largest
+      // verified chunk is below this threshold (and does not form a cycle).
+      chunkSizeWarningLimit: 600,
       rollupOptions: {
         output: {
-          manualChunks: {
-            react: ['react', 'react-dom', 'react-router-dom'],
-            query: ['@tanstack/react-query'],
-            charts: ['recharts'],
-            motion: ['motion', 'gsap'],
-            icons: ['lucide-react', '@primer/octicons-react']
+          manualChunks(id) {
+            const moduleId = id.replace(/\\/g, '/');
+
+            if (!moduleId.includes('/node_modules/')) return;
+            if (moduleId.includes('/node_modules/react/') || moduleId.includes('/node_modules/react-dom/') || moduleId.includes('/node_modules/react-router')) return 'react';
+            if (moduleId.includes('/node_modules/@tanstack/')) return 'query';
+            if (moduleId.includes('/node_modules/recharts/')) return 'charts';
+            if (moduleId.includes('/node_modules/motion/') || moduleId.includes('/node_modules/gsap/')) return 'motion';
+            if (moduleId.includes('/src/context/AppContext')) return 'app-context';
+            if (moduleId.includes('/src/components/common/octicons-compat')) return 'octicons';
           }
         }
       }

@@ -9,7 +9,7 @@ import {
   ChevronRight,
   Sparkles,
   GitBranch
-} from 'lucide-react';
+} from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { ProductLine, VersionIteration } from '../../types';
 import { StatusTag } from '../common/UIComponents';
@@ -71,13 +71,13 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#A5ADBA]">
+              <span className="text-xs text-[var(--text-body)]">
                 查看所有版本交付时间线，支持快速新增迭代规划与上线发布
               </span>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold shadow-xs transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 创建新版本
@@ -86,24 +86,24 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
 
             <div className="space-y-3">
               {lineVersions.length === 0 ? (
-                <div className="text-center py-10 bg-[#151A22] border border-[#2C3440] rounded-xl text-xs text-[#7C8796]">
+                <div className="text-center py-10 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
                   暂无版本记录，点击上方“创建新版本”制定首个版本规划
                 </div>
               ) : (
                 lineVersions.map((v) => (
                   <div
                     key={v.id}
-                    className="p-4 rounded-xl border border-[#2C3440] bg-[#151A22] space-y-2.5 hover:border-[#3A4655] transition-colors"
+                    className="p-4 rounded-xl border border-[var(--border-main)] bg-[var(--bg-surface-soft)] space-y-2.5 hover:border-[var(--border-subtle)] transition-colors"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <span className="px-2 py-0.5 rounded bg-[#2F66F6]/15 text-[#6EA0FF] font-mono font-bold text-xs border border-[#2F66F6]/30">
+                        <span className="px-2 py-0.5 rounded bg-[var(--primary)]/15 text-[var(--active-text)] font-mono font-bold text-xs border border-[var(--primary)]/30">
                           {v.code}
                         </span>
-                        <span className="font-bold text-[#F8FAFC] text-sm">{v.name}</span>
+                        <span className="font-bold text-[var(--text-primary)] text-sm">{v.name}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#7C8796] flex items-center gap-1">
+                        <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {v.startDate || '2026-09-01'} ~ {v.endDate || v.releaseDate || '2026-09-30'}
                         </span>
@@ -111,20 +111,20 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
                       </div>
                     </div>
 
-                    <p className="text-[#A5ADBA] bg-[#121923] p-2.5 rounded-lg leading-relaxed text-[11px]">
+                    <p className="text-[var(--text-body)] bg-[var(--bg-surface)] p-2.5 rounded-lg leading-relaxed text-[11px]">
                       {v.changelog || v.content || '版本常规升级与维护。'}
                     </p>
 
-                    <div className="flex items-center justify-between text-[#7C8796] pt-1">
+                    <div className="flex items-center justify-between text-[var(--text-muted)] pt-1">
                       <div className="flex items-center gap-3 text-[11px]">
-                        <span>关联需求：<strong className="text-[#6EA0FF] font-mono">{v.requirementsCount || v.reqCount || 0}</strong> 项</span>
+                        <span>关联需求：<strong className="text-[var(--active-text)] font-mono">{v.requirementsCount || v.reqCount || 0}</strong> 项</span>
                         <span>关联缺陷：<strong className="text-red-400 font-mono">{v.bugCount || 0}</strong> 处</span>
                       </div>
                       {v.status !== '已发布' && (
                         <button
                           type="button"
                           onClick={() => handlePublish(v)}
-                          className="px-2.5 py-1 rounded bg-[#2F66F6]/15 hover:bg-[#2F66F6]/30 text-[#6EA0FF] hover:text-white font-semibold text-[11px] transition-colors"
+                          className="px-2.5 py-1 rounded bg-[var(--primary)]/15 hover:bg-[var(--primary)]/30 text-[var(--active-text)] hover:text-white font-semibold text-[11px] transition-colors"
                         >
                           发布上线
                         </button>

@@ -4,6 +4,14 @@ import { useApp } from '../../context/AppContext';
 import { Card, Statistic } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
+type AntCardProps = React.ComponentPropsWithoutRef<'div'> & {
+  loading?: boolean;
+  variant?: 'borderless';
+  hoverable?: boolean;
+};
+
+const AntCard = Card as unknown as React.ComponentType<AntCardProps>;
+
 export const FORM_CONTROL_CLASS = 'w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-2.5 text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none';
 
 export const FormField: React.FC<{ label: string; required?: boolean; className?: string; children: React.ReactNode }> = ({ label, required, className = '', children }) => (
@@ -44,13 +52,11 @@ export const StatCard: React.FC<StatCardProps> = ({
   className,
   onClick,
 }) => {
-  const CardComponent = Card as any;
-  
   return (
-    <CardComponent
+    <AntCard
       loading={loading}
       className={`stat-card ${className || ''}`}
-      bordered={false}
+      variant="borderless"
       onClick={onClick}
       hoverable={!!onClick}
     >
@@ -69,10 +75,12 @@ export const StatCard: React.FC<StatCardProps> = ({
               value={value}
               prefix={prefix}
               suffix={suffix || unit}
-              valueStyle={{ 
-                fontSize: '24px', 
-                fontWeight: 600,
-                color: 'var(--text-primary)'
+              styles={{
+                content: {
+                  fontSize: 24,
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                },
               }}
             />
           </div>
@@ -91,7 +99,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           )}
         </div>
       </div>
-    </CardComponent>
+    </AntCard>
   );
 };
 

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { DatePicker, Cascader, Segmented } from "antd";
 import {
   ArrowLeft,
   Boxes,
@@ -26,12 +25,13 @@ import {
   TrendingUp,
   Sparkles,
   GitBranch
-} from 'lucide-react';
+} from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { ProductLine, ProductItemInLine, VersionIteration } from '../../types';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { CreateVersionModal } from './CreateVersionModal';
 import { ManageMembersModal } from './ManageMembersModal';
+import { SearchableSelect } from '../common/SearchableSelect';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -81,10 +81,10 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   if (!productLine) {
     return (
       <div className="p-8 text-center space-y-4">
-        <p className="text-sm text-[#A5ADBA]">未找到指定产品线信息</p>
+        <p className="text-sm text-[var(--text-body)]">未找到指定产品线信息</p>
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-[#2F66F6] text-[#F8FAFC] rounded-lg text-xs font-semibold"
+          className="px-4 py-2 bg-[var(--primary)] text-[var(--text-primary)] rounded-lg text-xs font-semibold"
         >
           返回产品线列表
         </button>
@@ -175,7 +175,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#121923] hover:bg-[#18212C] text-[#A5ADBA] hover:text-[#F8FAFC] rounded-lg text-xs font-semibold border border-[#2C3440] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--text-body)] hover:text-[var(--text-primary)] rounded-lg text-xs font-semibold border border-[var(--border-main)] transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             返回产品线矩阵
@@ -187,15 +187,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <button
             type="button"
             onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#18212C] hover:bg-[#202936] text-[#A5ADBA] hover:text-[#F8FAFC] rounded-lg text-xs font-semibold border border-[#2C3440] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated)] text-[var(--text-body)] hover:text-[var(--text-primary)] rounded-lg text-xs font-semibold border border-[var(--border-main)] transition-colors"
           >
-            <UserCheck className="w-3.5 h-3.5 text-[#6EA0FF]" />
+            <UserCheck className="w-3.5 h-3.5 text-[var(--active-text)]" />
             负责人配置
           </button>
           <button
             type="button"
             onClick={() => setIsManageMembersOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#18212C] hover:bg-[#202936] text-[#A5ADBA] hover:text-[#F8FAFC] rounded-lg text-xs font-semibold border border-[#2C3440] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated)] text-[var(--text-body)] hover:text-[var(--text-primary)] rounded-lg text-xs font-semibold border border-[var(--border-main)] transition-colors"
           >
             <Users className="w-3.5 h-3.5 text-purple-400" />
             管理成员
@@ -203,7 +203,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <button
             type="button"
             onClick={() => setIsAddProductOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#18212C] hover:bg-[#202936] text-[#A5ADBA] hover:text-[#F8FAFC] rounded-lg text-xs font-semibold border border-[#2C3440] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated)] text-[var(--text-body)] hover:text-[var(--text-primary)] rounded-lg text-xs font-semibold border border-[var(--border-main)] transition-colors"
           >
             <Package className="w-3.5 h-3.5 text-emerald-400" />
             添加包含产品
@@ -211,7 +211,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <button
             type="button"
             onClick={() => setIsCreateVersionOpen(true)}
-            className="product-line-primary-action flex items-center gap-1.5 px-3.5 py-1.5 bg-[#2F66F6] hover:bg-[#3B73FF] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+            className="product-line-primary-action flex items-center gap-1.5 px-3.5 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             创建版本
@@ -220,7 +220,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       </div>
 
       {/* Hero Overview Banner with Cover */}
-      <div className="product-line-hero relative rounded-2xl border border-[#2C3440] overflow-hidden bg-[#121923] shadow-lg">
+      <div className="product-line-hero relative rounded-2xl border border-[var(--border-main)] overflow-hidden bg-[var(--bg-surface)] shadow-lg">
         {/* Cover Background Graphic */}
         <div className="hidden">
           {productLine.coverImage ? (
@@ -233,14 +233,14 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           ) : (
             <div className={`w-full h-full bg-linear-to-r ${productLine.coverColor || 'from-blue-600 to-indigo-900'} opacity-80`} />
           )}
-          <div className="product-line-hero-overlay absolute inset-0 bg-linear-to-t from-[#121923] via-[#121923]/50 to-transparent" />
+          <div className="product-line-hero-overlay absolute inset-0 bg-linear-to-t from-[var(--bg-surface)] via-[var(--bg-surface)]/50 to-transparent" />
 
           {/* Top badges on cover */}
           <div className="absolute top-4 left-4 flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md text-[#6EA0FF] font-mono font-bold text-xs border border-white/10">
+            <span className="px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md text-[var(--active-text)] font-mono font-bold text-xs border border-white/10">
               {productLine.code}
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-[#2F66F6]/80 backdrop-blur-md text-white font-mono font-bold text-xs">
+            <span className="px-2.5 py-1 rounded-md bg-[var(--primary)]/80 backdrop-blur-md text-white font-mono font-bold text-xs">
               当前版本 {productLine.currentVersion || '1.0.0'}
             </span>
           </div>
@@ -251,9 +251,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 href={productLine.website}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-black/60 backdrop-blur-md text-[#A5ADBA] hover:text-[#F8FAFC] text-xs font-medium border border-white/10 hover:border-white/30 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-black/60 backdrop-blur-md text-[var(--text-body)] hover:text-[var(--text-primary)] text-xs font-medium border border-white/10 hover:border-white/30 transition-colors"
               >
-                <Globe className="w-3.5 h-3.5 text-[#2F66F6]" />
+                <Globe className="w-3.5 h-3.5 text-[var(--primary)]" />
                 <span>访问官网/体验站</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
@@ -275,25 +275,25 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         <div className="product-line-hero-body p-6 relative z-10 space-y-4">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-[#F8FAFC]">{productLine.name}</h2>
-              <p className="text-xs text-[#A5ADBA] max-w-3xl mt-2 leading-relaxed">
+              <h2 className="text-2xl font-bold text-[var(--text-primary)]">{productLine.name}</h2>
+              <p className="text-xs text-[var(--text-body)] max-w-3xl mt-2 leading-relaxed">
                 {productLine.description}
               </p>
             </div>
-            <div className="text-xs text-[#7C8796] shrink-0 text-right">
-              <div>立项规划日：<span className="text-[#A5ADBA] font-mono">{productLine.createdAt || '2024-01-01'}</span></div>
-              <div className="mt-1">综合负责人：<span className="text-[#6EA0FF] font-medium">{productLine.owner || productLine.ownerName || '张瑞'}</span></div>
+            <div className="text-xs text-[var(--text-muted)] shrink-0 text-right">
+              <div>立项规划日：<span className="text-[var(--text-body)] font-mono">{productLine.createdAt || '2024-01-01'}</span></div>
+              <div className="mt-1">综合负责人：<span className="text-[var(--active-text)] font-medium">{productLine.owner || productLine.ownerName || '张瑞'}</span></div>
             </div>
           </div>
 
           {/* Three Key Leads Display Bar (需求负责人、技术负责人、测试负责人) */}
-          <div className="pt-2 border-t border-[#2C3440]">
-            <div className="text-[11px] font-bold text-[#7C8796] uppercase tracking-wider mb-2.5 flex items-center justify-between">
+          <div className="pt-2 border-t border-[var(--border-main)]">
+            <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2.5 flex items-center justify-between">
               <span>产研核心指挥体系 (三大关键责任人)</span>
               <button
                 type="button"
                 onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }}
-                className="text-[#2F66F6] hover:text-[#6EA0FF] font-semibold flex items-center gap-1"
+                className="text-[var(--primary)] hover:text-[var(--active-text)] font-semibold flex items-center gap-1"
               >
                 <Edit3 className="w-3 h-3" />
                 调整负责人
@@ -302,13 +302,13 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* 需求负责人 */}
-              <div className="product-line-lead-card p-3 rounded-xl bg-[#151A22] border border-[#2C3440] flex items-center gap-3">
+              <div className="product-line-lead-card p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-main)] flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 font-bold text-xs">
                   PO
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[11px] text-[#7C8796]">需求负责人 (Product Owner)</div>
-                  <div className="text-sm font-bold text-[#F8FAFC] mt-0.5 truncate">
+                  <div className="text-[11px] text-[var(--text-muted)]">需求负责人 (Product Owner)</div>
+                  <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
                     {productLine.requirementOwner || productLine.owner || '张瑞 (产品总监)'}
                   </div>
                   <div className="text-[10px] text-purple-400/90 font-medium mt-0.5">
@@ -318,29 +318,29 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               </div>
 
               {/* 技术负责人 */}
-              <div className="product-line-lead-card p-3 rounded-xl bg-[#151A22] border border-[#2C3440] flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#2F66F6]/15 border border-[#2F66F6]/30 flex items-center justify-center text-[#6EA0FF] font-bold text-xs">
+              <div className="product-line-lead-card p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-main)] flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/15 border border-[var(--primary)]/30 flex items-center justify-center text-[var(--active-text)] font-bold text-xs">
                   TL
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[11px] text-[#7C8796]">技术负责人 (Tech Lead)</div>
-                  <div className="text-sm font-bold text-[#F8FAFC] mt-0.5 truncate">
+                  <div className="text-[11px] text-[var(--text-muted)]">技术负责人 (Tech Lead)</div>
+                  <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
                     {productLine.techOwner || '王浩然 (技术委员会主席)'}
                   </div>
-                  <div className="text-[10px] text-[#6EA0FF]/90 font-medium mt-0.5">
+                  <div className="text-[10px] text-[var(--active-text)]/90 font-medium mt-0.5">
                     把控系统架构演进、技术选型与高可用交付
                   </div>
                 </div>
               </div>
 
               {/* 测试负责人 */}
-              <div className="product-line-lead-card p-3 rounded-xl bg-[#151A22] border border-[#2C3440] flex items-center gap-3">
+              <div className="product-line-lead-card p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-main)] flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs">
                   QA
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[11px] text-[#7C8796]">测试负责人 (QA Lead)</div>
-                  <div className="text-sm font-bold text-[#F8FAFC] mt-0.5 truncate">
+                  <div className="text-[11px] text-[var(--text-muted)]">测试负责人 (QA Lead)</div>
+                  <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
                     {productLine.testOwner || '陈小敏 (资深QA测试专家)'}
                   </div>
                   <div className="text-[10px] text-emerald-400/90 font-medium mt-0.5">
@@ -353,48 +353,48 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
           {/* 6 Key Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
-            <div className="product-line-stat-card p-3 bg-[#151A22] border border-[#2C3440] rounded-xl">
-              <span className="text-[#7C8796] text-[11px] block">包含产品数</span>
-              <div className="text-lg font-bold text-[#F8FAFC] mt-1 font-mono">{currentProducts.length} 款</div>
-              <span className="text-[10px] text-[#2F66F6]">矩阵覆盖</span>
+            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
+              <span className="text-[var(--text-muted)] text-[11px] block">包含产品数</span>
+              <div className="text-lg font-bold text-[var(--text-primary)] mt-1 font-mono">{currentProducts.length} 款</div>
+              <span className="text-[10px] text-[var(--primary)]">矩阵覆盖</span>
             </div>
-            <div className="product-line-stat-card p-3 bg-[#151A22] border border-[#2C3440] rounded-xl">
-              <span className="text-[#7C8796] text-[11px] block">迭代版本数</span>
-              <div className="text-lg font-bold text-[#6EA0FF] mt-1 font-mono">{lineVersions.length || productLine.versionCount || 1} 个</div>
-              <span className="text-[10px] text-[#7C8796]">CI/CD流水线</span>
+            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
+              <span className="text-[var(--text-muted)] text-[11px] block">迭代版本数</span>
+              <div className="text-lg font-bold text-[var(--active-text)] mt-1 font-mono">{lineVersions.length || productLine.versionCount || 1} 个</div>
+              <span className="text-[10px] text-[var(--text-muted)]">CI/CD流水线</span>
             </div>
-            <div className="product-line-stat-card p-3 bg-[#151A22] border border-[#2C3440] rounded-xl">
-              <span className="text-[#7C8796] text-[11px] block">待办需求</span>
+            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
+              <span className="text-[var(--text-muted)] text-[11px] block">待办需求</span>
               <div className="text-lg font-bold text-purple-400 mt-1 font-mono">{pendingReqsCount} 个</div>
-              <span className="text-[10px] text-[#7C8796]">需求池待排期</span>
+              <span className="text-[10px] text-[var(--text-muted)]">需求池待排期</span>
             </div>
-            <div className="product-line-stat-card p-3 bg-[#151A22] border border-[#2C3440] rounded-xl">
-              <span className="text-[#7C8796] text-[11px] block">待办缺陷</span>
+            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
+              <span className="text-[var(--text-muted)] text-[11px] block">待办缺陷</span>
               <div className="text-lg font-bold text-red-400 mt-1 font-mono">{pendingBugsCount} 处</div>
               <span className="text-[10px] text-red-400/80">待修复验证</span>
             </div>
-            <div className="product-line-stat-card p-3 bg-[#151A22] border border-[#2C3440] rounded-xl">
-              <span className="text-[#7C8796] text-[11px] block">研发任务中</span>
+            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
+              <span className="text-[var(--text-muted)] text-[11px] block">研发任务中</span>
               <div className="text-lg font-bold text-emerald-400 mt-1 font-mono">{pendingTasksCount} 项</div>
-              <span className="text-[10px] text-[#7C8796]">在研特性</span>
+              <span className="text-[10px] text-[var(--text-muted)]">在研特性</span>
             </div>
-            <div className="product-line-stat-card p-3 bg-[#151A22] border border-[#2C3440] rounded-xl">
-              <span className="text-[#7C8796] text-[11px] block">落地客户数</span>
+            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
+              <span className="text-[var(--text-muted)] text-[11px] block">落地客户数</span>
               <div className="text-lg font-bold text-amber-400 mt-1 font-mono">{productLine.customerCount || 28} 家</div>
-              <span className="text-[10px] text-[#7C8796]">央国企与500强</span>
+              <span className="text-[10px] text-[var(--text-muted)]">央国企与500强</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="product-line-tabs border-b border-[#2C3440] flex items-center gap-2 overflow-x-auto text-xs">
+      <div className="product-line-tabs border-b border-[var(--border-main)] flex items-center gap-2 overflow-x-auto text-xs">
         <button
           onClick={() => setActiveTab('products')}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'products'
-              ? 'border-[#2F66F6] text-[#2F66F6]'
-              : 'border-transparent text-[#7C8796] hover:text-[#F8FAFC]'
+              ? 'border-[var(--primary)] text-[var(--primary)]'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           <Package className="w-3.5 h-3.5" />
@@ -405,8 +405,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           onClick={() => setActiveTab('versions')}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'versions'
-              ? 'border-[#2F66F6] text-[#2F66F6]'
-              : 'border-transparent text-[#7C8796] hover:text-[#F8FAFC]'
+              ? 'border-[var(--primary)] text-[var(--primary)]'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
@@ -417,8 +417,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           onClick={() => setActiveTab('members')}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'members'
-              ? 'border-[#2F66F6] text-[#2F66F6]'
-              : 'border-transparent text-[#7C8796] hover:text-[#F8FAFC]'
+              ? 'border-[var(--primary)] text-[var(--primary)]'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           <Users className="w-3.5 h-3.5" />
@@ -429,8 +429,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           onClick={() => setActiveTab('requirements')}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'requirements'
-              ? 'border-[#2F66F6] text-[#2F66F6]'
-              : 'border-transparent text-[#7C8796] hover:text-[#F8FAFC]'
+              ? 'border-[var(--primary)] text-[var(--primary)]'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           <FileText className="w-3.5 h-3.5" />
@@ -441,8 +441,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           onClick={() => setActiveTab('bugs')}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'bugs'
-              ? 'border-[#2F66F6] text-[#2F66F6]'
-              : 'border-transparent text-[#7C8796] hover:text-[#F8FAFC]'
+              ? 'border-[var(--primary)] text-[var(--primary)]'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           <Bug className="w-3.5 h-3.5" />
@@ -453,8 +453,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           onClick={() => setActiveTab('tasks')}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'tasks'
-              ? 'border-[#2F66F6] text-[#2F66F6]'
-              : 'border-transparent text-[#7C8796] hover:text-[#F8FAFC]'
+              ? 'border-[var(--primary)] text-[var(--primary)]'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           <Code2 className="w-3.5 h-3.5" />
@@ -467,15 +467,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-sm text-[#F8FAFC]">产品线所纳管的产品矩阵</h3>
-              <p className="text-xs text-[#7C8796] mt-0.5">
+              <h3 className="font-bold text-sm text-[var(--text-primary)]">产品线所纳管的产品矩阵</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 在此产品线业务边界下研发、交付与运营的具体标准化产品及模块组件
               </p>
             </div>
             <button
               type="button"
               onClick={() => setIsAddProductOpen(true)}
-              className="product-line-primary-action flex items-center gap-1.5 px-3 py-1.5 bg-[#2F66F6] hover:bg-[#3B73FF] text-white rounded-lg text-xs font-semibold shadow-xs"
+              className="product-line-primary-action flex items-center gap-1.5 px-3 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg text-xs font-semibold shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               添加产品
@@ -484,22 +484,22 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {currentProducts.length === 0 ? (
-              <div className="col-span-full text-center py-12 bg-[#121923] border border-[#2C3440] rounded-xl text-xs text-[#7C8796]">
+              <div className="col-span-full text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
                 暂无包含产品，点击右上角“添加产品”进行产品纳管配置
               </div>
             ) : (
               currentProducts.map((p) => (
                 <div
                   key={p.id}
-                  className="bg-[#121923] border border-[#2C3440] rounded-xl p-4.5 space-y-3 hover:border-[#2F66F6]/50 transition-colors shadow-xs flex flex-col justify-between"
+                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4.5 space-y-3 hover:border-[var(--primary)]/50 transition-colors shadow-xs flex flex-col justify-between"
                 >
                   <div className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <span className="font-mono font-bold text-[11px] text-[#6EA0FF] bg-[#2F66F6]/10 px-2 py-0.5 rounded">
+                        <span className="font-mono font-bold text-[11px] text-[var(--active-text)] bg-[var(--primary)]/10 px-2 py-0.5 rounded">
                           {p.code || 'PRD'}
                         </span>
-                        <h4 className="font-bold text-sm text-[#F8FAFC] mt-1.5">{p.name}</h4>
+                        <h4 className="font-bold text-sm text-[var(--text-primary)] mt-1.5">{p.name}</h4>
                       </div>
                       <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                         p.status === '运营中'
@@ -512,19 +512,19 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                       </span>
                     </div>
 
-                    <p className="text-xs text-[#A5ADBA] leading-relaxed line-clamp-3">
+                    <p className="text-xs text-[var(--text-body)] leading-relaxed line-clamp-3">
                       {p.description || '高内聚关键服务与业务组件'}
                     </p>
                   </div>
 
-                  <div className="pt-3 border-t border-[#2C3440] flex items-center justify-between text-xs">
-                    <span className="text-[#7C8796] font-mono text-[11px]">
-                      当前版本: <span className="text-[#F8FAFC] font-semibold">{p.version || 'V1.0.0'}</span>
+                  <div className="pt-3 border-t border-[var(--border-main)] flex items-center justify-between text-xs">
+                    <span className="text-[var(--text-muted)] font-mono text-[11px]">
+                      当前版本: <span className="text-[var(--text-primary)] font-semibold">{p.version || 'V1.0.0'}</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => handleRemoveProduct(p.id, p.name)}
-                      className="text-[#7C8796] hover:text-red-400 text-[11px] flex items-center gap-1 transition-colors"
+                      className="text-[var(--text-muted)] hover:text-red-400 text-[11px] flex items-center gap-1 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       移除
@@ -542,15 +542,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-sm text-[#F8FAFC]">版本迭代演进路线</h3>
-              <p className="text-xs text-[#7C8796] mt-0.5">
+              <h3 className="font-bold text-sm text-[var(--text-primary)]">版本迭代演进路线</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 记录该产品线已发布及规划中的各版本周期、关键更新与关联需求
               </p>
             </div>
             <button
               type="button"
               onClick={() => { setEditingVersion(null); setIsCreateVersionOpen(true); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               创建新版本
@@ -559,41 +559,41 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
           <div className="space-y-3">
             {lineVersions.length === 0 ? (
-              <div className="text-center py-12 bg-[#121923] border border-[#2C3440] rounded-xl text-xs text-[#7C8796]">
+              <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
                 暂无版本迭代记录，点击右上角“创建新版本”规划版本交付
               </div>
             ) : (
               lineVersions.map((v) => (
                 <div
                   key={v.id}
-                  className="bg-[#121923] border border-[#2C3440] rounded-xl p-4.5 shadow-xs space-y-3 hover:border-[#3A4655] transition-colors"
+                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4.5 shadow-xs space-y-3 hover:border-[var(--border-subtle)] transition-colors"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-3">
-                      <span className="px-2.5 py-1 rounded-lg bg-[#2F66F6]/15 text-[#6EA0FF] font-mono font-bold text-xs border border-[#2F66F6]/30">
+                      <span className="px-2.5 py-1 rounded-lg bg-[var(--primary)]/15 text-[var(--active-text)] font-mono font-bold text-xs border border-[var(--primary)]/30">
                         {v.code || 'V1.0'}
                       </span>
-                      <h4 className="font-bold text-sm text-[#F8FAFC]">{v.name}</h4>
+                      <h4 className="font-bold text-sm text-[var(--text-primary)]">{v.name}</h4>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-[#7C8796]">
+                      <span className="text-[11px] text-[var(--text-muted)]">
                         起止周期: {v.startDate || '2026-09-01'} ~ {v.endDate || v.releaseDate || '2026-09-30'}
                       </span>
                       <StatusTag status={v.status === '规划中' ? '待开始' : v.status === '已发布' ? '已结束' : v.status} />
-                      <button type="button" onClick={() => { setEditingVersion(v); setIsCreateVersionOpen(true); }} className="px-2 py-1 rounded bg-[#18212C] text-[#6EA0FF] hover:bg-[#202936]">编辑</button>
+                      <button type="button" onClick={() => { setEditingVersion(v); setIsCreateVersionOpen(true); }} className="px-2 py-1 rounded bg-[var(--bg-elevated)] text-[var(--active-text)] hover:bg-[var(--bg-elevated)]">编辑</button>
                     </div>
                   </div>
 
-                  <p className="text-xs text-[#A5ADBA] bg-[#151A22] p-3 rounded-lg leading-relaxed">
+                  <p className="text-xs text-[var(--text-body)] bg-[var(--bg-surface-soft)] p-3 rounded-lg leading-relaxed">
                     {v.changelog || v.content || '版本常规升级与性能优化，攻关重大业务功能。'}
                   </p>
 
-                  <div className="flex items-center justify-between text-xs text-[#7C8796] pt-1">
+                  <div className="flex items-center justify-between text-xs text-[var(--text-muted)] pt-1">
                     <div className="flex items-center gap-4">
-                      <span>包含需求：<strong className="text-[#6EA0FF] font-mono font-semibold">{v.requirementsCount || v.reqCount || 0}</strong> 项</span>
+                      <span>包含需求：<strong className="text-[var(--active-text)] font-mono font-semibold">{v.requirementsCount || v.reqCount || 0}</strong> 项</span>
                       <span>关联缺陷：<strong className="text-red-400 font-mono font-semibold">{v.bugCount || 0}</strong> 处</span>
                       {v.linkedRequirementIds && v.linkedRequirementIds.length > 0 && (
-                        <span className="text-[11px] text-[#2F66F6]">
+                        <span className="text-[11px] text-[var(--primary)]">
                           已关联需求ID: {v.linkedRequirementIds.join(', ')}
                         </span>
                       )}
@@ -614,15 +614,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-sm text-[#F8FAFC]">产品线成员协同配置</h3>
-              <p className="text-xs text-[#7C8796] mt-0.5">
+              <h3 className="font-bold text-sm text-[var(--text-primary)]">产品线成员协同配置</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 支持配置产品线需求、架构、研发、测试与运维人员权限与职责
               </p>
             </div>
             <button
               type="button"
               onClick={() => setIsManageMembersOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs"
             >
               <Users className="w-3.5 h-3.5" />
               管理成员名单
@@ -637,15 +637,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               return (
               <div
                 key={m.id}
-                className="bg-[#121923] border border-[#2C3440] rounded-xl p-4 flex items-center gap-3 shadow-xs hover:border-[#3A4655]"
+                className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4 flex items-center gap-3 shadow-xs hover:border-[var(--border-subtle)]"
               >
-                <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#2F66F6]/30 to-purple-600/30 border border-[#2F66F6]/40 flex items-center justify-center font-bold text-[#6EA0FF] text-xs shrink-0">
+                <div className="w-10 h-10 rounded-full bg-linear-to-br from-[var(--primary)]/30 to-purple-600/30 border border-[var(--primary)]/40 flex items-center justify-center font-bold text-[var(--active-text)] text-xs shrink-0">
                   {m.name.slice(0, 2)}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-bold text-xs text-[#F8FAFC] truncate">{m.name}</div>
-                  <div className="text-[11px] text-[#6EA0FF] font-medium mt-0.5 truncate">{m.role}</div>
-                  {m.email && <div className="text-[10px] text-[#7C8796] truncate mt-0.5">{m.email}</div>}
+                  <div className="font-bold text-xs text-[var(--text-primary)] truncate">{m.name}</div>
+                  <div className="text-[11px] text-[var(--active-text)] font-medium mt-0.5 truncate">{m.role}</div>
+                  {m.email && <div className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">{m.email}</div>}
                 </div>
               </div>
               );
@@ -658,38 +658,38 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       {activeTab === 'requirements' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-[#F8FAFC]">需求表中本产品线关联需求</h3>
-            <span className="text-xs text-[#7C8796]">共 {lineReqs.length} 项需求</span>
+            <h3 className="font-bold text-sm text-[var(--text-primary)]">需求表中本产品线关联需求</h3>
+            <span className="text-xs text-[var(--text-muted)]">共 {lineReqs.length} 项需求</span>
           </div>
 
           <div className="space-y-2">
             {lineReqs.length === 0 ? (
-              <div className="text-center py-10 bg-[#121923] border border-[#2C3440] rounded-xl text-xs text-[#7C8796]">
+              <div className="text-center py-10 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
                 暂无关联需求，可在需求池中提报并归属至该产品线
               </div>
             ) : (
               lineReqs.map((r) => (
                 <div
                   key={r.id}
-                  className="bg-[#121923] border border-[#2C3440] rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs"
+                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-[#6EA0FF]">{r.code || r.id}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-[#2F66F6]/15 text-[#6EA0FF] text-[10px] font-mono">{lineVersions.find((version) => version.linkedRequirementIds?.includes(r.id))?.code || '未分配版本'}</span>
-                      <span className="font-bold text-[#F8FAFC]">{r.title}</span>
+                      <span className="font-mono font-bold text-[var(--active-text)]">{r.code || r.id}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-[var(--primary)]/15 text-[var(--active-text)] text-[10px] font-mono">{lineVersions.find((version) => version.linkedRequirementIds?.includes(r.id))?.code || '未分配版本'}</span>
+                      <span className="font-bold text-[var(--text-primary)]">{r.title}</span>
                       <span className="px-1.5 py-0.2 rounded text-[10px] bg-red-950/60 text-red-400 border border-red-800/50">
                         {r.priority}
                       </span>
                     </div>
-                    <p className="text-[#A5ADBA] leading-relaxed">{r.description}</p>
-                    <div className="text-[11px] text-[#7C8796] flex items-center gap-3">
+                    <p className="text-[var(--text-body)] leading-relaxed">{r.description}</p>
+                    <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-3">
                       {r.customerName && <span>客户: {r.customerName}</span>}
                       {r.submitter && <span>提报人: {r.submitter}</span>}
                       <span>时间: {r.createdAt}</span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] bg-[#18212C] text-[#A5ADBA] shrink-0">
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-[var(--bg-elevated)] text-[var(--text-body)] shrink-0">
                     {r.status}
                   </span>
                 </div>
@@ -703,35 +703,35 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       {activeTab === 'bugs' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-[#F8FAFC]">本产品线缺陷清单</h3>
-            <span className="text-xs text-[#7C8796]">共 {lineBugs.length} 处缺陷</span>
+            <h3 className="font-bold text-sm text-[var(--text-primary)]">本产品线缺陷清单</h3>
+            <span className="text-xs text-[var(--text-muted)]">共 {lineBugs.length} 处缺陷</span>
           </div>
 
           <div className="space-y-2">
             {lineBugs.length === 0 ? (
-              <div className="text-center py-10 bg-[#121923] border border-[#2C3440] rounded-xl text-xs text-[#7C8796]">
+              <div className="text-center py-10 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
                 目前该产品线架构健康，暂无未关闭缺陷
               </div>
             ) : (
               lineBugs.map((b) => (
                 <div
                   key={b.id}
-                  className="bg-[#121923] border border-[#2C3440] rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs"
+                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-red-400">{b.code || b.id}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-[#2F66F6]/15 text-[#6EA0FF] text-[10px] font-mono">{b.versionName || '未分配版本'}</span>
-                      <span className="font-bold text-[#F8FAFC]">{b.title}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-[var(--primary)]/15 text-[var(--active-text)] text-[10px] font-mono">{b.versionName || '未分配版本'}</span>
+                      <span className="font-bold text-[var(--text-primary)]">{b.title}</span>
                       <span className="px-1.5 py-0.2 rounded text-[10px] bg-red-950/60 text-red-400">
                         {b.severity}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-[#18212C] text-[#A5ADBA]">
+                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-[var(--bg-elevated)] text-[var(--text-body)]">
                         {b.type || '功能缺陷'}
                       </span>
                     </div>
-                    <p className="text-[#A5ADBA] leading-relaxed">{b.description}</p>
-                    <div className="text-[11px] text-[#7C8796] flex items-center gap-3">
+                    <p className="text-[var(--text-body)] leading-relaxed">{b.description}</p>
+                    <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-3">
                       <span>指派人: {b.ownerName || b.assignee || '未指派'}</span>
                       <span>验证人: {b.verifierName || 'QA'}</span>
                       <span>提交于: {b.createdAt}</span>
@@ -751,32 +751,32 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       {activeTab === 'tasks' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-[#F8FAFC]">本产品线活跃研发特性任务</h3>
-            <span className="text-xs text-[#7C8796]">共 {lineDevTasks.length} 项特性开发</span>
+            <h3 className="font-bold text-sm text-[var(--text-primary)]">本产品线活跃研发特性任务</h3>
+            <span className="text-xs text-[var(--text-muted)]">共 {lineDevTasks.length} 项特性开发</span>
           </div>
 
           <div className="space-y-2">
             {lineDevTasks.length === 0 ? (
-              <div className="text-center py-10 bg-[#121923] border border-[#2C3440] rounded-xl text-xs text-[#7C8796]">
+              <div className="text-center py-10 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
                 暂无研发中特性，可将版本关联需求转入任务排期
               </div>
             ) : (
               lineDevTasks.map((t) => (
                 <div
                   key={t.id}
-                  className="bg-[#121923] border border-[#2C3440] rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs"
+                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 rounded bg-[#2F66F6]/15 text-[#6EA0FF] text-[10px] font-mono">{t.versionName || '未分配版本'}</span>
-                      <span className="font-bold text-[#F8FAFC]">{t.title}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-[var(--primary)]/15 text-[var(--active-text)] text-[10px] font-mono">{t.versionName || '未分配版本'}</span>
+                      <span className="font-bold text-[var(--text-primary)]">{t.title}</span>
                       <span className="px-1.5 py-0.2 rounded text-[10px] bg-purple-950/60 text-purple-400">
                         {t.priority}
                       </span>
                     </div>
-                    <div className="text-[11px] text-[#7C8796] flex items-center gap-3">
-                      <span>开发人: <strong className="text-[#A5ADBA]">{t.developer}</strong></span>
-                      {t.repo && <span>仓库: <span className="font-mono text-[#6EA0FF]">{t.repo}</span></span>}
+                    <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-3">
+                      <span>开发人: <strong className="text-[var(--text-body)]">{t.developer}</strong></span>
+                      {t.repo && <span>仓库: <span className="font-mono text-[var(--active-text)]">{t.repo}</span></span>}
                       {t.branch && <span>分支: <span className="font-mono">{t.branch}</span></span>}
                       <span>预估/已耗工时: {t.estimatedHours}h / {t.spentHours}h</span>
                     </div>
@@ -801,14 +801,14 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             <button
               type="button"
               onClick={() => setIsAddProductOpen(false)}
-              className="px-4 py-2 bg-[#18212C] text-[#A5ADBA] rounded-lg text-xs font-semibold"
+              className="px-4 py-2 bg-[var(--bg-elevated)] text-[var(--text-body)] rounded-lg text-xs font-semibold"
             >
               取消
             </button>
             <button
               type="submit"
               form="add-product-form"
-              className="px-4 py-2 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold shadow-xs"
+              className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs"
             >
               保存产品
             </button>
@@ -817,7 +817,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       >
         <form id="add-product-form" onSubmit={handleSaveProduct} className="space-y-3.5 text-xs">
           <div>
-            <label className="block font-medium text-[#A5ADBA] mb-1">
+            <label className="block font-medium text-[var(--text-body)] mb-1">
               产品规范名称 *
             </label>
             <input
@@ -826,13 +826,13 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               value={prodName}
               onChange={(e) => setProdName(e.target.value)}
               placeholder="例如：桌面多维协同工作台 (Desktop Suite)"
-              className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC]"
+              className="w-full p-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)]"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-medium text-[#A5ADBA] mb-1">
+              <label className="block font-medium text-[var(--text-body)] mb-1">
                 产品编码 (Code)
               </label>
               <input
@@ -840,11 +840,11 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 value={prodCode}
                 onChange={(e) => setProdCode(e.target.value)}
                 placeholder="例如：PRD-OS-DESK"
-                className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC] font-mono uppercase"
+                className="w-full p-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] font-mono uppercase"
               />
             </div>
             <div>
-              <label className="block font-medium text-[#A5ADBA] mb-1">
+              <label className="block font-medium text-[var(--text-body)] mb-1">
                 当前版本号
               </label>
               <input
@@ -852,19 +852,19 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 value={prodVersion}
                 onChange={(e) => setProdVersion(e.target.value)}
                 placeholder="例如：V3.5.0"
-                className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#6EA0FF] font-mono"
+                className="w-full p-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--active-text)] font-mono"
               />
             </div>
           </div>
 
           <div>
-            <label className="block font-medium text-[#A5ADBA] mb-1">
+            <label className="block font-medium text-[var(--text-body)] mb-1">
               运营状态
             </label>
             <select
               value={prodStatus}
               onChange={(e) => setProdStatus(e.target.value as any)}
-              className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC]"
+              className="w-full p-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)]"
             >
               <option value="运营中">运营中</option>
               <option value="研发中">研发中</option>
@@ -874,7 +874,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           </div>
 
           <div>
-            <label className="block font-medium text-[#A5ADBA] mb-1">
+            <label className="block font-medium text-[var(--text-body)] mb-1">
               产品定位与能力描述
             </label>
             <textarea
@@ -882,7 +882,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               value={prodDesc}
               onChange={(e) => setProdDesc(e.target.value)}
               placeholder="明确该产品的关键特性、交付形态与支撑的业务场景..."
-              className="w-full p-2 rounded-lg border border-[#2C3440] bg-[#151A22] text-[#F8FAFC]"
+              className="w-full p-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)]"
             />
           </div>
         </form>
@@ -898,14 +898,14 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             <button
               type="button"
               onClick={() => { resetLeadForm(); setIsEditLeadsOpen(false); }}
-              className="px-4 py-2 bg-[#18212C] text-[#A5ADBA] rounded-lg text-xs font-semibold"
+              className="px-4 py-2 bg-[var(--bg-elevated)] text-[var(--text-body)] rounded-lg text-xs font-semibold"
             >
               取消
             </button>
             <button
               type="submit"
               form="edit-leads-form"
-              className="px-4 py-2 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold shadow-xs"
+              className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs"
             >
               保存负责人配置
             </button>
@@ -914,60 +914,30 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       >
         <form id="edit-leads-form" onSubmit={handleSaveLeads} className="space-y-4 text-xs">
           <div>
-            <label className="block font-semibold text-[#A5ADBA] mb-1 flex items-center gap-1.5">
+            <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-purple-400" />
               需求负责人 (Product Owner / PO) *
             </label>
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">需求负责人 (Product Owner / PO) <span className="text-red-500">*</span></label>
-            <Cascader
-              showSearch
-              value={leadReqOwner ? [leadReqOwner] : undefined}
-              onChange={(value: any) => setLeadReqOwner(value?.[0] || '')}
-              options={Array.from(new Set([currentUser.name, productLine.owner, productLine.ownerName, leadReqOwner, ...requirementTasks.map((task) => task.ownerName)].filter(Boolean) as string[])).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
-              placeholder="搜索并选择负责人"
-              className="w-full"
-            />
-          </div>
-            <p className="text-[11px] text-[#7C8796] mt-1">负责业务调研、PRD规划评审与需求优先级排序</p>
+            <SearchableSelect label="需求负责人 (Product Owner / PO)" required value={leadReqOwner} options={Array.from(new Set([currentUser.name, productLine.owner, productLine.ownerName, leadReqOwner, ...requirementTasks.map((task) => task.ownerName)].filter(Boolean) as string[]))} onChange={setLeadReqOwner} placeholder="搜索并选择负责人" />
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">负责业务调研、PRD规划评审与需求优先级排序</p>
           </div>
 
           <div>
-            <label className="block font-semibold text-[#A5ADBA] mb-1 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#2F66F6]" />
+            <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[var(--primary)]" />
               技术负责人 (Tech Lead / 架构师) *
             </label>
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">技术负责人 (Tech Lead / 架构师) <span className="text-red-500">*</span></label>
-            <Cascader
-              showSearch
-              value={leadTechOwner ? [leadTechOwner] : undefined}
-              onChange={(value: any) => setLeadTechOwner(value?.[0] || '')}
-              options={Array.from(new Set([currentUser.name, leadTechOwner, ...devTasks.map((task) => task.developer)].filter(Boolean) as string[])).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
-              placeholder="搜索并选择负责人"
-              className="w-full"
-            />
-          </div>
-            <p className="text-[11px] text-[#7C8796] mt-1">负责技术选型、架构高可用审查与研发任务攻坚</p>
+            <SearchableSelect label="技术负责人 (Tech Lead / 架构师)" required value={leadTechOwner} options={Array.from(new Set([currentUser.name, leadTechOwner, ...devTasks.map((task) => task.developer)].filter(Boolean) as string[]))} onChange={setLeadTechOwner} placeholder="搜索并选择负责人" />
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">负责技术选型、架构高可用审查与研发任务攻坚</p>
           </div>
 
           <div>
-            <label className="block font-semibold text-[#A5ADBA] mb-1 flex items-center gap-1.5">
+            <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               测试负责人 (QA Lead / 质量主管) *
             </label>
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">测试负责人 (QA Lead / 质量主管) <span className="text-red-500">*</span></label>
-            <Cascader
-              showSearch
-              value={leadTestOwner ? [leadTestOwner] : undefined}
-              onChange={(value: any) => setLeadTestOwner(value?.[0] || '')}
-              options={Array.from(new Set([currentUser.name, leadTestOwner, ...bugs.map((bug) => bug.assignee)].filter(Boolean) as string[])).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
-              placeholder="搜索并选择负责人"
-              className="w-full"
-            />
-          </div>
-            <p className="text-[11px] text-[#7C8796] mt-1">负责版本封版验收、自动化测试回归与缺陷归零把控</p>
+            <SearchableSelect label="测试负责人 (QA Lead / 质量主管)" required value={leadTestOwner} options={Array.from(new Set([currentUser.name, leadTestOwner, ...bugs.map((bug) => bug.assignee)].filter(Boolean) as string[]))} onChange={setLeadTestOwner} placeholder="搜索并选择负责人" />
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">负责版本封版验收、自动化测试回归与缺陷归零把控</p>
           </div>
         </form>
       </Modal>

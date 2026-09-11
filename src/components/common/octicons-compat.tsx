@@ -6,18 +6,19 @@
 import {
   AlertIcon, AlertFillIcon, ArchiveIcon, ArrowDownIcon, ArrowDownRightIcon as OctArrowDownRightIcon,
   ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, ArrowUpRightIcon as OctArrowUpRightIcon,
-  BeakerIcon, BellIcon, BookIcon, BriefcaseIcon, BugIcon, CalendarIcon, CheckIcon,
+  BeakerIcon, BellIcon, BoldIcon, BookIcon, BriefcaseIcon, BroadcastIcon, BugIcon, CalendarIcon, CheckIcon,
   CheckCircleIcon, ChecklistIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon,
   ClockIcon, CodeIcon, CommandPaletteIcon, CommentDiscussionIcon, CpuIcon, CreditCardIcon,
   DownloadIcon, EyeIcon, FileCheckIcon, FileCodeIcon, FileDirectoryIcon, FileIcon,
-  FilterIcon, FlameIcon, GearIcon, GitBranchIcon, GitCommitIcon, GitPullRequestIcon,
-  HistoryIcon, HomeIcon, InboxIcon, KeyIcon, LinkExternalIcon, ListUnorderedIcon,
+  FilterIcon, FlameIcon, GearIcon, GitBranchIcon, GitCommitIcon, GitPullRequestIcon, GlobeIcon,
+  GraphBarHorizontalIcon, HorizontalRuleIcon,
+  HistoryIcon, HomeIcon, InboxIcon, ItalicIcon, KeyIcon, LinkExternalIcon, LinkIcon, ListOrderedIcon, ListUnorderedIcon,
   LocationIcon, LockIcon, MailIcon, MegaphoneIcon, MilestoneIcon, MoonIcon, MortarBoardIcon,
   OrganizationIcon, PackageIcon, PaperclipIcon, PencilIcon, PeopleIcon, PersonAddIcon,
   PersonIcon, PlayIcon, PlusIcon, ProjectIcon, PulseIcon, QuestionIcon,
-  RepoIcon, RocketIcon, RowsIcon, SearchIcon, ServerIcon, ShareIcon, ShieldCheckIcon,
+  RedoIcon, RepoIcon, RocketIcon, RowsIcon, SearchIcon, ServerIcon, ShareIcon, ShieldCheckIcon, ShieldIcon,
   SidebarCollapseIcon, SidebarExpandIcon, StarIcon, SunIcon, TagIcon, TasklistIcon,
-  TerminalIcon, TrashIcon, TrophyIcon, UploadIcon, VideoIcon, XCircleIcon, XIcon, ZapIcon,
+  StrikethroughIcon, TerminalIcon, TrashIcon, TrophyIcon, UndoIcon, UploadIcon, VideoIcon, XCircleIcon, XIcon, ZapIcon,
 } from '@primer/octicons-react';
 
 export const LayoutDashboard = HomeIcon;
@@ -168,3 +169,25 @@ export const ScreenNormalIcon = SidebarCollapseIcon;
 export const PaperAirplaneIcon = OctArrowUpRightIcon;
 export const KebabHorizontalIcon = RowsIcon;
 export const DeviceMobileIcon = PersonIcon;
+export const Bold = BoldIcon;
+export const Italic = ItalicIcon;
+export const Underline = HorizontalRuleIcon;
+export const Strikethrough = StrikethroughIcon;
+export const Link = LinkIcon;
+export const ListOrdered = ListOrderedIcon;
+export const AlignLeft = GraphBarHorizontalIcon;
+export const AlignCenter = GraphBarHorizontalIcon;
+export const AlignRight = GraphBarHorizontalIcon;
+export const Undo2 = UndoIcon;
+export const Redo2 = RedoIcon;
+export const WifiOff = BroadcastIcon;
+export const Headphones = PersonIcon;
+export const Truck = PackageIcon;
+export const ListFilter = FilterIcon;
+export const PenSquare = PencilIcon;
+export const MessageSquareText = CommentDiscussionIcon;
+export const UserPlus = PersonAddIcon;
+export const Code2 = CodeIcon;
+export const Edit3 = PencilIcon;
+export const Globe = GlobeIcon;
+export const Package = PackageIcon;

@@ -9,7 +9,7 @@ import {
   Check,
   Search,
   UserCheck
-} from 'lucide-react';
+} from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { ProductLine, ProductLineMember } from '../../types';
 
@@ -119,13 +119,13 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
           {/* Top summary & Add button */}
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#A5ADBA]">
-              共配置 <span className="text-[#F8FAFC] font-bold font-mono">{members.length}</span> 位产研成员
+            <span className="text-xs font-semibold text-[var(--text-body)]">
+              共配置 <span className="text-[var(--text-primary)] font-bold font-mono">{members.length}</span> 位产研成员
             </span>
             <button
               type="button"
               onClick={() => setIsAdding(!isAdding)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold transition-colors"
             >
               <UserPlus className="w-3.5 h-3.5" />
               {isAdding ? '取消添加' : '新增成员'}
@@ -136,16 +136,16 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
           {isAdding && (
             <form
               onSubmit={handleAddMember}
-              className="p-4 rounded-xl border border-[#2F66F6]/30 bg-[#2F66F6]/5 space-y-3 animate-in fade-in duration-150"
+              className="p-4 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary)]/5 space-y-3 animate-in fade-in duration-150"
             >
-              <h4 className="font-bold text-[#F8FAFC] flex items-center gap-1.5">
-                <UserCheck className="w-4 h-4 text-[#2F66F6]" />
+              <h4 className="font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-[var(--primary)]" />
                 录入新产品线成员
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] text-[#A5ADBA] mb-1">
+                  <label className="block text-[11px] text-[var(--text-body)] mb-1">
                     成员姓名 *
                   </label>
                   <input
@@ -154,17 +154,17 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="如：王浩然"
-                    className="w-full px-3 py-1.5 rounded-lg border border-[#2C3440] bg-[#121923] text-[#F8FAFC]"
+                    className="w-full px-3 py-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-[#A5ADBA] mb-1">
+                  <label className="block text-[11px] text-[var(--text-body)] mb-1">
                     团队角色 / 岗位 *
                   </label>
                   <select
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-[#2C3440] bg-[#121923] text-[#F8FAFC]"
+                    className="w-full px-3 py-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
                   >
                     {COMMON_ROLES.map((r) => (
                       <option key={r} value={r}>{r}</option>
@@ -175,7 +175,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] text-[#A5ADBA] mb-1">
+                  <label className="block text-[11px] text-[var(--text-body)] mb-1">
                     企业邮箱
                   </label>
                   <input
@@ -183,11 +183,11 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     placeholder="name@shichuang.com"
-                    className="w-full px-3 py-1.5 rounded-lg border border-[#2C3440] bg-[#121923] text-[#F8FAFC]"
+                    className="w-full px-3 py-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-[#A5ADBA] mb-1">
+                  <label className="block text-[11px] text-[var(--text-body)] mb-1">
                     联系电话
                   </label>
                   <input
@@ -195,7 +195,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
                     placeholder="13800000000"
-                    className="w-full px-3 py-1.5 rounded-lg border border-[#2C3440] bg-[#121923] text-[#F8FAFC]"
+                    className="w-full px-3 py-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
                   />
                 </div>
               </div>
@@ -204,13 +204,13 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsAdding(false)}
-                  className="px-3 py-1.5 rounded-lg bg-[#18212C] text-[#A5ADBA] hover:text-[#F8FAFC]"
+                  className="px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-body)] hover:text-[var(--text-primary)]"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-1 px-4 py-1.5 rounded-lg bg-[#2F66F6] text-[#F8FAFC] font-semibold hover:bg-[#3B73FF]"
+                  className="flex items-center gap-1 px-4 py-1.5 rounded-lg bg-[var(--primary)] text-[var(--text-primary)] font-semibold hover:bg-[var(--primary-hover)]"
                 >
                   <Check className="w-3.5 h-3.5" />
                   确认加入
@@ -224,20 +224,20 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
             {members.map((m) => (
               <div
                 key={m.id}
-                className="p-3.5 rounded-xl border border-[#2C3440] bg-[#151A22] flex items-center justify-between gap-3 hover:border-[#3A4655] transition-colors"
+                className="p-3.5 rounded-xl border border-[var(--border-main)] bg-[var(--bg-surface-soft)] flex items-center justify-between gap-3 hover:border-[var(--border-subtle)] transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-linear-to-br from-[#2F66F6]/30 to-indigo-600/30 border border-[#2F66F6]/40 flex items-center justify-center font-bold text-[#6EA0FF] text-xs shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-linear-to-br from-[var(--primary)]/30 to-indigo-600/30 border border-[var(--primary)]/40 flex items-center justify-center font-bold text-[var(--active-text)] text-xs shrink-0">
                     {m.name.slice(0, 2)}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-[#F8FAFC] text-xs">{m.name}</span>
-                      <span className="px-2 py-0.5 rounded-full bg-[#18212C] text-[#6EA0FF] font-medium text-[10px] border border-[#2C3440]">
+                      <span className="font-bold text-[var(--text-primary)] text-xs">{m.name}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--active-text)] font-medium text-[10px] border border-[var(--border-main)]">
                         {m.role}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-[#7C8796] mt-1">
+                    <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)] mt-1">
                       {m.email && (
                         <span className="flex items-center gap-1">
                           <Mail className="w-3 h-3" />
@@ -258,7 +258,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
                   type="button"
                   onClick={() => handleRemoveMember(m.id, m.name)}
                   title="移除成员"
-                  className="p-1.5 text-[#7C8796] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                  className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -268,11 +268,11 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[#2C3440] flex justify-end bg-[#151A22]/80">
+        <div className="px-6 py-4 border-t border-[var(--border-main)] flex justify-end bg-[var(--bg-surface-soft)]/80">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 bg-[#2F66F6] hover:bg-[#3B73FF] text-[#F8FAFC] rounded-lg text-xs font-semibold shadow-xs transition-colors"
+            className="px-5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs transition-colors"
           >
             完成
           </button>

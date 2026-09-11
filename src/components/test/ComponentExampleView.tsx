@@ -79,7 +79,6 @@ export const ComponentExampleView: React.FC = () => {
   ];
 
   const handleSubmit = async (values: any) => {
-    console.log('提交表单:', values);
     message.success('创建成功！');
   };
 
