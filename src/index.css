@@ -130,7 +130,7 @@
   .app-button-secondary:active:not(:disabled) { transform: translateY(1px); }
 
   .list-toolbar select,
-  .list-toolbar input:not([type='checkbox']):not([type='radio']) {
+  .list-toolbar input:not(.ant-select-input):not([type='checkbox']):not([type='radio']) {
     min-height: 32px;
     border: 1px solid var(--border-main);
     border-radius: 8px;
@@ -139,7 +139,7 @@
   }
   .list-toolbar select { padding: 0 2rem 0 0.75rem; }
 
-  .work-item-panel :where(input:not([type='checkbox']):not([type='radio']):not([type='file']), select) {
+  .work-item-panel :where(input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='file']), select) {
     height: 32px;
     min-height: 32px;
   }
@@ -257,7 +257,7 @@ html:not(.dark) .tech-shell table thead tr {
   border-color: var(--border-main) !important;
 }
 
-html:not(.dark) .tech-shell :where(select, textarea, input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])) {
+html:not(.dark) .tech-shell :where(select, textarea, input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])) {
   background-color: var(--bg-card) !important;
   color: var(--text-primary) !important;
 }
@@ -307,7 +307,7 @@ html:not(.dark) .tech-sidebar {
 .task-page [data-work-item-form] :where(input, textarea, select) {
   min-height: 32px;
 }
-.task-page .work-item-panel :where(input:not([type='checkbox']):not([type='file']), textarea, select) {
+.task-page .work-item-panel :where(input:not(.ant-select-input):not([type='checkbox']):not([type='file']), textarea, select) {
   min-height: 40px;
 }
 
@@ -446,12 +446,12 @@ html:not(.dark) .tech-main .fixed.inset-0 [class*="text-[#A5ADBA]"] {
 html:not(.dark) .tech-main .fixed.inset-0 [class*="text-[#7C8796]"] {
   color: var(--text-muted) !important;
 }
-html:not(.dark) .tech-main .fixed.inset-0 :where(input, select, textarea)[class] {
+html:not(.dark) .tech-main .fixed.inset-0 :where(input:not(.ant-select-input), select, textarea)[class] {
   background: var(--bg-card) !important;
   color: var(--text-primary) !important;
   border-color: var(--border-main) !important;
 }
-html:not(.dark) .tech-main .fixed.inset-0 :where(input, select, textarea)[class]:focus {
+html:not(.dark) .tech-main .fixed.inset-0 :where(input:not(.ant-select-input), select, textarea)[class]:focus {
   border-color: var(--primary) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 18%, transparent);
 }
@@ -749,7 +749,7 @@ html:not(.dark) .tech-shell .work-item-panel {
 .tech-shell :where(
   select,
   textarea,
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
+  input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
 ) {
   border-color: var(--border-main) !important;
   border-radius: 8px !important;
@@ -760,7 +760,7 @@ html:not(.dark) .tech-shell .work-item-panel {
 
 .tech-shell :where(
   select,
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
+  input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
 ) {
   min-height: 32px;
   height: 32px !important;
@@ -791,29 +791,29 @@ html:not(.dark) .tech-shell .work-item-panel {
   padding-bottom: 8px !important;
 }
 
-.tech-shell :where(select, textarea, input):hover:not(:disabled) {
+.tech-shell :where(select, textarea, input:not(.ant-select-input)):hover:not(:disabled) {
   border-color: var(--border-subtle) !important;
 }
 
-.tech-shell :where(select, textarea, input):focus-visible {
+.tech-shell :where(select, textarea, input:not(.ant-select-input)):focus-visible {
   border-color: var(--primary-hover) !important;
   outline: none !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent) !important;
 }
 
-.tech-shell :where(select, textarea, input):disabled {
+.tech-shell :where(select, textarea, input:not(.ant-select-input)):disabled {
   cursor: not-allowed;
   background-color: var(--bg-main) !important;
   color: var(--text-muted) !important;
   opacity: 0.7;
 }
 
-.tech-shell :where(select, textarea, input)[aria-invalid='true'] {
+.tech-shell :where(select, textarea, input:not(.ant-select-input))[aria-invalid='true'] {
   border-color: var(--danger) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent) !important;
 }
 
-.tech-shell :where(input, textarea)::placeholder {
+.tech-shell :where(input:not(.ant-select-input), textarea)::placeholder {
   color: var(--text-muted) !important;
   opacity: 1;
 }
@@ -1389,6 +1389,8 @@ html.dark .review-empty-icon {
 
 .work-order-form input::placeholder,
 .work-order-form textarea::placeholder,
+.work-order-dialog input::placeholder,
+.work-order-dialog textarea::placeholder,
 .work-order-form [contenteditable="true"]::before {
   color: var(--text-muted) !important;
   font-family: var(--font-sans) !important;
@@ -1398,11 +1400,15 @@ html.dark .review-empty-icon {
 
 .work-order-form {
   --work-order-field-gap: 5px;
+  --work-order-control-height: 36px;
 }
 
-.work-order-form .work-order-field {
+.work-order-form .work-order-field,
+.work-order-dialog .work-order-field,
+.work-order-dialog .work-order-dialog-field {
   display: grid;
   gap: var(--work-order-field-gap);
+  min-width: 0;
 }
 
 .work-order-form .form-date-field-label {
@@ -1412,17 +1418,102 @@ html.dark .review-empty-icon {
 .work-order-form :where(
   .ant-input,
   .ant-input-number-input,
-  .ant-select-selection-item,
+  .ant-select-content,
+  .ant-select-input,
+  .ant-select-placeholder,
+  .ant-picker-input > input
+),
+.work-order-dialog :where(
+  .ant-input,
+  .ant-input-number-input,
+  .ant-select-content,
+  .ant-select-input,
   .ant-select-placeholder,
   .ant-picker-input > input
 ) {
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 12px !important;
 }
 
-.work-order-form .ant-select-placeholder {
+.work-order-form .ant-select-placeholder,
+.work-order-dialog .ant-select-placeholder {
   color: var(--text-muted) !important;
   opacity: 1;
+}
+
+/* Ant Design 6 single-select content must remain within the trigger width. */
+.work-order-form .ant-select,
+.work-order-dialog .ant-select {
+  height: var(--work-order-control-height) !important;
+  min-height: var(--work-order-control-height) !important;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.work-order-form :where(.ant-input:not(textarea), .ant-input-number, .ant-picker),
+.work-order-dialog :where(.ant-input:not(textarea), .ant-input-number, .ant-picker) {
+  height: var(--work-order-control-height) !important;
+  min-height: var(--work-order-control-height) !important;
+}
+
+.work-order-form .ant-input-number-input,
+.work-order-dialog .ant-input-number-input {
+  height: auto !important;
+  min-height: 0;
+}
+
+.work-order-form .ant-select-content,
+.work-order-dialog .ant-select-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 1;
+  visibility: visible;
+}
+
+.work-order-dialog {
+  --work-order-field-gap: 5px;
+  --work-order-control-height: 36px;
+}
+
+.work-order-list-filters :where(.ant-input-affix-wrapper, .ant-select) {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
+.work-order-list-filters .ant-input-affix-wrapper > .ant-input {
+  height: auto !important;
+  min-height: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.work-order-list-filters :where(
+  .ant-input,
+  .ant-input::placeholder,
+  .ant-select-content,
+  .ant-select-input,
+  .ant-select-placeholder
+) {
+  font-family: var(--font-sans);
+  font-size: 12px !important;
+  opacity: 1;
+}
+
+.work-order-list-filters :where(.ant-input::placeholder, .ant-select-placeholder) {
+  color: var(--text-muted) !important;
+}
+
+.work-order-list-filters :where(.ant-input, .ant-select-content) {
+  color: var(--text-primary) !important;
 }
 
 .work-order-form .ant-input-number {

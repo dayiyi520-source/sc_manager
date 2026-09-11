@@ -12,9 +12,16 @@ describe('light workspace theme contract', () => {
   });
   it('normalizes dialogs and page controls inside the right workspace only', () => {
     expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed)');
-    expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 :where(input, select, textarea)[class]');
+    expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 :where(input:not(.ant-select-input), select, textarea)[class]');
     expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 button:disabled');
     expect(styles).toContain('html:not(.dark) .tech-main [role="tablist"]');
+  });
+
+  it('keeps work-order list search and select triggers at the same height', () => {
+    expect(styles).toContain('.work-order-list-filters :where(.ant-input-affix-wrapper, .ant-select)');
+    expect(styles).toContain('.work-order-list-filters .ant-input-affix-wrapper > .ant-input');
+    expect(styles).toContain('.ant-select-placeholder');
+    expect(styles).toContain('height: 36px !important;');
   });
 
   it('normalizes product-line detail tabs that use custom button markup', () => {

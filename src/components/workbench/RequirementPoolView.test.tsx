@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useApp } from '../../context/AppContext';
 import { requirementRepository } from '../../services/requirementRepository';
 import { RequirementPoolView } from './RequirementPoolView';
+import type { RequirementTask } from '../../types';
 
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
 vi.mock('../../services/requirementRepository', () => ({
@@ -65,6 +66,18 @@ describe('workbench work-order creation layout', () => {
     expect(screen.getByText(/添加文档附件/)).toBeInTheDocument();
   });
 
+  it.each([
+    ['交付支持', ['推进阶段', '其他说明']],
+    ['其他问题', ['问题来源', '期望结果']],
+  ])('uses Ant Design inputs for %s fields', async (type, labels) => {
+    render(<RequirementPoolView />);
+    await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(type) }));
+
+    expect(screen.getByLabelText('工单标题 *')).toHaveClass('ant-input');
+    labels.forEach((label) => expect(screen.getByLabelText(label)).toHaveClass('ant-input'));
+  });
+
   it('disables header actions while the work order is being submitted', async () => {
     let complete: ((value: boolean) => void) | undefined;
     addRequirementTask.mockReturnValue(new Promise<boolean>((resolve) => { complete = resolve; }));
@@ -80,5 +93,51 @@ describe('workbench work-order creation layout', () => {
     expect(screen.getByRole('button', { name: '取消' })).toBeDisabled();
 
     await act(async () => complete?.(true));
+  });
+
+  it('renders the selected label and clear control for Ant Design selects', async () => {
+    await openCustomerRequest();
+    const priority = screen.getByLabelText('优先级');
+    fireEvent.mouseDown(priority);
+    fireEvent.click(await screen.findByText('高', { selector: '.ant-select-item-option-content' }));
+    expect(priority.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('高');
+    expect(priority.closest('.ant-select')?.querySelector('.ant-select-clear')).toBeInTheDocument();
+  });
+
+  it('shows selected values in the workflow and reject dialog triggers', async () => {
+    const task = { id: 'work-order-1', title: '弹窗下拉回归工单', status: '待处理', priority: '中', ownerName: '林志豪', creatorName: '林志豪', events: [] } as unknown as RequirementTask;
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ events: [], workItems: [] } as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
+    vi.mocked(useApp).mockReturnValue({
+      requirementTasks: [task],
+      addRequirementTask,
+      setRequirementTasks: vi.fn(),
+      productLines: [],
+      customers: [],
+      biddings: [],
+      opportunities: [],
+      currentUser: { name: '林志豪', department: '管理部' },
+      addToast: vi.fn(),
+      openPageTab: vi.fn(),
+      setRequirementTaskDraft: vi.fn(),
+    } as unknown as ReturnType<typeof useApp>);
+
+    render(<RequirementPoolView />);
+    fireEvent.click(screen.getByRole('tab', { name: '工单列表' }));
+    fireEvent.click(screen.getByRole('button', { name: '详情' }));
+    await waitFor(() => expect(requirementRepository.detail).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: '工单流转' }));
+    const workflowType = screen.getByLabelText('流转类型 *');
+    fireEvent.mouseDown(workflowType);
+    fireEvent.click(await screen.findByText('转派给他人', { selector: '.ant-select-item-option-content' }));
+    expect(workflowType.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('转派给他人');
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '工单驳回' }));
+    const rejectReason = screen.getByLabelText('驳回原因 *');
+    fireEvent.mouseDown(rejectReason);
+    const firstReason = await screen.findByText('工单内容不明确', { selector: '.ant-select-item-option-content' });
+    fireEvent.click(firstReason);
+    expect(rejectReason.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent(firstReason.textContent || '');
   });
 });

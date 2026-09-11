@@ -38,7 +38,6 @@ import { useApp } from "../../context/AppContext";
 import { StatCard, StatusTag, Drawer, Modal } from "../common/UIComponents";
 import { requirementRepository } from "../../services/requirementRepository";
 import { RequirementActionButtons } from "../product/RequirementActionButtons";
-import { WorkflowAssigneeSelect } from "../product/WorkflowAssigneeSelect";
 import { RichTextEditor } from "../product/RichTextEditor";
 import type {
   EmployeeOption,
@@ -212,7 +211,7 @@ export const RequirementPoolView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
   const [workOpen, setWorkOpen] = useState(false);
-  const [workflowAction, setWorkflowAction] = useState<"convert" | "reassign" | "memo">("convert");
+  const [workflowAction, setWorkflowAction] = useState<"" | "convert" | "reassign" | "memo">("");
   const [subTasks, setSubTasks] = useState<Array<{ taskType: RequirementTaskType | ""; assignee: string; expectedDueDate: string; note: string }>>([{ taskType: "", assignee: "", expectedDueDate: "", note: "" }]);
   const [reassignAssignee, setReassignAssignee] = useState("");
   const [reassignReason, setReassignReason] = useState("");
@@ -348,6 +347,10 @@ export const RequirementPoolView: React.FC = () => {
   const handleWorkflowSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selected) return;
+    if (!workflowAction) {
+      addToast("warning", "请选择流转的任务类型");
+      return;
+    }
     const now = new Date().toISOString();
 
     if (workflowAction === "convert") {
@@ -600,8 +603,12 @@ export const RequirementPoolView: React.FC = () => {
   const cardSubText = (count: number) => `今日新增 +${count}`;
   const fieldClass =
     "mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20";
-  const filterClass =
-    "h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)]";
+  const filterClass = "min-w-[130px] shrink-0";
+  const cardIcon = (card: typeof workOrderCards[number]) => (
+    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] text-[var(--active-text)]">
+      {card.icon}
+    </span>
+  );
   const fields = <div className="work-order-form grid grid-cols-1 gap-4">
     <WorkOrderInput label="工单标题 *" value={title} onChange={setTitle} placeholder="请输入工单标题，简明描述问题或诉求" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -706,7 +713,7 @@ export const RequirementPoolView: React.FC = () => {
               <div className="mt-3 grid w-full max-w-5xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {workOrderCards.map((card) => (
                   <button key={card.type} type="button" onClick={() => openCreate(card.type)} className="group min-h-36 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)] hover:bg-[var(--bg-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30">
-                    <span className="mb-3 inline-flex items-center justify-center text-blue-600 dark:text-blue-400 transition">{card.icon}</span>
+                    <span className="mb-3 inline-flex transition">{cardIcon(card)}</span>
                     <span className="block text-sm font-semibold text-[var(--text-primary)]">{card.type}</span>
                     <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{card.description}</span>
                   </button>
@@ -753,7 +760,7 @@ export const RequirementPoolView: React.FC = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {typeStats.map((stat) => (
               <button key={stat.type} type="button" onClick={() => setTypeFilter(stat.type)} className="text-left">
-                <StatCard title={stat.type} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={<Inbox className="w-5 h-5" />} />
+                <StatCard title={stat.type} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={cardIcon(workOrderCards.find((card) => card.type === stat.type)!)} />
               </button>
             ))}
           </div>
@@ -767,28 +774,19 @@ export const RequirementPoolView: React.FC = () => {
                 {(filterMode === "type" ? [{ value: "all", label: "全部" }, ...workOrderCards.map((card) => ({ value: card.type, label: card.type }))] : [{ value: "all", label: "全部" }, { value: "mine_owned", label: "我负责的" }, { value: "mine_created", label: "我创建的" }]).map((item) => <button key={item.value} type="button" onClick={() => filterMode === "type" ? setTypeFilter(item.value as typeof typeFilter) : setScope(item.value as typeof scope)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${(filterMode === "type" ? typeFilter === item.value : scope === item.value) ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{item.label}</button>)}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="work-order-list-filters flex flex-wrap items-center gap-3">
             <div className="relative shrink-0">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input
+              <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="搜索标题/客户/负责人"
-                className="h-10 w-64 pl-9 pr-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)]"
+                prefix={<Search className="h-4 w-4 text-[var(--text-muted)]" />}
+                className="w-64"
               />
             </div>
-            {filterMode === "mine" && <select aria-label="类型" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)} className={`${filterClass} min-w-[130px] shrink-0`}><option value="all">类型</option>{workOrderCards.map((card) => <option key={card.type} value={card.type}>{card.type}</option>)}</select>}
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className={`${filterClass} min-w-[130px] shrink-0`}
-            >
-              <option value="all">状态</option>
-              {statuses.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className={`${filterClass} min-w-[130px] shrink-0`}><option value="all">优先级</option><option>紧急</option><option>高</option><option>中</option><option>低</option></select>
+            {filterMode === "mine" && <Select allowClear aria-label="类型" className={filterClass} placeholder="类型" value={typeFilter === "all" ? undefined : typeFilter} onChange={(value) => setTypeFilter(value ?? "all")} options={workOrderCards.map((card) => ({label:card.type,value:card.type}))} />}
+            <Select allowClear aria-label="状态" className={filterClass} placeholder="状态" value={status === "all" ? undefined : status} onChange={(value) => setStatus(value ?? "all")} options={statuses.map((item) => ({label:item,value:item}))} />
+            <Select allowClear aria-label="优先级" className={filterClass} placeholder="优先级" value={priority === "all" ? undefined : priority} onChange={(value) => setPriority(value ?? "all")} options={[{label:"紧急",value:"紧急"},{label:"高",value:"高"},{label:"中",value:"中"},{label:"低",value:"低"}]} />
             <button
               type="button"
               onClick={openCreateHome}
@@ -821,22 +819,16 @@ export const RequirementPoolView: React.FC = () => {
                       key={item.id}
                       className="border-b border-[var(--border-main)]"
                     >
-                      <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">
+                      <td className="px-4 py-3 font-semibold">
                         <div className="flex items-start gap-2">
                           <Inbox className="mt-0.5 w-4 h-4 text-[var(--active-text)] shrink-0" />
-                          <span className="max-w-[260px] line-clamp-2">
+                          <button type="button" onClick={() => openDetail(item)} className="max-w-[260px] line-clamp-2 text-left text-[var(--active-text)] hover:text-[var(--primary-hover)] hover:underline">
                             {item.title}
-                          </span>
+                          </button>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-[var(--text-body)]">
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const typeCard = workOrderCards.find(c => c.type === item.workOrderType);
-                            return typeCard ? <span className="text-[var(--text-muted)]">{typeCard.icon}</span> : null;
-                          })()}
-                          <span>{item.workOrderType || "历史工单"}</span>
-                        </div>
+                        <span>{item.workOrderType || "历史工单"}</span>
                       </td>
                       <td className="px-4 py-3">
                         <StatusTag status={item.priority} />
@@ -890,7 +882,7 @@ export const RequirementPoolView: React.FC = () => {
               <RequirementActionButtons
                 status={selected.status}
                 hasWorkItem={taskLocked}
-                onWork={() => { setWorkflowAction("convert"); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "" }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setWorkOpen(true); }}
+                onWork={() => { setWorkflowAction(""); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "" }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setWorkOpen(true); }}
                 onHold={() => setReasonType("hold")}
                 onReject={() => setReasonType("reject")}
               />
@@ -1002,19 +994,10 @@ export const RequirementPoolView: React.FC = () => {
         title="工单流转"
         maxWidth="4xl"
       >
-        <form onSubmit={handleWorkflowSubmit} className="space-y-4">
-          <label className="block text-xs text-[var(--text-muted)]">
+        <form onSubmit={handleWorkflowSubmit} className="work-order-dialog space-y-4">
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
             流转类型 *
-            <select
-              value={workflowAction}
-              onChange={(e) => setWorkflowAction(e.target.value as typeof workflowAction)}
-              className={fieldClass}
-              required
-            >
-              <option value="convert">转任务</option>
-              <option value="reassign">转派给他人</option>
-              <option value="memo">个人备忘录</option>
-            </select>
+            <Select allowClear aria-label="流转类型 *" className="w-full" value={workflowAction || undefined} onChange={(value) => setWorkflowAction((value ?? "") as typeof workflowAction)} placeholder="选择流转的任务类型" options={[{label:"转任务",value:"convert"},{label:"转派给他人",value:"reassign"},{label:"个人备忘录",value:"memo"}]} />
           </label>
 
           {workflowAction === "convert" && (
@@ -1044,41 +1027,31 @@ export const RequirementPoolView: React.FC = () => {
                     )}
                   </div>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
-                  <label className="block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-3">
+                  <label className="work-order-dialog-field block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-3">
                     任务类型 *
-                    <select
-                      value={t.taskType}
-                      onChange={(e) => {
-                        const val = e.target.value as RequirementTaskType;
+                      <Select
+                      allowClear
+                      aria-label="任务类型 *"
+                      className="w-full"
+                      value={t.taskType || undefined}
+                      placeholder="选择任务类型"
+                      options={taskTypes.map((item) => ({ label: item, value: item }))}
+                      onChange={(val) => {
                         setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, taskType: val } : item));
                       }}
-                      className={fieldClass}
-                      required
-                    >
-                      <option value="">选择任务类型</option>
-                      {taskTypes.map((item) => (
-                        <option key={item} value={item}>{item}</option>
-                      ))}
-                    </select>
+                    />
                   </label>
                   <div className="min-w-0 lg:col-span-3 [&>label]:block">
-                  <WorkflowAssigneeSelect
-                    label="任务负责人 *"
-                    value={t.assignee}
-                    options={employees.map((item) => item.name)}
-                    placeholder="输入负责人姓名搜索并选择"
-                    onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))}
-                  />
+                  <SearchSelect label="任务负责人 *" value={t.assignee} options={employees.map((item) => item.name)} placeholder="输入负责人姓名搜索并选择" onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))} />
                   </div>
-                  <DateField label="期望完成时间" value={t.expectedDueDate} onChange={(value) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, expectedDueDate: value } : item))} />
-                  <label className="block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-4">
+                  <div className="min-w-0 lg:col-span-2"><DateField label="期望完成时间" value={t.expectedDueDate} onChange={(value) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, expectedDueDate: value } : item))} /></div>
+                  <label className="work-order-dialog-field block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-4">
                     任务描述
-                    <input
-                      type="text"
+                    <Input
                       value={t.note}
                       onChange={(e) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, note: e.target.value } : item))}
                       placeholder="请输入任务描述说明..."
-                      className="mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs"
+                      className="w-full"
                     />
                   </label>
                   </div>
@@ -1089,15 +1062,15 @@ export const RequirementPoolView: React.FC = () => {
 
           {workflowAction === "reassign" && (
             <>
-              <WorkflowAssigneeSelect label="转派给负责人 *" value={reassignAssignee} options={employees.map((item) => item.name)} placeholder="输入新负责人姓名搜索并选择" onChange={setReassignAssignee} />
-              <label className="block text-xs text-[var(--text-muted)]">
+              <SearchSelect label="转派给负责人 *" value={reassignAssignee} options={employees.map((item) => item.name)} placeholder="输入新负责人姓名搜索并选择" onChange={setReassignAssignee} />
+              <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
                 转派原因说明 *
-                <textarea
+                <Input.TextArea
                   value={reassignReason}
                   onChange={(e) => setReassignReason(e.target.value)}
                   rows={3}
                   placeholder="请输入转派原因及交接说明..."
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs"
+                  className="w-full"
                   required
                 />
               </label>
@@ -1106,14 +1079,14 @@ export const RequirementPoolView: React.FC = () => {
 
           {workflowAction === "memo" && (
             <>
-              <label className="block text-xs text-[var(--text-muted)]">
+              <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
                 个人备忘内容 *
-                <textarea
+                <Input.TextArea
                   value={memoContent}
                   onChange={(e) => setMemoContent(e.target.value)}
                   rows={4}
                   placeholder="记录个人备忘信息或处理心得..."
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs"
+                  className="w-full"
                   required
                 />
               </label>
@@ -1133,7 +1106,7 @@ export const RequirementPoolView: React.FC = () => {
               type="submit"
               className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white"
             >
-              确认{workflowAction === "convert" ? "转任务" : workflowAction === "reassign" ? "转派" : "保存备忘"}
+              确认
             </button>
           </div>
         </form>
@@ -1143,33 +1116,21 @@ export const RequirementPoolView: React.FC = () => {
         onClose={() => setReasonType(null)}
         title={reasonType === "hold" ? "工单搁置" : "工单驳回"}
       >
-        <form onSubmit={transition} className="space-y-4">
+        <form onSubmit={transition} className="work-order-dialog space-y-4">
           {reasonType === "reject" && (
-            <label className="block text-xs text-[var(--text-muted)]">
+            <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
               驳回原因 *
-              <select
-                value={rejectCategory}
-                onChange={(e) => setRejectCategory(e.target.value)}
-                className="mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)]"
-                required
-              >
-                <option value="">请选择驳回原因</option>
-                {availableRejectReasons.map((reasonOpt) => (
-                  <option key={reasonOpt} value={reasonOpt}>
-                    {reasonOpt}
-                  </option>
-                ))}
-              </select>
+              <Select allowClear aria-label="驳回原因 *" className="w-full" value={rejectCategory || undefined} onChange={(value) => setRejectCategory(value ?? "")} placeholder="请选择驳回原因" options={availableRejectReasons.map((reasonOpt) => ({label:reasonOpt,value:reasonOpt}))} />
             </label>
           )}
 
-          <label className="block text-xs text-[var(--text-muted)]">
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
             {reasonType === "reject" ? "驳回详细说明 *" : "搁置原因说明 *"}
-            <textarea
+            <Input.TextArea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={4}
-              className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)]"
+              className="w-full"
               placeholder={reasonType === "reject" ? "请输入详细驳回说明或补充建议..." : "请输入搁置原因说明..."}
               required
             />
@@ -1186,7 +1147,7 @@ export const RequirementPoolView: React.FC = () => {
               type="submit"
               className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white"
             >
-              确认{reasonType === "reject" ? "驳回" : "搁置"}
+              确认
             </button>
           </div>
         </form>
