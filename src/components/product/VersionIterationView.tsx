@@ -19,7 +19,7 @@ import { useApp } from '../../context/AppContext';
 import { Modal, StatusTag } from '../common/UIComponents';
 import { DefectBug, DevTask, RequirementTask, VersionIteration } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
-import { SearchableSelect } from '../common/SearchableSelect';
+import { SearchableSelect } from '../common';
 
 type ViewMode = 'list' | 'detail' | 'planning';
 type DetailTab = 'requirements' | 'tasks' | 'bugs';

@@ -9,3 +9,6 @@ export type { EmptyStateProps } from './EmptyState';
 
 export { DetailField, DetailFieldGroup } from './DetailField';
 export type { DetailFieldProps, DetailFieldGroupProps } from './DetailField';
+
+export { StatCard } from '../UIComponents';
+export type { StatCardProps } from '../UIComponents';

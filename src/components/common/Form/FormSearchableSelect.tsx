@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Search, X } from './octicons-compat';
+import { Check, ChevronDown, Search, X } from '../octicons-compat';
 
 export type SearchableSelectProps = {
   label: string;

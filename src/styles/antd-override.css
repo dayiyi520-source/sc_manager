@@ -1,5 +1,65 @@
 /* Ant Design 组件样式覆盖 */
 
+/* ============================================
+   表单组件统一高度：40px
+   ============================================ */
+
+/* Input 输入框 */
+.ant-input,
+.ant-input-affix-wrapper {
+  height: 40px !important;
+  min-height: 40px !important;
+}
+
+/* Select 下拉选择 */
+.ant-select-selector {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+}
+
+.ant-select-single .ant-select-selector {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.ant-select-selection-item,
+.ant-select-selection-placeholder {
+  line-height: 24px !important;
+}
+
+/* Cascader 级联选择 */
+.ant-cascader-input {
+  height: 40px !important;
+  min-height: 40px !important;
+}
+
+.ant-cascader-picker {
+  height: 40px !important;
+}
+
+.ant-cascader-picker .ant-input {
+  height: 40px !important;
+  min-height: 40px !important;
+}
+
+/* DatePicker 日期选择 */
+.ant-picker {
+  width: 100% !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+}
+
+.ant-picker-input > input {
+  height: 24px !important;
+  line-height: 24px !important;
+}
+
+/* ============================================
+   组件样式优化
+   ============================================ */
+
 /* Segmented 分段控制器 - 选中态蓝色 */
 .ant-segmented .ant-segmented-item-selected {
   color: #3b82f6 !important;
@@ -22,11 +82,6 @@
 
 .ant-cascader-menu-item-content {
   white-space: nowrap !important;
-}
-
-/* DatePicker 样式调整 */
-.ant-picker {
-  width: 100% !important;
 }
 
 /* 暗色模式适配 */

@@ -12,3 +12,8 @@ export type { FormDatePickerProps } from './FormDatePicker';
 
 export { FormDateRangePicker } from './FormDateRangePicker';
 export type { FormDateRangePickerProps } from './FormDateRangePicker';
+
+export { SearchableSelect } from './FormSearchableSelect';
+export type { SearchableSelectProps } from './FormSearchableSelect';
+
+export { DateField } from './FormDateField';

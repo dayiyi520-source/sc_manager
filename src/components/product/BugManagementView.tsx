@@ -21,6 +21,7 @@ import {
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
+import { SearchableSelect } from '../common';
 import { BugItem } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { RichTextEditor } from './RichTextEditor';
@@ -445,7 +446,7 @@ export const BugManagementView: React.FC = () => {
             <Cascader
               showSearch
               value={formSeverity ? [formSeverity] : undefined}
-              onChange={(value) => value?.[0] => setFormSeverity(value as BugItem['severity'])}
+              onChange={(value) => value?.[0] && setFormSeverity(value[0] as BugItem['severity'])}
               options={[{ label: '致命阻断', value: '致命阻断' }, { label: '严重缺陷', value: '严重缺陷' }, { label: '一般问题', value: '一般问题' }, { label: '轻微优化', value: '轻微优化' }]}
               placeholder="请选择严重程度"
               className="w-full"
@@ -456,7 +457,7 @@ export const BugManagementView: React.FC = () => {
             <Cascader
               showSearch
               value={formPriority ? [formPriority] : undefined}
-              onChange={(value) => value?.[0] => setFormPriority(value as NonNullable<BugItem['priority']>)}
+              onChange={(value) => value?.[0] && setFormPriority(value[0] as NonNullable<BugItem['priority']>)}
               options={[{ label: '紧急', value: '紧急' }, { label: '高', value: '高' }, { label: '中', value: '中' }, { label: '低', value: '低' }]}
               placeholder="请选择优先级"
               className="w-full"
@@ -489,7 +490,7 @@ export const BugManagementView: React.FC = () => {
             <Cascader
               showSearch
               allowClear value={selectedRequirementId ? [selectedRequirementId] : undefined}
-              onChange={(value) => (title) => setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')(value?.[0])}
+              onChange={(value) => { const title = value?.[0]; setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || ''); }}
               options={requirementTasks.map((task) => task.title).map((opt: string) => ({ label: opt, value: opt }))}
               placeholder="请选择关联需求任务"
               className="w-full"

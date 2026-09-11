@@ -15,6 +15,7 @@ import {
 import { MessageSquare, Paperclip, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
+import { SearchableSelect, DateField } from '../common';
 import { DefectBug, DevTask, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { RichTextEditor } from './RichTextEditor';

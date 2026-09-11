@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SearchableSelect } from './SearchableSelect';
+import { SearchableSelect } from './Form';
 
 describe('SearchableSelect compact multiple mode', () => {
   it('renders selected values inline and removes a selected value', () => {

@@ -6,7 +6,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { TabsBar } from './components/layout/TabsBar';
 import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
 import { ToastContainer } from './components/common/UIComponents';
-import { SearchableSelect } from './components/common/SearchableSelect';
+import { SearchableSelect } from './components/common';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { DevLoginPage } from './components/auth/DevLoginPage';
 import { readSession } from './services/session';

@@ -51,7 +51,7 @@ import type {
 import { sanitizeHtml } from "../../utils/sanitizeHtml";
 import { getRejectReasonsForType } from "../../constants/rejectReasons";
 import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
-import { DateField } from "../common/DateField";
+import { DateField } from "../common";
 
 const statuses: RequirementTask["status"][] = [
   "待处理",
