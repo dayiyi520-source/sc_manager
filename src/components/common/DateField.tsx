@@ -22,8 +22,8 @@ export const DateField: React.FC<{
   };
 
   return (
-    <div className="block text-xs leading-5 text-[var(--text-muted)]">
-      <label className="block mb-1">
+    <div className="block">
+      <label className="block text-xs text-[var(--text-muted)] mb-1">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
@@ -35,7 +35,6 @@ export const DateField: React.FC<{
         disabled={disabled}
         allowClear
         className="w-full"
-        style={{ height: '32px' }}
       />
     </div>
   );
