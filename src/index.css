@@ -932,6 +932,38 @@ html:not(.dark) .tech-brand-panel .text-white {
   .version-toolbar > * { flex: 1 1 140px; min-width: 0; }
 }
 
+.version-product-line-cascader {
+  width: 160px;
+  min-width: 160px;
+  color: var(--active-text);
+  font-weight: 600;
+}
+
+.version-product-line-cascader .ant-cascader-input {
+  color: var(--active-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.version-product-line-cascader .ant-cascader-input::placeholder {
+  color: var(--primary) !important;
+  opacity: 1;
+}
+
+.version-product-line-cascader .ant-cascader-selection-placeholder {
+  color: var(--primary) !important;
+  opacity: 1;
+}
+
+.version-product-line-cascader.is-empty .ant-cascader-selection-item {
+  color: var(--primary) !important;
+}
+
+.version-product-line-dropdown {
+  min-width: 220px !important;
+  width: auto !important;
+}
+
 @media (min-width: 768px) and (max-width: 1199px) {
   .version-planning-layout { grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr); }
 }

@@ -22,7 +22,7 @@ import {
   Undo2,
   UserRound
 } from '@/components/common/octicons-compat';
-import { Select } from 'antd';
+import { Input, Select } from 'antd';
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
 import { showDeleteConfirm } from '../common/Feedback';
@@ -774,8 +774,8 @@ export const VersionIterationView: React.FC = () => {
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex items-center gap-3">{tabButton('list', '迭代列表', <ListTodo className="h-4 w-4" />)}{tabButton('planning', '迭代规划', <GitBranch className="h-4 w-4" />)}</div>
         </div>
-        <div className={`version-toolbar ml-auto flex flex-wrap items-center justify-end gap-2 ${mode === 'planning' ? 'hidden' : ''}`}>
-          <div className="w-44">
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="w-40">
             <Select
               aria-label="产品线筛选"
               showSearch
@@ -788,42 +788,38 @@ export const VersionIterationView: React.FC = () => {
               className="w-full"
             />
           </div>
-          {mode === 'list' && !showDetail ? (
-            <>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="搜索迭代"
-                  className="app-control w-44 pl-8 pr-2 text-xs"
-                />
-              </div>
-              <select value={status} onChange={(event) => setStatus(event.target.value)} className="app-control w-28 px-2 text-xs">
-                <option value="all">全部状态</option>
-                <option value="规划中">规划中</option>
-                <option value="迭代中">迭代中</option>
-                <option value="封版测试">封版测试</option>
-                <option value="已发布">已发布</option>
-              </select>
-              <button type="button" className={`${secondaryButton} h-8 w-8 px-0`} title="筛选">
-                <Filter className="h-3.5 w-3.5" />
-              </button>
-              <button type="button" onClick={openCreateVersion} className={`${primaryButton} h-8`}>
-                <Plus className="h-3.5 w-3.5" />
-                新建
-              </button>
-            </>
-          ) : (
-            <>
-              {!showDetail && <button type="button" onClick={openCreateVersion} className={`${primaryButton} h-8`}>
-                <Plus className="h-3.5 w-3.5" />
-                新建迭代
-              </button>}
-            </>
-          )}
         </div>
       </div>
+      {mode === 'list' && !showDetail && <div className="version-toolbar flex w-full flex-nowrap items-center justify-between gap-3 pt-3">
+          <div className="flex min-w-0 items-center gap-2">
+              <Input
+                aria-label="搜索迭代"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索迭代"
+                prefix={<Search className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+                className="w-80 max-w-[min(320px,45vw)]"
+              />
+              <Select
+                aria-label="状态筛选"
+                value={status}
+                onChange={setStatus}
+                options={[
+                  { value: 'all', label: '全部状态' },
+                  { value: '规划中', label: '规划中' },
+                  { value: '迭代中', label: '迭代中' },
+                  { value: '封版测试', label: '封版测试' },
+                  { value: '已发布', label: '已发布' }
+                ]}
+                className="w-28"
+                getPopupContainer={(trigger) => trigger.parentElement || document.body}
+              />
+          </div>
+          <button type="button" onClick={openCreateVersion} className={`${primaryButton} h-8 shrink-0 whitespace-nowrap`}>
+                <Plus className="h-3.5 w-3.5" />
+                新建
+          </button>
+      </div>}
       {mode === 'list' && (showDetail ? renderDetail() : renderList())}
       {mode === 'planning' && renderPlanning()}
       {selectedWorkItem && (

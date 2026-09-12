@@ -362,10 +362,14 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const [editingVersion, setEditingVersion] = useState<VersionIteration | null>(null);
   const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(Boolean(initialSettingsSection));
+  const [settingsSection, setSettingsSection] = useState<ProductLineSettingsSection>(initialSettingsSection || 'basic');
   const [isEditLeadsOpen, setIsEditLeadsOpen] = useState(false);
 
   useEffect(() => {
-    if (initialSettingsSection) setIsSettingsOpen(true);
+    if (initialSettingsSection) {
+      setSettingsSection(initialSettingsSection);
+      setIsSettingsOpen(true);
+    }
   }, [initialSettingsSection]);
 
   // Tabs state for sub-entities
@@ -494,7 +498,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   if (isSettingsOpen) {
     return <>
-      <ProductLineSettingsPanel productLine={productLine} initialSection={initialSettingsSection} onBack={() => setIsSettingsOpen(false)} onOpenMembers={() => setIsManageMembersOpen(true)} />
+      <ProductLineSettingsPanel productLine={productLine} initialSection={settingsSection} onBack={() => setIsSettingsOpen(false)} onOpenMembers={() => setIsManageMembersOpen(true)} />
       <ManageMembersModal isOpen={isManageMembersOpen} onClose={() => setIsManageMembersOpen(false)} productLine={productLine} />
     </>;
   }
@@ -766,7 +770,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             </div>
             <div className="flex items-center gap-1">
               <Button type="text" style={{ color: 'var(--primary)' }} className="hover:text-[var(--active-text)]" aria-label="添加成员" title="添加成员" icon={<UserAddOutlined style={{ color: 'var(--primary)' }} />} onClick={() => setIsManageMembersOpen(true)} />
-              <Button type="text" aria-label="成员设置" title="成员设置" icon={<SettingOutlined />} onClick={() => setIsManageMembersOpen(true)} />
+              <Button type="text" aria-label="成员设置" title="成员设置" icon={<SettingOutlined />} onClick={() => { setSettingsSection('members'); setIsSettingsOpen(true); }} />
             </div>
           </div>
 

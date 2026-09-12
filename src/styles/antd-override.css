@@ -86,9 +86,11 @@
   font-weight: 500;
 }
 
-/* Cascader 下拉框宽度 - 根据内容自适应，但不小于触发器宽度 */
+/* Cascader 下拉框宽度 - 避免被父容器强制拉伸，按菜单内容自适应 */
 .ant-cascader-dropdown {
-  min-width: 100% !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: calc(100vw - 32px);
 }
 
 .ant-cascader-menu {
