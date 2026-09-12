@@ -1,59 +1,48 @@
 /* Ant Design 组件样式覆盖 */
 
-/* ============================================
-   表单组件统一高度：40px
-   ============================================ */
-
-/* Input 输入框 */
-.ant-input,
-.ant-input-affix-wrapper {
-  height: 40px !important;
-  min-height: 40px !important;
+/* 平台表单基线：覆盖 legacy tech-shell 的 32px 输入框规则，统一为工单中心的 36px。 */
+.tech-shell .ant-input-affix-wrapper,
+.tech-shell input.ant-input {
+  height: 36px !important;
+  min-height: 36px !important;
 }
 
-/* Select 下拉选择 */
-.ant-select-selector {
-  height: 40px !important;
-  min-height: 40px !important;
-  padding: 8px 12px !important;
+.tech-shell .ant-input-affix-wrapper > .ant-input {
+  height: auto !important;
+  min-height: 0 !important;
 }
 
-.ant-select-single .ant-select-selector {
-  display: flex !important;
-  align-items: center !important;
+.tech-shell .ant-input::placeholder,
+.tech-shell .ant-select-selection-placeholder,
+.tech-shell .ant-select-placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1 !important;
+  font-size: 12px !important;
 }
 
-.ant-select-selection-item,
-.ant-select-selection-placeholder {
-  line-height: 24px !important;
+.product-line-health-enabled {
+  color: var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--border-main)) !important;
 }
 
-/* Cascader 级联选择 */
-.ant-cascader-input {
-  height: 40px !important;
-  min-height: 40px !important;
-}
-
-.ant-cascader-picker {
-  height: 40px !important;
-}
-
-.ant-cascader-picker .ant-input {
-  height: 40px !important;
-  min-height: 40px !important;
+.product-line-health-disabled {
+  color: var(--text-muted) !important;
+  background: var(--bg-surface-soft) !important;
+  border-color: var(--border-main) !important;
 }
 
 /* DatePicker 日期选择 */
 .ant-picker {
   width: 100% !important;
-  height: 40px !important;
-  min-height: 40px !important;
-  padding: 8px 12px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 6px 12px !important;
 }
 
 .ant-picker-input > input {
-  height: 24px !important;
-  line-height: 24px !important;
+  height: 22px !important;
+  line-height: 22px !important;
 }
 
 /* ============================================

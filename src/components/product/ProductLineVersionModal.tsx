@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from 'antd';
 import {
   Layers,
   Plus,
@@ -59,13 +60,13 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
                 </p>
               </div>
             </div>
-            <button
-              type="button"
+            <Button
+              type="text"
               onClick={onClose}
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors"
+              aria-label="关闭版本管理"
             >
               ✕
-            </button>
+            </Button>
           </div>
 
           {/* Content */}
@@ -74,14 +75,13 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
               <span className="text-xs text-[var(--text-body)]">
                 查看所有版本交付时间线，支持快速新增迭代规划与上线发布
               </span>
-              <button
-                type="button"
+              <Button
+                type="primary"
                 onClick={() => setIsCreateOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs transition-colors"
+                icon={<Plus className="w-3.5 h-3.5" />}
               >
-                <Plus className="w-3.5 h-3.5" />
                 创建新版本
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-3">
@@ -121,13 +121,12 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
                         <span>关联缺陷：<strong className="text-red-400 font-mono">{v.bugCount || 0}</strong> 处</span>
                       </div>
                       {v.status !== '已发布' && (
-                        <button
-                          type="button"
+                        <Button
+                          type="link"
                           onClick={() => handlePublish(v)}
-                          className="px-2.5 py-1 rounded bg-[var(--primary)]/15 hover:bg-[var(--primary)]/30 text-[var(--active-text)] hover:text-white font-semibold text-[11px] transition-colors"
                         >
                           发布上线
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -138,13 +137,11 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-[var(--border-main)] flex justify-end bg-[var(--bg-surface-soft)]">
-            <button
-              type="button"
+            <Button
               onClick={onClose}
-              className="px-5 py-2 bg-[var(--bg-elevated)] text-[var(--text-body)] hover:text-[var(--text-primary)] rounded-lg text-xs font-semibold transition-colors"
             >
               关闭
-            </button>
+            </Button>
           </div>
         </div>
       </div>

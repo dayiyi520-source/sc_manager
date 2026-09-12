@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {ConfigProvider, theme} from 'antd';
 import App from './App.tsx';
 import './index.css';
+import './styles/antd-override.css';
 import {BrowserRouter} from 'react-router-dom';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -47,9 +48,10 @@ const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           colorInfo: cssToken('--primary', '#3B82F6'),
           
           // 字体
-          fontSize: 14,
+          fontSize: 12,
           fontFamily: cssToken('--font-sans', 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'),
-          controlHeight: 32,
+          controlHeight: 36,
+          colorTextPlaceholder: cssToken('--text-muted', 'rgb(107, 114, 128)'),
           
           // 圆角
           borderRadius: 6,

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { DatePicker, Cascader, Segmented } from "antd";
+import { Input, Button, Select } from "antd";
+import { SearchOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   Boxes,
-  Search,
-  Plus,
   Layers,
   Globe,
   Users,
@@ -89,7 +88,14 @@ export const ProductLinesView: React.FC = () => {
       ownerName: formOwner.trim(),
       description: formDescription.trim() || '企业级关键核心业务支撑产品线，推动全生命周期标准化交付。',
       website: formWebsite.trim() || undefined,
-      requirementOwner: formOwner.trim(),
+      requirementOwner: '',
+      techOwner: '',
+      testOwner: '',
+      members: [{
+        id: `mem-${Date.now()}`,
+        name: formOwner.trim() || currentUser.name,
+        role: '产品线成员'
+      }],
       products: [
         {
           id: `prd-${Date.now()}-1`,
@@ -102,7 +108,7 @@ export const ProductLinesView: React.FC = () => {
       ],
       currentVersion: 'V1.0.0',
       versionCount: 1,
-      customerCount: 8,
+      customerCount: 0,
       health: '启用中'
     });
 
@@ -128,9 +134,9 @@ export const ProductLinesView: React.FC = () => {
     const activeTasks = lineTasks.filter((t) => t.status !== '已合并上线').length;
 
     return {
-      pendingReqs: pendingReqs || line.inProgressReqs || 4,
-      pendingBugs: pendingBugs || 2,
-      activeTasks: activeTasks || 5
+      pendingReqs,
+      pendingBugs,
+      activeTasks
     };
   };
 
@@ -151,24 +157,24 @@ export const ProductLinesView: React.FC = () => {
       {/* Action Toolbar */}
       <div className="product-lines-toolbar bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="relative flex-1 max-w-md">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-          <input
-            type="text"
+          <Input
+            prefix={<SearchOutlined />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="搜索产品线名称 / 编码 / 负责人..."
-            className="product-lines-search w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
+            className="product-lines-search w-full"
           />
         </div>
 
-        <button
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
           id="btn-add-product-line"
           onClick={() => { resetCreateForm(); setIsModalOpen(true); }}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg font-semibold shadow-xs transition-colors shrink-0"
+          className="shrink-0"
         >
-          <Plus className="w-4 h-4" />
           新建产品线
-        </button>
+        </Button>
       </div>
 
       {/* Product Lines Cards Grid (满足需求2 & 需求3) */}
@@ -195,7 +201,7 @@ export const ProductLinesView: React.FC = () => {
                       <h4 className="truncate text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--active-text)] transition-colors">
                         {pl.name}
                       </h4>
-                      <StatusTag status={pl.health === '已停用' ? '已停用' : '启用中'} />
+                      <StatusTag type={pl.health === '已停用' ? 'default' : 'info'} className={pl.health === '已停用' ? 'product-line-health-disabled' : 'product-line-health-enabled'} status={pl.health === '已停用' ? '已停用' : '启用中'} />
                     </div>
                   </div>
                 </div>
@@ -266,29 +272,32 @@ export const ProductLinesView: React.FC = () => {
                 {/* Footer Controls: 版本管理 & 成员管理 (满足需求2) */}
                 <div className="pt-2 border-t border-[var(--border-main)] flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
+                    <Button
                       onClick={(e) => {
                         e.stopPropagation();
                         setVersionModalLine(pl);
                       }}
-                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[var(--text-body)] hover:text-[var(--active-text)] font-semibold text-[11px] border border-[var(--border-main)] transition-colors"
+                      icon={<Layers className="w-3.5 h-3.5 text-[var(--primary)]" />}
                     >
-                      <Layers className="w-3.5 h-3.5 text-[var(--primary)]" />
                       <span>版本管理</span>
-                    </button>
+                    </Button>
 
-                    <button
-                      type="button"
+                    <Button
                       onClick={(e) => {
                         e.stopPropagation();
                         setMemberModalLine(pl);
                       }}
-                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[var(--text-body)] hover:text-purple-400 font-semibold text-[11px] border border-[var(--border-main)] transition-colors"
+                      icon={<Users className="w-3.5 h-3.5 text-purple-400" />}
                     >
-                      <Users className="w-3.5 h-3.5 text-purple-400" />
-                      <span>成员管理 ({pl.members?.length || 3})</span>
-                    </button>
+                      <span>成员管理 ({new Set([
+                        ...(pl.members || []).map((member) => typeof member === 'string' ? member : member.name),
+                        pl.owner,
+                        pl.ownerName,
+                        pl.requirementOwner,
+                        pl.techOwner,
+                        pl.testOwner
+                      ].filter(Boolean)).size})</span>
+                    </Button>
                   </div>
 
                 </div>
@@ -302,23 +311,21 @@ export const ProductLinesView: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => { resetCreateForm(); setIsModalOpen(false); }}
-        title="新建产品线架构"
+        title="新建产品线"
         footer={
           <>
-            <button
-              type="button"
+            <Button
               onClick={() => { resetCreateForm(); setIsModalOpen(false); }}
-              className="px-4 py-2 bg-[var(--bg-elevated)] text-[var(--text-body)] rounded-lg text-xs font-semibold hover:bg-[var(--bg-elevated)] transition-colors"
             >
               取消
-            </button>
-            <button
-              type="submit"
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
               form="create-product-line-form"
-              className="px-5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs transition-colors"
             >
-              保存并创建产品线
-            </button>
+              保存
+            </Button>
           </>
         }
       >
@@ -328,15 +335,27 @@ export const ProductLinesView: React.FC = () => {
           className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">产品线负责人 <span className="text-red-500">*</span></label>
-            <Cascader
+            <div>
+              <label className="block font-semibold text-[var(--text-body)] mb-1">产品线名称 *</label>
+              <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="请输入产品线名称" />
+            </div>
+            <div>
+              <label className="block font-semibold text-[var(--text-body)] mb-1">产品线编码 *</label>
+              <Input value={formCode} onChange={(e) => setFormCode(e.target.value.toUpperCase())} placeholder="例如：OS" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col" required>
+            <label className="text-xs font-semibold text-[var(--text-body)] mb-1">产品线负责人 <span className="text-[var(--danger)]">*</span></label>
+            <Select
               showSearch
-              value={formOwner ? [formOwner] : undefined}
-              onChange={(value: any) => setFormOwner(value?.[0] || '')}
+              allowClear
+              value={formOwner || undefined}
+              onChange={(value) => setFormOwner(value || '')}
               options={ownerOptions.map((opt: string) => ({ label: opt, value: opt }))}
               placeholder="搜索并选择负责人"
               className="w-full"
+              optionFilterProp="label"
             />
           </div>
             <div>
@@ -344,13 +363,13 @@ export const ProductLinesView: React.FC = () => {
                 <Globe className="w-3.5 h-3.5 text-[var(--primary)]" />
                 产品线网址 (官网/体验站)
               </label>
-              <input
-                type="url"
-                value={formWebsite}
-                onChange={(e) => setFormWebsite(e.target.value)}
-                placeholder="请输入产品线网址"
-                className="w-full p-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
-              />
+            <Input
+              type="url"
+              value={formWebsite}
+              onChange={(e) => setFormWebsite(e.target.value)}
+              placeholder="请输入产品线网址"
+              prefix={<Globe className="w-3.5 h-3.5 text-[var(--primary)]" />}
+            />
             </div>
           </div>
 
@@ -359,12 +378,11 @@ export const ProductLinesView: React.FC = () => {
             <label className="block font-semibold text-[var(--text-body)] mb-1">
               产品线描述与业务边界
             </label>
-            <textarea
+            <Input.TextArea
               rows={2}
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}
               placeholder="明确该产品线的技术架构、核心攻坚方向与支撑的企业应用生态..."
-              className="w-full p-2.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)] leading-relaxed"
             />
           </div>
 

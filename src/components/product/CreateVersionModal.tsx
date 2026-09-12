@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { Input, Select, DatePicker, Checkbox, Button } from 'antd';
+import dayjs from 'dayjs';
 import {
   Calendar,
   Layers,
@@ -148,20 +150,15 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
 
           <div>
             <label className="block font-semibold text-[var(--text-body)] mb-1.5">版本状态</label>
-            <select value={versionStatus} onChange={(e) => setVersionStatus(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)]">
-              <option value="待开始">待开始</option>
-              <option value="迭代中">迭代中</option>
-              <option value="已超时">已超时</option>
-              <option value="已结束">已结束</option>
-            </select>
+            <Select value={versionStatus} onChange={setVersionStatus} className="w-full" options={['待开始', '迭代中', '已超时', '已结束'].map((value) => ({ value, label: value }))} />
           </div>
-          <button
-            type="button"
+          <Button
+            type="text"
             onClick={onClose}
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors"
+            aria-label="关闭创建版本"
           >
             ✕
-          </button>
+          </Button>
         </div>
 
         {/* Scrollable Form Body */}
@@ -172,26 +169,24 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
               <label className="block font-semibold text-[var(--text-body)] mb-1.5">
                 版本名称 <span className="text-red-400">*</span>
               </label>
-              <input
+              <Input
                 type="text"
                 required
                 value={versionName}
                 onChange={(e) => setVersionName(e.target.value)}
                 placeholder="例如：师创智联OS V3.6.0 (信创适配增强版)"
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
             <div>
               <label className="block font-semibold text-[var(--text-body)] mb-1.5">
                 版本号 (Version Code) <span className="text-red-400">*</span>
               </label>
-              <input
+              <Input
                 type="text"
                 required
                 value={versionCode}
                 onChange={(e) => setVersionCode(e.target.value)}
                 placeholder="例如：V3.6.0"
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--active-text)] font-mono font-bold uppercase focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
           </div>
@@ -203,12 +198,11 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                 <Calendar className="w-3.5 h-3.5 text-[var(--primary)]" />
                 预计开始时间 <span className="text-red-400">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
+                value={startDate ? dayjs(startDate) : null}
+                onChange={(value) => setStartDate(value?.format('YYYY-MM-DD') || '')}
+                className="w-full"
               />
             </div>
             <div>
@@ -216,12 +210,11 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
                 预计结束时间 (封版交付日) <span className="text-red-400">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 required
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
+                value={endDate ? dayjs(endDate) : null}
+                onChange={(value) => setEndDate(value?.format('YYYY-MM-DD') || '')}
+                className="w-full"
               />
             </div>
           </div>
@@ -232,12 +225,11 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
               <FileText className="w-3.5 h-3.5 text-[var(--active-text)]" />
               版本内容 / 发版说明范围
             </label>
-            <textarea
+            <Input.TextArea
               rows={3}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="请输入该版本的主要演进内容、核心里程碑目标、关键模块重构与对标交付场景..."
-              className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)] leading-relaxed"
             />
           </div>
 
@@ -264,7 +256,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
             <div className="flex items-center gap-2 pt-1">
               <div className="relative flex-1">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                <input
+                <Input
                   type="text"
                   value={reqSearch}
                   onChange={(e) => setReqSearch(e.target.value)}
@@ -273,11 +265,9 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                 />
               </div>
               <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-body)] cursor-pointer shrink-0 select-none">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={onlyCurrentLineReqs}
                   onChange={(e) => setOnlyCurrentLineReqs(e.target.checked)}
-                  className="rounded border-[var(--border-main)] text-[var(--primary)] focus:ring-0"
                 />
                 仅当前产品线
               </label>
@@ -287,9 +277,9 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
               <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-[var(--border-main)]/60">
                 {availableReqs.map((req) => {
                   const isChecked = selectedReqIds.includes(req.id);
-                  return <button type="button" key={req.id} onClick={() => toggleReq(req.id)} className={`w-full text-left p-2.5 rounded-lg flex items-center gap-2 ${isChecked ? 'bg-[var(--primary)]/10 border border-[var(--primary)]/30' : 'hover:bg-[var(--bg-elevated)]/70 border border-transparent'}`}>
+                  return <Button type="text" key={req.id} onClick={() => toggleReq(req.id)} className={`w-full h-auto text-left p-2.5 rounded-lg flex items-center gap-2 ${isChecked ? 'bg-[var(--primary)]/10 border border-[var(--primary)]/30' : 'hover:bg-[var(--bg-elevated)]/70 border border-transparent'}`}>
                     <span className="font-mono text-[var(--active-text)] text-[11px]">{req.code || req.id}</span><span className="text-[var(--text-primary)] truncate">{req.title}</span><span className="ml-auto text-[10px] text-[var(--text-muted)]">{isChecked ? '已选择' : '选择'}</span>
-                  </button>;
+                  </Button>;
                 })}
               </div>
             )}
@@ -300,7 +290,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
                   <span key={req.id} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)]/40 bg-[var(--primary)]/10 px-2 py-1 text-[11px] text-[var(--text-body)]">
                     <span className="font-mono text-[var(--active-text)]">{req.code || req.id}</span>
                     <span className="max-w-48 truncate">{req.title}</span>
-                    <button type="button" onClick={() => toggleReq(req.id)} className="text-[var(--text-muted)] hover:text-red-400" aria-label={`移除${req.title}`}>×</button>
+                    <Button type="text" size="small" onClick={() => toggleReq(req.id)} className="text-[var(--text-muted)] hover:text-red-400" aria-label={`移除${req.title}`}>×</Button>
                   </span>
                 ))}
               </div>
@@ -381,21 +371,19 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
             创建后版本将进入 <span className="text-[var(--active-text)] font-medium">规划中</span> 状态并自动同步至研发迭代矩阵
           </div>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
+            <Button
               onClick={onClose}
-              className="px-4 py-2 bg-[var(--bg-elevated)] hover:bg-[var(--bg-elevated)] text-[var(--text-body)] rounded-lg text-xs font-semibold transition-colors"
             >
               取消
-            </button>
-            <button
-              type="submit"
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
               form="create-version-form"
-              className="flex items-center gap-1.5 px-5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-primary)] rounded-lg text-xs font-semibold shadow-xs transition-colors"
+              icon={<Check className="w-3.5 h-3.5" />}
             >
-              <Check className="w-3.5 h-3.5" />
               立即创建版本
-            </button>
+            </Button>
           </div>
         </div>
       </div>

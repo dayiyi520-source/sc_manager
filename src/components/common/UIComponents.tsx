@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, AlertCircle, CheckCircle2, Info, AlertTriangle, ArrowUpRight, ArrowDownRight } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { Card, Statistic } from 'antd';
+import { Card, Statistic, Tag } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
 type AntCardProps = React.ComponentPropsWithoutRef<'div'> & {
@@ -137,11 +137,11 @@ export const StatusTag: React.FC<{
   };
 
   return (
-    <span
+    <Tag
       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap ${styles[detectedType]} ${className}`}
     >
       {status}
-    </span>
+    </Tag>
   );
 };
 
@@ -151,8 +151,10 @@ export const Modal: React.FC<{
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  headerIcon?: React.ReactNode;
+  subtitle?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
-}> = ({ isOpen, onClose, title, children, footer, maxWidth = 'xl' }) => {
+}> = ({ isOpen, onClose, title, children, footer, headerIcon, subtitle, maxWidth = 'xl' }) => {
   if (!isOpen) return null;
 
   const maxWidthClasses = {
@@ -172,7 +174,13 @@ export const Modal: React.FC<{
         className={`relative bg-[var(--bg-surface)] text-[var(--text-body)] rounded-xl shadow-2xl border border-[var(--border-main)] w-full ${maxWidthClasses[maxWidth]} my-8 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)]">
-          <h3 className="text-base font-semibold text-[var(--text-primary)] font-serif tracking-wide">{title}</h3>
+          <h3 className="flex items-center gap-2.5 text-base font-bold text-[var(--text-primary)]">
+            {headerIcon && <span className="p-2 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">{headerIcon}</span>}
+            <span>
+              <span className="block">{title}</span>
+              {subtitle && <span className="block text-xs font-normal text-[var(--text-muted)] mt-0.5">{subtitle}</span>}
+            </span>
+          </h3>
           <button
             id="btn-modal-close"
             onClick={onClose}

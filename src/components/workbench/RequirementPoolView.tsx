@@ -1070,7 +1070,6 @@ export const RequirementPoolView: React.FC = () => {
                   onChange={(e) => setReassignReason(e.target.value)}
                   rows={3}
                   placeholder="请输入转派原因及交接说明..."
-                  className="w-full"
                   required
                 />
               </label>
@@ -1086,7 +1085,6 @@ export const RequirementPoolView: React.FC = () => {
                   onChange={(e) => setMemoContent(e.target.value)}
                   rows={4}
                   placeholder="记录个人备忘信息或处理心得..."
-                  className="w-full"
                   required
                 />
               </label>
@@ -1130,7 +1128,6 @@ export const RequirementPoolView: React.FC = () => {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={4}
-              className="w-full"
               placeholder={reasonType === "reject" ? "请输入详细驳回说明或补充建议..." : "请输入搁置原因说明..."}
               required
             />
