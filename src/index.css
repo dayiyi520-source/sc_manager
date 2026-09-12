@@ -959,6 +959,11 @@ html:not(.dark) .tech-brand-panel .text-white {
   color: var(--primary) !important;
 }
 
+.version-product-line-cascader.is-empty .ant-select-placeholder {
+  color: var(--primary) !important;
+  opacity: 1 !important;
+}
+
 .version-product-line-dropdown {
   min-width: 220px !important;
   width: auto !important;
