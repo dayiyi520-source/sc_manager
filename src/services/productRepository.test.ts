@@ -36,6 +36,27 @@ describe('productRepository task API contract', () => {
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(['/api/presales-tasks', '/api/delivery-tasks/delivery-1', '/api/ops-tasks/ops-1']);
   });
 
+  it('assigns a requirement through the selected product-line version route', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: null, message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await productRepository.assignRequirementToVersion('line-1', 'version-1', 'requirement-1');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/product-lines/line-1/versions/version-1/requirements/requirement-1');
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+  });
+
+  it('plans and removes each supported work-item kind through the version route', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: null, message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await productRepository.assignWorkItemToVersion('line-1', 'version-1', 'bug', 'bug-1');
+    await productRepository.unassignWorkItemFromVersion('line-1', 'version-1', 'bug', 'bug-1');
+    expect(fetchMock.mock.calls.map((call) => [call[0], call[1].method])).toEqual([
+      ['/api/product-lines/line-1/versions/version-1/work-items/bug/bug-1', 'POST'],
+      ['/api/product-lines/line-1/versions/version-1/work-items/bug/bug-1', 'DELETE']
+    ]);
+  });
+
   it('retries a transient GET failure once but does not retry writes', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response('', { status: 503 }))

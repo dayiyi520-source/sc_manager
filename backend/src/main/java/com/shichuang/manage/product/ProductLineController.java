@@ -1,11 +1,13 @@
 package com.shichuang.manage.product;
 import com.shichuang.manage.api.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
-@RestController @RequestMapping("/api/product-lines") @Profile("local")
+@RestController @RequestMapping("/api/product-lines") @Profile("local") @Tag(name="产品线管理")
 public class ProductLineController {
  private final ProductLineService service; public ProductLineController(ProductLineService service){this.service=service;}
  @GetMapping public ApiResponse<List<Map<String,Object>>> list(@RequestParam(defaultValue="") String keyword){return ApiResponse.ok(service.list(keyword));}
@@ -25,5 +27,8 @@ public class ProductLineController {
  @PostMapping("/{id}/versions") public ApiResponse<Void> addVersion(@PathVariable String id,@RequestBody Map<String,Object>b){service.addVersion(id,b);return ApiResponse.ok(null);}
  @PutMapping("/{id}/versions/{versionId}") public ApiResponse<Void> updateVersion(@PathVariable String id,@PathVariable String versionId,@RequestBody Map<String,Object>b){service.updateVersion(id,versionId,b);return ApiResponse.ok(null);}
  @DeleteMapping("/{id}/versions/{versionId}") public ApiResponse<Void> deleteVersion(@PathVariable String id,@PathVariable String versionId){service.deleteVersion(id,versionId);return ApiResponse.ok(null);}
+ @Operation(summary="将需求工作项规划至迭代版本") @PostMapping("/{id}/versions/{versionId}/requirements/{requirementId}") public ApiResponse<Void> assignRequirement(@PathVariable String id,@PathVariable String versionId,@PathVariable String requirementId){service.assignRequirement(id,versionId,requirementId);return ApiResponse.ok(null);}
+ @Operation(summary="将工作项规划至迭代版本") @PostMapping("/{id}/versions/{versionId}/work-items/{kind}/{itemId}") public ApiResponse<Void> assignWorkItem(@PathVariable String id,@PathVariable String versionId,@PathVariable String kind,@PathVariable String itemId){service.assignWorkItem(id,versionId,kind,itemId);return ApiResponse.ok(null);}
+ @Operation(summary="将工作项移出迭代版本") @DeleteMapping("/{id}/versions/{versionId}/work-items/{kind}/{itemId}") public ApiResponse<Void> unassignWorkItem(@PathVariable String id,@PathVariable String versionId,@PathVariable String kind,@PathVariable String itemId){service.unassignWorkItem(id,versionId,kind,itemId);return ApiResponse.ok(null);}
  @GetMapping("/{id}/activities") public ApiResponse<List<Map<String,Object>>> activities(@PathVariable String id){return ApiResponse.ok(service.activities(id));}
 }

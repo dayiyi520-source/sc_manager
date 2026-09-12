@@ -22,13 +22,13 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
   const [startDate, setStartDate] = useState(editingVersion?.startDate || '');
   const [endDate, setEndDate] = useState(editingVersion?.endDate || '');
   const [content, setContent] = useState(editingVersion?.content || editingVersion?.changelog || '');
-  const [versionStatus] = useState(editingVersion?.status || '待开始');
+  const versionStatus = editingVersion?.status || '规划中';
 
   useEffect(() => {
     if (!isOpen) return;
     setVersionName(editingVersion?.name || '');
     setVersionCode(editingVersion?.code || '');
-    setSelectedProductLineId(productLine?.id || '');
+    setSelectedProductLineId(productLine?.id || editingVersion?.productLineId || '');
     setVersionOwner(editingVersion?.ownerName || productLine?.ownerName || productLine?.owner || '');
     setStartDate(editingVersion?.startDate || '');
     setEndDate(editingVersion?.endDate || '');
@@ -73,7 +73,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
       <div className="bg-[var(--bg-surface)] text-[var(--text-body)] border border-[var(--border-main)] rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]">
-          <div className="flex items-center gap-2.5"><div className="p-2 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><Layers className="w-5 h-5" /></div><div><h3 className="text-base font-bold text-[var(--text-primary)]">创建迭代版本</h3><div className="mt-0.5 flex items-center gap-1 text-xs text-[var(--text-muted)]"><span>所属产品线：</span><Select size="small" showSearch value={selectedProductLineId || undefined} onChange={(value) => { setSelectedProductLineId(value); const line = productLines.find((item) => item.id === value); if (line && !editingVersion) setVersionOwner(line.ownerName || line.owner || ''); }} options={productLines.map((line) => ({ value: line.id, label: line.name }))} optionFilterProp="label" placeholder="暂未选择" className="min-w-32" /></div></div></div>
+          <div className="flex items-center gap-2.5"><div className="p-2 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><Layers className="w-5 h-5" /></div><div><h3 className="text-base font-bold text-[var(--text-primary)]">{editingVersion ? '修改迭代版本' : '创建迭代版本'}</h3><div className="mt-2 flex items-center gap-2 text-xs"><span className="text-[var(--text-muted)]">所属产品线：</span>{(productLine || editingVersion?.productLineId) ? <div className="flex items-center gap-2 font-semibold text-[var(--active-text)]"><span>{activeProductLine?.name || productLine?.name || editingVersion?.productLineName || '未关联产品线'}</span><span className="font-mono text-[var(--primary)]">{activeProductLine?.code || productLine?.code || '—'}</span></div> : <Select size="small" showSearch value={selectedProductLineId || undefined} onChange={(value) => { setSelectedProductLineId(value); const line = productLines.find((item) => item.id === value); if (line && !editingVersion) setVersionOwner(line.ownerName || line.owner || ''); }} options={productLines.map((line) => ({ value: line.id, label: `${line.name} (${line.code || '—'})` }))} optionFilterProp="label" placeholder="暂未选择" className="min-w-52" />}</div></div></div>
           <Button type="text" onClick={onClose} aria-label="关闭创建版本">✕</Button>
         </div>
         <form id="create-version-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
@@ -82,7 +82,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-[var(--primary)]" />预计开始时间</label><DatePicker value={startDate ? dayjs(startDate) : null} onChange={(value) => setStartDate(value?.format('YYYY-MM-DD') || '')} className="w-full" placeholder="请选择日期" /></div><div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" />预计结束时间</label><DatePicker value={endDate ? dayjs(endDate) : null} onChange={(value) => setEndDate(value?.format('YYYY-MM-DD') || '')} className="w-full" placeholder="请选择日期" /></div></div>
           <div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-[var(--active-text)]" />版本内容 / 发版说明范围</label><Input.TextArea rows={3} value={content} onChange={(event) => setContent(event.target.value)} placeholder="请输入该版本的更新内容介绍" /></div>
         </form>
-        <div className="px-6 py-4 border-t border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]/80"><div className="text-xs text-[var(--text-muted)]">创建后版本将进入 <span className="text-[var(--active-text)] font-medium">规划中</span> 状态并自动同步至研发迭代矩阵</div><div className="flex items-center gap-3"><Button onClick={onClose}>取消</Button><Button type="primary" htmlType="submit" form="create-version-form" icon={<Check className="w-3.5 h-3.5" />}>立即创建版本</Button></div></div>
+        <div className="px-6 py-4 border-t border-[var(--border-main)] flex items-center justify-end bg-[var(--bg-surface-soft)]/80"><div className="flex items-center gap-3"><Button onClick={onClose}>取消</Button><Button type="primary" htmlType="submit" form="create-version-form" icon={<Check className="w-3.5 h-3.5" />}>保存</Button></div></div>
       </div>
     </div>
   );

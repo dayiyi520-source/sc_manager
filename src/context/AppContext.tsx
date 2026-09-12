@@ -328,6 +328,9 @@ export interface AppContextType {
   addVersion: (v: Partial<VersionIteration>) => Promise<boolean>;
   updateVersion: (id: string, updates: Partial<VersionIteration>) => Promise<boolean>;
   deleteVersion: (id: string) => void;
+  assignRequirementToVersion: (requirementId: string, versionId: string) => Promise<boolean>;
+  assignWorkItemToVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string) => Promise<boolean>;
+  unassignWorkItemFromVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string) => Promise<boolean>;
   addRequirementTask: (task: Partial<RequirementTask>) => Promise<boolean>;
   updateRequirementTask: (id: string, updates: Partial<RequirementTask>) => void;
   addDesignTask: (task: Partial<RequirementTask>) => Promise<boolean>;
@@ -546,9 +549,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (Array.isArray(requirementQuery.data?.items)) {
       const remoteTasks = requirementQuery.data.items.map((task) => ({
         ...task,
-        status: normalizeRequirementStatus(task.status),
-        versionId: '',
-        versionName: ''
+        status: normalizeRequirementStatus(task.status)
       }));
       setRequirementTasks((prev) => {
         const remoteIds = new Set(remoteTasks.map((t) => t.id));
@@ -558,7 +559,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
   },[requirementQuery.data]);
-  useEffect(()=>{ if (Array.isArray(designQuery.data)) setDesignTasks(designQuery.data.map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: '', versionName: '' }))); },[designQuery.data]);
+  useEffect(()=>{ if (Array.isArray(designQuery.data)) setDesignTasks(designQuery.data.map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: task.versionId || '', versionName: task.versionName || '' }))); },[designQuery.data]);
   useEffect(() => {
     if (!Array.isArray(productLineQuery.data)) return;
     setProductLines(productLineQuery.data);
@@ -1538,6 +1539,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('success', '迭代已删除', current?.name);
   };
 
+  const assignRequirementToVersion = async (requirementId: string, versionId: string): Promise<boolean> => {
+    const version = versions.find((item) => item.id === versionId);
+    const requirement = requirementTasks.find((item) => item.id === requirementId);
+    if (!version?.productLineId || !requirement) {
+      addToast('error', '工作项规划失败', '目标迭代或工作项不存在，请刷新后重试');
+      return false;
+    }
+    if (requirementBackendEnabled) {
+      try {
+        await productRepository.assignRequirementToVersion(version.productLineId, version.id, requirement.id);
+        setRequirementTasks((prev) => prev.map((item) => item.id === requirement.id ? {
+          ...item,
+          versionId: version.id,
+          versionName: version.name,
+          productLineId: version.productLineId,
+          productLineName: version.productLineName || item.productLineName
+        } : item));
+        await Promise.all([requirementQuery.refetch(), productLineQuery.refetch()]);
+        return true;
+      } catch (error) {
+        addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试');
+        return false;
+      }
+    }
+    setRequirementTasks((prev) => prev.map((item) => item.id === requirement.id ? {
+      ...item,
+      versionId: version.id,
+      versionName: version.name,
+      productLineId: version.productLineId,
+      productLineName: version.productLineName || item.productLineName
+    } : item));
+    return true;
+  };
+
+  const assignWorkItemToVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string): Promise<boolean> => {
+    const version = versions.find((item) => item.id === versionId);
+    if (!version?.productLineId) { addToast('error', '工作项规划失败', '目标迭代不存在，请刷新后重试'); return false; }
+    const collection = kind === 'requirement' ? requirementTasks : kind === 'design' ? designTasks : kind === 'bug' ? bugs : devTasks;
+    const item = collection.find((candidate) => candidate.id === itemId);
+    if (!item) { addToast('error', '工作项规划失败', '工作项不存在，请刷新后重试'); return false; }
+    if (kind === 'requirement') return assignRequirementToVersion(itemId, versionId);
+    if (requirementBackendEnabled) {
+      try { await productRepository.assignWorkItemToVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
+      catch (error) { addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
+    }
+    const updates = { versionId: version.id, versionName: version.name, productLineId: version.productLineId, productLineName: version.productLineName || item.productLineName };
+    if (kind === 'design') setDesignTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    if (kind === 'bug') setBugs((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    if (kind === 'dev') setDevTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    return true;
+  };
+
+  const unassignWorkItemFromVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string): Promise<boolean> => {
+    const version = versions.find((item) => item.id === versionId);
+    if (!version?.productLineId) return false;
+    if (requirementBackendEnabled) {
+      try { await productRepository.unassignWorkItemFromVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), requirementQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
+      catch (error) { addToast('error', '移出迭代失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
+    }
+    const updates = { versionId: '', versionName: '' };
+    if (kind === 'requirement') setRequirementTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    if (kind === 'design') setDesignTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    if (kind === 'bug') setBugs((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    if (kind === 'dev') setDevTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    return true;
+  };
+
   const updateBug = (id: string, updates: Partial<DefectBug>) => {
     if (requirementBackendEnabled) {
       void productRepository.updateTask('bug', id, updates as Record<string, unknown>).then(() => bugQuery.refetch()).then(() => addToast('info', '缺陷状态已更新')).catch((error) => addToast('error', '缺陷更新失败', error instanceof Error ? error.message : '请稍后重试'));
@@ -1867,6 +1935,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addVersion,
         updateVersion,
         deleteVersion,
+        assignRequirementToVersion,
+        assignWorkItemToVersion,
+        unassignWorkItemFromVersion,
         addRequirementTask,
         updateRequirementTask,
         addDesignTask,

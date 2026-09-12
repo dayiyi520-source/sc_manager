@@ -1390,7 +1390,9 @@ export const INITIAL_REQUIREMENT_TASKS: RequirementTask[] = [
 export const INITIAL_VERSIONS: VersionIteration[] = [
   {
     id: 'ver-1',
+    code: 'V3.5.2',
     name: '师创智联OS V3.5.2 (信创标杆版)',
+    ownerName: '张瑞',
     productLineId: 'pl-1',
     productLineName: '师创智联协同OS',
     startDate: '2026-08-10',
@@ -1403,7 +1405,9 @@ export const INITIAL_VERSIONS: VersionIteration[] = [
   },
   {
     id: 'ver-2',
+    code: 'V2.8.0',
     name: '智慧数智分析引擎 V2.8.0 (数字孪生强化版)',
+    ownerName: '王浩然',
     productLineId: 'pl-2',
     productLineName: '智慧数智分析引擎',
     startDate: '2026-08-15',
@@ -1416,7 +1420,9 @@ export const INITIAL_VERSIONS: VersionIteration[] = [
   },
   {
     id: 'ver-3',
+    code: 'V3.1.2',
     name: '移动端协同App V3.1.2 (物流大并发版)',
+    ownerName: '李思齐',
     productLineId: 'pl-4',
     productLineName: '移动端协同App',
     startDate: '2026-08-01',
@@ -1429,7 +1435,9 @@ export const INITIAL_VERSIONS: VersionIteration[] = [
   },
   {
     id: 'ver-4',
+    code: 'V4.1.0',
     name: '智能低代码中台 V4.1.0 (流程引擎重构)',
+    ownerName: '张瑞',
     productLineId: 'pl-3',
     productLineName: '智能低代码中台',
     startDate: '2026-08-25',
