@@ -1,5 +1,5 @@
 import { apiRequest } from './apiClient';
-import type { ProductLine, ProductLineMember, VersionIteration, RequirementTask, DefectBug, DevTask } from '../types';
+import type { ProductLine, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, VersionIteration, RequirementTask, DefectBug, DevTask } from '../types';
 
 type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
@@ -12,6 +12,12 @@ export const productRepository = {
   createProductLine: (body: Partial<ProductLine>) => apiRequest<{ id: string; code: string }>('/api/product-lines', { method: 'POST', body: JSON.stringify(body) }),
   updateProductLine: (id: string, body: Partial<ProductLine>) => apiRequest<void>(`/api/product-lines/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   addProductLineMember: (id: string, body: Pick<ProductLineMember, 'name' | 'role'>) => apiRequest<void>(`/api/product-lines/${id}/members`, { method: 'POST', body: JSON.stringify(body) }),
+  updateProductLineMember: (id: string, memberId: string, body: Pick<ProductLineMember, 'role'>) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  removeProductLineMember: (id: string, memberId: string) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'DELETE' }),
+  workItemTypes: (id: string, category?: ProductLineWorkItemCategory) => apiRequest<ProductLineWorkItemType[]>(`/api/product-lines/${id}/work-item-types${category ? `?category=${encodeURIComponent(category)}` : ''}`),
+  createWorkItemType: (id: string, body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled'>) => apiRequest<{ id: string }>(`/api/product-lines/${id}/work-item-types`, { method: 'POST', body: JSON.stringify(body) }),
+  updateWorkItemType: (id: string, typeId: string, body: Partial<Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled'>>) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteWorkItemType: (id: string, typeId: string) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'DELETE' }),
   productLineActivities: (id: string) => apiRequest<ProductLine['activities']>(`/api/product-lines/${id}/activities`),
   createVersion: (lineId: string, body: Partial<VersionIteration>) => apiRequest<void>(`/api/product-lines/${lineId}/versions`, { method: 'POST', body: JSON.stringify(body) }),
   updateVersion: (lineId: string, versionId: string, body: Partial<VersionIteration>) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}`, { method: 'PUT', body: JSON.stringify(body) }),

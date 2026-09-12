@@ -20,6 +20,32 @@
   font-size: 12px !important;
 }
 
+/* 产品线设置沿用平台 36px 控件基线；legacy tech-shell 的 32px 规则不应覆盖 Select。 */
+.tech-shell .product-line-settings :where(.ant-select, .ant-select-selector) {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
+.tech-shell .product-line-settings textarea.ant-input {
+  height: auto !important;
+  min-height: 120px !important;
+}
+
+.tech-shell .product-line-switch {
+  height: 24px !important;
+  min-width: 44px !important;
+}
+
+.tech-shell .product-line-switch .ant-switch-handle {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.tech-shell .product-line-switch .ant-switch-inner {
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
 .product-line-health-enabled {
   color: var(--primary) !important;
   background: color-mix(in srgb, var(--primary) 12%, var(--bg-surface)) !important;

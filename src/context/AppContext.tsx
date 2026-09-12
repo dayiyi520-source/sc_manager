@@ -323,6 +323,8 @@ export interface AppContextType {
   addProductLine: (line: Partial<ProductLine>) => void;
   updateProductLine: (id: string, updates: Partial<ProductLine>) => Promise<void>;
   addProductLineMembers: (id: string, members: ProductLineMember[]) => Promise<void>;
+  updateProductLineMember: (id: string, memberId: string, role: ProductLineMember['role']) => Promise<void>;
+  removeProductLineMember: (id: string, memberId: string) => Promise<void>;
   addVersion: (v: Partial<VersionIteration>) => Promise<boolean>;
   updateVersion: (id: string, updates: Partial<VersionIteration>) => Promise<boolean>;
   deleteVersion: (id: string) => void;
@@ -1372,13 +1374,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addProductLine = (line: Partial<ProductLine>) => {
+    const ownerName = line.owner || line.ownerName || currentUser.name;
     const newLine: ProductLine = {
       id: `pl-${Date.now()}`,
       name: line.name || '新建产品线',
       code: line.code || 'PL-NEW',
       description: line.description || '该产品线还没有任何简介内容。',
-      ownerName: line.owner || line.ownerName || currentUser.name,
-      owner: line.owner || line.ownerName || currentUser.name,
+      ownerName,
+      owner: ownerName,
       website: line.website,
       subProducts: line.subProducts || [],
       productOwner: line.productOwner || '',
@@ -1389,7 +1392,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       visibility: '公开',
       coverColor: 'from-blue-600 to-indigo-700',
       coverUrl: line.coverUrl,
-      members: line.members || [],
+      members: line.members?.length ? line.members : [{ id: `mem-${Date.now()}`, name: ownerName, role: '管理员' }],
       products: line.products || [],
       currentVersion: 'V1.0.0',
       totalRequirements: line.totalRequirements ?? 0,
@@ -1441,6 +1444,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }))
           ]
         }
+      : line));
+  };
+
+  const updateProductLineMember = async (id: string, memberId: string, role: ProductLineMember['role']) => {
+    if (requirementBackendEnabled) {
+      await productRepository.updateProductLineMember(id, memberId, { role });
+      await productLineQuery.refetch();
+      return;
+    }
+    setProductLines((prev) => prev.map((line) => line.id === id
+      ? { ...line, members: (line.members || []).map((member) => typeof member === 'string' || member.id !== memberId ? member : { ...member, role }) }
+      : line));
+  };
+
+  const removeProductLineMember = async (id: string, memberId: string) => {
+    if (requirementBackendEnabled) {
+      await productRepository.removeProductLineMember(id, memberId);
+      await productLineQuery.refetch();
+      return;
+    }
+    setProductLines((prev) => prev.map((line) => line.id === id
+      ? { ...line, members: (line.members || []).filter((member) => typeof member === 'string' || member.id !== memberId) }
       : line));
   };
 
@@ -1837,6 +1862,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addProductLine,
         updateProductLine,
         addProductLineMembers,
+        updateProductLineMember,
+        removeProductLineMember,
         addVersion,
         updateVersion,
         deleteVersion,

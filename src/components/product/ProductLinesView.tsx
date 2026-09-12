@@ -13,9 +13,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { ProductLine } from '../../types';
-import { ProductLineDetailView } from './ProductLineDetailView';
-import { ProductLineVersionModal } from './ProductLineVersionModal';
-import { ManageMembersModal } from './ManageMembersModal';
+import { ProductLineDetailView, type ProductLineSettingsSection } from './ProductLineDetailView';
 
 export const ProductLinesView: React.FC = () => {
   const {
@@ -32,10 +30,7 @@ export const ProductLinesView: React.FC = () => {
 
   // Active detail view state
   const [selectedProductLineId, setSelectedProductLineId] = useState<string | null>(null);
-
-  // Quick modals state from cards
-  const [versionModalLine, setVersionModalLine] = useState<ProductLine | null>(null);
-  const [memberModalLine, setMemberModalLine] = useState<ProductLine | null>(null);
+  const [selectedSettingsSection, setSelectedSettingsSection] = useState<ProductLineSettingsSection | null>(null);
 
   // Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,7 +48,11 @@ export const ProductLinesView: React.FC = () => {
     return (
       <ProductLineDetailView
         productLineId={selectedProductLineId}
-        onBack={() => setSelectedProductLineId(null)}
+        initialSettingsSection={selectedSettingsSection || undefined}
+        onBack={() => {
+          setSelectedProductLineId(null);
+          setSelectedSettingsSection(null);
+        }}
       />
     );
   }
@@ -275,7 +274,10 @@ export const ProductLinesView: React.FC = () => {
                     <Button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setVersionModalLine(pl);
+                        sessionStorage.setItem('shichuang.productLineFilter', pl.id);
+                        sessionStorage.setItem('shichuang.productLineTargetTab', 'detail');
+                        window.dispatchEvent(new Event('shichuang:product-line-context'));
+                        openPageTab('prod_versions');
                       }}
                       icon={<Layers className="w-3.5 h-3.5 text-[var(--primary)]" />}
                     >
@@ -285,7 +287,8 @@ export const ProductLinesView: React.FC = () => {
                     <Button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setMemberModalLine(pl);
+                        setSelectedSettingsSection('members');
+                        setSelectedProductLineId(pl.id);
                       }}
                       icon={<Users className="w-3.5 h-3.5 text-purple-400" />}
                     >
@@ -389,23 +392,6 @@ export const ProductLinesView: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Quick Version Management Modal for Card (满足需求2) */}
-      {versionModalLine && (
-        <ProductLineVersionModal
-          isOpen={true}
-          onClose={() => setVersionModalLine(null)}
-          productLine={versionModalLine}
-        />
-      )}
-
-      {/* Quick Member Management Modal for Card (满足需求2) */}
-      {memberModalLine && (
-        <ManageMembersModal
-          isOpen={true}
-          onClose={() => setMemberModalLine(null)}
-          productLine={memberModalLine}
-        />
-      )}
     </div>
   );
 };

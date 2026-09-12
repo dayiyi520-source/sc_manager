@@ -254,12 +254,13 @@ export const VersionIterationView: React.FC = () => {
     return () => window.removeEventListener('shichuang:product-line-context', consumeProductLineContext);
   }, []);
 
+  const selectedProductLineName = productLines.find((line) => line.id === productLineFilter)?.name;
   const visibleVersions = useMemo(
     () =>
       productLineFilter === 'all'
         ? versions
-        : versions.filter((version) => version.productLineId === productLineFilter),
-    [productLineFilter, versions]
+        : versions.filter((version) => version.productLineId === productLineFilter || version.productLineName === selectedProductLineName),
+    [productLineFilter, selectedProductLineName, versions]
   );
 
   useEffect(() => {

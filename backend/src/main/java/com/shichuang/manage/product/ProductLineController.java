@@ -15,7 +15,12 @@ public class ProductLineController {
  @PatchMapping("/{id}/status") public ApiResponse<Void> status(@PathVariable String id,@RequestBody Map<String,String>b){service.status(id,b.getOrDefault("status",""));return ApiResponse.ok(null);}
  @GetMapping("/{id}/members") public ApiResponse<List<Map<String,Object>>> members(@PathVariable String id){return ApiResponse.ok(service.members(id));}
  @PostMapping("/{id}/members") public ApiResponse<Void> addMember(@PathVariable String id,@RequestBody Map<String,Object>b){service.addMember(id,b);return ApiResponse.ok(null);}
+ @PutMapping("/{id}/members/{memberId}") public ApiResponse<Void> updateMember(@PathVariable String id,@PathVariable String memberId,@RequestBody Map<String,Object>b){service.updateMember(id,memberId,b);return ApiResponse.ok(null);}
  @DeleteMapping("/{id}/members/{memberId}") public ApiResponse<Void> removeMember(@PathVariable String id,@PathVariable String memberId){service.removeMember(id,memberId);return ApiResponse.ok(null);}
+ @GetMapping("/{id}/work-item-types") public ApiResponse<List<Map<String,Object>>> workItemTypes(@PathVariable String id,@RequestParam(required=false) String category){return ApiResponse.ok(service.workItemTypes(id,category));}
+ @PostMapping("/{id}/work-item-types") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> addWorkItemType(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.addWorkItemType(id,b));}
+ @PutMapping("/{id}/work-item-types/{typeId}") public ApiResponse<Void> updateWorkItemType(@PathVariable String id,@PathVariable String typeId,@RequestBody Map<String,Object>b){service.updateWorkItemType(id,typeId,b);return ApiResponse.ok(null);}
+ @DeleteMapping("/{id}/work-item-types/{typeId}") public ApiResponse<Void> deleteWorkItemType(@PathVariable String id,@PathVariable String typeId){service.deleteWorkItemType(id,typeId);return ApiResponse.ok(null);}
  @GetMapping("/{id}/versions") public ApiResponse<List<Map<String,Object>>> versions(@PathVariable String id){return ApiResponse.ok(service.versions(id));}
  @PostMapping("/{id}/versions") public ApiResponse<Void> addVersion(@PathVariable String id,@RequestBody Map<String,Object>b){service.addVersion(id,b);return ApiResponse.ok(null);}
  @PutMapping("/{id}/versions/{versionId}") public ApiResponse<Void> updateVersion(@PathVariable String id,@PathVariable String versionId,@RequestBody Map<String,Object>b){service.updateVersion(id,versionId,b);return ApiResponse.ok(null);}

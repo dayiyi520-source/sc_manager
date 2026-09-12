@@ -376,6 +376,18 @@ export interface ProductLineMember {
   phone?: string;
 }
 
+export type ProductLineWorkItemCategory = '需求' | '设计' | '研发' | '缺陷';
+
+export interface ProductLineWorkItemType {
+  id: string;
+  category: ProductLineWorkItemCategory;
+  name: string;
+  description?: string;
+  creatorName?: string;
+  createdAt?: string;
+  enabled: boolean;
+}
+
 export interface ProductLineActivity {
   id: string;
   action: string;
@@ -408,10 +420,12 @@ export interface ProductLine {
   versionCount?: number;
   customerCount?: number;
   health?: '健康' | '预警' | '关注' | string;
-  visibility?: '公开' | '部门可见' | '保密';
+  status?: '启用中' | '已停用' | string;
+  visibility?: '公开' | '私密' | '仅创建者可见' | '部门可见' | '保密';
   coverColor?: string;
   coverUrl?: string;
   members?: ProductLineMember[] | string[];
+  workItemTypes?: ProductLineWorkItemType[];
   currentVersion?: string;
   totalRequirements?: number;
   inProgressReqs?: number;
