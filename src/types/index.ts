@@ -376,6 +376,14 @@ export interface ProductLineMember {
   phone?: string;
 }
 
+export interface ProductLineActivity {
+  id: string;
+  action: string;
+  detail?: string;
+  operatorName?: string;
+  createdAt: string;
+}
+
 export interface ProductItemInLine {
   id: string;
   name: string;
@@ -418,6 +426,8 @@ export interface ProductLine {
   pendingReqCount?: number;
   pendingBugCount?: number;
   activeTaskCount?: number;
+  versions?: VersionIteration[];
+  activities?: ProductLineActivity[];
 }
 
 export interface RequirementTask {
@@ -566,6 +576,7 @@ export interface VersionIteration {
   id: string;
   code?: string;
   name: string;
+  ownerName?: string;
   productLineId?: string;
   productLineName?: string;
   startDate?: string;
@@ -580,6 +591,7 @@ export interface VersionIteration {
   completedReqCount?: number;
   linkedRequirementIds?: string[];
   isReviewed?: boolean;
+  createdAt?: string;
 }
 
 export interface DefectBug {

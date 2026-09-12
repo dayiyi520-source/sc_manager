@@ -86,7 +86,7 @@ export const ProductLinesView: React.FC = () => {
       code: formCode.trim().toUpperCase(),
       owner: formOwner.trim(),
       ownerName: formOwner.trim(),
-      description: formDescription.trim() || '企业级关键核心业务支撑产品线，推动全生命周期标准化交付。',
+      description: formDescription.trim() || '该产品线还没有任何简介内容。',
       website: formWebsite.trim() || undefined,
       requirementOwner: '',
       techOwner: '',
@@ -94,7 +94,7 @@ export const ProductLinesView: React.FC = () => {
       members: [{
         id: `mem-${Date.now()}`,
         name: formOwner.trim() || currentUser.name,
-        role: '产品线成员'
+        role: '管理员'
       }],
       products: [
         {

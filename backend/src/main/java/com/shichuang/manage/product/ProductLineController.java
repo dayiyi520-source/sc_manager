@@ -15,7 +15,10 @@ public class ProductLineController {
  @PatchMapping("/{id}/status") public ApiResponse<Void> status(@PathVariable String id,@RequestBody Map<String,String>b){service.status(id,b.getOrDefault("status",""));return ApiResponse.ok(null);}
  @GetMapping("/{id}/members") public ApiResponse<List<Map<String,Object>>> members(@PathVariable String id){return ApiResponse.ok(service.members(id));}
  @PostMapping("/{id}/members") public ApiResponse<Void> addMember(@PathVariable String id,@RequestBody Map<String,Object>b){service.addMember(id,b);return ApiResponse.ok(null);}
+ @DeleteMapping("/{id}/members/{memberId}") public ApiResponse<Void> removeMember(@PathVariable String id,@PathVariable String memberId){service.removeMember(id,memberId);return ApiResponse.ok(null);}
  @GetMapping("/{id}/versions") public ApiResponse<List<Map<String,Object>>> versions(@PathVariable String id){return ApiResponse.ok(service.versions(id));}
  @PostMapping("/{id}/versions") public ApiResponse<Void> addVersion(@PathVariable String id,@RequestBody Map<String,Object>b){service.addVersion(id,b);return ApiResponse.ok(null);}
- @PutMapping("/{id}/versions/{versionId}") public ApiResponse<Void> updateVersion(@PathVariable String id,@PathVariable String versionId,@RequestBody Map<String,Object>b){service.updateVersion(versionId,b);return ApiResponse.ok(null);}
+ @PutMapping("/{id}/versions/{versionId}") public ApiResponse<Void> updateVersion(@PathVariable String id,@PathVariable String versionId,@RequestBody Map<String,Object>b){service.updateVersion(id,versionId,b);return ApiResponse.ok(null);}
+ @DeleteMapping("/{id}/versions/{versionId}") public ApiResponse<Void> deleteVersion(@PathVariable String id,@PathVariable String versionId){service.deleteVersion(id,versionId);return ApiResponse.ok(null);}
+ @GetMapping("/{id}/activities") public ApiResponse<List<Map<String,Object>>> activities(@PathVariable String id){return ApiResponse.ok(service.activities(id));}
 }

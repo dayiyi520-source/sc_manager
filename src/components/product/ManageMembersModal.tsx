@@ -14,38 +14,27 @@ interface ManageMembersModalProps {
   productLine: ProductLine;
 }
 
-const COMMON_ROLES = [
-  '需求负责人 (PO)',
-  '技术负责人 (Tech Lead)',
-  '测试负责人 (QA Lead)',
-  '核心前端架构师',
-  '后端高并发研发',
-  '系统架构师',
-  '数字孪生算法专家',
-  '信创运维与交付专家',
-  '产品经理 (PM)',
-  '交互与视觉设计 (UI/UX)'
-];
+const PRODUCT_LINE_MEMBER_ROLES = ['管理员', '产品', '研发', '设计', '测试', '参与人'];
 
 export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
   isOpen,
   onClose,
   productLine
 }) => {
-  const { updateProductLine, addToast, currentUser } = useApp();
+  const { addProductLineMembers, addToast, currentUser } = useApp();
 
   const getProductLineMembers = () => {
     const existing = productLine.members || [];
     const configuredLeads = [
-      { name: productLine.owner || productLine.ownerName, role: '综合负责人' },
-      { name: productLine.requirementOwner, role: '需求负责人 (PO)' },
-      { name: productLine.techOwner, role: '技术负责人 (Tech Lead)' },
-      { name: productLine.testOwner, role: '测试负责人 (QA Lead)' }
+      { name: productLine.owner || productLine.ownerName, role: '管理员' },
+      { name: productLine.requirementOwner, role: '产品' },
+      { name: productLine.techOwner, role: '研发' },
+      { name: productLine.testOwner, role: '测试' }
     ].filter((lead): lead is { name: string; role: string } => Boolean(lead.name));
     const normalized: ProductLineMember[] = existing.length > 0 && typeof existing[0] === 'string'
-      ? (existing as string[]).map((name, index) => ({ id: `legacy-${index}-${name}`, name, role: '产品线成员' }))
+      ? (existing as string[]).map((name, index) => ({ id: `legacy-${index}-${name}`, name, role: '参与人' }))
       : existing.length > 0 ? (existing as ProductLineMember[]) : [
-      { id: 'm-1', name: productLine.owner || '张瑞', role: '产品线负责人 / PO', email: 'lead@shichuang.com' }
+      { id: 'm-1', name: productLine.owner || '张瑞', role: '管理员', email: 'lead@shichuang.com' }
     ];
     const existingNames = new Set(normalized.map((member) => member.name));
     return [...normalized, ...configuredLeads
@@ -77,22 +66,24 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleAddMember = (e: React.FormEvent) => {
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRole || selectedNewMembers.length === 0) {
       addToast('warning', '请选择角色并添加成员');
       return;
     }
     const additions = selectedNewMembers.map((name, index) => ({ id: `mem-${Date.now()}-${index}`, name, role: newRole }));
-    const updated = [...members, ...additions];
-    setMembers(updated);
-    updateProductLine(productLine.id, { members: updated });
-    addToast('success', '成员配置已保存');
-
-    setNewName('');
-    setNewRole('');
-    setSelectedNewMembers([]);
-    onClose();
+    try {
+      await addProductLineMembers(productLine.id, additions);
+      setMembers((previous) => [...previous, ...additions]);
+      addToast('success', '成员添加成功');
+      setNewName('');
+      setNewRole('');
+      setSelectedNewMembers([]);
+      onClose();
+    } catch (error) {
+      addToast('error', '成员添加失败', error instanceof Error ? error.message : '请稍后重试');
+    }
   };
 
   return (
@@ -125,7 +116,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
           <form onSubmit={handleAddMember} className="space-y-4">
             <div>
               <label className="block text-[11px] text-[var(--text-body)] mb-1">选择角色 *</label>
-              <Select className="w-full" value={newRole || undefined} onChange={setNewRole} placeholder="请选择成员角色" options={COMMON_ROLES.map((r) => ({ label: r, value: r }))} />
+              <Select className="w-full" value={newRole || undefined} onChange={setNewRole} placeholder="请选择成员角色" options={PRODUCT_LINE_MEMBER_ROLES.map((role) => ({ label: role, value: role }))} />
             </div>
             <div>
               <label className="block text-[11px] text-[var(--text-body)] mb-1">添加成员 *</label>

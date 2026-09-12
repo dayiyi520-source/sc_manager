@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { DatePicker, Cascader, Segmented } from "antd";
 import {
   Bug,
   Calendar,
@@ -16,10 +15,11 @@ import {
   UserRound
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { Modal, StatusTag } from '../common/UIComponents';
+import { StatusTag } from '../common/UIComponents';
 import { showDeleteConfirm } from '../common/Feedback';
 import { DefectBug, DevTask, RequirementTask, VersionIteration } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
+import { CreateVersionModal } from './CreateVersionModal';
 import { SearchableSelect } from '../common';
 
 type ViewMode = 'list' | 'detail' | 'planning';
@@ -221,10 +221,7 @@ export const VersionIterationView: React.FC = () => {
     requirementTasks,
     devTasks,
     bugs,
-    setVersions,
-    addVersion,
-    updateVersion,
-    addToast
+    deleteVersion
   } = useApp();
   const [mode, setMode] = useState<ViewMode>('list');
   const [detailTab, setDetailTab] = useState<DetailTab>('requirements');
@@ -235,13 +232,27 @@ export const VersionIterationView: React.FC = () => {
   const [selectedId, setSelectedId] = useState(versions[0]?.id || '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
-  const [formName, setFormName] = useState('');
-  const [formReleaseDate, setFormReleaseDate] = useState('2026-09-08');
   const [formProductLineId, setFormProductLineId] = useState('');
 
   useEffect(() => {
     if (!selectedId && versions[0]?.id) setSelectedId(versions[0].id);
   }, [selectedId, versions]);
+
+  useEffect(() => {
+    const consumeProductLineContext = () => {
+      const lineId = sessionStorage.getItem('shichuang.productLineFilter');
+      const targetTab = sessionStorage.getItem('shichuang.productLineTargetTab');
+      if (lineId) setProductLineFilter(lineId);
+      if (targetTab === 'detail') setMode('detail');
+      if (lineId || targetTab) {
+        sessionStorage.removeItem('shichuang.productLineFilter');
+        sessionStorage.removeItem('shichuang.productLineTargetTab');
+      }
+    };
+    consumeProductLineContext();
+    window.addEventListener('shichuang:product-line-context', consumeProductLineContext);
+    return () => window.removeEventListener('shichuang:product-line-context', consumeProductLineContext);
+  }, []);
 
   const visibleVersions = useMemo(
     () =>
@@ -307,28 +318,23 @@ export const VersionIterationView: React.FC = () => {
 
   const openCreateVersion = () => {
     setEditingVersionId(null);
-    setFormName('');
     setFormProductLineId('');
-    setFormReleaseDate('2026-09-08');
     setIsModalOpen(true);
   };
 
   const openEditVersion = (version: VersionIteration) => {
     setEditingVersionId(version.id);
-    setFormName(version.name);
     setFormProductLineId(version.productLineId || '');
-    setFormReleaseDate(version.releaseDate || version.endDate || '');
     setIsModalOpen(true);
   };
 
-  const deleteVersion = (version: VersionIteration) => {
+  const confirmDeleteVersion = (version: VersionIteration) => {
     showDeleteConfirm({
       title: `确认删除迭代“${version.name}”？`,
       content: '删除后不可恢复，请确认是否继续。',
       onOk: () => {
-        setVersions((current) => current.filter((item) => item.id !== version.id));
+        deleteVersion(version.id);
         if (selectedId === version.id) setSelectedId('');
-        addToast('success', '迭代已删除', version.name);
       },
     });
   };
@@ -336,44 +342,6 @@ export const VersionIterationView: React.FC = () => {
   const openRequirement = (item: RequirementTask) => setSelectedWorkItem({ kind: 'requirement', item });
   const openDevTask = (item: DevTask) => setSelectedWorkItem({ kind: 'task', item });
   const openBug = (item: DefectBug) => setSelectedWorkItem({ kind: 'bug', item });
-
-  const save = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!formName.trim()) {
-      addToast('warning', '请填写迭代名称');
-      return;
-    }
-    const productLine = productLines.find((item) => item.id === formProductLineId);
-    if (editingVersionId) {
-      updateVersion(editingVersionId, {
-        name: formName.trim(),
-        productLineId: formProductLineId || undefined,
-        productLineName: productLine?.name,
-        releaseDate: formReleaseDate || undefined,
-        endDate: formReleaseDate || undefined
-      });
-      setIsModalOpen(false);
-      setEditingVersionId(null);
-      addToast('success', '迭代已更新', formName.trim());
-      return;
-    }
-    addVersion({
-      name: formName.trim(),
-      status: '规划中',
-      productLineId: formProductLineId || undefined,
-      productLineName: productLine?.name,
-      releaseDate: formReleaseDate,
-      reqCount: 0,
-      requirementsCount: 0,
-      bugCount: 0,
-      changelog: '版本常规升级与体验优化'
-    });
-    setIsModalOpen(false);
-    setFormName('');
-    setFormProductLineId('');
-    setEditingVersionId(null);
-    addToast('success', '迭代创建成功', formName.trim());
-  };
 
   const tabButton = (key: ViewMode, label: string) => (
     <button
@@ -401,7 +369,6 @@ export const VersionIterationView: React.FC = () => {
                 <th className="px-3 py-3 font-medium">起止时间</th>
                 <th className="px-3 py-3 font-medium">负责人</th>
                 <th className="px-3 py-3 font-medium">完成度</th>
-                <th className="px-3 py-3 font-medium">工时容量</th>
                 <th className="px-4 py-3 text-right font-medium">操作</th>
               </tr>
             </thead>
@@ -419,8 +386,8 @@ export const VersionIterationView: React.FC = () => {
                     <td className="px-3 py-3 text-[var(--text-body)]">{version.startDate || '--'} ~ {version.endDate || version.releaseDate || '--'}</td>
                     <td className="px-3 py-3">
                       <span className="inline-flex items-center gap-1.5 text-[var(--text-body)]">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] text-white" style={{ background: avatarColors[index % avatarColors.length] }}>朱</span>
-                        朱成浩
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] text-white" style={{ background: avatarColors[index % avatarColors.length] }}>{(version.ownerName || '未').slice(0, 1)}</span>
+                        {version.ownerName || '未分配'}
                       </span>
                     </td>
                     <td className="px-3 py-3">
@@ -428,13 +395,12 @@ export const VersionIterationView: React.FC = () => {
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                           <div className="h-full bg-[var(--primary)]" style={{ width: `${progress}%` }} />
                         </div>
-                        <span className="text-[11px] text-[var(--text-muted)]">{version.completedReqCount ?? 0}/{version.requirementsCount ?? version.reqCount ?? 0}</span>
+                        <span className="text-[11px] text-[var(--text-muted)]">{progress}%</span>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-[var(--text-muted)]">{(version.reqCount || version.requirementsCount || 0) * 12}.0/0.0h</td>
                     <td className="px-4 py-3 text-right">
                       <button type="button" onClick={() => openEditVersion(version)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--primary)]" title="编辑迭代"><Edit className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => deleteVersion(version)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)]" title="删除迭代"><Trash2 className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => confirmDeleteVersion(version)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)]" title="删除迭代"><Trash2 className="h-4 w-4" /></button>
                     </td>
                   </tr>
                 );
@@ -697,18 +663,17 @@ export const VersionIterationView: React.FC = () => {
           )}
         </WorkItemCreatePanel>
       )}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingVersionId ? '编辑迭代' : '新建迭代'}
-        footer={<><button type="button" onClick={() => setIsModalOpen(false)} className={secondaryButton}>取消</button><button type="button" onClick={(event) => save(event as unknown as React.FormEvent)} className={primaryButton}>{editingVersionId ? '保存修改' : '保存迭代'}</button></>}
-      >
-        <form onSubmit={save} className="space-y-4">
-          <label className="block text-xs font-medium text-[var(--text-body)]">所属产品线<select required value={formProductLineId} onChange={(event) => setFormProductLineId(event.target.value)} className="app-control mt-1 px-3"><option value="">请选择产品线</option>{productLines.map((line) => <option key={line.id} value={line.id}>{line.name}</option>)}</select></label>
-          <label className="block text-xs font-medium text-[var(--text-body)]">迭代名称<input required value={formName} onChange={(event) => setFormName(event.target.value)} className="app-control mt-1 px-3" /></label>
-          <label className="block text-xs font-medium text-[var(--text-body)]">计划发版日期<input type="date" value={formReleaseDate} onChange={(event) => setFormReleaseDate(event.target.value)} className="app-control mt-1 px-3" /></label>
-        </form>
-      </Modal>
+      {(() => {
+        const modalLine = productLines.find((line) => line.id === formProductLineId);
+        const modalVersion = editingVersionId ? versions.find((version) => version.id === editingVersionId) : null;
+        return <CreateVersionModal
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); setEditingVersionId(null); }}
+          productLine={modalLine}
+          editingVersion={modalVersion}
+          onSuccess={() => setIsModalOpen(false)}
+        />;
+      })()}
     </div>
   );
 };

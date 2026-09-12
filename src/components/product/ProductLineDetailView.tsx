@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Avatar, Input, Select, Button, Switch } from 'antd';
 import { UserAddOutlined, SettingOutlined } from '@ant-design/icons';
 import {
@@ -29,7 +29,7 @@ import {
   GitBranch
 } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { ProductLine, ProductItemInLine, VersionIteration } from '../../types';
+import { ProductLine, ProductLineActivity, ProductLineMember, VersionIteration } from '../../types';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { CreateVersionModal } from './CreateVersionModal';
 import { ManageMembersModal } from './ManageMembersModal';
@@ -38,6 +38,105 @@ interface ProductLineDetailViewProps {
   productLineId: string;
   onBack: () => void;
 }
+
+type ProductLineSettingsSection = 'basic' | 'members' | 'work-items' | 'notifications' | 'automation';
+
+const ProductLineSettingsPanel: React.FC<{
+  productLine: ProductLine;
+  onBack: () => void;
+  onOpenMembers: () => void;
+}> = ({ productLine, onBack, onOpenMembers }) => {
+  const { updateProductLine, addToast } = useApp();
+  const [section, setSection] = useState<ProductLineSettingsSection>('basic');
+  const [name, setName] = useState(productLine.name);
+  const [code, setCode] = useState(productLine.code);
+  const [description, setDescription] = useState(productLine.description);
+  const [visibility, setVisibility] = useState<ProductLine['visibility']>(productLine.visibility || '公开');
+
+  useEffect(() => {
+    setName(productLine.name);
+    setCode(productLine.code);
+    setDescription(productLine.description);
+    setVisibility(productLine.visibility || '公开');
+  }, [productLine]);
+
+  const saveBasicInfo = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !code.trim()) {
+      addToast('warning', '请填写产品线名称和编码');
+      return;
+    }
+    try {
+      await updateProductLine(productLine.id, {
+        name: name.trim(),
+        code: code.trim(),
+        description: description.trim() || '该产品线还没有任何简介内容。',
+        visibility
+      });
+    } catch (error) {
+      addToast('error', '产品线设置保存失败', error instanceof Error ? error.message : '请稍后重试');
+    }
+  };
+
+  const sections: Array<{ id: ProductLineSettingsSection; label: string }> = [
+    { id: 'basic', label: '基本信息' },
+    { id: 'members', label: '项目成员' },
+    { id: 'work-items', label: '工作项设置' },
+    { id: 'notifications', label: '通知' },
+    { id: 'automation', label: '自动化规则' }
+  ];
+
+  return (
+    <div className="space-y-5 animate-in fade-in duration-200">
+      <div className="flex items-center gap-3 border-b border-[var(--border-main)] pb-3">
+        <Button onClick={onBack} icon={<ArrowLeft className="w-3.5 h-3.5" />}>返回产品线详情</Button>
+        <div>
+          <h2 className="text-base font-bold text-[var(--text-primary)]">产品线设置</h2>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]"><span className="font-medium text-[var(--active-text)]">{productLine.name}</span> ({productLine.code})</p>
+        </div>
+      </div>
+
+      <div className="grid min-h-[520px] grid-cols-1 border border-[var(--border-main)] bg-[var(--bg-surface)] md:grid-cols-[190px_minmax(0,1fr)]">
+        <nav className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:border-b-0 md:border-r" aria-label="产品线设置菜单">
+          {sections.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setSection(item.id)}
+              className={`mb-1 flex h-9 w-full items-center rounded-md px-3 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${section === item.id ? 'bg-[var(--primary)]/12 text-[var(--active-text)]' : 'text-[var(--text-body)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <section className="min-w-0 p-6">
+          {section === 'basic' && (
+            <form onSubmit={saveBasicInfo} className="max-w-2xl space-y-5 text-xs">
+              <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">维护产品线的名称、编码、可见范围和简介。</p></div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="block font-medium text-[var(--text-body)]">产品线名称 *<Input className="mt-1.5" value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入产品线名称" /></label>
+                <label className="block font-medium text-[var(--text-body)]">产品线编码 *<Input className="mt-1.5" value={code} onChange={(event) => setCode(event.target.value)} placeholder="请输入产品线编码" /></label>
+              </div>
+              <label className="block font-medium text-[var(--text-body)]">可见范围<Select className="mt-1.5 w-full" value={visibility} onChange={setVisibility} options={['公开', '部门可见', '保密'].map((value) => ({ value, label: value }))} /></label>
+              <label className="block font-medium text-[var(--text-body)]">产品线简介<Input.TextArea className="mt-1.5" rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="请输入产品线简介" /></label>
+              <div className="flex justify-end"><Button type="primary" htmlType="submit">保存基本信息</Button></div>
+            </form>
+          )}
+          {section === 'members' && (
+            <div className="max-w-2xl space-y-5 text-xs"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">项目成员</h3><p className="mt-1 text-[var(--text-muted)]">配置产品线成员及其角色。</p></div><div className="rounded-md border border-[var(--border-main)] divide-y divide-[var(--border-main)]">{(productLine.members || []).length ? (productLine.members || []).map((member, index) => { const item = typeof member === 'string' ? { name: member, role: '参与人' } : member; return <div key={`${item.name}-${index}`} className="flex items-center gap-3 p-3"><Avatar size={28}>{item.name.slice(0, 1)}</Avatar><span className="font-medium text-[var(--text-primary)]">{item.name}</span><span className="ml-auto text-[var(--text-muted)]">{item.role}</span></div>; }) : <div className="p-4 text-[var(--text-muted)]">暂无成员</div>}</div><Button type="primary" onClick={onOpenMembers} icon={<UserAddOutlined style={{ color: 'var(--primary)' }} />}>管理项目成员</Button></div>
+          )}
+          {section === 'work-items' && <SettingsPlaceholder title="工作项设置" description="需求、缺陷和研发任务沿用当前产品线的工作流与字段规则。" />}
+          {section === 'notifications' && <SettingsPlaceholder title="通知" description="产品线成员、负责人和版本变更通知将在此统一配置。" />}
+          {section === 'automation' && <SettingsPlaceholder title="自动化规则" description="自动化规则将在配置完成后按产品线范围执行。" />}
+        </section>
+      </div>
+    </div>
+  );
+};
+
+const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({ title, description }) => (
+  <div className="max-w-2xl space-y-2 text-xs"><h3 className="text-sm font-bold text-[var(--text-primary)]">{title}</h3><p className="text-[var(--text-muted)]">{description}</p><div className="mt-5 border border-dashed border-[var(--border-main)] p-5 text-[var(--text-muted)]">暂无可配置项</div></div>
+);
 
 export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   productLineId,
@@ -50,7 +149,6 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     requirementPool,
     bugs,
     devTasks,
-    requirementTasks,
     currentUser,
     addToast,
     openPageTab
@@ -62,23 +160,16 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const [isCreateVersionOpen, setIsCreateVersionOpen] = useState(false);
   const [editingVersion, setEditingVersion] = useState<VersionIteration | null>(null);
   const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
-  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isEditLeadsOpen, setIsEditLeadsOpen] = useState(false);
 
   // Tabs state for sub-entities
-  const [activeTab, setActiveTab] = useState<'versions' | 'members' | 'activity'>('versions');
-
-  // Add Product Form state
-  const [prodName, setProdName] = useState('');
-  const [prodCode, setProdCode] = useState('');
-  const [prodVersion, setProdVersion] = useState('V1.0.0');
-  const [prodStatus, setProdStatus] = useState<'运营中' | '研发中' | '规划中' | '维护期'>('运营中');
-  const [prodDesc, setProdDesc] = useState('');
+  const [activeTab, setActiveTab] = useState<'versions' | 'members' | 'activity'>('activity');
 
   // Edit Leads Form state
-  const [leadReqOwner, setLeadReqOwner] = useState(productLine?.requirementOwner || productLine?.owner || '');
-  const [leadTechOwner, setLeadTechOwner] = useState(productLine?.techOwner || '王浩然');
-  const [leadTestOwner, setLeadTestOwner] = useState(productLine?.testOwner || '陈小敏');
+  const [leadReqOwner, setLeadReqOwner] = useState(productLine?.requirementOwner || '');
+  const [leadTechOwner, setLeadTechOwner] = useState(productLine?.techOwner || '');
+  const [leadTestOwner, setLeadTestOwner] = useState(productLine?.testOwner || '');
 
   if (!productLine) {
     return (
@@ -95,11 +186,6 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const lineVersions = versions.filter(
     (v) => v.productLineId === productLine.id || v.productLineName === productLine.name
   );
-  const latestPublishedVersion = lineVersions
-    .filter((version) => version.status === '已发布')
-    .sort((a, b) => String(b.releaseDate || b.endDate || '').localeCompare(String(a.releaseDate || a.endDate || '')))[0]?.code
-    || productLine.currentVersion
-    || 'V1.0.0';
   const latestCreatedVersion = [...lineVersions].sort((a, b) => String(b.createdAt || b.releaseDate || b.endDate || '').localeCompare(String(a.createdAt || a.releaseDate || a.endDate || '')))[0]?.code || 'V1.0.0';
   const linkedRequirementIds = new Set(
     lineVersions.flatMap((version) => version.linkedRequirementIds || [])
@@ -131,25 +217,35 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const pendingTasksCount = lineDevTasks.filter((t) => t.status !== '已合并上线').length;
   const totalTasksCount = lineDevTasks.length;
   const completedTasksCount = lineDevTasks.filter((t) => ['已完成', '已合并上线'].includes(t.status)).length;
-  const progressText = `${completedTasksCount}/${totalTasksCount}`;
+  const progressText = `${totalTasksCount ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0}%`;
 
-  const navigateWithLine = (menuId: string, tab?: string) => {
-    sessionStorage.setItem('shichuang.productLineFilter', productLine.id);
+  const navigateWithLine = (menuId: string, tab?: string, applyFilter = true) => {
+    if (applyFilter) sessionStorage.setItem('shichuang.productLineFilter', productLine.id);
+    else sessionStorage.removeItem('shichuang.productLineFilter');
     if (tab) sessionStorage.setItem('shichuang.productLineTargetTab', tab);
+    window.dispatchEvent(new Event('shichuang:product-line-context'));
     openPageTab(menuId);
   };
 
-  const currentProducts: ProductItemInLine[] = productLine.products || [];
-  const baseDetailMembers: Array<{ id: string; name: string; role: string }> = (productLine.members || []).map((member, index) => (
+  const normalizeRole = (role?: string) => {
+    if (!role) return '参与人';
+    if (role === '管理员' || role.includes('综合负责人')) return '管理员';
+    if (role === '产品' || role.includes('需求') || role.includes('产品')) return '产品';
+    if (role === '研发' || role.includes('技术') || role.includes('架构') || role.includes('研发')) return '研发';
+    if (role === '设计' || role.includes('设计') || role.includes('UI') || role.includes('UX')) return '设计';
+    if (role === '测试' || role.includes('测试') || role.includes('QA')) return '测试';
+    return '参与人';
+  };
+  const baseDetailMembers: ProductLineMember[] = (productLine.members || []).map((member, index) => (
     typeof member === 'string'
-      ? { id: `legacy-${index}-${member}`, name: member, role: '成员' }
-      : { id: member.id, name: member.name, role: member.role || '成员' }
+      ? { id: `legacy-${index}-${member}`, name: member, role: '参与人' }
+      : { ...member, role: normalizeRole(member.role) }
   ));
   const configuredLeadMembers = [
-    { name: productLine.owner || productLine.ownerName, role: '综合负责人' },
-    { name: productLine.requirementOwner, role: '需求负责人 (PO)' },
-    { name: productLine.techOwner, role: '技术负责人 (Tech Lead)' },
-    { name: productLine.testOwner, role: '测试负责人 (QA Lead)' }
+    { name: productLine.owner || productLine.ownerName, role: '管理员' },
+    { name: productLine.requirementOwner, role: '产品' },
+    { name: productLine.techOwner, role: '研发' },
+    { name: productLine.testOwner, role: '测试' }
   ].filter((lead): lead is { name: string; role: string } => Boolean(lead.name));
   const detailMemberNames = new Set(baseDetailMembers.map((member) => member.name));
   const detailMembers = [...baseDetailMembers, ...configuredLeadMembers
@@ -163,58 +259,37 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     productLine.techOwner,
     productLine.testOwner
   ].filter(Boolean)).size;
-
-  // Handle Add Product
-  const handleSaveProduct = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prodName.trim()) {
-      addToast('warning', '请填写产品名称');
-      return;
-    }
-
-    const newProd: ProductItemInLine = {
-      id: `prd-${Date.now()}`,
-      name: prodName.trim(),
-      code: prodCode.trim() || `${productLine.code}-SUB`,
-      version: prodVersion.trim() || 'V1.0.0',
-      status: prodStatus,
-      description: prodDesc.trim() || '高内聚业务服务与能力扩展模块'
-    };
-
-    const updated = [...currentProducts, newProd];
-    updateProductLine(productLine.id, { products: updated });
-    addToast('success', `产品【${newProd.name}】已添加至产品线`);
-
-    setProdName('');
-    setProdCode('');
-    setProdVersion('V1.0.0');
-    setProdDesc('');
-    setIsAddProductOpen(false);
-  };
-
-  const handleRemoveProduct = (prodId: string, name: string) => {
-    const updated = currentProducts.filter((p) => p.id !== prodId);
-    updateProductLine(productLine.id, { products: updated });
-    addToast('info', `已移除产品 ${name}`);
-  };
+  const memberRoleGroups = ['管理员', '产品', '研发', '设计', '测试', '参与人']
+    .map((label) => ({ label, members: detailMembers.filter((member) => normalizeRole(member.role) === label) }))
+    .filter((group) => group.members.length > 0);
+  const activityItems: ProductLineActivity[] = productLine.activities?.length
+    ? productLine.activities
+    : lineVersions.map((version) => ({ id: version.id, action: '创建了版本', detail: version.code || version.name, operatorName: currentUser.name, createdAt: version.createdAt || version.releaseDate || '' }));
 
   const resetLeadForm = () => {
-    setLeadReqOwner(productLine.requirementOwner || productLine.owner || '');
+    setLeadReqOwner(productLine.requirementOwner || '');
     setLeadTechOwner(productLine.techOwner || '');
     setLeadTestOwner(productLine.testOwner || '');
   };
 
   // Handle Save Leads
-  const handleSaveLeads = (e: React.FormEvent) => {
+  const handleSaveLeads = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProductLine(productLine.id, {
-      requirementOwner: leadReqOwner.trim(),
-      techOwner: leadTechOwner.trim(),
-      testOwner: leadTestOwner.trim()
-    });
-    setIsEditLeadsOpen(false);
-    addToast('success', '产研核心负责人配置已保存');
+    try {
+      await updateProductLine(productLine.id, {
+        requirementOwner: leadReqOwner.trim(),
+        techOwner: leadTechOwner.trim(),
+        testOwner: leadTestOwner.trim()
+      });
+      setIsEditLeadsOpen(false);
+    } catch (error) {
+      addToast('error', '负责人配置保存失败', error instanceof Error ? error.message : '请稍后重试');
+    }
   };
+
+  if (isSettingsOpen) {
+    return <ProductLineSettingsPanel productLine={productLine} onBack={() => setIsSettingsOpen(false)} onOpenMembers={() => { setIsSettingsOpen(false); setIsManageMembersOpen(true); }} />;
+  }
 
   return (
     <div className="product-line-detail space-y-6 animate-in fade-in duration-200">
@@ -231,14 +306,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
         {/* Header Action Buttons */}
         <div className="flex items-center gap-2">
-          <Button onClick={() => setIsAddProductOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品线设置</Button>
-          <Button
-            type="primary"
-            onClick={() => setIsCreateVersionOpen(true)}
-            icon={<Plus className="w-3.5 h-3.5" />}
-          >
-            创建版本
-          </Button>
+          <Button onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品线设置</Button>
         </div>
       </div>
 
@@ -321,7 +389,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }}
                 icon={<Edit3 className="w-3 h-3" />}
               >
-                调整负责人
+                负责人配置
               </Button>
             </div>
 
@@ -383,21 +451,21 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <div className="text-lg font-bold text-[var(--text-primary)] mt-1 font-mono">{latestCreatedVersion}</div>
             </div>
             <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
-              <button type="button" className="text-left" onClick={() => navigateWithLine('prod_versions', 'detail')}><span className="text-[var(--text-muted)] text-[11px] block">迭代版本数</span><div className="text-lg font-bold text-[var(--active-text)] mt-1 font-mono">{lineVersions.length || productLine.versionCount || 1} 个</div></button>
-            </div>
-            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
-              <button type="button" className="text-left" onClick={() => navigateWithLine('prod_req_tasks')}><span className="text-[var(--text-muted)] text-[11px] block">待办需求</span><div className="text-lg font-bold text-purple-400 mt-1 font-mono">{pendingReqsCount} 个</div></button>
-            </div>
-            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
-              <button type="button" className="text-left" onClick={() => navigateWithLine('prod_bugs')}><span className="text-[var(--text-muted)] text-[11px] block">待办缺陷</span><div className="text-lg font-bold text-red-400 mt-1 font-mono">{pendingBugsCount} 处</div></button>
-            </div>
-            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
-              <button type="button" className="text-left" onClick={() => navigateWithLine('prod_rd_tasks')}><span className="text-[var(--text-muted)] text-[11px] block">研发任务中</span><div className="text-lg font-bold text-emerald-400 mt-1 font-mono">{pendingTasksCount} 项</div></button>
-            </div>
-            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
               <span className="text-[var(--text-muted)] text-[11px] block">当前进展</span>
               <div className="text-lg font-bold text-amber-400 mt-1 font-mono">{progressText}</div>
             </div>
+            <button type="button" className="product-line-stat-card cursor-pointer p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]" onClick={() => navigateWithLine('prod_versions', 'detail', true)}>
+              <span className="text-[var(--text-muted)] text-[11px] block">迭代版本数</span><div className="text-lg font-bold text-[var(--active-text)] mt-1 font-mono">{lineVersions.length || productLine.versionCount || 0} 个</div>
+            </button>
+            <button type="button" className="product-line-stat-card cursor-pointer p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]" onClick={() => navigateWithLine('prod_req_tasks')}>
+              <span className="text-[var(--text-muted)] text-[11px] block">待办需求</span><div className="text-lg font-bold text-purple-400 mt-1 font-mono">{pendingReqsCount} 个</div>
+            </button>
+            <button type="button" className="product-line-stat-card cursor-pointer p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]" onClick={() => navigateWithLine('prod_bugs')}>
+              <span className="text-[var(--text-muted)] text-[11px] block">待办缺陷</span><div className="text-lg font-bold text-red-400 mt-1 font-mono">{pendingBugsCount} 处</div>
+            </button>
+            <button type="button" className="product-line-stat-card cursor-pointer p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]" onClick={() => navigateWithLine('prod_rd_tasks')}>
+              <span className="text-[var(--text-muted)] text-[11px] block">研发任务中</span><div className="text-lg font-bold text-emerald-400 mt-1 font-mono">{pendingTasksCount} 项</div>
+            </button>
           </div>
         </div>
       </div>
@@ -405,15 +473,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       {/* Tabs Navigation */}
       <div className="product-line-tabs border-b border-[var(--border-main)] flex items-center gap-2 overflow-x-auto text-xs">
         <button
-          onClick={() => setActiveTab('versions')}
+          onClick={() => setActiveTab('activity')}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
-            activeTab === 'versions'
+            activeTab === 'activity'
               ? 'border-[var(--primary)] text-[var(--primary)]'
               : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
-          <Layers className="w-3.5 h-3.5" />
-          <span>版本甘特图 ({lineVersions.length})</span>
+          <Activity className="w-3.5 h-3.5" />
+          <span>产品动态</span>
         </button>
 
         <button
@@ -429,15 +497,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('activity')}
+          onClick={() => setActiveTab('versions')}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
-            activeTab === 'activity'
+            activeTab === 'versions'
               ? 'border-[var(--primary)] text-[var(--primary)]'
               : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
-          <Activity className="w-3.5 h-3.5" />
-          <span>产品动态</span>
+          <Layers className="w-3.5 h-3.5" />
+          <span>版本甘特图 ({lineVersions.length})</span>
         </button>
       </div>
 
@@ -451,64 +519,29 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 记录该产品线已发布及规划中的各版本周期、关键更新与关联需求
               </p>
             </div>
-            <Button
-              type="primary"
-              onClick={() => { setEditingVersion(null); setIsCreateVersionOpen(true); }}
-              icon={<Plus className="w-3.5 h-3.5" />}
-            >
-              创建新版本
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button type="text" style={{ color: 'var(--primary)' }} className="hover:text-[var(--active-text)]" aria-label="创建新版本" title="创建新版本" onClick={() => { setEditingVersion(null); setIsCreateVersionOpen(true); }} icon={<Plus className="w-4 h-4 text-[var(--primary)]" />} />
+              <Button type="text" className="text-[var(--primary)] hover:text-[var(--active-text)]" aria-label="管理版本" title="管理版本" onClick={() => navigateWithLine('prod_versions', 'detail', true)} icon={<GitBranch className="w-4 h-4" />} />
+            </div>
           </div>
 
-          <div className="space-y-3">
-            {lineVersions.length === 0 ? (
-              <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
-                暂无版本迭代记录，点击右上角“创建新版本”规划版本交付
-              </div>
-            ) : (
-              lineVersions.map((v) => (
-                <div
-                  key={v.id}
-                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4.5 shadow-xs space-y-3 hover:border-[var(--border-subtle)] transition-colors"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <span className="px-2.5 py-1 rounded-lg bg-[var(--primary)]/15 text-[var(--active-text)] font-mono font-bold text-xs border border-[var(--primary)]/30">
-                        {v.code || 'V1.0'}
-                      </span>
-                      <h4 className="font-bold text-sm text-[var(--text-primary)]">{v.name}</h4>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-[var(--text-muted)]">
-                        起止周期: {v.startDate || '2026-09-01'} ~ {v.endDate || v.releaseDate || '2026-09-30'}
-                      </span>
-                      <StatusTag status={v.status === '规划中' ? '待开始' : v.status === '已发布' ? '已结束' : v.status} />
-                      <button type="button" onClick={() => { setEditingVersion(v); setIsCreateVersionOpen(true); }} className="px-2 py-1 rounded bg-[var(--bg-elevated)] text-[var(--active-text)] hover:bg-[var(--bg-elevated)]">编辑</button>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-[var(--text-body)] bg-[var(--bg-surface-soft)] p-3 rounded-lg leading-relaxed">
-                    {v.changelog || v.content || '版本常规升级与性能优化，攻关重大业务功能。'}
-                  </p>
-
-                  <div className="flex items-center justify-between text-xs text-[var(--text-muted)] pt-1">
-                    <div className="flex items-center gap-4">
-                      <span>包含需求：<strong className="text-[var(--active-text)] font-mono font-semibold">{v.requirementsCount || v.reqCount || 0}</strong> 项</span>
-                      <span>关联缺陷：<strong className="text-red-400 font-mono font-semibold">{v.bugCount || 0}</strong> 处</span>
-                      {v.linkedRequirementIds && v.linkedRequirementIds.length > 0 && (
-                        <span className="text-[11px] text-[var(--primary)]">
-                          已关联需求ID: {v.linkedRequirementIds.join(', ')}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[11px]">
-                      交付达成率：<strong className="text-emerald-400 font-mono">100%</strong>
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
+          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
+            <div className="mb-3 grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] gap-3 text-[11px] text-[var(--text-muted)]"><span>版本名称 / 版本号</span><span>时间区间</span></div>
+            <div className="space-y-3">
+              {lineVersions.map((version) => {
+                const start = new Date(version.startDate || version.releaseDate || Date.now()).getTime();
+                const end = new Date(version.endDate || version.releaseDate || start).getTime();
+                const timelineStart = Math.min(...lineVersions.map((item) => new Date(item.startDate || item.releaseDate || Date.now()).getTime()));
+                const timelineEnd = Math.max(...lineVersions.map((item) => new Date(item.endDate || item.releaseDate || Date.now()).getTime()), timelineStart + 86400000);
+                const left = ((start - timelineStart) / (timelineEnd - timelineStart)) * 100;
+                const width = Math.max(5, ((Math.max(end, start + 86400000) - start) / (timelineEnd - timelineStart)) * 100);
+                const interval = `${version.startDate || '--'} ~ ${version.endDate || version.releaseDate || '--'}`;
+                return <div key={`gantt-${version.id}`} className="grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] items-center gap-3"><div className="min-w-0"><div className="truncate text-xs font-semibold text-[var(--text-primary)]">{version.name}</div><div className="mt-0.5 truncate font-mono text-[11px] text-[var(--active-text)]">{version.code || '未设置版本号'}</div></div><div className="relative h-8 rounded bg-[var(--bg-surface-soft)]"><span className="absolute top-1.5 h-5 min-w-max rounded bg-[var(--primary)]/80 px-2 pt-0.5 text-[10px] text-white" style={{ left: `${left}%`, width: `${width}%` }} title={interval}>{interval}</span></div></div>;
+              })}
+            </div>
           </div>
+
+          {lineVersions.length === 0 && <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">暂无版本迭代记录，点击右上角“创建新版本”规划版本交付</div>}
         </div>
       )}
 
@@ -523,21 +556,19 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <Button type="text" aria-label="添加成员" title="添加成员" icon={<UserAddOutlined />} onClick={() => setIsManageMembersOpen(true)} />
+              <Button type="text" style={{ color: 'var(--primary)' }} className="hover:text-[var(--active-text)]" aria-label="添加成员" title="添加成员" icon={<UserAddOutlined style={{ color: 'var(--primary)' }} />} onClick={() => setIsManageMembersOpen(true)} />
               <Button type="text" aria-label="成员设置" title="成员设置" icon={<SettingOutlined />} onClick={() => setIsManageMembersOpen(true)} />
             </div>
           </div>
 
-          {Object.entries(detailMembers.reduce<Record<string, Array<{ id: string; name: string; role: string }>>>((groups, member) => {
-            (groups[member.role] ||= []).push(member);
-            return groups;
-          }, {})).map(([role, group]) => (
-            <section key={role}>
-              <h4 className="mb-3 text-lg font-medium text-[var(--text-body)]">{role}</h4>
+          {memberRoleGroups.map((group) => (
+            <section key={group.label}>
+              <h4 className="mb-3 text-sm font-medium text-[var(--text-body)]">{group.label}</h4>
               <div className="flex flex-wrap gap-x-8 gap-y-4">
-                {group.map((member) => (
+                {group.members.map((member) => (
                   <div key={member.id} className="w-28 text-center">
-                    <Avatar name={member.name} />
+                    <Avatar size={32}>{member.name.slice(0, 1)}</Avatar>
+                    <div className="mt-1 text-[10px] text-[var(--text-muted)]">{normalizeRole(member.role)}</div>
                     <div className="mt-2 truncate text-xs text-[var(--text-body)]" title={member.name}>{member.name}</div>
                   </div>
                 ))}
@@ -547,255 +578,29 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </div>
       )}
 
-      {/* Tab 4: 待办需求池 */}
-      {false && activeTab === 'requirements' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-[var(--text-primary)]">需求表中本产品线关联需求</h3>
-            <span className="text-xs text-[var(--text-muted)]">共 {lineReqs.length} 项需求</span>
-          </div>
-
-          <div className="space-y-2">
-            {lineReqs.length === 0 ? (
-              <div className="text-center py-10 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
-                暂无关联需求，可在需求池中提报并归属至该产品线
-              </div>
-            ) : (
-              lineReqs.map((r) => (
-                <div
-                  key={r.id}
-                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-[var(--active-text)]">{r.code || r.id}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--primary)]/15 text-[var(--active-text)] text-[10px] font-mono">{lineVersions.find((version) => version.linkedRequirementIds?.includes(r.id))?.code || '未分配版本'}</span>
-                      <span className="font-bold text-[var(--text-primary)]">{r.title}</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-red-950/60 text-red-400 border border-red-800/50">
-                        {r.priority}
-                      </span>
-                    </div>
-                    <p className="text-[var(--text-body)] leading-relaxed">{r.description}</p>
-                    <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-3">
-                      {r.customerName && <span>客户: {r.customerName}</span>}
-                      {r.submitter && <span>提报人: {r.submitter}</span>}
-                      <span>时间: {r.createdAt}</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] bg-[var(--bg-elevated)] text-[var(--text-body)] shrink-0">
-                    {r.status}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 5: 缺陷管理 */}
-      {false && activeTab === 'bugs' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-[var(--text-primary)]">本产品线缺陷清单</h3>
-            <span className="text-xs text-[var(--text-muted)]">共 {lineBugs.length} 处缺陷</span>
-          </div>
-
-          <div className="space-y-2">
-            {lineBugs.length === 0 ? (
-              <div className="text-center py-10 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
-                目前该产品线架构健康，暂无未关闭缺陷
-              </div>
-            ) : (
-              lineBugs.map((b) => (
-                <div
-                  key={b.id}
-                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-red-400">{b.code || b.id}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--primary)]/15 text-[var(--active-text)] text-[10px] font-mono">{b.versionName || '未分配版本'}</span>
-                      <span className="font-bold text-[var(--text-primary)]">{b.title}</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-red-950/60 text-red-400">
-                        {b.severity}
-                      </span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-[var(--bg-elevated)] text-[var(--text-body)]">
-                        {b.type || '功能缺陷'}
-                      </span>
-                    </div>
-                    <p className="text-[var(--text-body)] leading-relaxed">{b.description}</p>
-                    <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-3">
-                      <span>指派人: {b.ownerName || b.assignee || '未指派'}</span>
-                      <span>验证人: {b.verifierName || 'QA'}</span>
-                      <span>提交于: {b.createdAt}</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] bg-amber-950/60 text-amber-400 shrink-0">
-                    {b.status}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 6: 研发任务 */}
-      {false && activeTab === 'tasks' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-[var(--text-primary)]">本产品线活跃研发特性任务</h3>
-            <span className="text-xs text-[var(--text-muted)]">共 {lineDevTasks.length} 项特性开发</span>
-          </div>
-
-          <div className="space-y-2">
-            {lineDevTasks.length === 0 ? (
-              <div className="text-center py-10 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">
-                暂无研发中特性，可将版本关联需求转入任务排期
-              </div>
-            ) : (
-              lineDevTasks.map((t) => (
-                <div
-                  key={t.id}
-                  className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs"
-                >
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--primary)]/15 text-[var(--active-text)] text-[10px] font-mono">{t.versionName || '未分配版本'}</span>
-                      <span className="font-bold text-[var(--text-primary)]">{t.title}</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-purple-950/60 text-purple-400">
-                        {t.priority}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-3">
-                      <span>开发人: <strong className="text-[var(--text-body)]">{t.developer}</strong></span>
-                      {t.repo && <span>仓库: <span className="font-mono text-[var(--active-text)]">{t.repo}</span></span>}
-                      {t.branch && <span>分支: <span className="font-mono">{t.branch}</span></span>}
-                      <span>预估/已耗工时: {t.estimatedHours}h / {t.spentHours}h</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] bg-blue-950/60 text-blue-400 shrink-0 font-medium">
-                    {t.status}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
       {activeTab === 'activity' && (
         <div className="space-y-4">
           <h3 className="font-bold text-sm text-[var(--text-primary)]">产品动态</h3>
           <div className="space-y-3">
-            {[...lineVersions].sort((a, b) => String(b.createdAt || b.releaseDate || '').localeCompare(String(a.createdAt || a.releaseDate || ''))).map((version) => (
-              <div key={version.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 text-sm">
-                <Avatar size={32}>{(currentUser.name || '系').slice(0, 1)}</Avatar>
-                <span className="text-[var(--text-body)]">{currentUser.name} 创建了迭代 <span className="text-[var(--active-text)]">{version.code || version.name}</span></span>
-                <span className="ml-auto text-xs text-[var(--text-muted)]">{version.createdAt || version.releaseDate || ''}</span>
+            {activityItems.map((activity) => (
+              <div key={activity.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 text-sm">
+                <Avatar size={32}>{(activity.operatorName || currentUser.name || '系').slice(0, 1)}</Avatar>
+                <span className="text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span>
+                <span className="ml-auto text-xs text-[var(--text-muted)]">{activity.createdAt}</span>
               </div>
             ))}
-            {lineVersions.length === 0 && <div className="py-12 text-center text-sm text-[var(--text-muted)]">暂无产品动态</div>}
+            {activityItems.length === 0 && <div className="py-12 text-center text-sm text-[var(--text-muted)]">暂无产品动态</div>}
           </div>
         </div>
       )}
 
-      {/* Modal 1: Add Product Modal */}
-      <Modal
-        isOpen={isAddProductOpen}
-        onClose={() => setIsAddProductOpen(false)}
-        title={`产品线设置 - ${productLine.name}`}
-        headerIcon={<Package className="w-5 h-5" />}
-        subtitle={`产品线：${productLine.name} (${productLine.code})`}
-        footer={
-          <>
-            <Button
-              onClick={() => setIsAddProductOpen(false)}
-            >
-              取消
-            </Button>
-            <Button
-              type="primary"
-              htmlType="submit"
-              form="add-product-form"
-            >
-              保存产品
-            </Button>
-          </>
-        }
-      >
-        <form id="add-product-form" onSubmit={handleSaveProduct} className="space-y-3.5 text-xs">
-          <div>
-            <label className="block font-medium text-[var(--text-body)] mb-1">
-              产品规范名称 *
-            </label>
-            <Input
-              type="text"
-              required
-              value={prodName}
-              onChange={(e) => setProdName(e.target.value)}
-              placeholder="例如：桌面多维协同工作台 (Desktop Suite)"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-medium text-[var(--text-body)] mb-1">
-                产品编码 (Code)
-              </label>
-              <Input
-                type="text"
-                value={prodCode}
-                onChange={(e) => setProdCode(e.target.value)}
-                placeholder="例如：PRD-OS-DESK"
-              />
-            </div>
-            <div>
-              <label className="block font-medium text-[var(--text-body)] mb-1">
-                当前版本号
-              </label>
-              <Input
-                type="text"
-                value={prodVersion}
-                onChange={(e) => setProdVersion(e.target.value)}
-                placeholder="例如：V3.5.0"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-medium text-[var(--text-body)] mb-1">
-              运营状态
-            </label>
-            <Select
-              className="w-full"
-              value={prodStatus}
-              onChange={(value) => setProdStatus(value as any)}
-              options={['运营中', '研发中', '规划中', '维护期'].map((value) => ({ value, label: value }))}
-            />
-          </div>
-
-          <div>
-            <label className="block font-medium text-[var(--text-body)] mb-1">
-              产品定位与能力描述
-            </label>
-            <Input.TextArea
-              rows={3}
-              value={prodDesc}
-              onChange={(e) => setProdDesc(e.target.value)}
-              placeholder="明确该产品的关键特性、交付形态与支撑的业务场景..."
-            />
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal 2: Edit Leads Modal */}
+      {/* Modal: Edit Leads Modal */}
       <Modal
         isOpen={isEditLeadsOpen}
         onClose={() => { resetLeadForm(); setIsEditLeadsOpen(false); }}
         title="负责人配置"
         headerIcon={<UserCheck className="w-5 h-5" />}
-        subtitle={`产品线：${productLine.name} (${productLine.code})`}
+        subtitle={<span>产品线：<span className="font-medium text-[var(--active-text)]">{productLine.name}</span> ({productLine.code})</span>}
         footer={
           <>
             <Button

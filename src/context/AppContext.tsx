@@ -20,6 +20,7 @@ import {
   BiddingReview,
   Contract,
   ProductLine,
+  ProductLineMember,
   RequirementTask,
   RequirementEvent,
   VersionIteration,
@@ -320,9 +321,11 @@ export interface AppContextType {
   addBiddingReview: (rev: Partial<BiddingReview>) => void;
   addBidReview: (rev: Partial<BiddingReview>) => void;
   addProductLine: (line: Partial<ProductLine>) => void;
-  updateProductLine: (id: string, updates: Partial<ProductLine>) => void;
-  addVersion: (v: Partial<VersionIteration>) => void;
-  updateVersion: (id: string, updates: Partial<VersionIteration>) => void;
+  updateProductLine: (id: string, updates: Partial<ProductLine>) => Promise<void>;
+  addProductLineMembers: (id: string, members: ProductLineMember[]) => Promise<void>;
+  addVersion: (v: Partial<VersionIteration>) => Promise<boolean>;
+  updateVersion: (id: string, updates: Partial<VersionIteration>) => Promise<boolean>;
+  deleteVersion: (id: string) => void;
   addRequirementTask: (task: Partial<RequirementTask>) => Promise<boolean>;
   updateRequirementTask: (id: string, updates: Partial<RequirementTask>) => void;
   addDesignTask: (task: Partial<RequirementTask>) => Promise<boolean>;
@@ -554,7 +557,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   },[requirementQuery.data]);
   useEffect(()=>{ if (Array.isArray(designQuery.data)) setDesignTasks(designQuery.data.map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: '', versionName: '' }))); },[designQuery.data]);
-  useEffect(()=>{ if (productLineQuery.data?.length) setProductLines(productLineQuery.data); },[productLineQuery.data]);
+  useEffect(() => {
+    if (!productLineQuery.data?.length) return;
+    setProductLines(productLineQuery.data);
+    const remoteVersions = productLineQuery.data.flatMap((line) => (line.versions || []).map((version) => ({ ...version, productLineId: line.id, productLineName: line.name })));
+    if (remoteVersions.length) setVersions(remoteVersions);
+  }, [productLineQuery.data]);
   useEffect(()=>{ if (bugQuery.data?.length) setBugs(bugQuery.data as DefectBug[]); },[bugQuery.data]);
   useEffect(()=>{ if (devTaskQuery.data?.length) setDevTasks(devTaskQuery.data as DevTask[]); },[devTaskQuery.data]);
   useEffect(() => {
@@ -1368,7 +1376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `pl-${Date.now()}`,
       name: line.name || '新建产品线',
       code: line.code || 'PL-NEW',
-      description: line.description || '企业级关键业务支撑产品线',
+      description: line.description || '该产品线还没有任何简介内容。',
       ownerName: line.owner || line.ownerName || currentUser.name,
       owner: line.owner || line.ownerName || currentUser.name,
       website: line.website,
@@ -1401,55 +1409,108 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('success', '产品线创建成功', newLine.name);
   };
 
-  const updateProductLine = (id: string, updates: Partial<ProductLine>) => {
+  const updateProductLine = async (id: string, updates: Partial<ProductLine>) => {
     if (requirementBackendEnabled) {
-      void productRepository.updateProductLine(id, updates).then(() => productLineQuery.refetch()).then(() => addToast('success', '产品线配置已保存')).catch((error) => addToast('error', '产品线更新失败', error instanceof Error ? error.message : '请稍后重试'));
+      await productRepository.updateProductLine(id, updates);
+      await productLineQuery.refetch();
+      addToast('success', '产品线配置已保存');
       return;
     }
     setProductLines((prev) => prev.map((line) => line.id === id ? { ...line, ...updates } : line));
     addToast('success', '产品线配置已保存');
   };
 
-  const addVersion = (v: Partial<VersionIteration>) => {
+  const addProductLineMembers = async (id: string, members: ProductLineMember[]) => {
+    if (requirementBackendEnabled) {
+      await Promise.all(members.map(({ name, role }) => productRepository.addProductLineMember(id, { name, role })));
+      await productLineQuery.refetch();
+      return;
+    }
+    setProductLines((prev) => prev.map((line) => line.id === id
+      ? {
+          ...line,
+          members: [...(line.members || []), ...members],
+          activities: [
+            ...(line.activities || []),
+            ...members.map((member) => ({
+              id: `activity-${Date.now()}-${member.id}`,
+              action: '添加成员角色',
+              detail: `${member.name} · ${member.role}`,
+              operatorName: currentUser.name,
+              createdAt: new Date().toISOString()
+            }))
+          ]
+        }
+      : line));
+  };
+
+  const addVersion = async (v: Partial<VersionIteration>): Promise<boolean> => {
     const newVer: VersionIteration = {
       id: `ver-${Date.now()}`,
       code: v.code || `V${versions.length + 1}.0.0`,
       name: v.name || '新建迭代版本',
       productLineId: v.productLineId || (productLines[0]?.id ?? 'pl-1'),
       productLineName: v.productLineName || (productLines[0]?.name ?? '师创智联协同OS'),
-      startDate: v.startDate || '2026-08-31',
-      endDate: v.endDate || '2026-09-30',
-      releaseDate: v.releaseDate || '2026-09-30',
+      ownerName: v.ownerName || productLines.find((line) => line.id === v.productLineId)?.ownerName || productLines.find((line) => line.id === v.productLineId)?.owner || '',
+      startDate: v.startDate || '',
+      endDate: v.endDate || '',
+      releaseDate: v.releaseDate || '',
       status: v.status || '规划中',
       requirementsCount: v.reqCount || v.requirementsCount || 0,
       reqCount: v.reqCount || v.requirementsCount || 0,
       bugCount: v.bugCount || 0,
       completedReqCount: 0,
-      changelog: v.changelog || '版本常规升级与优化',
+      changelog: v.changelog || '',
       content: v.content || v.changelog || '',
       linkedRequirementIds: v.linkedRequirementIds || [],
       isReviewed: false
     };
     if (requirementBackendEnabled && newVer.productLineId) {
-      void productRepository.createVersion(newVer.productLineId, newVer).then(() => productLineQuery.refetch()).then(() => addToast('success', '版本规划创建成功', `${newVer.name} (${newVer.code})`)).catch((error) => addToast('error', '版本保存失败', error instanceof Error ? error.message : '请稍后重试'));
-      return;
+      try {
+        await productRepository.createVersion(newVer.productLineId, newVer);
+        await productLineQuery.refetch();
+        addToast('success', '版本规划创建成功', `${newVer.name} (${newVer.code})`);
+        return true;
+      } catch (error) {
+        addToast('error', '版本保存失败', error instanceof Error ? error.message : '请稍后重试');
+        return false;
+      }
     }
     setVersions((prev) => [newVer, ...prev]);
     addToast('success', '版本规划创建成功', `${newVer.name} (${newVer.code})`);
+    return true;
   };
 
-  const updateVersion = (id: string, updates: Partial<VersionIteration>) => {
+  const updateVersion = async (id: string, updates: Partial<VersionIteration>): Promise<boolean> => {
     if (requirementBackendEnabled) {
       const current = versions.find((version) => version.id === id);
       if (current?.productLineId) {
-        void productRepository.updateVersion(current.productLineId, id, updates).then(() => productLineQuery.refetch()).then(() => addToast('info', '版本迭代状态已更新')).catch((error) => addToast('error', '版本更新失败', error instanceof Error ? error.message : '请稍后重试'));
-        return;
+        try {
+          await productRepository.updateVersion(current.productLineId, id, updates);
+          await productLineQuery.refetch();
+          addToast('info', '版本迭代状态已更新');
+          return true;
+        } catch (error) {
+          addToast('error', '版本更新失败', error instanceof Error ? error.message : '请稍后重试');
+          return false;
+        }
       }
     }
     setVersions((prev) =>
       prev.map((v) => (v.id === id ? { ...v, ...updates } : v))
     );
     addToast('info', '版本迭代状态已更新');
+    return true;
+  };
+
+  const deleteVersion = (id: string) => {
+    const current = versions.find((version) => version.id === id);
+    if (requirementBackendEnabled && current?.productLineId) {
+      void productRepository.deleteVersion(current.productLineId, id).then(() => productLineQuery.refetch()).then(() => addToast('success', '迭代已删除', current.name)).catch((error) => addToast('error', '迭代删除失败', error instanceof Error ? error.message : '请稍后重试'));
+      return;
+    }
+    setVersions((prev) => prev.filter((version) => version.id !== id));
+    addToast('success', '迭代已删除', current?.name);
   };
 
   const updateBug = (id: string, updates: Partial<DefectBug>) => {
@@ -1775,8 +1836,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addBidReview: addBiddingReview,
         addProductLine,
         updateProductLine,
+        addProductLineMembers,
         addVersion,
         updateVersion,
+        deleteVersion,
         addRequirementTask,
         updateRequirementTask,
         addDesignTask,

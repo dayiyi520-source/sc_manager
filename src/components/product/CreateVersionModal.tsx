@@ -1,391 +1,88 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Input, Select, DatePicker, Checkbox, Button } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Button, DatePicker, Input, Select } from 'antd';
 import dayjs from 'dayjs';
-import {
-  Calendar,
-  Layers,
-  FileText,
-  Search,
-  CheckCircle2,
-  Check,
-  AlertCircle,
-  Clock,
-  Sparkles,
-  ChevronRight,
-  Filter
-} from '../common/octicons-compat';
+import { Calendar, Check, Clock, FileText, Layers } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { ProductLine, VersionIteration, RequirementPoolItem } from '../../types';
+import { ProductLine, VersionIteration } from '../../types';
 
 interface CreateVersionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  productLine: ProductLine;
+  productLine?: ProductLine;
   editingVersion?: VersionIteration | null;
   onSuccess?: (version: VersionIteration) => void;
 }
 
-export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({
-  isOpen,
-  onClose,
-  productLine,
-  editingVersion = null,
-  onSuccess
-}) => {
-  const { requirementPool, addVersion, updateVersion, addToast } = useApp();
-
-  const [versionName, setVersionName] = useState(editingVersion?.name || `${productLine.name} 2026年Q4升级迭代版`);
-  const [versionCode, setVersionCode] = useState(() => {
-    const current = editingVersion?.code || productLine.currentVersion || 'V1.0.0';
-    const match = current.match(/V?(\d+)\.(\d+)\.?(\d+)?/i);
-    if (match) {
-      const major = parseInt(match[1] || '1', 10);
-      const minor = parseInt(match[2] || '0', 10) + 1;
-      return `V${major}.${minor}.0`;
-    }
-    return 'V2.0.0';
-  });
-  const [startDate, setStartDate] = useState(editingVersion?.startDate || (() => new Date().toISOString().split('T')[0]));
-  const [endDate, setEndDate] = useState(() => {
-    if (editingVersion?.endDate) return editingVersion.endDate;
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    return d.toISOString().split('T')[0];
-  });
+export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, onClose, productLine, editingVersion = null, onSuccess }) => {
+  const { addVersion, updateVersion, addToast, productLines } = useApp();
+  const [selectedProductLineId, setSelectedProductLineId] = useState(productLine?.id || '');
+  const [versionName, setVersionName] = useState(editingVersion?.name || '');
+  const [versionCode, setVersionCode] = useState(editingVersion?.code || '');
+  const [versionOwner, setVersionOwner] = useState(editingVersion?.ownerName || productLine?.ownerName || productLine?.owner || '');
+  const [startDate, setStartDate] = useState(editingVersion?.startDate || '');
+  const [endDate, setEndDate] = useState(editingVersion?.endDate || '');
   const [content, setContent] = useState(editingVersion?.content || editingVersion?.changelog || '');
-  const [selectedReqIds, setSelectedReqIds] = useState<string[]>(editingVersion?.linkedRequirementIds || []);
-  const [reqSearch, setReqSearch] = useState('');
-  const [onlyCurrentLineReqs, setOnlyCurrentLineReqs] = useState(false);
-  const [versionStatus, setVersionStatus] = useState(editingVersion?.status || '待开始');
+  const [versionStatus] = useState(editingVersion?.status || '待开始');
 
   useEffect(() => {
     if (!isOpen) return;
-    setVersionName(editingVersion?.name || `${productLine.name} 2026年Q4升级迭代版`);
-    setVersionCode(editingVersion?.code || 'V2.0.0');
-    setStartDate(editingVersion?.startDate || new Date().toISOString().split('T')[0]);
+    setVersionName(editingVersion?.name || '');
+    setVersionCode(editingVersion?.code || '');
+    setSelectedProductLineId(productLine?.id || '');
+    setVersionOwner(editingVersion?.ownerName || productLine?.ownerName || productLine?.owner || '');
+    setStartDate(editingVersion?.startDate || '');
     setEndDate(editingVersion?.endDate || '');
     setContent(editingVersion?.content || editingVersion?.changelog || '');
-    setSelectedReqIds(editingVersion?.linkedRequirementIds || []);
-    setVersionStatus(editingVersion?.status || '待开始');
-  }, [editingVersion, isOpen, productLine.name]);
-
-  // Filter requirements from requirementPool (需求表)
-  const availableReqs = useMemo(() => {
-    return requirementPool.filter((item) => {
-      if (onlyCurrentLineReqs && item.productLineName && item.productLineName !== productLine.name) {
-        return false;
-      }
-      if (!reqSearch.trim()) return true;
-      const q = reqSearch.toLowerCase();
-      return (
-        item.title.toLowerCase().includes(q) ||
-        (item.code && item.code.toLowerCase().includes(q)) ||
-        (item.customerName && item.customerName.toLowerCase().includes(q)) ||
-        (item.submitter && item.submitter.toLowerCase().includes(q))
-      );
-    });
-  }, [requirementPool, onlyCurrentLineReqs, productLine.name, reqSearch]);
+  }, [editingVersion, isOpen, productLine?.id, productLine?.name, productLine?.owner, productLine?.ownerName]);
 
   if (!isOpen) return null;
 
-  const toggleReq = (id: string) => {
-    setSelectedReqIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  const selectedReqs = requirementPool.filter((item) => selectedReqIds.includes(item.id));
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!versionName.trim() || !versionCode.trim()) {
-      addToast('warning', '请填写版本名称与版本号');
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const selectedProductLine = productLines.find((line) => line.id === selectedProductLineId);
+    if (!selectedProductLine) {
+      addToast('warning', '请选择所属产品线');
       return;
     }
-    if (!startDate || !endDate) {
-      addToast('warning', '请选择预计开始与结束时间');
+    if (!versionName.trim() || !versionCode.trim() || !versionOwner.trim()) {
+      addToast('warning', '请填写版本名称、版本号和版本负责人');
       return;
     }
-
-    const newVersion: Partial<VersionIteration> = {
-      name: versionName.trim(),
-      code: versionCode.trim(),
-      productLineId: productLine.id,
-      productLineName: productLine.name,
-      startDate,
-      endDate,
-      releaseDate: endDate,
-      status: versionStatus,
-      content: content.trim() || `${productLine.name} 规划版本演进，涵盖核心需求落地与性能优化。`,
-      changelog: content.trim() || `${productLine.name} 规划版本演进，涵盖核心需求落地与性能优化。`,
-      requirementsCount: selectedReqIds.length,
-      reqCount: selectedReqIds.length,
-      linkedRequirementIds: selectedReqIds
+    const nextVersion: Partial<VersionIteration> = {
+      name: versionName.trim(), code: versionCode.trim(), ownerName: versionOwner.trim(),
+      productLineId: selectedProductLine.id, productLineName: selectedProductLine.name,
+      startDate: startDate || undefined, endDate: endDate || undefined, releaseDate: endDate || undefined,
+      status: versionStatus, content: content.trim(), changelog: content.trim(),
+      requirementsCount: 0, reqCount: 0, linkedRequirementIds: []
     };
-
-    if (editingVersion) updateVersion(editingVersion.id, newVersion);
-    else addVersion(newVersion);
-    if (onSuccess) {
-      onSuccess(newVersion as VersionIteration);
-    }
+    const saved = editingVersion
+      ? await updateVersion(editingVersion.id, nextVersion)
+      : await addVersion(nextVersion);
+    if (!saved) return;
+    onSuccess?.(nextVersion as VersionIteration);
     onClose();
   };
 
+  const activeProductLine = productLines.find((line) => line.id === selectedProductLineId);
+  const people = Array.from(new Set([
+    activeProductLine?.ownerName, activeProductLine?.owner, activeProductLine?.requirementOwner, activeProductLine?.techOwner, activeProductLine?.testOwner,
+    ...(activeProductLine?.members || []).map((member) => typeof member === 'string' ? member : member.name)
+  ].filter(Boolean) as string[]));
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
       <div className="bg-[var(--bg-surface)] text-[var(--text-body)] border border-[var(--border-main)] rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-        {/* Header */}
         <div className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-[var(--text-primary)]">创建迭代版本</h3>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                所属产品线：<span className="text-[var(--active-text)] font-medium">{productLine.name}</span> ({productLine.code})
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-[var(--text-body)] mb-1.5">版本状态</label>
-            <Select value={versionStatus} onChange={setVersionStatus} className="w-full" options={['待开始', '迭代中', '已超时', '已结束'].map((value) => ({ value, label: value }))} />
-          </div>
-          <Button
-            type="text"
-            onClick={onClose}
-            aria-label="关闭创建版本"
-          >
-            ✕
-          </Button>
+          <div className="flex items-center gap-2.5"><div className="p-2 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><Layers className="w-5 h-5" /></div><div><h3 className="text-base font-bold text-[var(--text-primary)]">创建迭代版本</h3><div className="mt-0.5 flex items-center gap-1 text-xs text-[var(--text-muted)]"><span>所属产品线：</span><Select size="small" showSearch value={selectedProductLineId || undefined} onChange={(value) => { setSelectedProductLineId(value); const line = productLines.find((item) => item.id === value); if (line && !editingVersion) setVersionOwner(line.ownerName || line.owner || ''); }} options={productLines.map((line) => ({ value: line.id, label: line.name }))} optionFilterProp="label" placeholder="暂未选择" className="min-w-32" /></div></div></div>
+          <Button type="text" onClick={onClose} aria-label="关闭创建版本">✕</Button>
         </div>
-
-        {/* Scrollable Form Body */}
         <form id="create-version-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
-          {/* Row 1: 版本名称 & 版本号 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <label className="block font-semibold text-[var(--text-body)] mb-1.5">
-                版本名称 <span className="text-red-400">*</span>
-              </label>
-              <Input
-                type="text"
-                required
-                value={versionName}
-                onChange={(e) => setVersionName(e.target.value)}
-                placeholder="例如：师创智联OS V3.6.0 (信创适配增强版)"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-[var(--text-body)] mb-1.5">
-                版本号 (Version Code) <span className="text-red-400">*</span>
-              </label>
-              <Input
-                type="text"
-                required
-                value={versionCode}
-                onChange={(e) => setVersionCode(e.target.value)}
-                placeholder="例如：V3.6.0"
-              />
-            </div>
-          </div>
-
-          {/* Row 2: 预计开始时间 & 预计结束时间 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[var(--primary)]" />
-                预计开始时间 <span className="text-red-400">*</span>
-              </label>
-              <DatePicker
-                required
-                value={startDate ? dayjs(startDate) : null}
-                onChange={(value) => setStartDate(value?.format('YYYY-MM-DD') || '')}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                预计结束时间 (封版交付日) <span className="text-red-400">*</span>
-              </label>
-              <DatePicker
-                required
-                value={endDate ? dayjs(endDate) : null}
-                onChange={(value) => setEndDate(value?.format('YYYY-MM-DD') || '')}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          {/* Row 3: 版本内容 */}
-          <div>
-            <label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[var(--active-text)]" />
-              版本内容 / 发版说明范围
-            </label>
-            <Input.TextArea
-              rows={3}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="请输入该版本的主要演进内容、核心里程碑目标、关键模块重构与对标交付场景..."
-            />
-          </div>
-
-          {/* Row 4: 关联需求 (需求取自需求表 requirementPool) */}
-          <div className="border border-[var(--border-main)] rounded-xl p-4 bg-[var(--bg-surface-soft)]/50 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[var(--text-primary)] text-xs">关联需求 (取自需求表)</span>
-                  <span className="px-2 py-0.5 rounded-full bg-[var(--primary)]/15 text-[var(--active-text)] text-[11px] font-mono font-bold">
-                    已选 {selectedReqIds.length} 项
-                  </span>
-                </div>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                  勾选需求池中需要并入本版本迭代规划的业务与产品需求
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-              </div>
-            </div>
-
-            {/* Filter toolbar */}
-            <div className="flex items-center gap-2 pt-1">
-              <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                <Input
-                  type="text"
-                  value={reqSearch}
-                  onChange={(e) => setReqSearch(e.target.value)}
-                  placeholder="快速搜索需求标题 / 编号 / 客户..."
-                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-xs"
-                />
-              </div>
-              <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-body)] cursor-pointer shrink-0 select-none">
-                <Checkbox
-                  checked={onlyCurrentLineReqs}
-                  onChange={(e) => setOnlyCurrentLineReqs(e.target.checked)}
-                />
-                仅当前产品线
-              </label>
-            </div>
-
-            {reqSearch.trim() && availableReqs.length > 0 && (
-              <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-[var(--border-main)]/60">
-                {availableReqs.map((req) => {
-                  const isChecked = selectedReqIds.includes(req.id);
-                  return <Button type="text" key={req.id} onClick={() => toggleReq(req.id)} className={`w-full h-auto text-left p-2.5 rounded-lg flex items-center gap-2 ${isChecked ? 'bg-[var(--primary)]/10 border border-[var(--primary)]/30' : 'hover:bg-[var(--bg-elevated)]/70 border border-transparent'}`}>
-                    <span className="font-mono text-[var(--active-text)] text-[11px]">{req.code || req.id}</span><span className="text-[var(--text-primary)] truncate">{req.title}</span><span className="ml-auto text-[10px] text-[var(--text-muted)]">{isChecked ? '已选择' : '选择'}</span>
-                  </Button>;
-                })}
-              </div>
-            )}
-
-            {selectedReqs.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {selectedReqs.map((req) => (
-                  <span key={req.id} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)]/40 bg-[var(--primary)]/10 px-2 py-1 text-[11px] text-[var(--text-body)]">
-                    <span className="font-mono text-[var(--active-text)]">{req.code || req.id}</span>
-                    <span className="max-w-48 truncate">{req.title}</span>
-                    <Button type="text" size="small" onClick={() => toggleReq(req.id)} className="text-[var(--text-muted)] hover:text-red-400" aria-label={`移除${req.title}`}>×</Button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Requirements list，仅在输入搜索后展示 */}
-            {false && (
-            <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-[var(--border-main)]/60">
-              {availableReqs.length === 0 ? (
-                <div className="text-center py-6 text-[var(--text-muted)] text-xs">
-                  暂无匹配的需求记录
-                </div>
-              ) : (
-                availableReqs.map((req) => {
-                  const isChecked = selectedReqIds.includes(req.id);
-                  return (
-                    <div
-                      key={req.id}
-                      onClick={() => toggleReq(req.id)}
-                      className={`pt-2 first:pt-0 p-2.5 rounded-lg cursor-pointer transition-colors flex items-start gap-3 ${
-                        isChecked
-                          ? 'bg-[var(--primary)]/10 border border-[var(--primary)]/30'
-                          : 'hover:bg-[var(--bg-elevated)]/70 border border-transparent'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {}} // handled by parent div
-                        className="mt-0.5 rounded border-[var(--border-main)] text-[var(--primary)] focus:ring-0 cursor-pointer"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono font-bold text-[var(--active-text)] text-[11px]">
-                            {req.code || req.id}
-                          </span>
-                          <span className="font-medium text-[var(--text-primary)] truncate">
-                            {req.title}
-                          </span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[10px] font-semibold ${
-                              req.priority.includes('P0')
-                                ? 'bg-red-950/60 text-red-400 border border-red-800/50'
-                                : req.priority.includes('P1')
-                                ? 'bg-amber-950/60 text-amber-400 border border-amber-800/50'
-                                : 'bg-blue-950/60 text-blue-400 border border-blue-800/50'
-                            }`}
-                          >
-                            {req.priority}
-                          </span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-[var(--bg-elevated)] text-[var(--text-body)]">
-                            {req.status}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)] mt-1">
-                          {req.productLineName && (
-                            <span>产品线: <span className="text-[var(--text-body)]">{req.productLineName}</span></span>
-                          )}
-                          {req.customerName && (
-                            <span>客户: <span className="text-[var(--text-body)]">{req.customerName}</span></span>
-                          )}
-                          {req.submitter && (
-                            <span>提报人: <span className="text-[var(--text-body)]">{req.submitter}</span></span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>)}
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="md:col-span-2"><label className="block font-semibold text-[var(--text-body)] mb-1.5">版本名称 <span className="text-red-400">*</span></label><Input required value={versionName} onChange={(event) => setVersionName(event.target.value)} placeholder="请输入版本名称" /></div><div><label className="block font-semibold text-[var(--text-body)] mb-1.5">版本号 (Version Code) <span className="text-red-400">*</span></label><Input required value={versionCode} onChange={(event) => setVersionCode(event.target.value)} placeholder="请输入版本号" /></div></div>
+          <div><label className="block font-semibold text-[var(--text-body)] mb-1.5">版本负责人 <span className="text-red-400">*</span></label><Select showSearch allowClear value={versionOwner || undefined} onChange={(value) => setVersionOwner(value || '')} options={people.map((name) => ({ value: name, label: name }))} optionFilterProp="label" placeholder="请选择版本负责人" className="w-full" /></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-[var(--primary)]" />预计开始时间</label><DatePicker value={startDate ? dayjs(startDate) : null} onChange={(value) => setStartDate(value?.format('YYYY-MM-DD') || '')} className="w-full" placeholder="请选择日期" /></div><div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" />预计结束时间</label><DatePicker value={endDate ? dayjs(endDate) : null} onChange={(value) => setEndDate(value?.format('YYYY-MM-DD') || '')} className="w-full" placeholder="请选择日期" /></div></div>
+          <div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-[var(--active-text)]" />版本内容 / 发版说明范围</label><Input.TextArea rows={3} value={content} onChange={(event) => setContent(event.target.value)} placeholder="请输入该版本的更新内容介绍" /></div>
         </form>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]/80">
-          <div className="text-xs text-[var(--text-muted)]">
-            创建后版本将进入 <span className="text-[var(--active-text)] font-medium">规划中</span> 状态并自动同步至研发迭代矩阵
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={onClose}
-            >
-              取消
-            </Button>
-            <Button
-              type="primary"
-              htmlType="submit"
-              form="create-version-form"
-              icon={<Check className="w-3.5 h-3.5" />}
-            >
-              立即创建版本
-            </Button>
-          </div>
-        </div>
+        <div className="px-6 py-4 border-t border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]/80"><div className="text-xs text-[var(--text-muted)]">创建后版本将进入 <span className="text-[var(--active-text)] font-medium">规划中</span> 状态并自动同步至研发迭代矩阵</div><div className="flex items-center gap-3"><Button onClick={onClose}>取消</Button><Button type="primary" htmlType="submit" form="create-version-form" icon={<Check className="w-3.5 h-3.5" />}>立即创建版本</Button></div></div>
       </div>
     </div>
   );

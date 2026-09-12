@@ -70,7 +70,7 @@ const MainContent: React.FC = () => {
   const [productLineFilter, setProductLineFilter] = useState('all');
   useEffect(() => {
     const pending = sessionStorage.getItem('shichuang.productLineFilter');
-    if (pending) {
+    if (pending && routedTabId !== 'prod_versions') {
       setProductLineFilter(pending);
       sessionStorage.removeItem('shichuang.productLineFilter');
     }
