@@ -558,10 +558,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   },[requirementQuery.data]);
   useEffect(()=>{ if (Array.isArray(designQuery.data)) setDesignTasks(designQuery.data.map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: '', versionName: '' }))); },[designQuery.data]);
   useEffect(() => {
-    if (!productLineQuery.data?.length) return;
+    if (!Array.isArray(productLineQuery.data)) return;
     setProductLines(productLineQuery.data);
     const remoteVersions = productLineQuery.data.flatMap((line) => (line.versions || []).map((version) => ({ ...version, productLineId: line.id, productLineName: line.name })));
-    if (remoteVersions.length) setVersions(remoteVersions);
+    setVersions(remoteVersions);
   }, [productLineQuery.data]);
   useEffect(()=>{ if (bugQuery.data?.length) setBugs(bugQuery.data as DefectBug[]); },[bugQuery.data]);
   useEffect(()=>{ if (devTaskQuery.data?.length) setDevTasks(devTaskQuery.data as DevTask[]); },[devTaskQuery.data]);
