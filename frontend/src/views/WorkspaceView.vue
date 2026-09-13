@@ -21,13 +21,9 @@ import MyTasksView from './workbench/MyTasksView.vue';
 import OkrPerformanceView from './workbench/OkrPerformanceView.vue';
 import KnowledgeBaseView from './workbench/KnowledgeBaseView.vue';
 import WorkOrderCenterView from './workbench/WorkOrderCenterView.vue';
-import RequirementTasksView from './product/RequirementTasksView.vue';
 import VersionIterationView from './product/VersionIterationView.vue';
 import ProductLineDetailView from './product/ProductLineDetailView.vue';
 
-import DesignTasksView from './product/DesignTasksView.vue';
-import DevTasksView from './product/DevTasksView.vue';
-import BugManagementView from './product/BugManagementView.vue';
 const route = useRoute();
 const router = useRouter();
 const store = useSessionStore();
@@ -254,10 +250,10 @@ function getSubIconClass(subId: string) {
         />
         <ProductLinesView v-else-if="activeId === 'prod_lines'" />
         <VersionIterationView v-else-if="activeId === 'prod_versions'" />
-        <RequirementTasksView v-else-if="activeId === 'prod_req_tasks'" kind="requirement" />
-        <DesignTasksView v-else-if="activeId === 'prod_design_tasks'" />
-        <DevTasksView v-else-if="activeId === 'prod_rd_tasks'" />
-        <BugManagementView v-else-if="activeId === 'prod_bugs'" />
+        <WorkItemListView v-else-if="activeId === 'prod_req_tasks'" kind="requirement" />
+        <WorkItemListView v-else-if="activeId === 'prod_design_tasks'" kind="design" />
+        <WorkItemListView v-else-if="activeId === 'prod_rd_tasks'" kind="dev" />
+        <WorkItemListView v-else-if="activeId === 'prod_bugs'" kind="bug" />
         <ProjectListView v-else-if="activeId === 'proj_list'" />
         <ProjectMilestonesView v-else-if="activeId === 'proj_config'" />
         <ApprovalCenterView v-else-if="['approval_center','approval_center_old'].includes(activeId)" />
