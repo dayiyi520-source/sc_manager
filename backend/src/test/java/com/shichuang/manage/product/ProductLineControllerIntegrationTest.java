@@ -6,12 +6,49 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Transactional
 class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
+
+    @Test
+    void versionDatesCanBeEmptyUpdatedAndClearedWithoutLosingTheVersion() throws Exception {
+        String token = loginToken();
+        String authorization = "Bearer " + token;
+        String lineResponse = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"日期回归测试\",\"code\":\"DATE-" + System.nanoTime() + "\",\"ownerName\":\"张瑞\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String lineId = objectMapper.readTree(lineResponse).path("data").path("id").asText();
+        mockMvc.perform(post("/api/product-lines/{id}/versions", lineId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"空日期版本\",\"code\":\"DATE-1\",\"startDate\":\"\",\"endDate\":\"\"}"))
+            .andExpect(status().isOk());
+        String versionId = jdbc.queryForObject("SELECT id_ FROM t_product_line_version WHERE product_line_id_=?", String.class, lineId);
+        assertNull(jdbc.queryForObject("SELECT start_date_ FROM t_product_line_version WHERE id_=?", String.class, versionId));
+        String path = "/api/product-lines/" + lineId + "/versions/" + versionId;
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json")
+                .content("{\"startDate\":\"2026-09-14\",\"endDate\":\"2026-09-30\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"修改标题保留日期\"}"))
+            .andExpect(status().isOk());
+        assertEquals("2026-09-14", jdbc.queryForObject("SELECT start_date_ FROM t_product_line_version WHERE id_=?", String.class, versionId));
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json")
+                .content("{\"endDate\":\"2026-09-01\"}"))
+            .andExpect(status().isBadRequest());
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json")
+                .content("{\"startDate\":null,\"endDate\":\"\"}"))
+            .andExpect(status().isOk());
+        assertNull(jdbc.queryForObject("SELECT end_date_ FROM t_product_line_version WHERE id_=?", String.class, versionId));
+        mockMvc.perform(get("/api/product-lines/{id}", lineId).header("Authorization", authorization))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.versions[0].id").value(versionId));
+    }
 
     @Test
     void persistsProductLineMembersVersionsAndActivities() throws Exception {

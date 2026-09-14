@@ -52,7 +52,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
     const nextVersion: Partial<VersionIteration> = {
       name: versionName.trim(), code: versionCode.trim(), ownerName: versionOwner.trim(),
       productLineId: selectedProductLine.id, productLineName: selectedProductLine.name,
-      startDate: startDate || undefined, endDate: endDate || undefined, releaseDate: endDate || undefined,
+      startDate, endDate, releaseDate: endDate || undefined,
       status: versionStatus, content: content.trim(), changelog: content.trim(),
       requirementsCount: 0, reqCount: 0, linkedRequirementIds: []
     };
