@@ -1,4 +1,8 @@
 <script setup lang="ts">
-defineProps<{rows:Array<Record<string,unknown>>;columns:string[];keys:string[]}>(); const emit=defineEmits<{select:[row:Record<string,unknown>]}>();
+import {computed} from 'vue';
+const props=defineProps<{rows:Array<Record<string,unknown>>;columns:string[];keys:string[]}>();
+const emit=defineEmits<{select:[row:Record<string,unknown>]}>();
+const tableColumns=computed(()=>props.columns.map((title,index)=>({title,dataIndex:props.keys[index],key:props.keys[index]})));
+const customRow=(record:Record<string,unknown>)=>({onClick:()=>emit('select',record)});
 </script>
-<template><div class="table-wrap"><table><thead><tr><th v-for="column in columns" :key="column">{{column}}</th></tr></thead><tbody><tr v-for="row in rows" :key="String(row.id)" @click="emit('select',row)"><td v-for="key in keys" :key="key">{{String(row[key]??'—')}}</td></tr></tbody></table></div></template>
+<template><div class="table-wrap"><a-table :data-source="rows" :columns="tableColumns" :custom-row="customRow" :pagination="false" row-key="id" size="middle"><template #bodyCell="{text}">{{String(text??'—')}}</template></a-table></div></template>
