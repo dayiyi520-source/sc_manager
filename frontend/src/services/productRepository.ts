@@ -12,4 +12,5 @@ export const unifiedWorkItems = {
   createChildren: (id: string, body: Array<Record<string, unknown>>) => apiRequest(`/api/work-items/${encodeURIComponent(id)}/children`, {method: 'POST', body: JSON.stringify(body)}),
   relations: (id: string) => apiRequest<Array<Record<string, unknown>>>(`/api/work-items/${encodeURIComponent(id)}/relations`),
   addRelation: (id: string, body: Record<string, string>) => apiRequest(`/api/work-items/${encodeURIComponent(id)}/relations`, {method: 'POST', body: JSON.stringify(body)}),
+  acceptance: (id: string, body: Record<string, string>) => apiRequest(`/api/work-items/${encodeURIComponent(id)}/acceptance`, {method: 'POST', body: JSON.stringify(body)}),
 };

@@ -1,0 +1,6 @@
+-- 需求最终完成前必须记录产品验收结果。
+SET @schema_name = DATABASE();
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='t_product_work_item' AND column_name='acceptance_status_')=0, 'ALTER TABLE t_product_work_item ADD COLUMN acceptance_status_ VARCHAR(32) NOT NULL DEFAULT ''待验收''', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='t_product_work_item' AND column_name='acceptance_note_')=0, 'ALTER TABLE t_product_work_item ADD COLUMN acceptance_note_ VARCHAR(1000) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='t_product_work_item' AND column_name='accepted_by_')=0, 'ALTER TABLE t_product_work_item ADD COLUMN accepted_by_ VARCHAR(128) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='t_product_work_item' AND column_name='accepted_at_')=0, 'ALTER TABLE t_product_work_item ADD COLUMN accepted_at_ DATETIME NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -66,6 +66,18 @@ public class UnifiedWorkItemController {
         return ApiResponse.ok(null);
     }
 
+    @PostMapping("/{id}/acceptance")
+    public ApiResponse<Void> acceptance(@PathVariable String id, @RequestBody Map<String, String> body) {
+        String status = Objects.toString(body.get("status"), "");
+        if (!Set.of("已通过", "已驳回").contains(status)) throw new IllegalArgumentException("验收状态无效");
+        String note = Objects.toString(body.get("note"), "").trim();
+        int count = jdbc.update("UPDATE t_product_work_item SET acceptance_status_=?,acceptance_note_=?,accepted_by_=CASE WHEN ?='已通过' THEN ? ELSE NULL END,accepted_at_=CASE WHEN ?='已通过' THEN NOW() ELSE NULL END,update_by_=?,update_time_=NOW(),version_=version_+1 WHERE id_=? AND tenant_id_=? AND type_='requirement' AND delete_flag_=0", status, note, status, RequestContext.operatorName(), status, RequestContext.userId(), id, RequestContext.tenantId());
+        if (count == 0) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "需求不存在");
+        event(id, "ACCEPTANCE_" + ("已通过".equals(status) ? "PASSED" : "REJECTED"), null, status, note.isBlank() ? "产品验收" : note);
+        aggregateParent(id);
+        return ApiResponse.ok(null);
+    }
+
     @PostMapping("/{id}/children")
     @Transactional
     public ApiResponse<List<Map<String,Object>>> createChildren(@PathVariable String id, @RequestBody List<Map<String,Object>> children) {
@@ -97,18 +109,19 @@ public class UnifiedWorkItemController {
 
     private void event(String id, String type, String from, String to, String content) { jdbc.update("INSERT INTO t_product_work_item_event (id_,tenant_id_,work_item_id_,event_type_,from_status_,to_status_,content_,operator_name_,create_by_,create_time_) VALUES (?,?,?,?,?,?,?,?,?,NOW())", UUID.randomUUID().toString(), RequestContext.tenantId(), id, type, from, to, content, RequestContext.operatorName(), RequestContext.userId()); }
     private void aggregateParent(String childId) {
-        List<Map<String,Object>> targets = jdbc.queryForList("SELECT id_,type_,parent_id_ FROM t_product_work_item WHERE id_=? AND tenant_id_=? AND delete_flag_=0", childId, RequestContext.tenantId());
+        List<Map<String,Object>> targets = jdbc.queryForList("SELECT id_,type_,parent_id_,acceptance_status_ FROM t_product_work_item WHERE id_=? AND tenant_id_=? AND delete_flag_=0", childId, RequestContext.tenantId());
         if (targets.isEmpty()) return;
         Map<String,Object> target = targets.get(0);
         String parentId = "requirement".equals(String.valueOf(target.get("type_"))) ? childId : Objects.toString(target.get("parent_id_"), "");
         if (parentId.isBlank()) return;
         Integer blocking=jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item c JOIN t_product_work_item_relation rel ON rel.from_id_=c.id_ AND rel.tenant_id_=c.tenant_id_ AND rel.relation_type_='BLOCKS' WHERE rel.to_id_=? AND rel.tenant_id_=? AND c.type_='bug' AND c.status_ NOT IN ('已关闭','已完成') AND c.delete_flag_=0", Integer.class, parentId, RequestContext.tenantId());
         Integer incomplete=jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE parent_id_=? AND tenant_id_=? AND delete_flag_=0 AND status_ NOT IN ('已完成','已关闭','已验收','已发布')", Integer.class, parentId, RequestContext.tenantId());
-        String status=(blocking!=null&&blocking>0)?"阻塞":(incomplete==null||incomplete==0?"已完成":"部分完成");
+        String acceptance = Objects.toString(target.get("acceptance_status_"), "待验收");
+        String status=(blocking!=null&&blocking>0)?"阻塞":(incomplete==null||incomplete==0 && "已通过".equals(acceptance)?"已完成":"部分完成");
         jdbc.update("UPDATE t_product_work_item SET status_=?,update_by_=?,update_time_=NOW(),version_=version_+1 WHERE id_=? AND tenant_id_=? AND type_='requirement' AND status_<>?", status, RequestContext.userId(), parentId, RequestContext.tenantId(), status);
     }
     private static boolean allowedStatus(String type, String status) { return switch (type) { case "development" -> Set.of("待转化","待排期","已排期","待开发","开发中","待测试","测试中","待验收","已验收","待发布","已发布","处理中","阻塞","部分完成","已完成").contains(status); case "bug" -> Set.of("待转化","待排期","已排期","待修复","修复中","待验证","已关闭","处理中","阻塞","部分完成","已完成").contains(status); default -> Set.of("待转化","待排期","已排期","处理中","阻塞","部分完成","已完成","已验收","已发布").contains(status); }; }
-    private static String selectSql() { return "SELECT id_ AS id,code_ AS code,title_ AS title,type_ AS type,product_line_id_ AS productLineId,product_line_name_ AS productLineName,iteration_id_ AS iterationId,iteration_name_ AS iterationName,parent_id_ AS parentId,owner_name_ AS ownerName,creator_name_ AS creatorName,priority_ AS priority,status_ AS status,due_date_ AS dueDate,description_ AS description,description_html_ AS descriptionHtml,source_id_ AS sourceId,create_time_ AS createdAt,update_time_ AS updatedAt,version_ AS version FROM t_product_work_item"; }
+    private static String selectSql() { return "SELECT id_ AS id,code_ AS code,title_ AS title,type_ AS type,product_line_id_ AS productLineId,product_line_name_ AS productLineName,iteration_id_ AS iterationId,iteration_name_ AS iterationName,parent_id_ AS parentId,owner_name_ AS ownerName,creator_name_ AS creatorName,priority_ AS priority,status_ AS status,acceptance_status_ AS acceptanceStatus,acceptance_note_ AS acceptanceNote,accepted_by_ AS acceptedBy,accepted_at_ AS acceptedAt,due_date_ AS dueDate,description_ AS description,description_html_ AS descriptionHtml,source_id_ AS sourceId,create_time_ AS createdAt,update_time_ AS updatedAt,version_ AS version FROM t_product_work_item"; }
     private static String text(Map<String,Object> body,String key){return Objects.toString(body.get(key),"").trim();}
     private static String defaultText(Map<String,Object> body,String key,String fallback){String v=text(body,key);return v.isBlank()?fallback:v;}
     private static Object nullable(Map<String,Object> body,String key){String v=text(body,key);return v.isBlank()?null:v;}
