@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Alert, Button, Empty, Form, Input, InputNumber, Progress, Radio, Cascader, Select, Spin, Tag, Tabs } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
@@ -10,12 +10,12 @@ import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
 import { cycleOptions } from './okr/cycleOptions';
 import { OKRItem } from '../../types';
-import { ObjectiveForm } from './okr/ObjectiveForm';
+import { ObjectiveForm, type ObjectiveFormHandle } from './okr/ObjectiveForm';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
-  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveReview, busy } = useOriginalOkr();
+  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveObjectiveDraft, saveReview, busy } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -30,7 +30,8 @@ const OriginalWorkspace: React.FC = () => {
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
 
   // Add OKR Modal State
-  const [isAddOkrOpen, setIsAddOkrOpen] = useState(false);
+  const [objectiveForms, setObjectiveForms] = useState<string[]>([]);
+  const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const newOkrCycle = dayjs().format('YYYY-MM');
 
   // Write Review Form State
@@ -63,7 +64,7 @@ const OriginalWorkspace: React.FC = () => {
 
   const handleSaveOkr = async (payload: Parameters<typeof saveObjective>[1]) => {
     if (await saveObjective(newOkrCycle, payload)) {
-      setSelectedCycles([newOkrCycle]); setIsAddOkrOpen(false);
+      setSelectedCycles([newOkrCycle]);
       return true;
     }
     return false;
@@ -113,7 +114,7 @@ const OriginalWorkspace: React.FC = () => {
             <Button type="primary"
               id="btn-add-okr"
               disabled={busy}
-              onClick={() => {setOkrCategoryTab('my'); setIsAddOkrOpen(true);}}
+              onClick={() => {setOkrCategoryTab('my'); setObjectiveForms(forms => [...forms, crypto.randomUUID()]);}}
 
             >
               <Plus className="w-3.5 h-3.5" />
@@ -139,9 +140,19 @@ const OriginalWorkspace: React.FC = () => {
             ]}
           />
 
-          {okrCategoryTab === 'my' && isAddOkrOpen && (
-            <ObjectiveForm cycle={newOkrCycle} ownerName={currentUser.name} parents={parents} busy={busy} unavailable={loading || !!error}
-              root={!!me?.rootFlag} onCancel={() => setIsAddOkrOpen(false)} onSave={handleSaveOkr}/>
+          {okrCategoryTab === 'my' && objectiveForms.length > 0 && (
+            <div className="okr-objective-form-stack">
+            <div className="okr-objective-period">{dayjs(newOkrCycle).format('YYYY年MM月')}<span>进行中</span></div>
+            {objectiveForms.map(formId => (
+            <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={newOkrCycle} ownerName={currentUser.name} parents={parents} busy={busy} unavailable={loading || !!error}
+              root={!!me?.rootFlag}
+              onCancel={() => setObjectiveForms(forms => forms.filter(id => id !== formId))}
+              onSave={async payload => { const ok = await handleSaveOkr(payload); if (ok) setObjectiveForms(forms => forms.filter(id => id !== formId)); return ok; }}
+              onSaveDraft={async payload => { const ok = await saveObjectiveDraft(newOkrCycle, payload); if (ok) setObjectiveForms(forms => forms.filter(id => id !== formId)); return ok; }}
+              onAddAnother={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])}/></div>
+            ))}
+            <div className="okr-objective-footer"><Button type="text" onClick={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])} disabled={busy}>+ 添加 O</Button><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy}>取消</Button><Button onClick={async () => { const results = await Promise.all(objectiveForms.map(id => objectiveRefs.current[id]?.saveDraft() ?? false)); if (results.every(Boolean)) setObjectiveForms([]); }} disabled={busy || loading || !!error}>存草稿</Button><Button type="primary" onClick={async () => { const results = await Promise.all(objectiveForms.map(id => objectiveRefs.current[id]?.submit() ?? false)); if (results.every(Boolean)) setObjectiveForms([]); }} loading={busy} disabled={loading || !!error}>{me?.rootFlag ? '提交目标' : '提交主管确认'}</Button></div>
+            </div>
           )}
 
           {/* OKR Cards List */}
