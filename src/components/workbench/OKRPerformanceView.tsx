@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Button, DatePicker, Empty, Form, Input, InputNumber, Progress, Radio, Segmented, Select, Spin, Tag, Tabs } from 'antd';
+import { Alert, Button, DatePicker, Empty, Form, Input, InputNumber, Progress, Radio, Cascader, Select, Spin, Tag, Tabs } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
@@ -8,12 +8,13 @@ import { Target, FileSpreadsheet, Plus, Calendar, Send } from '@/components/comm
 import { useApp } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
+import { cycleOptions } from './okr/cycleOptions';
 import { OKRItem } from '../../types';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
-  const { okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveReview, busy } = useOriginalOkr();
+  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveReview, busy } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -21,7 +22,7 @@ const OriginalWorkspace: React.FC = () => {
   const [okrCategoryTab, setOkrCategoryTab] = useState<
     'my' | 'supervisor' | 'subordinate' | 'department' | 'other_dept'
   >('my');
-  const [selectedCycle, setSelectedCycle] = useState(dayjs().format('YYYY-MM'));
+  const [selectedCycles, setSelectedCycles] = useState<string[]>([dayjs().format('YYYY-MM')]);
 
   // Review Sub Tabs: 写总结、我的总结、我收到的
   const [reviewSubTab, setReviewSubTab] = useState<'write' | 'my' | 'received'>('write');
@@ -29,7 +30,7 @@ const OriginalWorkspace: React.FC = () => {
 
   // Add OKR Modal State
   const [isAddOkrOpen, setIsAddOkrOpen] = useState(false);
-  const [newOkrCycle, setNewOkrCycle] = useState(dayjs().format('YYYY-MM'));
+  const newOkrCycle = dayjs().format('YYYY-MM');
   const [newOkrParentId, setNewOkrParentId] = useState<string>();
   const [newOkrObjective, setNewOkrObjective] = useState('');
   const [newOkrWeight, setNewOkrWeight] = useState(40);
@@ -51,7 +52,9 @@ const OriginalWorkspace: React.FC = () => {
   const candidates = completedWorkInPeriod(work, period.startDate, period.endDate);
   const me = people.find(p => p.id === currentUser.id);
   const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === newOkrCycle && o.status === 'active');
-  const months = Array.from({length:12}, (_, i) => dayjs().subtract(i, 'month').format('YYYY-MM'));
+  const periods = cycleOptions(records, currentUser.id);
+  const cyclePaths = periods.flatMap(group=>group.children.filter(c=>selectedCycles.includes(c.value)).map(c=>[group.value,c.value]));
+  const cycleLabel = selectedCycles.length === 1 ? `周期：${dayjs(selectedCycles[0]).format('YYYY年MM月')}` : `周期：${selectedCycles.length}个周期`;
 
   const matchesCategory = (o: OKRItem) => {
     if (okrCategoryTab === 'my') return o.category === 'my';
@@ -60,7 +63,7 @@ const OriginalWorkspace: React.FC = () => {
     if (okrCategoryTab === 'department') return o.category === 'department' || o.department === currentUser.department;
     return o.department !== currentUser.department;
   };
-  const filteredOkrs = okrs.filter((o) => o.cycle === selectedCycle && matchesCategory(o));
+  const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && matchesCategory(o));
 
   const handleSaveOkr = async () => {
     if (busy || loading || error) return;
@@ -75,7 +78,7 @@ const OriginalWorkspace: React.FC = () => {
       weight: newOkrWeight, deadline: newOkrDeadline,
       keyResults: [{id:crypto.randomUUID(), title:newKr1Content.trim(), weight:100, progress:0}],
     })) {
-      setSelectedCycle(newOkrCycle); setIsAddOkrOpen(false);
+      setSelectedCycles([newOkrCycle]); setIsAddOkrOpen(false);
       setNewOkrObjective(''); setNewKr1Content(''); setNewOkrParentId(undefined);
     }
   };
@@ -109,36 +112,19 @@ const OriginalWorkspace: React.FC = () => {
       {error && <Alert type="error" title="目标与绩效加载失败" description="服务暂不可用，请重试。已填写的内容仍保留。" action={<Button onClick={refresh}>重试</Button>}/>}
       {/* Top Main Navigation Tabs */}
       <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
-          <Button type={mainTab === 'okrs' ? 'primary' : 'text'}
-            id="tab-okrs"
-            onClick={() => setMainTab('okrs')}
-
-          >
-            <Target  />
-            目标 OKRs
-          </Button>
-          <Button type={mainTab === 'reviews' ? 'primary' : 'text'}
-            id="tab-reviews"
-            onClick={() => {
-              setMainTab('reviews');
-              setIsReviewFormOpen(false);
-            }}
-
-          >
-            <FileSpreadsheet  />
-            复盘总结
-          </Button>
-        </div>
+        <Tabs activeKey={mainTab} onChange={key=>{setMainTab(key as typeof mainTab);setIsReviewFormOpen(false);}} items={[{key:'okrs',label:'目标 OKRs'},{key:'reviews',label:'复盘总结'}]}/>
 
         {mainTab === 'okrs' && (
           <div className="flex items-center gap-3">
-            <Select aria-label="目标月份" value={selectedCycle} onChange={setSelectedCycle} options={months.map(month=>({value:month,label:dayjs(month).format('YYYY年MM月')}))}/>
+            <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear={false}
+              onChange={paths=>setSelectedCycles(paths.map(path=>String(path[path.length-1])))}
+              maxTagCount={0} maxTagPlaceholder={()=>cycleLabel} placeholder="周期：请选择"
+              tagRender={()=> <span>{cycleLabel}</span>} />
 
             <Button type="primary"
               id="btn-add-okr"
               disabled={busy}
-              onClick={() => {setOkrCategoryTab('my'); setNewOkrCycle(selectedCycle); setNewOkrParentId(undefined); setIsAddOkrOpen(true);}}
+              onClick={() => {setOkrCategoryTab('my'); setNewOkrDeadline(dayjs().endOf('month').format('YYYY-MM-DD')); setNewOkrParentId(undefined); setIsAddOkrOpen(true);}}
 
             >
               <Plus className="w-3.5 h-3.5" />
@@ -152,15 +138,15 @@ const OriginalWorkspace: React.FC = () => {
       {mainTab === 'okrs' && (
         <div className="space-y-6">
           {/* Sub Navigation */}
-          <Segmented
-            value={okrCategoryTab}
+          <Tabs
+            activeKey={okrCategoryTab}
             onChange={(value) => setOkrCategoryTab(value as typeof okrCategoryTab)}
-            options={[
-              { label: '我的 OKR', value: 'my' },
-              { label: '直属上级 OKR', value: 'supervisor' },
-              { label: '直属下级 OKR', value: 'subordinate' },
-              { label: '我部门的 OKR', value: 'department' },
-              { label: '跨部门协同 OKR', value: 'other_dept' },
+            items={[
+              { label: '我的 OKR', key: 'my' },
+              { label: '直属上级 OKR', key: 'supervisor' },
+              { label: '直属下级 OKR', key: 'subordinate' },
+              { label: '我部门的 OKR', key: 'department' },
+              { label: '跨部门协同 OKR', key: 'other_dept' },
             ]}
           />
 
@@ -174,9 +160,8 @@ const OriginalWorkspace: React.FC = () => {
                 <span className="text-slate-400">填写完成后提交主管确认</span>
               </div>
               <fieldset disabled={busy} className="p-5 space-y-4 text-xs">
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_140px] gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_140px] gap-3">
                   <Input maxLength={255} required aria-label="目标名称" value={newOkrObjective} onChange={(e) => setNewOkrObjective(e.target.value)} placeholder="输入目标名称：明确你想要达成什么，不写含糊概括的目标" className="w-full"/>
-                  <Select aria-label="目标周期" value={newOkrCycle} onChange={value=>{setNewOkrCycle(value);setNewOkrParentId(undefined);setNewOkrDeadline(dayjs(value).endOf('month').format('YYYY-MM-DD'));}} options={months.map(month=>({value:month,label:dayjs(month).format('YYYY年MM月')}))}/>
                   <InputNumber precision={0} aria-label="目标权重" value={newOkrWeight} onChange={value => setNewOkrWeight(value ?? 0)} min={0} max={100} placeholder="权重 %" className="w-full"/>
                 </div>
                 {!me?.rootFlag && <div>

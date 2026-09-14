@@ -3,3 +3,6 @@
 .original-okr .ant-input-number { width: 100%; }
 .original-okr .ant-segmented { max-width: 100%; overflow-x: auto; }
 .original-okr .okr-review-form { padding: 24px; }
+.original-okr .ant-tabs { min-width: 0; }
+.original-okr .ant-tabs-nav { margin-bottom: 0; }
+.okr-cycle-filter { width: 224px; }

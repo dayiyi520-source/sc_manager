@@ -257,7 +257,7 @@ html:not(.dark) .tech-shell table thead tr {
   border-color: var(--border-main) !important;
 }
 
-html:not(.dark) .tech-shell :where(select, textarea, input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])) {
+html:not(.dark) .tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])) {
   background-color: var(--bg-card) !important;
   color: var(--text-primary) !important;
 }
@@ -471,29 +471,29 @@ html:not(.dark) .tech-main .fixed.inset-0 button:disabled {
 }
 
 /* Semantic tab markup is used by the right-side page workspace. */
-html:not(.dark) .tech-main [role="tablist"] {
+html:not(.dark) .tech-main [role="tablist"]:not(.original-okr *) {
   background: transparent;
   border: none;
   padding: 0;
 }
-html:not(.dark) .tech-main [role="tab"] {
+html:not(.dark) .tech-main [role="tab"]:not(.original-okr *) {
   border-radius: 8px;
   color: var(--text-muted);
   transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
-html:not(.dark) .tech-main [role="tab"]:hover:not([aria-selected="true"]) {
+html:not(.dark) .tech-main [role="tab"]:not(.original-okr *):hover:not([aria-selected="true"]) {
   background: var(--bg-surface-soft);
   color: var(--text-primary);
 }
-html:not(.dark) .tech-main [role="tab"][aria-selected="true"] {
+html:not(.dark) .tech-main [role="tab"][aria-selected="true"]:not(.original-okr *) {
   background: #2563EB !important;
   color: #FFFFFF !important;
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
 }
-html:not(.dark) .tech-main [role="tab"][aria-selected="true"] * {
+html:not(.dark) .tech-main [role="tab"][aria-selected="true"]:not(.original-okr *) * {
   color: #FFFFFF !important;
 }
-html:not(.dark) .tech-main [role="tab"]:focus-visible {
+html:not(.dark) .tech-main [role="tab"]:not(.original-okr *):focus-visible {
   outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
   outline-offset: 2px;
 }
@@ -746,7 +746,7 @@ html:not(.dark) .tech-shell .work-item-panel {
 
 /* Application-wide form baseline. Legacy pages may keep their layout utility
  * classes, while every interactive field shares the same visual states. */
-.tech-shell :where(
+.tech-shell :where(:not(.original-okr *)):where(
   select,
   textarea,
   input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
@@ -758,7 +758,7 @@ html:not(.dark) .tech-shell .work-item-panel {
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
-.tech-shell :where(
+.tech-shell :where(:not(.original-okr *)):where(
   select,
   input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
 ) {
@@ -773,7 +773,7 @@ html:not(.dark) .tech-shell .work-item-panel {
   height: 32px;
 }
 
-.tech-shell :where(
+.tech-shell :where(:not(.original-okr *)):where(
   .ant-picker .ant-picker-input > input,
   .ant-select .ant-select-input,
   .ant-input-number .ant-input-number-input
@@ -791,29 +791,29 @@ html:not(.dark) .tech-shell .work-item-panel {
   padding-bottom: 8px !important;
 }
 
-.tech-shell :where(select, textarea, input:not(.ant-select-input)):hover:not(:disabled) {
+.tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input)):hover:not(:disabled) {
   border-color: var(--border-subtle) !important;
 }
 
-.tech-shell :where(select, textarea, input:not(.ant-select-input)):focus-visible {
+.tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input)):focus-visible {
   border-color: var(--primary-hover) !important;
   outline: none !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent) !important;
 }
 
-.tech-shell :where(select, textarea, input:not(.ant-select-input)):disabled {
+.tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input)):disabled {
   cursor: not-allowed;
   background-color: var(--bg-main) !important;
   color: var(--text-muted) !important;
   opacity: 0.7;
 }
 
-.tech-shell :where(select, textarea, input:not(.ant-select-input))[aria-invalid='true'] {
+.tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input))[aria-invalid='true'] {
   border-color: var(--danger) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent) !important;
 }
 
-.tech-shell :where(input:not(.ant-select-input), textarea)::placeholder {
+.tech-shell :where(:not(.original-okr *)):where(input:not(.ant-select-input), textarea)::placeholder {
   color: var(--text-muted) !important;
   opacity: 1;
 }

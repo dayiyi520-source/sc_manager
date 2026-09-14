@@ -43,7 +43,7 @@ export function useOriginalOkr() {
     } catch(error) { addToast('error',error instanceof Error?error.message:'提交失败，请重试'); return false; }
     finally {setBusy(false);}
   };
-  return {okrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
+  return {records:all,okrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
     error:records.error || peopleQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
     saveObjective:(period:string,payload:OkrPayload)=>save('objective',period,payload),
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
