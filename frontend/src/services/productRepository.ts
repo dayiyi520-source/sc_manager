@@ -8,4 +8,8 @@ export const unifiedWorkItems = {
   create: (body: Record<string, unknown>) => apiRequest('/api/work-items', {method: 'POST', body: JSON.stringify(body)}),
   update: (id: string, body: Record<string, unknown>) => apiRequest(`/api/work-items/${encodeURIComponent(id)}`, {method: 'PUT', body: JSON.stringify(body)}),
   events: (id: string) => apiRequest<Array<Record<string, unknown>>>(`/api/work-items/${encodeURIComponent(id)}/events`),
+  children: (id: string) => apiRequest<Array<Record<string, unknown>>>(`/api/work-items/${encodeURIComponent(id)}/children`),
+  createChildren: (id: string, body: Array<Record<string, unknown>>) => apiRequest(`/api/work-items/${encodeURIComponent(id)}/children`, {method: 'POST', body: JSON.stringify(body)}),
+  relations: (id: string) => apiRequest<Array<Record<string, unknown>>>(`/api/work-items/${encodeURIComponent(id)}/relations`),
+  addRelation: (id: string, body: Record<string, string>) => apiRequest(`/api/work-items/${encodeURIComponent(id)}/relations`, {method: 'POST', body: JSON.stringify(body)}),
 };
