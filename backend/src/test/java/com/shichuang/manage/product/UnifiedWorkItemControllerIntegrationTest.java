@@ -72,4 +72,50 @@ class UnifiedWorkItemControllerIntegrationTest extends AbstractApiIntegrationTes
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
+
+    @Test
+    void createsChildrenAndBlocksRequirement() throws Exception {
+        String token = loginToken();
+        String requirementResponse = mockMvc.perform(post("/api/work-items")
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"type\":\"requirement\",\"title\":\"父子关系测试需求\"}"))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        String requirementId = objectMapper.readTree(requirementResponse).path("data").path("id").asText();
+
+        String childrenResponse = mockMvc.perform(post("/api/work-items/{id}/children", requirementId)
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("[{\"type\":\"design\",\"title\":\"设计子项\"},{\"type\":\"development\",\"title\":\"研发子项\"},{\"type\":\"test\",\"title\":\"测试子项\"}]"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(3))
+            .andReturn().getResponse().getContentAsString();
+        String childId = objectMapper.readTree(childrenResponse).path("data").get(0).path("id").asText();
+
+        mockMvc.perform(get("/api/work-items/{id}/children", requirementId)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(3))
+            .andExpect(jsonPath("$.data[0].parentId").value(requirementId));
+
+        String bugResponse = mockMvc.perform(post("/api/work-items")
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"type\":\"bug\",\"title\":\"阻塞缺陷\"}"))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        String bugId = objectMapper.readTree(bugResponse).path("data").path("id").asText();
+
+        mockMvc.perform(post("/api/work-items/{id}/relations", bugId)
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"toId\":\"" + requirementId + "\",\"relationType\":\"BLOCKS\"}"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/work-items/{id}/relations", requirementId)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].relationType").value("BLOCKS"));
+    }
 }
