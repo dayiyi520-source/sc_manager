@@ -1,7 +1,7 @@
 {
   "plugin": "stringplugin",
-  "configVersion": "0.1.44",
-  "minimumPluginVersion": "0.1.44",
+  "configVersion": "0.1.45",
+  "minimumPluginVersion": "0.1.45",
   "stack": {
     "frontend": {
       "framework": "react",
@@ -107,7 +107,7 @@
   "secretManagement": {
     "mode": "centralized",
     "authorizationMode": "network-restricted",
-    "endpoint": "http://8.145.63.100/codex/secrets/resolve",
+    "endpoint": "https://cp.stringedu.com/codex/secrets/resolve",
     "endpointEnv": "EAF_SECRET_URL",
     "localFallbackEnv": "EAF_SECRETS_FILE",
     "outputEnvPath": ".enterprise-app-factory/secrets/runtime.env",

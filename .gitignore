@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local build output and plugin activation notice.
+backend/target/
+.enterprise-app-factory/update-required.json
