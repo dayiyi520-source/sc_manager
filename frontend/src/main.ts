@@ -5,9 +5,12 @@ import App from './App.vue';
 import './theme.css';  // 统一主题样式
 import './style.css';  // 布局样式
 import {router} from './router';
+import Antd from 'ant-design-vue';
+import 'ant-design-vue/dist/reset.css';
 
 const app = createApp(App);
 app.use(createPinia());
 app.use(router);
+app.use(Antd);
 app.use(VueQueryPlugin, {queryClient: new QueryClient()});
 app.mount('#app');
