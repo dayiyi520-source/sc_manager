@@ -75,6 +75,21 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
   jdbc.update("UPDATE t_product_requirement SET status_=? WHERE tenant_id_=? AND id_=?","研发中","local-tenant","req-1");
   mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(request))).andExpect(status().isBadRequest());
  }
+ @Test void includesUnifiedWorkItemsInOkrEvidence()throws Exception{
+  jdbc.update("""
+   INSERT INTO t_product_work_item
+   (id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,workflow_id_,status_key_,status_name_,status_group_,assignee_id_,assignee_name_,priority_,planned_end_date_,estimated_hours_,actual_hours_,source_type_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_,delete_flag_,version_)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6),0,0)
+   """, "okr-core-work", "local-tenant", "line-okr", "development", "type-dev", "WI-OKR-CORE", "统一研发工作项", "workflow-okr", "doing", "开发中", "ACTIVE", "user-tech", "王浩然", "P1", "2026-09-30", 8, 3, "MANUAL", "okr-core-request", "okr-core-hash", "user-tech", "user-tech");
+  String tech=login("tech");
+  var response=mockMvc.perform(get("/api/okr/work?ownerId=user-tech").header("Authorization","Bearer "+tech))
+    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  boolean found=false;
+  for(var item:objectMapper.readTree(response).path("data")){
+   if("okr-core-work".equals(item.path("sourceId").asText())){assertEquals("core:okr-core-work",item.path("id").asText());found=true;}
+  }
+  assertTrue(found,"统一工作项应进入 OKR 工作项证据列表");
+ }
  @Test void simpleReviewPersistsOriginalFieldsAndSubmitsAtomically()throws Exception{
   String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
   var payload=new java.util.LinkedHashMap<String,Object>();
