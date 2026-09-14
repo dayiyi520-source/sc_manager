@@ -7,9 +7,12 @@ import { TabsBar } from './components/layout/TabsBar';
 import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
 import { ToastContainer } from './components/common/UIComponents';
 import { SearchableSelect } from './components/common';
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams, useLocation } from 'react-router-dom';
 import { DevLoginPage } from './components/auth/DevLoginPage';
-import { readSession } from './services/session';
+import { clearSession, readSession } from './services/session';
+
+import { SESSION_CHANGED } from './services/sessionStorage';
+import { useQueryClient } from '@tanstack/react-query';
 
 const lazyNamed = (loader: () => Promise<Record<string, unknown>>, exportName: string) => lazy(async () => {
   const module = await loader();
@@ -242,7 +245,27 @@ const AppShell: React.FC = () => {
 };
 
 const ProtectedApp: React.FC = () => {
-  // 临时禁用登录验证用于测试
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const [session, setSession] = useState(readSession);
+  useEffect(() => {
+    const check = () => {
+      const current = readSession();
+      setSession(current);
+      if (!current) queryClient.clear();
+    };
+    window.addEventListener(SESSION_CHANGED, check);
+    window.addEventListener('focus', check);
+    const current = readSession();
+    const timer = current ? window.setTimeout(() => clearSession(), Math.min(current.expiresAt - Date.now(), 2147483647)) : undefined;
+    check();
+    return () => {
+      window.removeEventListener(SESSION_CHANGED, check);
+      window.removeEventListener('focus', check);
+      window.clearTimeout(timer);
+    };
+  }, [queryClient]);
+  if (!session) return <Navigate to="/login" replace state={{from: location.pathname + location.search, sessionExpired: true}} />;
   return <AppShell />;
 };
 

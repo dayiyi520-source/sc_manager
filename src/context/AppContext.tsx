@@ -6,7 +6,7 @@ import { crmRepository } from '../services/crmRepository';
 import { requirementRepository } from '../services/requirementRepository';
 import { productRepository } from '../services/productRepository';
 import { okrRepository } from '../services/okrRepository';
-import { devLogin, readSession, sessionUsername } from '../services/session';
+import { readSession } from '../services/session';
 import {
   MainMenuId,
   SubMenuId,
@@ -498,35 +498,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [invoiceApprovals, setInvoiceApprovals] = useState<InvoiceApprovalRecord[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
-    let retryTimer: number | undefined;
-    const synchronize = async () => {
-      const session = readSession();
-      if (!session?.token) {
-        if (!cancelled) { setCrmSessionToken(''); setCrmSessionReady(false); }
-        return;
-      }
-      if (!session.token.startsWith('local-dev-')) {
-        if (!cancelled) { setCrmSessionToken(session.token); setCurrentUser(session.user); setCrmSessionReady(true); }
-        return;
-      }
-      try {
-        const refreshed = await devLogin(sessionUsername(session));
-        if (cancelled) return;
-        setCurrentUser(refreshed.user);
-        setCrmSessionToken(refreshed.token);
-        setCrmSessionReady(true);
-        if (!refreshed.token.startsWith('local-dev-') && retryTimer) window.clearInterval(retryTimer);
-      } catch {
-        if (!cancelled) { setCrmSessionToken(session.token); setCrmSessionReady(true); }
-      }
-    };
-    void synchronize();
-    retryTimer = window.setInterval(() => {
-      if (readSession()?.token.startsWith('local-dev-')) void synchronize();
-      else if (retryTimer) window.clearInterval(retryTimer);
-    }, 15000);
-    return () => { cancelled = true; if (retryTimer) window.clearInterval(retryTimer); };
+    const session = readSession();
+    setCrmSessionToken(session?.token || '');
+    setCrmSessionReady(!!session);
+    if (session) setCurrentUser(session.user);
   }, []);
 
   // 所有领域共用同一数据模式，避免本地回退会话误请求后端。

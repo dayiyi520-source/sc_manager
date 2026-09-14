@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { Draggable } from 'gsap/Draggable';
 import { MorphSVGPlugin } from 'gsap/MorphSVGPlugin';
@@ -37,6 +37,9 @@ function playPullSound() {
 
 export function DevLoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedPath = location.state?.from;
+  const returnTo = typeof requestedPath === 'string' && requestedPath.startsWith('/app/') ? requestedPath : '/app/wb_my_tasks';
   const existing = readSession();
   const [isOn, setIsOn] = useState(false);
   const [shadeHue, setShadeHue] = useState(205);
@@ -44,7 +47,7 @@ export function DevLoginPage() {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(location.state?.sessionExpired ? '登录状态已失效，请重新登录后继续' : '');
   const isOnRef = useRef(false);
   const lampRootRef = useRef<HTMLDivElement>(null);
   const ropeHandleRef = useRef<HTMLButtonElement>(null);
@@ -88,10 +91,10 @@ export function DevLoginPage() {
     gsap.fromTo(root.querySelector('.lamp-stand'), { rotate: -2 }, { rotate: 2, duration: 3.8, repeat: -1, yoyo: true, ease: 'sine.inOut' });
   }, []);
 
-  if (existing && existing.expiresAt > Date.now()) return <Navigate to="/app/wb_my_tasks" replace />;
+  if (existing && existing.expiresAt > Date.now()) return <Navigate to={returnTo} replace />;
   const submit = async () => {
     setLoading(true); setError('');
-    try { await devLogin(username); navigate('/app/wb_my_tasks', { replace: true }); }
+    try { await devLogin(username); navigate(returnTo, { replace: true }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '本地登录失败'); }
     finally { setLoading(false); }
   };
