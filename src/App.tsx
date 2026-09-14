@@ -6,13 +6,13 @@ import { Sidebar } from './components/layout/Sidebar';
 import { TabsBar } from './components/layout/TabsBar';
 import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
 import { ToastContainer } from './components/common/UIComponents';
-import { SearchableSelect } from './components/common';
 import { Navigate, Route, Routes, useParams, useLocation } from 'react-router-dom';
 import { DevLoginPage } from './components/auth/DevLoginPage';
 import { clearSession, readSession } from './services/session';
 
 import { SESSION_CHANGED } from './services/sessionStorage';
 import { useQueryClient } from '@tanstack/react-query';
+import { Select } from 'antd';
 
 const lazyNamed = (loader: () => Promise<Record<string, unknown>>, exportName: string) => lazy(async () => {
   const module = await loader();
@@ -194,7 +194,16 @@ const MainContent: React.FC = () => {
         {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks') && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] pb-4 border-b border-[var(--border-main)]">
             <span>产品线</span>
-            <div className="w-44"><SearchableSelect label="产品线" hideLabel value={productLineFilter === 'all' ? '全部产品线' : productLines.find((productLine) => productLine.id === productLineFilter)?.name || ''} options={['全部产品线', ...productLines.map((productLine) => productLine.name)]} onChange={(name) => setProductLineFilter(name === '全部产品线' ? 'all' : productLines.find((productLine) => productLine.name === name)?.id || 'all')} placeholder="全部产品线" clearable /></div>
+            <Select
+              aria-label="产品线"
+              className="w-44"
+              showSearch
+              optionFilterProp="label"
+              value={productLineFilter}
+              options={[{ label: '全部产品线', value: 'all' }, ...productLines.map((productLine) => ({ label: productLine.name, value: productLine.id }))]}
+              onChange={setProductLineFilter}
+              placeholder="全部产品线"
+            />
           </div>
         )}
 

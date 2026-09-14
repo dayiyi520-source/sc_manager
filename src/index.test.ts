@@ -27,7 +27,7 @@ describe('light workspace theme contract', () => {
   it('normalizes product-line detail tabs that use custom button markup', () => {
     expect(styles).toContain('html:not(.dark) .product-line-detail .product-line-tabs > button');
     expect(styles).toContain('html:not(.dark) .product-line-detail .product-line-tabs > button:hover');
-    expect(styles).toContain('html:not(.dark) .product-line-detail .product-line-tabs > button[class*="text-[#2F66F6]"]');
+    expect(styles).toContain("html:not(.dark) .product-line-detail .product-line-tabs > button[aria-selected='true']");
     expect(styles).toContain('html:not(.dark) .product-line-detail .product-line-tabs > button:focus-visible');
     expect(styles).toContain('html:not(.dark) .product-line-detail button[class*="bg-[#2F66F6]"]');
   });

@@ -18,6 +18,14 @@ vi.mock('tinymce-i18n/langs8/zh-CN.js', () => ({}));
 import { RichTextEditor } from './RichTextEditor';
 
 describe('RichTextEditor', () => {
+  it('does not reset the initial document when the parent echoes typed content', () => {
+    const editor = React.createRef<HTMLDivElement>();
+    const onInput = vi.fn();
+    const { rerender } = render(<RichTextEditor editor={editor} value="草稿" htmlValue="<p>草稿</p>" onInput={onInput} />);
+    const initialValue = editorMock.props.initialValue;
+    rerender(<RichTextEditor editor={editor} value="草稿继续输入" htmlValue="<p>草稿继续输入</p>" onInput={onInput} />);
+    expect(editorMock.props.initialValue).toBe(initialValue);
+  });
   it('configures the screenshot capabilities and preserves the input contract', () => {
     const onInput = vi.fn();
     const editor = React.createRef<HTMLDivElement>();

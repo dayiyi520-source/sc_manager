@@ -687,6 +687,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       <div className="product-line-tabs border-b border-[var(--border-main)] flex items-center gap-2 overflow-x-auto text-xs">
         <button
           onClick={() => setActiveTab('activity')}
+          aria-selected={activeTab === 'activity'}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'activity'
               ? 'border-[var(--primary)] text-[var(--primary)]'
@@ -699,6 +700,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
         <button
           onClick={() => setActiveTab('members')}
+          aria-selected={activeTab === 'members'}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'members'
               ? 'border-[var(--primary)] text-[var(--primary)]'
@@ -711,6 +713,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
         <button
           onClick={() => setActiveTab('versions')}
+          aria-selected={activeTab === 'versions'}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
             activeTab === 'versions'
               ? 'border-[var(--primary)] text-[var(--primary)]'

@@ -25,6 +25,7 @@ import './RichTextEditor.css';
 type RichTextEditorProps = {
   editor: React.RefObject<HTMLDivElement | null>;
   size?: 'default' | 'work-order';
+  readOnly?: boolean;
   value?: string;
   htmlValue?: string;
   onInput: (text: string, html: string) => void;
@@ -37,7 +38,7 @@ const themeValue = (name: string, fallback: string) => typeof window === 'undefi
 const toText = (html: string) => { const node = document.createElement('div'); node.innerHTML = html; return node.innerText || node.textContent || ''; };
 const hasMeaningfulContent = (html: string) => /<(img|table|video|audio|iframe)\b/i.test(html) || toText(html).replace(/\u00a0/g, ' ').trim().length > 0;
 
-export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = 'default', value = '', htmlValue = '', onInput, onBlur, placeholder = '请输入内容，支持文字排版、列表和链接...' }) => {
+export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = 'default', readOnly = false, value = '', htmlValue = '', onInput, onBlur, placeholder = '请输入内容，支持文字排版、列表和链接...' }) => {
   const instanceRef = useRef<TinyMceInstance | null>(null);
   const updateMarkdownAvailabilityRef = useRef<(html: string) => void>(() => undefined);
   const [markdownMode, setMarkdownMode] = useState(false);
@@ -51,7 +52,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
   }), [isDark]);
   const proxy = (html: string) => { if (editor.current) editor.current.innerHTML = html; };
   const emit = (instance: TinyMceInstance) => { const html = instance.getContent(); proxy(html); updateMarkdownAvailabilityRef.current(html); onInput(instance.getContent({ format: 'text' }), html); };
-  const initialContent = htmlValue || (value ? value.replace(/\n/g, '<br>') : '');
+  // TinyMCE resets content and selection when initialValue changes. Parent
+  // input echoes must not become a new initial document on every keystroke.
+  const initialContent = useRef(htmlValue || (value ? value.replace(/\n/g, '<br>') : '')).current;
 
   useEffect(() => {
     const instance = instanceRef.current;
@@ -69,7 +72,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
   const init = useMemo(() => ({
     height: 320, menubar: false, branding: false, promotion: false, language: 'zh-CN', skin: 'oxide', placeholder, resize: true,
     plugins: 'advlist autolink autoresize code image link lists media table wordcount',
-    toolbar: 'undo redo | removeformat | blocks fontfamily fontsize | bold italic strikethrough underline | forecolor backcolor | imageupload table customlink blockquote codesample | alignleft aligncenter alignright | bullist numlist outdent indent | lineheight | markdown',
+    toolbar: readOnly ? false : 'undo redo | removeformat | blocks fontfamily fontsize | bold italic strikethrough underline | forecolor backcolor | imageupload table customlink blockquote codesample | alignleft aligncenter alignright | bullist numlist outdent indent | lineheight | markdown',
+    readonly: readOnly,
     toolbar_mode: 'wrap',
     content_style: `body{margin:16px;color:${theme.text};background:${theme.surface};font-family:system-ui,sans-serif;font-size:14px;line-height:1.7}a{color:${theme.primary}}blockquote{border-left:3px solid ${theme.primary};margin-left:0;padding-left:12px;color:${theme.muted}}ul.checklist{list-style:none;padding-left:0}ul.checklist li::before{content:'☐';margin-right:8px;color:${theme.primary}}`,
     setup: (instance: TinyMceInstance) => {

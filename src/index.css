@@ -398,7 +398,7 @@ html:not(.dark) .product-line-detail .product-line-tabs > button:hover {
   color: var(--text-primary) !important;
   background: var(--bg-surface-soft);
 }
-html:not(.dark) .product-line-detail .product-line-tabs > button[class*="text-[#2F66F6]"] {
+html:not(.dark) .product-line-detail .product-line-tabs > button[aria-selected='true'] {
   color: var(--primary) !important;
   border-color: var(--primary) !important;
 }
@@ -496,6 +496,40 @@ html:not(.dark) .tech-main [role="tab"][aria-selected="true"]:not(.original-okr 
 html:not(.dark) .tech-main [role="tab"]:not(.original-okr *):focus-visible {
   outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
   outline-offset: 2px;
+}
+
+/* Requirement scope tabs mirror the work-order static segmented style. */
+html:not(.dark) .tech-main .requirement-scope-tabs[role="tablist"]:not(.original-okr *) {
+  background: var(--bg-surface-soft) !important;
+  border: 1px solid var(--border-main) !important;
+  padding: 4px !important;
+}
+html:not(.dark) .tech-main .requirement-scope-tab[role="tab"]:not(.original-okr *) {
+  background: transparent !important;
+  color: var(--text-body) !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+html:not(.dark) .tech-main .requirement-scope-tab[role="tab"][aria-selected="true"]:not(.original-okr *) {
+  background: var(--bg-card) !important;
+  color: var(--primary) !important;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 12%, transparent) !important;
+}
+.dark .tech-main .requirement-scope-tabs[role="tablist"] {
+  background: var(--bg-surface-soft) !important;
+  border: 1px solid var(--border-main) !important;
+  padding: 4px !important;
+}
+.dark .tech-main .requirement-scope-tab[role="tab"] {
+  background: transparent !important;
+  color: var(--text-body) !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+.dark .tech-main .requirement-scope-tab[role="tab"][aria-selected="true"] {
+  background: var(--bg-card) !important;
+  color: var(--primary) !important;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 12%, transparent) !important;
 }
 html:not(.dark) .product-line-card {
   background: #FFFFFF !important;

@@ -71,6 +71,19 @@
   line-height: 22px !important;
 }
 
+/* The DatePicker wrapper owns its border and focus ring, not its inner input. */
+.tech-shell .task-page .work-item-panel .ant-picker .ant-picker-input > input,
+.tech-shell .task-page .work-item-panel .ant-picker .ant-picker-input > input:hover,
+.tech-shell .task-page .work-item-panel .ant-picker .ant-picker-input > input:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  min-height: 0 !important;
+  height: 22px !important;
+}
+
 /* ============================================
    组件样式优化
    ============================================ */

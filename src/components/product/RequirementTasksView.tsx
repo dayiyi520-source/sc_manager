@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { DatePicker, Cascader, Segmented } from "antd";
+import { Badge, Button, DatePicker, Form, Input, InputNumber, Popover, Segmented, Select, Upload } from 'antd';
 import dayjs from 'dayjs';
 import {
   Search,
@@ -8,19 +8,17 @@ import {
   ArrowRight,
   Check,
   FileText,
-  Calendar,
   Sparkles,
   List
 } from '@/components/common/octicons-compat';
 import { MessageSquare, Paperclip, X } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
-import { SearchableSelect, DateField } from '../common';
+import { DateField } from '../common';
 import { DefectBug, DevTask, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { RichTextEditor } from './RichTextEditor';
 import { Pagination } from '../common/Pagination';
-import { InlineEditableSelect } from '../common/InlineEditableSelect';
 import { requirementRepository } from '../../services/requirementRepository';
 import { productRepository } from '../../services/productRepository';
 
@@ -58,6 +56,10 @@ const normalizePriority = (priority: string) => ({
   'P3-低优': '低'
 }[priority] || priority);
 
+const SearchableSelect: React.FC<{ label: string; value: string; options: string[]; onChange: (value: string) => void; placeholder?: string; clearable?: boolean }> = ({ label, value, options, onChange, placeholder = '请选择', clearable }) => (
+  <label className="block text-[var(--text-muted)]"><span>{label}</span><Select showSearch optionFilterProp="label" allowClear={clearable} value={value || undefined} onChange={(next) => onChange(next || '')} options={options.map((option) => ({ label: option, value: option }))} placeholder={placeholder} className="mt-1 w-full" /></label>
+);
+
 // DateField is shared with all task and work-order forms.
 
 const DetailField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
@@ -79,8 +81,8 @@ const DetailTextInput: React.FC<{ label: string; value: string; onSave: (value: 
 const DetailDateInput: React.FC<{ label: string; value?: string; onSave: (value: string) => void }> = ({ label, value = '', onSave }) => <DateField label={label} value={value} onChange={onSave} />;
 
 const WORK_ORDER_TYPES: Array<{ key: RequirementWorkOrderType; label: string }> = [
-  { key: 'requirement', label: '需求' }, { key: 'task', label: '任务' }, { key: 'bug', label: '缺陷' },
-  { key: 'risk', label: '风险' }, { key: 'source', label: '原始诉求' }, { key: 'topic', label: '主题' }
+  { key: 'requirement', label: '客户诉求' }, { key: 'bug', label: '线上问题' }, { key: 'task', label: '售前支持' },
+  { key: 'risk', label: '交付支持' }, { key: 'source', label: '其他问题' }
 ];
 
 const WorkOrderPicker: React.FC<{
@@ -196,6 +198,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const [pageSize, setPageSize] = useState(10);
 
   const [selectedTask, setSelectedTask] = useState<RequirementTask | null>(null);
+  const [detailEditing, setDetailEditing] = useState(false);
   const detailDescriptionEditor = useRef<HTMLDivElement>(null);
   const [detailDescription, setDetailDescription] = useState('');
   const [detailDescriptionHtml, setDetailDescriptionHtml] = useState('');
@@ -209,6 +212,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setDetailDescriptionHtml(selectedTask?.descriptionHtml || '');
     setDetailTab('activity');
     setCommentDraft('');
+    setDetailEditing(false);
   }, [selectedTask?.id]);
 
   useEffect(() => {
@@ -303,7 +307,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
 
   useEffect(() => {
     const handleOutsidePointerDown = (event: PointerEvent) => {
-      if (controlsRef.current?.contains(event.target as Node)) return;
+      const target = event.target as HTMLElement;
+      if (controlsRef.current?.contains(target) || target.closest('.ant-select-dropdown, .ant-picker-dropdown, .ant-popover')) return;
       setSearchOpen(false);
       setSearchOwnerPickerOpen(false);
       setFilterOpen(false);
@@ -390,8 +395,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setIsModalOpen(true);
   };
 
-  const onDocumentMedia = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []) as File[];
+  const appendDocumentMedia = (files: File[]) => {
     const allowed = /\.(txt|doc|docx|xls|xlsx|pdf)$/i;
     files.filter((file) => allowed.test(file.name)).forEach((file) => {
       const reader = new FileReader();
@@ -405,11 +409,9 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       }]);
       reader.readAsDataURL(file);
     });
-    event.target.value = '';
   };
 
-  const handleSaveTask = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveTask = async () => {
     if (!formTitle.trim()) {
       addToast('warning', `请填写${itemLabel}名称`);
       return;
@@ -473,8 +475,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     if (saveSucceeded) setIsModalOpen(false);
   };
 
-  const handleSaveAndContinue = (e: React.MouseEvent) => {
-    void handleSaveTask(e as unknown as React.FormEvent);
+  const handleSaveAndContinue = () => {
+    void handleSaveTask();
     if (formTitle.trim()) window.setTimeout(openAddModal, 0);
   };
 
@@ -603,7 +605,6 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const groupLabel = groupOptions.find(([key]) => key === groupBy)?.[1];
   const visibleGroupOptions = groupOptions.filter(([, label]) => label.includes(groupQuery.trim()));
   const hasSearch = Boolean(searchQuery || searchOwnerNames.length);
-  const filterInputClass = 'h-8 w-full rounded-md border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]';
   const setFilterDate = (field: 'createdAt' | 'plannedStartDate', part: 'from' | 'to', value: string) => {
     setFilterDraft((current) => ({ ...current, [field]: { ...current[field], [part]: value } }));
   };
@@ -618,24 +619,18 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     const value = filterDraft[field];
     return <div className="filter-row grid h-8 grid-cols-[96px_88px_minmax(0,1fr)] items-center rounded-md border border-[var(--border-main)] bg-[var(--bg-card)]">
       <div className="filter-label flex h-full items-center px-3 font-medium text-[var(--text-body)]">{label}</div>
-      <div className="filter-operator flex h-full items-center border-x border-[var(--border-main)] px-2">
-        <select aria-label={`${label}过滤方式`} value={value.operator} onChange={(event) => setMultiFilter(field, { ...value, operator: event.target.value as TextFilterOperator })} className="h-8 w-full border-0 bg-transparent p-0 text-[var(--text-primary)] outline-none">
-          <option value="include">包含</option><option value="exclude">不包含</option>
-        </select>
+      <div className="filter-operator flex h-full items-center border-x border-[var(--border-main)]">
+        <Select aria-label={`${label}过滤方式`} variant="borderless" value={value.operator} onChange={(operator) => setMultiFilter(field, { ...value, operator })} className="w-full" options={[{ label: '包含', value: 'include' }, { label: '不包含', value: 'exclude' }]} />
       </div>
-      <div className="filter-value px-2"><SearchableSelect label={label} hideLabel compact multiple value="" options={options} selectedValues={value.values} onChange={() => undefined} onChangeMultiple={(values) => setMultiFilter(field, { ...value, values })} placeholder="请选择或输入关键字查询" clearable /></div>
+      <div className="filter-value px-2"><Select aria-label={label} variant="borderless" mode="multiple" allowClear showSearch optionFilterProp="label" value={value.values} onChange={(values) => setMultiFilter(field, { ...value, values })} options={options.map((option) => ({ label: option, value: option }))} placeholder="请选择或输入关键字查询" className="w-full" /></div>
     </div>;
   };
   const dateFilterRow = (label: string, field: 'createdAt' | 'plannedStartDate') => {
     const value = filterDraft[field];
-    const dateInput = (part: 'from' | 'to', placeholder: string) => <span className="relative flex h-8 min-w-0 items-center px-3 text-[var(--text-muted)] focus-within:text-[var(--text-primary)]">
-      <span className={`pointer-events-none truncate ${value[part] ? 'text-[var(--text-primary)]' : ''}`}>{value[part] || placeholder}</span>
-      <Calendar className="pointer-events-none absolute right-2.5 h-4 w-4 text-[var(--text-muted)]" />
-      <input aria-label={`${label}${part === 'from' ? '开始' : '结束'}`} type="date" value={value[part]} onChange={(event) => setFilterDate(field, part, event.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-    </span>;
+    const dateInput = (part: 'from' | 'to', placeholder: string) => <DatePicker aria-label={`${label}${part === 'from' ? '开始' : '结束'}`} variant="borderless" value={value[part] ? dayjs(value[part]) : null} onChange={(date) => setFilterDate(field, part, date ? date.format('YYYY-MM-DD') : '')} placeholder={placeholder} className="w-full" />;
     return <div className="filter-row grid h-8 grid-cols-[96px_88px_minmax(0,1fr)] items-center rounded-md border border-[var(--border-main)] bg-[var(--bg-card)]">
       <div className="filter-label flex h-full items-center px-3 font-medium text-[var(--text-body)]">{label}</div>
-      <div className="filter-operator flex h-full items-center border-x border-[var(--border-main)] px-2"><select aria-label={`${label}过滤方式`} value={value.operator} onChange={(event) => setFilterDraft((current) => ({ ...current, [field]: { ...value, operator: event.target.value as DateFilterOperator, to: event.target.value === 'between' ? value.to : '' } }))} className="h-8 w-full border-0 bg-transparent p-0 text-[var(--text-primary)] outline-none"><option value="between">介于</option><option value="equals">等于</option><option value="after">大于</option><option value="before">小于</option></select></div>
+      <div className="filter-operator flex h-full items-center border-x border-[var(--border-main)]"><Select aria-label={`${label}过滤方式`} variant="borderless" value={value.operator} onChange={(operator) => setFilterDraft((current) => ({ ...current, [field]: { ...value, operator, to: operator === 'between' ? value.to : '' } }))} className="w-full" options={[{ label: '介于', value: 'between' }, { label: '等于', value: 'equals' }, { label: '大于', value: 'after' }, { label: '小于', value: 'before' }]} /></div>
       <div className={`grid items-center gap-2 px-2 ${value.operator === 'between' ? 'grid-cols-[1fr_auto_1fr]' : 'grid-cols-1'}`}>
         {dateInput('from', value.operator === 'between' ? '起始日期' : '选择日期')}
         {value.operator === 'between' && <><span className="text-center text-[var(--text-muted)]">-</span>{dateInput('to', '结束日期')}</>}
@@ -649,42 +644,45 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       <div ref={controlsRef} className="task-page-toolbar bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3 text-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           {/* 分类 */}
-          <div className="app-segmented flex rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800">
-            {([['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的']] as const).map(([key, label]) => (
-              <button key={key} onClick={() => setActiveTab(key)} className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-medium transition-colors ${activeTab === key ? 'border-slate-200/80 bg-white font-semibold text-[var(--primary)] shadow-2xs dark:border-[var(--border-main)] dark:bg-[var(--bg-surface)] dark:text-[var(--active-text)]' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-[var(--text-muted)] dark:hover:text-[var(--text-primary)]'}`}>
-                {label}·{tabCounts[key]}
-              </button>
-            ))}
+          <div role="tablist" aria-label={`${itemLabel}范围`} className="requirement-scope-tabs inline-flex h-10 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">
+            {([['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeTab === value} onClick={() => setActiveTab(value)} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{tabCounts[value]}</button>)}
           </div>
 
           <div className="flex items-center gap-2">
             <div className="relative flex items-center gap-1">
               <div className="flex h-8 items-center">
                 <div className={`relative overflow-hidden transition-[width,opacity] duration-200 ease-out ${searchOpen ? 'mr-1 w-64 opacity-100' : 'w-0 opacity-0'}`}>
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" /><input autoFocus={searchOpen} value={searchDraft} onChange={(event) => { const nextValue = event.target.value; if (nextValue.includes('@')) { setSearchDraft(nextValue.replaceAll('@', '')); setSearchOwnerPickerOpen(true); } else { setSearchDraft(nextValue); } }} onKeyDown={(event) => { event.stopPropagation(); if (event.key === 'Enter') { event.preventDefault(); applySearch(); } }} placeholder="输入标题或@负责人" className="app-control h-8 w-64 pl-8 pr-3 text-xs" />
+                  <Input autoFocus={searchOpen} allowClear prefix={<Search className="h-4 w-4" />} value={searchDraft} onChange={(event) => { const nextValue = event.target.value; if (nextValue.includes('@')) { setSearchDraft(nextValue.replaceAll('@', '')); setSearchOwnerPickerOpen(true); } else { setSearchDraft(nextValue); } }} onPressEnter={applySearch} placeholder="输入标题或@负责人" className="w-64" />
                 </div>
               </div>
-              <button type="button" aria-label="搜索" aria-pressed={searchOpen} onClick={() => { setSearchOpen((open) => !open); setSearchOwnerPickerOpen(false); setFilterOpen(false); setGroupOpen(false); }} className={`rounded-lg p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${searchOpen ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}><Search className="h-4 w-4" /></button>
-              <button type="button" aria-label="过滤器" aria-pressed={filterOpen} onClick={() => { setFilterDraft(appliedFilters); setFilterOpen((open) => !open); setSearchOpen(false); setSearchOwnerPickerOpen(false); setGroupOpen(false); }} className={`relative rounded-lg p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${filterOpen || activeFilterCount ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-blue-600 px-1 text-center text-[10px] leading-4 text-white">{activeFilterCount}</span>}</button>
-              <button type="button" aria-label="分组" aria-pressed={groupOpen} onClick={() => { setGroupOpen((open) => !open); setFilterOpen(false); setSearchOpen(false); setSearchOwnerPickerOpen(false); }} className={`rounded-lg p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${groupOpen ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}><List className="h-4 w-4" /></button>
-              {searchOpen && searchOwnerPickerOpen && <div className="absolute left-0 top-11 z-40 w-[min(88vw,300px)]"><SearchableSelect label="搜索负责人" hideLabel hideTrigger open={searchOwnerPickerOpen} onOpenChange={setSearchOwnerPickerOpen} compact multiple value="" options={employees} selectedValues={searchOwnerNames} onChange={() => undefined} onChangeMultiple={setSearchOwnerNames} placeholder="搜索负责人" clearable /></div>}
-              {groupOpen && <div className="absolute right-0 top-11 z-40 w-64 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 shadow-xl"><div className="mb-2 flex items-center gap-2 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface)] px-2"><Search className="h-4 w-4 text-[var(--text-muted)]" /><input value={groupQuery} onChange={(event) => setGroupQuery(event.target.value)} placeholder="搜索..." className="h-8 min-w-0 flex-1 bg-transparent text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]" /></div>{visibleGroupOptions.map(([key, label]) => <button key={key} type="button" onClick={() => { setGroupBy(key); setGroupValue(''); setGroupOpen(false); }} className="flex w-full items-center justify-between px-1 py-2 text-left text-[var(--text-primary)] hover:text-[var(--primary)]">按{label}分组{groupBy === key && <Check className="h-4 w-4 text-emerald-500" />}</button>)}<button type="button" onClick={() => { setGroupBy('none'); setGroupValue(''); setGroupOpen(false); }} className="flex w-full items-center justify-between border-t border-[var(--border-main)] px-1 py-2 text-left text-[var(--text-primary)] hover:text-[var(--primary)]">取消分组{groupBy === 'none' && <Check className="h-4 w-4 text-emerald-500" />}</button></div>}
+              <Button type="text" aria-label="搜索" aria-pressed={searchOpen} onClick={() => { setSearchOpen((open) => !open); setSearchOwnerPickerOpen(false); setFilterOpen(false); setGroupOpen(false); }} icon={<Search className="h-4 w-4" />} />
+              <Badge count={activeFilterCount} size="small" offset={[-2, 2]}>
+                <Button type="text" aria-label="过滤器" aria-pressed={filterOpen} onClick={() => { setFilterDraft(appliedFilters); setFilterOpen((open) => !open); setSearchOpen(false); setSearchOwnerPickerOpen(false); setGroupOpen(false); }} icon={<Filter className="h-4 w-4" />} />
+              </Badge>
+              <Popover
+                trigger="click"
+                open={groupOpen}
+                onOpenChange={(open) => { setGroupOpen(open); if (open) { setFilterOpen(false); setSearchOpen(false); setSearchOwnerPickerOpen(false); } }}
+                placement="bottomRight"
+                content={<div className="w-48 space-y-2"><Input allowClear prefix={<Search className="h-4 w-4" />} value={groupQuery} onChange={(event) => setGroupQuery(event.target.value)} placeholder="搜索分组字段" />{visibleGroupOptions.map(([key, label]) => <Button block style={{ justifyContent: 'flex-start', textAlign: 'left' }} type="text" key={key} onClick={() => { setGroupBy(key); setGroupValue(''); setGroupOpen(false); }}>{`按${label}分组`}{groupBy === key && <Check className="ml-auto h-4 w-4" />}</Button>)}<Button block style={{ justifyContent: 'flex-start', textAlign: 'left' }} type="text" onClick={() => { setGroupBy('none'); setGroupValue(''); setGroupOpen(false); }}>取消分组{groupBy === 'none' && <Check className="ml-auto h-4 w-4" />}</Button></div>}
+              >
+                <Button type="text" aria-label="分组" aria-pressed={groupOpen} icon={<List className="h-4 w-4" />} />
+              </Popover>
+              {searchOpen && searchOwnerPickerOpen && <div className="absolute left-0 top-11 z-40 w-[min(88vw,300px)]"><Select aria-label="搜索负责人" mode="multiple" autoFocus open={searchOwnerPickerOpen} onDropdownVisibleChange={setSearchOwnerPickerOpen} showSearch allowClear optionFilterProp="label" value={searchOwnerNames} onChange={setSearchOwnerNames} options={employees.map((name) => ({ label: name, value: name }))} placeholder="搜索负责人" className="w-full" /></div>}
             </div>
-            <button
+            <Button
+              type="primary"
               id="btn-add-req-task"
               onClick={openAddModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              新建{itemLabel}
-            </button>
+              icon={<Plus className="h-3.5 w-3.5" />}
+            >新建{itemLabel}</Button>
           </div>
         </div>
         {filterOpen && <div className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-4">
           <div className="grid gap-2 overflow-visible lg:grid-cols-2">
             <div className="filter-row grid h-8 grid-cols-[96px_minmax(0,1fr)] items-center rounded-md border border-[var(--border-main)] bg-[var(--bg-card)]">
               <div className="filter-label flex h-full items-center px-3 font-medium text-[var(--text-body)]">标题</div>
-              <div className="filter-value flex h-full items-center border-l border-[var(--border-main)] px-2"><input value={filterDraft.title.value} onChange={(event) => setFilterDraft((current) => ({ ...current, title: { ...current.title, value: event.target.value } }))} className={`${filterInputClass} h-8 border-0 bg-transparent p-0 focus:border-0`} placeholder="请输入标题关键词" /></div>
+              <div className="filter-value flex h-full items-center border-l border-[var(--border-main)] px-2"><Input aria-label="标题过滤值" variant="borderless" value={filterDraft.title.value} onChange={(event) => setFilterDraft((current) => ({ ...current, title: { ...current.title, value: event.target.value } }))} placeholder="请输入标题关键词" /></div>
             </div>
             {multiFilterRow('状态', 'status', STAGES)}
             {multiFilterRow('负责人', 'owner', employees)}
@@ -695,7 +693,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
             {dateFilterRow('计划开始时间', 'plannedStartDate')}
             {multiFilterRow('参与人', 'cc', ccOptions)}
           </div>
-          <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={clearFilters} className="app-button-secondary h-8 px-3 text-xs">清空</button><button type="button" onClick={() => { setAppliedFilters(filterDraft); setFilterOpen(false); }} className="tech-button-primary h-8 rounded-lg px-3 text-xs">应用过滤</button></div>
+          <div className="mt-3 flex justify-end gap-2"><Button onClick={clearFilters}>清空</Button><Button type="primary" onClick={() => { setAppliedFilters(filterDraft); setFilterOpen(false); }}>应用过滤</Button></div>
         </div>}
         {(hasSearch || activeFilterCount > 0) && <div className="flex min-h-11 flex-wrap items-center gap-2 border-b border-[var(--border-main)] px-1 py-2 text-[11px]">
           {hasSearch && <span className="group/tag inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">搜索：{searchQuery || '负责人'}{searchOwnerNames.length ? ` · ${searchOwnerNames.join('、')}` : ''}<button type="button" aria-label="清除搜索" onClick={() => { setSearchDraft(''); setSearchQuery(''); setSearchOwnerNames([]); }} className="opacity-0 transition-opacity group-hover/tag:opacity-100"><X className="h-3 w-3" /></button></span>}
@@ -718,7 +716,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                   <th className="py-3 px-4">标题</th>
                   <th className="py-3 px-4">状态</th>
                   <th className="py-3 px-4">优先级</th>
-                  <th className="py-3 px-4">产品线</th>
+                  <th className="py-3 px-4">迭代版本</th>
                   <th className="py-3 px-4">负责人</th>
                   <th className="py-3 px-4">创建人</th>
                   <th className="py-3 px-4">创建时间</th>
@@ -736,16 +734,16 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                       <button type="button" onClick={() => setSelectedTask(t)} className="line-clamp-2 max-w-[320px] text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]" title={t.title}>{t.title}</button>
                     </td>
                     <td className="py-3.5 px-4">
-                      <InlineEditableSelect value={t.status} options={STAGES} tone="status" onChange={(status) => updateTask(t.id, { status })} />
+                      <Select aria-label={`${t.title}状态`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={t.status} options={STAGES.map((status, index) => ({ label: status, value: status, disabled: index < STAGES.indexOf(t.status) }))} onChange={(status) => updateTask(t.id, { status })} />
                     </td>
                     <td className="py-3.5 px-4">
                       <StatusTag status={normalizePriority(t.priority)} />
                     </td>
                     <td className="max-w-[240px] py-3.5 px-4 text-slate-600 dark:text-slate-400">
-                      <span className="line-clamp-2" title={`${t.productLineName || '未设置'} · ${t.versionName || '未关联'}`}>{t.productLineName || '未设置'} · <span className="font-mono text-blue-600">{t.versionName || '未关联'}</span></span>
+                      <span className="line-clamp-2 font-mono text-blue-600" title={t.versionName || '未关联'}>{t.versionName || '未关联'}</span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-500">
-                      <InlineEditableSelect value={t.ownerName} options={employees} onChange={(ownerName) => updateTask(t.id, { ownerName })} />
+                      <Select aria-label={`${t.title}负责人`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={t.ownerName || undefined} placeholder="未设置" options={employees.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => updateTask(t.id, { ownerName })} />
                     </td>
                     <td className="py-3.5 px-4 text-slate-500">
                       {t.creatorName || currentUser.name}
@@ -783,16 +781,17 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           showContinueOption={false}
           footer={
             <>
+              <Button type="primary" ghost={!detailEditing} onClick={() => setDetailEditing((value) => !value)}>{detailEditing ? '保存' : '编辑'}</Button>
               <button
                 type="button"
                 onClick={() => setSelectedTask(null)}
-                className="tech-button-primary h-10 rounded-lg px-4 text-xs font-semibold"
+                className="h-10 rounded-lg border border-[var(--border-main)] px-4 text-xs font-semibold text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]"
               >
                 关闭
               </button>
             </>
           }
-          properties={<div className="space-y-6 text-xs">
+          properties={<div className={`space-y-6 text-xs ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
               <SearchableSelect label="当前状态" value={selectedTask.status} options={STAGES} onChange={(status) => saveDetailUpdates({ status })} />
@@ -819,9 +818,11 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           </div>}
         >
           <div className="w-full space-y-5 text-xs">
-            <DetailTextInput label={`${itemLabel}名称`} value={selectedTask.title} onSave={(title) => title.trim() && saveDetailUpdates({ title })} />
-            <DetailTextInput label="验收标准" value={selectedTask.expectedGoal || ''} onSave={(expectedGoal) => saveDetailUpdates({ expectedGoal })} multiline />
-            <label className="block text-[var(--text-muted)]"><span>任务描述</span><div className="mt-1"><RichTextEditor editor={detailDescriptionEditor} value={detailDescription} htmlValue={detailDescriptionHtml} onInput={(text, html) => { setDetailDescription(text); setDetailDescriptionHtml(html); }} onBlur={() => saveDetailUpdates({ description: detailDescription, descriptionHtml: detailDescriptionHtml })} placeholder="详细记录需求背景、业务场景和实现说明..." /></div></label>
+            <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
+              <DetailTextInput label={`${itemLabel}名称`} value={selectedTask.title} onSave={(title) => title.trim() && saveDetailUpdates({ title })} />
+              <DetailTextInput label="验收标准" value={selectedTask.expectedGoal || ''} onSave={(expectedGoal) => saveDetailUpdates({ expectedGoal })} multiline />
+              <label className="block text-[var(--text-muted)]"><span>任务描述</span><div className="mt-1"><RichTextEditor key={`${selectedTask.id}-${detailEditing ? 'edit' : 'view'}`} readOnly={!detailEditing} editor={detailDescriptionEditor} value={detailDescription} htmlValue={detailDescriptionHtml} onInput={(text, html) => { setDetailDescription(text); setDetailDescriptionHtml(html); }} onBlur={() => saveDetailUpdates({ description: detailDescription, descriptionHtml: detailDescriptionHtml })} placeholder="详细记录需求背景、业务场景和实现说明..." /></div></label>
+            </div>
             <section className="border-t border-[var(--border-main)] pt-4">
               <div className="mb-4 border-b border-[var(--border-main)] px-3 py-2">
                 <Segmented
@@ -834,7 +835,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                 />
               </div>
               {detailTab === 'workOrders' ? (
-                <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={updateLinkedWorkOrders} placeholder="选择关联工单" />
+                <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={detailEditing ? updateLinkedWorkOrders : () => undefined} placeholder="选择关联工单" />
               ) : (
                 <div className="space-y-5">
                   <div className="space-y-4">
@@ -848,8 +849,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                     }) : <p className="text-[var(--text-muted)]">暂无动态记录</p>}
                   </div>
                   <div className="border-t border-[var(--border-main)] pt-4">
-                    <label className="block text-[var(--text-muted)]"><span>发表评论</span><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} rows={4} placeholder="记录进展、问题或需要协同的事项..." className="mt-2 min-h-24 w-full resize-y rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 py-2 leading-6 text-[var(--text-primary)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20" /></label>
-                    <div className="mt-3 flex justify-end"><button type="button" onClick={submitComment} disabled={!commentDraft.trim()} className="tech-button-primary inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"><MessageSquare className="h-3.5 w-3.5" />发布评论</button></div>
+                    <label className="block text-[var(--text-muted)]"><span>发表评论</span><textarea disabled={!detailEditing} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} rows={4} placeholder={detailEditing ? '记录进展、问题或需要协同的事项...' : '点击编辑后可发表评论'} className="mt-2 min-h-24 w-full resize-y rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 py-2 leading-6 text-[var(--text-primary)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-60" /></label>
+                    <div className="mt-3 flex justify-end"><button type="button" onClick={submitComment} disabled={!detailEditing || !commentDraft.trim()} className="tech-button-primary inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"><MessageSquare className="h-3.5 w-3.5" />发布评论</button></div>
                   </div>
                 </div>
               )}
@@ -864,162 +865,37 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         onClose={() => setIsModalOpen(false)}
         title={editingTask ? `编辑${itemLabel}` : `新建${itemLabel}`}
         showContinueOption={!editingTask}
-        secondaryAction={!editingTask ? <button type="button" onClick={handleSaveAndContinue} className="app-button-secondary h-10 px-4 text-xs font-semibold">保存并继续</button> : undefined}
+        secondaryAction={!editingTask ? <Button onClick={handleSaveAndContinue}>保存并继续</Button> : undefined}
         footer={
           <>
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="app-button-secondary h-10 px-4 text-xs font-semibold"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSaveTask}
-              className="tech-button-primary h-10 rounded-lg px-4 text-xs font-semibold"
-            >
-              保存
-            </button>
+            <Button onClick={() => setIsModalOpen(false)}>取消</Button>
+            <Button type="primary" onClick={() => void handleSaveTask()}>保存</Button>
           </>
         }
-        properties={<div className="space-y-6 text-xs">
-          <section className="space-y-3">
-            <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">需求类型 <span className="text-red-500">*</span></label>
-            <Cascader
-              showSearch
-              value={formRequirementType ? [formRequirementType] : undefined}
-              onChange={(value: any) => setFormRequirementType(value?.[0] || '')}
-              options={['业务需求', '产品优化', '技术需求', '合规需求'].map((opt: string) => ({ label: opt, value: opt }))}
-              placeholder="请选择需求类型"
-              className="w-full"
-            />
-          </div>
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">负责人 <span className="text-red-500">*</span></label>
-            <Cascader
-              showSearch
-              value={formOwnerName ? [formOwnerName] : undefined}
-              onChange={(value: any) => setFormOwnerName(value?.[0] || '')}
-              options={employees.map((opt: string) => ({ label: opt, value: opt }))}
-              placeholder="搜索并选择负责人"
-              className="w-full"
-            />
-          </div>
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">优先级 <span className="text-red-500">*</span></label>
-            <Cascader
-              showSearch
-              value={formPriority ? [formPriority] : undefined}
-              onChange={(value: any) => (value) => setFormPriority(value as RequirementTask['priority'])(value?.[0] || '')}
-              options={['紧急', '高', '中', '低'].map((opt: string) => ({ label: opt, value: opt }))}
-              placeholder="请选择优先级"
-              className="w-full"
-            />
-          </div>
-            <SearchableSelect label="所属产品线" required value={formProductLineName} options={productLines.map((pl) => pl.name)} onChange={(value) => { setFormProductLineName(value); setFormVersionName(''); }} placeholder="请选择所属产品线" />
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">计划开始时间 <span className="text-red-500">*</span></label>
-            <DatePicker
-              value={formPlannedStartDate ? dayjs(formPlannedStartDate) : null}
-              onChange={(date) => setFormPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')}
-              className="w-full"
-              placeholder="选择日期"
-            />
-          </div>
-            <div className="flex flex-col gap-1.5" required>
-            <label className="text-xs font-medium text-[var(--text-primary)]">计划完成时间 <span className="text-red-500">*</span></label>
-            <DatePicker
-              value={formDueDate ? dayjs(formDueDate) : null}
-              onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')}
-              className="w-full"
-              placeholder="选择日期"
-            />
-          </div>
-            <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[var(--text-muted)]">期望完成时间</label>
-            <DatePicker
-              value={formExpectedCompleteDate ? dayjs(formExpectedCompleteDate) : null}
-              onChange={(date) => setFormExpectedCompleteDate(date ? date.format('YYYY-MM-DD') : '')}
-              className="w-full"
-              placeholder="选择日期"
-            />
-          </div>
-            <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[var(--text-muted)]">迭代版本</label>
-            <Cascader
-              showSearch allowClear
-              value={formVersionName ? [formVersionName] : undefined}
-              onChange={(value: any) => setFormVersionName(value?.[0] || '')}
-              options={versions.filter((v) => !v.productLineName || v.productLineName === formProductLineName).map((v) => v.name).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
-              placeholder="暂不关联"
-              className="w-full"
-            />
-          </div>
-            <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[var(--text-muted)]">关联客户</label>
-            <Cascader
-              showSearch allowClear
-              value={formCustomerName ? [formCustomerName] : undefined}
-              onChange={(value: any) => setFormCustomerName(value?.[0] || '')}
-              options={customers.map((c) => c.name).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)}
-              placeholder="暂不关联"
-              className="w-full"
-            />
-          </div>
-            <SearchableSelect label="参与人" value="" options={employees.filter((name) => !formCcNames.includes(name))} onChange={(name) => setFormCcNames((items) => [...items, name])} placeholder="搜索并选择参与人" />
-            {formCcNames.length > 0 && <div className="flex flex-wrap gap-1.5">{formCcNames.map((name) => <span key={name} className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{name}<button type="button" aria-label={`移除参与人${name}`} onClick={() => setFormCcNames((items) => items.filter((item) => item !== name))}><X className="h-3 w-3" /></button></span>)}</div>}
-          </section>
-          <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
-            <h3 className="font-semibold text-[var(--text-primary)]">工时</h3>
-            <label className="block text-[var(--text-muted)]">预计工时（小时）<input min="0" type="number" value={formEstimatedHours} onChange={(e) => setFormEstimatedHours(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" /></label>
-          </section>
-          <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
-            <h3 className="font-semibold text-[var(--text-primary)]">附件</h3>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-3 text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)]"><Paperclip className="h-4 w-4" />添加文档附件<input type="file" accept=".txt,.doc,.docx,.xls,.xlsx,.pdf" multiple className="sr-only" onChange={onDocumentMedia} /></label>
-            {formMedia.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-lg bg-[var(--bg-surface-soft)] p-2 text-[var(--text-body)]"><FileText className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{item.name}</span><button type="button" aria-label={`移除附件${item.name}`} onClick={() => setFormMedia((items) => items.filter((media) => media.id !== item.id))}><X className="h-4 w-4" /></button></div>)}
-          </section>
-        </div>}
+        properties={<Form layout="vertical" className="requirement-create-properties" requiredMark>
+          <Form.Item label="需求类型" required><Select showSearch optionFilterProp="label" value={formRequirementType || undefined} onChange={setFormRequirementType} options={['业务需求', '产品优化', '技术需求', '合规需求'].map((value) => ({ label: value, value }))} placeholder="请选择需求类型" /></Form.Item>
+          <Form.Item label="负责人" required><Select showSearch optionFilterProp="label" value={formOwnerName || undefined} onChange={setFormOwnerName} options={employees.map((value) => ({ label: value, value }))} placeholder="搜索并选择负责人" /></Form.Item>
+          <Form.Item label="优先级" required><Select value={formPriority || undefined} onChange={(value) => setFormPriority(value)} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>
+          <Form.Item label="所属产品线" required><Select showSearch optionFilterProp="label" value={formProductLineName || undefined} onChange={(value) => { setFormProductLineName(value); setFormVersionName(''); }} options={productLines.map((line) => ({ label: line.name, value: line.name }))} placeholder="请选择所属产品线" /></Form.Item>
+          <Form.Item label="计划开始时间" required><DatePicker value={formPlannedStartDate ? dayjs(formPlannedStartDate) : null} onChange={(date) => setFormPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
+          <Form.Item label="计划完成时间" required><DatePicker value={formDueDate ? dayjs(formDueDate) : null} onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
+          <Form.Item label="期望完成时间"><DatePicker value={formExpectedCompleteDate ? dayjs(formExpectedCompleteDate) : null} onChange={(date) => setFormExpectedCompleteDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
+          <Form.Item label="迭代版本"><Select showSearch allowClear optionFilterProp="label" value={formVersionName || undefined} onChange={(value) => setFormVersionName(value || '')} options={versions.filter((version) => !version.productLineName || version.productLineName === formProductLineName).map((version) => ({ label: version.name, value: version.name }))} placeholder="暂不关联" /></Form.Item>
+          <Form.Item label="关联客户"><Select showSearch allowClear optionFilterProp="label" value={formCustomerName || undefined} onChange={(value) => setFormCustomerName(value || '')} options={customers.map((customer) => ({ label: customer.name, value: customer.name }))} placeholder="暂不关联" /></Form.Item>
+          <Form.Item label="参与人"><Select mode="multiple" showSearch allowClear optionFilterProp="label" value={formCcNames} onChange={setFormCcNames} options={employees.map((value) => ({ label: value, value }))} placeholder="搜索并选择参与人" /></Form.Item>
+          <Form.Item label="预计工时（小时）"><InputNumber min={0} value={formEstimatedHours === '' ? null : formEstimatedHours} onChange={(value) => setFormEstimatedHours(value ?? '')} className="w-full" placeholder="请输入预计工时" /></Form.Item>
+          <Form.Item label="附件">
+            <Upload accept=".txt,.doc,.docx,.xls,.xlsx,.pdf" multiple showUploadList={false} beforeUpload={(file) => { appendDocumentMedia([file]); return Upload.LIST_IGNORE; }}><Button block icon={<Paperclip className="h-4 w-4" />}>添加文档附件</Button></Upload>
+            {formMedia.map((item) => <div key={item.id} className="mt-2 flex items-center gap-2 text-[var(--text-body)]"><FileText className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{item.name}</span><Button type="text" danger size="small" aria-label={`移除附件${item.name}`} onClick={() => setFormMedia((items) => items.filter((media) => media.id !== item.id))} icon={<X className="h-4 w-4" />} /></div>)}
+          </Form.Item>
+        </Form>}
       >
-        <form onSubmit={handleSaveTask} className="w-full space-y-5 text-xs" data-work-item-form>
-          <div className="space-y-5">
-            <div className="col-span-2">
-              <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                {itemLabel}名称 *
-              </label>
-              <input
-                type="text"
-                value={formTitle}
-                onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="例如：支持达梦DM8数据库读写分离与主备秒级切换"
-                className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                验收标准
-              </label>
-              <input
-                type="text"
-                value={formTarget}
-                onChange={(e) => setFormTarget(e.target.value)}
-                placeholder="例如：通过自动化单测，支撑压测 QPS 突破 5000"
-                className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                任务描述
-              </label>
-              <RichTextEditor editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} placeholder="详细记录需求背景、业务场景和实现说明..." />
-            </div>
-
-            <label className="block text-[var(--text-muted)]"><span>关联对象</span><WorkOrderPicker candidates={candidateOptions.filter((item) => item.id !== editingTask?.id)} selectedIds={[...selectedRequirementTaskIds, ...selectedWorkOrderIds]} onChange={(ids) => { const selectedId = ids.slice(-1)[0] || ''; const selectedItem = candidateOptions.find((item) => item.id === selectedId); setSelectedRequirementTaskIds(selectedItem?.type === 'requirement' ? [selectedId] : []); setSelectedWorkOrderIds(selectedItem && selectedItem.type !== 'requirement' ? [selectedId] : []); }} placeholder="请选择关联需求或工单" /></label>
-          </div>
-        </form>
+        <Form layout="vertical" className="w-full" data-work-item-form>
+          <Form.Item label={`${itemLabel}名称`} required><Input value={formTitle} onChange={(event) => setFormTitle(event.target.value)} placeholder="例如：支持达梦DM8数据库读写分离与主备秒级切换" /></Form.Item>
+          <Form.Item label="验收标准"><Input value={formTarget} onChange={(event) => setFormTarget(event.target.value)} placeholder="例如：通过自动化单测，支撑压测 QPS 突破 5000" /></Form.Item>
+          <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} placeholder="详细记录需求背景、业务场景和实现说明..." /></Form.Item>
+          <Form.Item label="关联对象"><WorkOrderPicker candidates={candidateOptions.filter((item) => item.id !== editingTask?.id)} selectedIds={[...selectedRequirementTaskIds, ...selectedWorkOrderIds]} onChange={(ids) => { const selectedId = ids.slice(-1)[0] || ''; const selectedItem = candidateOptions.find((item) => item.id === selectedId); setSelectedRequirementTaskIds(selectedItem?.type === 'requirement' ? [selectedId] : []); setSelectedWorkOrderIds(selectedItem && selectedItem.type !== 'requirement' ? [selectedId] : []); }} placeholder="请选择关联工单" /></Form.Item>
+        </Form>
       </WorkItemCreatePanel>
     </div>
   );
