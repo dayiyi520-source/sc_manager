@@ -35,4 +35,12 @@ class OkrPolicyTest {
         assertThrows(IllegalArgumentException.class, () -> OkrPolicy.period(start,start.minusDays(1)));
         assertThrows(IllegalArgumentException.class, () -> OkrPolicy.period(start,start.plusMonths(2)));
     }
+ @org.junit.jupiter.api.Test void completedWorkRejectsUnfinishedCancelledAndOutsidePeriod() {
+  var start=java.time.LocalDate.of(2026,9,14);var end=start.plusDays(6);
+  org.junit.jupiter.api.Assertions.assertDoesNotThrow(()->com.shichuang.manage.okr.service.OkrPolicy.completedWork("已完成",start,start,end));
+  org.junit.jupiter.api.Assertions.assertDoesNotThrow(()->com.shichuang.manage.okr.service.OkrPolicy.completedWork("已关闭",end,start,end));
+  for(String state:java.util.List.of("进行中","已取消","已驳回"))org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->com.shichuang.manage.okr.service.OkrPolicy.completedWork(state,start,start,end));
+  org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->com.shichuang.manage.okr.service.OkrPolicy.completedWork("已完成",start.minusDays(1),start,end));
+  org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->com.shichuang.manage.okr.service.OkrPolicy.completedWork("已完成",end.plusDays(1),start,end));
+ }
 }

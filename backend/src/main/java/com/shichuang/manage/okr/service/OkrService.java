@@ -29,7 +29,7 @@ import java.util.*;
  private Map<String,Object> person(String id){return people().stream().filter(p->id.equals(p.get("id"))).findFirst().orElseThrow(()->new IllegalArgumentException("人员不存在或已停用"));}
  private Map<String,Object> inputPayload(Object input,String kind){
   var value=payload(input);var result=new LinkedHashMap<String,Object>();
-  var keys="objective".equals(kind)?List.of("title","parentObjectiveId","parentKeyResultId","keyResults"):List.of("title","startDate","endDate","summary","items");
+  var keys="objective".equals(kind)?List.of("title","parentObjectiveId","parentKeyResultId","keyResults","weight","deadline"):List.of("title","startDate","endDate","summary","items","reviewMode","reviewType","selfScore","uncompletedReason","suggestions","helpNeeded","sendTo");
   for(String key:keys)if(value.containsKey(key))result.put(key,value.get(key));
   if("review".equals(kind)){
    var items=new ArrayList<Map<String,Object>>();
@@ -42,7 +42,10 @@ import java.util.*;
  private int integer(Object value,int min,int max){if(!(value instanceof Number n)||n.doubleValue()!=n.intValue()||n.intValue()<min||n.intValue()>max)throw new IllegalArgumentException("数值范围须为 "+min+" 至 "+max);return n.intValue();}
  private List<Map<String,Object>> rows(Object value){if(!(value instanceof List<?> list)||list.size()>500)throw new IllegalArgumentException("请检查明细数量");return list.stream().map(this::payload).toList();}
  private void validateObjective(String owner,String period,Map<String,Object> p){
-  required(p,"title");java.time.YearMonth month;
+  required(p,"title");
+  if(p.containsKey("weight"))integer(p.get("weight"),0,100);
+  if(p.containsKey("deadline"))try{java.time.LocalDate.parse(required(p,"deadline"));}catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("目标截止日期无效");}
+  java.time.YearMonth month;
   try{month=java.time.YearMonth.parse(period);}catch(Exception e){throw new IllegalArgumentException("目标周期须为月份");}
   String parentId=Objects.toString(p.get("parentObjectiveId"),"");
   Map<String,Object> parent=parentId.isBlank()?null:record(parentId);
@@ -70,6 +73,14 @@ import java.util.*;
   required(p,"title");
   java.time.LocalDate start,end;try{start=java.time.LocalDate.parse(required(p,"startDate"));end=java.time.LocalDate.parse(required(p,"endDate"));}catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("复盘日期无效");}
   OkrPolicy.period(start,end);
+  boolean completedOnly="completed".equals(p.get("reviewMode"));
+  if(completedOnly){
+   if(!Set.of("week","month").contains(Objects.toString(p.get("reviewType"),"")))throw new IllegalArgumentException("请选择周或月复盘");
+   integer(p.get("selfScore"),0,100);
+   if(submitting)required(p,"summary");
+   for(String key:List.of("summary","uncompletedReason","suggestions","helpNeeded"))if(Objects.toString(p.get(key),"").length()>2000)throw new IllegalArgumentException("复盘文本不能超过2000字");
+   if(!(p.get("sendTo") instanceof List<?> recipients)||recipients.size()>100||recipients.stream().anyMatch(v->!(v instanceof String text)||text.length()>100))throw new IllegalArgumentException("参与人格式无效");
+  }
   var available=work(owner);var seen=new HashSet<String>();
   var entries=rows(p.getOrDefault("items",List.of()));
   for(var entry:entries){
@@ -79,7 +90,10 @@ import java.util.*;
    var updated=java.time.LocalDate.parse(source.get("updatedAt").toString().substring(0,10));
    if(created.isAfter(end)||Set.of("已完成","已发布","已验收","已关闭","已取消","已驳回").contains(source.get("status"))&&updated.isBefore(start))throw new IllegalArgumentException("工作项不在本期范围内，请重新归集");
    entry.put("title",source.get("title"));entry.put("status",source.get("status"));entry.put("sourceWorkOrderIds",source.get("sourceWorkOrderIds"));
-   if(submitting)required(entry,"result");
+   if(completedOnly){
+    OkrPolicy.completedWork(source.get("status").toString(),updated,start,end);
+    entry.remove("objectiveId");entry.remove("keyResultId");entry.remove("affectedObjectiveId");entry.remove("affectedKeyResultId");
+   }else if(submitting)required(entry,"result");
    String affected=Objects.toString(entry.get("affectedObjectiveId"),"");
    if(!affected.isBlank()){
     var target=record(affected);
@@ -103,8 +117,10 @@ import java.util.*;
  @Transactional public Map<String,Object> create(Map<String,Object>b){
   String kind=required(b,"kind"),period=required(b,"periodKey");if(!Set.of("objective","review").contains(kind))throw new IllegalArgumentException("记录类型无效");
   var p=inputPayload(b.getOrDefault("payload",Map.of()),kind);String owner=RequestContext.userId();
-  if("objective".equals(kind))validateObjective(owner,period,p);else validateReview(owner,p,false);
-  String id=UUID.randomUUID().toString(),data=encode(p);mapper.insert(RequestContext.tenantId(),id,kind,owner,period,"draft",data);mapper.event(RequestContext.tenantId(),id,"create",owner,data);return Map.of("id",id,"status","draft","version",0);
+  boolean submit=Boolean.TRUE.equals(b.get("submit"));
+  if("objective".equals(kind))validateObjective(owner,period,p);else validateReview(owner,p,submit);
+  String state=submit?("objective".equals(kind)?(root(owner)?"active":"pending_review"):"submitted"):"draft";
+  String id=UUID.randomUUID().toString(),data=encode(p);mapper.insert(RequestContext.tenantId(),id,kind,owner,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit":"create",owner,data);return Map.of("id",id,"status",state,"version",0);
  }
  @Transactional public void update(String id,Map<String,Object>b){
   Map<String,Object>s=record(id);String owner=s.get("ownerId").toString(),state=s.get("status").toString(),action=required(b,"action"),kind=s.get("kind").toString();

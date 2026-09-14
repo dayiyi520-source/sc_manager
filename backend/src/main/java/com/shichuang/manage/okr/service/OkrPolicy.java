@@ -42,6 +42,13 @@ public final class OkrPolicy {
         }
     }
 
+    public static void completedWork(String status, LocalDate updated, LocalDate start, LocalDate end) {
+        if (!Set.of("已完成", "已验收", "已发布", "已关闭").contains(status)
+                || updated.isBefore(start) || updated.isAfter(end)) {
+            throw new IllegalArgumentException("只能关联本期已完成的任务或工单，请重新选择");
+        }
+    }
+
     public static String transition(String kind, String state, String action, boolean owner, boolean reviewer) {
         if ("objective".equals(kind)) {
             if (owner && Set.of("draft", "returned").contains(state) && "submit".equals(action)) return "pending_review";

@@ -1,0 +1,5 @@
+.original-okr { color: var(--text-primary); }
+.original-okr p, .original-okr h3 { overflow-wrap: anywhere; }
+.original-okr .ant-input-number { width: 100%; }
+.original-okr .ant-segmented { max-width: 100%; overflow-x: auto; }
+.original-okr .okr-review-form { padding: 24px; }

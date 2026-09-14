@@ -12,7 +12,7 @@ public class OkrMapper {
         return jdbc.queryForList("SELECT u.id_ AS id,u.name_ AS name,u.department_ AS department,r.supervisor_id_ AS supervisorId,COALESCE(r.root_flag_,0) AS rootFlag,COALESCE(r.version_,-1) AS version FROM t_sys_user u LEFT JOIN t_okr_reporting r ON r.tenant_id_=u.tenant_id_ AND r.employee_id_=u.id_ AND r.delete_flag_=0 WHERE u.tenant_id_=? AND u.delete_flag_=0 AND u.status_='enabled' ORDER BY u.name_",tenant);
     }
     public List<Map<String,Object>> records(String tenant) {
-        return jdbc.queryForList("SELECT id_ AS id,kind_ AS kind,owner_id_ AS ownerId,period_key_ AS periodKey,status_ AS status,payload_ AS payload,version_ AS version FROM t_okr_record WHERE tenant_id_=? AND delete_flag_=0 ORDER BY create_time_ DESC",tenant);
+        return jdbc.queryForList("SELECT id_ AS id,kind_ AS kind,owner_id_ AS ownerId,period_key_ AS periodKey,status_ AS status,payload_ AS payload,version_ AS version,create_time_ AS createdAt FROM t_okr_record WHERE tenant_id_=? AND delete_flag_=0 ORDER BY create_time_ DESC",tenant);
     }
     public void insert(String tenant,String id,String kind,String owner,String period,String status,String payload) {
         jdbc.update("INSERT INTO t_okr_record (id_,tenant_id_,kind_,owner_id_,period_key_,status_,payload_,create_by_,update_by_,create_time_,update_time_) VALUES (?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))",id,tenant,kind,owner,period,status,payload,owner,owner);

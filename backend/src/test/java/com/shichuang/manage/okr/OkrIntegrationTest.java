@@ -62,4 +62,28 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
   saved=objectMapper.readTree(jdbc.queryForObject("SELECT payload_ FROM t_okr_record WHERE id_=?",String.class,review));assertTrue(saved.path("items").get(0).path("included").asBoolean());assertEquals(88,saved.path("finalScore").asInt());
   for(var snapshot:saved.path("objectiveSnapshots"))if(objective.equals(snapshot.path("id").asText()))assertEquals(0,snapshot.path("payload").path("progress").asInt());
  }
+ @Test void simpleReviewLinksCompletedWorkWithoutKrOrPerItemNarrative()throws Exception{
+  String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
+  jdbc.update("UPDATE t_product_requirement SET owner_name_=?,status_=?,update_time_=? WHERE tenant_id_=? AND id_=?","王浩然","已完成","2026-09-14 12:00:00","local-tenant","req-1");
+  String workJson=mockMvc.perform(get("/api/okr/work?ownerId=user-tech").header("Authorization","Bearer "+tech)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String workId="";for(var w:objectMapper.readTree(workJson).path("data"))if("req-1".equals(w.path("sourceId").asText()))workId=w.path("id").asText();assertFalse(workId.isBlank());
+  var payload=new java.util.LinkedHashMap<String,Object>();
+  payload.put("title","完成工作关联验收");payload.put("startDate","2026-09-14");payload.put("endDate","2026-09-20");payload.put("reviewMode","completed");payload.put("reviewType","week");payload.put("summary","完成本周任务");payload.put("selfScore",90);payload.put("sendTo",List.of());payload.put("items",List.of(Map.of("workId",workId)));
+  var request=Map.of("kind","review","periodKey","2026-09-14/2026-09-20","payload",payload,"submit",true);
+  String response=mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(request))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String id=objectMapper.readTree(response).path("data").path("id").asText();var saved=objectMapper.readTree(jdbc.queryForObject("SELECT payload_ FROM t_okr_record WHERE id_=?",String.class,id));assertEquals(workId,saved.path("items").get(0).path("workId").asText());assertEquals("已完成",saved.path("items").get(0).path("status").asText());
+  jdbc.update("UPDATE t_product_requirement SET status_=? WHERE tenant_id_=? AND id_=?","研发中","local-tenant","req-1");
+  mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(request))).andExpect(status().isBadRequest());
+ }
+ @Test void simpleReviewPersistsOriginalFieldsAndSubmitsAtomically()throws Exception{
+  String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
+  var payload=new java.util.LinkedHashMap<String,Object>();
+  payload.put("title","原表单周复盘");payload.put("startDate","2026-09-14");payload.put("endDate","2026-09-20");payload.put("reviewMode","completed");payload.put("reviewType","week");payload.put("summary","已完成交付");payload.put("selfScore",88);payload.put("suggestions","改进协作");payload.put("helpNeeded","资源支持");payload.put("uncompletedReason","等待确认");payload.put("sendTo",List.of("部门主管"));payload.put("items",List.of());
+  String response=mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("kind","review","periodKey","2026-09-14/2026-09-20","payload",payload,"submit",true)))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String id=objectMapper.readTree(response).path("data").path("id").asText();
+  var row=jdbc.queryForMap("SELECT status_,payload_ FROM t_okr_record WHERE id_=?",id);
+  assertEquals("submitted",row.get("status_"));var saved=objectMapper.readTree(row.get("payload_").toString());assertEquals(88,saved.path("selfScore").asInt());assertEquals("资源支持",saved.path("helpNeeded").asText());
+  payload.put("selfScore",101);
+  mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("kind","review","periodKey","2026-09","payload",payload,"submit",true)))).andExpect(status().isBadRequest());
+ }
 }
