@@ -112,7 +112,10 @@ const OriginalWorkspace: React.FC = () => {
       {error && <Alert type="error" title="目标与绩效加载失败" description="服务暂不可用，请重试。已填写的内容仍保留。" action={<Button onClick={refresh}>重试</Button>}/>}
       {/* Top Main Navigation Tabs */}
       <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-        <Tabs activeKey={mainTab} onChange={key=>{setMainTab(key as typeof mainTab);setIsReviewFormOpen(false);}} items={[{key:'okrs',label:'目标 OKRs'},{key:'reviews',label:'复盘总结'}]}/>
+        <div className="flex items-center gap-2">
+          <Button id="tab-okrs" type={mainTab === 'okrs' ? 'primary' : 'text'} icon={<Target/>} onClick={()=>setMainTab('okrs')}>目标 OKRs</Button>
+          <Button id="tab-reviews" type={mainTab === 'reviews' ? 'primary' : 'text'} icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
+        </div>
 
         {mainTab === 'okrs' && (
           <div className="flex items-center gap-3">
