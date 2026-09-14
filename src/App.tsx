@@ -23,7 +23,7 @@ const KnowledgeBaseView = lazyNamed(() => import('./components/workbench/Knowled
 const CRMDashboardView = lazyNamed(() => import('./components/crm/CRMDashboardView'), 'CRMDashboardView');
 const RequirementTasksView = lazyNamed(() => import('./components/product/RequirementTasksView'), 'RequirementTasksView');
 const RequirementPoolView = lazyNamed(() => import('./components/workbench/RequirementPoolView'), 'RequirementPoolView');
-const OkrWorkspace = lazyNamed(() => import('./components/workbench/okr/OkrWorkspace'), 'OkrWorkspace');
+const OKRPerformanceView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'OKRPerformanceView');
 
 // CRM Views
 const CRMCustomersView = lazyNamed(() => import('./components/crm/CRMCustomersView'), 'CRMCustomersView');
@@ -85,7 +85,7 @@ const MainContent: React.FC = () => {
       case 'wb_my_tasks':
         return <MyTasksView />;
       case 'wb_okr_perf':
-        return <OkrWorkspace />;
+        return <OKRPerformanceView />;
       case 'wb_knowledge':
       case 'wb_knowledge_center':
       case 'know_base':

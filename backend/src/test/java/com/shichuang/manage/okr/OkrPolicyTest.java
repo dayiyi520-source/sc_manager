@@ -10,12 +10,16 @@ class OkrPolicyTest {
     @Test void rejectsPeerOrSelfAsParent() {
         assertThrows(IllegalArgumentException.class, () -> OkrPolicy.requireParent("me", "boss", "peer", "active", false));
         assertThrows(IllegalArgumentException.class, () -> OkrPolicy.requireParent("me", "me", "me", "active", false));
-        assertThrows(IllegalArgumentException.class, () -> OkrPolicy.requireParent("me", null, null, "active", false));
+        assertDoesNotThrow(() -> OkrPolicy.requireParent("me", null, null, null, false));
+        assertDoesNotThrow(() -> OkrPolicy.requireParent("me", "boss", null, null, false));
     }
     @Test void requiresActiveSupervisorAndAllowsExplicitRoot() {
         assertDoesNotThrow(() -> OkrPolicy.requireParent("me", "boss", "boss", "active", false));
         assertThrows(IllegalArgumentException.class, () -> OkrPolicy.requireParent("me", "boss", "boss", "archived", false));
         assertDoesNotThrow(() -> OkrPolicy.requireParent("root", null, null, null, true));
+    }
+    @Test void allowsOptionalAlignmentAndValidatesObjectiveTypesAtServiceBoundary() {
+        assertDoesNotThrow(() -> OkrPolicy.requireParent("me", "boss", null, null, false));
     }
     @Test void computesWeightedProgressAndRetainsZero() {
         assertEquals(65, OkrPolicy.progress(List.of(30,70), List.of(100,50)));

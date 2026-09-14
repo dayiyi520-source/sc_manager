@@ -21,6 +21,7 @@ export function useOriginalOkr() {
       category:r.ownerId===currentUser.id?'my':r.ownerId===me?.supervisorId?'supervisor':owner?.supervisorId===currentUser.id?'subordinate':owner?.department===currentUser.department?'department':'other_dept',
       objective:r.payload.title,weight:r.payload.weight ?? 100,progress:r.payload.progress || 0,deadline:r.payload.deadline || '',
       parentObjectiveId:r.payload.parentObjectiveId,alignTo:all.find(p=>p.id===r.payload.parentObjectiveId)?.payload.title,
+      parentKeyResultId:r.payload.parentKeyResultId, objectiveType:r.payload.objectiveType || 'target',
       status:r.status as OKRItem['status'],
       keyResults:(r.payload.keyResults || []).map(k=>({id:k.id,content:k.title,progress:k.progress,weight:k.weight,deadline:r.payload.deadline || ''})),
     };

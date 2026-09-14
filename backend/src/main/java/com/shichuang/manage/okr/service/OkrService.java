@@ -29,7 +29,7 @@ import java.util.*;
  private Map<String,Object> person(String id){return people().stream().filter(p->id.equals(p.get("id"))).findFirst().orElseThrow(()->new IllegalArgumentException("人员不存在或已停用"));}
  private Map<String,Object> inputPayload(Object input,String kind){
   var value=payload(input);var result=new LinkedHashMap<String,Object>();
-  var keys="objective".equals(kind)?List.of("title","parentObjectiveId","parentKeyResultId","keyResults","weight","deadline"):List.of("title","startDate","endDate","summary","items","reviewMode","reviewType","selfScore","uncompletedReason","suggestions","helpNeeded","sendTo");
+  var keys="objective".equals(kind)?List.of("title","parentObjectiveId","parentKeyResultId","keyResults","weight","deadline","objectiveType","note"):List.of("title","startDate","endDate","summary","items","reviewMode","reviewType","selfScore","uncompletedReason","suggestions","helpNeeded","sendTo");
   for(String key:keys)if(value.containsKey(key))result.put(key,value.get(key));
   if("review".equals(kind)){
    var items=new ArrayList<Map<String,Object>>();
@@ -43,11 +43,16 @@ import java.util.*;
  private List<Map<String,Object>> rows(Object value){if(!(value instanceof List<?> list)||list.size()>500)throw new IllegalArgumentException("请检查明细数量");return list.stream().map(this::payload).toList();}
  private void validateObjective(String owner,String period,Map<String,Object> p){
   required(p,"title");
+  String objectiveType=Objects.toString(p.getOrDefault("objectiveType","target"),"");
+  if(!Set.of("target","challenge").contains(objectiveType))throw new IllegalArgumentException("目标类型须为目标型或挑战型");
+  p.put("objectiveType",objectiveType);
+  if(p.containsKey("note")&&(!(p.get("note") instanceof String note)||note.length()>2000))throw new IllegalArgumentException("备注不能超过 2000 字");
   if(p.containsKey("weight"))integer(p.get("weight"),0,100);
   if(p.containsKey("deadline"))try{java.time.LocalDate.parse(required(p,"deadline"));}catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("目标截止日期无效");}
   java.time.YearMonth month;
   try{month=java.time.YearMonth.parse(period);}catch(Exception e){throw new IllegalArgumentException("目标周期须为月份");}
   String parentId=Objects.toString(p.get("parentObjectiveId"),"");
+  if(parentId.isBlank()&&!Objects.toString(p.get("parentKeyResultId"),"").isBlank())throw new IllegalArgumentException("选择上级 KR 时必须指定所属目标");
   Map<String,Object> parent=parentId.isBlank()?null:record(parentId);
   String boss=supervisor(owner);
   OkrPolicy.requireParent(owner,boss.isBlank()?null:boss,parent==null?null:parent.get("ownerId").toString(),parent==null?null:parent.get("status").toString(),root(owner));
@@ -57,7 +62,13 @@ import java.util.*;
    if(!kr.isBlank()&&rows(payload(parent.get("payload")).get("keyResults")).stream().noneMatch(r->kr.equals(r.get("id"))))throw new IllegalArgumentException("上级 KR 已变更");
   }
   var krs=rows(p.get("keyResults"));var ids=new HashSet<String>();
-  for(var kr:krs){if(!ids.add(required(kr,"id")))throw new IllegalArgumentException("KR 不能重复");required(kr,"title");integer(kr.getOrDefault("progress",0),0,100);}
+  for(var kr:krs){
+   if(!ids.add(required(kr,"id")))throw new IllegalArgumentException("KR 不能重复");required(kr,"title");integer(kr.getOrDefault("progress",0),0,100);
+   if(kr.containsKey("deadline"))try{
+    var date=java.time.LocalDate.parse(required(kr,"deadline"));
+    if(p.containsKey("deadline")&&date.isAfter(java.time.LocalDate.parse(p.get("deadline").toString())))throw new IllegalArgumentException("KR 截止日期不能晚于目标截止日期");
+   }catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("KR 截止日期无效");}
+  }
   OkrPolicy.weights(krs.stream().map(kr->integer(kr.get("weight"),1,100)).toList());
   p.put("progress",OkrPolicy.progress(krs.stream().map(kr->((Number)kr.get("weight")).intValue()).toList(),krs.stream().map(kr->((Number)kr.getOrDefault("progress",0)).intValue()).toList()));
  }
