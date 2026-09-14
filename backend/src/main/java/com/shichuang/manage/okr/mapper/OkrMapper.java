@@ -41,6 +41,16 @@ public class OkrMapper {
             String sources = Set.of("t_product_requirement","t_product_dev_task","t_product_bug").contains(table) ? "source_work_order_ids_" : "JSON_ARRAY(requirement_id_)";
             result.addAll(jdbc.queryForList("SELECT CONCAT(?,':',id_) AS id,id_ AS sourceId,? AS kind,title_ AS title,status_ AS status,owner_name_ AS ownerName,actual_hours_ AS actualHours,estimated_hours_ AS estimatedHours,due_date_ AS dueDate,create_time_ AS createdAt,update_time_ AS updatedAt," + sources + " AS sourceWorkOrderIds FROM " + table + " WHERE tenant_id_=? AND owner_name_=? AND delete_flag_=0 ORDER BY update_time_ DESC",kind,kind,tenant,ownerName));
         }
+        result.addAll(jdbc.queryForList("""
+            SELECT CONCAT('core:',w.id_) AS id,w.id_ AS sourceId,w.category_ AS kind,w.title_ AS title,
+                   w.status_name_ AS status,w.assignee_name_ AS ownerName,w.actual_hours_ AS actualHours,
+                   w.estimated_hours_ AS estimatedHours,w.planned_end_date_ AS dueDate,w.create_time_ AS createdAt,
+                   w.update_time_ AS updatedAt,
+                   CASE WHEN w.requirement_id_ IS NULL THEN JSON_ARRAY() ELSE JSON_ARRAY(w.requirement_id_) END AS sourceWorkOrderIds
+            FROM t_product_work_item w
+            WHERE w.tenant_id_=? AND w.assignee_name_=? AND w.delete_flag_=0
+            ORDER BY w.update_time_ DESC
+            """,tenant,ownerName));
         return result;
     }
     public List<Map<String,Object>> links(String tenant,String owner){

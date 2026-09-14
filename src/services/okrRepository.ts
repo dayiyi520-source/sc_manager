@@ -1,12 +1,13 @@
 import { apiRequest } from './apiClient';
 
 export interface OkrPerson { id: string; name: string; department: string; supervisorId: string | null; rootFlag: number; version: number }
-export interface OkrKr { id: string; title: string; weight: number; progress: number }
+export interface OkrKr { id: string; title: string; weight: number; progress: number; deadline?: string }
 export interface OkrReviewItem { workId: string; title: string; status: string; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
 export interface OkrPayload {
   reviewMode?: 'completed'; reviewType?: 'week' | 'month'; selfScore?: number;
   uncompletedReason?: string; suggestions?: string; helpNeeded?: string; sendTo?: string[];
   weight?: number; deadline?: string;
+  objectiveType?: 'target' | 'challenge'; note?: string;
   title: string; parentObjectiveId?: string; parentKeyResultId?: string; keyResults?: OkrKr[]; progress?: number;
   startDate?: string; endDate?: string; summary?: string; items?: OkrReviewItem[];
   feedback?: string; finalScore?: number; evaluation?: string;

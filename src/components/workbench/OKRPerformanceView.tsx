@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Alert, Button, DatePicker, Empty, Form, Input, InputNumber, Progress, Radio, Cascader, Select, Spin, Tag, Tabs } from 'antd';
+import React, { useRef, useState } from 'react';
+import { Alert, Button, Empty, Form, Input, InputNumber, Progress, Radio, Cascader, Select, Spin, Tag, Tabs } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
@@ -10,11 +10,12 @@ import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
 import { cycleOptions } from './okr/cycleOptions';
 import { OKRItem } from '../../types';
+import { ObjectiveForm, type ObjectiveFormHandle } from './okr/ObjectiveForm';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
-  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveReview, busy } = useOriginalOkr();
+  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveObjectiveDraft, saveReview, busy } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -29,13 +30,9 @@ const OriginalWorkspace: React.FC = () => {
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
 
   // Add OKR Modal State
-  const [isAddOkrOpen, setIsAddOkrOpen] = useState(false);
+  const [objectiveForms, setObjectiveForms] = useState<string[]>([]);
+  const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const newOkrCycle = dayjs().format('YYYY-MM');
-  const [newOkrParentId, setNewOkrParentId] = useState<string>();
-  const [newOkrObjective, setNewOkrObjective] = useState('');
-  const [newOkrWeight, setNewOkrWeight] = useState(40);
-  const [newOkrDeadline, setNewOkrDeadline] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));
-  const [newKr1Content, setNewKr1Content] = useState('');
 
   // Write Review Form State
   const [reviewType, setReviewType] = useState<'week' | 'month'>('month');
@@ -65,22 +62,12 @@ const OriginalWorkspace: React.FC = () => {
   };
   const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && matchesCategory(o));
 
-  const handleSaveOkr = async () => {
-    if (busy || loading || error) return;
-    if (!newOkrObjective.trim() || !newKr1Content.trim()) {
-      addToast('warning', '请填写目标和关键结果'); return;
+  const handleSaveOkr = async (payload: Parameters<typeof saveObjective>[1]) => {
+    if (await saveObjective(newOkrCycle, payload)) {
+      setSelectedCycles([newOkrCycle]);
+      return true;
     }
-    if (!me?.rootFlag && !parents.some(p => p.id === newOkrParentId)) {
-      addToast('warning', '请选择直属上级的 OKR'); return;
-    }
-    if (await saveObjective(newOkrCycle, {
-      title: newOkrObjective.trim(), parentObjectiveId: newOkrParentId,
-      weight: newOkrWeight, deadline: newOkrDeadline,
-      keyResults: [{id:crypto.randomUUID(), title:newKr1Content.trim(), weight:100, progress:0}],
-    })) {
-      setSelectedCycles([newOkrCycle]); setIsAddOkrOpen(false);
-      setNewOkrObjective(''); setNewKr1Content(''); setNewOkrParentId(undefined);
-    }
+    return false;
   };
 
   const handleSubmitReview = async () => {
@@ -127,7 +114,7 @@ const OriginalWorkspace: React.FC = () => {
             <Button type="primary"
               id="btn-add-okr"
               disabled={busy}
-              onClick={() => {setOkrCategoryTab('my'); setNewOkrDeadline(dayjs().endOf('month').format('YYYY-MM-DD')); setNewOkrParentId(undefined); setIsAddOkrOpen(true);}}
+              onClick={() => {setOkrCategoryTab('my'); setObjectiveForms(forms => [...forms, crypto.randomUUID()]);}}
 
             >
               <Plus className="w-3.5 h-3.5" />
@@ -153,32 +140,19 @@ const OriginalWorkspace: React.FC = () => {
             ]}
           />
 
-          {okrCategoryTab === 'my' && isAddOkrOpen && (
-            <Form disabled={busy}
-              onFinish={handleSaveOkr}
-              className="rounded-xl border border-blue-500 bg-white dark:bg-slate-900 shadow-xs overflow-hidden"
-            >
-              <div className="flex items-center justify-between px-5 py-3 bg-blue-50/70 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800/60 text-xs">
-                <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">O1</span><span className="font-semibold text-slate-800 dark:text-slate-200">添加目标</span><span className="text-slate-400">{newOkrCycle.replace('-', '年')}月</span></div>
-                <span className="text-slate-400">填写完成后提交主管确认</span>
-              </div>
-              <fieldset disabled={busy} className="p-5 space-y-4 text-xs">
-                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_140px] gap-3">
-                  <Input maxLength={255} required aria-label="目标名称" value={newOkrObjective} onChange={(e) => setNewOkrObjective(e.target.value)} placeholder="输入目标名称：明确你想要达成什么，不写含糊概括的目标" className="w-full"/>
-                  <InputNumber precision={0} aria-label="目标权重" value={newOkrWeight} onChange={value => setNewOkrWeight(value ?? 0)} min={0} max={100} placeholder="权重 %" className="w-full"/>
-                </div>
-                {!me?.rootFlag && <div>
-                  <Select className="w-full" aria-label="关联上级 OKR" placeholder="+ 选择上级 OKR" showSearch optionFilterProp="label" allowClear
-                    value={newOkrParentId} disabled={busy || loading} loading={loading}
-                    options={parents.map(o=>({value:o.id,label:`${o.ownerName} · ${o.objective}`}))}
-                    onChange={setNewOkrParentId} notFoundContent="本月暂无可关联的直属上级 OKR"/>
-                  {!parents.length && <p className="mt-2 text-slate-500">请联系直属上级确认本月 OKR 后再选择。</p>}
-                </div>}
-                <Input.TextArea maxLength={2000} rows={2} aria-label="KR1 关键结果" value={newKr1Content} onChange={(e) => setNewKr1Content(e.target.value)} placeholder="KR1 关键结果：遵循 SMART 原则，具体、可衡量、可达成、相关性、时效性" className="w-full"/>
-                <DatePicker aria-label="截止日期" allowClear={false} value={dayjs(newOkrDeadline)} onChange={v=>v&&setNewOkrDeadline(v.format('YYYY-MM-DD'))}/>
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800"><Button  onClick={() => setIsAddOkrOpen(false)} >取消</Button><Button htmlType="submit" type="primary" loading={busy} disabled={loading || !!error} >提交主管确认</Button></div>
-              </fieldset>
-            </Form>
+          {okrCategoryTab === 'my' && objectiveForms.length > 0 && (
+            <div className="okr-objective-form-stack">
+            <div className="okr-objective-period">{dayjs(newOkrCycle).format('YYYY年MM月')}<span>进行中</span></div>
+            {objectiveForms.map(formId => (
+            <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={newOkrCycle} ownerName={currentUser.name} parents={parents} busy={busy} unavailable={loading || !!error}
+              root={!!me?.rootFlag}
+              onCancel={() => setObjectiveForms(forms => forms.filter(id => id !== formId))}
+              onSave={async payload => { const ok = await handleSaveOkr(payload); if (ok) setObjectiveForms(forms => forms.filter(id => id !== formId)); return ok; }}
+              onSaveDraft={async payload => { const ok = await saveObjectiveDraft(newOkrCycle, payload); if (ok) setObjectiveForms(forms => forms.filter(id => id !== formId)); return ok; }}
+              onAddAnother={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])}/></div>
+            ))}
+            <div className="okr-objective-footer"><Button type="text" onClick={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])} disabled={busy}>+ 添加 O</Button><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy}>取消</Button><Button onClick={async () => { const results = await Promise.all(objectiveForms.map(id => objectiveRefs.current[id]?.saveDraft() ?? false)); if (results.every(Boolean)) setObjectiveForms([]); }} disabled={busy || loading || !!error}>存草稿</Button><Button type="primary" onClick={async () => { const results = await Promise.all(objectiveForms.map(id => objectiveRefs.current[id]?.submit() ?? false)); if (results.every(Boolean)) setObjectiveForms([]); }} loading={busy} disabled={loading || !!error}>{me?.rootFlag ? '提交目标' : '提交主管确认'}</Button></div>
+            </div>
           )}
 
           {/* OKR Cards List */}

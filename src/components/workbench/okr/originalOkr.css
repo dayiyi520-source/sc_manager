@@ -6,3 +6,39 @@
 .original-okr .ant-tabs { min-width: 0; }
 .original-okr .ant-tabs-nav { margin-bottom: 0; }
 .okr-cycle-filter { width: 224px; }
+.okr-objective-form { border: 1px solid var(--primary); border-radius: 12px; overflow: hidden; background: var(--bg-surface); box-shadow: 0 12px 32px rgba(0,0,0,.22); }
+.okr-objective-form-stack { border: 1px solid var(--primary); border-radius: 12px; overflow: hidden; background: var(--bg-surface); box-shadow: 0 12px 32px rgba(0,0,0,.22); }
+.okr-objective-form-stack .okr-objective-form { border: 0; border-radius: 0; box-shadow: none; }
+.okr-objective-form-item + .okr-objective-form-item { border-top: 1px solid var(--border-main); }
+.okr-objective-period { padding: 16px 24px; font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--border-main); }
+.okr-objective-period span { margin-left: 12px; color: var(--text-muted); font-size: 14px; font-weight: 500; }
+.okr-objective-body { padding: 20px 24px; display: grid; gap: 12px; }
+.okr-objective-columns { display: grid; grid-template-columns: minmax(0,1fr) 120px 160px 40px; gap: 12px; align-items: center; }
+.okr-objective-columns > :nth-child(2), .okr-objective-columns > :nth-child(3) { justify-self: stretch; text-align: center; }
+.okr-objective-columns > :nth-child(2) .ant-input-number-input { text-align: center; }
+.okr-objective-columns > :nth-child(3) .ant-picker { justify-content: center; width: 100%; }
+.okr-objective-columns > :nth-child(3) .okr-objective-deadline { display: block; text-align: center; }
+.okr-objective-head { color: var(--text-muted); font-size: 12px; }
+.okr-align-trigger { justify-self: start; padding-inline: 0; color: var(--primary); font-weight: 600; }
+.okr-align-trigger:hover { color: var(--primary); text-decoration: underline; }
+.okr-objective-title, .okr-objective-kr-title { display: flex; align-items: center; min-width: 0; }
+.okr-objective-kind { min-width: 52px; color: var(--primary); border-color: var(--primary); }
+.okr-objective-kind.challenge { color: var(--warning); border-color: var(--warning); }
+.okr-objective-meta { display: flex; gap: 8px; flex-wrap: wrap; color: var(--text-muted); font-size: 12px; }
+.okr-objective-meta span { border: 1px solid var(--border-main); border-radius: 6px; padding: 6px 12px; }
+.okr-objective-krs { border-top: 1px solid var(--border-main); }
+.okr-objective-kr { padding: 10px 0; border-bottom: 1px solid var(--border-main); }
+.okr-objective-kr-title > span { width: 48px; font-weight: 700; }
+.okr-objective-kr.is-dragging { opacity: .55; background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.okr-objective-kr.is-drag-over { border-top: 2px solid var(--primary); box-shadow: inset 0 2px 0 var(--primary); }
+.okr-kr-drag { display: inline-flex; width: 24px !important; color: var(--text-muted); cursor: grab; opacity: 0; transition: opacity .15s ease; }
+.okr-objective-kr:hover .okr-kr-drag, .okr-objective-kr:focus-within .okr-kr-drag { opacity: 1; }
+.okr-kr-drag:active { cursor: grabbing; }
+.okr-alignment-dialog { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; min-height: 260px; }
+.okr-alignment-section-title { margin-bottom: 8px; color: var(--text-muted); font-size: 12px; }
+.okr-alignment-selected { align-self: start; padding: 12px; border: 1px solid var(--border-main); border-radius: 8px; color: var(--text-secondary); font-size: 13px; }
+.okr-alignment-dialog .ant-list { max-height: 260px; overflow: auto; border: 1px solid var(--border-main); border-radius: 8px; }
+.okr-alignment-dialog .ant-list-item { padding: 8px 12px; }
+.okr-objective-add { display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); font-size: 12px; }
+.okr-objective-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border-main); }
+@media (max-width: 900px) { .okr-objective-columns { grid-template-columns: minmax(0,1fr) 100px; } .okr-objective-head span:nth-child(3), .okr-objective-columns > .okr-objective-deadline, .okr-objective-kr > :nth-child(3) { display: none; } .okr-alignment-dialog { grid-template-columns: 1fr; } }

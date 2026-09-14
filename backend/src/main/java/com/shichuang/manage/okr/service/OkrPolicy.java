@@ -10,7 +10,7 @@ public final class OkrPolicy {
 
     public static void requireParent(String ownerId, String supervisorId, String parentOwnerId,
                                      String parentStatus, boolean organizationRoot) {
-        if (organizationRoot && supervisorId == null && parentOwnerId == null) return;
+        if (parentOwnerId == null) return;
         if (supervisorId == null || !supervisorId.equals(parentOwnerId) || ownerId.equals(parentOwnerId)) {
             throw new IllegalArgumentException("请选择直属上级已确认的目标或 KR；尚未配置直属上级时请联系管理员");
         }
