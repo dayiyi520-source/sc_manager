@@ -5,7 +5,8 @@ import { resolveDataMode } from '../hooks/useDataMode';
 import { crmRepository } from '../services/crmRepository';
 import { requirementRepository } from '../services/requirementRepository';
 import { productRepository } from '../services/productRepository';
-import { devLogin, readSession, sessionUsername } from '../services/session';
+import { okrRepository } from '../services/okrRepository';
+import { readSession } from '../services/session';
 import {
   MainMenuId,
   SubMenuId,
@@ -473,8 +474,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [approvals, setApprovals] = useState<ApprovalFlow[]>(INITIAL_APPROVALS);
   const [projects, setProjects] = useState<ProjectItem[]>(INITIAL_PROJECTS);
   const [servers, setServers] = useState<ServerNode[]>(INITIAL_SERVERS);
-  const [okrs, setOkrs] = useState<OKRItem[]>(INITIAL_OKRS);
-  const [performances, setPerformances] = useState<PerformanceReview[]>(INITIAL_PERFORMANCES);
+  const [okrs, setOkrs] = useState<OKRItem[]>([]);
+  const [performances, setPerformances] = useState<PerformanceReview[]>([]);
+  const okrQuery = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:okrRepository.records,enabled:!!readSession()?.token});
+  useEffect(() => {
+    setOkrs((okrQuery.data||[]).filter(r=>r.kind==='objective'&&r.ownerId===currentUser.id).map(r=>({
+      id:r.id,cycle:r.periodKey,ownerId:r.ownerId,ownerName:currentUser.name,department:currentUser.department,category:'my',
+      objective:r.payload.title,weight:100,progress:r.payload.progress||0,deadline:r.periodKey,
+      parentObjectiveId:r.payload.parentObjectiveId,parentKeyResultId:r.payload.parentKeyResultId,
+      keyResults:(r.payload.keyResults||[]).map(k=>({id:k.id,content:k.title,weight:k.weight,progress:k.progress,deadline:r.periodKey}))
+    })));
+  },[okrQuery.data,currentUser.id,currentUser.name,currentUser.department]);
   const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>(INITIAL_KNOWLEDGE_DOCS);
 
   // Operations & Delivery Extensions
@@ -488,35 +498,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [invoiceApprovals, setInvoiceApprovals] = useState<InvoiceApprovalRecord[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
-    let retryTimer: number | undefined;
-    const synchronize = async () => {
-      const session = readSession();
-      if (!session?.token) {
-        if (!cancelled) { setCrmSessionToken(''); setCrmSessionReady(false); }
-        return;
-      }
-      if (!session.token.startsWith('local-dev-')) {
-        if (!cancelled) { setCrmSessionToken(session.token); setCurrentUser(session.user); setCrmSessionReady(true); }
-        return;
-      }
-      try {
-        const refreshed = await devLogin(sessionUsername(session));
-        if (cancelled) return;
-        setCurrentUser(refreshed.user);
-        setCrmSessionToken(refreshed.token);
-        setCrmSessionReady(true);
-        if (!refreshed.token.startsWith('local-dev-') && retryTimer) window.clearInterval(retryTimer);
-      } catch {
-        if (!cancelled) { setCrmSessionToken(session.token); setCrmSessionReady(true); }
-      }
-    };
-    void synchronize();
-    retryTimer = window.setInterval(() => {
-      if (readSession()?.token.startsWith('local-dev-')) void synchronize();
-      else if (retryTimer) window.clearInterval(retryTimer);
-    }, 15000);
-    return () => { cancelled = true; if (retryTimer) window.clearInterval(retryTimer); };
+    const session = readSession();
+    setCrmSessionToken(session?.token || '');
+    setCrmSessionReady(!!session);
+    if (session) setCurrentUser(session.user);
   }, []);
 
   // 所有领域共用同一数据模式，避免本地回退会话误请求后端。
@@ -997,6 +982,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       progress: 0,
       deadline: okr.deadline || '2026-09-30',
       alignTo: okr.alignTo || '公司年度核心战略',
+      parentObjectiveId: okr.parentObjectiveId,
+      parentKeyResultId: okr.parentKeyResultId,
+      alignmentType: okr.alignmentType || '承接目标',
+      status: okr.status || 'pending_review',
       keyResults: okr.keyResults || [
         { id: `kr-${Date.now()}-1`, content: '关键成果 KR 1', progress: 0, weight: 50, deadline: '2026-09-30' },
         { id: `kr-${Date.now()}-2`, content: '关键成果 KR 2', progress: 0, weight: 50, deadline: '2026-09-30' }
@@ -1020,7 +1009,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       helpNeeded: perf.helpNeeded || '暂无需协助事项',
       sendTo: perf.sendTo || ['总经办', '直接主管'],
       createdAt: '刚刚',
-      status: 'submitted'
+      status: 'submitted',
+      linkedWorkItems: perf.linkedWorkItems || [],
+      outOfPlanWork: perf.outOfPlanWork || []
     };
     setPerformances((prev) => [newPerf, ...prev]);
     addToast('success', '工作复盘总结已提交', `已发送至：${newPerf.sendTo.join(', ')}`);

@@ -13,6 +13,8 @@ $mapping = @{
     'V1.0.31__product_line_work_item_types.sql' = 'V1.0.38__product_line_work_item_types.sql'
     'V20260914.1__unified_work_item_storage.sql' = 'V20260914.1__unified_work_item_storage.sql'
     'V20260914.2__work_item_relations.sql' = 'V20260914.2__work_item_relations.sql'
+    'V20260914.3__okr_performance.sql' = 'V20260914.3__okr_performance.sql'
+    'V20260914.4__okr_work_links.sql' = 'V20260914.4__okr_work_links.sql'
 }
 $files = @{}
 foreach ($file in Get-ChildItem -LiteralPath $historicalRoot -Filter 'V*.sql') {

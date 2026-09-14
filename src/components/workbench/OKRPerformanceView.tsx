@@ -1,27 +1,20 @@
 import React, { useState } from 'react';
-import { DatePicker, Cascader, Segmented } from "antd";
-import {
-  Target,
-  FileSpreadsheet,
-  Plus,
-  TrendingUp,
-  Calendar,
-  UserCheck,
-  CheckCircle2,
-  AlertCircle,
-  MessageSquare,
-  Sparkles,
-  Send,
-  Sliders,
-  ChevronRight,
-  Filter
-} from '@/components/common/octicons-compat';
+import { Alert, Button, DatePicker, Empty, Form, Input, InputNumber, Progress, Radio, Cascader, Select, Spin, Tag, Tabs } from 'antd';
+import Card from 'antd/es/card/Card';
+import dayjs from 'dayjs';
+import { useOriginalOkr } from './okr/useOriginalOkr';
+import { completedWorkInPeriod, reviewPeriod } from './okr/simpleReview';
+import { Target, FileSpreadsheet, Plus, Calendar, Send } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { StatCard, StatusTag } from '../common/UIComponents';
-import { OKRItem, PerformanceReview } from '../../types';
+import { OkrProvider } from './okr/OkrProvider';
+import './okr/originalOkr.css';
+import { cycleOptions } from './okr/cycleOptions';
+import { OKRItem } from '../../types';
 
-export const OKRPerformanceView: React.FC = () => {
-  const { okrs, addOKR, performances, addPerformanceReview, currentUser, addToast } = useApp();
+export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
+const OriginalWorkspace: React.FC = () => {
+  const { currentUser, addToast } = useApp();
+  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveReview, busy } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -29,7 +22,7 @@ export const OKRPerformanceView: React.FC = () => {
   const [okrCategoryTab, setOkrCategoryTab] = useState<
     'my' | 'supervisor' | 'subordinate' | 'department' | 'other_dept'
   >('my');
-  const [selectedCycle, setSelectedCycle] = useState('2026-09');
+  const [selectedCycles, setSelectedCycles] = useState<string[]>([dayjs().format('YYYY-MM')]);
 
   // Review Sub Tabs: 写总结、我的总结、我收到的
   const [reviewSubTab, setReviewSubTab] = useState<'write' | 'my' | 'received'>('write');
@@ -37,15 +30,12 @@ export const OKRPerformanceView: React.FC = () => {
 
   // Add OKR Modal State
   const [isAddOkrOpen, setIsAddOkrOpen] = useState(false);
-  const [newOkrCycle, setNewOkrCycle] = useState('2026-09');
-  const [newOkrAlignTo, setNewOkrAlignTo] = useState('公司年度战略目标：突破智能协同千万级标杆市场');
+  const newOkrCycle = dayjs().format('YYYY-MM');
+  const [newOkrParentId, setNewOkrParentId] = useState<string>();
   const [newOkrObjective, setNewOkrObjective] = useState('');
   const [newOkrWeight, setNewOkrWeight] = useState(40);
-  const [newOkrDeadline, setNewOkrDeadline] = useState('2026-09-30');
+  const [newOkrDeadline, setNewOkrDeadline] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));
   const [newKr1Content, setNewKr1Content] = useState('');
-  const [newKr1Weight, setNewKr1Weight] = useState(50);
-  const [newKr2Content, setNewKr2Content] = useState('');
-  const [newKr2Weight, setNewKr2Weight] = useState(50);
 
   // Write Review Form State
   const [reviewType, setReviewType] = useState<'week' | 'month'>('month');
@@ -57,130 +47,92 @@ export const OKRPerformanceView: React.FC = () => {
   const [reviewHelpNeeded, setReviewHelpNeeded] = useState('');
   const [reviewSendTo, setReviewSendTo] = useState('总经办, 部门主管');
 
+  const [selectedWorkIds, setSelectedWorkIds] = useState<string[]>([]);
+  const period = reviewPeriod(reviewType);
+  const candidates = completedWorkInPeriod(work, period.startDate, period.endDate);
+  const me = people.find(p => p.id === currentUser.id);
+  const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === newOkrCycle && o.status === 'active');
+  const periods = cycleOptions(records, currentUser.id);
+  const cyclePaths = periods.flatMap(group=>group.children.filter(c=>selectedCycles.includes(c.value)).map(c=>[group.value,c.value]));
+  const cycleLabel = selectedCycles.length === 1 ? `周期：${dayjs(selectedCycles[0]).format('YYYY年MM月')}` : `周期：${selectedCycles.length}个周期`;
+
   const matchesCategory = (o: OKRItem) => {
     if (okrCategoryTab === 'my') return o.category === 'my';
-    if (okrCategoryTab === 'supervisor') return o.category === 'supervisor' || o.department.includes('总经办');
+    if (okrCategoryTab === 'supervisor') return o.category === 'supervisor';
     if (okrCategoryTab === 'subordinate') return o.category === 'subordinate';
     if (okrCategoryTab === 'department') return o.category === 'department' || o.department === currentUser.department;
-    return true;
+    return o.department !== currentUser.department;
   };
-  const filteredOkrs = okrs.filter((o) => o.cycle === selectedCycle && matchesCategory(o));
+  const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && matchesCategory(o));
 
-  const handleSaveOkr = () => {
-    if (!newOkrObjective.trim()) {
-      addToast('warning', '请填写目标(O)内容');
-      return;
+  const handleSaveOkr = async () => {
+    if (busy || loading || error) return;
+    if (!newOkrObjective.trim() || !newKr1Content.trim()) {
+      addToast('warning', '请填写目标和关键结果'); return;
     }
-    addOKR({
-      cycle: newOkrCycle,
-      objective: newOkrObjective,
-      weight: Number(newOkrWeight),
-      deadline: newOkrDeadline,
-      alignTo: newOkrAlignTo,
-      keyResults: [
-        {
-          id: `kr-${Date.now()}-1`,
-          content: newKr1Content || '按时按质推进关键业务指标达成',
-          progress: 0,
-          weight: Number(newKr1Weight),
-          deadline: newOkrDeadline
-        },
-        {
-          id: `kr-${Date.now()}-2`,
-          content: newKr2Content || '保障团队协同与客户满意度不低于90分',
-          progress: 0,
-          weight: Number(newKr2Weight),
-          deadline: newOkrDeadline
-        }
-      ]
-    });
-    setIsAddOkrOpen(false);
-    setNewOkrObjective('');
-    setNewKr1Content('');
-    setNewKr2Content('');
+    if (!me?.rootFlag && !parents.some(p => p.id === newOkrParentId)) {
+      addToast('warning', '请选择直属上级的 OKR'); return;
+    }
+    if (await saveObjective(newOkrCycle, {
+      title: newOkrObjective.trim(), parentObjectiveId: newOkrParentId,
+      weight: newOkrWeight, deadline: newOkrDeadline,
+      keyResults: [{id:crypto.randomUUID(), title:newKr1Content.trim(), weight:100, progress:0}],
+    })) {
+      setSelectedCycles([newOkrCycle]); setIsAddOkrOpen(false);
+      setNewOkrObjective(''); setNewKr1Content(''); setNewOkrParentId(undefined);
+    }
   };
 
-  const handleSubmitReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewSummary.trim()) {
-      addToast('warning', '请填写本期总结核心内容');
-      return;
+  const handleSubmitReview = async () => {
+    if (busy || loading || error) return;
+    if (!reviewCycleName.trim()) { addToast('warning', '请填写总结周期名称'); return; }
+    if (!reviewSummary.trim()) { addToast('warning', '请填写本期总结核心内容'); return; }
+    const selected = candidates.filter(w => selectedWorkIds.includes(w.id));
+    if (selected.length !== selectedWorkIds.length) {
+      addToast('warning', '所选工作项状态已变化，请重新选择'); return;
     }
-    addPerformanceReview({
-      type: reviewType,
-      cycleName: reviewCycleName,
-      summary: reviewSummary,
-      uncompletedReason: reviewUncompleted,
-      selfScore: Number(reviewSelfScore),
-      suggestions: reviewSuggestions,
-      helpNeeded: reviewHelpNeeded,
-      sendTo: reviewSendTo.split(',').map((s) => s.trim())
-    });
-    setReviewSubTab('my');
-    setIsReviewFormOpen(false);
+    if (await saveReview({
+      title:reviewCycleName, ...period, reviewType, reviewMode:'completed', summary:reviewSummary,
+      selfScore:reviewSelfScore, uncompletedReason:reviewUncompleted, suggestions:reviewSuggestions,
+      helpNeeded:reviewHelpNeeded, sendTo:reviewSendTo.split(',').map(s=>s.trim()).filter(Boolean),
+      items:selected.map(w=>({workId:w.id,title:w.title,status:w.status,result:'',impact:''})),
+    })) {setReviewSubTab('my'); setIsReviewFormOpen(false); setSelectedWorkIds([]);}
   };
 
   const openReviewForm = (type: 'week' | 'month') => {
     setReviewType(type);
-    setReviewCycleName(type === 'week' ? '2026年第36周复盘总结' : '2026年8月月度复盘总结');
-    setIsReviewFormOpen(true);
+    const dates = reviewPeriod(type);
+    setReviewCycleName(type === 'week' ? `${dates.startDate} 至 ${dates.endDate} 周复盘总结` : `${dayjs().format('YYYY年M月')}月度复盘总结`);
+    setSelectedWorkIds([]); setIsReviewFormOpen(true);
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <div className="original-okr space-y-6 animate-in fade-in duration-150">
+      {loading && <div role="status"><Spin size="small"/> 正在加载目标与绩效…</div>}
+      {error && <Alert type="error" title="目标与绩效加载失败" description="服务暂不可用，请重试。已填写的内容仍保留。" action={<Button onClick={refresh}>重试</Button>}/>}
       {/* Top Main Navigation Tabs */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+      <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
         <div className="flex items-center gap-2">
-          <button
-            id="tab-okrs"
-            onClick={() => setMainTab('okrs')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              mainTab === 'okrs'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Target className="w-4 h-4" />
-            目标 OKRs
-          </button>
-          <button
-            id="tab-reviews"
-            onClick={() => {
-              setMainTab('reviews');
-              setIsReviewFormOpen(false);
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              mainTab === 'reviews'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            复盘总结
-          </button>
+          <Button id="tab-okrs" type={mainTab === 'okrs' ? 'primary' : 'text'} icon={<Target/>} onClick={()=>setMainTab('okrs')}>目标 OKRs</Button>
+          <Button id="tab-reviews" type={mainTab === 'reviews' ? 'primary' : 'text'} icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
         </div>
 
         {mainTab === 'okrs' && (
           <div className="flex items-center gap-3">
-            <select
-              value={selectedCycle}
-              onChange={(e) => setSelectedCycle(e.target.value)}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-            >
-              <option value="2026-09">2026年09月（当前月份）</option>
-              <option value="2026-08">2026年08月（上月）</option>
-              <option value="2026-07">2026年07月（已归档）</option>
-              <option value="2026-06">2026年06月（已归档）</option>
-            </select>
+            <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear={false}
+              onChange={paths=>setSelectedCycles(paths.map(path=>String(path[path.length-1])))}
+              maxTagCount={0} maxTagPlaceholder={()=>cycleLabel} placeholder="周期：请选择"
+              tagRender={()=> <span>{cycleLabel}</span>} />
 
-            <button
+            <Button type="primary"
               id="btn-add-okr"
-              onClick={() => setIsAddOkrOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+              disabled={busy}
+              onClick={() => {setOkrCategoryTab('my'); setNewOkrDeadline(dayjs().endOf('month').format('YYYY-MM-DD')); setNewOkrParentId(undefined); setIsAddOkrOpen(true);}}
+
             >
               <Plus className="w-3.5 h-3.5" />
               添加目标
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -189,54 +141,55 @@ export const OKRPerformanceView: React.FC = () => {
       {mainTab === 'okrs' && (
         <div className="space-y-6">
           {/* Sub Navigation */}
-          <Segmented
-            value={okrCategoryTab}
+          <Tabs
+            activeKey={okrCategoryTab}
             onChange={(value) => setOkrCategoryTab(value as typeof okrCategoryTab)}
-            options={[
-              { label: '我的 OKR', value: 'my' },
-              { label: '直属上级 OKR', value: 'supervisor' },
-              { label: '直属下级 OKR', value: 'subordinate' },
-              { label: '我部门的 OKR', value: 'department' },
-              { label: '跨部门协同 OKR', value: 'other_dept' },
+            items={[
+              { label: '我的 OKR', key: 'my' },
+              { label: '直属上级 OKR', key: 'supervisor' },
+              { label: '直属下级 OKR', key: 'subordinate' },
+              { label: '我部门的 OKR', key: 'department' },
+              { label: '跨部门协同 OKR', key: 'other_dept' },
             ]}
           />
 
           {okrCategoryTab === 'my' && isAddOkrOpen && (
-            <form
-              onSubmit={(event) => { event.preventDefault(); handleSaveOkr(); }}
+            <Form disabled={busy}
+              onFinish={handleSaveOkr}
               className="rounded-xl border border-blue-500 bg-white dark:bg-slate-900 shadow-xs overflow-hidden"
             >
               <div className="flex items-center justify-between px-5 py-3 bg-blue-50/70 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800/60 text-xs">
                 <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">O1</span><span className="font-semibold text-slate-800 dark:text-slate-200">添加目标</span><span className="text-slate-400">{newOkrCycle.replace('-', '年')}月</span></div>
                 <span className="text-slate-400">填写完成后提交主管确认</span>
               </div>
-              <div className="p-5 space-y-4 text-xs">
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_140px] gap-3">
-                  <input type="text" required value={newOkrObjective} onChange={(e) => setNewOkrObjective(e.target.value)} placeholder="输入目标名称：明确你想要达成什么，不写含糊概括的目标" className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-                  <select value={newOkrCycle} onChange={(e) => setNewOkrCycle(e.target.value)} className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"><option value="2026-09">2026年09月</option><option value="2026-08">2026年08月</option><option value="2026-07">2026年07月</option></select>
-                  <input type="number" value={newOkrWeight} onChange={(e) => setNewOkrWeight(Number(e.target.value))} min="0" max="100" placeholder="权重 %" className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
+              <fieldset disabled={busy} className="p-5 space-y-4 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_140px] gap-3">
+                  <Input maxLength={255} required aria-label="目标名称" value={newOkrObjective} onChange={(e) => setNewOkrObjective(e.target.value)} placeholder="输入目标名称：明确你想要达成什么，不写含糊概括的目标" className="w-full"/>
+                  <InputNumber precision={0} aria-label="目标权重" value={newOkrWeight} onChange={value => setNewOkrWeight(value ?? 0)} min={0} max={100} placeholder="权重 %" className="w-full"/>
                 </div>
-                <input type="text" value={newOkrAlignTo} onChange={(e) => setNewOkrAlignTo(e.target.value)} placeholder="+ 选择对齐目标" className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-                <textarea rows={2} value={newKr1Content} onChange={(e) => setNewKr1Content(e.target.value)} placeholder="KR1 关键结果：遵循 SMART 原则，具体、可衡量、可达成、相关性、时效性" className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-                <input type="date" value={newOkrDeadline} onChange={(e) => setNewOkrDeadline(e.target.value)} className="w-full md:w-56 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800"><button type="button" onClick={() => setIsAddOkrOpen(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">取消</button><button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">提交主管确认</button></div>
-              </div>
-            </form>
+                {!me?.rootFlag && <div>
+                  <Select className="w-full" aria-label="关联上级 OKR" placeholder="+ 选择上级 OKR" showSearch optionFilterProp="label" allowClear
+                    value={newOkrParentId} disabled={busy || loading} loading={loading}
+                    options={parents.map(o=>({value:o.id,label:`${o.ownerName} · ${o.objective}`}))}
+                    onChange={setNewOkrParentId} notFoundContent="本月暂无可关联的直属上级 OKR"/>
+                  {!parents.length && <p className="mt-2 text-slate-500">请联系直属上级确认本月 OKR 后再选择。</p>}
+                </div>}
+                <Input.TextArea maxLength={2000} rows={2} aria-label="KR1 关键结果" value={newKr1Content} onChange={(e) => setNewKr1Content(e.target.value)} placeholder="KR1 关键结果：遵循 SMART 原则，具体、可衡量、可达成、相关性、时效性" className="w-full"/>
+                <DatePicker aria-label="截止日期" allowClear={false} value={dayjs(newOkrDeadline)} onChange={v=>v&&setNewOkrDeadline(v.format('YYYY-MM-DD'))}/>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800"><Button  onClick={() => setIsAddOkrOpen(false)} >取消</Button><Button htmlType="submit" type="primary" loading={busy} disabled={loading || !!error} >提交主管确认</Button></div>
+              </fieldset>
+            </Form>
           )}
 
           {/* OKR Cards List */}
           <div className="space-y-4">
-            {filteredOkrs.length === 0 ? (
+            {filteredOkrs.length === 0 && !loading && !error ? (
               <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
-                <div className="review-empty-icon mb-4 flex items-center justify-center"><Target className="h-9 w-9 text-blue-600 dark:text-blue-400" /></div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">本月暂无目标</h3>
+                <Empty description="本月暂无目标"/>
                 <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">当前月份还没有填写 OKR，点击右上角“添加目标”开始设定。</p>
               </div>
             ) : filteredOkrs.map((okr, oIdx) => (
-              <div
-                key={okr.id}
-                className="tech-list-item bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-4"
-              >
+              <Card key={okr.id}>
                 {/* Header of OKR */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                   <div className="space-y-1">
@@ -273,12 +226,7 @@ export const OKRPerformanceView: React.FC = () => {
                 </div>
 
                 {/* Progress bar */}
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${okr.progress}%` }}
-                  />
-                </div>
+                <Progress percent={okr.progress} showInfo={false}/>
 
                 {/* Key Results list */}
                 <div className="space-y-2 pt-2">
@@ -299,12 +247,7 @@ export const OKRPerformanceView: React.FC = () => {
                             {kr.progress}%
                           </span>
                         </div>
-                        <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className="bg-blue-600 h-full rounded-full"
-                            style={{ width: `${kr.progress}%` }}
-                          />
-                        </div>
+                        <Progress percent={kr.progress} size="small" showInfo={false}/>
                         <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
                           <span>权重: {kr.weight}%</span>
                           <span>截止: {kr.deadline}</span>
@@ -313,7 +256,7 @@ export const OKRPerformanceView: React.FC = () => {
                     ))}
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
@@ -322,111 +265,52 @@ export const OKRPerformanceView: React.FC = () => {
       {/* Main Tab 2: 目标复盘总结 */}
       {mainTab === 'reviews' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 text-xs">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setReviewSubTab('write');
-                  setIsReviewFormOpen(false);
-                }}
-                className={`pb-2.5 px-3 font-semibold transition-colors border-b-2 ${
-                  reviewSubTab === 'write'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                写复盘总结
-              </button>
-              <button
-                onClick={() => setReviewSubTab('my')}
-                className={`pb-2.5 px-3 font-semibold transition-colors border-b-2 ${
-                  reviewSubTab === 'my'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                我的复盘列表 ({performances.filter((p) => p.author === currentUser.name).length})
-              </button>
-              <button
-                onClick={() => setReviewSubTab('received')}
-                className={`pb-2.5 px-3 font-semibold transition-colors border-b-2 ${
-                  reviewSubTab === 'received'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                我收到的复盘 ({performances.length})
-              </button>
-            </div>
-          </div>
+          <Tabs activeKey={reviewSubTab} onChange={v=>{setReviewSubTab(v as typeof reviewSubTab);if(v==='write')setIsReviewFormOpen(false);}} items={[
+            {key:'write',label:'写复盘总结'},
+            {key:'my',label:`我的复盘列表 (${performances.filter(p=>p.authorId===currentUser.id).length})`},
+            {key:'received',label:`我收到的复盘 (${performances.filter(p=>p.authorId!==currentUser.id).length})`},
+          ]}/>
 
           {/* Subtab: 写总结 */}
           {reviewSubTab === 'write' && !isReviewFormOpen && (
             <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
-              <div className="review-empty-icon mb-4 flex items-center justify-center">
-                <FileSpreadsheet className="h-9 w-9 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">暂无需要填写的总结</h3>
+              <Empty description="暂无需要填写的总结"/>
               <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                 选择复盘周期后开始记录本阶段的工作成果与改进计划
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <button
-                  type="button"
+                <Button
+
                   onClick={() => openReviewForm('week')}
-                  className="tech-button-secondary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all"
+
                 >
                   <Calendar className="h-3.5 w-3.5" />
                   周复盘
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+
                   onClick={() => openReviewForm('month')}
-                  className="tech-button-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all"
+
                 >
                   <FileSpreadsheet className="h-3.5 w-3.5" />
                   月度复盘
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           {reviewSubTab === 'write' && isReviewFormOpen && (
-            <form
-              onSubmit={handleSubmitReview}
-              className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-5 text-xs max-w-4xl"
+            <Form disabled={busy}
+              onFinish={handleSubmitReview}
+              className="okr-review-form bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-5 text-xs max-w-4xl"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <fieldset disabled={busy} className="space-y-5">
+              <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                   填写周期复盘与述职报告
                 </h3>
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="rtype"
-                      checked={reviewType === 'week'}
-                      onChange={() => {
-                        setReviewType('week');
-                        setReviewCycleName('2026年第36周复盘总结');
-                      }}
-                      className="text-blue-600"
-                    />
-                    <span>周工作总结</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="rtype"
-                      checked={reviewType === 'month'}
-                      onChange={() => {
-                        setReviewType('month');
-                        setReviewCycleName('2026年8月月度复盘总结');
-                      }}
-                      className="text-blue-600"
-                    />
-                    <span>月度复盘述职</span>
-                  </label>
+                  <Radio.Group value={reviewType} onChange={e=>openReviewForm(e.target.value)} options={[{label:'周工作总结',value:'week'},{label:'月度复盘述职',value:'month'}]}/>
                 </div>
               </div>
 
@@ -435,53 +319,55 @@ export const OKRPerformanceView: React.FC = () => {
                   <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
                     总结周期名称 *
                   </label>
-                  <input
-                    type="text"
-                    value={reviewCycleName}
+                  <Input maxLength={255} aria-label="总结周期名称" value={reviewCycleName}
                     onChange={(e) => setReviewCycleName(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
+                    className="w-full"/>
                 </div>
                 <div>
                   <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
                     个人绩效自评得分 (0-100分) *
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={reviewSelfScore}
-                    onChange={(e) => setReviewSelfScore(Number(e.target.value))}
-                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
+                  <InputNumber precision={0} min={0}
+                    max={100}
+                    aria-label="个人绩效自评得分" value={reviewSelfScore}
+                    onChange={value => setReviewSelfScore(value ?? 0)}
+                    className="w-full"/>
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1" htmlFor="review-completed-work">
+                  关联{reviewType === 'week' ? '本周' : '本月'}完成的任务 / 工单
+                </label>
+                <Select id="review-completed-work" className="w-full" mode="multiple" showSearch optionFilterProp="label" allowClear
+                  placeholder="选择已完成的任务或工单，可多选" value={selectedWorkIds} onChange={setSelectedWorkIds}
+                  loading={workLoading} disabled={busy || workLoading || !!workError}
+                  options={candidates.map(w=>({value:w.id,label:`${w.title} · ${w.status}`}))}
+                  notFoundContent={workLoading ? '正在加载…' : '本期没有已完成的任务或工单'}/>
+                {workError && <Alert type="error" title="任务与工单加载失败" action={<Button onClick={refreshWork}>重试</Button>}/>}
               </div>
 
               <div>
                 <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
                   本月 / 本周核心工作总结 *
                 </label>
-                <textarea
-                  rows={4}
+                <Input.TextArea maxLength={2000} rows={4}
                   required
-                  value={reviewSummary}
+                  aria-label="核心工作总结" value={reviewSummary}
                   onChange={(e) => setReviewSummary(e.target.value)}
                   placeholder="详细列举本周期主导完成的重点事项、突破成果及交付里程碑..."
-                  className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                />
+                  className="w-full"/>
               </div>
 
               <div>
                 <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
                   本月 / 本周未完成任务说明及原因归因分析
                 </label>
-                <textarea
-                  rows={2}
-                  value={reviewUncompleted}
+                <Input.TextArea maxLength={2000} rows={2}
+                  aria-label="未完成任务说明" value={reviewUncompleted}
                   onChange={(e) => setReviewUncompleted(e.target.value)}
                   placeholder="未达标事项、滞后原因分析与下阶段补救措施..."
-                  className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                />
+                  className="w-full"/>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -489,25 +375,21 @@ export const OKRPerformanceView: React.FC = () => {
                   <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
                     对公司管理意见或建议
                   </label>
-                  <textarea
-                    rows={2}
-                    value={reviewSuggestions}
+                  <Input.TextArea maxLength={2000} rows={2}
+                    aria-label="管理意见或建议" value={reviewSuggestions}
                     onChange={(e) => setReviewSuggestions(e.target.value)}
                     placeholder="业务协同、流程机制或研发支持建议..."
-                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
+                    className="w-full"/>
                 </div>
                 <div>
                   <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
                     需要协助 / 协调事项
                   </label>
-                  <textarea
-                    rows={2}
-                    value={reviewHelpNeeded}
+                  <Input.TextArea maxLength={2000} rows={2}
+                    aria-label="需要协助事项" value={reviewHelpNeeded}
                     onChange={(e) => setReviewHelpNeeded(e.target.value)}
                     placeholder="需要跨部门支持、预算资源或高管协调事项..."
-                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
+                    className="w-full"/>
                 </div>
               </div>
 
@@ -515,41 +397,36 @@ export const OKRPerformanceView: React.FC = () => {
                 <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
                   发送参与人 (多个逗号隔开)
                 </label>
-                <input
-                  type="text"
-                  value={reviewSendTo}
+                <Input maxLength={255} aria-label="发送参与人" value={reviewSendTo}
                   onChange={(e) => setReviewSendTo(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                />
+                  className="w-full"/>
               </div>
 
               <div className="pt-2 flex justify-end">
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs shadow-xs transition-colors"
+                <Button
+                  htmlType="submit" type="primary" loading={busy} disabled={loading || !!error}
+
                 >
                   <Send className="w-4 h-4" />
-                  提交复盘总结
-                </button>
+                  {busy ? '正在提交…' : '提交复盘总结'}
+                </Button>
               </div>
-            </form>
+              </fieldset>
+            </Form>
           )}
 
           {/* Subtab: 看总结 */}
           {(reviewSubTab === 'my' || reviewSubTab === 'received') && (
             <div className="space-y-4">
-              {performances.map((perf) => (
-                <div
-                  key={perf.id}
-                  className="tech-list-item bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-3 text-xs"
-                >
-                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              {performances.filter(p => reviewSubTab === 'my' ? p.authorId === currentUser.id : p.authorId !== currentUser.id).map((perf) => (
+                <Card key={perf.id}>
+                  <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-sm text-slate-900 dark:text-white">
                           {perf.cycleName}
                         </span>
-                        <StatusTag status={perf.status} />
+                        <Tag>{{draft:'草稿',submitted:'已提交',reviewed:'已评价'}[perf.status] || perf.status}</Tag>
                       </div>
                       <div className="text-[11px] text-slate-400 mt-0.5">
                         述职人：{perf.author} ({perf.authorDept}) · 提交时间：{perf.createdAt}
@@ -561,7 +438,7 @@ export const OKRPerformanceView: React.FC = () => {
                         <span className="text-slate-400 text-[11px]">自评分</span>
                         <div className="font-bold text-blue-600 text-sm">{perf.selfScore}分</div>
                       </div>
-                      {perf.leaderScore && (
+                      {perf.leaderScore != null && (
                         <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-3">
                           <span className="text-slate-400 text-[11px]">领导考评分</span>
                           <div className="font-bold text-emerald-600 text-sm">{perf.leaderScore}分</div>
@@ -575,6 +452,11 @@ export const OKRPerformanceView: React.FC = () => {
                       <span className="font-semibold text-slate-800 dark:text-slate-200">工作成果总结：</span>
                       <p className="text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{perf.summary}</p>
                     </div>
+
+                    {!!perf.linkedWorkItems?.length && <div>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">关联任务 / 工单：</span>
+                      <ul className="mt-2 space-y-2 text-slate-600 dark:text-slate-300">{perf.linkedWorkItems.map(item=><li key={item.id}>{item.title} · {item.status}</li>)}</ul>
+                    </div>}
 
                     {perf.uncompletedReason && (
                       <div>
@@ -590,7 +472,7 @@ export const OKRPerformanceView: React.FC = () => {
                       </div>
                     )}
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )}

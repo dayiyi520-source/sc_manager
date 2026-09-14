@@ -1,0 +1,30 @@
+import { apiRequest } from './apiClient';
+
+export interface OkrPerson { id: string; name: string; department: string; supervisorId: string | null; rootFlag: number; version: number }
+export interface OkrKr { id: string; title: string; weight: number; progress: number }
+export interface OkrReviewItem { workId: string; title: string; status: string; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
+export interface OkrPayload {
+  reviewMode?: 'completed'; reviewType?: 'week' | 'month'; selfScore?: number;
+  uncompletedReason?: string; suggestions?: string; helpNeeded?: string; sendTo?: string[];
+  weight?: number; deadline?: string;
+  title: string; parentObjectiveId?: string; parentKeyResultId?: string; keyResults?: OkrKr[]; progress?: number;
+  startDate?: string; endDate?: string; summary?: string; items?: OkrReviewItem[];
+  feedback?: string; finalScore?: number; evaluation?: string;
+  objectiveSnapshots?: Array<{id:string;period:string;payload:OkrPayload}>;
+}
+export interface OkrRecord { id: string; kind: 'objective' | 'review'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload }
+export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
+const base = '/api/okr';
+export const okrRepository = {
+  people: () => apiRequest<OkrPerson[]>(`${base}/people`),
+  records: async (): Promise<OkrRecord[]> => {
+    const rows = await apiRequest<Array<Omit<OkrRecord,'payload'> & {payload: string | OkrPayload}>>(`${base}/records`);
+    return rows.map(r => ({...r, payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload}));
+  },
+  work: (ownerId: string) => apiRequest<OkrWork[]>(`${base}/work?ownerId=${encodeURIComponent(ownerId)}`),
+  link: (work: OkrWork, objectiveId?:string,keyResultId?:string) => apiRequest(`${base}/work/link`,{method:'PUT',body:JSON.stringify({workId:work.id,objectiveId,keyResultId,version:work.linkVersion})}),
+  create: (kind: string, periodKey: string, payload: OkrPayload, submit = false) => apiRequest<{id:string}>(`${base}/records`, {method:'POST',body:JSON.stringify({kind,periodKey,payload,submit})}),
+  update: (record: OkrRecord, action: string, data: Record<string, unknown> = {}) => apiRequest(`${base}/records/${record.id}`,{method:'PATCH',body:JSON.stringify({action,version:record.version,...data})}),
+  reporting: (person: OkrPerson, supervisorId: string | null, root: boolean) => apiRequest(`${base}/people/${person.id}`, {method:'PUT',body:JSON.stringify({supervisorId,root,version:person.version})}),
+  events: (id: string) => apiRequest<Array<{action:string;operator:string;createdAt:string}>>(`${base}/${id}/events`),
+};

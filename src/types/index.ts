@@ -97,6 +97,10 @@ export interface OKRItem {
   progress: number; // 0-100
   deadline: string;
   alignTo?: string; // 对齐目标
+  parentObjectiveId?: string;
+  parentKeyResultId?: string;
+  alignmentType?: '承接目标' | '支撑KR' | '协同目标' | '独立目标';
+  status?: 'draft' | 'pending_review' | 'active' | 'paused' | 'completed' | 'archived';
   keyResults: {
     id: string;
     content: string;
@@ -122,6 +126,29 @@ export interface PerformanceReview {
   status: 'draft' | 'submitted' | 'reviewed';
   feedback?: string;
   leaderScore?: number;
+  linkedWorkItems?: ReviewWorkItem[];
+  outOfPlanWork?: OutOfPlanWorkItem[];
+}
+
+export interface ReviewWorkItem {
+  id: string;
+  title: string;
+  type: 'task' | 'ticket' | 'requirement' | 'bug';
+  status: string;
+  objectiveId?: string;
+  keyResultId?: string;
+  resultSummary?: string;
+  blocker?: string;
+}
+
+export interface OutOfPlanWorkItem {
+  id: string;
+  title: string;
+  source: string;
+  resultSummary: string;
+  impactOnOkr?: string;
+  workload?: number;
+  includedInScore?: boolean;
 }
 
 // 知识库
