@@ -39,6 +39,7 @@ export const OKRPerformanceView: React.FC = () => {
   const [isAddOkrOpen, setIsAddOkrOpen] = useState(false);
   const [newOkrCycle, setNewOkrCycle] = useState('2026-09');
   const [newOkrAlignTo, setNewOkrAlignTo] = useState('公司年度战略目标：突破智能协同千万级标杆市场');
+  const [newOkrParentId, setNewOkrParentId] = useState('');
   const [newOkrObjective, setNewOkrObjective] = useState('');
   const [newOkrWeight, setNewOkrWeight] = useState(40);
   const [newOkrDeadline, setNewOkrDeadline] = useState('2026-09-30');
@@ -56,6 +57,7 @@ export const OKRPerformanceView: React.FC = () => {
   const [reviewSuggestions, setReviewSuggestions] = useState('');
   const [reviewHelpNeeded, setReviewHelpNeeded] = useState('');
   const [reviewSendTo, setReviewSendTo] = useState('总经办, 部门主管');
+  const [reviewOutOfPlan, setReviewOutOfPlan] = useState('');
 
   const matchesCategory = (o: OKRItem) => {
     if (okrCategoryTab === 'my') return o.category === 'my';
@@ -71,12 +73,20 @@ export const OKRPerformanceView: React.FC = () => {
       addToast('warning', '请填写目标(O)内容');
       return;
     }
+    if (!newOkrParentId) {
+      addToast('warning', '请选择上级目标或 KR', '下级 OKR 必须建立承接关系');
+      return;
+    }
+    const parent = okrs.find((item) => item.id === newOkrParentId);
     addOKR({
       cycle: newOkrCycle,
       objective: newOkrObjective,
       weight: Number(newOkrWeight),
       deadline: newOkrDeadline,
       alignTo: newOkrAlignTo,
+      parentObjectiveId: parent?.id,
+      alignmentType: '承接目标',
+      status: 'pending_review',
       keyResults: [
         {
           id: `kr-${Date.now()}-1`,
@@ -98,6 +108,7 @@ export const OKRPerformanceView: React.FC = () => {
     setNewOkrObjective('');
     setNewKr1Content('');
     setNewKr2Content('');
+    setNewOkrParentId('');
   };
 
   const handleSubmitReview = (e: React.FormEvent) => {
@@ -115,9 +126,11 @@ export const OKRPerformanceView: React.FC = () => {
       suggestions: reviewSuggestions,
       helpNeeded: reviewHelpNeeded,
       sendTo: reviewSendTo.split(',').map((s) => s.trim())
+      ,outOfPlanWork: reviewOutOfPlan.trim() ? [{ id: `oop-${Date.now()}`, title: reviewOutOfPlan.trim(), source: '计划外工作', resultSummary: reviewOutOfPlan.trim() }] : []
     });
     setReviewSubTab('my');
     setIsReviewFormOpen(false);
+    setReviewOutOfPlan('');
   };
 
   const openReviewForm = (type: 'week' | 'month') => {
@@ -217,6 +230,10 @@ export const OKRPerformanceView: React.FC = () => {
                   <input type="number" value={newOkrWeight} onChange={(e) => setNewOkrWeight(Number(e.target.value))} min="0" max="100" placeholder="权重 %" className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
                 </div>
                 <input type="text" value={newOkrAlignTo} onChange={(e) => setNewOkrAlignTo(e.target.value)} placeholder="+ 选择对齐目标" className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
+                <select required value={newOkrParentId} onChange={(e) => setNewOkrParentId(e.target.value)} className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                  <option value="">选择要承接的上级目标 / KR *</option>
+                  {okrs.filter((item) => item.ownerId !== currentUser.id).map((item) => <option key={item.id} value={item.id}>{item.ownerName} · {item.objective}</option>)}
+                </select>
                 <textarea rows={2} value={newKr1Content} onChange={(e) => setNewKr1Content(e.target.value)} placeholder="KR1 关键结果：遵循 SMART 原则，具体、可衡量、可达成、相关性、时效性" className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
                 <input type="date" value={newOkrDeadline} onChange={(e) => setNewOkrDeadline(e.target.value)} className="w-full md:w-56 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
                 <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800"><button type="button" onClick={() => setIsAddOkrOpen(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">取消</button><button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">提交主管确认</button></div>
@@ -469,6 +486,11 @@ export const OKRPerformanceView: React.FC = () => {
                   placeholder="详细列举本周期主导完成的重点事项、突破成果及交付里程碑..."
                   className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">计划外工作及对 OKR 的影响</label>
+                <textarea rows={3} value={reviewOutOfPlan} onChange={(e) => setReviewOutOfPlan(e.target.value)} placeholder="记录本周期临时工单、紧急支持或其他计划外工作，并说明对目标进度的影响" className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
               </div>
 
               <div>
