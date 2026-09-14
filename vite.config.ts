@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vitest/config';
+import {loadEnv} from 'vite';
 
 function devApiMockPlugin() {
   return {
@@ -90,7 +91,8 @@ function devApiMockPlugin() {
   };
 }
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
   return {
     base: process.env.VITE_BASE_PATH || '/',
     plugins: [devApiMockPlugin(), react(), tailwindcss()],
@@ -130,7 +132,7 @@ export default defineConfig(() => {
       strictPort: true,
       proxy: {
         '/api': {
-          target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8080',
+          target: process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://127.0.0.1:8080',
           changeOrigin: true,
           configure: (proxy) => {
             proxy.on('error', (_err, _req, res) => {
@@ -153,7 +155,7 @@ export default defineConfig(() => {
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      watch: process.env.DISABLE_HMR === 'true' ? null : {ignored: ['**/.enterprise-app-factory/**', '**/backend/target/**']},
     },
   };
 });

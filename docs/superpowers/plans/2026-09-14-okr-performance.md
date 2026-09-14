@@ -1,6 +1,23 @@
 # 目标与绩效闭环 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> 执行方式：按用户要求在当前工作树直接完成，不拆分代理或分支。以下原始文件规划供追溯，实际交付以本节为准。
+
+## 2026-09-14 实施结果
+
+- [x] 组织关系配置、循环校验和直属上下级数据范围。
+- [x] 下级必须承接同月直属上级执行中目标，可进一步引用上级 KR。
+- [x] KR 权重、加权进度、目标提交确认、完成与归档。
+- [x] 实际任务和工单归集、持久化 KR 关联、计划外工作保留。
+- [x] 结构化复盘、产出与阻塞、受影响目标和 KR 关联。
+- [x] 主管退回、员工重提、最终评分和计划外贡献确认。
+- [x] MySQL 持久化、并发版本校验、事务审计、提交快照。
+- [x] 前后端自动化检查和独立本地验收服务。
+
+实际代码位于 `src/components/workbench/okr/`、`src/services/okrRepository.ts` 和 `backend/src/main/java/com/shichuang/manage/okr/`。新增迁移为 1.0.33、1.0.34。使用现有 React 19、Ant Design 6.6.3、Spring Boot JDBC 约定。
+
+后续依次处理业务验收反馈、多目标协同与完整目标树、源任务页面关联入口、来源跳转与历史进度。统一旧任务负责人 ID 并处理历史数据库迁移基线后，另行安排共享环境验证和上线。未执行生产部署。
+
+验收环境与已知边界见 `docs/qa/okr-local-acceptance.md`。
 
 **Goal:** 实现上级 OKR 引用、任务/工单归集、计划外工作复盘和主管评价闭环。
 

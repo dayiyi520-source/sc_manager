@@ -49,7 +49,8 @@ export const MyTasksView: React.FC = () => {
   });
 
   // 获取用户OKR
-  const myOkr = okrs.find((o) => o.category === 'my') || okrs[0];
+  const currentCycle = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+  const myOkr = okrs.find((o) => o.ownerId === currentUser.id && o.cycle === currentCycle);
 
   // Tab组件
   const TabButton: React.FC<{
@@ -253,7 +254,7 @@ export const MyTasksView: React.FC = () => {
               我的OKR进度
             </div>
             <button
-              onClick={() => openPageTab('workbench_okr_perf')}
+              onClick={() => openPageTab('wb_okr_perf')}
               className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1"
             >
               查看详情

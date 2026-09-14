@@ -1,7 +1,7 @@
 <!-- ENTERPRISE_APP_FACTORY_START -->
 # stringplugin Project Rules
 
-Last synced: 2026-09-08
+Last synced: 2026-09-14
 
 This project uses the stringplugin team plugin. Follow these rules before creating or changing code in this repository.
 
@@ -17,7 +17,7 @@ This project uses the stringplugin team plugin. Follow these rules before creati
 ## Version State
 
 - Current version: `V1.0.0`.
-- Latest code branch: `master`.
+- Latest code branch: `codex/manage_admin-okr`.
 - Version mode: `latest-code-version-context`.
 - Current PRD path: `docs/prd/V1.0.0.md`.
 - Version state source: `.enterprise-app-factory/project.json`.
@@ -162,7 +162,6 @@ This project uses the stringplugin team plugin. Follow these rules before creati
 - Gitee stores only configuration and `secretRefs`, never real passwords or access tokens.
 - Do not commit `.enterprise-app-factory/secrets/runtime.env`, local secret JSON files, server passwords, database passwords, or personal tokens.
 <!-- ENTERPRISE_APP_FACTORY_END -->
-
 
 ## 统一开发规范
 

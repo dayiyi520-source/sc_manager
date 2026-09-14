@@ -1,0 +1,4 @@
+.okr-workspace .ant-table-thead > tr > th {
+  background: var(--bg-surface-soft) !important;
+  color: var(--text-muted) !important;
+}
