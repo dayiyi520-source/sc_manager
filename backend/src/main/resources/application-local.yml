@@ -8,6 +8,7 @@ spring:
     password: ${LOCAL_DB_PASSWORD:shichuang_local}
   flyway:
     clean-disabled: true
+    out-of-order: true
 string:
   auth:
     token-secret: ${LOCAL_TOKEN_SECRET:local-development-token-secret-change-me}
