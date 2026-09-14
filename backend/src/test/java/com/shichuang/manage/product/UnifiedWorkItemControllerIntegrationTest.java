@@ -118,4 +118,52 @@ class UnifiedWorkItemControllerIntegrationTest extends AbstractApiIntegrationTes
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].relationType").value("BLOCKS"));
     }
+
+    @Test
+    void aggregatesRequirementAfterChildrenBugAndAcceptanceComplete() throws Exception {
+        String token = loginToken();
+        String requirementResponse = mockMvc.perform(post("/api/work-items")
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"type\":\"requirement\",\"title\":\"完成聚合测试需求\"}"))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        String requirementId = objectMapper.readTree(requirementResponse).path("data").path("id").asText();
+
+        String childrenResponse = mockMvc.perform(post("/api/work-items/{id}/children", requirementId)
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("[{\"type\":\"design\",\"title\":\"完成聚合设计\",\"status\":\"已完成\"},{\"type\":\"development\",\"title\":\"完成聚合研发\",\"status\":\"已完成\"},{\"type\":\"test\",\"title\":\"完成聚合测试\",\"status\":\"已完成\"}]"))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertEquals(3, objectMapper.readTree(childrenResponse).path("data").size());
+
+        String bugResponse = mockMvc.perform(post("/api/work-items")
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"type\":\"bug\",\"title\":\"完成聚合阻塞缺陷\"}"))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        String bugId = objectMapper.readTree(bugResponse).path("data").path("id").asText();
+        mockMvc.perform(post("/api/work-items/{id}/relations", bugId)
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"toId\":\"" + requirementId + "\",\"relationType\":\"BLOCKS\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/work-items/{id}", bugId)
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"status\":\"已关闭\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/work-items/{id}/acceptance", requirementId)
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .content("{\"status\":\"已通过\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/work-items/{id}", requirementId)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("已完成"))
+            .andExpect(jsonPath("$.data.acceptanceStatus").value("已通过"));
+    }
 }
