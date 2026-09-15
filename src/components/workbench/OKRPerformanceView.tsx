@@ -61,6 +61,11 @@ const OriginalWorkspace: React.FC = () => {
     return o.department !== currentUser.department;
   };
   const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && matchesCategory(o));
+  const visiblePerformances = performances.filter(performance => (
+    reviewSubTab === 'my'
+      ? performance.authorId === currentUser.id
+      : performance.authorId !== currentUser.id
+  ));
 
   const handleSaveOkr = async (payload: Parameters<typeof saveObjective>[1]) => {
     if (await saveObjective(newOkrCycle, payload)) {
@@ -106,10 +111,12 @@ const OriginalWorkspace: React.FC = () => {
 
         {mainTab === 'okrs' && (
           <div className="flex items-center gap-3">
-            <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear={false}
-              onChange={paths=>setSelectedCycles(paths.map(path=>String(path[path.length-1])))}
-              maxTagCount={0} maxTagPlaceholder={()=>cycleLabel} placeholder="周期：请选择"
-              tagRender={()=> <span>{cycleLabel}</span>} />
+            <div className="okr-cycle-control">
+              <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear={false}
+                onChange={paths=>setSelectedCycles(paths.map(path=>String(path[path.length-1])))}
+                maxTagCount={0} maxTagPlaceholder={()=>cycleLabel} placeholder="周期：请选择" />
+              <span className="okr-cycle-label" aria-hidden="true">{cycleLabel}</span>
+            </div>
 
             <Button type="primary"
               id="btn-add-okr"
@@ -157,7 +164,7 @@ const OriginalWorkspace: React.FC = () => {
 
           {/* OKR Cards List */}
           <div className="space-y-4">
-            {filteredOkrs.length === 0 && !loading && !error ? (
+            {filteredOkrs.length === 0 && objectiveForms.length === 0 && !loading && !error ? (
               <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
                 <Empty description="本月暂无目标"/>
                 <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">当前月份还没有填写 OKR，点击右上角“添加目标”开始设定。</p>
@@ -392,7 +399,14 @@ const OriginalWorkspace: React.FC = () => {
           {/* Subtab: 看总结 */}
           {(reviewSubTab === 'my' || reviewSubTab === 'received') && (
             <div className="space-y-4">
-              {performances.filter(p => reviewSubTab === 'my' ? p.authorId === currentUser.id : p.authorId !== currentUser.id).map((perf) => (
+              {visiblePerformances.length === 0 ? (
+                <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
+                  <Empty description={reviewSubTab === 'my' ? '暂无我的复盘' : '暂无收到的复盘'}/>
+                  <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    {reviewSubTab === 'my' ? '完成并提交复盘总结后将在这里展示' : '其他成员发送给你的复盘将在这里展示'}
+                  </p>
+                </div>
+              ) : visiblePerformances.map((perf) => (
                 <Card key={perf.id}>
                   <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                     <div>

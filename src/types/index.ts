@@ -99,6 +99,7 @@ export interface OKRItem {
   alignTo?: string; // 对齐目标
   parentObjectiveId?: string;
   parentKeyResultId?: string;
+  alignments?: Array<{ parentObjectiveId: string; parentKeyResultId?: string }>;
   alignmentType?: '承接目标' | '支撑KR' | '协同目标' | '独立目标';
   objectiveType?: 'target' | 'challenge';
   status?: 'draft' | 'pending_review' | 'active' | 'paused' | 'completed' | 'archived';
