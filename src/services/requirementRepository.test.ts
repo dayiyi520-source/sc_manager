@@ -33,6 +33,22 @@ describe('requirementRepository', () => {
     expect(result.items[0].specialFields).toEqual({ requestType: '新功能', requestSource: '客户反馈' });
   });
 
+  it('normalizes JSON array fields used by the requirement detail page', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code: 'OK',
+      message: '',
+      data: { id: 'req-1', media: '[]', ccNames: '["张瑞"]', sourceWorkOrderIds: 'invalid-json', sourceWorkOrderTitles: null },
+      requestId: 'r-json-arrays',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+
+    const result = await requirementRepository.detail('req-1');
+
+    expect(result.media).toEqual([]);
+    expect(result.ccNames).toEqual(['张瑞']);
+    expect(result.sourceWorkOrderIds).toEqual([]);
+    expect(result.sourceWorkOrderTitles).toEqual([]);
+  });
+
   it('surfaces structured API errors for failed transitions', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'VALIDATION_ERROR', message: '请输入原因', data: null, requestId: 'r2' }), { status: 400, headers: { 'Content-Type': 'application/json' } })));
 

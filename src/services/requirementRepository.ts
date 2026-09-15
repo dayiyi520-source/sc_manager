@@ -1,14 +1,29 @@
 import { apiRequest, PageResult } from './apiClient';
 import type { DepartmentOption, EmployeeOption, RequirementTask, RequirementWorkItem, RequirementWorkOrderCandidate } from '../types';
 
-function normalizeSpecialFields(task: RequirementTask): RequirementTask {
-  if (typeof task.specialFields !== 'string') return task;
+function parseJson<T>(value: T | string | null | undefined, fallback: T): T {
+  if (typeof value !== 'string') return value ?? fallback;
   try {
-    const parsed = JSON.parse(task.specialFields);
-    return { ...task, specialFields: parsed && typeof parsed === 'object' ? parsed : {} };
+    return JSON.parse(value) as T;
   } catch {
-    return { ...task, specialFields: {} };
+    return fallback;
   }
+}
+
+export function normalizeRequirementTask(task: RequirementTask): RequirementTask {
+  const specialFields = parseJson(task.specialFields, {});
+  const media = parseJson(task.media, []);
+  const ccNames = parseJson(task.ccNames, []);
+  const sourceWorkOrderIds = parseJson(task.sourceWorkOrderIds, []);
+  const sourceWorkOrderTitles = parseJson(task.sourceWorkOrderTitles, []);
+  return {
+    ...task,
+    specialFields: specialFields && typeof specialFields === 'object' && !Array.isArray(specialFields) ? specialFields : {},
+    media: Array.isArray(media) ? media : [],
+    ccNames: Array.isArray(ccNames) ? ccNames : [],
+    sourceWorkOrderIds: Array.isArray(sourceWorkOrderIds) ? sourceWorkOrderIds : [],
+    sourceWorkOrderTitles: Array.isArray(sourceWorkOrderTitles) ? sourceWorkOrderTitles : [],
+  };
 }
 
 export const requirementRepository = {
@@ -16,13 +31,13 @@ export const requirementRepository = {
     const query = new URLSearchParams(Object.entries(values).map(([key, value]) => [key, String(value)])).toString();
     return apiRequest<PageResult<RequirementTask>>(`/api/requirements?${query}`).then((page) => {
       const items = Array.isArray(page?.items) ? page.items : [];
-      return { page: page?.page || 1, pageSize: page?.pageSize || 10, total: page?.total || items.length, ...page, items: items.map(normalizeSpecialFields) };
+      return { page: page?.page || 1, pageSize: page?.pageSize || 10, total: page?.total || items.length, ...page, items: items.map(normalizeRequirementTask) };
     });
   },
   create: (input: Partial<RequirementTask>) => apiRequest<{ id: string; code: string }>('/api/requirements', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: string, input: Partial<RequirementTask> & { version?: number }) => apiRequest<void>(`/api/requirements/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   comment: (id: string, content: string) => apiRequest<void>(`/api/requirements/${id}/comments`, { method: 'POST', body: JSON.stringify({ content }) }),
-  detail: (id: string) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}`).then((detail) => normalizeSpecialFields(detail) as typeof detail),
+  detail: (id: string) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}`).then((detail) => normalizeRequirementTask(detail) as typeof detail),
   workOrderCandidates: (values: { keyword?: string; type?: string; requirementId?: string; limit?: number } = {}) => {
     const query = new URLSearchParams(Object.entries(values).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])).toString();
     return apiRequest<RequirementWorkOrderCandidate[]>(`/api/requirements/work-order-candidates?${query}`);

@@ -33,6 +33,8 @@ describe('RichTextEditor', () => {
 
     expect(screen.getByTestId('tiny-editor')).toBeTruthy();
     expect(editorMock.init.language).toBe('zh-CN');
+    expect(editorMock.init.skin).toBe(false);
+    expect(editorMock.init.content_css).toBe(false);
     expect(editorMock.init.toolbar).toContain('undo redo');
     expect(editorMock.init.toolbar).not.toContain('formatpainter');
     expect(editorMock.init.toolbar).not.toContain('checklist');

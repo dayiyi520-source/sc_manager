@@ -65,7 +65,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
   useEffect(() => { if (!markdownMode || !instanceRef.current) return; setMarkdownDraft(turndown.turndown(instanceRef.current.getContent())); }, [markdownMode]);
 
   const init = useMemo(() => ({
-    height: 320, menubar: false, branding: false, promotion: false, language: 'zh-CN', skin: 'oxide', placeholder, resize: true,
+    height: 320, menubar: false, branding: false, promotion: false, language: 'zh-CN', skin: false, content_css: false, placeholder, resize: true,
     plugins: 'image link lists codesample table',
     toolbar: readOnly ? false : 'undo redo | removeformat | blocks fontfamily fontsize | bold italic strikethrough underline | forecolor backcolor | imageupload table customlink blockquote codesample | alignleft aligncenter alignright | bullist numlist outdent indent | lineheight | markdown',
     readonly: readOnly,
