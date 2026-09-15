@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { resolveDataMode } from '../hooks/useDataMode';
 import { crmRepository } from '../services/crmRepository';
 import { requirementRepository } from '../services/requirementRepository';
 import { productRepository } from '../services/productRepository';
-import { okrRepository } from '../services/okrRepository';
-import { readSession } from '../services/session';
+import { useSessionState } from './modules/useSessionState';
+import { useCrmQueries } from './modules/useCrmQueries';
+import { useProductQueries } from './modules/useProductQueries';
+import { useOkrState } from './modules/useOkrState';
+import { useNavigationState } from './modules/useNavigationState';
+import { useWorkspaceUiState, type WorkspaceToast } from './modules/useWorkspaceUiState';
 import {
   MainMenuId,
   SubMenuId,
@@ -76,12 +77,7 @@ import {
   INITIAL_INVOICES
 } from '../data/mockData';
 
-export interface ToastItem {
-  id: string;
-  type: 'success' | 'info' | 'warning' | 'error';
-  title: string;
-  message?: string;
-}
+export type ToastItem = WorkspaceToast;
 
 export interface NavigationMenuItem {
   id: SubMenuId;
@@ -388,48 +384,9 @@ const normalizeRequirementStatus = (status: RequirementTask['status']): Requirem
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const rawRouteTab = location.pathname.startsWith('/app/') ? location.pathname.slice('/app/'.length) as SubMenuId : 'wb_my_tasks';
-  const routeTab = (ALIAS_MAP[rawRouteTab] || rawRouteTab) as SubMenuId;
-  const [activeTabId, setActiveTabId] = useState<SubMenuId>(routeTab);
-  const [openTabs, setOpenTabs] = useState<PageTab[]>([
-    { id: 'wb_my_tasks', title: '我的任务', mainMenuId: 'workbench', iconName: 'CheckSquare', closable: false }
-  ]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1200);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-
-  useEffect(() => {
-    const syncSidebarForViewport = () => {
-      if (window.innerWidth < 1200) {
-        setSidebarCollapsed(true);
-        if (window.innerWidth < 900) setMobileSidebarOpen(false);
-      }
-    };
-    window.addEventListener('resize', syncSidebarForViewport);
-    return () => window.removeEventListener('resize', syncSidebarForViewport);
-  }, []);
-  const initialSession = readSession();
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(initialSession?.user || CURRENT_USERS[0]);
-  const [crmSessionToken, setCrmSessionToken] = useState(initialSession?.token || '');
-  const [crmSessionReady, setCrmSessionReady] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const storedTheme = window.localStorage.getItem('sc-admin-theme');
-    return storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'light';
-  });
-  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
-
-  // Apply dark mode class to root
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    document.documentElement.style.colorScheme = theme;
-    window.localStorage.setItem('sc-admin-theme', theme);
-  }, [theme]);
+  const { activeTabId, setActiveTabId, openTabs, sidebarCollapsed, mobileSidebarOpen, openPageTab, closePageTab, toggleSidebar, toggleMobileSidebar } = useNavigationState(MENU_GROUPS, ALIAS_MAP);
+  const { currentUser, setCurrentUser, sessionToken: crmSessionToken, dataMode } = useSessionState(CURRENT_USERS[0]);
+  const { theme, globalSearchOpen, setGlobalSearchOpen, toasts, addToast, removeToast, toggleTheme } = useWorkspaceUiState();
 
   // Selected for drawers
   const [selectedCustomerIdForDetail, setSelectedCustomerIdForDetail] = useState<string | null>(null);
@@ -474,17 +431,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [approvals, setApprovals] = useState<ApprovalFlow[]>(INITIAL_APPROVALS);
   const [projects, setProjects] = useState<ProjectItem[]>(INITIAL_PROJECTS);
   const [servers, setServers] = useState<ServerNode[]>(INITIAL_SERVERS);
-  const [okrs, setOkrs] = useState<OKRItem[]>([]);
-  const [performances, setPerformances] = useState<PerformanceReview[]>([]);
-  const okrQuery = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:okrRepository.records,enabled:!!readSession()?.token});
-  useEffect(() => {
-    setOkrs((okrQuery.data||[]).filter(r=>r.kind==='objective'&&r.ownerId===currentUser.id).map(r=>({
-      id:r.id,cycle:r.periodKey,ownerId:r.ownerId,ownerName:currentUser.name,department:currentUser.department,category:'my',
-      objective:r.payload.title,weight:100,progress:r.payload.progress||0,deadline:r.periodKey,
-      parentObjectiveId:r.payload.parentObjectiveId,parentKeyResultId:r.payload.parentKeyResultId,
-      keyResults:(r.payload.keyResults||[]).map(k=>({id:k.id,content:k.title,weight:k.weight,progress:k.progress,deadline:r.periodKey}))
-    })));
-  },[okrQuery.data,currentUser.id,currentUser.name,currentUser.department]);
+  const { okrs, setOkrs, performances, setPerformances } = useOkrState(currentUser, dataMode === 'remote');
   const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>(INITIAL_KNOWLEDGE_DOCS);
 
   // Operations & Delivery Extensions
@@ -497,170 +444,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(INITIAL_INVOICES);
   const [invoiceApprovals, setInvoiceApprovals] = useState<InvoiceApprovalRecord[]>([]);
 
-  useEffect(() => {
-    const session = readSession();
-    setCrmSessionToken(session?.token || '');
-    setCrmSessionReady(!!session);
-    if (session) setCurrentUser(session.user);
-  }, []);
-
   // 所有领域共用同一数据模式，避免本地回退会话误请求后端。
-  const dataMode = resolveDataMode(crmSessionToken, crmSessionReady);
   const crmEnabled = dataMode === 'remote';
   const requirementBackendEnabled = dataMode === 'remote';
-  const leadQuery = useQuery({ queryKey:['crm','leads',crmSessionToken], queryFn:()=>crmRepository.leads({page:1,pageSize:100}), enabled:crmEnabled });
-  const customerQuery = useQuery({ queryKey:['crm','customers',crmSessionToken], queryFn:()=>crmRepository.customers({page:1,pageSize:100}), enabled:crmEnabled });
-  const opportunityQuery = useQuery({ queryKey:['crm','opportunities',crmSessionToken], queryFn:()=>crmRepository.opportunities({page:1,pageSize:100}), enabled:crmEnabled });
-  const biddingQuery = useQuery({ queryKey:['crm','biddings',crmSessionToken], queryFn:()=>crmRepository.biddings({page:1,pageSize:100}), enabled:crmEnabled });
-  const engagementQuery = useQuery({ queryKey:['crm','winning-engagements',crmSessionToken], queryFn:()=>crmRepository.engagements({page:1,pageSize:100}), enabled:crmEnabled });
-  const followUpQuery = useQuery({ queryKey:['crm','follow-ups',crmSessionToken], queryFn:()=>crmRepository.followUps({page:1,pageSize:100}), enabled:crmEnabled });
-  const contractQuery = useQuery({ queryKey:['crm','contracts',crmSessionToken], queryFn:()=>crmRepository.contracts({page:1,pageSize:100}), enabled:crmEnabled });
-  const requirementQuery = useQuery({ queryKey:['requirements',crmSessionToken], queryFn:()=>requirementRepository.list({page:1,pageSize:100}), enabled:requirementBackendEnabled });
-  const designQuery = useQuery({ queryKey:['design-tasks',crmSessionToken], queryFn:()=>productRepository.designTasks(), enabled:requirementBackendEnabled });
-  const productLineQuery = useQuery({ queryKey:['product-lines',crmSessionToken], queryFn:()=>productRepository.productLines(), enabled:requirementBackendEnabled });
-  const bugQuery = useQuery({ queryKey:['product-bugs',crmSessionToken], queryFn:()=>productRepository.tasks('bug'), enabled:requirementBackendEnabled });
-  const devTaskQuery = useQuery({ queryKey:['product-dev-tasks',crmSessionToken], queryFn:()=>productRepository.tasks('dev'), enabled:requirementBackendEnabled });
+  const { leadQuery, customerQuery, opportunityQuery, biddingQuery, engagementQuery, followUpQuery, contractQuery } = useCrmQueries(crmSessionToken, crmEnabled);
+  const { requirementQuery, designQuery, productLineQuery, bugQuery, devTaskQuery } = useProductQueries(crmSessionToken, requirementBackendEnabled);
 
-  // Keep the local verification dataset visible when the optional CRM API is unavailable or empty.
-  // This preserves the page workflow while the retry banner still exposes the service problem.
-  useEffect(()=>{ setCustomers(customerQuery.data?.items?.length ? customerQuery.data.items : INITIAL_CUSTOMERS) },[customerQuery.data]);
-  useEffect(()=>{ setLeads(leadQuery.data?.items?.length ? leadQuery.data.items : INITIAL_LEADS) },[leadQuery.data]);
-  useEffect(()=>{ setOpportunities(opportunityQuery.data?.items?.length ? opportunityQuery.data.items : INITIAL_OPPORTUNITIES) },[opportunityQuery.data]);
-  useEffect(()=>{ if (biddingQuery.data?.items?.length) setBiddings(biddingQuery.data.items as TenderBidding[]); },[biddingQuery.data]);
-  useEffect(()=>{ if (engagementQuery.data?.items?.length) setWinningEngagements(engagementQuery.data.items.map((item: any) => ({ ...item, bidCode: item.biddingId || '', projectName: item.name, amount: 0, commRecords: [], timeline: [], relatedFiles: [], createdAt: item.createdAt || '' }))); },[engagementQuery.data]);
-  useEffect(()=>{ setFollowUps(followUpQuery.data?.items?.length ? followUpQuery.data.items : INITIAL_FOLLOWUPS) },[followUpQuery.data]);
-  useEffect(()=>{ setContracts(contractQuery.data?.items?.length ? contractQuery.data.items : INITIAL_CONTRACTS) },[contractQuery.data]);
+  // Remote success is authoritative, including an empty result. Demo data is only used in local mode.
+  useEffect(()=>{ if (!crmEnabled) setCustomers(INITIAL_CUSTOMERS); else if (customerQuery.isSuccess) setCustomers(customerQuery.data?.items || []); },[crmEnabled,customerQuery.data,customerQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setLeads(INITIAL_LEADS); else if (leadQuery.isSuccess) setLeads(leadQuery.data?.items || []); },[crmEnabled,leadQuery.data,leadQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setOpportunities(INITIAL_OPPORTUNITIES); else if (opportunityQuery.isSuccess) setOpportunities(opportunityQuery.data?.items || []); },[crmEnabled,opportunityQuery.data,opportunityQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setBiddings(INITIAL_BIDDINGS); else if (biddingQuery.isSuccess) setBiddings((biddingQuery.data?.items || []) as TenderBidding[]); },[crmEnabled,biddingQuery.data,biddingQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setWinningEngagements([]); else if (engagementQuery.isSuccess) setWinningEngagements((engagementQuery.data?.items || []).map((item: any) => ({ ...item, bidCode: item.biddingId || '', projectName: item.name, amount: 0, commRecords: [], timeline: [], relatedFiles: [], createdAt: item.createdAt || '' }))); },[crmEnabled,engagementQuery.data,engagementQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setFollowUps(INITIAL_FOLLOWUPS); else if (followUpQuery.isSuccess) setFollowUps(followUpQuery.data?.items || []); },[crmEnabled,followUpQuery.data,followUpQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setContracts(INITIAL_CONTRACTS); else if (contractQuery.isSuccess) setContracts(contractQuery.data?.items || []); },[crmEnabled,contractQuery.data,contractQuery.isSuccess]);
   useEffect(()=>{
     if (Array.isArray(requirementQuery.data?.items)) {
       const remoteTasks = requirementQuery.data.items.map((task) => ({
         ...task,
         status: normalizeRequirementStatus(task.status)
       }));
-      setRequirementTasks((prev) => {
-        const remoteIds = new Set(remoteTasks.map((t) => t.id));
-        const remoteTitles = new Set(remoteTasks.map((t) => t.title));
-        const localOnly = prev.filter((t) => !remoteIds.has(t.id) && !remoteTitles.has(t.title));
-        return [...localOnly, ...remoteTasks];
-      });
+      setRequirementTasks(requirementBackendEnabled ? remoteTasks : prev => prev);
     }
   },[requirementQuery.data]);
-  useEffect(()=>{ if (Array.isArray(designQuery.data)) setDesignTasks(designQuery.data.map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: task.versionId || '', versionName: task.versionName || '' }))); },[designQuery.data]);
+  useEffect(()=>{ if (designQuery.isSuccess) setDesignTasks((designQuery.data?.items || []).map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: task.versionId || '', versionName: task.versionName || '' }))); },[designQuery.data,designQuery.isSuccess]);
   useEffect(() => {
     if (!Array.isArray(productLineQuery.data)) return;
     setProductLines(productLineQuery.data);
     const remoteVersions = productLineQuery.data.flatMap((line) => (line.versions || []).map((version) => ({ ...version, productLineId: line.id, productLineName: line.name })));
     setVersions(remoteVersions);
   }, [productLineQuery.data]);
-  useEffect(()=>{ if (bugQuery.data?.length) setBugs(bugQuery.data as DefectBug[]); },[bugQuery.data]);
-  useEffect(()=>{ if (devTaskQuery.data?.length) setDevTasks(devTaskQuery.data as DevTask[]); },[devTaskQuery.data]);
-  useEffect(() => {
-    setActiveTabId(routeTab);
-    setOpenTabs((previousTabs) => {
-      const menuItems = MENU_GROUPS.flatMap((group) => group.subMenus);
-      const normalizedTabs = previousTabs.map((tab) => {
-        const normalizedId = (ALIAS_MAP[tab.id] || tab.id) as SubMenuId;
-        const menu = menuItems.find((item) => item.id === normalizedId);
-        return menu
-          ? { ...tab, id: normalizedId, title: menu.title, mainMenuId: menu.mainMenuId, iconName: menu.icon }
-          : { ...tab, id: normalizedId };
-      });
-      const dedupedTabs = normalizedTabs.filter((tab, index, tabs) => tabs.findIndex((candidate) => candidate.id === tab.id) === index);
-      if (dedupedTabs.some((tab) => tab.id === routeTab)) return dedupedTabs;
-      const menu = menuItems.find((item) => item.id === routeTab);
-      return menu
-        ? [...dedupedTabs, { id: routeTab, title: menu.title, mainMenuId: menu.mainMenuId, iconName: menu.icon, closable: routeTab !== 'wb_my_tasks' }]
-        : dedupedTabs;
-    });
-  }, [routeTab]);
+  useEffect(()=>{ if (bugQuery.isSuccess) setBugs((bugQuery.data?.items || []) as DefectBug[]); },[bugQuery.data,bugQuery.isSuccess]);
+  useEffect(()=>{ if (devTaskQuery.isSuccess) setDevTasks((devTaskQuery.data?.items || []) as DevTask[]); },[devTaskQuery.data,devTaskQuery.isSuccess]);
 
   const refreshCrm = () => Promise.all([customerQuery.refetch(),leadQuery.refetch(),opportunityQuery.refetch(),biddingQuery.refetch(),engagementQuery.refetch(),followUpQuery.refetch(),contractQuery.refetch(),requirementQuery.refetch(),productLineQuery.refetch(),bugQuery.refetch(),devTaskQuery.refetch()]);
   const crmLoading = customerQuery.isFetching || leadQuery.isFetching || opportunityQuery.isFetching || biddingQuery.isFetching || followUpQuery.isFetching || contractQuery.isFetching;
   const crmError = [customerQuery.error, leadQuery.error, opportunityQuery.error, followUpQuery.error, contractQuery.error].find(Boolean);
-
-  // Global hotkey: Cmd/Ctrl + K for Global Search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setGlobalSearchOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const addToast = (type: ToastItem['type'], title: string, message?: string) => {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    setToasts((prev) => [...prev, { id, type, title, message }]);
-    setTimeout(() => {
-      removeToast(id);
-    }, 4000);
-  };
-
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  const openPageTab = (menuId: string) => {
-    // Resolve alias
-    const resolvedId = (ALIAS_MAP[menuId] || menuId) as SubMenuId;
-
-    // Find menu item info across groups
-    let foundMenu: NavigationMenuItem | undefined;
-    for (const group of MENU_GROUPS) {
-      const match = group.subMenus.find((m) => m.id === resolvedId);
-      if (match) {
-        foundMenu = match;
-        break;
-      }
-    }
-
-    if (!foundMenu) {
-      // Fallback if not found in menu groups
-      foundMenu = {
-        id: resolvedId,
-        title: menuId,
-        mainMenuId: 'workbench',
-        icon: 'FileText'
-      };
-    }
-
-    setOpenTabs((previousTabs) => {
-      if (previousTabs.some((tab) => tab.id === resolvedId || ALIAS_MAP[tab.id] === resolvedId)) return previousTabs;
-      return [
-        ...previousTabs,
-        {
-          id: foundMenu!.id,
-          title: foundMenu!.title,
-          mainMenuId: foundMenu!.mainMenuId,
-          iconName: foundMenu!.icon,
-          closable: foundMenu!.id !== 'wb_my_tasks'
-        }
-      ];
-    });
-    setActiveTabId(resolvedId);
-    navigate(`/app/${resolvedId}`);
-  };
-
-  const closePageTab = (id: SubMenuId) => {
-    if (id === 'wb_my_tasks') return; // Cannot close default workbench
-    const newTabs = openTabs.filter((t) => t.id !== id);
-    setOpenTabs(newTabs);
-    if (activeTabId === id) {
-      const lastTab = newTabs[newTabs.length - 1];
-      setActiveTabId(lastTab ? lastTab.id : 'wb_my_tasks');
-      navigate(`/app/${lastTab ? lastTab.id : 'wb_my_tasks'}`);
-    }
-  };
-
-  const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => !prev);
-  };
-  const toggleMobileSidebar = () => setMobileSidebarOpen((prev) => !prev);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-  };
 
   const setCurrentUserRole = (role: CurrentUser['role']) => {
     const target = CURRENT_USERS.find((u) => u.role === role) || CURRENT_USERS[0];
@@ -831,8 +650,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);
         return true;
       } catch (error) {
-        addToast('success', '工单创建成功', `已存入工单中心（离线会话模式）`);
-        return true;
+        setRequirementTasks((prev) => prev.filter((item) => item.id !== newTask.id));
+        addToast('error', '工单创建失败', error instanceof Error ? error.message : '服务暂不可用，请稍后重试');
+        return false;
       }
     }
     addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);

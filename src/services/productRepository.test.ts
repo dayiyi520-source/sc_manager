@@ -16,6 +16,16 @@ describe('productRepository task API contract', () => {
     expect(fetchMock.mock.calls[0][1].headers.get('Authorization')).toBe('Bearer test-token');
   });
 
+  it('passes server pagination and task filters without dropping the total', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: { items: [{ id: 'bug-1' }], page: 2, pageSize: 10, total: 31 }, message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await productRepository.tasks('bug', { page: 2, pageSize: 10, keyword: '登录', productLine: '协同平台', status: '待修复', ownerName: '张瑞' });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/bugs?page=2&pageSize=10&keyword=%E7%99%BB%E5%BD%95&productLine=%E5%8D%8F%E5%90%8C%E5%B9%B3%E5%8F%B0&status=%E5%BE%85%E4%BF%AE%E5%A4%8D&ownerName=%E5%BC%A0%E7%91%9E');
+    expect(result).toMatchObject({ page: 2, pageSize: 10, total: 31 });
+  });
+
   it('keeps create and update routes scoped to the selected task table', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: { id: 'task-1' }, message: '', requestId: 'r' }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

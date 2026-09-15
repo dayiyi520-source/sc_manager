@@ -118,6 +118,8 @@ export default defineConfig(() => {
             if (moduleId.includes('/node_modules/react/') || moduleId.includes('/node_modules/react-dom/') || moduleId.includes('/node_modules/react-router')) return 'react';
             if (moduleId.includes('/node_modules/@tanstack/')) return 'query';
             if (moduleId.includes('/node_modules/recharts/')) return 'charts';
+            if (moduleId.includes('/node_modules/@tinymce/') || moduleId.includes('/node_modules/tinymce/')) return 'rich-editor';
+            if (moduleId.includes('/node_modules/marked/')) return 'markdown';
             if (moduleId.includes('/node_modules/motion/') || moduleId.includes('/node_modules/gsap/')) return 'motion';
             if (moduleId.includes('/src/context/AppContext')) return 'app-context';
             if (moduleId.includes('/src/components/common/octicons-compat')) return 'octicons';

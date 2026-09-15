@@ -11,10 +11,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/requirements")
-@Profile("local")
 @Tag(name = "需求池", description = "需求收集、流转、审计与下游同步")
 public class RequirementController {
     private final RequirementService service;
@@ -22,7 +22,14 @@ public class RequirementController {
 
     @Operation(summary = "分页查询需求")
     @GetMapping
-    public ApiResponse<PageResult<Map<String,Object>>> list(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="100") int pageSize,@RequestParam(defaultValue="") String keyword,@RequestParam(defaultValue="") String productLine,@RequestParam(defaultValue="") String department,@RequestParam(defaultValue="") String priority,@RequestParam(defaultValue="") String status,@RequestParam(defaultValue="requirement") String workItemKind){return ApiResponse.ok(service.list(page,pageSize,keyword,productLine,department,priority,status,workItemKind));}
+    public ApiResponse<?> list(@RequestParam Map<String,String> params){
+        int page = integer(params, "page", 1); int pageSize = integer(params, "pageSize", 100);
+        if (params.keySet().stream().anyMatch(key -> Set.of("title", "statuses", "owners", "creators", "customers", "versions", "createdFrom", "plannedStartFrom", "ccNames", "groupBy", "groupValue").contains(key))) {
+            return ApiResponse.ok(service.list(page, pageSize, TaskListFilter.from(params)));
+        }
+        return ApiResponse.ok(service.list(page, pageSize, params.getOrDefault("keyword", ""), params.getOrDefault("productLine", ""), params.getOrDefault("department", ""), params.getOrDefault("priority", ""), params.getOrDefault("status", ""), params.getOrDefault("ownerName", ""), params.getOrDefault("workItemKind", "requirement")));
+    }
+    private int integer(Map<String,String> values,String key,int fallback){try{return Integer.parseInt(values.getOrDefault(key,String.valueOf(fallback)));}catch(NumberFormatException ignored){return fallback;}}
     @GetMapping("/departments") public ApiResponse<List<Map<String,Object>>> departments(){return ApiResponse.ok(service.departments());}
     @Operation(summary = "查询需求详情及流转记录")
     @GetMapping("/{id}") public ApiResponse<Map<String,Object>> detail(@PathVariable String id){return ApiResponse.ok(service.detail(id));}

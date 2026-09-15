@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@Profile("local")
 @RequestMapping("/api/work-items/{id}/transitions")
 @Tag(name="统一工作项状态流转")
 public class WorkItemTransitionController {

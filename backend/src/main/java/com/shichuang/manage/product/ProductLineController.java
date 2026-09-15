@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
-@RestController @RequestMapping("/api/product-lines") @Profile("local") @Tag(name="产品线管理")
+@RestController @RequestMapping("/api/product-lines") @Tag(name="产品线管理")
 public class ProductLineController {
  private final ProductLineService service; public ProductLineController(ProductLineService service){this.service=service;}
  @GetMapping public ApiResponse<List<Map<String,Object>>> list(@RequestParam(defaultValue="") String keyword){return ApiResponse.ok(service.list(keyword));}

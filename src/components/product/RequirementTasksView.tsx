@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, DatePicker, Form, Input, InputNumber, Popover, Segmented, Select, Upload } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
   Search,
@@ -17,10 +18,11 @@ import { StatusTag } from '../common/UIComponents';
 import { DateField } from '../common';
 import { DefectBug, DevTask, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
-import { RichTextEditor } from './RichTextEditor';
+import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { requirementRepository } from '../../services/requirementRepository';
 import { productRepository } from '../../services/productRepository';
+import { readSession } from '../../services/session';
 
 type RequirementFilterState = {
   title: { operator: TextFilterOperator; value: string };
@@ -140,20 +142,20 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const isSpecialTask = taskKind === 'bug' || taskKind === 'dev';
   useEffect(() => {
     if (!isBusinessTask) { setBusinessTasks([]); return; }
-    productRepository.businessTasks(taskKind).then(setBusinessTasks).catch(() => setBusinessTasks([]));
+    productRepository.businessTasks(taskKind).then((result) => setBusinessTasks(result.items)).catch(() => setBusinessTasks([]));
   }, [isBusinessTask, taskKind]);
   useEffect(() => {
     if (taskKind === 'bug') setSpecialTasks(bugs.map((item: DefectBug) => ({ ...item, ownerName: item.ownerName || item.assignee || '', expectedGoal: '', dueDate: '', priority: item.priority || '中', versionName: item.versionName || '', productLineName: item.productLineName || '', description: item.description || '', status: item.status || '待修复' })) as RequirementTask[]);
     else if (taskKind === 'dev') setSpecialTasks(devTasks.map((item: DevTask) => ({ ...item, ownerName: item.developer || '', expectedGoal: '', dueDate: '', priority: item.priority || '中', versionName: item.versionName || '', productLineName: item.productLineName || '', description: item.description || '', status: item.status || '开发中' })) as RequirementTask[]);
     else setSpecialTasks([]);
   }, [taskKind, bugs, devTasks]);
-  const activeTasks = taskKind === 'design' ? designTasks : isBusinessTask ? businessTasks : isSpecialTask ? specialTasks : requirementTasks;
+  const contextTasks = taskKind === 'design' ? designTasks : isBusinessTask ? businessTasks : isSpecialTask ? specialTasks : requirementTasks;
   const addTask = async (task: Partial<RequirementTask>) => {
     if (taskKind === 'design') return addDesignTask(task);
     if (isBusinessTask) {
       const optimistic: RequirementTask = { ...task, id: `${taskKind}-${Date.now()}`, title: task.title || `新建${itemLabel}`, description: task.description || '', expectedGoal: task.expectedGoal || '', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, productLineName: task.productLineName || '', versionName: task.versionName || '', estimatedHours: task.estimatedHours || 0, dueDate: task.dueDate || '' };
       setBusinessTasks((prev) => [optimistic, ...prev]);
-      try { await productRepository.createBusinessTask(taskKind, optimistic); setBusinessTasks(await productRepository.businessTasks(taskKind)); return true; }
+      try { await productRepository.createBusinessTask(taskKind, optimistic); setBusinessTasks((await productRepository.businessTasks(taskKind)).items); return true; }
       catch (error) { setBusinessTasks((prev) => prev.filter((item) => item.id !== optimistic.id)); addToast('error', `${itemLabel}保存失败`, error instanceof Error ? error.message : '请稍后重试'); return false; }
     }
     if (isSpecialTask) {
@@ -196,6 +198,69 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const [groupValue, setGroupValue] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const remoteEnabled = Boolean(readSession());
+  const selectedProductLine = productLines.find((line) => line.id === productLineFilter);
+  const serverPage = page;
+  const serverPageSize = pageSize;
+  const serverKeyword = searchQuery;
+  const csv = (values: string[]) => values.filter(Boolean).join(',');
+  const serverQueryValues = {
+    page: serverPage,
+    pageSize: serverPageSize,
+    keyword: serverKeyword,
+    productLine: selectedProductLine?.name || '',
+    searchOwners: activeTab === 'my_owned' ? currentUser.name : csv(searchOwnerNames),
+    title: appliedFilters.title.value,
+    titleOperator: appliedFilters.title.operator,
+    statuses: csv(appliedFilters.status.values),
+    statusOperator: appliedFilters.status.operator,
+    owners: csv(appliedFilters.owner.values),
+    ownerOperator: appliedFilters.owner.operator,
+    creators: csv(activeTab === 'my_created' ? [currentUser.name] : appliedFilters.creator.values),
+    creatorOperator: appliedFilters.creator.operator,
+    customers: csv(appliedFilters.customer.values),
+    customerOperator: appliedFilters.customer.operator,
+    versions: csv(appliedFilters.version.values),
+    versionOperator: appliedFilters.version.operator,
+    createdFrom: appliedFilters.createdAt.from,
+    createdTo: appliedFilters.createdAt.to,
+    createdOperator: appliedFilters.createdAt.operator,
+    plannedStartFrom: appliedFilters.plannedStartDate.from,
+    plannedStartTo: appliedFilters.plannedStartDate.to,
+    plannedStartOperator: appliedFilters.plannedStartDate.operator,
+    ccNames: csv(appliedFilters.cc.values),
+    ccOperator: appliedFilters.cc.operator,
+    groupBy: groupBy === 'none' ? '' : groupBy,
+    groupValue
+  };
+  const serverPageQuery = useQuery({
+    queryKey: ['task-page', taskKind, serverQueryValues],
+    enabled: remoteEnabled,
+    queryFn: async (): Promise<{ items: RequirementTask[]; total: number; groups: Array<{ label: string; count: number }> }> => {
+      if (taskKind === 'requirement') {
+        const result = await requirementRepository.list({ ...serverQueryValues, workItemKind: 'requirement' });
+        return { items: result.items, total: result.total, groups: result.groups || [] };
+      }
+      if (taskKind === 'design') {
+        const result = await productRepository.designTasks(serverQueryValues);
+        return { items: result.items, total: result.total, groups: result.groups || [] };
+      }
+      if (taskKind === 'bug' || taskKind === 'dev') {
+        const result = await productRepository.tasks(taskKind, serverQueryValues);
+        const items = result.items.map((item) => {
+          const value = item as DefectBug & DevTask & RequirementTask;
+          return taskKind === 'bug'
+            ? { ...item, ownerName: value.ownerName || value.assignee || '', expectedGoal: value.expectedGoal || '', dueDate: value.dueDate || '', priority: value.priority || '中', versionName: value.versionName || '', productLineName: value.productLineName || '', description: value.description || '', status: value.status || '待修复' }
+            : { ...item, ownerName: value.developer || value.ownerName || '', expectedGoal: value.expectedGoal || '', dueDate: value.dueDate || '', priority: value.priority || '中', versionName: value.versionName || '', productLineName: value.productLineName || '', description: value.description || '', status: value.status || '开发中' };
+        }) as RequirementTask[];
+        return { items, total: result.total, groups: result.groups || [] };
+      }
+      const result = await productRepository.businessTasks(taskKind as 'presales' | 'delivery' | 'ops', serverQueryValues);
+      return { items: result.items, total: result.total, groups: result.groups || [] };
+    }
+  });
+  const activeTasks = remoteEnabled ? serverPageQuery.data?.items || [] : contextTasks;
 
   const [selectedTask, setSelectedTask] = useState<RequirementTask | null>(null);
   const [detailEditing, setDetailEditing] = useState(false);
@@ -532,19 +597,19 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     matchesDateFilter(task.plannedStartDate, filters.plannedStartDate) &&
     matchesMultiFilter(task.ccNames || [], filters.cc)
   );
-  const selectedProductLine = productLines.find((line) => line.id === productLineFilter);
   const productLineTasks = productLineFilter === 'all' ? activeTasks : activeTasks.filter((task) => task.productLineId === productLineFilter || task.productLineName === selectedProductLine?.name);
-  const baseTasks = productLineTasks.filter((task) => categoryMatch(task, activeTab));
+  const baseTasks = remoteEnabled ? productLineTasks : productLineTasks.filter((task) => categoryMatch(task, activeTab));
   const filteredTasks = baseTasks.filter((task) => {
+    if (remoteEnabled) return true;
     const titlePart = searchQuery.trim().toLocaleLowerCase();
     const titleMatch = textMatches(task.title, titlePart);
     const ownerMatch = searchOwnerNames.length === 0 || searchOwnerNames.includes(task.ownerName);
     return titleMatch && ownerMatch && matchesFilters(task, appliedFilters);
   });
   const tabCounts = {
-    all: productLineTasks.length,
-    my_owned: productLineTasks.filter((task) => categoryMatch(task, 'my_owned')).length,
-    my_created: productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length
+    all: remoteEnabled && activeTab === 'all' ? serverPageQuery.data?.total || 0 : productLineTasks.length,
+    my_owned: remoteEnabled && activeTab === 'my_owned' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_owned')).length,
+    my_created: remoteEnabled && activeTab === 'my_created' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length
   };
   const getGroupValue = (task: RequirementTask) => {
     switch (groupBy) {
@@ -558,16 +623,26 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       default: return '';
     }
   };
-  const groupTabs = groupBy === 'none' ? [] : Array.from(filteredTasks.reduce((groups, task) => {
+  const localGroupTabs: Array<[string, number]> = groupBy === 'none' ? [] : Array.from(filteredTasks.reduce((groups, task) => {
     const label = getGroupValue(task);
     groups.set(label, (groups.get(label) || 0) + 1);
     return groups;
-  }, new Map<string, number>()));
-  const effectiveGroupValue = groupBy === 'none' ? '' : groupTabs.some(([label]) => label === groupValue) ? groupValue : groupTabs[0]?.[0] || '';
-  const visibleTasks = groupBy === 'none' ? filteredTasks : filteredTasks.filter((task) => getGroupValue(task) === effectiveGroupValue);
-  const pagedTasks = visibleTasks.slice((page - 1) * pageSize, page * pageSize);
+  }, new Map<string, number>()).entries());
+  const groupTabs: Array<[string, number]> = remoteEnabled
+    ? (serverPageQuery.data?.groups || []).map((group): [string, number] => [group.label, Number(group.count)])
+    : localGroupTabs;
+  const groupValueExists = groupTabs.some(([label]) => label === groupValue);
+  const firstGroupValue = groupTabs[0]?.[0] || '';
+  const effectiveGroupValue = groupBy === 'none' ? '' : groupValueExists ? groupValue : firstGroupValue;
+  const visibleTasks = remoteEnabled || groupBy === 'none' ? filteredTasks : filteredTasks.filter((task) => getGroupValue(task) === effectiveGroupValue);
+  const pagedTasks = remoteEnabled ? visibleTasks : visibleTasks.slice((page - 1) * pageSize, page * pageSize);
+  const paginationTotal = remoteEnabled ? serverPageQuery.data?.total || 0 : visibleTasks.length;
 
   useEffect(() => setPage(1), [activeTab, searchQuery, searchOwnerNames, appliedFilters, groupBy, groupValue, pageSize, productLineFilter]);
+  useEffect(() => {
+    if (!remoteEnabled || groupBy === 'none' || !firstGroupValue || groupValueExists) return;
+    setGroupValue(firstGroupValue);
+  }, [remoteEnabled, groupBy, firstGroupValue, groupValueExists]);
 
   const applySearch = () => {
     setSearchQuery(searchDraft.trim());
@@ -764,11 +839,11 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                   </tr>
                   </React.Fragment>
                 ))}
-                {pagedTasks.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">没有符合当前搜索、过滤或分组条件的{itemLabel === '需求任务' ? '需求' : itemLabel}</td></tr>}
+                {pagedTasks.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">{serverPageQuery.isPending && remoteEnabled ? `正在加载${itemLabel}...` : serverPageQuery.isError && remoteEnabled ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => serverPageQuery.refetch()}>重试</Button></span> : `没有符合当前搜索、过滤或分组条件的${itemLabel === '需求任务' ? '需求' : itemLabel}`}</td></tr>}
               </tbody>
             </table>
           </div>
-          <Pagination total={visibleTasks.length} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          <Pagination total={paginationTotal} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </div>
 
       {/* Task Detail Drawer */}

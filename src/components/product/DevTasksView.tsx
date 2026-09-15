@@ -18,7 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
 import { DevTask } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
-import { RichTextEditor } from './RichTextEditor';
+import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
 

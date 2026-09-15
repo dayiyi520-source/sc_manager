@@ -29,6 +29,28 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
     private WorkOrderService workOrderService;
 
     @Test
+    void groupsFilteredRequirementsBeforeApplyingGroupPagination() throws Exception {
+        String token = loginToken();
+        String marker = "需求分组-" + System.nanoTime();
+        createRequirement(token, marker + "-一");
+        createRequirement(token, marker + "-二");
+
+        mockMvc.perform(get("/api/requirements")
+                .header("Authorization", "Bearer " + token)
+                .param("keyword", marker)
+                .param("title", "")
+                .param("groupBy", "priority")
+                .param("groupValue", "高")
+                .param("page", "1")
+                .param("pageSize", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.groups[0].label").value("高"))
+            .andExpect(jsonPath("$.data.groups[0].count").value(2));
+    }
+
+    @Test
     void createsHoldsAndAssignsRequirementWithAuditTrail() throws Exception {
         String token = loginToken();
         String title = "集成测试需求-" + System.nanoTime();

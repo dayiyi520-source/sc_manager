@@ -24,7 +24,7 @@ import { StatCard, StatusTag } from '../common/UIComponents';
 import { SearchableSelect } from '../common';
 import { BugItem } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
-import { RichTextEditor } from './RichTextEditor';
+import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
 

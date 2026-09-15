@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
-@RestController @Profile("local") @RequestMapping("/api/okr") @Tag(name="目标与绩效")
+@RestController @RequestMapping("/api/okr") @Tag(name="目标与绩效")
 public class OkrController {
  private final OkrService service; public OkrController(OkrService service){this.service=service;}
  @GetMapping("/people") @Operation(summary="查询目标承接关系") public ApiResponse<List<Map<String,Object>>> people(){return ApiResponse.ok(service.people());}

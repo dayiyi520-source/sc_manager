@@ -2,6 +2,7 @@ package com.shichuang.manage.crm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shichuang.manage.api.PageResult;
+import com.shichuang.manage.auth.AuthorizationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class CrmService {
     }
 
     public PageResult<Map<String, Object>> customers(int page, int pageSize, String keyword, String type, String level) {
+        AuthorizationService.requireRead("crm");
         int normalizedPage = Math.max(1, page);
         int normalizedSize = Math.min(100, Math.max(1, pageSize));
         String like = "%" + keyword + "%";
@@ -34,12 +36,14 @@ public class CrmService {
     }
 
     public Map<String, Object> customer(String id) {
+        AuthorizationService.requireRead("crm");
         List<Map<String, Object>> rows = mapper.findCustomer(id);
         if (rows.isEmpty()) throw notFound("客户不存在");
         return rows.get(0);
     }
 
     public Map<String, Object> createCustomer(Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         validateCustomerType(body.get("type"));
         String id = UUID.randomUUID().toString();
         String code = Objects.toString(body.getOrDefault("code", "CUST-" + System.currentTimeMillis()));
@@ -48,6 +52,7 @@ public class CrmService {
     }
 
     public PageResult<Map<String, Object>> journey(int page, int pageSize, String customerId, String leadId, String opportunityId, String requirementId, String workItemId) {
+        AuthorizationService.requireRead("crm");
         int normalizedPage = Math.max(1, page);
         int normalizedSize = Math.min(100, Math.max(1, pageSize));
         String normalizedCustomerId = safe(customerId);
@@ -61,6 +66,7 @@ public class CrmService {
     }
 
     public PageResult<Map<String, Object>> leads(int page, int pageSize, String keyword, String status) {
+        AuthorizationService.requireRead("crm");
         int normalizedPage = Math.max(1, page);
         int normalizedSize = Math.min(100, Math.max(1, pageSize));
         String like = "%" + keyword + "%";
@@ -71,6 +77,7 @@ public class CrmService {
     }
 
     public Map<String, Object> createLead(Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         String customerId = Objects.toString(body.get("customerId"), "");
         ensureCustomer(customerId);
         if (Objects.toString(body.get("name"), "").isBlank() || Objects.toString(body.get("schoolContact"), "").isBlank()) throw new IllegalArgumentException("线索名称和学校联系人不能为空");
@@ -81,12 +88,14 @@ public class CrmService {
     }
 
     public void updateLead(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         String products = body.containsKey("products") ? jsonArray(body.get("products"), "意向产品格式无效") : null;
         if (mapper.updateLead(id, body, products) == 0) throw conflict("线索已变化，请刷新后重试");
     }
 
     @Transactional
     public Map<String, Object> convertLead(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         List<Map<String, Object>> rows = mapper.lockLead(id);
         Map<String, Object> lead = rows.stream().findFirst().orElseThrow(() -> notFound("线索不存在"));
         if (!"跟进中".equals(lead.get("status"))) {
@@ -106,12 +115,14 @@ public class CrmService {
     }
 
     public void updateCustomer(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         if (body.containsKey("type")) validateCustomerType(body.get("type"));
         String tags = body.containsKey("tags") ? jsonArray(body.get("tags"), "客户标签格式无效") : null;
         if (mapper.updateCustomer(id, body, tags) == 0) throw conflict("客户档案已变化，请刷新后重试");
     }
 
     public PageResult<Map<String, Object>> opportunities(int page, int pageSize, String keyword, String stage) {
+        AuthorizationService.requireRead("crm");
         int normalizedPage = Math.max(1, page);
         int normalizedSize = Math.min(100, Math.max(1, pageSize));
         String like = "%" + keyword + "%";
@@ -120,12 +131,14 @@ public class CrmService {
     }
 
     public Map<String, Object> opportunity(String id) {
+        AuthorizationService.requireRead("crm");
         List<Map<String, Object>> rows = mapper.findOpportunity(id);
         if (rows.isEmpty()) throw notFound("商机不存在");
         return rows.get(0);
     }
 
     public Map<String, Object> createOpportunity(Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         String customerId = Objects.toString(body.get("customerId"), "");
         ensureCustomer(customerId);
         if (Objects.toString(body.get("leadId"), "").isBlank()) throw new IllegalArgumentException("商机必须由线索转化产生");
@@ -138,11 +151,13 @@ public class CrmService {
     }
 
     public void updateOpportunity(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         if (mapper.updateOpportunity(id, body) == 0) throw conflict("记录已被其他人更新，请刷新后重试");
     }
 
     @Transactional
     public void transitionOpportunity(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         String stage = Objects.toString(body.get("stage"), "");
         if (stage.isBlank()) throw new IllegalArgumentException("阶段不能为空");
         if (mapper.transitionOpportunity(id, stage, body.get("version")) == 0) throw conflict("阶段已被其他人更新，请刷新后重试");
@@ -154,6 +169,7 @@ public class CrmService {
 
     @Transactional
     public Map<String, Object> updateBidding(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         Map<String, Object> existing = mapper.findBiddingByOpportunity(id);
         if (existing == null) throw notFound("招投标记录不存在");
         String biddingId = Objects.toString(existing.get("id"));
@@ -171,6 +187,7 @@ public class CrmService {
 
     @Transactional
     public Map<String, Object> updateEngagement(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         Map<String, Object> engagement = mapper.engagement(id);
         if (engagement == null) throw notFound("中标接洽记录不存在");
         if (mapper.updateEngagement(id, Objects.toString(body.get("status"), ""), body.get("version")) == 0) throw conflict("中标接洽记录已变化，请刷新后重试");
@@ -180,11 +197,12 @@ public class CrmService {
         return Map.of("id", id);
     }
 
-    public PageResult<Map<String,Object>> biddings(int page, int pageSize) { int p=Math.max(1,page), s=Math.min(100,Math.max(1,pageSize)); return new PageResult<>(mapper.findBiddings(s,(p-1)*s),p,s,mapper.countBiddings()); }
-    public PageResult<Map<String,Object>> engagements(int page, int pageSize) { int p=Math.max(1,page), s=Math.min(100,Math.max(1,pageSize)); return new PageResult<>(mapper.findEngagements(s,(p-1)*s),p,s,mapper.countEngagements()); }
-    public PageResult<Map<String,Object>> projects(int page, int pageSize) { int p=Math.max(1,page), s=Math.min(100,Math.max(1,pageSize)); return new PageResult<>(mapper.findProjects(s,(p-1)*s),p,s,mapper.countProjects()); }
+    public PageResult<Map<String,Object>> biddings(int page, int pageSize) { AuthorizationService.requireRead("crm"); int p=Math.max(1,page), s=Math.min(100,Math.max(1,pageSize)); return new PageResult<>(mapper.findBiddings(s,(p-1)*s),p,s,mapper.countBiddings()); }
+    public PageResult<Map<String,Object>> engagements(int page, int pageSize) { AuthorizationService.requireRead("crm"); int p=Math.max(1,page), s=Math.min(100,Math.max(1,pageSize)); return new PageResult<>(mapper.findEngagements(s,(p-1)*s),p,s,mapper.countEngagements()); }
+    public PageResult<Map<String,Object>> projects(int page, int pageSize) { AuthorizationService.requireRead("crm"); int p=Math.max(1,page), s=Math.min(100,Math.max(1,pageSize)); return new PageResult<>(mapper.findProjects(s,(p-1)*s),p,s,mapper.countProjects()); }
 
     public PageResult<Map<String, Object>> followUps(int page, int pageSize, String keyword, String customerId, String opportunityId, String from, String to) {
+        AuthorizationService.requireRead("crm");
         int normalizedPage = Math.max(1, page);
         int normalizedSize = Math.min(100, Math.max(1, pageSize));
         String like = "%" + keyword + "%";
@@ -197,12 +215,14 @@ public class CrmService {
     }
 
     public Map<String, Object> followUp(String id) {
+        AuthorizationService.requireRead("crm");
         List<Map<String, Object>> rows = mapper.findFollowUp(id);
         if (rows.isEmpty()) throw notFound("跟进记录不存在");
         return rows.get(0);
     }
 
     public Map<String, Object> createFollowUp(Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         String customerId = Objects.toString(body.get("customerId"), "");
         ensureCustomer(customerId);
         if (Objects.toString(body.get("content"), "").isBlank()) throw new IllegalArgumentException("跟进内容不能为空");
@@ -213,6 +233,7 @@ public class CrmService {
     }
 
     public PageResult<Map<String, Object>> contracts(int page, int pageSize, String keyword, String status) {
+        AuthorizationService.requireRead("crm");
         int normalizedPage = Math.max(1, page);
         int normalizedSize = Math.min(100, Math.max(1, pageSize));
         String like = "%" + keyword + "%";
@@ -221,6 +242,7 @@ public class CrmService {
     }
 
     public Map<String, Object> contract(String id) {
+        AuthorizationService.requireRead("crm");
         List<Map<String, Object>> rows = mapper.findContract(id);
         if (rows.isEmpty()) throw notFound("合同不存在");
         Map<String, Object> result = new java.util.LinkedHashMap<>(rows.get(0));
@@ -230,6 +252,7 @@ public class CrmService {
 
     @Transactional
     public Map<String, Object> createContract(Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         String customerId = Objects.toString(body.get("customerId"), "");
         ensureCustomer(customerId);
         double amount = ((Number) body.getOrDefault("amount", 0)).doubleValue();
@@ -249,10 +272,12 @@ public class CrmService {
     }
 
     public void updateContract(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("crm");
         if (mapper.updateContract(id, body) == 0) throw conflict("合同已变化，请刷新后重试");
     }
 
     public Map<String, Object> dashboardSummary() {
+        AuthorizationService.requireRead("crm");
         return mapper.dashboardSummary();
     }
 

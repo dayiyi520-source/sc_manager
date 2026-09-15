@@ -3,6 +3,7 @@ package com.shichuang.manage.product;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shichuang.manage.api.PageResult;
 import com.shichuang.manage.auth.RequestContext;
+import com.shichuang.manage.auth.AuthorizationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,23 +31,43 @@ public class RequirementService {
         this.objectMapper = objectMapper;
     }
 
-    public PageResult<Map<String, Object>> list(int page, int pageSize, String keyword, String productLine, String department, String priority, String status, String workItemKind) {
+    public PageResult<Map<String, Object>> list(int page, int pageSize, String keyword, String productLine, String department, String priority, String status, String ownerName, String workItemKind) {
+        AuthorizationService.requireRead("product");
         int currentPage = Math.max(1, page);
         int size = Math.min(100, Math.max(1, pageSize));
         int offset = (currentPage - 1) * size;
         String tenantId = RequestContext.tenantId();
         String like = "%" + keyword.trim() + "%";
         String kind = "design".equalsIgnoreCase(workItemKind) ? "design" : "requirement";
-        String where = "tenant_id_=? AND delete_flag_=0 AND work_item_kind_=? AND (title_ LIKE ? OR description_ LIKE ? OR owner_name_ LIKE ? OR product_line_name_ LIKE ? OR department_ LIKE ?) AND (?='' OR product_line_name_=?) AND (?='' OR department_=?) AND (?='' OR priority_=?) AND (?='' OR status_=?)";
-        Object[] args = { tenantId, kind, like, like, like, like, like, productLine, productLine, department, department, priority, priority, status, status };
+        String where = "tenant_id_=? AND delete_flag_=0 AND work_item_kind_=? AND (title_ LIKE ? OR description_ LIKE ? OR owner_name_ LIKE ? OR product_line_name_ LIKE ? OR department_ LIKE ?) AND (?='' OR product_line_name_=?) AND (?='' OR department_=?) AND (?='' OR priority_=?) AND (?='' OR status_=?) AND (?='' OR owner_name_=?)";
+        Object[] args = { tenantId, kind, like, like, like, like, like, productLine, productLine, department, department, priority, priority, status, status, ownerName, ownerName };
         return new PageResult<>(mapper.list(where, args, size, offset), currentPage, size, mapper.count(where, args));
     }
 
+    public TaskPageResult<Map<String, Object>> list(int page, int pageSize, TaskListFilter filter) {
+        AuthorizationService.requireRead("product");
+        int currentPage = Math.max(1, page);
+        int size = Math.min(100, Math.max(1, pageSize));
+        TaskListPredicate predicate = TaskListPredicate.build(RequestContext.tenantId(), "", "owner_name_", filter, true);
+        String where = predicate.sql() + " AND work_item_kind_=?";
+        Object[] args = java.util.Arrays.copyOf(predicate.args(), predicate.args().length + 1);
+        args[args.length - 1] = "requirement";
+        TaskListPredicate groupPredicate = TaskListPredicate.build(RequestContext.tenantId(), "", "owner_name_", filter.withoutGroupValue(), true);
+        String groupWhere = groupPredicate.sql() + " AND work_item_kind_=?";
+        Object[] groupArgs = java.util.Arrays.copyOf(groupPredicate.args(), groupPredicate.args().length + 1);
+        groupArgs[groupArgs.length - 1] = "requirement";
+        String expression = TaskListPredicate.groupExpression("", "owner_name_", filter.groupBy(), true);
+        List<Map<String,Object>> groups = expression == null ? List.of() : mapper.groups(groupWhere, groupArgs, expression);
+        return new TaskPageResult<>(mapper.listFiltered(where, args, size, (currentPage - 1) * size), currentPage, size, mapper.count(where, args), groups);
+    }
+
     public List<Map<String, Object>> departments() {
+        AuthorizationService.requireRead("product");
         return mapper.departments(RequestContext.tenantId());
     }
 
     public Map<String, Object> detail(String id) {
+        AuthorizationService.requireRead("product");
         String tenantId = RequestContext.tenantId();
         List<Map<String, Object>> rows = mapper.find(tenantId, id);
         if (rows.isEmpty()) throw notFound("需求不存在");
@@ -57,12 +78,14 @@ public class RequirementService {
     }
 
     public List<Map<String, Object>> events(String id, String eventType, String operatorName) {
+        AuthorizationService.requireRead("product");
         String tenantId = RequestContext.tenantId();
         if (mapper.find(tenantId, id).isEmpty()) throw notFound("需求不存在");
         return mapper.events(tenantId, id, safe(eventType), safe(operatorName));
     }
 
     public PageResult<Map<String, Object>> auditEvents(int page, int pageSize, String requirementId, String eventType, String operatorName, String from, String to) {
+        AuthorizationService.requireRead("product");
         int currentPage = Math.max(1, page);
         int size = Math.min(100, Math.max(1, pageSize));
         int offset = (currentPage - 1) * size;
@@ -79,6 +102,7 @@ public class RequirementService {
 
     @Transactional
     public Map<String, Object> create(Map<String, Object> body) {
+        AuthorizationService.requireWrite("product");
         String title = text(body, "title");
         String productLine = text(body, "productLineName");
         String tenantId = RequestContext.tenantId();
@@ -103,6 +127,7 @@ public class RequirementService {
     }
 
     public void update(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("product");
         String tenantId = RequestContext.tenantId();
         Map<String, Object> current = mapper.lock(tenantId, id);
         if (mapper.update(tenantId, RequestContext.userId(), id, body, body.containsKey("media") ? jsonNullable(body.get("media")) : null) == 0) {
@@ -135,6 +160,7 @@ public class RequirementService {
 
     @Transactional
     public void comment(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("product");
         String content = text(body, "content");
         if (content.isBlank()) throw new IllegalArgumentException("评论内容不能为空");
         if (mapper.find(RequestContext.tenantId(), id).isEmpty()) throw notFound("需求不存在");
@@ -143,6 +169,7 @@ public class RequirementService {
 
     @Transactional
     public void transition(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("product");
         String tenantId = RequestContext.tenantId();
         Map<String, Object> current = mapper.lock(tenantId, id);
         String action = text(body, "action");
@@ -163,6 +190,7 @@ public class RequirementService {
 
     @Transactional
     public Map<String, Object> createWorkItem(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("product");
         String tenantId = RequestContext.tenantId();
         Map<String, Object> current = mapper.lock(tenantId, id);
         String type = text(body, "taskType");
@@ -198,16 +226,19 @@ public class RequirementService {
     }
 
     public List<Map<String, Object>> workItems(String type) {
+        AuthorizationService.requireRead("product");
         return workOrders.list(RequestContext.tenantId(), type);
     }
 
     public List<Map<String, Object>> workOrderCandidates(String keyword, String type, String requirementId, int limit) {
+        AuthorizationService.requireRead("product");
         String tenantId = RequestContext.tenantId();
         int safeLimit = Math.min(200, Math.max(1, limit));
         return mapper.workOrderCandidates(tenantId, safe(keyword), safe(type), safe(requirementId), safeLimit);
     }
 
     public PageResult<Map<String, Object>> syncStatus(int page, int pageSize, String taskType, String syncStatus) {
+        AuthorizationService.requireRead("product");
         int currentPage = Math.max(1, page);
         int size = Math.min(100, Math.max(1, pageSize));
         String normalizedType = safe(taskType);
@@ -230,6 +261,7 @@ public class RequirementService {
 
     @Transactional
     public void updateWorkItemStatus(String id, Map<String, Object> body) {
+        AuthorizationService.requireWrite("product");
         String status = text(body, "status");
         if (!Set.of("待处理", "处理中", "已完成", "已取消").contains(status)) throw new IllegalArgumentException("不支持的工作项状态");
         String tenantId = RequestContext.tenantId();
@@ -242,6 +274,7 @@ public class RequirementService {
 
     @Transactional
     public Map<String, Object> retryWorkItem(String id) {
+        AuthorizationService.requireWrite("product");
         String tenantId = RequestContext.tenantId();
         Map<String, Object> item = workOrders.find(tenantId, id);
         WorkOrderService.SyncResult sync = workOrders.retry(tenantId, id, RequestContext.userId());

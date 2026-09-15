@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@Profile("local")
 @RequestMapping("/api/product-lines/{lineId}")
 @Tag(name="工作项分类配置")
 public class WorkItemConfigurationController {

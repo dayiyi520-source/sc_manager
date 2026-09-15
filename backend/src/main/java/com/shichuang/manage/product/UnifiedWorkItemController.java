@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@Profile("local")
 @Tag(name = "统一工作项", description = "兼容读取与汇总，不执行状态流转或数据迁移")
 public class UnifiedWorkItemController {
     private final UnifiedWorkItemService service;

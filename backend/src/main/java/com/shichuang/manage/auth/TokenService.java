@@ -30,7 +30,7 @@ public class TokenService {
     public String issue(String userId, String role, String tenantId, String name) {
         try {
             String header = ENCODER.encodeToString("{\"alg\":\"HS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
-            String payload = ENCODER.encodeToString(objectMapper.writeValueAsBytes(Map.of("sub", userId, "role", role, "tenant", tenantId, "name", name, "exp", Instant.now().plusSeconds(28800).getEpochSecond())));
+            String payload = ENCODER.encodeToString(objectMapper.writeValueAsBytes(Map.of("sub", userId, "role", role, "tenant", tenantId, "name", name, "jti", java.util.UUID.randomUUID().toString(), "exp", Instant.now().plusSeconds(28800).getEpochSecond())));
             String content = header + "." + payload;
             return content + "." + ENCODER.encodeToString(sign(content));
         } catch (Exception error) { throw new IllegalStateException("无法创建本地会话", error); }

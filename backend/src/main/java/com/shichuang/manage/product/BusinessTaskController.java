@@ -1,60 +1,11 @@
 package com.shichuang.manage.product;
-
-import com.shichuang.manage.api.ApiResponse;
-import com.shichuang.manage.auth.RequestContext;
-import org.springframework.context.annotation.Profile;
-import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.web.bind.annotation.*;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-
-import java.time.LocalDate;
-import java.util.*;
-
-@RestController
-@Profile("local")
-@Tag(name = "业务任务", description = "售前、交付和运维任务独立接口")
-public class BusinessTaskController {
-    private final JdbcTemplate jdbc;
-    public BusinessTaskController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
-
-    @Operation(summary = "查询业务任务列表")
-    @GetMapping({"/api/presales-tasks", "/api/delivery-tasks", "/api/ops-tasks"})
-    public ApiResponse<List<Map<String,Object>>> list(@RequestHeader(value="X-Task-Type", required=false) String header, jakarta.servlet.http.HttpServletRequest request) {
-        return ApiResponse.ok(jdbc.queryForList(selectSql() + " FROM " + table(request.getRequestURI()) + " t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ AND r.delete_flag_=0 WHERE t.tenant_id_=? AND t.delete_flag_=0 ORDER BY t.create_time_ DESC", RequestContext.tenantId()));
-    }
-
-    @Operation(summary = "查询业务任务详情")
-    @GetMapping({"/api/presales-tasks/{id}", "/api/delivery-tasks/{id}", "/api/ops-tasks/{id}"})
-    public ApiResponse<Map<String,Object>> detail(@PathVariable String id, jakarta.servlet.http.HttpServletRequest request) {
-        List<Map<String,Object>> rows = jdbc.queryForList(selectSql() + " FROM " + table(request.getRequestURI()) + " t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ AND r.delete_flag_=0 WHERE t.id_=? AND t.tenant_id_=? AND t.delete_flag_=0", id, RequestContext.tenantId());
-        if (rows.isEmpty()) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在");
-        return ApiResponse.ok(rows.get(0));
-    }
-
-    @Operation(summary = "新建业务任务")
-    @PostMapping({"/api/presales-tasks", "/api/delivery-tasks", "/api/ops-tasks"})
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<Map<String,Object>> create(@RequestBody Map<String,Object> body, jakarta.servlet.http.HttpServletRequest request) {
-        String title = Objects.toString(body.get("title"), "").trim();
-        if (title.isBlank()) throw new IllegalArgumentException("任务名称不能为空");
-        String id = UUID.randomUUID().toString();
-        String code = prefix(request.getRequestURI()) + "-" + LocalDate.now().getYear() + "-" + System.currentTimeMillis();
-        jdbc.update("INSERT INTO " + table(request.getRequestURI()) + " (id_,tenant_id_,code_,title_,description_,expected_goal_,status_,priority_,owner_name_,creator_name_,department_,version_id_,version_name_,product_line_id_,product_line_name_,customer_id_,customer_name_,estimated_hours_,actual_hours_,due_date_,create_by_,update_by_,create_time_,update_time_,delete_flag_,version_,work_item_kind_) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW(),0,0,?)", id, RequestContext.tenantId(), code, title, text(body,"description"), text(body,"expectedGoal"), textOr(body,"status","待处理"), textOr(body,"priority","中"), text(body,"ownerName"), RequestContext.operatorName(), text(body,"department"), text(body,"versionId"), text(body,"versionName"), text(body,"productLineId"), text(body,"productLineName"), text(body,"customerId"), text(body,"customerName"), body.getOrDefault("estimatedHours",0), body.getOrDefault("actualHours",0), textOr(body,"dueDate",LocalDate.now().toString()), RequestContext.userId(), RequestContext.userId(), prefix(request.getRequestURI()));
-        return ApiResponse.ok(Map.of("id", id, "code", code));
-    }
-
-    @Operation(summary = "更新业务任务")
-    @PutMapping({"/api/presales-tasks/{id}", "/api/delivery-tasks/{id}", "/api/ops-tasks/{id}"})
-    public ApiResponse<Void> update(@PathVariable String id, @RequestBody Map<String,Object> body, jakarta.servlet.http.HttpServletRequest request) {
-        int count = jdbc.update("UPDATE " + table(request.getRequestURI()) + " SET title_=COALESCE(?,title_),description_=COALESCE(?,description_),expected_goal_=COALESCE(?,expected_goal_),status_=COALESCE(?,status_),priority_=COALESCE(?,priority_),owner_name_=COALESCE(?,owner_name_),product_line_id_=COALESCE(?,product_line_id_),product_line_name_=COALESCE(?,product_line_name_),version_id_=COALESCE(?,version_id_),version_name_=COALESCE(?,version_name_),customer_id_=COALESCE(?,customer_id_),customer_name_=COALESCE(?,customer_name_),estimated_hours_=COALESCE(?,estimated_hours_),actual_hours_=COALESCE(?,actual_hours_),due_date_=COALESCE(?,due_date_),update_by_=?,update_time_=NOW(),version_=version_+1 WHERE id_=? AND tenant_id_=? AND delete_flag_=0", body.get("title"), body.get("description"), body.get("expectedGoal"), body.get("status"), body.get("priority"), body.get("ownerName"), body.get("productLineId"), body.get("productLineName"), body.get("versionId"), body.get("versionName"), body.get("customerId"), body.get("customerName"), body.get("estimatedHours"), body.get("actualHours"), body.get("dueDate"), RequestContext.userId(), id, RequestContext.tenantId());
-        if (count == 0) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在");
-        return ApiResponse.ok(null);
-    }
-    private static String table(String uri) { if (uri.startsWith("/api/presales")) return "t_crm_presales_task"; if (uri.startsWith("/api/delivery")) return "t_project_delivery_task"; return "t_project_ops_task"; }
-    private static String prefix(String uri) { if (uri.startsWith("/api/presales")) return "PRESALES"; if (uri.startsWith("/api/delivery")) return "DELIVERY"; return "OPS"; }
-    private static String selectSql() { return "SELECT t.id_ AS id,t.code_ AS code,t.title_ AS title,t.description_ AS description,t.expected_goal_ AS expectedGoal,t.status_ AS status,t.priority_ AS priority,t.owner_name_ AS ownerName,t.creator_name_ AS creatorName,t.department_ AS department,t.version_id_ AS versionId,t.version_name_ AS versionName,t.product_line_id_ AS productLineId,t.product_line_name_ AS productLineName,t.customer_id_ AS customerId,t.customer_name_ AS customerName,t.estimated_hours_ AS estimatedHours,t.actual_hours_ AS actualHours,t.due_date_ AS dueDate,t.create_time_ AS createdAt,t.version_ AS version,t.work_item_kind_ AS workItemKind,t.requirement_id_ AS requirementId,CASE WHEN t.requirement_id_ IS NULL THEN JSON_ARRAY() ELSE JSON_ARRAY(t.requirement_id_) END AS sourceWorkOrderIds,CASE WHEN r.id_ IS NULL THEN JSON_ARRAY() ELSE JSON_ARRAY(r.title_) END AS sourceWorkOrderTitles"; }
-    private static String text(Map<String,Object> b,String k){return Objects.toString(b.get(k),"").trim();}
-    private static String textOr(Map<String,Object> b,String k,String d){String v=text(b,k);return v.isBlank()?d:v;}
+import com.shichuang.manage.api.*; import org.springframework.http.HttpStatus; import org.springframework.web.bind.annotation.*; import java.util.Map;
+@RestController public class BusinessTaskController {
+ private final TaskAliasService service; public BusinessTaskController(TaskAliasService service){this.service=service;}
+ @GetMapping({"/api/presales-tasks","/api/delivery-tasks","/api/ops-tasks"}) public ApiResponse<TaskPageResult<Map<String,Object>>> list(@RequestParam Map<String,String> params,jakarta.servlet.http.HttpServletRequest r){return ApiResponse.ok(service.list(kind(r),integer(params,"page",1),integer(params,"pageSize",20),TaskListFilter.from(params)));}
+ @GetMapping({"/api/presales-tasks/{id}","/api/delivery-tasks/{id}","/api/ops-tasks/{id}"}) public ApiResponse<Map<String,Object>> detail(@PathVariable String id,jakarta.servlet.http.HttpServletRequest r){return ApiResponse.ok(service.detail(kind(r),id));}
+ @PostMapping({"/api/presales-tasks","/api/delivery-tasks","/api/ops-tasks"}) @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> create(@RequestBody Map<String,Object>b,jakarta.servlet.http.HttpServletRequest r){return ApiResponse.ok(service.create(kind(r),b));}
+ @PutMapping({"/api/presales-tasks/{id}","/api/delivery-tasks/{id}","/api/ops-tasks/{id}"}) public ApiResponse<Void> update(@PathVariable String id,@RequestBody Map<String,Object>b,jakarta.servlet.http.HttpServletRequest r){service.update(kind(r),id,b);return ApiResponse.ok(null);}
+ private String kind(jakarta.servlet.http.HttpServletRequest r){String u=r.getRequestURI();return u.startsWith("/api/presales")?"presales":u.startsWith("/api/delivery")?"delivery":"ops";}
+ private int integer(Map<String,String> values,String key,int fallback){try{return Integer.parseInt(values.getOrDefault(key,String.valueOf(fallback)));}catch(NumberFormatException ignored){return fallback;}}
 }

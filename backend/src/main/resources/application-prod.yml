@@ -1,0 +1,16 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${ALIYUN_DB_URL}
+    username: ${ALIYUN_DB_USERNAME}
+    password: ${ALIYUN_DB_PASSWORD}
+  flyway:
+    enabled: true
+    clean-disabled: true
+string:
+  auth:
+    token-secret: ${AUTH_TOKEN_SECRET}
+    bootstrap-secret: ${AUTH_BOOTSTRAP_SECRET:}
+    session-validation: true

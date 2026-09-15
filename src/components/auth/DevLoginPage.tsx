@@ -54,6 +54,7 @@ export function DevLoginPage() {
   const ropeHandleRef = useRef<HTMLButtonElement>(null);
   const ropePathRef = useRef<SVGPathElement>(null);
   const ropeBaseRef = useRef<SVGPathElement>(null);
+  const toggleLampRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const root = lampRootRef.current;
@@ -71,6 +72,7 @@ export function DevLoginPage() {
         return next;
       });
     };
+    toggleLampRef.current = () => { playPullSound(); setLampState(!isOnRef.current); };
     const draggable = Draggable.create(handle, {
       type: 'y', bounds: { minY: 0, maxY: 92 },
       onPress() { playPullSound(); gsap.to(rope, { duration: 0.18, morphSVG: 'M205 119 C194 142 216 162 205 190', ease: 'power2.out' }); },
@@ -81,7 +83,7 @@ export function DevLoginPage() {
       },
       onRelease() { gsap.to(rope, { duration: 0.45, morphSVG: 'M205 119 C205 140 205 160 205 178', ease: 'elastic.out(1, 0.45)' }); },
     });
-    return () => draggable.forEach((instance) => instance.kill());
+    return () => { toggleLampRef.current = null; draggable.forEach((instance) => instance.kill()); };
   }, []);
 
   useEffect(() => { isOnRef.current = isOn; }, [isOn]);
@@ -120,7 +122,7 @@ export function DevLoginPage() {
                 <g className="lamp-eyes" transform={isOn ? 'rotate(0 145 86)' : 'rotate(180 145 86)'}><circle cx="128" cy="84" r="4" fill="#07101c" /><circle cx="162" cy="84" r="4" fill="#07101c" /><path d="M133 97 Q145 106 157 97" fill="none" stroke="#07101c" strokeWidth="3" strokeLinecap="round" /></g>
               </g>
               <path ref={ropeBaseRef} d="M205 119 C205 140 205 160 205 178" fill="none" stroke="transparent" strokeWidth="2" /><path ref={ropePathRef} d="M205 119 C205 140 205 160 205 178" fill="none" stroke="#b8c7d9" strokeWidth="2" strokeDasharray="3 4" /><circle cx="205" cy="120" r="4" fill="#dbeafe" />
-            </svg><button ref={ropeHandleRef} type="button" className="rope-handle" aria-label="拖拽拉绳切换台灯"><span /></button><span className="rope-hint">向下拖拽拉绳</span>
+            </svg><button ref={ropeHandleRef} type="button" className="rope-handle" aria-label="拖拽拉绳切换台灯" onClick={() => toggleLampRef.current?.()}><span /></button><span className="rope-hint">向下拖拽拉绳</span>
           </div><div className="lamp-status"><span className="status-dot" /> {isOn ? '照明已开启' : '灯光已关闭'} · {isOn ? '欢迎回来' : '拉动拉绳开始'}</div>
         </section>
         <section className={`login-card ${isOn ? 'login-card-visible' : ''}`} aria-live="polite">

@@ -7,6 +7,7 @@ import './styles/antd-override.css';
 import {BrowserRouter} from 'react-router-dom';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { AIEDIT_TOKENS } from './theme/tokens';
 
 const queryClient = new QueryClient({defaultOptions:{queries:{retry:1,staleTime:15000}}});
 
@@ -35,28 +36,35 @@ const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     return () => observer.disconnect();
   }, []);
 
+  const tokens = isDark ? AIEDIT_TOKENS.dark : AIEDIT_TOKENS.light;
   return (
     <ConfigProvider
       theme={{
         algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
           // AIEDIT 品牌色
-          colorPrimary: cssToken('--primary', '#2F66F6'),
-          colorSuccess: cssToken('--success', '#22C55E'),
-          colorWarning: cssToken('--warning', '#FACC15'),
-          colorError: cssToken('--danger', '#F26D5B'),
-          colorInfo: cssToken('--primary', '#3B82F6'),
+          colorPrimary: cssToken('--primary', tokens.primary),
+          colorSuccess: cssToken('--success', tokens.success),
+          colorWarning: cssToken('--warning', tokens.warning),
+          colorError: cssToken('--danger', tokens.danger),
+          colorInfo: cssToken('--primary-hover', tokens.primaryHover),
           
           // 字体
           fontSize: 12,
           fontFamily: cssToken('--font-sans', 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'),
           controlHeight: 36,
-          colorTextPlaceholder: cssToken('--text-muted', 'rgb(107, 114, 128)'),
+          colorText: tokens.text,
+          colorTextSecondary: tokens.textMuted,
+          colorTextPlaceholder: tokens.textSubtle,
+          colorBgBase: tokens.bgMain,
+          colorBgContainer: tokens.surface,
+          colorBorder: tokens.border,
+          colorBorderSecondary: tokens.borderStrong,
           
           // 圆角
-          borderRadius: 6,
-          borderRadiusLG: 8,
-          borderRadiusSM: 4,
+          borderRadius: 8,
+          borderRadiusLG: 12,
+          borderRadiusSM: 6,
           
           // 间距
           paddingLG: 24,

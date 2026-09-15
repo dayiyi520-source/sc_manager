@@ -26,6 +26,14 @@ public class RequirementMapper {
         return jdbc.queryForList(selectSql() + " FROM t_product_requirement WHERE " + where + " ORDER BY create_time_ DESC LIMIT ? OFFSET ?", concat(args, size, offset));
     }
 
+    List<Map<String, Object>> listFiltered(String where, Object[] args, int size, int offset) {
+        return jdbc.queryForList(selectSql() + " FROM t_product_requirement WHERE " + where + " ORDER BY create_time_ DESC LIMIT ? OFFSET ?", concat(args, size, offset));
+    }
+
+    List<Map<String, Object>> groups(String where, Object[] args, String expression) {
+        return jdbc.queryForList("SELECT " + expression + " AS label,COUNT(*) AS count FROM t_product_requirement WHERE " + where + " GROUP BY " + expression + " ORDER BY count DESC,label", args);
+    }
+
     List<Map<String, Object>> departments(String tenantId) {
         return jdbc.queryForList("SELECT department_ AS id, department_ AS name, MAX(CASE WHEN role_ IN ('admin','product_manager','tech_lead','sales_director') THEN name_ ELSE '' END) AS managerName FROM t_sys_user WHERE tenant_id_=? AND status_='enabled' AND delete_flag_=0 GROUP BY department_ ORDER BY department_", tenantId);
     }

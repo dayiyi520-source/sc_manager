@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@Profile("local")
 @RequestMapping("/api/work-items/{id}/relations")
 @Tag(name="统一工作项关系与阻塞")
 public class WorkItemRelationController {

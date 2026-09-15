@@ -38,7 +38,7 @@ import { useApp } from "../../context/AppContext";
 import { StatCard, StatusTag, Drawer, Modal } from "../common/UIComponents";
 import { requirementRepository } from "../../services/requirementRepository";
 import { RequirementActionButtons } from "../product/RequirementActionButtons";
-import { RichTextEditor } from "../product/RichTextEditor";
+import { LazyRichTextEditor as RichTextEditor } from "../product/LazyRichTextEditor";
 import type {
   EmployeeOption,
   RequirementEvent,

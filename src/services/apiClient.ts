@@ -1,6 +1,6 @@
 import { SESSION_TOKEN_KEY, invalidateSession } from './sessionStorage'
 export interface ApiResponse<T> { code: string; message: string; data: T; requestId: string }
-export interface PageResult<T> { items: T[]; page: number; pageSize: number; total: number }
+export interface PageResult<T> { items: T[]; page: number; pageSize: number; total: number; groups?: Array<{ label: string; count: number }> }
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 export class ApiError extends Error { constructor(public status: number, public code: string, message: string) { super(message) } }
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {

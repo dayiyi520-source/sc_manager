@@ -8,21 +8,16 @@ import 'tinymce/tinymce';
 import 'tinymce/icons/default';
 import 'tinymce/themes/silver';
 import 'tinymce/models/dom';
-import 'tinymce/plugins/advlist';
-import 'tinymce/plugins/autolink';
-import 'tinymce/plugins/autoresize';
-import 'tinymce/plugins/code';
 import 'tinymce/plugins/image';
 import 'tinymce/plugins/link';
 import 'tinymce/plugins/lists';
-import 'tinymce/plugins/media';
+import 'tinymce/plugins/codesample';
 import 'tinymce/plugins/table';
-import 'tinymce/plugins/wordcount';
 import 'tinymce-i18n/langs8/zh-CN.js';
 import 'tinymce/skins/ui/oxide/skin.css';
 import './RichTextEditor.css';
 
-type RichTextEditorProps = {
+export type RichTextEditorProps = {
   editor: React.RefObject<HTMLDivElement | null>;
   size?: 'default' | 'work-order';
   readOnly?: boolean;
@@ -71,7 +66,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
 
   const init = useMemo(() => ({
     height: 320, menubar: false, branding: false, promotion: false, language: 'zh-CN', skin: 'oxide', placeholder, resize: true,
-    plugins: 'advlist autolink autoresize code image link lists media table wordcount',
+    plugins: 'image link lists codesample table',
     toolbar: readOnly ? false : 'undo redo | removeformat | blocks fontfamily fontsize | bold italic strikethrough underline | forecolor backcolor | imageupload table customlink blockquote codesample | alignleft aligncenter alignright | bullist numlist outdent indent | lineheight | markdown',
     readonly: readOnly,
     toolbar_mode: 'wrap',

@@ -41,7 +41,7 @@ import { StatCard, StatusTag, Drawer, Modal } from "../common/UIComponents";
 import { requirementRepository } from "../../services/requirementRepository";
 import { RequirementActionButtons } from "./RequirementActionButtons";
 import { WorkflowAssigneeSelect } from "./WorkflowAssigneeSelect";
-import { RichTextEditor } from "./RichTextEditor";
+import { LazyRichTextEditor as RichTextEditor } from "./LazyRichTextEditor";
 import type {
   EmployeeOption,
   RequirementEvent,

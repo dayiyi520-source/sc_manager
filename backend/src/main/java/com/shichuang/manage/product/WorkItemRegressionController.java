@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@Profile("local")
 @RequestMapping("/api/work-items")
 @Tag(name="线上问题与回归测试")
 public class WorkItemRegressionController {

@@ -1,5 +1,6 @@
 package com.shichuang.manage.okr.service;
 import com.shichuang.manage.auth.RequestContext;
+import com.shichuang.manage.auth.AuthorizationService;
 import com.shichuang.manage.okr.mapper.OkrMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -10,9 +11,10 @@ import java.util.*;
 @Service public class OkrService {
  private final OkrMapper mapper; private final ObjectMapper json;
  public OkrService(OkrMapper mapper,ObjectMapper json){this.mapper=mapper;this.json=json;}
- public List<Map<String,Object>> people(){return mapper.people(RequestContext.tenantId());}
+ public List<Map<String,Object>> people(){AuthorizationService.requireRead("okr"); return mapper.people(RequestContext.tenantId());}
  private String supervisor(String owner){return people().stream().filter(p->owner.equals(p.get("id"))).map(p->Objects.toString(p.get("supervisorId"),"")).findFirst().orElse("");}
  public List<Map<String,Object>> records(){
+  AuthorizationService.requireRead("okr");
   String me=RequestContext.userId();var reporting=people();
   String boss=reporting.stream().filter(p->me.equals(p.get("id"))).map(p->Objects.toString(p.get("supervisorId"),"")).findFirst().orElse("");
   var reports=new HashSet<String>();for(var p:reporting)if(me.equals(p.get("supervisorId")))reports.add(p.get("id").toString());

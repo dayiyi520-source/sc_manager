@@ -13,8 +13,8 @@ vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
 vi.mock('../../services/requirementRepository', () => ({
   requirementRepository: { employees: vi.fn(), detail: vi.fn() },
 }));
-vi.mock('../product/RichTextEditor', () => ({
-  RichTextEditor: ({ size, onInput }: { size?: string; onInput: (text: string, html: string) => void }) => (
+vi.mock('../product/LazyRichTextEditor', () => ({
+  LazyRichTextEditor: ({ size, onInput }: { size?: string; onInput: (text: string, html: string) => void }) => (
     <div data-testid="rich-text-editor" data-size={size}>
       <button type="button" onClick={() => onInput('工单详细描述', '<p>工单详细描述</p>')}>填写工单描述</button>
     </div>

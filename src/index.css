@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@theme {
+  --color-aiedit-primary: var(--primary);
+  --color-aiedit-surface: var(--bg-surface);
+  --color-aiedit-border: var(--border-main);
+  --color-aiedit-text: var(--text-primary);
+  --color-aiedit-muted: var(--text-muted);
+  --color-aiedit-success: var(--success);
+  --color-aiedit-warning: var(--warning);
+  --color-aiedit-danger: var(--danger);
+}
+
 @layer base {
   :root {
     --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

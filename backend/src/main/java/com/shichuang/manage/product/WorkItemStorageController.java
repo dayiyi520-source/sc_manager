@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@Profile("local")
 @RequestMapping("/api/work-items")
 @Tag(name="统一工作项存储")
 public class WorkItemStorageController {
