@@ -4,8 +4,12 @@ export interface OkrPerson { id: string; name: string; department: string; super
 export interface OkrKr { id: string; title: string; weight: number; progress: number; deadline?: string }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
 export interface OkrReviewItem { workId: string; title: string; status: string; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
+export interface OkrKrReview { objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
+export interface OkrReviewAssistance { subject:string; result:string }
+export interface OkrExtraWork { workIds:string[]; description:string; impact:string; notes?:Record<string,string> }
 export interface OkrPayload {
-  reviewMode?: 'completed'; reviewType?: 'week' | 'month'; selfScore?: number;
+  reviewMode?: 'completed' | 'structured'; reviewType?: 'week' | 'month'; selfScore?: number;
+  krReviews?: OkrKrReview[]; assistance?: OkrReviewAssistance[]; extraWork?: OkrExtraWork; syncKrProgress?: boolean;
   uncompletedReason?: string; suggestions?: string; helpNeeded?: string; sendTo?: string[];
   weight?: number; deadline?: string;
   objectiveType?: 'target' | 'challenge'; note?: string;
@@ -15,7 +19,7 @@ export interface OkrPayload {
   objectiveSnapshots?: Array<{id:string;period:string;payload:OkrPayload}>;
 }
 export interface OkrRecord { id: string; kind: 'objective' | 'review'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload }
-export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
+export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
 const base = '/api/okr';
 export const okrRepository = {
   people: () => apiRequest<OkrPerson[]>(`${base}/people`),

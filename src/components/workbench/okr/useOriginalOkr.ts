@@ -33,6 +33,7 @@ export function useOriginalOkr() {
       uncompletedReason:p.uncompletedReason || '',suggestions:p.suggestions || '',helpNeeded:p.helpNeeded || '',sendTo:p.sendTo || [],
       createdAt:r.createdAt?.replace('T',' ').slice(0,16) || '—',status:r.status as PerformanceReview['status'],feedback:p.feedback,leaderScore:p.finalScore,
       linkedWorkItems:(p.items || []).map(i=>({id:i.workId,title:i.title,type:'task',status:i.status})),
+      krReviews:p.krReviews || [], assistance:p.assistance || [], extraWork:p.extraWork, syncKrProgress:p.syncKrProgress,
     };
   });
   const refresh = () => client.invalidateQueries({queryKey:['okr',currentUser.id]});
@@ -40,7 +41,7 @@ export function useOriginalOkr() {
     setBusy(true);
     try {
       await okrRepository.create(kind,period,payload,submit);
-      await refresh(); addToast('success',kind==='objective'?(submit?'目标已提交':'目标草稿已保存'):'复盘已提交'); return true;
+      await refresh(); addToast('success',kind==='objective'?(submit?'目标已提交':'目标草稿已保存'):(submit?'复盘已提交':'复盘草稿已保存')); return true;
     } catch(error) { addToast('error',error instanceof Error?error.message:'提交失败，请重试'); return false; }
     finally {setBusy(false);}
   };
@@ -49,5 +50,6 @@ export function useOriginalOkr() {
     saveObjective:(period:string,payload:OkrPayload)=>save('objective',period,payload),
     saveObjectiveDraft:(period:string,payload:OkrPayload)=>save('objective',period,payload,false),
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
+    saveReviewDraft:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload,false),
   };
 }

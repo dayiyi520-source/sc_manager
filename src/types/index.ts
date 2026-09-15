@@ -130,6 +130,10 @@ export interface PerformanceReview {
   leaderScore?: number;
   linkedWorkItems?: ReviewWorkItem[];
   outOfPlanWork?: OutOfPlanWorkItem[];
+  krReviews?: import('../services/okrRepository').OkrKrReview[];
+  assistance?: import('../services/okrRepository').OkrReviewAssistance[];
+  extraWork?: import('../services/okrRepository').OkrExtraWork;
+  syncKrProgress?: boolean;
 }
 
 export interface ReviewWorkItem {
