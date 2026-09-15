@@ -252,7 +252,7 @@ const OriginalWorkspace: React.FC = () => {
           )}
 
           {reviewSubTab === 'write' && isReviewFormOpen && (
-            <StructuredReviewEditor key={reviewType} type={reviewType} okrs={okrs.filter(o=>o.ownerId===currentUser.id&&o.status==='active')} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onTypeChange={openReviewForm} onCancel={()=>setIsReviewFormOpen(false)} onSaveDraft={saveReviewDraft} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}}/>
+            <StructuredReviewEditor key={reviewType} type={reviewType} okrs={okrs.filter(o=>o.ownerId===currentUser.id)} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>setIsReviewFormOpen(false)} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setOkrCategoryTab('my');setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={saveReviewDraft} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}}/>
           )}
 
           {/* Subtab: 看总结 */}
