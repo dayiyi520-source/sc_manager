@@ -24,11 +24,13 @@ public class RequirementService {
     private final RequirementMapper mapper;
     private final WorkOrderService workOrders;
     private final ObjectMapper objectMapper;
+    private final WorkItemConfigurationService configurations;
 
-    public RequirementService(RequirementMapper mapper, WorkOrderService workOrders, ObjectMapper objectMapper) {
+    public RequirementService(RequirementMapper mapper, WorkOrderService workOrders, ObjectMapper objectMapper, WorkItemConfigurationService configurations) {
         this.mapper = mapper;
         this.workOrders = workOrders;
         this.objectMapper = objectMapper;
+        this.configurations = configurations;
     }
 
     public PageResult<Map<String, Object>> list(int page, int pageSize, String keyword, String productLine, String department, String priority, String status, String ownerName, String workItemKind) {
@@ -112,6 +114,7 @@ public class RequirementService {
         String department = ownerName.isBlank() ? legacyDepartment : mapper.employeeDepartment(tenantId, ownerName);
         String customerId = text(body, "customerId");
         if (title.isBlank()) throw new IllegalArgumentException("需求名称不能为空");
+        if (body.get("workItemTypeId") != null) configurations.requireTypeForLegacy(text(body, "productLineId"), text(body, "workItemTypeId"), "requirement");
         if (ownerName.isBlank() || department.isBlank()) throw new IllegalArgumentException("负责人不能为空且必须是组织员工");
         if (!customerId.isBlank() && mapper.customerExists(tenantId, customerId) == 0) throw new IllegalArgumentException("关联客户无效");
         String id = UUID.randomUUID().toString();

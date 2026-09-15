@@ -81,6 +81,9 @@ public class WorkItemConfigurationService {
         if (category!=null && !CATEGORIES.get(category).equals(type.get("category"))) throw new IllegalArgumentException("任务类型不属于当前分类");
         return type;
     }
+    public Map<String,Object> requireTypeForLegacy(String line,String id,String category) {
+        return requireType(line,id,category,true);
+    }
     Map<String,Object> requireWorkflow(String line,String id) {
         Map<String,Object> value=mapper.workflow(RequestContext.tenantId(),line,id);
         if (value==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"流程不存在");

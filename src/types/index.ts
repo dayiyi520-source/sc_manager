@@ -50,6 +50,7 @@ export type SubMenuId =
   | 'prod_rd_tasks'
   | 'prod_dev_tasks'
   | 'prod_bugs'
+  | 'prod_test_tasks'
   | 'wb_work_order'
 
   | 'prod_reviews'
@@ -409,7 +410,7 @@ export interface ProductLineMember {
   phone?: string;
 }
 
-export type ProductLineWorkItemCategory = '需求' | '设计' | '研发' | '缺陷';
+export type ProductLineWorkItemCategory = '需求' | '设计' | '研发' | '测试' | '缺陷';
 
 export interface ProductLineWorkItemType {
   id: string;
@@ -514,6 +515,7 @@ export interface RequirementTask {
   sourceWorkOrderTitles?: string[];
   requirementId?: string;
   requirementType?: string;
+  workItemTypeId?: string;
   ccNames?: string[];
   plannedStartDate?: string;
   expectedCompleteDate?: string;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Avatar, Input, Select, Button, Switch, Checkbox } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import {
   ArrowLeft,
   Boxes,
@@ -42,6 +42,75 @@ interface ProductLineDetailViewProps {
 
 export type ProductLineSettingsSection = 'basic' | 'members' | 'work-items' | 'notifications' | 'automation';
 
+const WORKFLOW_CATEGORY_OPTIONS = [
+  { value: 'requirement', label: '需求' },
+  { value: 'design', label: '设计' },
+  { value: 'dev', label: '研发' },
+  { value: 'test', label: '测试' },
+  { value: 'bug', label: '缺陷' }
+] as const;
+
+const defaultWorkflowDefinition = () => ({
+  states: [
+    { key: 'todo', name: '待处理', group: 'NOT_STARTED', initial: true, successful: false, enabled: true, stage: 'requirement' },
+    { key: 'done', name: '已完成', group: 'COMPLETED', initial: false, successful: true, enabled: true, stage: 'acceptance' }
+  ],
+  transitions: [{ key: 'complete', from: 'todo', to: 'done', name: '完成', roles: ['admin', 'product_manager', 'tech_lead'], requiredFields: [] }]
+});
+
+const ProductLineWorkflowSettings: React.FC<{ productLine: ProductLine; initialCategory?: typeof WORKFLOW_CATEGORY_OPTIONS[number]['value'] }> = ({ productLine, initialCategory = 'requirement' }) => {
+  const { addToast } = useApp();
+  const [category, setCategory] = useState<typeof WORKFLOW_CATEGORY_OPTIONS[number]['value']>(initialCategory);
+  useEffect(() => setCategory(initialCategory), [initialCategory]);
+  const [workflows, setWorkflows] = useState<Awaited<ReturnType<typeof productRepository.workflows>>>([]);
+  const [selected, setSelected] = useState<string>('');
+  const [name, setName] = useState('默认工作流');
+  const [definition, setDefinition] = useState(JSON.stringify(defaultWorkflowDefinition(), null, 2));
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const next = await productRepository.workflows(productLine.id);
+      setWorkflows(next);
+      const current = next.find((item) => item.category === category && item.status === 'DRAFT') || next.find((item) => item.category === category);
+      setSelected(current?.id || '');
+      setName(current?.name || `${WORKFLOW_CATEGORY_OPTIONS.find((item) => item.value === category)?.label}工作流`);
+      setDefinition(JSON.stringify(current?.definition || defaultWorkflowDefinition(), null, 2));
+    } catch (error) {
+      addToast('error', '工作流读取失败', error instanceof Error ? error.message : '请稍后重试');
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [productLine.id, category]);
+
+  const save = async () => {
+    let parsed: { states: Array<Record<string, unknown>>; transitions: Array<Record<string, unknown>> };
+    try { parsed = JSON.parse(definition); } catch { addToast('warning', '流程定义不是有效 JSON'); return; }
+    try {
+      const current = workflows.find((item) => item.id === selected);
+      if (current && current.status === 'DRAFT') {
+        await productRepository.updateWorkflow(productLine.id, current.id, { category, name: name.trim(), definition: parsed, revision: current.revision });
+      } else {
+        await productRepository.createWorkflow(productLine.id, { category, name: name.trim(), definition: parsed });
+      }
+      addToast('success', '工作流草稿已保存');
+      await load();
+    } catch (error) { addToast('error', '工作流保存失败', error instanceof Error ? error.message : '请检查状态和流转定义'); }
+  };
+  const publish = async () => {
+    const current = workflows.find((item) => item.id === selected);
+    if (!current || current.status !== 'DRAFT') return;
+    try { await productRepository.publishWorkflow(productLine.id, current.id, current.revision); addToast('success', '工作流已发布'); await load(); }
+    catch (error) { addToast('error', '工作流发布失败', error instanceof Error ? error.message : '请检查流程定义'); }
+  };
+  return <div className="mt-6 space-y-4 border-t border-[var(--border-main)] pt-5">
+    <div><h4 className="text-sm font-bold text-[var(--text-primary)]">流程配置</h4><p className="mt-1 text-[var(--text-muted)]">按工作项分类维护状态和流转。已发布版本不可修改，修改时会生成新的草稿版本。</p></div>
+    <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]"><Select value={category} onChange={setCategory} options={WORKFLOW_CATEGORY_OPTIONS.map((item) => ({ value: item.value, label: item.label }))} /><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="流程名称" /></div>
+    <Input.TextArea value={definition} onChange={(event) => setDefinition(event.target.value)} autoSize={{ minRows: 10, maxRows: 24 }} spellCheck={false} className="font-mono text-xs" aria-label="工作流定义" />
+    <div className="flex items-center justify-between gap-3"><span className="text-xs text-[var(--text-muted)]">{loading ? '正在读取...' : selected ? `当前版本：${workflows.find((item) => item.id === selected)?.status || '草稿'}` : '尚未创建该分类流程'}</span><div className="flex gap-2"><Button onClick={() => void save()} type="primary">保存草稿</Button><Button onClick={() => void publish()} disabled={!selected || workflows.find((item) => item.id === selected)?.status !== 'DRAFT'}>发布流程</Button></div></div>
+  </div>;
+};
+
 const ProductLineSettingsPanel: React.FC<{
   productLine: ProductLine;
   onBack: () => void;
@@ -50,6 +119,7 @@ const ProductLineSettingsPanel: React.FC<{
 }> = ({ productLine, onBack, onOpenMembers, initialSection }) => {
   const { updateProductLine, updateProductLineMember, removeProductLineMember, addToast } = useApp();
   const [section, setSection] = useState<ProductLineSettingsSection>(initialSection || 'basic');
+  const [workflowCategory, setWorkflowCategory] = useState<typeof WORKFLOW_CATEGORY_OPTIONS[number]['value']>('requirement');
   const [name, setName] = useState(productLine.name);
   const [code, setCode] = useState(productLine.code);
   const [description, setDescription] = useState(productLine.description);
@@ -159,9 +229,9 @@ const ProductLineSettingsPanel: React.FC<{
               <Modal isOpen={Boolean(memberToRemove)} onClose={() => setMemberToRemove(null)} title="移除项目成员" footer={<><Button onClick={() => setMemberToRemove(null)}>取消</Button><Button type="primary" danger onClick={async () => { if (!memberToRemove) return; if (memberToRemove.id.startsWith('owner-')) { addToast('warning', '产品线负责人默认保留为管理员成员'); setMemberToRemove(null); return; } try { await removeProductLineMember(productLine.id, memberToRemove.id); addToast('success', '成员已移除'); setMemberToRemove(null); } catch (error) { addToast('error', '成员移除失败', error instanceof Error ? error.message : '请稍后重试'); } }}>确认移除</Button></>}><p className="text-sm text-[var(--text-body)]">确定将“{memberToRemove?.name}”移除产品线吗？</p></Modal>
             </div>
           )}
-          {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
+          {section === 'work-items' && <><ProductLineWorkItemSettings productLine={productLine} onWorkflowCategoryChange={setWorkflowCategory} /><ProductLineWorkflowSettings productLine={productLine} initialCategory={workflowCategory} /></>}
           {section === 'notifications' && <ProductLineNotificationSettings />}
-          {section === 'automation' && <SettingsPlaceholder title="自动化规则" description="自动化规则将在配置完成后按产品线范围执行。" />}
+          {section === 'automation' && <div className="max-w-2xl space-y-3 text-xs"><h3 className="text-sm font-bold text-[var(--text-primary)]">自动化规则</h3><p className="text-[var(--text-muted)]">自动化规则属于具体工作项分类的流程配置，请在“工作项设置”中按需求、设计、研发、测试或缺陷分类维护。</p><Button type="primary" onClick={() => setSection('work-items')}>前往工作项设置</Button></div>}
         </section>
       </div>
     </div>
@@ -172,9 +242,9 @@ const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({
   <div className="max-w-2xl space-y-2 text-xs"><h3 className="text-sm font-bold text-[var(--text-primary)]">{title}</h3><p className="text-[var(--text-muted)]">{description}</p><div className="mt-5 border border-dashed border-[var(--border-main)] p-5 text-[var(--text-muted)]">暂无可配置项</div></div>
 );
 
-const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '缺陷'];
+const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '测试', '缺陷'];
 
-const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
+const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine; onWorkflowCategoryChange?: (category: typeof WORKFLOW_CATEGORY_OPTIONS[number]['value']) => void }> = ({ productLine, onWorkflowCategoryChange }) => {
   const { addToast, setProductLines } = useApp();
   const [activeCategory, setActiveCategory] = useState<ProductLineWorkItemCategory>('需求');
   const normalizeItems = (nextItems: ProductLineWorkItemType[]) => nextItems.map((item) => ({ ...item, enabled: Boolean(item.enabled) }));
@@ -281,7 +351,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
       </div>
       <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
         <div className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>类型名称</span><span>描述</span><span>添加人</span><span>添加时间</span><span>是否启用</span><span className="text-right">操作</span></div>
-        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="font-medium text-[var(--text-primary)]">{item.name}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{activeCategory}工作项类型，点击右上角“新增类型”添加</div>}
+        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="font-medium text-[var(--text-primary)]">{item.name}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}工作流`} title={`配置${item.name}工作流`} icon={<ApartmentOutlined />} onClick={() => onWorkflowCategoryChange?.(({ 需求: 'requirement', 设计: 'design', 研发: 'dev', 缺陷: 'bug' } as Record<ProductLineWorkItemCategory, typeof WORKFLOW_CATEGORY_OPTIONS[number]['value']>)[item.category])} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{activeCategory}工作项类型，点击右上角“新增类型”添加</div>}
       </div>
       <Modal isOpen={isEditorOpen} onClose={() => setIsEditorOpen(false)} title={editingItem ? '修改工作项类型' : '新增工作项类型'} footer={<><Button onClick={() => setIsEditorOpen(false)}>取消</Button><Button type="primary" htmlType="submit" form="work-item-type-form">保存</Button></>}>
         <form id="work-item-type-form" onSubmit={saveItem} className="space-y-4 text-xs">
@@ -743,18 +813,24 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
           <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
             <div className="mb-3 grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] gap-3 text-[11px] text-[var(--text-muted)]"><span>版本名称 / 版本号</span><span>时间区间</span></div>
-            <div className="space-y-3">
-              {lineVersions.map((version) => {
-                const start = new Date(version.startDate || version.releaseDate || Date.now()).getTime();
-                const end = new Date(version.endDate || version.releaseDate || start).getTime();
-                const timelineStart = Math.min(...lineVersions.map((item) => new Date(item.startDate || item.releaseDate || Date.now()).getTime()));
-                const timelineEnd = Math.max(...lineVersions.map((item) => new Date(item.endDate || item.releaseDate || Date.now()).getTime()), timelineStart + 86400000);
-                const left = ((start - timelineStart) / (timelineEnd - timelineStart)) * 100;
-                const width = Math.max(5, ((Math.max(end, start + 86400000) - start) / (timelineEnd - timelineStart)) * 100);
-                const interval = `${version.startDate || '--'} ~ ${version.endDate || version.releaseDate || '--'}`;
-                return <div key={`gantt-${version.id}`} className="grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] items-center gap-3"><div className="min-w-0"><div className="truncate text-xs font-semibold text-[var(--text-primary)]">{version.name}</div><div className="mt-0.5 truncate font-mono text-[11px] text-[var(--active-text)]">{version.code || '未设置版本号'}</div></div><div className="relative h-8 rounded bg-[var(--bg-surface-soft)]"><span className="absolute top-1.5 h-5 min-w-max rounded bg-[var(--primary)]/80 px-2 pt-0.5 text-[10px] text-white" style={{ left: `${left}%`, width: `${width}%` }} title={interval}>{interval}</span></div></div>;
-              })}
-            </div>
+            {lineVersions.length > 0 && (() => {
+              const toTime = (value?: string) => value ? new Date(value).getTime() : Date.now();
+              const timelineStart = Math.min(...lineVersions.map((item) => toTime(item.startDate || item.releaseDate)));
+              const timelineEnd = Math.max(...lineVersions.map((item) => toTime(item.endDate || item.releaseDate || item.startDate)), timelineStart + 86400000);
+              const span = Math.max(timelineEnd - timelineStart, 86400000);
+              const ticks = Array.from({ length: 6 }, (_, index) => new Date(timelineStart + span * index / 5));
+              return <div className="space-y-3">
+                <div className="grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] gap-3"><span /><div className="relative h-8 border-b border-[var(--border-main)]">{ticks.map((tick, index) => <span key={tick.toISOString()} className="absolute top-0 -translate-x-1/2 text-[10px] text-[var(--text-muted)]" style={{ left: `${index * 20}%` }}>{tick.toISOString().slice(0, 10)}</span>)}</div></div>
+                {lineVersions.map((version) => {
+                  const start = toTime(version.startDate || version.releaseDate);
+                  const end = Math.max(toTime(version.endDate || version.releaseDate || version.startDate), start + 86400000);
+                  const left = Math.max(0, ((start - timelineStart) / span) * 100);
+                  const width = Math.max(2, ((end - start) / span) * 100);
+                  const interval = `${version.startDate || '--'} ~ ${version.endDate || version.releaseDate || '--'}`;
+                  return <div key={`gantt-${version.id}`} className="grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] items-center gap-3"><div className="min-w-0"><div className="truncate text-xs font-semibold text-[var(--text-primary)]">{version.name}</div><div className="mt-0.5 truncate font-mono text-[11px] text-[var(--active-text)]">{version.code || '未设置版本号'}</div></div><div className="relative h-8 rounded bg-[var(--bg-surface-soft)]"><span className="absolute top-1.5 h-5 min-w-[8px] rounded bg-[var(--primary)]/80 px-2 pt-0.5 text-[10px] text-white" style={{ left: `${left}%`, width: `${width}%` }} title={interval}>{interval}</span></div></div>;
+                })}
+              </div>;
+            })()}
           </div>
 
           {lineVersions.length === 0 && <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">暂无版本迭代记录，点击右上角“创建新版本”规划版本交付</div>}

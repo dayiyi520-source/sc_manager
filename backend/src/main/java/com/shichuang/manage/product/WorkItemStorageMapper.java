@@ -45,7 +45,10 @@ public class WorkItemStorageMapper {
     public Map<String,Object> item(String tenant,String line,String id) { return one(ITEM+" AND id_=?",tenant,line,id); }
     public Map<String,Object> timedItem(String tenant,String line,String id) {
         Map<String,Object> item = item(tenant,line,id);
-        if (item != null) item.putAll(one("SELECT source_type_ AS sourceType,actual_start_at_ AS actualStartAt,completed_at_ AS completedAt FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",tenant,line,id));
+        if (item != null) {
+            item.putAll(one("SELECT source_type_ AS sourceType,actual_start_at_ AS actualStartAt,completed_at_ AS completedAt FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",tenant,line,id));
+            item.put("children", jdbc.queryForList(ITEM + " AND parent_work_item_id_=? ORDER BY create_time_,id_", tenant, line, id));
+        }
         return item;
     }
     public boolean hasUnfinishedChildren(String tenant,String line,String id) {

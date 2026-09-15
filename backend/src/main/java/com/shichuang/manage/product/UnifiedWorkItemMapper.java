@@ -12,34 +12,12 @@ public class UnifiedWorkItemMapper {
 
     public UnifiedWorkItemMapper(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
-    /** Fixed SQL identifiers only. Dedicated design rows supersede retained migration copies. */
-    private static String select(String table, String category, String source, String owner, String requirement) {
-        return "SELECT t.id_ AS id, '" + category + "' AS category, '" + source + "' AS source, "
-            + "t.code_ AS code,t.title_ AS title,t.product_line_id_ AS productLineId,t.version_id_ AS versionId,"
-            + requirement + " AS requirementId," + owner + " AS assigneeName,t.status_ AS status,"
-            + "t.priority_ AS priority,t.due_date_ AS dueDate,t.estimated_hours_ AS estimatedHours,"
-            + "t.actual_hours_ AS actualHours,t.create_time_ AS createdAt,NULL AS taskTypeId,NULL AS workflowId,NULL AS statusKey,"
-            + "NULL AS statusGroup,NULL AS successful,NULL AS parentWorkItemId,NULL AS assigneeId FROM " + table + " t "
-            + "WHERE t.tenant_id_=? AND t.product_line_id_=? AND t.delete_flag_=0";
-    }
-
-    static final String UNION = select("t_product_requirement", "requirement", "requirement", "t.owner_name_", "NULL")
-        + " AND COALESCE(t.work_item_kind_,'requirement')='requirement' UNION ALL "
-        + select("t_product_design_task", "design", "design", "t.owner_name_", "t.requirement_id_")
-        + " UNION ALL "
-        + select("t_product_requirement", "design", "legacy-design", "t.owner_name_", "NULL")
-        + " AND t.work_item_kind_='design' AND NOT EXISTS (SELECT 1 FROM t_product_design_task d "
-        + "WHERE d.id_=t.id_ AND d.tenant_id_=t.tenant_id_) UNION ALL "
-        + select("t_product_dev_task", "dev", "dev", "t.developer_name_", "t.requirement_id_")
-        + " UNION ALL "
-        + select("t_product_bug", "bug", "bug", "t.assignee_name_", "t.requirement_id_")
-        + " UNION ALL SELECT id_,category_,'core',code_,title_,product_line_id_,version_id_,requirement_id_,assignee_name_,status_name_,"
-        + "priority_,planned_end_date_,estimated_hours_,actual_hours_,create_time_,task_type_id_,workflow_id_,status_key_,status_group_,successful_,parent_work_item_id_,assignee_id_"
+    static final String CORE = "SELECT id_ AS id, category_ AS category, 'core' AS source, code_ AS code, title_ AS title, product_line_id_ AS productLineId, version_id_ AS versionId, requirement_id_ AS requirementId, assignee_name_ AS assigneeName, status_name_ AS status, "
+        + "priority_ AS priority, planned_end_date_ AS dueDate, estimated_hours_ AS estimatedHours, actual_hours_ AS actualHours, create_time_ AS createdAt, task_type_id_ AS taskTypeId, workflow_id_ AS workflowId, status_key_ AS statusKey, status_group_ AS statusGroup, successful_ AS successful, parent_work_item_id_ AS parentWorkItemId, assignee_id_ AS assigneeId"
         + " FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0";
 
     public List<Map<String, Object>> byProductLine(String tenant, String lineId) {
-        return jdbc.queryForList("SELECT * FROM (" + UNION + ") items ORDER BY createdAt DESC,category,id",
-            tenant, lineId, tenant, lineId, tenant, lineId, tenant, lineId, tenant, lineId, tenant, lineId);
+        return jdbc.queryForList("SELECT * FROM (" + CORE + ") items ORDER BY createdAt DESC,category,id", tenant, lineId);
     }
 
     public boolean canRead(String tenant, String lineId, String userId) {

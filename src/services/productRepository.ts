@@ -4,6 +4,21 @@ import type { PageResult } from './apiClient';
 
 type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
+export type WorkItemCategoryKey = 'requirement' | 'design' | 'dev' | 'test' | 'bug';
+export type WorkItemWorkflow = {
+  id: string;
+  category: WorkItemCategoryKey;
+  name: string;
+  workflowVersion: number;
+  status: 'DRAFT' | 'PUBLISHED' | string;
+  revision: number;
+  definition: { states: Array<Record<string, unknown>>; transitions: Array<Record<string, unknown>> };
+};
+export type UnifiedWorkItem = {
+  id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;
+  requirementId?: string | null; assigneeName?: string; status?: { name?: string; group?: string; successful?: boolean };
+  priority?: string; parentWorkItemId?: string | null; dueDate?: string | null; potentialBlockingDefect?: boolean;
+};
 
 const specialTaskPath = (kind: SpecialTaskKind) => kind === 'bug' ? '/api/bugs' : '/api/dev-tasks';
 const businessTaskPath = (kind: BusinessTaskKind) => `/api/${kind}-tasks`;
@@ -21,6 +36,14 @@ export const productRepository = {
   createWorkItemType: (id: string, body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled'>) => apiRequest<{ id: string }>(`/api/product-lines/${id}/work-item-types`, { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItemType: (id: string, typeId: string, body: Partial<Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled'>>) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteWorkItemType: (id: string, typeId: string) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'DELETE' }),
+  workflows: (id: string) => apiRequest<WorkItemWorkflow[]>(`/api/product-lines/${id}/workflows`),
+  createWorkflow: (id: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'>) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows`, { method: 'POST', body: JSON.stringify({ ...body, revision: 0 }) }),
+  updateWorkflow: (id: string, workflowId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision: number }) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  publishWorkflow: (id: string, workflowId: string, revision: number) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}/publish`, { method: 'POST', body: JSON.stringify({ revision }) }),
+  workItemDetail: (lineId: string, id: string) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(lineId)}`),
+  workItems: (productLineId: string, category = '', keyword = '') => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=1&pageSize=100`),
+  createWorkItem: (body: { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; description?: string; expectedGoal?: string; versionId?: string; requirementId?: string; parentWorkItemId?: string; assigneeId?: string; priority: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
+  requirementSummary: (productLineId: string, requirementId: string) => apiRequest<{ linkedItems: UnifiedWorkItem[] }>(`/api/requirements/${encodeURIComponent(requirementId)}/summary?productLineId=${encodeURIComponent(productLineId)}`),
   productLineActivities: (id: string) => apiRequest<ProductLine['activities']>(`/api/product-lines/${id}/activities`),
   createVersion: (lineId: string, body: Partial<VersionIteration>) => apiRequest<void>(`/api/product-lines/${lineId}/versions`, { method: 'POST', body: JSON.stringify(body) }),
   updateVersion: (lineId: string, versionId: string, body: Partial<VersionIteration>) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}`, { method: 'PUT', body: JSON.stringify(body) }),
