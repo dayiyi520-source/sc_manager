@@ -22,7 +22,7 @@ export const WorkItemCreatePanel: React.FC<{
   }, [isOpen, onClose]);
   if (!isOpen) return null;
   if (presentation === 'drawer') {
-    return <Drawer open onClose={onClose} title={title} width="min(960px, 75vw)" destroyOnClose footer={footer ? <div className="flex items-center gap-3">{secondaryAction}<span className="flex-1" />{footer}</div> : undefined}>
+    return <Drawer open onClose={onClose} title={title} size="min(1200px, 75vw)" destroyOnClose footer={footer ? <div className="flex items-center gap-3">{secondaryAction}<span className="flex-1" />{footer}</div> : undefined}>
       <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_320px]"><main className="min-w-0 px-2 py-2">{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-6" aria-label="字段设置">{properties}</aside>}</div>
     </Drawer>;
   }

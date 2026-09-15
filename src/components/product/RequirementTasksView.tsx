@@ -900,7 +900,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                 <span>任务描述</span>
                 <div className="mt-1">
                   <RichTextEditor 
-                    key={`detail-${selectedTask.id}`}
+                    key={`detail-${selectedTask.id}-${detailEditing ? 'edit' : 'readonly'}`}
                     readOnly={!detailEditing}
                     editor={detailDescriptionEditor}
                     value={detailDescription}
@@ -995,6 +995,5 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     </div>
   );
 };
-
 
 
