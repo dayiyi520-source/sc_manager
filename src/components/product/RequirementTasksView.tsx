@@ -896,7 +896,27 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
             <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
               <DetailTextInput label={`${itemLabel}名称`} value={selectedTask.title} onSave={(title) => title.trim() && saveDetailUpdates({ title })} />
               <DetailTextInput label="验收标准" value={selectedTask.expectedGoal || ''} onSave={(expectedGoal) => saveDetailUpdates({ expectedGoal })} multiline />
-              <label className="block text-[var(--text-muted)]"><span>任务描述</span><div className="mt-1"><RichTextEditor key={`${selectedTask.id}-${detailEditing ? 'edit' : 'view'}`} readOnly={!detailEditing} editor={detailDescriptionEditor} value={detailDescription} htmlValue={detailDescriptionHtml} onInput={(text, html) => { setDetailDescription(text); setDetailDescriptionHtml(html); }} onBlur={() => saveDetailUpdates({ description: detailDescription, descriptionHtml: detailDescriptionHtml })} placeholder="详细记录需求背景、业务场景和实现说明..." /></div></label>
+                            <label className="block text-[var(--text-muted)]">
+                <span>任务描述</span>
+                <div className="mt-1">
+                  <RichTextEditor 
+                    key={`detail-${selectedTask.id}`}
+                    readOnly={!detailEditing}
+                    editor={detailDescriptionEditor}
+                    value={detailDescription}
+                    htmlValue={detailDescriptionHtml}
+                    onInput={(text, html) => {
+                      setDetailDescription(text);
+                      setDetailDescriptionHtml(html);
+                    }}
+                    onBlur={() => saveDetailUpdates({ 
+                      description: detailDescription, 
+                      descriptionHtml: detailDescriptionHtml 
+                    })}
+                    placeholder="详细记录需求背景、业务场景和实现说明..."
+                  />
+                </div>
+              </label>
             </div>
             <section className="border-t border-[var(--border-main)] pt-4">
               <div className="mb-4 border-b border-[var(--border-main)] px-3 py-2">
@@ -968,10 +988,13 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         <Form layout="vertical" className="w-full" data-work-item-form>
           <Form.Item label={`${itemLabel}名称`} required><Input value={formTitle} onChange={(event) => setFormTitle(event.target.value)} placeholder="例如：支持达梦DM8数据库读写分离与主备秒级切换" /></Form.Item>
           <Form.Item label="验收标准"><Input value={formTarget} onChange={(event) => setFormTarget(event.target.value)} placeholder="例如：通过自动化单测，支撑压测 QPS 突破 5000" /></Form.Item>
-          <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} placeholder="详细记录需求背景、业务场景和实现说明..." /></Form.Item>
+          <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} onBlur={() => { /* auto-save description */ }} placeholder="详细记录需求背景、业务场景和实现说明..." /></Form.Item>
           <Form.Item label="关联对象"><WorkOrderPicker candidates={candidateOptions.filter((item) => item.id !== editingTask?.id)} selectedIds={[...selectedRequirementTaskIds, ...selectedWorkOrderIds]} onChange={(ids) => { const selectedId = ids.slice(-1)[0] || ''; const selectedItem = candidateOptions.find((item) => item.id === selectedId); setSelectedRequirementTaskIds(selectedItem?.type === 'requirement' ? [selectedId] : []); setSelectedWorkOrderIds(selectedItem && selectedItem.type !== 'requirement' ? [selectedId] : []); }} placeholder="请选择关联工单" /></Form.Item>
         </Form>
       </WorkItemCreatePanel>
     </div>
   );
 };
+
+
+

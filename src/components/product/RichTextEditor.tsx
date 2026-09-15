@@ -45,7 +45,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
     muted: themeValue('--text-muted', '#7C8796'),
     surface: themeValue('--bg-card', '#0D1620'),
   }), [isDark]);
-  const proxy = (html: string) => { if (editor.current) editor.current.innerHTML = html; };
+  const proxy = (html: string) => { /* ref is for accessibility only, not for DOM manipulation */ };
   const emit = (instance: TinyMceInstance) => { const html = instance.getContent(); proxy(html); updateMarkdownAvailabilityRef.current(html); onInput(instance.getContent({ format: 'text' }), html); };
   // TinyMCE resets content and selection when initialValue changes. Parent
   // input echoes must not become a new initial document on every keystroke.
@@ -65,12 +65,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
   useEffect(() => { if (!markdownMode || !instanceRef.current) return; setMarkdownDraft(turndown.turndown(instanceRef.current.getContent())); }, [markdownMode]);
 
   const init = useMemo(() => ({
-    height: 320, menubar: false, branding: false, promotion: false, language: 'zh-CN', skin: false, content_css: false, placeholder, resize: true,
+    height: 320, menubar: false, branding: false, promotion: false, language: 'zh-CN', skin: 'oxide-dark', content_css: 'dark', placeholder, resize: true,
     plugins: 'image link lists codesample table',
     toolbar: readOnly ? false : 'undo redo | removeformat | blocks fontfamily fontsize | bold italic strikethrough underline | forecolor backcolor | imageupload table customlink blockquote codesample | alignleft aligncenter alignright | bullist numlist outdent indent | lineheight | markdown',
     readonly: readOnly,
     toolbar_mode: 'wrap',
-    content_style: `body{margin:16px;color:${theme.text};background:${theme.surface};font-family:system-ui,sans-serif;font-size:14px;line-height:1.7}a{color:${theme.primary}}blockquote{border-left:3px solid ${theme.primary};margin-left:0;padding-left:12px;color:${theme.muted}}ul.checklist{list-style:none;padding-left:0}ul.checklist li::before{content:'☐';margin-right:8px;color:${theme.primary}}`,
+    content_style: `html{background:${theme.surface}}body{margin:16px;color:${theme.text};background:${theme.surface};font-family:system-ui,sans-serif;font-size:14px;line-height:1.7}.mce-content-body{color:${theme.text}}.mce-list-item{color:${theme.text}}.mce-caret{color:${theme.text}}a{color:${theme.primary};text-decoration:underline}a:hover{opacity:0.8}blockquote{border-left:3px solid ${theme.primary};margin-left:0;padding-left:12px;color:${theme.muted}}code{background:${theme.surface};color:${theme.primary};padding:2px 6px;border-radius:3px}pre{background:${theme.surface};color:${theme.text};padding:12px;border-radius:4px;overflow-x:auto}ul.checklist{list-style:none;padding-left:0}ul.checklist li::before{content:'☐';margin-right:8px;color:${theme.primary}}`,
     setup: (instance: TinyMceInstance) => {
       instanceRef.current = instance;
       instance.ui.registry.addButton('imageupload', { icon: 'image', tooltip: '上传图片', onAction: () => {
@@ -124,3 +124,6 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
     {markdownMode ? <div className="space-y-3 p-3"><textarea aria-label="Markdown 源码" value={markdownDraft} onChange={(event) => setMarkdownDraft(event.target.value)} className="rich-text-editor__markdown min-h-80 w-full resize-y rounded border border-[var(--border-main)] bg-[var(--bg-card)] p-3 font-mono text-sm leading-6 text-[var(--text-primary)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20" /><div className="flex justify-end gap-2"><button type="button" onClick={() => setMarkdownMode(false)} className="rounded px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-surface-soft)]">取消</button><button type="button" onClick={applyMarkdown} className="rounded bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--primary-hover)]">应用 Markdown</button></div></div> : <Editor initialValue={initialContent} licenseKey="gpl" init={init} onInit={(_event, instance) => { instanceRef.current = instance; proxy(instance.getContent()); updateMarkdownAvailabilityRef.current(instance.getContent()); }} onEditorChange={(html, instance) => { proxy(html); updateMarkdownAvailabilityRef.current(html); onInput(instance.getContent({ format: 'text' }), html); }} />}
   </div>;
 };
+
+
+
