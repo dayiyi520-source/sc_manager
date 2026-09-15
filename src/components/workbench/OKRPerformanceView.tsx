@@ -1,21 +1,21 @@
 import React, { useRef, useState } from 'react';
-import { Alert, Button, Empty, Form, Input, InputNumber, Progress, Radio, Cascader, Select, Spin, Tag, Tabs } from 'antd';
+import { Alert, Button, Empty, Progress, Cascader, Spin, Tag, Tabs, Collapse } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
-import { completedWorkInPeriod, reviewPeriod } from './okr/simpleReview';
-import { Target, FileSpreadsheet, Plus, Calendar, Send } from '@/components/common/octicons-compat';
+import { Target, FileSpreadsheet, Plus, Calendar } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
 import { cycleOptions } from './okr/cycleOptions';
 import { OKRItem } from '../../types';
 import { ObjectiveForm, type ObjectiveFormHandle } from './okr/ObjectiveForm';
+import { StructuredReviewEditor } from './okr/StructuredReviewEditor';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
-  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveObjectiveDraft, saveReview, busy } = useOriginalOkr();
+  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, busy } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -36,17 +36,6 @@ const OriginalWorkspace: React.FC = () => {
 
   // Write Review Form State
   const [reviewType, setReviewType] = useState<'week' | 'month'>('month');
-  const [reviewCycleName, setReviewCycleName] = useState('2026年8月月度复盘总结');
-  const [reviewSummary, setReviewSummary] = useState('');
-  const [reviewUncompleted, setReviewUncompleted] = useState('');
-  const [reviewSelfScore, setReviewSelfScore] = useState(90);
-  const [reviewSuggestions, setReviewSuggestions] = useState('');
-  const [reviewHelpNeeded, setReviewHelpNeeded] = useState('');
-  const [reviewSendTo, setReviewSendTo] = useState('总经办, 部门主管');
-
-  const [selectedWorkIds, setSelectedWorkIds] = useState<string[]>([]);
-  const period = reviewPeriod(reviewType);
-  const candidates = completedWorkInPeriod(work, period.startDate, period.endDate);
   const me = people.find(p => p.id === currentUser.id);
   const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === newOkrCycle && o.status === 'active');
   const periods = cycleOptions(records, currentUser.id);
@@ -61,6 +50,11 @@ const OriginalWorkspace: React.FC = () => {
     return o.department !== currentUser.department;
   };
   const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && matchesCategory(o));
+  const visiblePerformances = performances.filter(performance => (
+    reviewSubTab === 'my'
+      ? performance.authorId === currentUser.id
+      : performance.authorId !== currentUser.id
+  ));
 
   const handleSaveOkr = async (payload: Parameters<typeof saveObjective>[1]) => {
     if (await saveObjective(newOkrCycle, payload)) {
@@ -70,27 +64,9 @@ const OriginalWorkspace: React.FC = () => {
     return false;
   };
 
-  const handleSubmitReview = async () => {
-    if (busy || loading || error) return;
-    if (!reviewCycleName.trim()) { addToast('warning', '请填写总结周期名称'); return; }
-    if (!reviewSummary.trim()) { addToast('warning', '请填写本期总结核心内容'); return; }
-    const selected = candidates.filter(w => selectedWorkIds.includes(w.id));
-    if (selected.length !== selectedWorkIds.length) {
-      addToast('warning', '所选工作项状态已变化，请重新选择'); return;
-    }
-    if (await saveReview({
-      title:reviewCycleName, ...period, reviewType, reviewMode:'completed', summary:reviewSummary,
-      selfScore:reviewSelfScore, uncompletedReason:reviewUncompleted, suggestions:reviewSuggestions,
-      helpNeeded:reviewHelpNeeded, sendTo:reviewSendTo.split(',').map(s=>s.trim()).filter(Boolean),
-      items:selected.map(w=>({workId:w.id,title:w.title,status:w.status,result:'',impact:''})),
-    })) {setReviewSubTab('my'); setIsReviewFormOpen(false); setSelectedWorkIds([]);}
-  };
-
   const openReviewForm = (type: 'week' | 'month') => {
     setReviewType(type);
-    const dates = reviewPeriod(type);
-    setReviewCycleName(type === 'week' ? `${dates.startDate} 至 ${dates.endDate} 周复盘总结` : `${dayjs().format('YYYY年M月')}月度复盘总结`);
-    setSelectedWorkIds([]); setIsReviewFormOpen(true);
+    setIsReviewFormOpen(true);
   };
 
   return (
@@ -106,10 +82,12 @@ const OriginalWorkspace: React.FC = () => {
 
         {mainTab === 'okrs' && (
           <div className="flex items-center gap-3">
-            <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear={false}
-              onChange={paths=>setSelectedCycles(paths.map(path=>String(path[path.length-1])))}
-              maxTagCount={0} maxTagPlaceholder={()=>cycleLabel} placeholder="周期：请选择"
-              tagRender={()=> <span>{cycleLabel}</span>} />
+            <div className="okr-cycle-control">
+              <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear={false}
+                onChange={paths=>setSelectedCycles(paths.map(path=>String(path[path.length-1])))}
+                maxTagCount={0} maxTagPlaceholder={()=>cycleLabel} placeholder="周期：请选择" />
+              <span className="okr-cycle-label" aria-hidden="true">{cycleLabel}</span>
+            </div>
 
             <Button type="primary"
               id="btn-add-okr"
@@ -157,7 +135,7 @@ const OriginalWorkspace: React.FC = () => {
 
           {/* OKR Cards List */}
           <div className="space-y-4">
-            {filteredOkrs.length === 0 && !loading && !error ? (
+            {filteredOkrs.length === 0 && objectiveForms.length === 0 && !loading && !error ? (
               <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
                 <Empty description="本月暂无目标"/>
                 <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">当前月份还没有填写 OKR，点击右上角“添加目标”开始设定。</p>
@@ -274,125 +252,25 @@ const OriginalWorkspace: React.FC = () => {
           )}
 
           {reviewSubTab === 'write' && isReviewFormOpen && (
-            <Form disabled={busy}
-              onFinish={handleSubmitReview}
-              className="okr-review-form bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 shadow-xs space-y-5 text-xs max-w-4xl"
-            >
-              <fieldset disabled={busy} className="space-y-5">
-              <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  填写周期复盘与述职报告
-                </h3>
-                <div className="flex items-center gap-3">
-                  <Radio.Group value={reviewType} onChange={e=>openReviewForm(e.target.value)} options={[{label:'周工作总结',value:'week'},{label:'月度复盘述职',value:'month'}]}/>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    总结周期名称 *
-                  </label>
-                  <Input maxLength={255} aria-label="总结周期名称" value={reviewCycleName}
-                    onChange={(e) => setReviewCycleName(e.target.value)}
-                    className="w-full"/>
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    个人绩效自评得分 (0-100分) *
-                  </label>
-                  <InputNumber precision={0} min={0}
-                    max={100}
-                    aria-label="个人绩效自评得分" value={reviewSelfScore}
-                    onChange={value => setReviewSelfScore(value ?? 0)}
-                    className="w-full"/>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1" htmlFor="review-completed-work">
-                  关联{reviewType === 'week' ? '本周' : '本月'}完成的任务 / 工单
-                </label>
-                <Select id="review-completed-work" className="w-full" mode="multiple" showSearch optionFilterProp="label" allowClear
-                  placeholder="选择已完成的任务或工单，可多选" value={selectedWorkIds} onChange={setSelectedWorkIds}
-                  loading={workLoading} disabled={busy || workLoading || !!workError}
-                  options={candidates.map(w=>({value:w.id,label:`${w.title} · ${w.status}`}))}
-                  notFoundContent={workLoading ? '正在加载…' : '本期没有已完成的任务或工单'}/>
-                {workError && <Alert type="error" title="任务与工单加载失败" action={<Button onClick={refreshWork}>重试</Button>}/>}
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  本月 / 本周核心工作总结 *
-                </label>
-                <Input.TextArea maxLength={2000} rows={4}
-                  required
-                  aria-label="核心工作总结" value={reviewSummary}
-                  onChange={(e) => setReviewSummary(e.target.value)}
-                  placeholder="详细列举本周期主导完成的重点事项、突破成果及交付里程碑..."
-                  className="w-full"/>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  本月 / 本周未完成任务说明及原因归因分析
-                </label>
-                <Input.TextArea maxLength={2000} rows={2}
-                  aria-label="未完成任务说明" value={reviewUncompleted}
-                  onChange={(e) => setReviewUncompleted(e.target.value)}
-                  placeholder="未达标事项、滞后原因分析与下阶段补救措施..."
-                  className="w-full"/>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    对公司管理意见或建议
-                  </label>
-                  <Input.TextArea maxLength={2000} rows={2}
-                    aria-label="管理意见或建议" value={reviewSuggestions}
-                    onChange={(e) => setReviewSuggestions(e.target.value)}
-                    placeholder="业务协同、流程机制或研发支持建议..."
-                    className="w-full"/>
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    需要协助 / 协调事项
-                  </label>
-                  <Input.TextArea maxLength={2000} rows={2}
-                    aria-label="需要协助事项" value={reviewHelpNeeded}
-                    onChange={(e) => setReviewHelpNeeded(e.target.value)}
-                    placeholder="需要跨部门支持、预算资源或高管协调事项..."
-                    className="w-full"/>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  发送参与人 (多个逗号隔开)
-                </label>
-                <Input maxLength={255} aria-label="发送参与人" value={reviewSendTo}
-                  onChange={(e) => setReviewSendTo(e.target.value)}
-                  className="w-full"/>
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <Button
-                  htmlType="submit" type="primary" loading={busy} disabled={loading || !!error}
-
-                >
-                  <Send className="w-4 h-4" />
-                  {busy ? '正在提交…' : '提交复盘总结'}
-                </Button>
-              </div>
-              </fieldset>
-            </Form>
+            <StructuredReviewEditor key={reviewType} type={reviewType} okrs={okrs.filter(o=>o.ownerId===currentUser.id&&o.status==='active')} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onTypeChange={openReviewForm} onCancel={()=>setIsReviewFormOpen(false)} onSaveDraft={saveReviewDraft} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}}/>
           )}
 
           {/* Subtab: 看总结 */}
           {(reviewSubTab === 'my' || reviewSubTab === 'received') && (
             <div className="space-y-4">
-              {performances.filter(p => reviewSubTab === 'my' ? p.authorId === currentUser.id : p.authorId !== currentUser.id).map((perf) => (
+              {visiblePerformances.length > 0 && <div className="grid grid-cols-3 gap-4">
+                <Card size="small"><div className="text-xs text-slate-500">复盘总数</div><div className="text-xl font-semibold">{visiblePerformances.length}</div></Card>
+                <Card size="small"><div className="text-xs text-slate-500">本月复盘</div><div className="text-xl font-semibold">{visiblePerformances.filter(p=>p.type==='month').length}</div></Card>
+                <Card size="small"><div className="text-xs text-slate-500">平均自评</div><div className="text-xl font-semibold">{Math.round(visiblePerformances.reduce((s,p)=>s+p.selfScore,0)/visiblePerformances.length)}</div></Card>
+              </div>}
+              {visiblePerformances.length === 0 ? (
+                <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
+                  <Empty description={reviewSubTab === 'my' ? '暂无我的复盘' : '暂无收到的复盘'}/>
+                  <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    {reviewSubTab === 'my' ? '完成并提交复盘总结后将在这里展示' : '其他成员发送给你的复盘将在这里展示'}
+                  </p>
+                </div>
+              ) : visiblePerformances.map((perf) => (
                 <Card key={perf.id}>
                   <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                     <div>
@@ -422,6 +300,14 @@ const OriginalWorkspace: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
+                    {!!perf.krReviews?.length && <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-3">
+                      <div><span className="text-xs text-slate-500">KR 数量</span><div className="font-semibold">{perf.krReviews.length}</div></div>
+                      <div><span className="text-xs text-slate-500">确认进度</span><Progress percent={Math.round(perf.krReviews.reduce((s,k)=>s+k.currentProgress,0)/perf.krReviews.length)} size="small"/></div>
+                      <div><span className="text-xs text-slate-500">健康状态</span><div className="mt-1"><Tag color={perf.krReviews.some(k=>k.health==='blocked')?'red':perf.krReviews.some(k=>k.health==='risk')?'orange':'green'}>{perf.krReviews.some(k=>k.health==='blocked')?'存在阻塞':perf.krReviews.some(k=>k.health==='risk')?'存在风险':'正常'}</Tag></div></div>
+                    </div>}
+                    {!!perf.krReviews?.length && <Collapse ghost items={perf.krReviews.map((kr,index)=>({key:kr.keyResultId,label:`KR${index+1} · ${kr.keyResultTitle}`,children:<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs"><div><strong>本期成果</strong><p className="mt-1 text-slate-600 dark:text-slate-300">{kr.achievement||'未填写'}</p></div><div><strong>阻塞与风险</strong><p className="mt-1 text-slate-600 dark:text-slate-300">{kr.blocker||'无'}</p></div><div><strong>下一步计划</strong><p className="mt-1 text-slate-600 dark:text-slate-300">{kr.nextPlan||'未填写'}</p></div></div>}))}/>}
+                    {(perf.extraWork?.description||perf.extraWork?.impact)&&<div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-3 text-xs"><div><strong>非 OKR 额外工作</strong><p className="mt-1">{perf.extraWork.description}</p></div><div><strong>对 OKR 的影响</strong><p className="mt-1">{perf.extraWork.impact||'无'}</p></div></div>}
+                    {!!perf.assistance?.length&&<div className="text-xs"><strong>协助与协同事项</strong><ul className="mt-2 space-y-1">{perf.assistance.map((item,index)=><li key={index}>{item.subject} · {item.result}</li>)}</ul></div>}
                     <div>
                       <span className="font-semibold text-slate-800 dark:text-slate-200">工作成果总结：</span>
                       <p className="text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{perf.summary}</p>

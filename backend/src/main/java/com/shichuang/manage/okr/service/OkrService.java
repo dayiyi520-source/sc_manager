@@ -31,12 +31,18 @@ import java.util.*;
  private Map<String,Object> person(String id){return people().stream().filter(p->id.equals(p.get("id"))).findFirst().orElseThrow(()->new IllegalArgumentException("人员不存在或已停用"));}
  private Map<String,Object> inputPayload(Object input,String kind){
   var value=payload(input);var result=new LinkedHashMap<String,Object>();
-  var keys="objective".equals(kind)?List.of("title","parentObjectiveId","parentKeyResultId","keyResults","weight","deadline","objectiveType","note"):List.of("title","startDate","endDate","summary","items","reviewMode","reviewType","selfScore","uncompletedReason","suggestions","helpNeeded","sendTo");
+  var keys="objective".equals(kind)?List.of("title","parentObjectiveId","parentKeyResultId","alignments","keyResults","weight","deadline","objectiveType","note"):List.of("title","startDate","endDate","summary","items","reviewMode","reviewType","selfScore","uncompletedReason","suggestions","helpNeeded","sendTo","krReviews","assistance","extraWork","syncKrProgress");
   for(String key:keys)if(value.containsKey(key))result.put(key,value.get(key));
   if("review".equals(kind)){
    var items=new ArrayList<Map<String,Object>>();
    for(var entry:rows(result.getOrDefault("items",List.of()))){var clean=new LinkedHashMap<String,Object>();for(String key:List.of("workId","objectiveId","keyResultId","affectedObjectiveId","affectedKeyResultId","result","impact"))if(entry.containsKey(key))clean.put(key,entry.get(key));items.add(clean);}
    result.put("items",items);
+   if("structured".equals(result.get("reviewMode"))){
+    var reviews=new ArrayList<Map<String,Object>>();
+    for(var entry:rows(result.getOrDefault("krReviews",List.of()))){var clean=new LinkedHashMap<String,Object>();for(String key:List.of("objectiveId","objectiveTitle","keyResultId","keyResultTitle","previousProgress","currentProgress","health","achievement","blocker","nextPlan","evidenceNote","workIds"))if(entry.containsKey(key))clean.put(key,entry.get(key));reviews.add(clean);}result.put("krReviews",reviews);
+    var assistance=new ArrayList<Map<String,Object>>();for(var entry:rows(result.getOrDefault("assistance",List.of()))){var clean=new LinkedHashMap<String,Object>();for(String key:List.of("subject","result"))if(entry.containsKey(key))clean.put(key,entry.get(key));assistance.add(clean);}result.put("assistance",assistance);
+    if(result.containsKey("extraWork")){var source=payload(result.get("extraWork"));var clean=new LinkedHashMap<String,Object>();for(String key:List.of("workIds","description","impact","notes"))if(source.containsKey(key))clean.put(key,source.get(key));result.put("extraWork",clean);}
+   }
   }
   return result;
  }
@@ -53,16 +59,23 @@ import java.util.*;
   if(p.containsKey("deadline"))try{java.time.LocalDate.parse(required(p,"deadline"));}catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("目标截止日期无效");}
   java.time.YearMonth month;
   try{month=java.time.YearMonth.parse(period);}catch(Exception e){throw new IllegalArgumentException("目标周期须为月份");}
-  String parentId=Objects.toString(p.get("parentObjectiveId"),"");
-  if(parentId.isBlank()&&!Objects.toString(p.get("parentKeyResultId"),"").isBlank())throw new IllegalArgumentException("选择上级 KR 时必须指定所属目标");
-  Map<String,Object> parent=parentId.isBlank()?null:record(parentId);
   String boss=supervisor(owner);
-  OkrPolicy.requireParent(owner,boss.isBlank()?null:boss,parent==null?null:parent.get("ownerId").toString(),parent==null?null:parent.get("status").toString(),root(owner));
-  if(parent!=null){
+  var alignments=new ArrayList<Map<String,Object>>(p.containsKey("alignments")?rows(p.get("alignments")):List.of());
+  if(alignments.size()>20)throw new IllegalArgumentException("对齐目标不能超过 20 个");
+  if(alignments.isEmpty()&&!Objects.toString(p.get("parentObjectiveId"),"").isBlank())alignments.add(new LinkedHashMap<>(Map.of("parentObjectiveId",p.get("parentObjectiveId"),"parentKeyResultId",Objects.toString(p.get("parentKeyResultId"),""))));
+  var parentIds=new HashSet<String>();
+  for(var alignment:alignments){
+   String parentId=Objects.toString(alignment.get("parentObjectiveId"),"");String kr=Objects.toString(alignment.get("parentKeyResultId"),"");
+   if(parentId.isBlank())throw new IllegalArgumentException("对齐目标不能为空");
+   if(!parentIds.add(parentId))throw new IllegalArgumentException("同一目标只能添加一次对齐");
+   Map<String,Object> parent=record(parentId);
+   OkrPolicy.requireParent(owner,boss.isBlank()?null:boss,parent.get("ownerId").toString(),parent.get("status").toString(),root(owner));
    if(!"objective".equals(parent.get("kind"))||!period.equals(parent.get("periodKey")))throw new IllegalArgumentException("请选择同周期的上级目标");
-   String kr=Objects.toString(p.get("parentKeyResultId"),"");
    if(!kr.isBlank()&&rows(payload(parent.get("payload")).get("keyResults")).stream().noneMatch(r->kr.equals(r.get("id"))))throw new IllegalArgumentException("上级 KR 已变更");
+   var clean=new LinkedHashMap<String,Object>();clean.put("parentObjectiveId",parentId);if(!kr.isBlank())clean.put("parentKeyResultId",kr);alignment.clear();alignment.putAll(clean);
   }
+  p.put("alignments",alignments);
+  if(!alignments.isEmpty()){p.put("parentObjectiveId",alignments.get(0).get("parentObjectiveId"));if(alignments.get(0).containsKey("parentKeyResultId"))p.put("parentKeyResultId",alignments.get(0).get("parentKeyResultId"));else p.remove("parentKeyResultId");}
   var krs=rows(p.get("keyResults"));var ids=new HashSet<String>();
   for(var kr:krs){
    if(!ids.add(required(kr,"id")))throw new IllegalArgumentException("KR 不能重复");required(kr,"title");integer(kr.getOrDefault("progress",0),0,100);
@@ -86,7 +99,26 @@ import java.util.*;
   required(p,"title");
   java.time.LocalDate start,end;try{start=java.time.LocalDate.parse(required(p,"startDate"));end=java.time.LocalDate.parse(required(p,"endDate"));}catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("复盘日期无效");}
   OkrPolicy.period(start,end);
-  boolean completedOnly="completed".equals(p.get("reviewMode"));
+  String reviewMode=Objects.toString(p.get("reviewMode"),"");
+  boolean completedOnly="completed".equals(reviewMode);
+  boolean structured="structured".equals(reviewMode);
+  if(!reviewMode.isBlank()&&!completedOnly&&!structured)throw new IllegalArgumentException("复盘模式无效");
+  if(structured){
+   if(!Set.of("week","month").contains(Objects.toString(p.get("reviewType"),"")))throw new IllegalArgumentException("请选择周或月复盘");
+   integer(p.get("selfScore"),0,100);var reviewIds=new HashSet<String>();
+   for(var entry:rows(p.getOrDefault("krReviews",List.of()))){
+    String objectiveId=required(entry,"objectiveId"),krId=required(entry,"keyResultId");if(!reviewIds.add(krId))throw new IllegalArgumentException("同一 KR 不能重复复盘");
+    var objective=record(objectiveId);if(!owner.equals(objective.get("ownerId"))||!"objective".equals(objective.get("kind")))throw new IllegalArgumentException("只能复盘本人的目标");
+    var kr=rows(payload(objective.get("payload")).get("keyResults")).stream().filter(k->krId.equals(k.get("id"))).findFirst().orElseThrow(()->new IllegalArgumentException("KR 不存在或已变更"));
+    entry.put("objectiveTitle",payload(objective.get("payload")).get("title"));entry.put("keyResultTitle",kr.get("title"));integer(entry.get("previousProgress"),0,100);integer(entry.get("currentProgress"),0,100);
+    if(!Set.of("normal","risk","blocked").contains(Objects.toString(entry.get("health"),"")))throw new IllegalArgumentException("KR 健康状态无效");
+    for(String key:List.of("achievement","blocker","nextPlan","evidenceNote"))if(Objects.toString(entry.get(key),"").length()>2000)throw new IllegalArgumentException("KR 复盘文本不能超过2000字");
+    if(!(entry.getOrDefault("workIds",List.of()) instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("KR 工作证据格式无效");
+   }
+   for(var entry:rows(p.getOrDefault("assistance",List.of())))for(String key:List.of("subject","result"))if(Objects.toString(entry.get(key),"").length()>500)throw new IllegalArgumentException("协助事项不能超过500字");
+   var extra=payload(p.getOrDefault("extraWork",Map.of()));for(String key:List.of("description","impact"))if(Objects.toString(extra.get(key),"").length()>2000)throw new IllegalArgumentException("额外工作说明不能超过2000字");if(!Set.of("","none","support","block").contains(Objects.toString(extra.get("impact"),"")))throw new IllegalArgumentException("额外工作影响类型无效");if(!(extra.getOrDefault("workIds",List.of()) instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("额外工作关联格式无效");if(extra.containsKey("notes")){var notes=payload(extra.get("notes"));if(notes.size()>100||notes.values().stream().anyMatch(value->Objects.toString(value,"").length()>500)||notes.keySet().stream().anyMatch(key->!ids.contains(key)))throw new IllegalArgumentException("额外工作说明格式无效");}
+   if(!(p.getOrDefault("syncKrProgress",false) instanceof Boolean))throw new IllegalArgumentException("同步进度选项无效");
+  }
   if(completedOnly){
    if(!Set.of("week","month").contains(Objects.toString(p.get("reviewType"),"")))throw new IllegalArgumentException("请选择周或月复盘");
    integer(p.get("selfScore"),0,100);
@@ -106,7 +138,7 @@ import java.util.*;
    if(completedOnly){
     OkrPolicy.completedWork(source.get("status").toString(),updated,start,end);
     entry.remove("objectiveId");entry.remove("keyResultId");entry.remove("affectedObjectiveId");entry.remove("affectedKeyResultId");
-   }else if(submitting)required(entry,"result");
+   }else if(!structured&&submitting)required(entry,"result");
    String affected=Objects.toString(entry.get("affectedObjectiveId"),"");
    if(!affected.isBlank()){
     var target=record(affected);
@@ -124,15 +156,31 @@ import java.util.*;
     String kr=required(entry,"keyResultId");if(rows(payload(o.get("payload")).get("keyResults")).stream().noneMatch(k->kr.equals(k.get("id"))))throw new IllegalArgumentException("关联 KR 不存在");
    }
   }
+  if(structured){
+   var selected=new HashSet<String>();
+   for(var review:rows(p.getOrDefault("krReviews",List.of())))for(Object value:(List<?>)review.getOrDefault("workIds",List.of()))if(!selected.add(Objects.toString(value,"")))throw new IllegalArgumentException("同一工作项只能关联一次");
+   var extra=payload(p.getOrDefault("extraWork",Map.of()));for(Object value:(List<?>)extra.getOrDefault("workIds",List.of()))if(!selected.add(Objects.toString(value,"")))throw new IllegalArgumentException("同一工作项只能关联一次");
+   if(!seen.equals(selected))throw new IllegalArgumentException("工作证据与关联明细不一致");
+  }
   p.put("items",entries);
   if(submitting&&supervisor(owner).isBlank())throw new IllegalArgumentException("尚未配置复盘评价人");
+ }
+ private void syncReviewProgress(String owner,Map<String,Object> p){
+  if(!Boolean.TRUE.equals(p.get("syncKrProgress")))return;
+  var reviews=rows(p.getOrDefault("krReviews",List.of()));
+  for(String objectiveId:reviews.stream().map(r->r.get("objectiveId").toString()).distinct().toList()){
+   var record=record(objectiveId);if(!owner.equals(record.get("ownerId")))throw new IllegalArgumentException("只能同步本人的 KR");var payload=payload(record.get("payload"));var krs=rows(payload.get("keyResults"));
+   for(var kr:krs)reviews.stream().filter(r->objectiveId.equals(r.get("objectiveId"))&&kr.get("id").equals(r.get("keyResultId"))).findFirst().ifPresent(r->kr.put("progress",r.get("currentProgress")));
+   payload.put("keyResults",krs);payload.put("progress",OkrPolicy.progress(krs.stream().map(k->integer(k.get("weight"),1,100)).toList(),krs.stream().map(k->integer(k.get("progress"),0,100)).toList()));
+   int version=((Number)record.get("version")).intValue();if(mapper.update(RequestContext.tenantId(),objectiveId,version,record.get("status").toString(),encode(payload),owner)!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"目标进度已变更，请刷新后重试");
+  }
  }
  @Transactional public Map<String,Object> create(Map<String,Object>b){
   String kind=required(b,"kind"),period=required(b,"periodKey");if(!Set.of("objective","review").contains(kind))throw new IllegalArgumentException("记录类型无效");
   var p=inputPayload(b.getOrDefault("payload",Map.of()),kind);String owner=RequestContext.userId();
   boolean submit=Boolean.TRUE.equals(b.get("submit"));
   if("objective".equals(kind)&&!java.time.YearMonth.now().toString().equals(period))throw new IllegalArgumentException("只能添加进行中的当前月份目标");
-  if("objective".equals(kind))validateObjective(owner,period,p);else validateReview(owner,p,submit);
+  if("objective".equals(kind))validateObjective(owner,period,p);else {validateReview(owner,p,submit);if(submit)syncReviewProgress(owner,p);}
   String state=submit?("objective".equals(kind)?(root(owner)?"active":"pending_review"):"submitted"):"draft";
   String id=UUID.randomUUID().toString(),data=encode(p);mapper.insert(RequestContext.tenantId(),id,kind,owner,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit":"create",owner,data);return Map.of("id",id,"status",state,"version",0);
  }

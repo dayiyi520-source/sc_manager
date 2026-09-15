@@ -99,6 +99,7 @@ export interface OKRItem {
   alignTo?: string; // 对齐目标
   parentObjectiveId?: string;
   parentKeyResultId?: string;
+  alignments?: Array<{ parentObjectiveId: string; parentKeyResultId?: string }>;
   alignmentType?: '承接目标' | '支撑KR' | '协同目标' | '独立目标';
   objectiveType?: 'target' | 'challenge';
   status?: 'draft' | 'pending_review' | 'active' | 'paused' | 'completed' | 'archived';
@@ -129,6 +130,10 @@ export interface PerformanceReview {
   leaderScore?: number;
   linkedWorkItems?: ReviewWorkItem[];
   outOfPlanWork?: OutOfPlanWorkItem[];
+  krReviews?: import('../services/okrRepository').OkrKrReview[];
+  assistance?: import('../services/okrRepository').OkrReviewAssistance[];
+  extraWork?: import('../services/okrRepository').OkrExtraWork;
+  syncKrProgress?: boolean;
 }
 
 export interface ReviewWorkItem {
