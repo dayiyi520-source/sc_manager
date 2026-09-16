@@ -8,6 +8,7 @@ import { decodeAlignment, ObjectiveAlignmentModal, type AlignmentCategory } from
 
 interface Props {
   cycle: string;
+  objectiveIndex?: number;
   ownerName: string;
   parents: OKRItem[];
   busy: boolean;
@@ -23,7 +24,7 @@ interface Props {
 export interface ObjectiveFormHandle { submit: () => Promise<boolean>; saveDraft: () => Promise<boolean>; }
 export const calculateKrWeightTotal = (items: Pick<OkrKr, 'weight'>[]) => items.reduce((total, item) => total + item.weight, 0);
 
-export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, ownerName, parents, busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true }, ref) {
+export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, ownerName, parents, busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true }, ref) {
   const [title, setTitle] = useState('');
   const [objectiveType, setObjectiveType] = useState<'target' | 'challenge'>('target');
   const [alignments, setAlignments] = useState<string[]>([]);
@@ -45,8 +46,8 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const krWeightTotal = calculateKrWeightTotal(krs);
   const changeKr = (id: string, patch: Partial<OkrKr>) => setKrs(items => items.map(kr => kr.id === id ? { ...kr, ...patch } : kr));
   const distribute = (items: OkrKr[]) => items.map((kr, i) => ({ ...kr, weight: Math.floor(100 / items.length) + (i < 100 % items.length ? 1 : 0) }));
-  const submit = async (): Promise<boolean> => {
-    if (busy || unavailable) return false;
+  const submit = async (fromBatch = false): Promise<boolean> => {
+    if ((!fromBatch && busy) || unavailable) return false;
     if (!title.trim() || krs.some(kr => !kr.title.trim())) { setError('请填写目标名称和每条关键结果。'); return false; }
     if (krs.some(kr => kr.weight <= 0) || krWeightTotal !== 100) { setError('KR 权重须大于 0，合计为 100%。'); return false; }
     const latestKrDate = krs.map(kr => kr.deadline).filter(Boolean).sort().at(-1) || '';
@@ -57,7 +58,8 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     return onSave({ title: title.trim(), objectiveType, parentObjectiveId, parentKeyResultId, alignments: selectedAlignments, weight: krWeightTotal, ...(latestKrDate ? {deadline: latestKrDate} : {}), note: note.trim(),
       keyResults: krs.map(kr => ({ ...kr, title: kr.title.trim(), ...(kr.deadline ? {deadline: kr.deadline} : {}) })) });
   };
-  const saveDraft = async (): Promise<boolean> => {
+  const saveDraft = async (fromBatch = false): Promise<boolean> => {
+    if (!fromBatch && busy) return false;
     if (!onSaveDraft) return false;
     if (!title.trim()) { setError('请先填写目标名称。'); return false; }
     const latestKrDate = krs.map(kr => kr.deadline).filter(Boolean).sort().at(-1) || '';
@@ -65,7 +67,10 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     const [{ parentObjectiveId, parentKeyResultId } = {}] = selectedAlignments;
     return onSaveDraft({ title: title.trim(), objectiveType, parentObjectiveId, parentKeyResultId, alignments: selectedAlignments, weight: krWeightTotal, ...(latestKrDate ? {deadline: latestKrDate} : {}), note: note.trim(), keyResults: krs.map(kr => ({...kr, title: kr.title.trim(), ...(kr.deadline ? {deadline: kr.deadline} : {})})) });
   };
-  useImperativeHandle(ref, () => ({ submit, saveDraft }), [submit, saveDraft]);
+  useImperativeHandle(ref, () => ({
+    submit: () => submit(true),
+    saveDraft: () => saveDraft(true),
+  }), [submit, saveDraft]);
   const openAlignment = () => { setDraftAlignments(alignments); setAlignmentSearch(''); setAlignmentCategory('supervisor'); setAlignmentModalOpen(true); };
   const commitAlignment = () => {
     setAlignments(draftAlignments);
@@ -74,7 +79,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     setAlignmentModalOpen(false);
   };
   const moveKr = (from: number, to: number) => setKrs(items => { const copy = [...items]; [copy[from], copy[to]] = [copy[to], copy[from]]; return copy; });
-  return <Form className="okr-objective-form" disabled={busy} onFinish={submit}>
+  return <Form className="okr-objective-form" disabled={busy} onFinish={() => void submit()}>
     {chrome && <div className="okr-objective-period">{dayjs(cycle).format('YYYY年MM月')}<span>进行中</span></div>}
     <div className="okr-objective-body">
       <div className="okr-objective-columns okr-objective-head">
@@ -88,7 +93,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
           <Tooltip title={objectiveType === 'target' ? '目标型，点击切换为挑战型' : '挑战型，点击切换为目标型'}>
             <Button className={`okr-objective-kind ${objectiveType}`} aria-label={`目标类型：${objectiveType === 'target' ? '目标型' : '挑战型'}`}
               aria-pressed={objectiveType === 'challenge'} onClick={() => setObjectiveType(value => value === 'target' ? 'challenge' : 'target')}
-              icon={objectiveType === 'target' ? <GoalIcon/> : <RocketIcon/>}>O1</Button>
+              icon={objectiveType === 'target' ? <GoalIcon/> : <RocketIcon/>}>O{objectiveIndex + 1}</Button>
           </Tooltip>
           <Input aria-label="目标名称" variant="borderless" maxLength={255} value={title} onChange={e => setTitle(e.target.value)} placeholder="输入目标名称"/>
         </div>
@@ -108,7 +113,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
       <div className="okr-objective-add"><Button type="text" icon={<PlusIcon/>} disabled={busy || krs.length >= 20} onClick={() => setKrs(items => distribute([...items, { id: crypto.randomUUID(), title: '', weight: 0, progress: 0 }]))}>添加关键结果</Button><span>KR 权重合计 {krWeightTotal}%</span></div>
       {error && <Alert type="warning" title={error} showIcon/>}
     </div>
-    {chrome && <div className="okr-objective-footer"><Button type="text" onClick={onAddAnother} disabled={busy}>+ 添加 O</Button><span className="okr-objective-footer-spacer"/><Button onClick={onCancel} disabled={busy}>取消</Button><Button onClick={saveDraft} disabled={busy || unavailable}>存草稿</Button><Button type="primary" htmlType="submit" loading={busy} disabled={unavailable}>{root ? '提交目标' : '提交主管确认'}</Button></div>}
+    {chrome && <div className="okr-objective-footer"><Button type="text" onClick={onAddAnother} disabled={busy}>+ 添加 O</Button><span className="okr-objective-footer-spacer"/><Button onClick={onCancel} disabled={busy}>取消</Button><Button onClick={() => void saveDraft()} disabled={busy || unavailable}>存草稿</Button><Button type="primary" htmlType="submit" loading={busy} disabled={unavailable}>{root ? '提交目标' : '提交主管确认'}</Button></div>}
     <ObjectiveAlignmentModal open={alignmentModalOpen} parents={parents} selectedValues={draftAlignments} search={alignmentSearch} category={alignmentCategory} onSearchChange={setAlignmentSearch} onCategoryChange={setAlignmentCategory} onSelectionChange={setDraftAlignments} onCancel={() => setAlignmentModalOpen(false)} onConfirm={commitAlignment}/>
   </Form>;
 });

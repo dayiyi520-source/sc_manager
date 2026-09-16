@@ -34,6 +34,8 @@ export function useOriginalOkr() {
       createdAt:r.createdAt?.replace('T',' ').slice(0,16) || '—',status:r.status as PerformanceReview['status'],feedback:p.feedback,leaderScore:p.finalScore,
       linkedWorkItems:(p.items || []).map(i=>({id:i.workId,title:i.title,type:'task',status:i.status})),
       krReviews:p.krReviews || [], assistance:p.assistance || [], extraWork:p.extraWork, syncKrProgress:p.syncKrProgress,
+      weeklyReviewSnapshots:p.weeklyReviewSnapshots || [], monthlyOtherTasks:p.monthlyOtherTasks || [], nextMonthPlans:p.nextMonthPlans || [],
+      otherNotes:p.otherNotes || '', nextMonthArrangement:p.nextMonthArrangement || '',
     };
   });
   const refresh = () => client.invalidateQueries({queryKey:['okr',currentUser.id]});

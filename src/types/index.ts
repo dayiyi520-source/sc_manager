@@ -135,6 +135,11 @@ export interface PerformanceReview {
   assistance?: import('../services/okrRepository').OkrReviewAssistance[];
   extraWork?: import('../services/okrRepository').OkrExtraWork;
   syncKrProgress?: boolean;
+  weeklyReviewSnapshots?: import('../services/okrRepository').OkrWeeklyReviewSnapshot[];
+  monthlyOtherTasks?: import('../services/okrRepository').OkrMonthlyTask[];
+  nextMonthPlans?: import('../services/okrRepository').OkrMonthlyPlan[];
+  otherNotes?: string;
+  nextMonthArrangement?: string;
 }
 
 export interface ReviewWorkItem {

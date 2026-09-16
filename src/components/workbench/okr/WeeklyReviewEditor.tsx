@@ -61,9 +61,8 @@ const workSource = (item: OkrWork): PickerSource => {
   return kind.includes('work_order') || kind.includes('ticket') ? 'ticket' : 'task';
 };
 
-interface StructuredReviewEditorProps {
+interface WeeklyReviewEditorProps {
   key?: React.Key;
-  type: 'week' | 'month';
   okrs: OKRItem[];
   work: OkrWork[];
   busy: boolean;
@@ -76,8 +75,7 @@ interface StructuredReviewEditorProps {
   onAddObjective?: () => void;
 }
 
-export function StructuredReviewEditor({
-  type,
+export function WeeklyReviewEditor({
   okrs,
   work,
   busy,
@@ -88,8 +86,8 @@ export function StructuredReviewEditor({
   onSubmit,
   onCancel,
   onAddObjective
-}: StructuredReviewEditorProps) {
-  const period = useMemo(() => reviewPeriod(type), [type]);
+}: WeeklyReviewEditorProps) {
+  const period = useMemo(() => reviewPeriod('week'), []);
   const start = dayjs(period.startDate);
   const end = dayjs(period.endDate);
 
@@ -99,14 +97,12 @@ export function StructuredReviewEditor({
     return Math.floor(diffDays / 7) + 1;
   }, [start]);
 
-  const cycleTitle = useMemo(() => {
-    if (type === 'week') {
-      return `${start.year()}年第 ${weekNumber} 周 (${start.format('MM.DD')} - ${end.format('MM.DD')})`;
-    }
-    return `${start.year()}年${start.format('MM')}月 (${start.format('MM.DD')} - ${end.format('MM.DD')})`;
-  }, [type, start, end, weekNumber]);
+  const cycleTitle = useMemo(
+    () => `${start.year()}年第 ${weekNumber} 周 (${start.format('MM.DD')} - ${end.format('MM.DD')})`,
+    [start, end, weekNumber]
+  );
 
-  const reviewTitle = `[${type === 'week' ? '周报' : '月报'}] ${cycleTitle}`;
+  const reviewTitle = `[周报] ${cycleTitle}`;
 
   const [selfScore] = useState<number>(90);
   const [sync, setSync] = useState<boolean>(true);
@@ -234,7 +230,7 @@ export function StructuredReviewEditor({
     title: reviewTitle,
     startDate: period.startDate,
     endDate: period.endDate,
-    reviewType: type,
+    reviewType: 'week',
     reviewMode: 'structured',
     selfScore,
     summary: '',
@@ -256,6 +252,7 @@ export function StructuredReviewEditor({
       workId: item.id,
       title: item.title,
       status: item.status,
+      workType: workSource(item),
       result: workNotes[item.id] || '',
       impact: ''
     }))
@@ -360,8 +357,8 @@ export function StructuredReviewEditor({
       <div className={`okr-review-sticky-toolbar${toolbarStuck ? ' is-stuck' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <Tag color={type === 'week' ? 'blue' : 'purple'} className="px-2 py-0.5 text-xs font-semibold rounded m-0 border-0">
-              {type === 'week' ? '周报' : '月报'}
+            <Tag color="blue" className="px-2 py-0.5 text-xs font-semibold rounded m-0 border-0">
+              周报
             </Tag>
             <h2 className="text-base font-bold text-[var(--text-primary)] m-0">
               {cycleTitle}
@@ -390,7 +387,7 @@ export function StructuredReviewEditor({
               loading={busy}
               onClick={requestSubmit}
             >
-              提交{type === 'week' ? '周报' : '月报'}
+              提交周报
             </Button>
           </div>
         </div>
@@ -1003,7 +1000,7 @@ export function StructuredReviewEditor({
       {/* 提交确认弹窗 (带中文界面及OKR系统进度同步勾选) */}
       <Modal
         open={submitModalOpen}
-        title={`确认提交${type === 'week' ? '周报' : '月报'}`}
+        title="确认提交周报"
         onCancel={() => setSubmitModalOpen(false)}
         onOk={async () => {
           setSubmitModalOpen(false);
@@ -1015,7 +1012,7 @@ export function StructuredReviewEditor({
       >
         <div className="space-y-4 py-2">
           <p className="text-sm text-[var(--text-body)]">
-            您即将提交本期{type === 'week' ? '周报' : '月报'}，以下是您的关键结果进度更新汇总：
+            您即将提交本期周报，以下是您的关键结果进度更新汇总：
           </p>
           <div className="okr-review-submit-summary">
             {objectiveGroups.length ? objectiveGroups.map(({ objective, krs: objectiveKrs }, objectiveIndex) => (

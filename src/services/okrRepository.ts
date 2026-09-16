@@ -3,13 +3,22 @@ import { apiRequest } from './apiClient';
 export interface OkrPerson { id: string; name: string; department: string; supervisorId: string | null; rootFlag: number; version: number }
 export interface OkrKr { id: string; title: string; weight: number; progress: number; deadline?: string }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
-export interface OkrReviewItem { workId: string; title: string; status: string; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
+export interface OkrReviewItem { workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
 export interface OkrKrReview { objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
 export interface OkrReviewAssistance { subject:string; result:string }
 export interface OkrExtraWork { workIds:string[]; description:string; impact:string; notes?:Record<string,string> }
+export interface OkrMonthlyTask { id:string; content:string; result:string; status:string; sourceReviewId?:string; workId?:string }
+export interface OkrMonthlyPlan { id:string; content:string; objectiveId?:string; keyResultId?:string; plannedDate?:string }
+export interface OkrWeeklyReviewSnapshot {
+  id:string; title:string; startDate:string; endDate:string; status:string; summary?:string;
+  krReviews:OkrKrReview[]; assistance:OkrReviewAssistance[]; extraWork?:OkrExtraWork; items:OkrReviewItem[];
+}
 export interface OkrPayload {
-  reviewMode?: 'completed' | 'structured'; reviewType?: 'week' | 'month'; selfScore?: number;
+  reviewMode?: 'completed' | 'structured' | 'monthly'; reviewType?: 'week' | 'month'; selfScore?: number;
   krReviews?: OkrKrReview[]; assistance?: OkrReviewAssistance[]; extraWork?: OkrExtraWork; syncKrProgress?: boolean;
+  weeklyReviewIds?: string[]; weeklyReviewSnapshots?: OkrWeeklyReviewSnapshot[];
+  monthlyOtherTasks?: OkrMonthlyTask[]; nextMonthPlans?: OkrMonthlyPlan[];
+  otherNotes?: string; nextMonthArrangement?: string;
   uncompletedReason?: string; suggestions?: string; helpNeeded?: string; sendTo?: string[];
   weight?: number; deadline?: string;
   objectiveType?: 'target' | 'challenge'; note?: string;

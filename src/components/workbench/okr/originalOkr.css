@@ -5,6 +5,12 @@
 .original-okr .okr-review-form { padding: 24px; }
 .original-okr .ant-tabs { min-width: 0; }
 .original-okr .ant-tabs-nav { margin-bottom: 0; }
+.okr-loading-state { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--text-muted); font-size: 12px; }
+.okr-page-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-main); }
+.okr-primary-tabs, .okr-page-actions { display: flex; align-items: center; gap: 8px; }
+.okr-primary-tabs { padding: 4px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface-soft); }
+.okr-primary-tabs .ant-btn { min-height: 32px; }
+.okr-page-actions { flex-wrap: wrap; justify-content: flex-end; }
 .okr-cycle-control { position: relative; width: 224px; }
 .okr-cycle-filter { width: 100%; }
 .okr-cycle-filter .ant-select-content-item-rest { visibility: hidden; }
@@ -12,6 +18,7 @@
 .okr-objective-form { border: 1px solid var(--primary); border-radius: 12px; overflow: hidden; background: var(--bg-surface); box-shadow: 0 12px 32px rgba(0,0,0,.22); }
 .okr-objective-form-stack { border: 1px solid var(--primary); border-radius: 12px; overflow: hidden; background: var(--bg-surface); box-shadow: 0 12px 32px rgba(0,0,0,.22); }
 .okr-objective-form-stack .okr-objective-form { border: 0; border-radius: 0; box-shadow: none; }
+.okr-objective-form-stack.is-batching .okr-objective-form-item { opacity: .72; pointer-events: none; }
 .okr-objective-form-item + .okr-objective-form-item { border-top: 1px solid var(--border-main); }
 .okr-objective-period { padding: 16px 24px; font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--border-main); }
 .okr-objective-period span { margin-left: 12px; color: var(--text-muted); font-size: 14px; font-weight: 500; }
@@ -71,7 +78,33 @@
 .okr-alignment-empty .ant-empty-description { color: var(--text-muted); }
 .okr-objective-add { display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); font-size: 12px; }
 .okr-objective-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border-main); }
+.okr-objective-footer-spacer { flex: 1; }
+.okr-summary-card { border-color: var(--border-main); background: var(--bg-card); }
+.okr-summary-card:hover { border-color: var(--border-subtle); }
+.okr-summary-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
+.okr-summary-index { display: inline-flex; min-width: 32px; height: 24px; align-items: center; justify-content: center; padding: 0 8px; border: 1px solid color-mix(in srgb,var(--primary) 42%,var(--border-main)); border-radius: 6px; background: color-mix(in srgb,var(--primary) 12%,transparent); color: var(--active-text); font-size: 12px; font-weight: 700; }
+.okr-summary-title { margin: 0; color: var(--text-primary); font-size: 16px; line-height: 24px; }
+.okr-summary-alignment { display: flex; align-items: center; gap: 8px; margin-top: 4px; color: var(--text-muted); font-size: 12px; }
+.okr-summary-alignment > span:first-child { padding: 2px 8px; border: 1px solid var(--border-main); border-radius: 6px; background: var(--bg-surface-soft); font-size: 11px; }
+.okr-summary-meta { display: flex; flex: none; align-items: center; gap: 16px; }
+.okr-summary-meta-label { color: var(--text-muted); font-size: 11px; line-height: 18px; }
+.okr-summary-progress-value { color: var(--primary); font-size: 18px; line-height: 26px; font-weight: 700; }
+.okr-summary-owner { padding-left: 16px; border-left: 1px solid var(--border-main); text-align: right; }
+.okr-summary-owner-value { color: var(--text-secondary); font-size: 12px; line-height: 20px; font-weight: 600; }
+.okr-summary-section-title { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 18px; font-weight: 600; text-transform: uppercase; }
+.okr-summary-kr { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface-soft); font-size: 12px; transition: border-color .15s ease, background-color .15s ease; }
+.okr-summary-kr:hover { border-color: var(--border-subtle); background: var(--bg-elevated); }
+.okr-summary-kr-title { color: var(--text-primary); font-weight: 600; }
+.okr-summary-kr-progress { flex: none; color: var(--primary); font-weight: 700; }
+.okr-summary-kr-meta { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; color: var(--text-muted); font-size: 11px; }
+.okr-overview-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); overflow: hidden; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface); }
+.okr-overview-stats > div { display: grid; gap: 4px; min-height: 72px; align-content: center; padding: 12px 16px; }
+.okr-overview-stats > div + div { border-left: 1px solid var(--border-main); }
+.okr-overview-stats span { color: var(--text-muted); font-size: 12px; }
+.okr-overview-stats strong { color: var(--text-primary); font-size: 18px; line-height: 26px; }
+.okr-document-section-index { display: inline-flex; width: 20px; height: 20px; flex: none; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb,var(--primary) 42%,var(--border-main)); border-radius: 6px; background: color-mix(in srgb,var(--primary) 12%,transparent); color: var(--active-text); font-size: 11px; font-weight: 700; }
 @media (max-width: 900px) { .okr-objective-columns { grid-template-columns: minmax(0,1fr) 100px; } .okr-objective-head span:nth-child(3), .okr-objective-columns > .okr-objective-deadline, .okr-objective-kr > :nth-child(3) { display: none; } .okr-alignment-modal { grid-template-columns: 1fr; max-height: 64vh; overflow: auto; } .okr-alignment-nav, .okr-alignment-options { border-right: 0; border-bottom: 1px solid var(--border-main); } .okr-alignment-empty { min-height: 220px; } }
+@media (max-width: 760px) { .okr-page-toolbar, .okr-summary-head { align-items: stretch; flex-direction: column; } .okr-page-actions, .okr-primary-tabs { width: 100%; } .okr-primary-tabs .ant-btn { flex: 1; } .okr-cycle-control { min-width: 0; flex: 1; } .okr-summary-meta { justify-content: space-between; } .okr-overview-stats { grid-template-columns: 1fr; } .okr-overview-stats > div + div { border-top: 1px solid var(--border-main); border-left: 0; } }
 
 .okr-review-editor { display: grid; gap: 16px; color: var(--text-primary); }
 .okr-review-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
@@ -189,6 +222,124 @@
 @media (max-width: 900px) { .okr-work-association-filters { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .okr-review-layout { grid-template-columns: 1fr; } .okr-review-aside { position: static; grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 760px) { .okr-review-toolbar { align-items: flex-start; flex-direction: column; } .okr-review-toolbar-actions { justify-content: flex-start; } .okr-review-stats { grid-template-columns: 1fr; } .okr-review-stats > div + div { border-top: 1px solid var(--border-main); border-left: 0; } .okr-review-basics, .okr-review-narratives, .okr-review-assistance, .okr-review-aside { grid-template-columns: 1fr; } .okr-review-progress { grid-template-columns: 40px minmax(80px,1fr); } .okr-review-progress .ant-input-number-group-wrapper { grid-column: 2; } .okr-review-section-head, .okr-review-kr-head { align-items: flex-start; flex-direction: column; } }
+
+.okr-monthly-review { display: grid; max-width: 1440px; gap: 16px; margin: 0 auto; padding-bottom: 32px; color: var(--text-primary); }
+.okr-monthly-toolbar { position: sticky; top: -24px; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-card); box-shadow: 0 12px 32px color-mix(in srgb,var(--bg-main) 22%,transparent); }
+.okr-monthly-title-row, .okr-monthly-actions, .okr-monthly-kr-header > div, .okr-monthly-progress-control { display: flex; align-items: center; gap: 8px; }
+.okr-monthly-title-row h2 { margin: 0; font-size: 18px; line-height: 26px; }
+.okr-monthly-toolbar p, .okr-monthly-section-head p { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.okr-monthly-actions { justify-content: flex-end; flex-wrap: wrap; }
+.okr-monthly-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: hidden; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface); }
+.okr-monthly-metrics > div { display: flex; min-height: 88px; align-items: center; gap: 16px; padding: 16px 24px; }
+.okr-monthly-metrics > div + div { border-left: 1px solid var(--border-main); }
+.okr-monthly-metrics > div > svg { width: 28px; height: 28px; color: var(--primary); }
+.okr-monthly-metrics > div:nth-child(3) > svg { color: var(--warning); }
+.okr-monthly-metrics span { display: grid; gap: 2px; }
+.okr-monthly-metrics strong { font-size: 14px; line-height: 20px; }
+.okr-monthly-metrics b { font-size: 24px; line-height: 28px; }
+.okr-monthly-metrics small { color: var(--text-muted); font-size: 12px; }
+.okr-monthly-panel { display: grid; min-width: 0; gap: 16px; padding: 16px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface); }
+.okr-monthly-section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.okr-monthly-section-head h3, .okr-monthly-list-title h3, .okr-monthly-kr-header h3 { margin: 0; font-size: 14px; line-height: 20px; }
+.okr-monthly-week-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.okr-monthly-week-grid .ant-checkbox-wrapper { display: flex; min-width: 0; align-items: center; padding: 12px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-card); transition: background 150ms ease,border-color 150ms ease; }
+.okr-monthly-week-grid .ant-checkbox-wrapper:hover { border-color: var(--border-subtle); background: var(--bg-surface-soft); }
+.okr-monthly-week-grid .ant-checkbox-wrapper-checked { border-color: var(--primary); }
+.okr-monthly-week-grid .ant-checkbox-wrapper > span:last-child { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: 8px; }
+.okr-monthly-week-grid .ant-checkbox-wrapper > span:last-child > span { display: grid; min-width: 0; gap: 2px; }
+.okr-monthly-week-grid b { font-size: 13px; }
+.okr-monthly-week-grid small { color: var(--text-muted); font-size: 11px; }
+.okr-monthly-kr-layout { display: grid; grid-template-columns: 320px minmax(0,1fr); min-height: 560px; overflow: hidden; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface); }
+.okr-monthly-kr-list { display: grid; align-content: start; border-right: 1px solid var(--border-main); }
+.okr-monthly-list-title { display: flex; min-height: 52px; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--border-main); }
+.okr-monthly-list-title span { color: var(--text-muted); font-size: 12px; }
+.okr-monthly-kr-list button { display: grid; width: 100%; gap: 8px; padding: 16px; border: 0; border-bottom: 1px solid var(--border-main); background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; transition: background 150ms ease,box-shadow 150ms ease; }
+.okr-monthly-kr-list button:hover { background: var(--bg-surface-soft); }
+.okr-monthly-kr-list button:focus-visible { outline: 2px solid color-mix(in srgb,var(--primary) 45%,transparent); outline-offset: -2px; }
+.okr-monthly-kr-list button.is-active { background: color-mix(in srgb,var(--primary) 10%,var(--bg-surface)); box-shadow: inset 3px 0 0 var(--primary); }
+.okr-monthly-kr-name { display: flex; min-width: 0; align-items: center; gap: 8px; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.okr-monthly-kr-name b { color: var(--primary); }
+.okr-monthly-health { display: inline-flex; width: fit-content; align-items: center; gap: 4px; color: var(--success); font-size: 11px; }
+.okr-monthly-health svg { width: 14px; height: 14px; }
+.okr-monthly-health.is-risk { color: var(--warning); }
+.okr-monthly-health.is-blocked { color: var(--danger); }
+.okr-monthly-kr-list button > small { color: var(--text-muted); font-size: 11px; }
+.okr-monthly-kr-detail { display: grid; min-width: 0; align-content: start; gap: 16px; padding: 20px; }
+.okr-monthly-kr-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
+.okr-monthly-kr-header svg { color: var(--primary); }
+.okr-monthly-progress-control > span { color: var(--text-muted); font-size: 12px; }
+.okr-monthly-risk-callout { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; padding: 12px; border: 1px solid color-mix(in srgb,var(--warning) 45%,var(--border-main)); border-radius: 8px; background: color-mix(in srgb,var(--warning) 8%,var(--bg-surface)); }
+.okr-monthly-risk-callout > svg { margin-top: 2px; color: var(--warning); }
+.okr-monthly-risk-callout > div { display: grid; gap: 8px; }
+.okr-monthly-risk-callout b { font-size: 13px; }
+.okr-monthly-result-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.okr-monthly-result-grid label { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-card); }
+.okr-monthly-result-grid label > span { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.okr-monthly-result-grid label svg { color: var(--primary); }
+.okr-monthly-source-list, .okr-monthly-evidence-list { display: grid; gap: 8px; padding-top: 4px; }
+.okr-monthly-source-list h4, .okr-monthly-evidence-list h4 { margin: 0; font-size: 13px; }
+.okr-monthly-source-list > div, .okr-monthly-evidence-list > div { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 12px; border-top: 1px solid var(--border-main); font-size: 12px; }
+.okr-monthly-source-list p, .okr-monthly-evidence-list p { margin: 0; padding: 16px; border: 1px dashed var(--border-main); border-radius: 8px; color: var(--text-muted); font-size: 12px; text-align: center; }
+.okr-monthly-evidence-list > div span { min-width: 0; flex: 1; font-weight: 600; }
+.okr-monthly-evidence-list > div small { color: var(--text-muted); }
+.okr-monthly-bottom-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.okr-monthly-edit-list { display: grid; gap: 8px; }
+.okr-monthly-edit-list > div { display: grid; grid-template-columns: minmax(160px,1fr) minmax(140px,1fr) 104px 32px; gap: 8px; align-items: center; }
+.okr-monthly-edit-list.is-plan > div { grid-template-columns: minmax(180px,1fr) minmax(160px,220px) 124px 32px; }
+.okr-monthly-okr-tree { display: grid; align-content: start; border-right: 1px solid var(--border-main); }
+.okr-monthly-tree-objective + .okr-monthly-tree-objective { border-top: 1px solid var(--border-main); }
+.okr-monthly-tree-o { display: flex; min-width: 0; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; background: var(--bg-surface-soft); font-size: 13px; font-weight: 600; }
+.okr-monthly-tree-o svg { width: 14px; height: 14px; flex: none; color: var(--text-muted); }
+.okr-monthly-tree-o b { flex: none; color: var(--primary); }
+.okr-monthly-tree-o span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.okr-monthly-tree-krs { display: grid; }
+.okr-monthly-tree-kr { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: start; gap: 8px; padding: 12px 12px 12px 28px; border-top: 1px solid var(--border-main); transition: background 150ms ease,box-shadow 150ms ease; }
+.okr-monthly-tree-kr:hover { background: var(--bg-surface-soft); }
+.okr-monthly-tree-kr.is-active { background: color-mix(in srgb,var(--primary) 10%,var(--bg-surface)); box-shadow: inset 3px 0 0 var(--primary); }
+.okr-monthly-tree-kr > .ant-checkbox-wrapper { margin-top: 2px; }
+.okr-monthly-tree-kr button { display: grid; min-width: 0; grid-template-columns: minmax(0,1fr) 40px; gap: 8px; padding: 0; border: 0; background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; }
+.okr-monthly-tree-kr button:disabled { cursor: not-allowed; opacity: .58; }
+.okr-monthly-tree-kr button:focus-visible { outline: 2px solid color-mix(in srgb,var(--primary) 45%,transparent); outline-offset: 3px; border-radius: 6px; }
+.okr-monthly-tree-kr button > span { grid-column: 1 / -1; display: flex; min-width: 0; gap: 6px; overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.okr-monthly-tree-kr button > span b { flex: none; color: var(--primary); }
+.okr-monthly-tree-kr button .ant-progress { align-self: center; margin: 0; }
+.okr-monthly-tree-kr button small { align-self: center; color: var(--text-muted); font-size: 11px; text-align: right; }
+.okr-monthly-status-row { display: flex; min-width: 0; align-items: center; gap: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
+.okr-monthly-current-progress, .okr-monthly-progress-change, .okr-monthly-health-control { display: flex; min-width: 0; align-items: center; gap: 10px; white-space: nowrap; }
+.okr-monthly-current-progress > span, .okr-monthly-progress-change > span:first-child, .okr-monthly-health-control > span { color: var(--text-muted); font-size: 13px; }
+.okr-monthly-current-progress .ant-input-number { width: 120px; }
+.okr-monthly-current-progress .ant-input-number-input { font-size: 14px; }
+.okr-monthly-status-divider { color: var(--text-muted); font-size: 18px; line-height: 1; }
+.okr-monthly-progress-values { color: var(--text-body); font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size: 12px; }
+.okr-monthly-progress-values strong { color: var(--primary); }
+.okr-monthly-progress-change .ant-progress { width: 160px; margin: 0; }
+.okr-monthly-progress-change > span:last-child { font-size: 13px; font-weight: 600; }
+.okr-monthly-progress-change .is-positive { color: var(--success); }
+.okr-monthly-progress-change .is-negative { color: var(--danger); }
+.okr-monthly-health-control .ant-radio-group { display: flex; align-items: center; gap: 12px; }
+.okr-monthly-health-control .ant-radio-wrapper { margin-inline-end: 0; color: var(--text-body); font-size: 13px; }
+.okr-monthly-health-control .is-normal { color: var(--success); font-weight: 600; }
+.okr-monthly-health-control .is-risk { color: var(--warning); font-weight: 600; }
+.okr-monthly-health-control .is-blocked { color: var(--danger); font-weight: 600; }
+.okr-monthly-timeline { display: grid; gap: 16px; padding-top: 4px; }
+.okr-monthly-timeline h4 { margin: 0; font-size: 13px; }
+.okr-monthly-timeline-week { display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 16px; }
+.okr-monthly-timeline-marker { position: relative; display: grid; align-content: start; gap: 2px; padding: 2px 0 20px 20px; color: var(--text-primary); font-size: 12px; font-weight: 600; }
+.okr-monthly-timeline-marker::before { position: absolute; top: 14px; bottom: -14px; left: 5px; width: 1px; content: ''; background: var(--border-main); }
+.okr-monthly-timeline-week:last-child .okr-monthly-timeline-marker::before { display: none; }
+.okr-monthly-timeline-marker > span { position: absolute; top: 5px; left: 0; width: 11px; height: 11px; border: 2px solid var(--primary); border-radius: 999px; background: var(--bg-surface); }
+.okr-monthly-timeline-marker small { color: var(--text-muted); font-size: 11px; font-weight: 400; }
+.okr-monthly-timeline-items { display: grid; gap: 8px; padding-bottom: 16px; }
+.okr-monthly-timeline-items > div { display: grid; grid-template-columns: minmax(120px,1fr) 88px minmax(160px,1.4fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-card); }
+.okr-monthly-timeline-items strong { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.okr-monthly-timeline-items span { color: var(--primary); font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size: 11px; }
+.okr-monthly-timeline-items small, .okr-monthly-timeline-items > p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.okr-monthly-timeline-empty { margin: 0; padding: 24px; border: 1px dashed var(--border-main); border-radius: 8px; color: var(--text-muted); font-size: 12px; text-align: center; }
+
+@media (max-width: 1180px) { .okr-monthly-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } .okr-monthly-metrics > div:nth-child(3) { border-top: 1px solid var(--border-main); border-left: 0; } .okr-monthly-metrics > div:nth-child(4) { border-top: 1px solid var(--border-main); } .okr-monthly-bottom-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1180px) { .okr-monthly-status-row { flex-wrap: wrap; } }
+@media (max-width: 900px) { .okr-monthly-toolbar, .okr-monthly-kr-header, .okr-monthly-section-head { align-items: flex-start; flex-direction: column; } .okr-monthly-actions { justify-content: flex-start; } .okr-monthly-kr-layout { grid-template-columns: 1fr; } .okr-monthly-okr-tree { border-right: 0; border-bottom: 1px solid var(--border-main); } .okr-monthly-result-grid, .okr-monthly-status-row { grid-template-columns: 1fr; } .okr-monthly-status-row { align-items: flex-start; flex-direction: column; gap: 12px; } .okr-monthly-status-divider { display: none; } }
+@media (max-width: 620px) { .okr-monthly-metrics { grid-template-columns: 1fr; } .okr-monthly-metrics > div + div { border-top: 1px solid var(--border-main); border-left: 0; } .okr-monthly-current-progress, .okr-monthly-progress-change, .okr-monthly-health-control { width: 100%; flex-wrap: wrap; } .okr-monthly-current-progress .ant-input-number { width: 150px; } .okr-monthly-progress-change .ant-progress { flex: 1; min-width: 120px; } .okr-monthly-health-control .ant-radio-group { flex-wrap: wrap; } .okr-monthly-timeline-week { grid-template-columns: 1fr; gap: 4px; } .okr-monthly-timeline-marker { padding-bottom: 4px; } .okr-monthly-timeline-marker::before { display: none; } .okr-monthly-timeline-items > div { grid-template-columns: 1fr; } }
 
 
 .dark .review-document-container .ant-table {
