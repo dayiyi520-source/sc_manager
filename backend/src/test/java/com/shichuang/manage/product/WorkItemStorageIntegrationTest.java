@@ -128,6 +128,26 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(parent.get("id"),child.get("parentWorkItemId"));
         assertThrows(IllegalArgumentException.class,()->storage.create(input("wrong-version","test",childType,parent.get("id").toString(),UUID.randomUUID().toString(),null)));
     }
+    @Test void detailReturnsParentAndDeleteUsesRevisionAndProtectsChildren() {
+        String childType=type("test","可删除子任务");
+        configurations.childRule(line,new ChildRule(type,childType,true));
+        var parent=storage.create(input("delete-parent","test",type,null,null,null));
+        var child=storage.create(input("delete-child","test",childType,parent.get("id").toString(),null,null));
+
+        var detail=storage.detail(line,child.get("id").toString());
+        assertEquals(parent.get("id"),((Map<?,?>)detail.get("parent")).get("id"));
+        var topLevel=unified.list(line,"","test","",1,20).page();
+        assertEquals(1,topLevel.total());
+        assertEquals(parent.get("id"),topLevel.items().get(0).id());
+        assertTrue(topLevel.items().get(0).hasChildren());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.delete(line,parent.get("id").toString(),((Number)parent.get("revision")).intValue())).getStatusCode().value());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.delete(line,child.get("id").toString(),99)).getStatusCode().value());
+
+        storage.delete(line,child.get("id").toString(),((Number)child.get("revision")).intValue());
+        assertEquals(404,assertThrows(ResponseStatusException.class,()->storage.detail(line,child.get("id").toString())).getStatusCode().value());
+        storage.delete(line,parent.get("id").toString(),((Number)parent.get("revision")).intValue());
+        assertEquals(404,assertThrows(ResponseStatusException.class,()->storage.detail(line,parent.get("id").toString())).getStatusCode().value());
+    }
     @Test void rejectsPublishedVersionAndForeignType() {
         assertThrows(ResponseStatusException.class,()->storage.create(input("published","test",type,null,version("已发布"),null)));
         assertThrows(IllegalArgumentException.class,()->storage.create(input("foreign","test",UUID.randomUUID().toString(),null,null,null)));

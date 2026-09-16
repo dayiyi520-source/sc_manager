@@ -11,5 +11,6 @@ public record UnifiedWorkItem(
     String taskTypeId, String workflowId, String statusKey, WorkItemStatus status, String statusColor,
     String priority, String originalPriority, LocalDate plannedEndDate,
     BigDecimal estimatedHours, BigDecimal actualHours, LocalDateTime createdAt,
-    boolean overdue, boolean potentialBlockingDefect, String parentWorkItemId, String assigneeId
+    boolean overdue, boolean potentialBlockingDefect, String parentWorkItemId, String assigneeId,
+    boolean hasChildren, int revision
 ) {}

@@ -79,4 +79,11 @@ describe('productRepository task API contract', () => {
     await expect(productRepository.createTask('bug', { title: '不应重试写入' })).rejects.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('reads persisted work-item relations for the detail association tab', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: { relations: [] }, message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await productRepository.workItemRelations('line-1', 'task-1');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/work-items/task-1/relations?productLineId=line-1');
+  });
 });

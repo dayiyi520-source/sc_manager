@@ -112,12 +112,16 @@ class UnifiedWorkItemServiceTest {
     @Test void listPaginationAndExplicitTestCoverageAreStable() {
         session("admin");
         when(lines.find("tenant-a", "line")).thenReturn(Map.of("id", "line"));
-        when(mapper.byProductLine("tenant-a", "line")).thenReturn(List.of(row("requirement", "r", "测试中")));
+        when(mapper.count("tenant-a", "line", "", "", "")).thenReturn(1L);
+        when(mapper.list("tenant-a", "line", "", "", "", 0, 20)).thenReturn(List.of(row("requirement", "r", "测试中")));
         assertEquals(1, service.list("line", "", "", "", 1, 20).page().total());
         assertTrue(service.list("line", "", "", "", Integer.MAX_VALUE, 100).page().items().isEmpty());
+        when(mapper.count("tenant-a", "line", "", "test", "")).thenReturn(0L);
         var test = service.list("line", "", "test", "", 1, 20);
         assertEquals(0, test.page().total());
         assertFalse(test.limitations().contains("测试工作项尚未接入"));
+        verify(mapper).list("tenant-a", "line", "", "", "", 0, 20);
+        verify(mapper, never()).byProductLine(anyString(), anyString());
     }
 
     @Test void nonAdminMustPassProductLineVisibilityBeforeReadingItems() {
@@ -125,7 +129,7 @@ class UnifiedWorkItemServiceTest {
         when(lines.find("tenant-a", "line")).thenReturn(Map.of("id", "line"));
         assertEquals(403, assertThrows(ResponseStatusException.class,
             () -> service.list("line", "", "", "", 1, 20)).getStatusCode().value());
-        verify(mapper, never()).byProductLine(anyString(), anyString());
+        verify(mapper, never()).count(anyString(), anyString(), anyString(), anyString(), anyString());
         when(mapper.canRead("tenant-a", "line", "user")).thenReturn(true);
         assertEquals(0, service.list("line", "", "", "", 1, 20).page().total());
     }

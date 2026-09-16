@@ -50,13 +50,13 @@ public class UnifiedWorkItemService {
         if (!versionId.isBlank()) requireVersion(lineId, versionId);
         int safePage = Math.max(1, page);
         int safeSize = Math.max(1, Math.min(100, size));
-        String term = keyword.trim().toLowerCase(java.util.Locale.ROOT);
-        List<UnifiedWorkItem> items = read(lineId).stream()
-            .filter(item -> category.isBlank() || category.equals(item.category()))
-            .filter(item -> versionId.isBlank() || versionId.equals(item.versionId()))
-            .filter(item -> (item.title() + " " + item.code()).toLowerCase(java.util.Locale.ROOT).contains(term)).toList();
-        List<UnifiedWorkItem> slice = items.stream().skip((long) (safePage - 1) * safeSize).limit(safeSize).toList();
-        return new Listing(new PageResult<>(slice, safePage, safeSize, items.size()), LIMITATIONS);
+        String term = keyword.trim();
+        long offsetValue = (long) (safePage - 1) * safeSize;
+        long total = mapper.count(RequestContext.tenantId(), lineId, versionId, category, term);
+        List<UnifiedWorkItem> slice = offsetValue >= total || offsetValue > Integer.MAX_VALUE ? List.of()
+            : mapper.list(RequestContext.tenantId(), lineId, versionId, category, term, (int) offsetValue, safeSize)
+                .stream().map(row -> map(row, LocalDate.now())).toList();
+        return new Listing(new PageResult<>(slice, safePage, safeSize, total), LIMITATIONS);
     }
 
     public VersionSummary versionSummary(String lineId, String versionId) {
@@ -140,7 +140,8 @@ public class UnifiedWorkItemService {
             statusColor == null ? "neutral" : statusColor, priority, originalPriority,
             due, decimal(row.get("estimatedHours")), decimal(row.get("actualHours")), created,
             due != null && due.isBefore(today) && !status.terminal(),
-            "bug".equals(category) && ("P0".equals(priority) || "P1".equals(priority)) && !status.terminal(), nullable(row,"parentWorkItemId"), nullable(row,"assigneeId"));
+            "bug".equals(category) && ("P0".equals(priority) || "P1".equals(priority)) && !status.terminal(), nullable(row,"parentWorkItemId"), nullable(row,"assigneeId"),
+            WorkItemConfigurationService.enabled(row.get("hasChildren")), ((Number)row.getOrDefault("revision",0)).intValue());
     }
 
     private void requireLine(String lineId) {

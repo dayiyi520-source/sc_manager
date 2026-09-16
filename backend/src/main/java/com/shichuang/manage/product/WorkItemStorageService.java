@@ -74,6 +74,13 @@ public class WorkItemStorageService {
     }
     public Map<String,Object> detail(String line,String id) { access.check(line,false); requireItem(line,id); return mapper.timedItem(RequestContext.tenantId(),line,id); }
     public List<Map<String,Object>> activities(String line,String id) { access.check(line,false); requireItem(line,id); return mapper.activities(RequestContext.tenantId(),line,id); }
+    @Transactional public void delete(String line,String id,int revision) {
+        access.check(line,true);
+        Map<String,Object> item=requireItem(line,id);
+        if(mapper.hasChildren(RequestContext.tenantId(),line,id)) throw conflict("请先处理该任务下的子任务");
+        if(revision!=((Number)item.get("revision")).intValue()) throw conflict("任务已被其他人修改，请刷新后重试");
+        if(mapper.softDelete(RequestContext.tenantId(),line,id,revision,RequestContext.userId())!=1) throw conflict("任务已变化，请刷新后重试");
+    }
     private Map<String,Object> requireItem(String line,String id) {
         Map<String,Object> item=mapper.item(RequestContext.tenantId(),line,id);
         if (item==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"统一工作项不存在");

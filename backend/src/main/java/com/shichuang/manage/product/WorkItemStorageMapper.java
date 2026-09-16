@@ -46,15 +46,22 @@ public class WorkItemStorageMapper {
     public boolean childAllowed(String tenant,String line,String parent,String child) {
         return one("SELECT id_ FROM t_product_work_item_child_rule WHERE tenant_id_=? AND product_line_id_=? AND parent_type_id_=? AND child_type_id_=? AND enabled_=1 AND delete_flag_=0",tenant,line,parent,child) != null;
     }
-    private static final String ITEM = "SELECT id_ AS id,code_ AS code,product_line_id_ AS productLineId,category_ AS category,task_type_id_ AS taskTypeId,title_ AS title,description_ AS description,expected_goal_ AS expectedGoal,version_id_ AS versionId,requirement_id_ AS requirementId,parent_work_item_id_ AS parentWorkItemId,workflow_id_ AS workflowId,status_key_ AS statusKey,status_name_ AS statusName,status_group_ AS statusGroup,status_color_ AS statusColor,successful_ AS successful,assignee_id_ AS assigneeId,assignee_name_ AS assigneeName,priority_ AS priority,planned_start_date_ AS plannedStartDate,planned_end_date_ AS plannedEndDate,estimated_hours_ AS estimatedHours,actual_hours_ AS actualHours,version_ AS revision,create_time_ AS createdAt FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0";
+    private static final String ITEM = "SELECT w.id_ AS id,w.code_ AS code,w.product_line_id_ AS productLineId,w.category_ AS category,w.task_type_id_ AS taskTypeId,w.title_ AS title,w.description_ AS description,w.expected_goal_ AS expectedGoal,w.version_id_ AS versionId,w.requirement_id_ AS requirementId,w.parent_work_item_id_ AS parentWorkItemId,w.workflow_id_ AS workflowId,w.status_key_ AS statusKey,w.status_name_ AS statusName,w.status_group_ AS statusGroup,w.status_color_ AS statusColor,w.successful_ AS successful,w.assignee_id_ AS assigneeId,w.assignee_name_ AS assigneeName,w.priority_ AS priority,w.planned_start_date_ AS plannedStartDate,w.planned_end_date_ AS plannedEndDate,w.estimated_hours_ AS estimatedHours,w.actual_hours_ AS actualHours,w.version_ AS revision,w.create_time_ AS createdAt,EXISTS(SELECT 1 FROM t_product_work_item child WHERE child.tenant_id_=w.tenant_id_ AND child.product_line_id_=w.product_line_id_ AND child.parent_work_item_id_=w.id_ AND child.delete_flag_=0) AS hasChildren FROM t_product_work_item w WHERE w.tenant_id_=? AND w.product_line_id_=? AND w.delete_flag_=0";
     public Map<String,Object> item(String tenant,String line,String id) { return one(ITEM+" AND id_=?",tenant,line,id); }
     public Map<String,Object> timedItem(String tenant,String line,String id) {
         Map<String,Object> item = item(tenant,line,id);
         if (item != null) {
             item.putAll(one("SELECT source_type_ AS sourceType,actual_start_at_ AS actualStartAt,completed_at_ AS completedAt FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",tenant,line,id));
             item.put("children", jdbc.queryForList(ITEM + " AND parent_work_item_id_=? ORDER BY create_time_,id_", tenant, line, id));
+            if(item.get("parentWorkItemId")!=null) item.put("parent",item(tenant,line,item.get("parentWorkItemId").toString()));
         }
         return item;
+    }
+    public boolean hasChildren(String tenant,String line,String id) {
+        return one("SELECT id_ FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND parent_work_item_id_=? AND delete_flag_=0 LIMIT 1",tenant,line,id)!=null;
+    }
+    public int softDelete(String tenant,String line,String id,int revision,String user) {
+        return jdbc.update("UPDATE t_product_work_item SET delete_flag_=1,version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND delete_flag_=0",user,tenant,line,id,revision);
     }
     public boolean hasUnfinishedChildren(String tenant,String line,String id) {
         return one("SELECT id_ FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND parent_work_item_id_=? AND delete_flag_=0 AND successful_=0 LIMIT 1",tenant,line,id)!=null;

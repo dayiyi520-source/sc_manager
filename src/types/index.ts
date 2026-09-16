@@ -508,7 +508,7 @@ export interface RequirementTask {
   dueDate: string;
   createdAt?: string;
   todoList?: { id: string; text: string; done: boolean }[];
-  category?: 'my_responsible' | 'my_dept' | 'assigned_to_me' | 'other_dept';
+  category?: 'my_responsible' | 'my_dept' | 'assigned_to_me' | 'other_dept' | 'requirement' | 'design' | 'dev' | 'test' | 'bug';
   workOrderType?: WorkOrderType;
   specialFields?: Record<string, string | number | null> | string;
   sourceWorkOrderIds?: string[];
@@ -516,6 +516,9 @@ export interface RequirementTask {
   requirementId?: string;
   requirementType?: string;
   workItemTypeId?: string;
+  parentWorkItemId?: string;
+  hasChildren?: boolean;
+  revision?: number;
   ccNames?: string[];
   plannedStartDate?: string;
   expectedCompleteDate?: string;

@@ -63,7 +63,6 @@ const TeamOrgView = lazyNamed(() => import('./components/team/TeamOrgView'), 'Te
 const SystemSettingsView = lazyNamed(() => import('./components/system/SystemSettingsView'), 'SystemSettingsView');
 const AntDesignTestView = lazyNamed(() => import('./components/test/AntDesignTestView'), 'AntDesignTestView');
 const RequirementWorkItemsView = lazyNamed(() => import('./components/common/RequirementWorkItemsView'), 'RequirementWorkItemsView');
-const TestAndDefectView = lazyNamed(() => import('./components/product/TestAndDefectView'), 'TestAndDefectView');
 
 const MainContent: React.FC = () => {
   const { activeTabId, openTabs } = useAppNavigation();
@@ -145,7 +144,7 @@ const MainContent: React.FC = () => {
       case 'prod_bugs':
         return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="缺陷管理" taskKind="bug" />;
       case 'prod_test_tasks':
-        return <TestAndDefectView productLineFilter={productLineFilter} />;
+        return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="测试任务" taskKind="test" />;
       case 'prod_reviews':
       case 'prod_review':
         return <ProductReviewView />;

@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Badge, Button, DatePicker, Form, Input, InputNumber, Modal, Popover, Segmented, Select, Tag, Upload } from 'antd';
+import { Badge, Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popover, Segmented, Select, Tag, Upload } from 'antd';
+import { ApartmentOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
   Search,
   Filter,
   Plus,
-  ArrowRight,
   Check,
   FileText,
   Sparkles,
@@ -58,6 +58,8 @@ const normalizePriority = (priority: string) => ({
   'P2-普通': '中',
   'P3-低优': '低'
 }[priority] || priority);
+const apiPriority = (priority: string) => ({ 紧急: 'P0', 高: 'P1', 中: 'P2', 低: 'P3' }[normalizePriority(priority)] || 'P2');
+const workItemCategoryLabel: Record<string, string> = { requirement: '需求', design: '设计', dev: '研发', test: '测试', bug: '缺陷' };
 
 const SearchableSelect: React.FC<{ label: string; value: string; options: string[]; onChange: (value: string) => void; placeholder?: string; clearable?: boolean }> = ({ label, value, options, onChange, placeholder = '请选择', clearable }) => (
   <label className="block text-[var(--text-muted)]"><span>{label}</span><Select showSearch optionFilterProp="label" allowClear={clearable} value={value || undefined} onChange={(next) => onChange(next || '')} options={options.map((option) => ({ label: option, value: option }))} placeholder={placeholder} className="mt-1 w-full" /></label>
@@ -82,6 +84,13 @@ const DetailTextInput: React.FC<{ label: string; value: string; onSave: (value: 
 };
 
 const DetailDateInput: React.FC<{ label: string; value?: string; onSave: (value: string) => void }> = ({ label, value = '', onSave }) => <DateField label={label} value={value} onChange={onSave} />;
+
+const DetailNumberInput: React.FC<{ label: string; value: number; onSave: (value: number) => void }> = ({ label, value, onSave }) => {
+  const [draft, setDraft] = useState<number | null>(value);
+  useEffect(() => setDraft(value), [value]);
+  const commit = () => { const next = draft ?? 0; if (next !== value) onSave(next); };
+  return <label className="block text-[var(--text-muted)]"><span>{label}</span><InputNumber min={0} value={draft} onChange={setDraft} onBlur={commit} onPressEnter={commit} className="mt-1 w-full" /></label>;
+};
 
 const WORK_ORDER_TYPES: Array<{ key: RequirementWorkOrderType; label: string }> = [
   { key: 'requirement', label: '客户诉求' }, { key: 'bug', label: '线上问题' }, { key: 'task', label: '售前支持' },
@@ -115,7 +124,7 @@ const WorkOrderPicker: React.FC<{
   </div>;
 };
 
-export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLabel?: string; taskKind?: 'requirement' | 'design' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops' }> = ({ productLineFilter = 'all', itemLabel = '需求任务', taskKind = 'requirement' }) => {
+export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLabel?: string; taskKind?: 'requirement' | 'design' | 'test' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops' }> = ({ productLineFilter = 'all', itemLabel = '需求任务', taskKind = 'requirement' }) => {
   const {
     requirementTasks,
     designTasks,
@@ -209,6 +218,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const serverPage = page;
   const serverPageSize = pageSize;
   const serverKeyword = searchQuery;
+  const unifiedCategory = taskKind === 'requirement' || taskKind === 'design' || taskKind === 'dev' || taskKind === 'test' || taskKind === 'bug' ? taskKind : '';
   const csv = (values: string[]) => values.filter(Boolean).join(',');
   const serverQueryValues = {
     page: serverPage,
@@ -241,7 +251,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   };
   const serverPageQuery = useQuery({
     queryKey: ['task-page', taskKind, serverQueryValues],
-    enabled: remoteEnabled,
+    enabled: Boolean(remoteEnabled && !unifiedCategory),
     queryFn: async (): Promise<{ items: RequirementTask[]; total: number; groups: Array<{ label: string; count: number }> }> => {
       if (taskKind === 'requirement') {
         const result = await requirementRepository.list({ ...serverQueryValues, workItemKind: 'requirement' });
@@ -265,7 +275,6 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       return { items: result.items, total: result.total, groups: result.groups || [] };
     }
   });
-  const unifiedCategory = taskKind === 'requirement' || taskKind === 'design' || taskKind === 'dev' || taskKind === 'bug' ? taskKind : '';
   const unifiedQuery = useQuery({
     queryKey: ['unified-task-page', unifiedCategory, productLineFilter, searchQuery],
     enabled: Boolean(unifiedCategory && remoteEnabled),
@@ -281,41 +290,40 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         priority: item.priority || 'P2-标准',
         expectedGoal: '',
         description: '',
-        requirementType: item.category
+        requirementType: item.category,
+        workItemTypeId: item.taskTypeId || undefined,
+        parentWorkItemId: item.parentWorkItemId || undefined,
+        versionId: item.versionId || undefined,
+        estimatedHours: Number(item.estimatedHours || 0),
+        createdAt: item.createdAt,
+        revision: item.revision,
+        hasChildren: item.hasChildren
       })) as RequirementTask[];
     }
   });
   const activeTasks = unifiedCategory && remoteEnabled ? unifiedQuery.data || [] : contextTasks;
-  useEffect(() => {
-    if (!remoteEnabled || !unifiedCategory) return;
-    let cancelled = false;
-    const lines = productLineFilter === 'all' ? productLines : productLines.filter((line) => line.id === productLineFilter);
-    Promise.all(lines.flatMap((line) => (['requirement', 'design', 'dev', 'test', 'bug'] as const).map((category) => productRepository.workItems(line.id, category))))
-      .then((results) => {
-        if (cancelled) return;
-        const grouped: Record<string, UnifiedWorkItem[]> = {};
-        results.flatMap((result) => result.page?.items || []).forEach((item) => {
-          if (item.parentWorkItemId) (grouped[item.parentWorkItemId] ||= []).push(item);
-        });
-        setListChildren(grouped);
-      }).catch(() => { if (!cancelled) setListChildren({}); });
-    return () => { cancelled = true; };
-  }, [remoteEnabled, unifiedCategory, productLineFilter, productLines]);
 
   const [selectedTask, setSelectedTask] = useState<RequirementTask | null>(null);
   const [detailEditing, setDetailEditing] = useState(false);
   const detailDescriptionEditor = useRef<HTMLDivElement>(null);
   const [detailDescription, setDetailDescription] = useState('');
   const [detailDescriptionHtml, setDetailDescriptionHtml] = useState('');
-  const [detailTab, setDetailTab] = useState<'workOrders' | 'activity'>('activity');
+  const [detailTab, setDetailTab] = useState<'relations' | 'activity' | 'children'>('activity');
   const [remoteCandidates, setRemoteCandidates] = useState<RequirementWorkOrderCandidate[]>([]);
+  const [relatedWorkItems, setRelatedWorkItems] = useState<RequirementTask[]>([]);
   const [childWorkItems, setChildWorkItems] = useState<Array<Record<string, unknown>>>([]);
+  const [parentWorkItem, setParentWorkItem] = useState<Record<string, unknown> | null>(null);
   const [childModalOpen, setChildModalOpen] = useState(false);
   const [childTitle, setChildTitle] = useState('');
+  const [childDescription, setChildDescription] = useState('');
+  const [childPriority, setChildPriority] = useState<RequirementTask['priority']>('中');
+  const [childPlannedStartDate, setChildPlannedStartDate] = useState('');
+  const [childDueDate, setChildDueDate] = useState('');
+  const [childEstimatedHours, setChildEstimatedHours] = useState<number | ''>('');
   const [childCategory, setChildCategory] = useState<'design' | 'dev' | 'test' | 'bug'>('dev');
   const [childTypeId, setChildTypeId] = useState('');
   const [childTypes, setChildTypes] = useState<Array<{ id: string; name: string; enabled: boolean; category: string }>>([]);
-  const [listChildren, setListChildren] = useState<Record<string, UnifiedWorkItem[]>>({});
+  const [listChildren, setListChildren] = useState<Record<string, RequirementTask[]>>({});
   const [expandedListRows, setExpandedListRows] = useState<string[]>([]);
   const [commentDraft, setCommentDraft] = useState('');
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -327,15 +335,17 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setCommentDraft('');
     setDetailEditing(false);
     setChildWorkItems([]);
+    setParentWorkItem(null);
+    setRelatedWorkItems([]);
   }, [selectedTask?.id]);
 
   useEffect(() => {
     if (!selectedTask) return;
-    if (isBusinessTask || taskKind === 'design') return;
+    if (isBusinessTask || unifiedCategory) return;
     requirementRepository.detail(selectedTask.id)
       .then((detail) => setSelectedTask((current) => current?.id === detail.id ? { ...current, ...detail } : current))
       .catch(() => undefined);
-  }, [selectedTask?.id, isBusinessTask, taskKind]);
+  }, [selectedTask?.id, isBusinessTask, unifiedCategory]);
 
   useEffect(() => {
     if (!selectedTask?.productLineId) return;
@@ -343,9 +353,16 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     const summaryRequest = selectedTask.requirementId
       ? productRepository.requirementSummary(selectedTask.productLineId, selectedTask.requirementId)
       : Promise.resolve({ linkedItems: [] });
-    Promise.all([detailRequest, summaryRequest])
-      .then(([detail, summary]) => setChildWorkItems(Array.isArray(detail.children) && detail.children.length ? detail.children : (summary.linkedItems || []).filter((item) => item.id !== selectedTask.id)))
-      .catch(() => setChildWorkItems([]));
+    const relationsRequest = productRepository.workItemRelations(selectedTask.productLineId, selectedTask.id);
+    Promise.all([detailRequest, summaryRequest, relationsRequest])
+      .then(async ([detail, summary, relationView]) => {
+        setChildWorkItems(Array.isArray(detail.children) && detail.children.length ? detail.children : (summary.linkedItems || []).filter((item) => item.id !== selectedTask.id));
+        setParentWorkItem(detail.parent && typeof detail.parent === 'object' ? detail.parent : null);
+        const relatedIds = (relationView.relations || []).filter((relation) => relation.type === 'RELATES_TO').map((relation) => relation.sourceId === selectedTask.id ? relation.targetId : relation.sourceId);
+        const relatedDetails = await Promise.all(relatedIds.map((id) => productRepository.workItemDetail(selectedTask.productLineId!, id)));
+        setRelatedWorkItems(relatedDetails.map((item) => storedTask(item, selectedTask)));
+      })
+      .catch(() => { setChildWorkItems([]); setParentWorkItem(null); setRelatedWorkItems([]); });
   }, [selectedTask?.id, selectedTask?.productLineId]);
 
   const childCategoryOptions = useMemo(() => {
@@ -368,11 +385,17 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setChildTypeId(first?.id || '');
   }, [childCategory, childTypes]);
 
-  const openChildModal = () => {
-    if (!selectedTask?.productLineId) return;
-    const firstCategory = childCategoryOptions[0]?.value || 'dev';
+  const openChildModal = (task: RequirementTask | null = selectedTask) => {
+    if (!task?.productLineId) return;
+    setSelectedTask(task);
+    const firstCategory = task.category === 'test' ? 'bug' : task.category === 'design' || task.category === 'dev' ? 'dev' : 'design';
     setChildCategory(firstCategory);
     setChildTitle('');
+    setChildDescription('');
+    setChildPriority('中');
+    setChildPlannedStartDate('');
+    setChildDueDate('');
+    setChildEstimatedHours('');
     setChildModalOpen(true);
   };
 
@@ -388,17 +411,22 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         category: childCategory,
         taskTypeId: childTypeId,
         title: childTitle.trim(),
-        description: '',
+        description: childDescription,
         expectedGoal: '',
         versionId: selectedTask.versionId || undefined,
         requirementId: selectedTask.requirementId || (selectedTask.category === 'requirement' ? selectedTask.id : undefined),
         parentWorkItemId: selectedTask.id,
-        priority: 'P2'
+        assigneeId: undefined,
+        priority: apiPriority(childPriority),
+        plannedStartDate: childPlannedStartDate || undefined,
+        plannedEndDate: childDueDate || undefined,
+        estimatedHours: Number(childEstimatedHours || 0)
       });
       addToast('success', '子任务已创建');
       setChildModalOpen(false);
       const detail = await productRepository.workItemDetail(selectedTask.productLineId, selectedTask.id);
       setChildWorkItems(Array.isArray(detail.children) ? detail.children : []);
+      setListChildren((current) => ({ ...current, [selectedTask.id]: (detail.children || []).map((item: Record<string, unknown>) => storedTask(item, selectedTask)) }));
     } catch (error) {
       addToast('error', '子任务创建失败', error instanceof Error ? error.message : '请检查工作流和父子类型配置');
     }
@@ -487,7 +515,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       .catch(() => setEmployees(Array.from(new Set([currentUser.name, ...requirementTasks.map((item) => item.ownerName).filter(Boolean)]))));
   }, [currentUser.name, requirementTasks]);
 
-  const configuredCategory = taskKind === 'requirement' ? '需求' : taskKind === 'design' ? '设计' : taskKind === 'dev' ? '研发' : taskKind === 'bug' ? '缺陷' : undefined;
+  const configuredCategory = taskKind === 'requirement' ? '需求' : taskKind === 'design' ? '设计' : taskKind === 'dev' ? '研发' : taskKind === 'test' ? '测试' : taskKind === 'bug' ? '缺陷' : undefined;
   useEffect(() => {
     const line = productLines.find((item) => item.name === formProductLineName) || productLines.find((item) => item.id === productLineFilter);
     if (!line || !configuredCategory) { setConfiguredWorkItemTypes([]); return; }
@@ -611,8 +639,12 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       addToast('warning', `请选择${itemLabel}类型`);
       return;
     }
-  const selectedProductLine = productLines.find((line) => line.name === formProductLineName);
+    const selectedProductLine = productLines.find((line) => line.name === formProductLineName);
     const selectedWorkItemType = configuredWorkItemTypes.find((item) => item.name === formRequirementType);
+    if (configuredCategory && (!selectedProductLine || !selectedWorkItemType)) {
+      addToast('warning', '请选择产品线及其已启用的工作项子类型');
+      return;
+    }
     const selectedVersion = versions.find((version) => version.name === formVersionName);
     let saveSucceeded = true;
     if (editingTask) {
@@ -641,6 +673,29 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         media: formMedia
       });
       addToast('success', `${itemLabel}信息已更新`);
+    } else if (configuredCategory && selectedProductLine && selectedWorkItemType && unifiedCategory) {
+      try {
+        await productRepository.createWorkItem({
+          requestId: `create-${unifiedCategory}-${Date.now()}`,
+          productLineId: selectedProductLine.id,
+          category: unifiedCategory,
+          taskTypeId: selectedWorkItemType.id,
+          title: formTitle.trim(),
+          description: formDescription,
+          expectedGoal: formTarget,
+          versionId: selectedVersion?.id,
+          requirementId: unifiedCategory === 'requirement' ? undefined : selectedRequirementTaskIds[0] || undefined,
+          priority: apiPriority(formPriority),
+          plannedStartDate: formPlannedStartDate || undefined,
+          plannedEndDate: formDueDate || undefined,
+          estimatedHours: Number(formEstimatedHours) || 0
+        });
+        await unifiedQuery.refetch();
+        addToast('success', `${itemLabel}已创建`, `已关联产品线子类型“${selectedWorkItemType.name}”及其最新状态流程`);
+      } catch (error) {
+        saveSucceeded = false;
+        addToast('error', `${itemLabel}创建失败`, error instanceof Error ? error.message : '请检查产品线类型和状态配置');
+      }
     } else {
       const saved = await addTask({
         title: formTitle,
@@ -677,6 +732,113 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     void handleSaveTask();
     if (formTitle.trim()) window.setTimeout(openAddModal, 0);
   };
+
+  const unifiedTask = (item: UnifiedWorkItem, fallback?: RequirementTask): RequirementTask => ({
+    ...((fallback || {}) as RequirementTask),
+    id: item.id,
+    code: item.code,
+    title: item.title,
+    category: item.category,
+    status: item.status?.name || '待处理',
+    priority: item.priority || 'P2',
+    ownerName: item.assigneeName || '',
+    productLineId: item.productLineId,
+    productLineName: productLines.find((line) => line.id === item.productLineId)?.name || fallback?.productLineName || '',
+    versionId: item.versionId || undefined,
+    versionName: fallback?.versionName || '',
+    requirementId: item.requirementId || undefined,
+    parentWorkItemId: item.parentWorkItemId || undefined,
+    workItemTypeId: item.taskTypeId || undefined,
+    dueDate: item.dueDate || '',
+    estimatedHours: Number(item.estimatedHours || 0),
+    createdAt: item.createdAt,
+    revision: item.revision,
+    hasChildren: item.hasChildren
+  });
+
+  const storedTask = (item: Record<string, unknown>, fallback?: RequirementTask): RequirementTask => ({
+    ...((fallback || {}) as RequirementTask),
+    id: String(item.id || ''),
+    code: String(item.code || ''),
+    title: String(item.title || ''),
+    category: String(item.category || fallback?.category || 'requirement') as RequirementTask['category'],
+    status: String(item.statusName || (item.status && typeof item.status === 'object' ? (item.status as { name?: string }).name : '') || '待处理'),
+    priority: String(item.priority || fallback?.priority || 'P2'),
+    ownerName: String(item.assigneeName || ''),
+    productLineId: String(item.productLineId || fallback?.productLineId || ''),
+    productLineName: productLines.find((line) => line.id === String(item.productLineId || fallback?.productLineId || ''))?.name || fallback?.productLineName || '',
+    versionId: item.versionId ? String(item.versionId) : fallback?.versionId,
+    versionName: fallback?.versionName || '',
+    requirementId: item.requirementId ? String(item.requirementId) : fallback?.requirementId,
+    parentWorkItemId: item.parentWorkItemId ? String(item.parentWorkItemId) : undefined,
+    workItemTypeId: item.taskTypeId ? String(item.taskTypeId) : undefined,
+    plannedStartDate: item.plannedStartDate ? String(item.plannedStartDate) : undefined,
+    dueDate: item.plannedEndDate ? String(item.plannedEndDate) : fallback?.dueDate || '',
+    estimatedHours: Number(item.estimatedHours || 0),
+    createdAt: item.createdAt ? String(item.createdAt) : undefined,
+    revision: item.revision == null ? undefined : Number(item.revision),
+    description: String(item.description || ''),
+    expectedGoal: String(item.expectedGoal || ''),
+    hasChildren: Boolean(item.hasChildren)
+  });
+
+  const copyTask = async (task: RequirementTask, linked: boolean) => {
+    const category = ['requirement', 'design', 'dev', 'test', 'bug'].includes(String(task.category)) ? task.category as 'requirement' | 'design' | 'dev' | 'test' | 'bug' : unifiedCategory;
+    if (!task.productLineId || !task.workItemTypeId || !category) { addToast('warning', '该任务尚未绑定产品线子类型，无法复制'); return; }
+    try {
+      const created = await productRepository.createWorkItem({
+        requestId: `copy-${task.id}-${Date.now()}`,
+        productLineId: task.productLineId,
+        category,
+        taskTypeId: task.workItemTypeId,
+        title: `${task.title} - 副本`,
+        description: task.description || '',
+        expectedGoal: task.expectedGoal || '',
+        versionId: task.versionId || undefined,
+        requirementId: category === 'requirement' ? undefined : task.requirementId || undefined,
+        priority: apiPriority(task.priority),
+        plannedStartDate: task.plannedStartDate || undefined,
+        plannedEndDate: task.dueDate || undefined,
+        estimatedHours: Number(task.estimatedHours || 0)
+      });
+      if (linked) await productRepository.createWorkItemRelation(task.productLineId, task.id, String(created.id));
+      await unifiedQuery.refetch();
+      addToast('success', linked ? '任务已复制并建立关联' : '任务已复制');
+    } catch (error) { addToast('error', linked ? '复制并关联失败' : '复制任务失败', error instanceof Error ? error.message : '请稍后重试'); }
+  };
+
+  const deleteTask = (task: RequirementTask) => {
+    if (!task.productLineId || task.revision == null) { addToast('warning', '该任务不是统一工作项，暂不能从此处删除'); return; }
+    Modal.confirm({
+      title: `删除任务“${task.title}”？`,
+      content: '任务将被软删除；存在子任务时系统会阻止删除。',
+      okText: '删除', cancelText: '取消', okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await productRepository.deleteWorkItem(task.productLineId!, task.id, task.revision!);
+          if (selectedTask?.id === task.id) setSelectedTask(null);
+          await unifiedQuery.refetch();
+          addToast('success', '任务已删除');
+        } catch (error) { addToast('error', '任务删除失败', error instanceof Error ? error.message : '请稍后重试'); }
+      }
+    });
+  };
+
+  const operationMenu = (task: RequirementTask) => ({
+    items: [
+      { key: 'child', icon: <PlusOutlined />, label: '添加子任务' },
+      { key: 'copy', icon: <CopyOutlined />, label: '复制任务' },
+      { key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' },
+      { type: 'divider' as const },
+      { key: 'delete', icon: <DeleteOutlined />, danger: true, label: '删除' }
+    ],
+    onClick: ({ key }: { key: string }) => {
+      if (key === 'child') openChildModal(task);
+      if (key === 'copy') void copyTask(task, false);
+      if (key === 'copy-link') void copyTask(task, true);
+      if (key === 'delete') deleteTask(task);
+    }
+  });
 
   const uniqueValues = (values: Array<string | undefined>) => Array.from(new Set(values.filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'zh-CN'));
   const creatorOptions = uniqueValues(requirementTasks.map((task) => task.creatorName || currentUser.name));
@@ -740,9 +902,9 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     return titleMatch && ownerMatch && matchesFilters(task, appliedFilters);
   });
   const tabCounts = {
-    all: remoteEnabled && activeTab === 'all' ? serverPageQuery.data?.total || 0 : productLineTasks.length,
-    my_owned: remoteEnabled && activeTab === 'my_owned' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_owned')).length,
-    my_created: remoteEnabled && activeTab === 'my_created' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length
+    all: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId).length : remoteEnabled && activeTab === 'all' ? serverPageQuery.data?.total || 0 : productLineTasks.length,
+    my_owned: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_owned')).length : remoteEnabled && activeTab === 'my_owned' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_owned')).length,
+    my_created: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_created')).length : remoteEnabled && activeTab === 'my_created' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length
   };
   const getGroupValue = (task: RequirementTask) => {
     switch (groupBy) {
@@ -761,15 +923,16 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     groups.set(label, (groups.get(label) || 0) + 1);
     return groups;
   }, new Map<string, number>()).entries());
-  const groupTabs: Array<[string, number]> = remoteEnabled
+  const groupTabs: Array<[string, number]> = remoteEnabled && !unifiedCategory
     ? (serverPageQuery.data?.groups || []).map((group): [string, number] => [group.label, Number(group.count)])
     : localGroupTabs;
   const groupValueExists = groupTabs.some(([label]) => label === groupValue);
   const firstGroupValue = groupTabs[0]?.[0] || '';
   const effectiveGroupValue = groupBy === 'none' ? '' : groupValueExists ? groupValue : firstGroupValue;
-  const visibleTasks = remoteEnabled || groupBy === 'none' ? filteredTasks : filteredTasks.filter((task) => getGroupValue(task) === effectiveGroupValue);
+  const rootTasks = unifiedCategory && remoteEnabled ? filteredTasks.filter((task) => !task.parentWorkItemId) : filteredTasks;
+  const visibleTasks = (remoteEnabled && !unifiedCategory) || groupBy === 'none' ? rootTasks : rootTasks.filter((task) => getGroupValue(task) === effectiveGroupValue);
   const pagedTasks = remoteEnabled ? visibleTasks : visibleTasks.slice((page - 1) * pageSize, page * pageSize);
-  const paginationTotal = unifiedCategory && remoteEnabled ? activeTasks.length : remoteEnabled ? serverPageQuery.data?.total || 0 : visibleTasks.length;
+  const paginationTotal = unifiedCategory && remoteEnabled ? rootTasks.length : remoteEnabled ? serverPageQuery.data?.total || 0 : visibleTasks.length;
 
   useEffect(() => setPage(1), [activeTab, searchQuery, searchOwnerNames, appliedFilters, groupBy, groupValue, pageSize, productLineFilter]);
   useEffect(() => {
@@ -844,6 +1007,58 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         {value.operator === 'between' && <><span className="text-center text-[var(--text-muted)]">-</span>{dateInput('to', '结束日期')}</>}
       </div>
     </div>;
+  };
+
+  const toggleListRow = async (task: RequirementTask) => {
+    if (expandedListRows.includes(task.id)) {
+      setExpandedListRows((rows) => rows.filter((item) => item !== task.id));
+      return;
+    }
+    setExpandedListRows((rows) => [...rows, task.id]);
+    if (listChildren[task.id] || !task.productLineId) return;
+    try {
+      const detail = await productRepository.workItemDetail(task.productLineId, task.id);
+      setListChildren((current) => ({ ...current, [task.id]: (detail.children || []).map((item: Record<string, unknown>) => storedTask(item, task)) }));
+    } catch (error) {
+      setExpandedListRows((rows) => rows.filter((item) => item !== task.id));
+      addToast('error', '子任务加载失败', error instanceof Error ? error.message : '请稍后重试');
+    }
+  };
+
+  const renderTaskRows = (task: RequirementTask, depth = 0, isLast = true): React.ReactNode => {
+    const children = listChildren[task.id] || [];
+    const hasChildren = Boolean(task.hasChildren || children.length > 0);
+    const expanded = expandedListRows.includes(task.id);
+    const isChild = depth > 0;
+    return <React.Fragment key={task.id}>
+      <tr className={`${isChild ? 'bg-[var(--bg-surface-soft)]/60' : ''} transition-colors hover:bg-[var(--bg-surface-soft)]`}>
+        <td className="max-w-[360px] px-4 py-3.5 font-semibold text-[var(--text-primary)]">
+          <div className="flex min-w-0 items-center gap-2" style={{ paddingLeft: depth * 24 }}>
+            <input type="checkbox" aria-label={`选择${task.title}`} className="h-4 w-4 shrink-0 rounded border-[var(--border-main)]" />
+            {depth > 0 && <span aria-hidden="true" className="shrink-0 font-mono text-[var(--text-muted)]">{isLast ? '└─' : '├─'}</span>}
+            {hasChildren ? <button type="button" aria-label={`${expanded ? '收起' : '展开'}${task.title}`} onClick={() => void toggleListRow(task)} className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]">{expanded ? '⌄' : '›'}</button> : <span className="w-5 shrink-0" />}
+            <span className="shrink-0 rounded border border-[var(--border-main)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-body)]">{workItemCategoryLabel[String(task.category)] || '任务'}</span>
+            <button type="button" onClick={() => setSelectedTask(task)} className="min-w-0 truncate text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]" title={task.title}>{task.title}</button>
+          </div>
+        </td>
+        <td className="px-4 py-3.5">
+          {isChild ? <WorkItemStatusTag name={task.status || '待处理'} /> : <Select aria-label={`${task.title}状态`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.status} options={STAGES.map((status, index) => ({ label: status, value: status, disabled: index < STAGES.indexOf(task.status) }))} onChange={(status) => updateTask(task.id, { status })} />}
+        </td>
+        <td className="px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>
+        <td className="max-w-[240px] px-4 py-3.5 text-[var(--text-body)]"><span className="line-clamp-2 font-mono text-[var(--primary)]" title={task.versionName || '未关联'}>{task.versionName || '未关联'}</span></td>
+        <td className="px-4 py-3.5 text-[var(--text-muted)]">
+          {isChild ? task.ownerName || '未设置' : <Select aria-label={`${task.title}负责人`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.ownerName || undefined} placeholder="未设置" options={employees.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => updateTask(task.id, { ownerName })} />}
+        </td>
+        <td className="px-4 py-3.5 text-[var(--text-muted)]">{task.creatorName || currentUser.name}</td>
+        <td className="px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt || '—'}</td>
+        <td className="px-4 py-3.5 text-right">
+          <Dropdown menu={operationMenu(task)} trigger={['click']}>
+            <Button type="text" icon={<MoreOutlined />} aria-label={`操作${task.title}`} />
+          </Dropdown>
+        </td>
+      </tr>
+      {expanded && children.map((child, index) => renderTaskRows(child, depth + 1, index === children.length - 1))}
+    </React.Fragment>;
   };
 
   return (
@@ -932,54 +1147,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {pagedTasks.map((t) => (
-                  <React.Fragment key={t.id}>
-                  <tr
-                    key={`${t.id}-row`}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                  >
-                    <td className="max-w-[320px] py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
-                      <div className="flex items-center gap-2"><input type="checkbox" aria-label={`选择${t.title}`} className="h-4 w-4 rounded border-slate-300" />{listChildren[t.id]?.length ? <button type="button" aria-label={`${expandedListRows.includes(t.id) ? '收起' : '展开'}${t.title}`} onClick={() => setExpandedListRows((rows) => rows.includes(t.id) ? rows.filter((id) => id !== t.id) : [...rows, t.id])} className="text-slate-600">{expandedListRows.includes(t.id) ? '⌄' : '›'}</button> : <span className="w-3" />}<span className="rounded-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">STORY</span><button type="button" onClick={() => setSelectedTask(t)} className="line-clamp-2 max-w-[240px] text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]" title={t.title}>{t.title}</button></div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <Select aria-label={`${t.title}状态`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={t.status} options={STAGES.map((status, index) => ({ label: status, value: status, disabled: index < STAGES.indexOf(t.status) }))} onChange={(status) => updateTask(t.id, { status })} />
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <StatusTag status={normalizePriority(t.priority)} />
-                    </td>
-                    <td className="max-w-[240px] py-3.5 px-4 text-slate-600 dark:text-slate-400">
-                      <span className="line-clamp-2 font-mono text-blue-600" title={t.versionName || '未关联'}>{t.versionName || '未关联'}</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-500">
-                      <Select aria-label={`${t.title}负责人`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={t.ownerName || undefined} placeholder="未设置" options={employees.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => updateTask(t.id, { ownerName })} />
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-500">
-                      {t.creatorName || currentUser.name}
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-500 font-mono">
-                      {t.createdAt || '—'}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => setSelectedTask(t)}
-                          className="inline-flex items-center gap-1 text-[var(--active-text)] hover:text-[var(--primary-hover)]"
-                        >
-                          详情 <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedListRows.includes(t.id) && listChildren[t.id]?.length ? listChildren[t.id].map((child) => <tr key={`${t.id}-${child.id}`} className="bg-slate-50/60 dark:bg-slate-800/30">
-                    <td className="py-2.5 px-4"><div className="flex items-center gap-2 pl-8"><span className="h-4 w-px bg-slate-300 dark:bg-slate-700" /><span className="rounded-sm bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-white">TASK</span><button type="button" onClick={() => setSelectedTask({ ...t, id: child.id, title: child.title, category: child.category, status: child.status?.name || '待处理', priority: child.priority || 'P2', ownerName: child.assigneeName || '', requirementId: child.requirementId || t.requirementId, parentWorkItemId: child.parentWorkItemId || t.id } as RequirementTask)} className="text-left text-[var(--primary)] hover:text-[var(--primary-hover)]">{child.title}</button></div></td>
-                    <td className="py-2.5 px-4"><WorkItemStatusTag name={child.status?.name || '待处理'} color={child.statusColor} /></td>
-                    <td className="py-2.5 px-4"><StatusTag status={normalizePriority(child.priority || 'P2')} /></td>
-                    <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">{t.versionName || '未关联'}</td>
-                    <td className="py-2.5 px-4 text-slate-500">{child.assigneeName || '未设置'}</td><td className="py-2.5 px-4 text-slate-500">{t.creatorName || currentUser.name}</td><td className="py-2.5 px-4 text-slate-500">{child.createdAt || '—'}</td><td />
-                  </tr>) : null}
-                  </React.Fragment>
-                ))}
-                {pagedTasks.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">{serverPageQuery.isPending && remoteEnabled ? `正在加载${itemLabel}...` : serverPageQuery.isError && remoteEnabled ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => serverPageQuery.refetch()}>重试</Button></span> : `没有符合当前搜索、过滤或分组条件的${itemLabel === '需求任务' ? '需求' : itemLabel}`}</td></tr>}
+                {pagedTasks.map((task, index) => renderTaskRows(task, 0, index === pagedTasks.length - 1))}
+                {pagedTasks.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">{unifiedCategory && remoteEnabled && unifiedQuery.isPending ? `正在加载${itemLabel}...` : unifiedCategory && remoteEnabled && unifiedQuery.isError ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => unifiedQuery.refetch()}>重试</Button></span> : serverPageQuery.isPending && remoteEnabled && !unifiedCategory ? `正在加载${itemLabel}...` : serverPageQuery.isError && remoteEnabled && !unifiedCategory ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => serverPageQuery.refetch()}>重试</Button></span> : `没有符合当前搜索、过滤或分组条件的${itemLabel === '需求任务' ? '需求' : itemLabel}`}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1009,11 +1178,11 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           properties={<div className={`space-y-6 text-xs ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
+              <SearchableSelect label="所属产品线" value={selectedTask.productLineName || ''} options={productLines.map((line) => line.name)} onChange={(productLineName) => saveDetailUpdates({ productLineName, productLineId: productLines.find((line) => line.name === productLineName)?.id, versionName: '' })} placeholder="未设置" />
               <SearchableSelect label="当前状态" value={selectedTask.status} options={STAGES} onChange={(status) => saveDetailUpdates({ status })} />
               <SearchableSelect label="需求类型" value={selectedTask.requirementType || ''} options={['业务需求', '产品优化', '技术需求', '合规需求']} onChange={(requirementType) => saveDetailUpdates({ requirementType })} placeholder="未设置" clearable />
               <SearchableSelect label="负责人" value={selectedTask.ownerName || ''} options={employees} onChange={(ownerName) => saveDetailUpdates({ ownerName })} placeholder="未设置" />
               <SearchableSelect label="优先级" value={normalizePriority(selectedTask.priority)} options={['紧急', '高', '中', '低']} onChange={(priority) => saveDetailUpdates({ priority: priority as RequirementTask['priority'] })} />
-              <SearchableSelect label="所属产品线" value={selectedTask.productLineName || ''} options={productLines.map((line) => line.name)} onChange={(productLineName) => saveDetailUpdates({ productLineName, productLineId: productLines.find((line) => line.name === productLineName)?.id, versionName: '' })} placeholder="未设置" />
               <DetailDateInput label="计划开始时间" value={selectedTask.plannedStartDate} onSave={(plannedStartDate) => saveDetailUpdates({ plannedStartDate })} />
               <DetailDateInput label="计划完成时间" value={selectedTask.dueDate} onSave={(dueDate) => saveDetailUpdates({ dueDate })} />
               <DetailDateInput label="期望完成时间" value={selectedTask.expectedCompleteDate} onSave={(expectedCompleteDate) => saveDetailUpdates({ expectedCompleteDate })} />
@@ -1024,7 +1193,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
             </section>
             <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
               <h3 className="font-semibold text-[var(--text-primary)]">工时</h3>
-              <DetailTextInput label="预计工时（小时）" value={String(selectedTask.estimatedHours ?? 0)} onSave={(value) => saveDetailUpdates({ estimatedHours: Number(value) || 0 })} />
+              <DetailNumberInput label="预计工时（小时）" value={Number(selectedTask.estimatedHours || 0)} onSave={(estimatedHours) => saveDetailUpdates({ estimatedHours })} />
             </section>
             <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
               <h3 className="font-semibold text-[var(--text-primary)]">附件</h3>
@@ -1033,11 +1202,19 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           </div>}
         >
           <div className="w-full space-y-5 text-xs">
-            <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
+            <div className={detailEditing ? '' : 'pointer-events-none opacity-80'}>
               <DetailTextInput label={`${itemLabel}名称`} value={selectedTask.title} onSave={(title) => title.trim() && saveDetailUpdates({ title })} />
+            </div>
+            {parentWorkItem && <section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2">
+              <span className="block text-[var(--text-muted)]">父级任务</span>
+              <button type="button" onClick={() => setSelectedTask(storedTask(parentWorkItem, selectedTask))} className="mt-1 flex max-w-full items-center gap-2 text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">
+                <span className="shrink-0 font-mono text-[11px]">{String(parentWorkItem.code || '')}</span>
+                <span className="truncate">{String(parentWorkItem.title || '')}</span>
+              </button>
+            </section>}
+            <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
               {taskKind === 'requirement' && <DetailTextInput label="验收标准" value={selectedTask.expectedGoal || ''} onSave={(expectedGoal) => saveDetailUpdates({ expectedGoal })} multiline />}
-              <section className="space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold text-[var(--text-primary)]">子任务</h3><Button size="small" onClick={openChildModal}>+ 添加子任务</Button></div>{childWorkItems.length > 0 ? <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{childWorkItems.map((child) => <div key={String(child.id)} className="grid grid-cols-[90px_minmax(0,1fr)_100px_120px] gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><span className="text-[var(--text-muted)]">{({ design: '设计', dev: '研发', test: '测试', bug: '缺陷', requirement: '需求' } as Record<string, string>)[String(child.category)] || String(child.category || '工作项')}</span><span className="truncate text-[var(--text-primary)]">{String(child.title || '')}</span><span className="text-[var(--text-body)]">{String(child.statusName || child.status?.name || '待处理')}</span><span className="truncate text-[var(--text-muted)]">{String(child.assigneeName || '未分配')}</span></div>)}</div> : <div className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">暂无子任务，需求评审下发的设计、研发、测试主任务会显示在这里</div>}</section>
-                            <label className="block text-[var(--text-muted)]">
+              <label className="block text-[var(--text-muted)]">
                 <span>任务描述</span>
                 <div className="mt-1">
                   <RichTextEditor 
@@ -1063,15 +1240,30 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
               <div className="mb-4 border-b border-[var(--border-main)] px-3 py-2">
                 <Segmented
                   value={detailTab}
-                  onChange={(value) => setDetailTab(value as 'activity' | 'workOrders')}
+                  onChange={(value) => setDetailTab(value as 'activity' | 'relations' | 'children')}
                   options={[
                     { label: `动态 · ${selectedTask.events?.length || 0}`, value: 'activity' },
-                    { label: `关联工单 · ${selectedTask.sourceWorkOrderIds?.length || 0}`, value: 'workOrders' },
+                    { label: `关联对象 · ${relatedWorkItems.length + (selectedTask.sourceWorkOrderIds?.length || 0)}`, value: 'relations' },
+                    { label: `子任务 · ${childWorkItems.length}`, value: 'children' },
                   ]}
                 />
               </div>
-              {detailTab === 'workOrders' ? (
-                <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={detailEditing ? updateLinkedWorkOrders : () => undefined} placeholder="选择关联工单" />
+              {detailTab === 'relations' ? (
+                <div className="space-y-4">
+                  {relatedWorkItems.length > 0 && <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{relatedWorkItems.map((item) => <button type="button" key={item.id} onClick={() => setSelectedTask(item)} className="grid w-full grid-cols-[100px_minmax(0,1fr)_100px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 text-left last:border-b-0 hover:bg-[var(--bg-surface-soft)]"><span className="font-mono text-[var(--text-muted)]">{item.code || '工作项'}</span><span className="truncate text-[var(--primary)]">{item.title}</span><span className="text-[var(--text-body)]">{item.status}</span></button>)}</div>}
+                  <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={detailEditing ? updateLinkedWorkOrders : () => undefined} placeholder="选择关联工单" />
+                  {!relatedWorkItems.length && !(selectedTask.sourceWorkOrderIds || []).length && <p className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">暂无关联对象</p>}
+                </div>
+              ) : detailTab === 'children' ? (
+                <div className="space-y-3">
+                  <div className="flex justify-end"><Button size="small" icon={<PlusOutlined />} onClick={() => openChildModal()}>添加子任务</Button></div>
+                  {childWorkItems.length > 0 ? <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{childWorkItems.map((child) => <div key={String(child.id)} className="grid grid-cols-[90px_minmax(0,1fr)_100px_120px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0">
+                    <span className="text-[var(--text-muted)]">{workItemCategoryLabel[String(child.category)] || String(child.category || '工作项')}</span>
+                    <button type="button" onClick={() => setSelectedTask(storedTask(child, selectedTask))} className="truncate text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">{String(child.title || '')}</button>
+                    <span className="text-[var(--text-body)]">{String(child.statusName || (child.status && typeof child.status === 'object' ? (child.status as { name?: string }).name : '') || '待处理')}</span>
+                    <span className="truncate text-[var(--text-muted)]">{String(child.assigneeName || '未分配')}</span>
+                  </div>)}</div> : <div className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">暂无子任务</div>}
+                </div>
               ) : (
                 <div className="space-y-5">
                   <div className="space-y-4">
@@ -1094,13 +1286,27 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           </div>
         </WorkItemCreatePanel>
       )}
-      <Modal title="添加子任务" open={childModalOpen} onCancel={() => setChildModalOpen(false)} onOk={() => void createChildWorkItem()} okText="创建" cancelText="取消">
-        <div className="space-y-4">
-          <label className="block text-xs text-[var(--text-muted)]"><span>子任务分类</span><Select className="mt-1 w-full" value={childCategory} options={childCategoryOptions} onChange={setChildCategory} /></label>
-          <label className="block text-xs text-[var(--text-muted)]"><span>工作项类型</span><Select className="mt-1 w-full" value={childTypeId || undefined} placeholder="请选择已配置类型" options={childTypes.filter((item) => item.category === childCategory).map((item) => ({ value: item.id, label: item.name }))} onChange={setChildTypeId} /></label>
-          <label className="block text-xs text-[var(--text-muted)]"><span>子任务名称</span><Input className="mt-1" value={childTitle} onChange={(event) => setChildTitle(event.target.value)} placeholder="例如：完成接口联调" /></label>
-        </div>
-      </Modal>
+      <WorkItemCreatePanel
+        isOpen={childModalOpen}
+        onClose={() => setChildModalOpen(false)}
+        title="添加子任务"
+        showContinueOption={false}
+        footer={<><Button onClick={() => setChildModalOpen(false)}>取消</Button><Button type="primary" onClick={() => void createChildWorkItem()}>创建</Button></>}
+        properties={<Form layout="vertical" className="requirement-create-properties">
+          <Form.Item label="子任务分类" required><Select value={childCategory} options={childCategoryOptions} onChange={setChildCategory} /></Form.Item>
+          <Form.Item label="工作项类型" required><Select value={childTypeId || undefined} placeholder="请选择已配置类型" options={childTypes.filter((item) => item.category === childCategory).map((item) => ({ value: item.id, label: item.name }))} onChange={setChildTypeId} /></Form.Item>
+          <Form.Item label="优先级" required><Select value={childPriority} onChange={setChildPriority} options={['紧急', '高', '中', '低'].map((value) => ({ value, label: value }))} /></Form.Item>
+          <Form.Item label="计划开始时间"><DatePicker value={childPlannedStartDate ? dayjs(childPlannedStartDate) : null} onChange={(date) => setChildPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" /></Form.Item>
+          <Form.Item label="计划完成时间"><DatePicker value={childDueDate ? dayjs(childDueDate) : null} onChange={(date) => setChildDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" /></Form.Item>
+          <Form.Item label="预计工时（小时）"><InputNumber min={0} value={childEstimatedHours === '' ? null : childEstimatedHours} onChange={(value) => setChildEstimatedHours(value ?? '')} className="w-full" /></Form.Item>
+        </Form>}
+      >
+        <Form layout="vertical" className="w-full">
+          <Form.Item label="子任务名称" required><Input value={childTitle} onChange={(event) => setChildTitle(event.target.value)} placeholder="例如：完成接口联调" /></Form.Item>
+          {selectedTask && <section className="mb-6 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2"><span className="block text-xs text-[var(--text-muted)]">父级任务</span><div className="mt-1 flex min-w-0 gap-2 text-xs"><span className="shrink-0 font-mono text-[var(--text-muted)]">{selectedTask.code || selectedTask.id}</span><span className="truncate text-[var(--text-primary)]">{selectedTask.title}</span></div></section>}
+          <Form.Item label="任务描述"><Input.TextArea rows={8} value={childDescription} onChange={(event) => setChildDescription(event.target.value)} placeholder="补充子任务范围、交付物和注意事项" /></Form.Item>
+        </Form>
+      </WorkItemCreatePanel>
 
       {/* Add / Edit Task Modal (云效风格: 任务名称、任务描述、期望目标、完成时间、分配负责人、紧急程度、关联版本、关联客户、关联产品、预计工时) */}
       <WorkItemCreatePanel
@@ -1135,7 +1341,6 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       >
         <Form layout="vertical" className="w-full" data-work-item-form>
           <Form.Item label={`${itemLabel}名称`} required><Input value={formTitle} onChange={(event) => setFormTitle(event.target.value)} placeholder="例如：支持达梦DM8数据库读写分离与主备秒级切换" /></Form.Item>
-          {taskKind === 'requirement' && <Form.Item label="验收标准"><Input value={formTarget} onChange={(event) => setFormTarget(event.target.value)} placeholder="例如：通过自动化单测，支撑压测 QPS 突破 5000" /></Form.Item>}
           <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} onBlur={() => { /* auto-save description */ }} placeholder="详细记录需求背景、业务场景和实现说明..." /></Form.Item>
           <Form.Item label="关联对象"><WorkOrderPicker candidates={candidateOptions.filter((item) => item.id !== editingTask?.id)} selectedIds={[...selectedRequirementTaskIds, ...selectedWorkOrderIds]} onChange={(ids) => { const selectedId = ids.slice(-1)[0] || ''; const selectedItem = candidateOptions.find((item) => item.id === selectedId); setSelectedRequirementTaskIds(selectedItem?.type === 'requirement' ? [selectedId] : []); setSelectedWorkOrderIds(selectedItem && selectedItem.type !== 'requirement' ? [selectedId] : []); }} placeholder="请选择关联工单" /></Form.Item>
         </Form>
