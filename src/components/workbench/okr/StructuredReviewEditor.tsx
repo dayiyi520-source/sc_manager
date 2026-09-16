@@ -54,7 +54,6 @@ const objectiveGroups=okrs.filter(objective=>selectedObjectiveIds.includes(objec
  const changeObjectives=(ids:string[])=>setSelectedObjectiveIds(ids);
  const openPicker=(target:string,source:PickerSource='task')=>{const kr=krs.find(item=>item.keyResultId===target);setPicker({target,source,selection:target==='extra'?[...extra.workIds]:[...(kr?.workIds||[])],keyword:'',status:'all'});};
  const pickerCandidates=candidates.filter(item=>picker?.source===workSource(item)).filter(item=>['待处理','处理中','已完成'].includes(item.status)).filter(item=>item.status!=='已完成'||(!dayjs(item.updatedAt).isBefore(period.startDate,'day')&&!dayjs(item.updatedAt).isAfter(period.endDate,'day'))).filter(item=>!picker?.keyword.trim()||`${item.title} ${item.id}`.toLowerCase().includes(picker.keyword.trim().toLowerCase())).filter(item=>picker?.status==='all'||item.status===picker.status);
- const changeType=(item:OkrWork)=>item.createdAt>=period.startDate&&item.createdAt<=period.endDate?'本期新建':item.status==='已完成'?'本期完成':'本期进行中';
  const confirmPicker=()=>{if(!picker)return;if(picker.target==='extra')setExtra(value=>({...value,workIds:picker.selection}));else update(picker.target,{workIds:picker.selection});setPicker(null);};
  const removeWork=(target:string,id:string)=>target==='extra'?setExtra(value=>({...value,workIds:value.workIds.filter(workId=>workId!==id)})):update(target,{workIds:krs.find(kr=>kr.keyResultId===target)?.workIds.filter(workId=>workId!==id)||[]});
  const evidenceColumns=(target:string)=>[
@@ -93,10 +92,10 @@ const objectiveGroups=okrs.filter(objective=>selectedObjectiveIds.includes(objec
   <Modal
    className="okr-work-picker-shell"
    open={!!picker}
-   title="关联我的工作数据"
+   title="关联任务或工单"
    width={1120}
    onCancel={()=>setPicker(null)}
-   footer={[<span key="count" className="okr-work-picker-footer-count">已选择 <b>{picker?.selection.length||0}</b> 项任务或工单</span>,<Button key="cancel" size="large" onClick={()=>setPicker(null)}>取消</Button>,<Button key="confirm" size="large" type="primary" onClick={confirmPicker}>确认关联（{picker?.selection.length||0}）</Button>]}
+   footer={[<span key="count" className="okr-work-picker-footer-count">已选 <b>{picker?.selection.length||0}</b> 项任务或工单</span>,<Button key="cancel" size="large" onClick={()=>setPicker(null)}>取消</Button>,<Button key="confirm" size="large" type="primary" onClick={confirmPicker}>确认关联（{picker?.selection.length||0}）</Button>]}
   >
    {picker&&<div className="okr-work-picker">
     <Tabs
@@ -109,7 +108,7 @@ const objectiveGroups=okrs.filter(objective=>selectedObjectiveIds.includes(objec
      <Input size="large" allowClear prefix={<Search/>} value={picker.keyword} onChange={event=>setPicker(value=>value&&({...value,keyword:event.target.value}))} placeholder="搜索任务名称或编号"/>
      <Select size="large" value={picker.status} onChange={status=>setPicker(value=>value&&({...value,status}))} options={[{value:'all',label:'全部状态'},{value:'待处理',label:'待处理'},{value:'处理中',label:'处理中'},{value:'已完成',label:'已完成'}]}/>
     </div>
-    <main className="okr-work-picker-main">{workError&&<Alert type="error" title="工作项加载失败" action={<Button onClick={onRefreshWork}>重试</Button>}/>}<Table<OkrWork> rowKey="id" loading={workLoading} pagination={false} dataSource={pickerCandidates} locale={{emptyText:<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前条件下暂无可关联工作"/>}} rowSelection={{selectedRowKeys:picker.selection,onChange:keys=>setPicker(value=>value&&({...value,selection:keys as string[]})),getCheckboxProps:item=>({disabled:linkedIds.has(item.id)&&!picker.selection.includes(item.id)})}} columns={[{title:'标题',dataIndex:'title',ellipsis:true},{title:'当前状态',dataIndex:'status',width:120,render:(status:string)=><Tag color={statusColor(status)}>{status}</Tag>},{title:'本期变化类型',width:140,render:(_:unknown,item:OkrWork)=><span>{changeType(item)}</span>},{title:'更新时间',dataIndex:'updatedAt',width:140,render:(value:string)=>value?.slice(0,16).replace('T',' ')||'-'},{title:'选择操作',width:100,render:(_:unknown,item:OkrWork)=><Button type="link" disabled={linkedIds.has(item.id)&&!picker.selection.includes(item.id)} onClick={()=>setPicker(value=>value&&({...value,selection:value.selection.includes(item.id)?value.selection.filter(id=>id!==item.id):[...value.selection,item.id]}))}>{picker.selection.includes(item.id)?'取消选择':'选择'}</Button>}]}/></main>
+    <main className="okr-work-picker-main">{workError&&<Alert type="error" title="工作项加载失败" action={<Button onClick={onRefreshWork}>重试</Button>}/>}<Table<OkrWork> rowKey="id" loading={workLoading} pagination={false} dataSource={pickerCandidates} locale={{emptyText:<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前条件下暂无可关联工作"/>}} rowSelection={{selectedRowKeys:picker.selection,onChange:keys=>setPicker(value=>value&&({...value,selection:keys as string[]})),getCheckboxProps:item=>({disabled:linkedIds.has(item.id)&&!picker.selection.includes(item.id)})}} columns={[{title:'标题',dataIndex:'title',ellipsis:true},{title:'当前状态',dataIndex:'status',width:120,render:(status:string)=><Tag color={statusColor(status)}>{status}</Tag>},{title:'创建者',dataIndex:'creatorName',width:140,render:(value:string)=>value||'未知'},{title:'更新时间',dataIndex:'updatedAt',width:140,render:(value:string)=>value?.slice(0,16).replace('T',' ')||'-'},{title:'选择操作',width:100,render:(_:unknown,item:OkrWork)=><Button type="link" disabled={linkedIds.has(item.id)&&!picker.selection.includes(item.id)} onClick={()=>setPicker(value=>value&&({...value,selection:value.selection.includes(item.id)?value.selection.filter(id=>id!==item.id):[...value.selection,item.id]}))}>{picker.selection.includes(item.id)?'取消选择':'选择'}</Button>}]}/></main>
    </div>}
   </Modal>
  </div>;

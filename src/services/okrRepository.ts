@@ -19,7 +19,7 @@ export interface OkrPayload {
   objectiveSnapshots?: Array<{id:string;period:string;payload:OkrPayload}>;
 }
 export interface OkrRecord { id: string; kind: 'objective' | 'review'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload }
-export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
+export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; creatorName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
 const base = '/api/okr';
 export const okrRepository = {
   people: () => apiRequest<OkrPerson[]>(`${base}/people`),
