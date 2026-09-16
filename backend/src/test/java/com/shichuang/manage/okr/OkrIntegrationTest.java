@@ -66,7 +66,7 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
   String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
   jdbc.update("UPDATE t_product_requirement SET owner_name_=?,status_=?,update_time_=? WHERE tenant_id_=? AND id_=?","王浩然","已完成","2026-09-14 12:00:00","local-tenant","req-1");
   String workJson=mockMvc.perform(get("/api/okr/work?ownerId=user-tech").header("Authorization","Bearer "+tech)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-  String workId="";for(var w:objectMapper.readTree(workJson).path("data"))if("req-1".equals(w.path("sourceId").asText()))workId=w.path("id").asText();assertFalse(workId.isBlank());
+  String workId="";for(var w:objectMapper.readTree(workJson).path("data"))if("req-1".equals(w.path("sourceId").asText())){workId=w.path("id").asText();assertEquals("product_requirement",w.path("kind").asText());}assertFalse(workId.isBlank());
   var payload=new java.util.LinkedHashMap<String,Object>();
   payload.put("title","完成工作关联验收");payload.put("startDate","2026-09-14");payload.put("endDate","2026-09-20");payload.put("reviewMode","completed");payload.put("reviewType","week");payload.put("summary","完成本周任务");payload.put("selfScore",90);payload.put("sendTo",List.of());payload.put("items",List.of(Map.of("workId",workId)));
   var request=Map.of("kind","review","periodKey","2026-09-14/2026-09-20","payload",payload,"submit",true);

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Alert, Button, Empty, Progress, Cascader, Spin, Tag, Tabs, Collapse } from 'antd';
+import { Alert, Button, Empty, Progress, Cascader, Spin, Tag, Tabs } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
@@ -13,6 +13,27 @@ import { ObjectiveForm, type ObjectiveFormHandle } from './okr/ObjectiveForm';
 import { StructuredReviewEditor } from './okr/StructuredReviewEditor';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
+
+type StoredExtraWork = {
+  source?: string;
+  content?: string;
+  hours?: string;
+  status?: string;
+  impact?: string;
+};
+
+const parseStoredExtraWork = (description?: string): StoredExtraWork[] => {
+  if (!description?.startsWith('[')) return [];
+  try {
+    const value: unknown = JSON.parse(description);
+    return Array.isArray(value)
+      ? value.filter((item): item is StoredExtraWork => typeof item === 'object' && item !== null)
+      : [];
+  } catch {
+    return [];
+  }
+};
+
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
   const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, busy } = useOriginalOkr();
@@ -216,36 +237,38 @@ const OriginalWorkspace: React.FC = () => {
 
       {/* Main Tab 2: 目标复盘总结 */}
       {mainTab === 'reviews' && (
-        <div className="space-y-6">
-          <Tabs activeKey={reviewSubTab} onChange={v=>{setReviewSubTab(v as typeof reviewSubTab);if(v==='write')setIsReviewFormOpen(false);}} items={[
-            {key:'write',label:'写复盘总结'},
-            {key:'my',label:`我的复盘列表 (${performances.filter(p=>p.authorId===currentUser.id).length})`},
-            {key:'received',label:`我收到的复盘 (${performances.filter(p=>p.authorId!==currentUser.id).length})`},
-          ]}/>
+        <div className={reviewSubTab === 'write' && isReviewFormOpen ? "space-y-0" : "space-y-6"}>
+          <Tabs
+            className={reviewSubTab === 'write' && isReviewFormOpen ? "!mb-0" : ""}
+            activeKey={reviewSubTab}
+            onChange={v=>{setReviewSubTab(v as typeof reviewSubTab);if(v==='write'){setIsReviewFormOpen(true);setReviewType('week');}}}
+            items={[
+              {key:'write',label:'写复盘总结'},
+              {key:'my',label:`我的复盘列表 (${performances.filter(p=>p.authorId===currentUser.id).length})`},
+              {key:'received',label:`我收到的复盘 (${performances.filter(p=>p.authorId!==currentUser.id).length})`},
+            ]}
+          />
 
           {/* Subtab: 写总结 */}
           {reviewSubTab === 'write' && !isReviewFormOpen && (
             <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
-              <Empty description="暂无需要填写的总结"/>
-              <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                选择复盘周期后开始记录本阶段的工作成果与改进计划
+              <Empty description="选择复盘周期开始撰写"/>
+              <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--text-muted)]">
+                记录本阶段的工作成果、OKR进度与改进计划
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 <Button
-
+                  type="primary"
                   onClick={() => openReviewForm('week')}
-
                 >
                   <Calendar className="h-3.5 w-3.5" />
-                  周复盘
+                  写周报
                 </Button>
                 <Button
-
                   onClick={() => openReviewForm('month')}
-
                 >
                   <FileSpreadsheet className="h-3.5 w-3.5" />
-                  月度复盘
+                  写月报
                 </Button>
               </div>
             </div>
@@ -266,67 +289,159 @@ const OriginalWorkspace: React.FC = () => {
               {visiblePerformances.length === 0 ? (
                 <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
                   <Empty description={reviewSubTab === 'my' ? '暂无我的复盘' : '暂无收到的复盘'}/>
-                  <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--text-muted)]">
                     {reviewSubTab === 'my' ? '完成并提交复盘总结后将在这里展示' : '其他成员发送给你的复盘将在这里展示'}
                   </p>
                 </div>
               ) : visiblePerformances.map((perf) => (
-                <Card key={perf.id}>
-                  <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <Card key={perf.id} className="border border-[var(--border-main)] bg-[var(--bg-card)]">
+                  <div className="flex flex-wrap gap-3 items-center justify-between border-b border-[var(--border-main)] pb-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">
+                        <Tag color={perf.type === 'week' ? 'blue' : 'purple'}>{perf.type === 'week' ? '周报' : '月报'}</Tag>
+                        <span className="font-bold text-sm text-[var(--text-primary)]">
                           {perf.cycleName}
                         </span>
-                        <Tag>{{draft:'草稿',submitted:'已提交',reviewed:'已评价'}[perf.status] || perf.status}</Tag>
+                        <Tag color={perf.status === 'submitted' ? 'processing' : perf.status === 'reviewed' ? 'success' : 'default'}>
+                          {{draft:'草稿状态',submitted:'已提交',reviewed:'已评价'}[perf.status] || perf.status}
+                        </Tag>
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
+                      <div className="text-[11px] text-[var(--text-muted)] mt-1">
                         述职人：{perf.author} ({perf.authorDept}) · 提交时间：{perf.createdAt}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <span className="text-slate-400 text-[11px]">自评分</span>
-                        <div className="font-bold text-blue-600 text-sm">{perf.selfScore}分</div>
+                        <span className="text-[var(--text-muted)] text-[11px]">自评分</span>
+                        <div className="font-bold text-[var(--primary)] text-sm">{perf.selfScore}分</div>
                       </div>
                       {perf.leaderScore != null && (
-                        <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-3">
-                          <span className="text-slate-400 text-[11px]">领导考评分</span>
-                          <div className="font-bold text-emerald-600 text-sm">{perf.leaderScore}分</div>
+                        <div className="text-right border-l border-[var(--border-main)] pl-3">
+                          <span className="text-[var(--text-muted)] text-[11px]">领导考评分</span>
+                          <div className="font-bold text-[var(--success)] text-sm">{perf.leaderScore}分</div>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    {!!perf.krReviews?.length && <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-3">
-                      <div><span className="text-xs text-slate-500">KR 数量</span><div className="font-semibold">{perf.krReviews.length}</div></div>
-                      <div><span className="text-xs text-slate-500">确认进度</span><Progress percent={Math.round(perf.krReviews.reduce((s,k)=>s+k.currentProgress,0)/perf.krReviews.length)} size="small"/></div>
-                      <div><span className="text-xs text-slate-500">健康状态</span><div className="mt-1"><Tag color={perf.krReviews.some(k=>k.health==='blocked')?'red':perf.krReviews.some(k=>k.health==='risk')?'orange':'green'}>{perf.krReviews.some(k=>k.health==='blocked')?'存在阻塞':perf.krReviews.some(k=>k.health==='risk')?'存在风险':'正常'}</Tag></div></div>
-                    </div>}
-                    {!!perf.krReviews?.length && <Collapse ghost items={perf.krReviews.map((kr,index)=>({key:kr.keyResultId,label:`KR${index+1} · ${kr.keyResultTitle}`,children:<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs"><div><strong>本期成果</strong><p className="mt-1 text-slate-600 dark:text-slate-300">{kr.achievement||'未填写'}</p></div><div><strong>阻塞与风险</strong><p className="mt-1 text-slate-600 dark:text-slate-300">{kr.blocker||'无'}</p></div><div><strong>下一步计划</strong><p className="mt-1 text-slate-600 dark:text-slate-300">{kr.nextPlan||'未填写'}</p></div></div>}))}/>}
-                    {(perf.extraWork?.description||perf.extraWork?.impact)&&<div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-3 text-xs"><div><strong>非 OKR 额外工作</strong><p className="mt-1">{perf.extraWork.description}</p></div><div><strong>对 OKR 的影响</strong><p className="mt-1">{perf.extraWork.impact||'无'}</p></div></div>}
-                    {!!perf.assistance?.length&&<div className="text-xs"><strong>协助与协同事项</strong><ul className="mt-2 space-y-1">{perf.assistance.map((item,index)=><li key={index}>{item.subject} · {item.result}</li>)}</ul></div>}
-                    <div>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">工作成果总结：</span>
-                      <p className="text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{perf.summary}</p>
-                    </div>
+                  <div className="space-y-4 pt-3">
+                    {/* ▌ 1. 整体工作摘要 */}
+                    {perf.summary && (
+                      <div className="bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg p-3.5">
+                        <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-[var(--text-primary)]">
+                          <span className="w-1.5 h-3.5 bg-[var(--primary)] rounded-full inline-block" />
+                          <span>1. 整体工作摘要 (Overall Summary)</span>
+                        </div>
+                        <p className="text-xs text-[var(--text-body)] leading-relaxed m-0">{perf.summary}</p>
+                      </div>
+                    )}
 
-                    {!!perf.linkedWorkItems?.length && <div>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">关联任务 / 工单：</span>
-                      <ul className="mt-2 space-y-2 text-slate-600 dark:text-slate-300">{perf.linkedWorkItems.map(item=><li key={item.id}>{item.title} · {item.status}</li>)}</ul>
-                    </div>}
+                    {/* ▌ 2. OKR 目标复盘 */}
+                    {!!perf.krReviews?.length && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+                          <span className="w-1.5 h-3.5 bg-[var(--primary)] rounded-full inline-block" />
+                          <span>2. OKR 目标复盘</span>
+                        </div>
+                        {perf.krReviews.map((kr, index) => (
+                          <div key={kr.keyResultId || index} className="bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg p-3.5 space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-main)] pb-2">
+                              <span className="font-semibold text-xs text-[var(--text-primary)]">
+                                <span className="text-[var(--primary)] font-bold mr-1.5">KR{index + 1}</span>
+                                {kr.keyResultTitle}
+                              </span>
+                              <div className="flex items-center gap-3 text-xs">
+                                <span className="text-[var(--text-muted)]">复盘前: {kr.previousProgress}% → 本期: <strong className="text-[var(--primary)]">{kr.currentProgress}%</strong></span>
+                                <Tag color={kr.health === 'normal' ? 'success' : kr.health === 'risk' ? 'warning' : 'error'}>
+                                  {kr.health === 'normal' ? '正常' : kr.health === 'risk' ? '有风险' : '已阻塞'}
+                                </Tag>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                              <div className="bg-[var(--bg-card)] p-2.5 rounded border border-[var(--border-main)]">
+                                <span className="text-[var(--text-muted)] font-medium block mb-1">本期成果:</span>
+                                <p className="text-[var(--text-primary)] m-0 leading-relaxed">{kr.achievement || '未填写'}</p>
+                              </div>
+                              <div className="bg-[var(--bg-card)] p-2.5 rounded border border-[var(--border-main)]">
+                                <span className="text-[var(--text-muted)] font-medium block mb-1">阻塞与风险:</span>
+                                <p className="text-[var(--text-primary)] m-0 leading-relaxed">{kr.blocker || '无'}</p>
+                              </div>
+                              <div className="bg-[var(--bg-card)] p-2.5 rounded border border-[var(--border-main)]">
+                                <span className="text-[var(--text-muted)] font-medium block mb-1">下一步计划:</span>
+                                <p className="text-[var(--text-primary)] m-0 leading-relaxed">{kr.nextPlan || '未填写'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ▌ 3. 非 OKR 额外工作 */}
+                    {(perf.extraWork?.description || perf.extraWork?.impact) && (
+                      <div className="bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg p-3.5 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+                          <span className="w-1.5 h-3.5 bg-[var(--primary)] rounded-full inline-block" />
+                          <span>3. 非 OKR 额外工作</span>
+                        </div>
+                        {(() => {
+                          const rows = parseStoredExtraWork(perf.extraWork.description);
+                          if (rows.length > 0) {
+                            return (
+                              <div className="space-y-1.5">
+                                {rows.map((r, i) => (
+                                  <div key={i} className="flex flex-wrap items-center justify-between gap-2 p-2 bg-[var(--bg-card)] border border-[var(--border-main)] rounded text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <Tag color={r.source === '工单' ? 'purple' : 'blue'}>{r.source}</Tag>
+                                      <span className="text-[var(--text-primary)]">{r.content}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[var(--text-muted)]">
+                                      <span>耗时: {r.hours || '-'}</span>
+                                      <span>状态: <Tag color="success">{r.status || '已完成'}</Tag></span>
+                                      <span className="text-[var(--warning)]">{r.impact}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="text-xs text-[var(--text-body)] space-y-1">
+                              <div><span className="text-[var(--text-muted)]">工作内容：</span>{perf.extraWork.description}</div>
+                              {perf.extraWork.impact && <div><span className="text-[var(--text-muted)]">对 OKR 的影响：</span>{perf.extraWork.impact}</div>}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {/* ▌ 4. 协助与协同事项 */}
+                    {!!perf.assistance?.length && (
+                      <div className="bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg p-3.5 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+                          <span className="w-1.5 h-3.5 bg-[var(--primary)] rounded-full inline-block" />
+                          <span>4. 协助与协同事项 (跨团队/跨部门支持)</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {perf.assistance.map((item, index) => (
+                            <div key={index} className="text-xs bg-[var(--bg-card)] border border-[var(--border-main)] p-2.5 rounded space-y-1">
+                              <div className="text-[var(--text-muted)]">协助对象：<span className="text-[var(--text-primary)] font-medium">{item.subject}</span></div>
+                              <div className="text-[var(--text-muted)]">结果：<span className="text-[var(--text-primary)]">{item.result}</span></div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {perf.uncompletedReason && (
                       <div>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">未完成事项说明：</span>
-                        <p className="text-slate-600 dark:text-slate-300 mt-0.5">{perf.uncompletedReason}</p>
+                        <span className="font-semibold text-[var(--text-primary)] text-xs">未完成事项说明：</span>
+                        <p className="text-[var(--text-body)] mt-0.5 text-xs">{perf.uncompletedReason}</p>
                       </div>
                     )}
 
                     {perf.feedback && (
-                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-lg text-emerald-800 dark:text-emerald-300">
+                      <div className="p-3 bg-[var(--bg-surface-soft)] border border-[var(--success)] rounded-lg text-[var(--success)] text-xs">
                         <span className="font-semibold">主管批复与评价：</span>
                         <p className="mt-0.5">{perf.feedback}</p>
                       </div>

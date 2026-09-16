@@ -37,7 +37,7 @@ public class OkrMapper {
         var result = new ArrayList<Map<String,Object>>();
         // Names are a legacy work-item contract. The service rejects ambiguous names.
         for (String table : List.of("t_product_requirement","t_product_design_task","t_product_dev_task","t_product_bug","t_crm_presales_task","t_project_delivery_task","t_project_ops_task")) {
-            String kind = table.replace("t_","");
+            String kind = table.substring(2);
             String sources = Set.of("t_product_requirement","t_product_dev_task","t_product_bug").contains(table) ? "source_work_order_ids_" : "JSON_ARRAY(requirement_id_)";
             result.addAll(jdbc.queryForList("SELECT CONCAT(?,':',id_) AS id,id_ AS sourceId,? AS kind,title_ AS title,status_ AS status,owner_name_ AS ownerName,creator_name_ AS creatorName,actual_hours_ AS actualHours,estimated_hours_ AS estimatedHours,due_date_ AS dueDate,create_time_ AS createdAt,update_time_ AS updatedAt," + sources + " AS sourceWorkOrderIds FROM " + table + " WHERE tenant_id_=? AND owner_name_=? AND delete_flag_=0 ORDER BY update_time_ DESC",kind,kind,tenant,ownerName));
         }
