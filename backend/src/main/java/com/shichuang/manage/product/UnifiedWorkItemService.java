@@ -133,9 +133,11 @@ public class UnifiedWorkItemService {
         Object rawCreated = row.get("createdAt");
         LocalDateTime created = rawCreated == null ? null : rawCreated instanceof java.sql.Timestamp timestamp ? timestamp.toLocalDateTime()
             : rawCreated instanceof LocalDateTime dateTime ? dateTime : LocalDateTime.parse(rawCreated.toString().replace(' ', 'T'));
+        String statusColor = nullable(row,"statusColor");
         return new UnifiedWorkItem(category + ":" + text(row, "id"), text(row, "id"), category, text(row, "source"),
             text(row, "code"), text(row, "title"), text(row, "productLineId"), nullable(row, "versionId"),
-            nullable(row, "requirementId"), text(row, "assigneeName"), nullable(row,"taskTypeId"), nullable(row,"workflowId"), nullable(row,"statusKey"), status, priority, originalPriority,
+            nullable(row, "requirementId"), text(row, "assigneeName"), nullable(row,"taskTypeId"), nullable(row,"workflowId"), nullable(row,"statusKey"), status,
+            statusColor == null ? "neutral" : statusColor, priority, originalPriority,
             due, decimal(row.get("estimatedHours")), decimal(row.get("actualHours")), created,
             due != null && due.isBefore(today) && !status.terminal(),
             "bug".equals(category) && ("P0".equals(priority) || "P1".equals(priority)) && !status.terminal(), nullable(row,"parentWorkItemId"), nullable(row,"assigneeId"));

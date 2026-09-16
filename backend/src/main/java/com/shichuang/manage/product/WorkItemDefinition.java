@@ -8,8 +8,17 @@ import java.util.*;
 public final class WorkItemDefinition {
     private WorkItemDefinition() {}
     public static final Map<String,String> CATEGORIES = Map.of("requirement","需求","design","设计","dev","研发","test","测试","bug","缺陷");
+    public static final Set<String> STATE_COLORS = Set.of("neutral","blue","cyan","green","yellow","red","purple");
     public record State(String key, String name, WorkItemStatus.Group group, boolean initial,
-                        boolean successful, boolean enabled, String stage) {}
+                        boolean successful, boolean enabled, String stage, String color) {
+        public State(String key, String name, WorkItemStatus.Group group, boolean initial,
+                     boolean successful, boolean enabled, String stage) {
+            this(key, name, group, initial, successful, enabled, stage, "neutral");
+        }
+        public State {
+            color = color == null || color.isBlank() ? "neutral" : color;
+        }
+    }
     public static final Set<String> WRITE_ROLES = Set.of("admin", "product_manager", "tech_lead");
     public static final Set<String> REQUIRED_FIELDS = Set.of("assigneeId", "description", "expectedGoal", "plannedEndDate", "reason");
     public record ApprovalTasks(String designTypeId, String devTypeId, String testTypeId) {}
@@ -23,6 +32,7 @@ public final class WorkItemDefinition {
     public record Transition(String edgeKey, Integer revision, String reason) {}
     public record Workflow(List<State> states, List<Edge> transitions) {}
     public record SaveWorkflow(String category, String name, Workflow definition, Integer revision) {}
+    public record CreateWorkItemType(String category, String name, String description, Boolean enabled, SaveWorkflow workflow) {}
     public record Revision(int revision) {}
     public record ChildRule(String parentTypeId, String childTypeId, boolean enabled) {}
     public record CreateItem(String requestId, String productLineId, String category, String taskTypeId,
@@ -49,15 +59,19 @@ public final class WorkItemDefinition {
             if (state == null) throw new IllegalArgumentException("状态不能为空");
             key(state.key()); required(state.name(), "状态名称", 128);
             if (state.group() == null || state.group() == WorkItemStatus.Group.UNKNOWN) throw new IllegalArgumentException("请选择通用状态属性");
-            if (state.successful() != (state.group() == WorkItemStatus.Group.COMPLETED)) throw new IllegalArgumentException("成功结束必须使用完成属性");
+            if (state.successful() != (state.group() == WorkItemStatus.Group.COMPLETED)) throw new IllegalArgumentException("完成状态必须由通用阶段自动推导");
             if (state.initial() && (!state.enabled() || state.group() != WorkItemStatus.Group.NOT_STARTED)) throw new IllegalArgumentException("初始状态必须启用且为未开始");
+            if (!STATE_COLORS.contains(state.color())) throw new IllegalArgumentException("状态颜色无效");
             if (state.stage() == null || !Set.of("requirement","design","dev","test","acceptance","release").contains(state.stage()))
                 throw new IllegalArgumentException("业务阶段无效");
             if (states.put(state.key(), state) != null) throw new IllegalArgumentException("状态编码不能重复");
         }
+        if (workflow.states().stream().noneMatch(s -> s.group() == WorkItemStatus.Group.NOT_STARTED)
+            || workflow.states().stream().noneMatch(s -> s.group() == WorkItemStatus.Group.COMPLETED))
+            throw new IllegalArgumentException("状态流转必须包含至少一个‘未开始’和一个‘已完成’阶段的状态。");
         List<State> initial = workflow.states().stream().filter(State::initial).toList();
-        if (initial.size() != 1 || workflow.states().stream().noneMatch(s -> s.enabled() && s.successful()))
-            throw new IllegalArgumentException("流程必须恰有一个初始状态和至少一个启用的成功终态");
+        if (initial.size() != 1)
+            throw new IllegalArgumentException("流程必须恰有一个默认状态");
         Set<String> edgeKeys = new HashSet<>();
         Set<String> pairs = new HashSet<>();
         for (Edge edge : workflow.transitions()) {

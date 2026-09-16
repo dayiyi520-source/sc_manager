@@ -18,13 +18,18 @@ public class WorkItemStorageMapper {
     public Map<String,Object> type(String tenant, String line, String id) {
         return one("SELECT id_ AS id,category_ AS category,enabled_ AS enabled FROM t_product_line_work_item_type WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",tenant,line,id);
     }
-    private static final String WORKFLOW = "SELECT id_ AS id,category_ AS category,name_ AS name,workflow_version_ AS workflowVersion,status_ AS status,definition_ AS definition,version_ AS revision FROM t_product_workflow WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0";
+    private static final String WORKFLOW = "SELECT id_ AS id,category_ AS category,task_type_id_ AS taskTypeId,name_ AS name,workflow_version_ AS workflowVersion,status_ AS status,definition_ AS definition,version_ AS revision FROM t_product_workflow WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0";
     public List<Map<String,Object>> workflows(String tenant,String line) { return jdbc.queryForList(WORKFLOW+" ORDER BY category_,workflow_version_ DESC",tenant,line); }
+    public List<Map<String,Object>> workflows(String tenant,String line,String taskTypeId) { return jdbc.queryForList(WORKFLOW+" AND task_type_id_=? ORDER BY workflow_version_ DESC",tenant,line,taskTypeId); }
     public Map<String,Object> workflow(String tenant,String line,String id) { return one(WORKFLOW+" AND id_=?",tenant,line,id); }
-    public Map<String,Object> publishedWorkflow(String tenant,String line,String category) { return one(WORKFLOW+" AND category_=? AND status_='PUBLISHED' ORDER BY workflow_version_ DESC LIMIT 1",tenant,line,category); }
-    public void insertWorkflow(String tenant,String line,String id,String category,String name,String definition,String user) {
-        Integer next = jdbc.queryForObject("SELECT COALESCE(MAX(workflow_version_),0)+1 FROM t_product_workflow WHERE tenant_id_=? AND product_line_id_=? AND category_=?",Integer.class,tenant,line,category);
-        jdbc.update("INSERT INTO t_product_workflow(id_,tenant_id_,product_line_id_,category_,workflow_version_,name_,definition_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,CAST(? AS JSON),?,?,NOW(6),NOW(6))",id,tenant,line,category,next,name,definition,user,user);
+    public Map<String,Object> publishedWorkflow(String tenant,String line,String category) { return one(WORKFLOW+" AND category_=? AND task_type_id_ IS NULL AND status_='PUBLISHED' ORDER BY workflow_version_ DESC LIMIT 1",tenant,line,category); }
+    public Map<String,Object> publishedWorkflow(String tenant,String line,String category,String taskTypeId) {
+        Map<String,Object> scoped=one(WORKFLOW+" AND category_=? AND task_type_id_=? AND status_='PUBLISHED' ORDER BY workflow_version_ DESC LIMIT 1",tenant,line,category,taskTypeId);
+        return scoped!=null?scoped:publishedWorkflow(tenant,line,category);
+    }
+    public void insertWorkflow(String tenant,String line,String id,String category,String taskTypeId,String name,String definition,String user) {
+        Integer next = jdbc.queryForObject("SELECT COALESCE(MAX(workflow_version_),0)+1 FROM t_product_workflow WHERE tenant_id_=? AND product_line_id_=? AND category_=? AND ((? IS NULL AND task_type_id_ IS NULL) OR task_type_id_=?)",Integer.class,tenant,line,category,taskTypeId,taskTypeId);
+        jdbc.update("INSERT INTO t_product_workflow(id_,tenant_id_,product_line_id_,category_,task_type_id_,workflow_version_,name_,definition_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,CAST(? AS JSON),?,?,NOW(6),NOW(6))",id,tenant,line,category,taskTypeId,next,name,definition,user,user);
     }
     public int updateWorkflow(String tenant,String line,String id,int revision,String name,String definition,String user) {
         return jdbc.update("UPDATE t_product_workflow SET name_=?,definition_=CAST(? AS JSON),version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND status_='DRAFT' AND delete_flag_=0",name,definition,user,tenant,line,id,revision);
@@ -41,7 +46,7 @@ public class WorkItemStorageMapper {
     public boolean childAllowed(String tenant,String line,String parent,String child) {
         return one("SELECT id_ FROM t_product_work_item_child_rule WHERE tenant_id_=? AND product_line_id_=? AND parent_type_id_=? AND child_type_id_=? AND enabled_=1 AND delete_flag_=0",tenant,line,parent,child) != null;
     }
-    private static final String ITEM = "SELECT id_ AS id,code_ AS code,product_line_id_ AS productLineId,category_ AS category,task_type_id_ AS taskTypeId,title_ AS title,description_ AS description,expected_goal_ AS expectedGoal,version_id_ AS versionId,requirement_id_ AS requirementId,parent_work_item_id_ AS parentWorkItemId,workflow_id_ AS workflowId,status_key_ AS statusKey,status_name_ AS statusName,status_group_ AS statusGroup,successful_ AS successful,assignee_id_ AS assigneeId,assignee_name_ AS assigneeName,priority_ AS priority,planned_start_date_ AS plannedStartDate,planned_end_date_ AS plannedEndDate,estimated_hours_ AS estimatedHours,actual_hours_ AS actualHours,version_ AS revision,create_time_ AS createdAt FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0";
+    private static final String ITEM = "SELECT id_ AS id,code_ AS code,product_line_id_ AS productLineId,category_ AS category,task_type_id_ AS taskTypeId,title_ AS title,description_ AS description,expected_goal_ AS expectedGoal,version_id_ AS versionId,requirement_id_ AS requirementId,parent_work_item_id_ AS parentWorkItemId,workflow_id_ AS workflowId,status_key_ AS statusKey,status_name_ AS statusName,status_group_ AS statusGroup,status_color_ AS statusColor,successful_ AS successful,assignee_id_ AS assigneeId,assignee_name_ AS assigneeName,priority_ AS priority,planned_start_date_ AS plannedStartDate,planned_end_date_ AS plannedEndDate,estimated_hours_ AS estimatedHours,actual_hours_ AS actualHours,version_ AS revision,create_time_ AS createdAt FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0";
     public Map<String,Object> item(String tenant,String line,String id) { return one(ITEM+" AND id_=?",tenant,line,id); }
     public Map<String,Object> timedItem(String tenant,String line,String id) {
         Map<String,Object> item = item(tenant,line,id);
@@ -60,12 +65,12 @@ public class WorkItemStorageMapper {
     public int transition(String tenant,String line,String id,int revision,String from,WorkItemDefinition.State to,String user) {
         boolean terminal=to.group()==WorkItemStatus.Group.COMPLETED || to.group()==WorkItemStatus.Group.CANCELLED;
         return jdbc.update("""
-            UPDATE t_product_work_item SET status_key_=?,status_name_=?,status_group_=?,successful_=?,
+            UPDATE t_product_work_item SET status_key_=?,status_name_=?,status_group_=?,status_color_=?,successful_=?,
               actual_start_at_=CASE WHEN ?='IN_PROGRESS' THEN COALESCE(actual_start_at_,NOW(6)) ELSE actual_start_at_ END,
               completed_at_=CASE WHEN ? THEN NOW(6) ELSE NULL END,
               version_=version_+1,update_by_=?,update_time_=NOW(6)
             WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND status_key_=? AND delete_flag_=0
-            """,to.key(),to.name(),to.group().name(),to.successful(),to.group().name(),terminal,user,tenant,line,id,revision,from);
+            """,to.key(),to.name(),to.group().name(),to.color(),to.successful(),to.group().name(),terminal,user,tenant,line,id,revision,from);
     }
     public Map<String,Object> request(String tenant,String line,String requestId) {
         return one("SELECT id_ AS id,request_hash_ AS requestHash,create_by_ AS creatorId FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND request_id_=? AND delete_flag_=0",tenant,line,requestId);
@@ -84,11 +89,11 @@ public class WorkItemStorageMapper {
         String parentId,String assigneeName,String workflowId,WorkItemDefinition.State initial,String hash,String user) {
         jdbc.update("""
             INSERT INTO t_product_work_item(id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,description_,expected_goal_,
-              version_id_,requirement_id_,parent_work_item_id_,workflow_id_,status_key_,status_name_,status_group_,successful_,assignee_id_,assignee_name_,
+              version_id_,requirement_id_,parent_work_item_id_,workflow_id_,status_key_,status_name_,status_group_,status_color_,successful_,assignee_id_,assignee_name_,
               priority_,planned_start_date_,planned_end_date_,estimated_hours_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))
             """,id,tenant,input.productLineId(),input.category(),input.taskTypeId(),code,input.title().trim(),input.description(),input.expectedGoal(),
-            versionId,requirementId,parentId,workflowId,initial.key(),initial.name(),initial.group().name(),initial.successful(),
+            versionId,requirementId,parentId,workflowId,initial.key(),initial.name(),initial.group().name(),initial.color(),initial.successful(),
             WorkItemDefinition.optional(input.assigneeId()),assigneeName,input.priority(),input.plannedStartDate(),input.plannedEndDate(),
             input.estimatedHours()==null?java.math.BigDecimal.ZERO:input.estimatedHours(),input.requestId(),hash,user,user);
     }

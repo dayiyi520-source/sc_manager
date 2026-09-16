@@ -8,6 +8,7 @@ export type WorkItemCategoryKey = 'requirement' | 'design' | 'dev' | 'test' | 'b
 export type WorkItemWorkflow = {
   id: string;
   category: WorkItemCategoryKey;
+  taskTypeId?: string | null;
   name: string;
   workflowVersion: number;
   status: 'DRAFT' | 'PUBLISHED' | string;
@@ -17,8 +18,17 @@ export type WorkItemWorkflow = {
 export type UnifiedWorkItem = {
   id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;
   requirementId?: string | null; assigneeName?: string; status?: { name?: string; group?: string; successful?: boolean };
+  statusColor?: string;
   priority?: string; parentWorkItemId?: string | null; dueDate?: string | null; potentialBlockingDefect?: boolean;
 };
+export type AutomationRule = {
+  id: string; name: string; enabled: boolean; triggerType: 'STATUS_CHANGED'; triggerTypeId: string;
+  triggerStateKey: string; conditionType: 'NONE' | 'TASK_TYPE' | 'PRIORITY' | 'MULTI'; conditionValue?: string | null;
+  conditions?: Array<Record<string, unknown>>; actionType: 'CREATE_SUBTASK' | 'DERIVE_PARENT_STATUS' | 'MULTI';
+  actions?: Array<Record<string, unknown>>; actionConfig: Record<string, unknown> | string;
+  revision: number; updatedAt?: string;
+};
+export type AutomationLog = { id: string; ruleId: string; workItemId: string; result: string; detail?: string; createdAt: string };
 
 const specialTaskPath = (kind: SpecialTaskKind) => kind === 'bug' ? '/api/bugs' : '/api/dev-tasks';
 const businessTaskPath = (kind: BusinessTaskKind) => `/api/${kind}-tasks`;
@@ -33,13 +43,22 @@ export const productRepository = {
   updateProductLineMember: (id: string, memberId: string, body: Pick<ProductLineMember, 'role'>) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(body) }),
   removeProductLineMember: (id: string, memberId: string) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'DELETE' }),
   workItemTypes: (id: string, category?: ProductLineWorkItemCategory) => apiRequest<ProductLineWorkItemType[]>(`/api/product-lines/${id}/work-item-types${category ? `?category=${encodeURIComponent(category)}` : ''}`),
-  createWorkItemType: (id: string, body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled'>) => apiRequest<{ id: string }>(`/api/product-lines/${id}/work-item-types`, { method: 'POST', body: JSON.stringify(body) }),
+  createWorkItemType: (id: string, body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled'> & { workflow: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> }) => apiRequest<{ id: string; workflowId: string }>(`/api/product-lines/${id}/work-item-types`, { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItemType: (id: string, typeId: string, body: Partial<Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled'>>) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteWorkItemType: (id: string, typeId: string) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'DELETE' }),
   workflows: (id: string) => apiRequest<WorkItemWorkflow[]>(`/api/product-lines/${id}/workflows`),
+  typeWorkflows: (id: string, typeId: string) => apiRequest<WorkItemWorkflow[]>(`/api/product-lines/${id}/work-item-types/${typeId}/workflows`),
+  createTypeWorkflow: (id: string, typeId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'>) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/work-item-types/${typeId}/workflows`, { method: 'POST', body: JSON.stringify({ ...body, revision: 0 }) }),
+  updateTypeWorkflow: (id: string, typeId: string, workflowId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision: number }) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/work-item-types/${typeId}/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(body) }),
   createWorkflow: (id: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'>) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows`, { method: 'POST', body: JSON.stringify({ ...body, revision: 0 }) }),
   updateWorkflow: (id: string, workflowId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision: number }) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(body) }),
   publishWorkflow: (id: string, workflowId: string, revision: number) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}/publish`, { method: 'POST', body: JSON.stringify({ revision }) }),
+  automationRules: (id: string, keyword = '') => apiRequest<{ enabled: boolean; rules: AutomationRule[] }>(`/api/product-lines/${id}/automation-rules?keyword=${encodeURIComponent(keyword)}`),
+  createAutomationRule: (id: string, body: Omit<AutomationRule, 'id' | 'revision' | 'updatedAt'>) => apiRequest<AutomationRule>(`/api/product-lines/${id}/automation-rules`, { method: 'POST', body: JSON.stringify(body) }),
+  updateAutomationRule: (id: string, ruleId: string, body: Omit<AutomationRule, 'id' | 'updatedAt'>) => apiRequest<AutomationRule>(`/api/product-lines/${id}/automation-rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteAutomationRule: (id: string, ruleId: string) => apiRequest<void>(`/api/product-lines/${id}/automation-rules/${ruleId}`, { method: 'DELETE' }),
+  updateAutomationSetting: (id: string, enabled: boolean) => apiRequest<{ enabled: boolean }>(`/api/product-lines/${id}/automation-rules/setting`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
+  automationLogs: (id: string) => apiRequest<AutomationLog[]>(`/api/product-lines/${id}/automation-rules/logs`),
   workItemDetail: (lineId: string, id: string) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(lineId)}`),
   workItems: (productLineId: string, category = '', keyword = '') => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=1&pageSize=100`),
   createWorkItem: (body: { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; description?: string; expectedGoal?: string; versionId?: string; requirementId?: string; parentWorkItemId?: string; assigneeId?: string; priority: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),

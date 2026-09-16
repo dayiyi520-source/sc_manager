@@ -16,6 +16,8 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
     @Autowired WorkItemStorageService storage;
     @Autowired ProductLineService productLines;
     @Autowired UnifiedWorkItemService unified;
+    @Autowired AutomationRuleService automations;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     private String line,type,workflow;
     private final String tenant="work-item-storage-test";
 
@@ -35,6 +37,7 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
             var item=storage.create(input(UUID.randomUUID().toString(),category,selectedType,null,null,null));
             assertEquals(category,item.get("category"));
             assertEquals("open",item.get("statusKey"));
+            assertEquals("neutral",item.get("statusColor"));
             assertEquals(1,storage.activities(line,item.get("id").toString()).size());
         }
         assertEquals(5,jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE tenant_id_=?",Integer.class,tenant));
@@ -42,6 +45,7 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(type,result.taskTypeId());
         assertEquals(workflow,result.workflowId());
         assertEquals(WorkItemStatus.Group.NOT_STARTED,result.status().group());
+        assertEquals("neutral",result.statusColor());
     }
     @Test void createIsIdempotentAndRejectsChangedPayload() {
         var input=input("same-request","test",type,null,null,null);
@@ -66,6 +70,45 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         configurations.publish(line,next.get("id").toString(),0);
         assertEquals(workflow,storage.detail(line,item.get("id").toString()).get("workflowId"));
         assertEquals(next.get("id"),storage.create(input("new-version","test",type,null,null,null)).get("workflowId"));
+    }
+    @Test void taskTypeWorkflowOverridesCategoryWorkflowForNewItems() {
+        var scoped=configurations.save(line,type,null,new SaveWorkflow("test","测试执行专属流程",WorkItemDefinitionTest.workflow(),null));
+        configurations.publish(line,scoped.get("id").toString(),0);
+        var item=storage.create(input("type-scoped","test",type,null,null,null));
+        assertEquals(type,scoped.get("taskTypeId"));
+        assertEquals(scoped.get("id"),item.get("workflowId"));
+    }
+    @Test void createsTypeAndPublishedWorkflowAtomically() {
+        var input=new CreateWorkItemType("测试","原子创建类型","同一事务保存",true,
+            new SaveWorkflow("test","原子创建类型状态配置",WorkItemDefinitionTest.workflow(),null));
+        var created=productLines.addWorkItemTypeWithWorkflow(line,input);
+        var workflows=configurations.workflows(line,created.get("id").toString());
+        assertEquals(1,workflows.size());
+        assertEquals("PUBLISHED",workflows.get(0).get("status"));
+        assertEquals(created.get("workflowId"),workflows.get(0).get("id"));
+
+        int before=productLines.workItemTypes(line,null).size();
+        var invalid=new CreateWorkItemType("测试","应回滚类型","",true,
+            new SaveWorkflow("dev","分类错误",WorkItemDefinitionTest.workflow(),null));
+        var transaction=new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        assertThrows(IllegalArgumentException.class,()->transaction.executeWithoutResult(status->productLines.addWorkItemTypeWithWorkflow(line,invalid)));
+        assertEquals(before,productLines.workItemTypes(line,null).size());
+    }
+    @Test void automationRuleCrudUsesOptimisticRevisionAndGlobalSwitch() {
+        Map<String,Object> body=new HashMap<>();
+        body.put("name","完成后创建子任务"); body.put("enabled",true); body.put("triggerType","STATUS_CHANGED");
+        body.put("triggerTypeId",type); body.put("triggerStateKey","done"); body.put("conditionType","NONE");
+        body.put("conditionValue",""); body.put("actionType","CREATE_SUBTASK"); body.put("actionConfig",Map.of("childTypeId",type));
+        var created=automations.save(line,null,body);
+        assertEquals(1,((List<?>)automations.overview(line,"").get("rules")).size());
+        Map<String,Object> changed=new HashMap<>(body); changed.put("name","更新后的规则"); changed.put("revision",created.get("revision"));
+        var updated=automations.save(line,created.get("id").toString(),changed);
+        assertEquals("更新后的规则",updated.get("name"));
+        assertThrows(ResponseStatusException.class,()->automations.save(line,created.get("id").toString(),changed));
+        assertFalse((Boolean)automations.setting(line,false).get("enabled"));
+        automations.delete(line,created.get("id").toString());
+        assertTrue(((List<?>)automations.overview(line,"").get("rules")).isEmpty());
     }
     @Test void staleDraftRevisionCannotOverwriteConfiguration() {
         var draft=configurations.save(line,null,new SaveWorkflow("test","草稿",WorkItemDefinitionTest.workflow(),null));

@@ -13,7 +13,7 @@ public class UnifiedWorkItemMapper {
     public UnifiedWorkItemMapper(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     static final String CORE = "SELECT id_ AS id, category_ AS category, 'core' AS source, code_ AS code, title_ AS title, product_line_id_ AS productLineId, version_id_ AS versionId, requirement_id_ AS requirementId, assignee_name_ AS assigneeName, status_name_ AS status, "
-        + "priority_ AS priority, planned_end_date_ AS dueDate, estimated_hours_ AS estimatedHours, actual_hours_ AS actualHours, create_time_ AS createdAt, task_type_id_ AS taskTypeId, workflow_id_ AS workflowId, status_key_ AS statusKey, status_group_ AS statusGroup, successful_ AS successful, parent_work_item_id_ AS parentWorkItemId, assignee_id_ AS assigneeId"
+        + "priority_ AS priority, planned_end_date_ AS dueDate, estimated_hours_ AS estimatedHours, actual_hours_ AS actualHours, create_time_ AS createdAt, task_type_id_ AS taskTypeId, workflow_id_ AS workflowId, status_key_ AS statusKey, status_group_ AS statusGroup, status_color_ AS statusColor, successful_ AS successful, parent_work_item_id_ AS parentWorkItemId, assignee_id_ AS assigneeId"
         + " FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0";
 
     public List<Map<String, Object>> byProductLine(String tenant, String lineId) {

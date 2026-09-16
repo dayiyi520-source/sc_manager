@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Avatar, Input, Select, Button, Switch, Checkbox } from 'antd';
+import { Avatar, Input, Select, Button, Switch, Checkbox, Drawer } from 'antd';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import {
   ArrowLeft,
@@ -33,6 +33,16 @@ import { productRepository } from '../../services/productRepository';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { CreateVersionModal } from './CreateVersionModal';
 import { ManageMembersModal } from './ManageMembersModal';
+import {
+  buildWorkflowDefinition,
+  CATEGORY_KEYS,
+  createDefaultWorkItemStates,
+  EditableWorkflowState,
+  validateWorkflowStates,
+  WorkItemStateConfigDrawer,
+  WorkItemStateEditor
+} from './WorkItemStateConfigDrawer';
+import { AutomationRulesPanel } from './AutomationRulesPanel';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -42,75 +52,6 @@ interface ProductLineDetailViewProps {
 
 export type ProductLineSettingsSection = 'basic' | 'members' | 'work-items' | 'notifications' | 'automation';
 
-const WORKFLOW_CATEGORY_OPTIONS = [
-  { value: 'requirement', label: '需求' },
-  { value: 'design', label: '设计' },
-  { value: 'dev', label: '研发' },
-  { value: 'test', label: '测试' },
-  { value: 'bug', label: '缺陷' }
-] as const;
-
-const defaultWorkflowDefinition = () => ({
-  states: [
-    { key: 'todo', name: '待处理', group: 'NOT_STARTED', initial: true, successful: false, enabled: true, stage: 'requirement' },
-    { key: 'done', name: '已完成', group: 'COMPLETED', initial: false, successful: true, enabled: true, stage: 'acceptance' }
-  ],
-  transitions: [{ key: 'complete', from: 'todo', to: 'done', name: '完成', roles: ['admin', 'product_manager', 'tech_lead'], requiredFields: [] }]
-});
-
-const ProductLineWorkflowSettings: React.FC<{ productLine: ProductLine; initialCategory?: typeof WORKFLOW_CATEGORY_OPTIONS[number]['value'] }> = ({ productLine, initialCategory = 'requirement' }) => {
-  const { addToast } = useApp();
-  const [category, setCategory] = useState<typeof WORKFLOW_CATEGORY_OPTIONS[number]['value']>(initialCategory);
-  useEffect(() => setCategory(initialCategory), [initialCategory]);
-  const [workflows, setWorkflows] = useState<Awaited<ReturnType<typeof productRepository.workflows>>>([]);
-  const [selected, setSelected] = useState<string>('');
-  const [name, setName] = useState('默认工作流');
-  const [definition, setDefinition] = useState(JSON.stringify(defaultWorkflowDefinition(), null, 2));
-  const [loading, setLoading] = useState(false);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const next = await productRepository.workflows(productLine.id);
-      setWorkflows(next);
-      const current = next.find((item) => item.category === category && item.status === 'DRAFT') || next.find((item) => item.category === category);
-      setSelected(current?.id || '');
-      setName(current?.name || `${WORKFLOW_CATEGORY_OPTIONS.find((item) => item.value === category)?.label}工作流`);
-      setDefinition(JSON.stringify(current?.definition || defaultWorkflowDefinition(), null, 2));
-    } catch (error) {
-      addToast('error', '工作流读取失败', error instanceof Error ? error.message : '请稍后重试');
-    } finally { setLoading(false); }
-  };
-  useEffect(() => { void load(); }, [productLine.id, category]);
-
-  const save = async () => {
-    let parsed: { states: Array<Record<string, unknown>>; transitions: Array<Record<string, unknown>> };
-    try { parsed = JSON.parse(definition); } catch { addToast('warning', '流程定义不是有效 JSON'); return; }
-    try {
-      const current = workflows.find((item) => item.id === selected);
-      if (current && current.status === 'DRAFT') {
-        await productRepository.updateWorkflow(productLine.id, current.id, { category, name: name.trim(), definition: parsed, revision: current.revision });
-      } else {
-        await productRepository.createWorkflow(productLine.id, { category, name: name.trim(), definition: parsed });
-      }
-      addToast('success', '工作流草稿已保存');
-      await load();
-    } catch (error) { addToast('error', '工作流保存失败', error instanceof Error ? error.message : '请检查状态和流转定义'); }
-  };
-  const publish = async () => {
-    const current = workflows.find((item) => item.id === selected);
-    if (!current || current.status !== 'DRAFT') return;
-    try { await productRepository.publishWorkflow(productLine.id, current.id, current.revision); addToast('success', '工作流已发布'); await load(); }
-    catch (error) { addToast('error', '工作流发布失败', error instanceof Error ? error.message : '请检查流程定义'); }
-  };
-  return <div className="mt-6 space-y-4 border-t border-[var(--border-main)] pt-5">
-    <div><h4 className="text-sm font-bold text-[var(--text-primary)]">流程配置</h4><p className="mt-1 text-[var(--text-muted)]">按工作项分类维护状态和流转。已发布版本不可修改，修改时会生成新的草稿版本。</p></div>
-    <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]"><Select value={category} onChange={setCategory} options={WORKFLOW_CATEGORY_OPTIONS.map((item) => ({ value: item.value, label: item.label }))} /><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="流程名称" /></div>
-    <Input.TextArea value={definition} onChange={(event) => setDefinition(event.target.value)} autoSize={{ minRows: 10, maxRows: 24 }} spellCheck={false} className="font-mono text-xs" aria-label="工作流定义" />
-    <div className="flex items-center justify-between gap-3"><span className="text-xs text-[var(--text-muted)]">{loading ? '正在读取...' : selected ? `当前版本：${workflows.find((item) => item.id === selected)?.status || '草稿'}` : '尚未创建该分类流程'}</span><div className="flex gap-2"><Button onClick={() => void save()} type="primary">保存草稿</Button><Button onClick={() => void publish()} disabled={!selected || workflows.find((item) => item.id === selected)?.status !== 'DRAFT'}>发布流程</Button></div></div>
-  </div>;
-};
-
 const ProductLineSettingsPanel: React.FC<{
   productLine: ProductLine;
   onBack: () => void;
@@ -119,7 +60,6 @@ const ProductLineSettingsPanel: React.FC<{
 }> = ({ productLine, onBack, onOpenMembers, initialSection }) => {
   const { updateProductLine, updateProductLineMember, removeProductLineMember, addToast } = useApp();
   const [section, setSection] = useState<ProductLineSettingsSection>(initialSection || 'basic');
-  const [workflowCategory, setWorkflowCategory] = useState<typeof WORKFLOW_CATEGORY_OPTIONS[number]['value']>('requirement');
   const [name, setName] = useState(productLine.name);
   const [code, setCode] = useState(productLine.code);
   const [description, setDescription] = useState(productLine.description);
@@ -229,9 +169,9 @@ const ProductLineSettingsPanel: React.FC<{
               <Modal isOpen={Boolean(memberToRemove)} onClose={() => setMemberToRemove(null)} title="移除项目成员" footer={<><Button onClick={() => setMemberToRemove(null)}>取消</Button><Button type="primary" danger onClick={async () => { if (!memberToRemove) return; if (memberToRemove.id.startsWith('owner-')) { addToast('warning', '产品线负责人默认保留为管理员成员'); setMemberToRemove(null); return; } try { await removeProductLineMember(productLine.id, memberToRemove.id); addToast('success', '成员已移除'); setMemberToRemove(null); } catch (error) { addToast('error', '成员移除失败', error instanceof Error ? error.message : '请稍后重试'); } }}>确认移除</Button></>}><p className="text-sm text-[var(--text-body)]">确定将“{memberToRemove?.name}”移除产品线吗？</p></Modal>
             </div>
           )}
-          {section === 'work-items' && <><ProductLineWorkItemSettings productLine={productLine} onWorkflowCategoryChange={setWorkflowCategory} /><ProductLineWorkflowSettings productLine={productLine} initialCategory={workflowCategory} /></>}
+          {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
           {section === 'notifications' && <ProductLineNotificationSettings />}
-          {section === 'automation' && <div className="max-w-2xl space-y-3 text-xs"><h3 className="text-sm font-bold text-[var(--text-primary)]">自动化规则</h3><p className="text-[var(--text-muted)]">自动化规则属于具体工作项分类的流程配置，请在“工作项设置”中按需求、设计、研发、测试或缺陷分类维护。</p><Button type="primary" onClick={() => setSection('work-items')}>前往工作项设置</Button></div>}
+          {section === 'automation' && <AutomationRulesPanel productLine={productLine} />}
         </section>
       </div>
     </div>
@@ -244,15 +184,18 @@ const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({
 
 const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '测试', '缺陷'];
 
-const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine; onWorkflowCategoryChange?: (category: typeof WORKFLOW_CATEGORY_OPTIONS[number]['value']) => void }> = ({ productLine, onWorkflowCategoryChange }) => {
+const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
   const { addToast, setProductLines } = useApp();
   const [activeCategory, setActiveCategory] = useState<ProductLineWorkItemCategory>('需求');
   const normalizeItems = (nextItems: ProductLineWorkItemType[]) => nextItems.map((item) => ({ ...item, enabled: Boolean(item.enabled) }));
   const [items, setItems] = useState<ProductLineWorkItemType[]>(normalizeItems(productLine.workItemTypes || []));
   const [editingItem, setEditingItem] = useState<ProductLineWorkItemType | null>(null);
   const [itemToDelete, setItemToDelete] = useState<ProductLineWorkItemType | null>(null);
+  const [stateConfigItem, setStateConfigItem] = useState<ProductLineWorkItemType | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<{ category: ProductLineWorkItemCategory; name: string; description: string; enabled: boolean }>({ category: '需求', name: '', description: '', enabled: true });
+  const [initialWorkflowStates, setInitialWorkflowStates] = useState<EditableWorkflowState[]>(createDefaultWorkItemStates('requirement'));
 
   useEffect(() => {
     setItems(normalizeItems(productLine.workItemTypes || []));
@@ -271,6 +214,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine; onWorkfl
   const openCreate = () => {
     setEditingItem(null);
     setForm({ category: activeCategory, name: '', description: '', enabled: true });
+    setInitialWorkflowStates(createDefaultWorkItemStates(CATEGORY_KEYS[activeCategory]));
     setIsEditorOpen(true);
   };
   const openEdit = (item: ProductLineWorkItemType) => {
@@ -290,10 +234,27 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine; onWorkfl
       addToast('warning', '请输入工作项类型名称');
       return;
     }
+    if (!editingItem) {
+      const invalid = validateWorkflowStates(initialWorkflowStates);
+      if (invalid) {
+        addToast('warning', invalid);
+        return;
+      }
+    }
+    setIsSaving(true);
     try {
       if (isRemote()) {
         if (editingItem) await productRepository.updateWorkItemType(productLine.id, editingItem.id, { ...form, name, description: form.description.trim() });
-        else await productRepository.createWorkItemType(productLine.id, { ...form, name, description: form.description.trim() });
+        else {
+          const category = CATEGORY_KEYS[form.category];
+          const states = initialWorkflowStates.map((state) => ({ ...state, name: state.name.trim(), stage: category === 'bug' ? 'dev' : category }));
+          await productRepository.createWorkItemType(productLine.id, {
+            ...form,
+            name,
+            description: form.description.trim(),
+            workflow: { category, name: `${name}状态配置`, definition: buildWorkflowDefinition(states) }
+          });
+        }
         await reloadRemoteItems();
       } else {
         const localItem: ProductLineWorkItemType = editingItem
@@ -306,6 +267,8 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine; onWorkfl
       addToast('success', editingItem ? '工作项类型已修改' : '工作项类型已新增');
     } catch (error) {
       addToast('error', editingItem ? '工作项类型修改失败' : '工作项类型新增失败', error instanceof Error ? error.message : '请稍后重试');
+    } finally {
+      setIsSaving(false);
     }
   };
   const toggleItem = async (item: ProductLineWorkItemType, enabled: boolean) => {
@@ -351,17 +314,32 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine; onWorkfl
       </div>
       <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
         <div className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>类型名称</span><span>描述</span><span>添加人</span><span>添加时间</span><span>是否启用</span><span className="text-right">操作</span></div>
-        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="font-medium text-[var(--text-primary)]">{item.name}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}工作流`} title={`配置${item.name}工作流`} icon={<ApartmentOutlined />} onClick={() => onWorkflowCategoryChange?.(({ 需求: 'requirement', 设计: 'design', 研发: 'dev', 缺陷: 'bug' } as Record<ProductLineWorkItemCategory, typeof WORKFLOW_CATEGORY_OPTIONS[number]['value']>)[item.category])} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{activeCategory}工作项类型，点击右上角“新增类型”添加</div>}
+        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="truncate font-medium text-[var(--text-primary)]" title={item.name}>{item.name}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}状态`} title="状态配置" icon={<ApartmentOutlined />} onClick={() => setStateConfigItem(item)} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{activeCategory}工作项类型，点击右上角“新增类型”添加</div>}
       </div>
-      <Modal isOpen={isEditorOpen} onClose={() => setIsEditorOpen(false)} title={editingItem ? '修改工作项类型' : '新增工作项类型'} footer={<><Button onClick={() => setIsEditorOpen(false)}>取消</Button><Button type="primary" htmlType="submit" form="work-item-type-form">保存</Button></>}>
-        <form id="work-item-type-form" onSubmit={saveItem} className="space-y-4 text-xs">
-          <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型分类</span><Select value={form.category} onChange={(category) => setForm((previous) => ({ ...previous, category }))} options={WORK_ITEM_CATEGORIES.map((category) => ({ value: category, label: category }))} /></label>
-          <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型名称 *</span><Input value={form.name} onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))} placeholder="请输入类型名称" /></label>
-          <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>描述</span><Input.TextArea rows={4} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} placeholder="请输入类型描述" /></label>
-          <div className="flex items-center justify-between"><span className="font-medium text-[var(--text-body)]">是否启用</span><Switch className="product-line-switch" checked={form.enabled} onChange={(enabled) => setForm((previous) => ({ ...previous, enabled }))} /></div>
+      <Drawer
+        width={editingItem ? 560 : 840}
+        open={isEditorOpen}
+        onClose={() => setIsEditorOpen(false)}
+        destroyOnClose={false}
+        title={editingItem ? '修改工作项类型' : '新增工作项类型'}
+        footer={<div className="flex justify-end gap-2"><Button onClick={() => setIsEditorOpen(false)}>取消</Button><Button type="primary" loading={isSaving} htmlType="submit" form="work-item-type-form">{editingItem ? '保存修改' : '创建并发布'}</Button></div>}
+      >
+        <form id="work-item-type-form" onSubmit={saveItem} className="space-y-5 text-xs">
+          <section className="space-y-4">
+            <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">设置子类型的名称、分类和启用状态。</p></div>
+            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型分类</span><Select value={form.category} onChange={(category) => { setForm((previous) => ({ ...previous, category })); if (!editingItem) setInitialWorkflowStates(createDefaultWorkItemStates(CATEGORY_KEYS[category])); }} options={WORK_ITEM_CATEGORIES.map((category) => ({ value: category, label: category }))} /></label>
+            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型名称 *</span><Input maxLength={128} value={form.name} onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))} placeholder="请输入类型名称" /></label>
+            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>描述</span><Input.TextArea rows={3} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} placeholder="请输入类型描述" /></label>
+            <div className="flex items-center justify-between"><div><div className="font-medium text-[var(--text-body)]">是否启用</div><p className="mt-1 text-[11px] text-[var(--text-muted)]">停用后不能新建该类型的工作项。</p></div><Switch className="product-line-switch" checked={form.enabled} onChange={(enabled) => setForm((previous) => ({ ...previous, enabled }))} /></div>
+          </section>
+          {!editingItem && <section className="space-y-4 border-t border-[var(--border-main)] pt-5">
+            <div><h3 className="text-sm font-bold text-[var(--text-primary)]">初始化状态</h3><p className="mt-1 text-[var(--text-muted)]">状态名称可自定义，每个状态必须归属未开始、进行中、已完成或已取消。</p></div>
+            <WorkItemStateEditor states={initialWorkflowStates} category={CATEGORY_KEYS[form.category]} onChange={setInitialWorkflowStates} />
+          </section>}
         </form>
-      </Modal>
+      </Drawer>
       <Modal isOpen={Boolean(itemToDelete)} onClose={() => setItemToDelete(null)} title="删除工作项类型" footer={<><Button onClick={() => setItemToDelete(null)}>取消</Button><Button type="primary" danger onClick={() => void deleteItem()}>确认删除</Button></>}><p className="text-sm text-[var(--text-body)]">确定删除“{itemToDelete?.name}”吗？删除后不可恢复。</p></Modal>
+      <WorkItemStateConfigDrawer productLine={productLine} item={stateConfigItem} open={Boolean(stateConfigItem)} onClose={() => setStateConfigItem(null)} />
     </div>
   );
 };

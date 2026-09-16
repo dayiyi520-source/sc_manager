@@ -63,8 +63,8 @@ public class WorkItemStorageService {
         String assigneeId=optional(body.assigneeId());
         String assigneeName=assigneeId==null?null:mapper.assignee(tenant,assigneeId);
         if (assigneeId!=null && assigneeName==null) throw new IllegalArgumentException("负责人不存在或已停用");
-        Map<String,Object> workflow=mapper.publishedWorkflow(tenant,line,body.category());
-        if (workflow==null) throw conflict("请先发布该分类的状态流程");
+        Map<String,Object> workflow=mapper.publishedWorkflow(tenant,line,body.category(),body.taskTypeId());
+        if (workflow==null) throw conflict("请先发布该工作项类型的状态配置");
         Workflow definition=configurations.decode(workflow.get("definition"));
         State initial=definition.states().stream().filter(State::initial).findFirst().orElseThrow();
         String id=UUID.randomUUID().toString(),code="WI-"+id;

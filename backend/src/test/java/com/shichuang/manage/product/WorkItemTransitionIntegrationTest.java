@@ -29,8 +29,8 @@ class WorkItemTransitionIntegrationTest extends AbstractApiIntegrationTest {
     }
     @AfterEach void clear() { RequestContext.clear(); }
     @Test void startFinishAndExplicitReopenPreserveStartAndRecordHistory() {
-        var started=execute(id,"start",0,""); assertNotNull(started.get("actualStartAt")); assertNull(started.get("completedAt"));
-        var done=execute(id,"finish",1,"已检查"); assertEquals("完成",done.get("statusName")); assertNotNull(done.get("completedAt"));
+        var started=execute(id,"start",0,""); assertNotNull(started.get("actualStartAt")); assertNull(started.get("completedAt")); assertEquals("blue",started.get("statusColor"));
+        var done=execute(id,"finish",1,"已检查"); assertEquals("完成",done.get("statusName")); assertNotNull(done.get("completedAt")); assertEquals("green",done.get("statusColor"));
         var reopened=execute(id,"reopen",2,"需要补充"); assertNull(reopened.get("completedAt")); assertEquals(started.get("actualStartAt"),reopened.get("actualStartAt"));
         assertEquals(4,storage.activities(line,id).size());
         assertEquals("doing",storage.detail(line,id).get("statusKey"));
@@ -116,10 +116,10 @@ class WorkItemTransitionIntegrationTest extends AbstractApiIntegrationTest {
     private void session(String role) { RequestContext.set(Map.of("sub","u","tenant",TENANT,"role",role)); }
     private static Workflow workflow() {
         return new Workflow(List.of(
-            new State("open","待设计",WorkItemStatus.Group.NOT_STARTED,true,false,true,"design"),
-            new State("doing","设计中",WorkItemStatus.Group.IN_PROGRESS,false,false,true,"design"),
-            new State("done","完成",WorkItemStatus.Group.COMPLETED,false,true,true,"design"),
-            new State("skipped","无需设计",WorkItemStatus.Group.COMPLETED,false,true,true,"design")),List.of(
+            new State("open","待设计",WorkItemStatus.Group.NOT_STARTED,true,false,true,"design","neutral"),
+            new State("doing","设计中",WorkItemStatus.Group.IN_PROGRESS,false,false,true,"design","blue"),
+            new State("done","完成",WorkItemStatus.Group.COMPLETED,false,true,true,"design","green"),
+            new State("skipped","无需设计",WorkItemStatus.Group.COMPLETED,false,true,true,"design","yellow")),List.of(
             new Edge("start","open","doing","开始"),new Edge("finish","doing","done","完成",null,List.of("reason")),
             new Edge("skip","open","skipped","无需设计",null,List.of("reason")),new Edge("reopen","done","doing","重开"),
             new Edge("resume","skipped","done","恢复完成")));

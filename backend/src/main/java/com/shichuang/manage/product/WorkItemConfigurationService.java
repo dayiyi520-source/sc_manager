@@ -23,18 +23,28 @@ public class WorkItemConfigurationService {
         access.check(line,false);
         return mapper.workflows(RequestContext.tenantId(),line).stream().map(this::view).toList();
     }
+    public List<Map<String,Object>> workflows(String line,String taskTypeId) {
+        access.check(line,false);
+        requireType(line,taskTypeId,null,false);
+        return mapper.workflows(RequestContext.tenantId(),line,taskTypeId).stream().map(this::view).toList();
+    }
     @Transactional public Map<String,Object> save(String line,String id,SaveWorkflow body) {
+        return save(line,null,id,body);
+    }
+    @Transactional public Map<String,Object> save(String line,String taskTypeId,String id,SaveWorkflow body) {
         access.check(line,true);
         category(body.category()); required(body.name(),"流程名称",128); validate(body.definition());
+        if(taskTypeId!=null) requireType(line,taskTypeId,body.category(),false);
         validateApproval(line,body.category(),body.definition(),false);
         String tenant=RequestContext.tenantId(), user=RequestContext.userId();
         if (id==null) {
             id=UUID.randomUUID().toString();
-            mapper.insertWorkflow(tenant,line,id,body.category(),body.name().trim(),encode(body.definition()),user);
+            mapper.insertWorkflow(tenant,line,id,body.category(),taskTypeId,body.name().trim(),encode(body.definition()),user);
         } else {
             Map<String,Object> current=requireWorkflow(line,id);
             if (!"DRAFT".equals(current.get("status"))) throw conflict("已发布流程不能修改，请创建新版本");
             if (!body.category().equals(current.get("category"))) throw new IllegalArgumentException("流程分类不能修改");
+            if (!Objects.equals(taskTypeId,current.get("taskTypeId"))) throw new IllegalArgumentException("流程所属工作项类型不能修改");
             if (body.revision()==null || mapper.updateWorkflow(tenant,line,id,body.revision(),body.name().trim(),encode(body.definition()),user)!=1)
                 throw conflict("流程已变更，请刷新后重试");
         }

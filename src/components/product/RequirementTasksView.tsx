@@ -18,6 +18,7 @@ import { StatusTag } from '../common/UIComponents';
 import { DateField } from '../common';
 import { DefectBug, DevTask, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
+import { WorkItemStatusTag } from './WorkItemStatusTag';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { requirementRepository } from '../../services/requirementRepository';
@@ -971,7 +972,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                   </tr>
                   {expandedListRows.includes(t.id) && listChildren[t.id]?.length ? listChildren[t.id].map((child) => <tr key={`${t.id}-${child.id}`} className="bg-slate-50/60 dark:bg-slate-800/30">
                     <td className="py-2.5 px-4"><div className="flex items-center gap-2 pl-8"><span className="h-4 w-px bg-slate-300 dark:bg-slate-700" /><span className="rounded-sm bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-white">TASK</span><button type="button" onClick={() => setSelectedTask({ ...t, id: child.id, title: child.title, category: child.category, status: child.status?.name || '待处理', priority: child.priority || 'P2', ownerName: child.assigneeName || '', requirementId: child.requirementId || t.requirementId, parentWorkItemId: child.parentWorkItemId || t.id } as RequirementTask)} className="text-left text-[var(--primary)] hover:text-[var(--primary-hover)]">{child.title}</button></div></td>
-                    <td className="py-2.5 px-4"><Tag>{child.status?.name || '待处理'}</Tag></td>
+                    <td className="py-2.5 px-4"><WorkItemStatusTag name={child.status?.name || '待处理'} color={child.statusColor} /></td>
                     <td className="py-2.5 px-4"><StatusTag status={normalizePriority(child.priority || 'P2')} /></td>
                     <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">{t.versionName || '未关联'}</td>
                     <td className="py-2.5 px-4 text-slate-500">{child.assigneeName || '未设置'}</td><td className="py-2.5 px-4 text-slate-500">{t.creatorName || currentUser.name}</td><td className="py-2.5 px-4 text-slate-500">{child.createdAt || '—'}</td><td />
