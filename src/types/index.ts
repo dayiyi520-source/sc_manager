@@ -115,6 +115,7 @@ export interface OKRItem {
 
 export interface PerformanceReview {
   id: string;
+  version?: number;
   type: 'week' | 'month';
   cycleName: string; // "2026年8月月结"
   author: string;
@@ -135,6 +136,11 @@ export interface PerformanceReview {
   assistance?: import('../services/okrRepository').OkrReviewAssistance[];
   extraWork?: import('../services/okrRepository').OkrExtraWork;
   syncKrProgress?: boolean;
+  weeklyReviewSnapshots?: import('../services/okrRepository').OkrWeeklyReviewSnapshot[];
+  monthlyOtherTasks?: import('../services/okrRepository').OkrMonthlyTask[];
+  nextMonthPlans?: import('../services/okrRepository').OkrMonthlyPlan[];
+  otherNotes?: string;
+  nextMonthArrangement?: string;
 }
 
 export interface ReviewWorkItem {
