@@ -28,7 +28,7 @@ export function useOriginalOkr() {
   });
   const performances: (PerformanceReview & {authorId:string})[] = all.filter(r=>r.kind==='review').map(r=>{
     const owner = people.find(p=>p.id===r.ownerId), p=r.payload;
-    return {id:r.id,authorId:r.ownerId,author:owner?.name || '人员已停用',authorDept:owner?.department || '',
+    return {id:r.id,version:r.version,authorId:r.ownerId,author:owner?.name || '人员已停用',authorDept:owner?.department || '',
       type:p.reviewType || 'month',cycleName:p.title,summary:p.summary || '',selfScore:p.selfScore ?? 0,
       uncompletedReason:p.uncompletedReason || '',suggestions:p.suggestions || '',helpNeeded:p.helpNeeded || '',sendTo:p.sendTo || [],
       createdAt:r.createdAt?.replace('T',' ').slice(0,16) || '—',status:r.status as PerformanceReview['status'],feedback:p.feedback,leaderScore:p.finalScore,
@@ -39,6 +39,18 @@ export function useOriginalOkr() {
     };
   });
   const refresh = () => client.invalidateQueries({queryKey:['okr',currentUser.id]});
+  const submitReviewDraft = async (id:string) => {
+    const record = all.find(item=>item.id===id && item.kind==='review');
+    if(!record){addToast('error','复盘记录不存在或已刷新');return false;}
+    setBusy(true);
+    try{
+      await okrRepository.update(record,'submit');
+      await refresh();
+      addToast('success','复盘已提交');
+      return true;
+    }catch(error){addToast('error',error instanceof Error?error.message:'提交失败，请重试');return false;}
+    finally{setBusy(false);}
+  };
   const save = async (kind: 'objective' | 'review', period:string, payload:OkrPayload, submit = true) => {
     setBusy(true);
     try {
@@ -53,5 +65,6 @@ export function useOriginalOkr() {
     saveObjectiveDraft:(period:string,payload:OkrPayload)=>save('objective',period,payload,false),
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
     saveReviewDraft:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload,false),
+    submitReviewDraft,
   };
 }

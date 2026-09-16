@@ -51,6 +51,14 @@ import java.util.*;
   return result;
  }
  private boolean root(String id){return ((Number)person(id).get("rootFlag")).intValue()==1;}
+ private String normalizeImpact(Object value){
+  return switch(Objects.toString(value,"").trim()){
+   case "无明显影响" -> "none";
+   case "挤占 KR 投入" -> "block";
+   case "支持 KR" -> "support";
+   default -> Objects.toString(value,"").trim();
+  };
+ }
  private int integer(Object value,int min,int max){if(!(value instanceof Number n)||n.doubleValue()!=n.intValue()||n.intValue()<min||n.intValue()>max)throw new IllegalArgumentException("数值范围须为 "+min+" 至 "+max);return n.intValue();}
  private List<Map<String,Object>> rows(Object value){if(!(value instanceof List<?> list)||list.size()>500)throw new IllegalArgumentException("请检查明细数量");return list.stream().map(this::payload).toList();}
  private void validateObjective(String owner,String period,Map<String,Object> p){
@@ -119,11 +127,11 @@ import java.util.*;
     if(!Set.of("normal","risk","blocked").contains(Objects.toString(entry.get("health"),"")))throw new IllegalArgumentException("KR 健康状态无效");
     for(String key:List.of("achievement","blocker","nextPlan","evidenceNote"))if(Objects.toString(entry.get(key),"").length()>2000)throw new IllegalArgumentException("KR 复盘文本不能超过2000字");
     if(monthly&&submitting&&Objects.toString(entry.get("achievement"),"").isBlank())throw new IllegalArgumentException("请补充所有 KR 的本月结果");
-    if(monthly&&submitting&&!"normal".equals(entry.get("health"))&&Objects.toString(entry.get("blocker"),"").isBlank())throw new IllegalArgumentException("风险或阻塞 KR 必须填写偏差原因");
+    if(submitting&&!"normal".equals(entry.get("health"))&&Objects.toString(entry.get("blocker"),"").isBlank())throw new IllegalArgumentException("风险或阻塞 KR 必须填写风险原因及所需支持");
     if(!(entry.getOrDefault("workIds",List.of()) instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("KR 工作证据格式无效");
    }
    for(var entry:rows(p.getOrDefault("assistance",List.of())))for(String key:List.of("subject","result"))if(Objects.toString(entry.get(key),"").length()>500)throw new IllegalArgumentException("协助事项不能超过500字");
-   var extra=payload(p.getOrDefault("extraWork",Map.of()));for(String key:List.of("description","impact"))if(Objects.toString(extra.get(key),"").length()>2000)throw new IllegalArgumentException("额外工作说明不能超过2000字");if(!Set.of("","none","support","block").contains(Objects.toString(extra.get("impact"),"")))throw new IllegalArgumentException("额外工作影响类型无效");if(!(extra.getOrDefault("workIds",List.of()) instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("额外工作关联格式无效");if(extra.containsKey("notes")){var notes=payload(extra.get("notes"));if(notes.size()>100||notes.values().stream().anyMatch(value->Objects.toString(value,"").length()>500)||notes.keySet().stream().anyMatch(key->!ids.contains(key)))throw new IllegalArgumentException("额外工作说明格式无效");}
+   var extra=payload(p.getOrDefault("extraWork",Map.of()));String impact=normalizeImpact(extra.get("impact"));extra.put("impact",impact);p.put("extraWork",extra);for(String key:List.of("description","impact"))if(Objects.toString(extra.get(key),"").length()>2000)throw new IllegalArgumentException("额外工作说明不能超过2000字");if(!Set.of("","none","support","block").contains(impact))throw new IllegalArgumentException("额外工作影响类型无效");if(!(extra.getOrDefault("workIds",List.of()) instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("额外工作关联格式无效");if(extra.containsKey("notes")){var notes=payload(extra.get("notes"));if(notes.size()>100||notes.values().stream().anyMatch(value->Objects.toString(value,"").length()>500)||notes.keySet().stream().anyMatch(key->!ids.contains(key)))throw new IllegalArgumentException("额外工作说明格式无效");}
    if(!(p.getOrDefault("syncKrProgress",false) instanceof Boolean))throw new IllegalArgumentException("同步进度选项无效");
    if(monthly)validateMonthlyReview(owner,start,end,p,submitting);
   }
@@ -142,7 +150,7 @@ import java.util.*;
    var created=java.time.LocalDate.parse(source.get("createdAt").toString().substring(0,10));
    var updated=java.time.LocalDate.parse(source.get("updatedAt").toString().substring(0,10));
    if(created.isAfter(end)||Set.of("已完成","已发布","已验收","已关闭","已取消","已驳回").contains(source.get("status"))&&updated.isBefore(start))throw new IllegalArgumentException("工作项不在本期范围内，请重新归集");
-   entry.put("title",source.get("title"));entry.put("status",source.get("status"));entry.put("sourceWorkOrderIds",source.get("sourceWorkOrderIds"));String sourceKind=Objects.toString(source.get("kind"),"").toLowerCase();entry.put("workType",sourceKind.contains("work_order")||sourceKind.contains("ticket")?"ticket":"task");
+   entry.put("title",source.get("title"));entry.put("status",source.get("status"));entry.put("sourceWorkOrderIds",source.get("sourceWorkOrderIds"));String sourceKind=Objects.toString(source.get("kind"),"").toLowerCase();entry.put("workType",sourceKind.contains("work_order")||sourceKind.contains("ticket")||"product_requirement".equals(sourceKind)||"requirement_work_item".equals(sourceKind)?"ticket":"task");
    if(completedOnly){
     OkrPolicy.completedWork(source.get("status").toString(),updated,start,end);
     entry.remove("objectiveId");entry.remove("keyResultId");entry.remove("affectedObjectiveId");entry.remove("affectedKeyResultId");
@@ -171,7 +179,7 @@ import java.util.*;
    if(!seen.equals(selected))throw new IllegalArgumentException("工作证据与关联明细不一致");
   }
   p.put("items",entries);
-  if(submitting&&supervisor(owner).isBlank())throw new IllegalArgumentException("尚未配置复盘评价人");
+  if(submitting&&!root(owner)&&supervisor(owner).isBlank())throw new IllegalArgumentException("尚未配置复盘评价人");
  }
  private void validateMonthlyReview(String owner,java.time.LocalDate start,java.time.LocalDate end,Map<String,Object> p,boolean submitting){
   var month=java.time.YearMonth.from(start);

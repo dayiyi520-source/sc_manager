@@ -19,8 +19,8 @@ import {
 import dayjs from 'dayjs';
 import type { OKRItem } from '../../../types';
 import type { OkrPayload, OkrWork } from '../../../services/okrRepository';
-import { Plus, Save, Search, Send, Trash2 } from '@/components/common/octicons-compat';
-import { periodWork } from './workAggregation';
+import { AlertTriangle, Plus, Save, Search, Send, Trash2 } from '@/components/common/octicons-compat';
+import { periodWork, workSource } from './workAggregation';
 import { reviewPeriod } from './simpleReview';
 
 type Health = 'normal' | 'risk' | 'blocked';
@@ -56,10 +56,11 @@ const statusColor = (status: string) =>
     ? 'error'
     : 'processing';
 
-const workSource = (item: OkrWork): PickerSource => {
-  const kind = item.kind.toLowerCase();
-  return kind.includes('work_order') || kind.includes('ticket') ? 'ticket' : 'task';
-};
+const impactOptions = [
+  { value: 'none', label: '无明显影响' },
+  { value: 'block', label: '挤占 KR 投入' },
+  { value: 'support', label: '支持 KR' }
+];
 
 interface WeeklyReviewEditorProps {
   key?: React.Key;
@@ -155,7 +156,7 @@ export function WeeklyReviewEditor({
   }>({
     workIds: [],
     description: '',
-    impact: '无明显影响',
+    impact: 'none',
     notes: {}
   });
 
@@ -338,7 +339,7 @@ export function WeeklyReviewEditor({
         source: workSource(item) === 'ticket' ? '工单' : '任务',
         status: item.status,
         hours: item.actualHours ? `${item.actualHours} 小时` : '',
-        impact: extra.impact || '无明显影响',
+        impact: extra.impact || 'none',
         isManual: false
       }));
 
@@ -615,6 +616,21 @@ export function WeeklyReviewEditor({
                         )}
                       </div>
 
+                      {kr.health !== 'normal' && (
+                        <div className="okr-review-risk-callout">
+                          <AlertTriangle />
+                          <div>
+                            <b>风险原因及所需支持</b>
+                            <Input.TextArea
+                              value={kr.blocker}
+                              onChange={e => update(kr.keyResultId, { blocker: e.target.value })}
+                              autoSize={{ minRows: 2, maxRows: 5 }}
+                              placeholder="说明风险或阻塞原因、外部依赖和所需支持"
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       {/* Narrative Fields */}
                       <div className="space-y-3 pt-2">
                         <div>
@@ -626,18 +642,6 @@ export function WeeklyReviewEditor({
                             value={kr.achievement}
                             onChange={e => update(kr.keyResultId, { achievement: e.target.value })}
                             placeholder="填写本期交付结果、数据变化和已完成的里程碑"
-                          />
-                        </div>
-
-                        <div>
-                          <div className="text-xs font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1">
-                            <span className="text-[var(--danger)]">*</span> 阻塞与风险 (支持为空/写无)
-                          </div>
-                          <Input.TextArea
-                            autoSize={{ minRows: 3 }}
-                            value={kr.blocker}
-                            onChange={e => update(kr.keyResultId, { blocker: e.target.value })}
-                            placeholder="填写风险、依赖和需要协调的事项；没有可填写“无”"
                           />
                         </div>
 
@@ -691,7 +695,7 @@ export function WeeklyReviewEditor({
                     source: '手工记录',
                     status: '处理中',
                     hours: '',
-                    impact: '无明显影响',
+                    impact: 'none',
                     note: ''
                   }
                 ])
@@ -784,13 +788,9 @@ export function WeeklyReviewEditor({
                     render: (_, row) => (
                       <Select
                         size="small"
-                        value={row.impact || '无明显影响'}
+                        value={row.impact || 'none'}
                         style={{ width: 160 }}
-                        options={[
-                          { value: '无明显影响', label: '无明显影响' },
-                          { value: '挤占 KR 投入', label: '挤占 KR 投入' },
-                          { value: '支持 KR', label: '支持 KR' }
-                        ]}
+                        options={impactOptions}
                         onChange={impact => {
                           if (row.isManual) {
                             setManualWorks(rows =>
@@ -1003,9 +1003,9 @@ export function WeeklyReviewEditor({
         title="确认提交周报"
         onCancel={() => setSubmitModalOpen(false)}
         onOk={async () => {
-          setSubmitModalOpen(false);
-          await onSubmit(payload());
+          if (await onSubmit(payload())) setSubmitModalOpen(false);
         }}
+        confirmLoading={busy}
         okText="确认提交"
         cancelText="取消"
         width={600}

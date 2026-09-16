@@ -115,6 +115,7 @@ export interface OKRItem {
 
 export interface PerformanceReview {
   id: string;
+  version?: number;
   type: 'week' | 'month';
   cycleName: string; // "2026年8月月结"
   author: string;

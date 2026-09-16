@@ -219,6 +219,48 @@
 .okr-review-submit-kr > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .okr-review-submit-kr > span:last-child { flex: none; }
 .okr-review-submit-kr strong { color: var(--primary); }
+.okr-review-risk-callout { display: grid; width: 100%; grid-template-columns: auto minmax(0,1fr); gap: 12px; padding: 12px 16px; border: 1px solid color-mix(in srgb,var(--warning) 45%,var(--border-main)); border-radius: 8px; background: color-mix(in srgb,var(--warning) 8%,var(--bg-surface)); }
+.okr-review-risk-callout > svg { width: 16px; height: 16px; margin-top: 3px; color: var(--warning); }
+.okr-review-risk-callout > div { display: grid; min-width: 0; gap: 8px; }
+.okr-review-risk-callout b { color: var(--text-primary); font-size: 13px; line-height: 20px; }
+.okr-review-risk-callout .ant-input { width: 100%; }
+.okr-my-reviews, .okr-received-reviews { padding-top: 8px; }
+.okr-review-filter-tabs { display:flex; gap:28px; border-bottom:1px solid var(--border-main); }
+.okr-review-filter-tabs button, .okr-received-list-tools button { border:0; border-bottom:2px solid transparent; padding:8px 4px 10px; background:transparent; color:var(--text-muted); cursor:pointer; }
+.okr-review-filter-tabs button.is-active, .okr-received-list-tools button.is-active { border-bottom-color:var(--primary); color:var(--primary); font-weight:600; }
+.okr-review-month-rail { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:8px; padding:14px 16px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
+.okr-review-month-rail div { display:grid; justify-items:center; gap:4px; color:var(--text-muted); font-size:11px; }
+.okr-review-month-rail i { color:var(--border-subtle); font-size:16px; font-style:normal; }
+.okr-review-month-rail .has-review { color:var(--text-primary); font-weight:600; }
+.okr-review-month-rail .has-review i { color:var(--success); }
+.okr-my-review-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.okr-my-review-card { border-color:var(--border-main); background:var(--bg-card); }
+.okr-my-review-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.okr-my-review-card-head h3 { margin:8px 0 4px; color:var(--text-primary); font-size:16px; }
+.okr-my-review-card-head span { color:var(--text-muted); font-size:11px; }
+.okr-my-review-score { display:flex; align-items:center; gap:14px; margin:16px 0; }
+.okr-my-review-score div { display:grid; gap:4px; color:var(--text-muted); font-size:12px; }
+.okr-my-review-score strong { color:var(--primary); font-size:18px; }
+.okr-my-review-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.okr-my-review-metrics span { display:flex; align-items:center; gap:6px; padding:10px; border:1px solid var(--border-main); border-radius:6px; color:var(--text-body); font-size:12px; }
+.okr-my-review-metrics svg { color:var(--primary); }
+.okr-my-review-summary { display:grid; gap:6px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border-main); }
+.okr-my-review-summary b { color:var(--text-primary); font-size:12px; }
+.okr-my-review-summary p { min-height:38px; margin:0; color:var(--text-body); font-size:12px; line-height:18px; }
+.okr-my-review-summary div { display:flex; gap:16px; font-size:11px; }.okr-my-review-summary .is-normal{color:var(--success)}.okr-my-review-summary .is-risk{color:var(--warning)}.okr-my-review-summary .is-blocked{color:var(--danger)}
+.okr-my-review-actions { display:flex; gap:8px; margin-top:16px; }
+.okr-review-empty { display:flex; min-height:420px; align-items:center; justify-content:center; padding:32px; border:1px dashed var(--border-main); border-radius:8px; background:var(--bg-surface); text-align:center; }
+.okr-received-layout { display:grid; grid-template-columns:360px minmax(0,1fr); min-height:650px; overflow:hidden; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
+.okr-received-list { border-right:1px solid var(--border-main); background:var(--bg-card); }
+.okr-received-list-tools { display:grid; gap:8px; padding:14px; border-bottom:1px solid var(--border-main); }.okr-received-list-tools > div { display:flex; gap:20px; }
+.okr-received-list-empty, .okr-received-detail-empty { display:flex; min-height:540px; align-items:center; justify-content:center; padding:32px; text-align:center; }
+.okr-received-list-item { display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:start; gap:10px; width:100%; padding:16px 14px; border:0; border-bottom:1px solid var(--border-main); background:transparent; text-align:left; cursor:pointer; }.okr-received-list-item:hover{background:var(--bg-surface-soft)}.okr-received-list-item.is-active{background:color-mix(in srgb,var(--primary) 10%,var(--bg-surface));box-shadow:inset 3px 0 var(--primary)}
+.okr-avatar { display:grid; width:32px; height:32px; place-items:center; border-radius:50%; background:color-mix(in srgb,var(--primary) 20%,var(--bg-surface)); color:var(--primary); font-weight:700; }
+.okr-received-list-item > span:nth-child(2) { display:grid; min-width:0; gap:4px; }.okr-received-list-item b{color:var(--text-primary);font-size:13px}.okr-received-list-item small,.okr-received-list-item em{overflow:hidden;color:var(--text-muted);font-size:11px;font-style:normal;text-overflow:ellipsis;white-space:nowrap}
+.okr-received-detail { display:grid; min-width:0; align-content:start; padding:24px; background:var(--bg-surface); }.okr-received-detail-empty{min-height:600px}.okr-received-detail-head{display:flex;justify-content:space-between;gap:16px;padding-bottom:20px;border-bottom:1px solid var(--border-main)}.okr-received-detail-head h2{margin:8px 0 4px;font-size:20px}.okr-received-detail-head p{margin:0;color:var(--text-muted);font-size:12px}
+.okr-received-summary-row { display:grid; gap:10px; padding:18px 0; }.okr-received-summary-row > div { display:grid; grid-template-columns:52px minmax(80px,1fr) 42px 40px minmax(80px,1fr) 42px auto; align-items:center; gap:8px; color:var(--text-muted); font-size:11px; }.okr-received-summary-row .ant-progress{margin:0}.okr-received-summary-row b{color:var(--text-primary);font-size:12px}
+.okr-received-section { margin-top:12px; padding:16px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); }.okr-received-section-title{display:flex;align-items:center;gap:8px}.okr-received-section-title svg{color:var(--success)}.okr-received-section-title h3{margin:0;color:var(--text-primary);font-size:14px}.okr-received-section-title strong{margin-left:auto;color:var(--text-muted);font-size:12px}.okr-received-section p{margin:12px 0 0;color:var(--text-body);font-size:12px;line-height:20px}.okr-received-risk{display:flex;gap:8px;margin-top:12px;color:var(--warning);font-size:12px}.okr-received-next{display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-main);color:var(--text-body);font-size:12px}.okr-received-next b{color:var(--text-muted)}.okr-received-two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.okr-received-feedback{display:flex;gap:8px;margin-top:16px}.okr-received-feedback .ant-input{flex:1}
+@media (max-width:900px){.okr-my-review-grid,.okr-received-two-col{grid-template-columns:1fr}.okr-received-layout{grid-template-columns:1fr}.okr-received-list{border-right:0;border-bottom:1px solid var(--border-main)}.okr-review-month-rail{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media (max-width: 900px) { .okr-work-association-filters { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .okr-review-layout { grid-template-columns: 1fr; } .okr-review-aside { position: static; grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 760px) { .okr-review-toolbar { align-items: flex-start; flex-direction: column; } .okr-review-toolbar-actions { justify-content: flex-start; } .okr-review-stats { grid-template-columns: 1fr; } .okr-review-stats > div + div { border-top: 1px solid var(--border-main); border-left: 0; } .okr-review-basics, .okr-review-narratives, .okr-review-assistance, .okr-review-aside { grid-template-columns: 1fr; } .okr-review-progress { grid-template-columns: 40px minmax(80px,1fr); } .okr-review-progress .ant-input-number-group-wrapper { grid-column: 2; } .okr-review-section-head, .okr-review-kr-head { align-items: flex-start; flex-direction: column; } }

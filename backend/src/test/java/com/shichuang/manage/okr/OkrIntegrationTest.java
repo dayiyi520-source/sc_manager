@@ -46,6 +46,14 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
   mockMvc.perform(patch("/api/okr/records/"+id).header("Authorization","Bearer "+admin).contentType("application/json").content("{\"action\":\"approve\",\"version\":3,\"finalScore\":0,\"feedback\":\"已核实\",\"evaluation\":\"未形成交付结果\"}")).andExpect(status().isOk());
   assertEquals(0,objectMapper.readTree(jdbc.queryForObject("SELECT payload_ FROM t_okr_record WHERE id_=?",String.class,id)).path("finalScore").asInt(-1));
  }
+ @Test void organizationRootCanSubmitReviewWithoutSupervisor()throws Exception{
+  String admin=login("admin");reporting(admin,"user-admin","",true);
+  var payload=new java.util.LinkedHashMap<String,Object>();
+  payload.put("title","组织根周复盘");payload.put("startDate","2026-09-14");payload.put("endDate","2026-09-20");payload.put("reviewMode","structured");payload.put("reviewType","week");payload.put("selfScore",90);payload.put("summary","");payload.put("krReviews",List.of());payload.put("assistance",List.of());payload.put("extraWork",Map.of("workIds",List.of(),"description","","impact","none"));payload.put("syncKrProgress",false);payload.put("items",List.of());
+  String response=mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+admin).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("kind","review","periodKey","2026-09-14/2026-09-20","payload",payload,"submit",true)))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String id=objectMapper.readTree(response).path("data").path("id").asText();
+  assertEquals("submitted",jdbc.queryForObject("SELECT status_ FROM t_okr_record WHERE id_=?",String.class,id));
+ }
  @Test void persistsWorkLinksAndFreezesSubmittedEvidence()throws Exception{
   String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
   var krs=List.of(Map.of("id","kr","title","交付结果","weight",100,"progress",0));String parent=create(admin,"objective",Map.of("title","组织方向","keyResults",krs));action(admin,parent,"submit",0);
@@ -89,6 +97,23 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
    if("okr-core-work".equals(item.path("sourceId").asText())){assertEquals("core:okr-core-work",item.path("id").asText());found=true;}
   }
   assertTrue(found,"统一工作项应进入 OKR 工作项证据列表");
+ }
+ @Test void transferredRequirementWorkItemCanBeSubmittedFromLegacyReviewDraft()throws Exception{
+  String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
+  jdbc.update("""
+   INSERT INTO t_requirement_work_item
+   (id_,tenant_id_,requirement_id_,task_type_,title_,assignee_name_,note_,status_,sync_status_,retry_count_,create_by_,update_by_,create_time_,update_time_,delete_flag_,version_)
+   VALUES (?,?,?,?,?,?,?,'处理中','SUCCESS',0,?,?,?, ?,0,0)
+   ""","okr-transferred-ticket","local-tenant","req-1","development","转派给我的工单","王浩然","处理转派工单","user-admin","user-admin","2026-09-14 09:00:00","2026-09-15 10:00:00");
+  String workJson=mockMvc.perform(get("/api/okr/work?ownerId=user-tech").header("Authorization","Bearer "+tech)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String workId="";for(var item:objectMapper.readTree(workJson).path("data"))if("okr-transferred-ticket".equals(item.path("sourceId").asText())){workId=item.path("id").asText();assertEquals("requirement_work_item",item.path("kind").asText());}assertFalse(workId.isBlank());
+  var payload=new java.util.LinkedHashMap<String,Object>();
+  payload.put("title","旧草稿兼容提交");payload.put("startDate","2026-09-14");payload.put("endDate","2026-09-20");payload.put("reviewMode","structured");payload.put("reviewType","week");payload.put("selfScore",90);payload.put("krReviews",List.of());payload.put("assistance",List.of());payload.put("extraWork",Map.of("workIds",List.of(workId),"description","","impact","无明显影响"));payload.put("syncKrProgress",false);payload.put("items",List.of(Map.of("workId",workId)));
+  String draft=create(tech,"review",payload);
+  action(tech,draft,"submit",0);
+  var saved=objectMapper.readTree(jdbc.queryForObject("SELECT payload_ FROM t_okr_record WHERE id_=?",String.class,draft));
+  assertEquals("none",saved.path("extraWork").path("impact").asText());assertEquals("ticket",saved.path("items").get(0).path("workType").asText());
+  assertEquals("submitted",jdbc.queryForObject("SELECT status_ FROM t_okr_record WHERE id_=?",String.class,draft));
  }
  @Test void simpleReviewPersistsOriginalFieldsAndSubmitsAtomically()throws Exception{
   String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);

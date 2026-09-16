@@ -42,6 +42,17 @@ public class OkrMapper {
             result.addAll(jdbc.queryForList("SELECT CONCAT(?,':',id_) AS id,id_ AS sourceId,? AS kind,title_ AS title,status_ AS status,owner_name_ AS ownerName,creator_name_ AS creatorName,actual_hours_ AS actualHours,estimated_hours_ AS estimatedHours,due_date_ AS dueDate,create_time_ AS createdAt,update_time_ AS updatedAt," + sources + " AS sourceWorkOrderIds FROM " + table + " WHERE tenant_id_=? AND owner_name_=? AND delete_flag_=0 ORDER BY update_time_ DESC",kind,kind,tenant,ownerName));
         }
         result.addAll(jdbc.queryForList("""
+            SELECT CONCAT('requirement_work_item:',w.id_) AS id,w.id_ AS sourceId,'requirement_work_item' AS kind,
+                   w.title_ AS title,w.status_ AS status,w.assignee_name_ AS ownerName,COALESCE(u.name_,w.create_by_) AS creatorName,
+                   0 AS actualHours,0 AS estimatedHours,r.due_date_ AS dueDate,w.create_time_ AS createdAt,w.update_time_ AS updatedAt,
+                   JSON_ARRAY(w.requirement_id_) AS sourceWorkOrderIds
+            FROM t_requirement_work_item w
+            JOIN t_product_requirement r ON r.id_=w.requirement_id_ AND r.tenant_id_=w.tenant_id_ AND r.delete_flag_=0
+            LEFT JOIN t_sys_user u ON u.id_=w.create_by_ AND u.tenant_id_=w.tenant_id_
+            WHERE w.tenant_id_=? AND w.assignee_name_=? AND w.delete_flag_=0
+            ORDER BY w.update_time_ DESC
+            """,tenant,ownerName));
+        result.addAll(jdbc.queryForList("""
             SELECT CONCAT('core:',w.id_) AS id,w.id_ AS sourceId,w.category_ AS kind,w.title_ AS title,
                    w.status_name_ AS status,w.assignee_name_ AS ownerName,COALESCE(u.name_,w.create_by_) AS creatorName,w.actual_hours_ AS actualHours,
                    w.estimated_hours_ AS estimatedHours,w.planned_end_date_ AS dueDate,w.create_time_ AS createdAt,

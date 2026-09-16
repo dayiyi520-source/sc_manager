@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {periodWork,reviewWork} from './workAggregation';
+import {periodWork,reviewWork,workSource} from './workAggregation';
 import type {OkrWork} from '../../../services/okrRepository';
 const work=(overrides:Partial<OkrWork>):OkrWork=>({id:'task:1',sourceId:'1',kind:'task',title:'处理工单',status:'开发中',createdAt:'2026-08-01',updatedAt:'2026-08-02',dueDate:'2026-09-30',actualHours:0,estimatedHours:4,sourceWorkOrderIds:'["ticket-1"]',linkVersion:-1,...overrides});
 describe('period work aggregation',()=>{
@@ -13,5 +13,10 @@ describe('period work aggregation',()=>{
  it('keeps out-of-plan work and does not overwrite existing results on regrouping',()=>{
   const entry=reviewWork(work({}));entry.result='完成紧急恢复';entry.impact='占用原计划两天';
   expect(reviewWork(work({}),entry)).toEqual(entry);expect(entry.objectiveId).toBeUndefined();
+ });
+ it('classifies transferred requirements and requirement work items as tickets',()=>{
+  expect(workSource(work({kind:'product_requirement'}))).toBe('ticket');
+  expect(workSource(work({kind:'requirement_work_item'}))).toBe('ticket');
+  expect(workSource(work({kind:'product_dev_task'}))).toBe('task');
  });
 });
