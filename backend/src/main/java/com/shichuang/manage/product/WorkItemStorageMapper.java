@@ -97,12 +97,13 @@ public class WorkItemStorageMapper {
         jdbc.update("""
             INSERT INTO t_product_work_item(id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,description_,expected_goal_,
               version_id_,requirement_id_,parent_work_item_id_,workflow_id_,status_key_,status_name_,status_group_,status_color_,successful_,assignee_id_,assignee_name_,
-              priority_,planned_start_date_,planned_end_date_,estimated_hours_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))
+              priority_,planned_start_date_,planned_end_date_,estimated_hours_,actual_hours_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))
             """,id,tenant,input.productLineId(),input.category(),input.taskTypeId(),code,input.title().trim(),input.description(),input.expectedGoal(),
             versionId,requirementId,parentId,workflowId,initial.key(),initial.name(),initial.group().name(),initial.color(),initial.successful(),
             WorkItemDefinition.optional(input.assigneeId()),assigneeName,input.priority(),input.plannedStartDate(),input.plannedEndDate(),
-            input.estimatedHours()==null?java.math.BigDecimal.ZERO:input.estimatedHours(),input.requestId(),hash,user,user);
+            input.estimatedHours()==null?java.math.BigDecimal.ZERO:input.estimatedHours(),
+            input.actualHours()==null?java.math.BigDecimal.ZERO:input.actualHours(),input.requestId(),hash,user,user);
     }
     public void activity(String tenant,String line,String subject,String event,String json,String user) {
         jdbc.update("INSERT INTO t_product_work_item_activity(id_,tenant_id_,product_line_id_,subject_id_,event_type_,content_,create_by_,create_time_) VALUES(?,?,?,?,?,CAST(? AS JSON),?,NOW(6))",UUID.randomUUID().toString(),tenant,line,subject,event,json,user);

@@ -17,6 +17,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
+    void acceptsDeliverySupervisorAsProductLineMemberRole() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        String response = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"交付角色测试\",\"code\":\"DELIVERY-" + System.nanoTime() + "\",\"ownerName\":\"林志豪\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String lineId = objectMapper.readTree(response).path("data").path("id").asText();
+
+        mockMvc.perform(post("/api/product-lines/{id}/members", lineId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"张瑞\",\"role\":\"交付主管\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("OK"));
+
+        assertEquals(1, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_line_member WHERE product_line_id_=? AND member_name_='张瑞' AND role_='交付主管' AND delete_flag_=0",
+            Integer.class, lineId));
+    }
+
+    @Test
     void versionDatesCanBeEmptyUpdatedAndClearedWithoutLosingTheVersion() throws Exception {
         String token = loginToken();
         String authorization = "Bearer " + token;

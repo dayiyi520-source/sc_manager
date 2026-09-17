@@ -52,8 +52,15 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         var first=storage.create(input);
         assertEquals(first.get("id"),storage.create(input).get("id"));
         assertEquals(1,storage.activities(line,first.get("id").toString()).size());
-        var changed=new CreateItem(input.requestId(),line,"test",type,"不同标题",null,null,null,null,null,null,"P1",null,null,null);
+        var changed=new CreateItem(input.requestId(),line,"test",type,"不同标题",null,null,null,null,null,null,"P1",null,null,null,null);
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.create(changed)).getStatusCode().value());
+    }
+    @Test void persistsEstimatedAndActualHoursOnCreation() {
+        var input=new CreateItem("hours",line,"test",type,"工时任务",null,null,null,null,null,null,"P2",null,null,
+            new java.math.BigDecimal("8.50"),new java.math.BigDecimal("3.25"));
+        var created=storage.create(input);
+        assertEquals(0,new java.math.BigDecimal("8.50").compareTo((java.math.BigDecimal)created.get("estimatedHours")));
+        assertEquals(0,new java.math.BigDecimal("3.25").compareTo((java.math.BigDecimal)created.get("actualHours")));
     }
     @Test void usedTypeCanBeDisabledButNotDeletedOrRecategorized() {
         storage.create(input("type-use","test",type,null,null,null));
@@ -195,6 +202,6 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         return id;
     }
     private CreateItem input(String request,String category,String selectedType,String parent,String version,String requirement) {
-        return new CreateItem(request,line,category,selectedType,"真实统一工作项",null,null,version,requirement,parent,null,"P1",null,null,null);
+        return new CreateItem(request,line,category,selectedType,"真实统一工作项",null,null,version,requirement,parent,null,"P1",null,null,null,null);
     }
 }

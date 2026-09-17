@@ -60,7 +60,7 @@ public class WorkItemRegressionService {
         var before=relations.snapshot(line);
         var test=storage.create(new CreateItem(input.requestId(),line,"test",input.taskTypeId(),input.title(),
             Objects.toString(bug.get("description"),null),Objects.toString(bug.get("expectedGoal"),null),input.versionId(),
-            Objects.toString(bug.get("requirementId"),null),null,input.assigneeId(),bug.get("priority").toString(),null,input.plannedEndDate(),null));
+            Objects.toString(bug.get("requirementId"),null),null,input.assigneeId(),bug.get("priority").toString(),null,input.plannedEndDate(),null,null));
         String id=test.get("id").toString(),tenant=RequestContext.tenantId(),user=RequestContext.userId();
         origins.source(tenant,line,id,"DEFECT_REGRESSION");
         relationMapper.insert(tenant,line,UUID.randomUUID().toString(),bugId,id,"REQUIRES_REGRESSION","FINISH",false,user);

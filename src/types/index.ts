@@ -511,6 +511,8 @@ export interface RequirementTask {
   events?: RequirementEvent[];
   estimatedHours: number;
   actualHours?: number;
+  statusKey?: string;
+  statusColor?: string;
   dueDate: string;
   createdAt?: string;
   todoList?: { id: string; text: string; done: boolean }[];

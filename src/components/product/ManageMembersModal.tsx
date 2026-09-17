@@ -14,7 +14,7 @@ interface ManageMembersModalProps {
   productLine: ProductLine;
 }
 
-const PRODUCT_LINE_MEMBER_ROLES = ['管理员', '产品', '研发', '设计', '测试', '参与人'];
+const PRODUCT_LINE_MEMBER_ROLES = ['管理员', '产品', '研发', '设计', '测试', '交付主管', '参与人'];
 
 export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
   isOpen,

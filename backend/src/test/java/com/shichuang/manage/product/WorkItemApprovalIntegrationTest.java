@@ -34,7 +34,7 @@ class WorkItemApprovalIntegrationTest extends AbstractApiIntegrationTest {
             types.put(kind,lines.addWorkItemType(line,new HashMap<>(Map.of("category",CATEGORIES.get(kind),"name",kind,"enabled",true))).get("id").toString());
             publish(kind,definition("requirement".equals(kind)));
         }
-        id=storage.create(new CreateItem(UUID.randomUUID().toString(),line,"requirement",types.get("requirement"),"验收需求",null,null,version,null,null,null,"P1",null,null,null)).get("id").toString();
+        id=storage.create(new CreateItem(UUID.randomUUID().toString(),line,"requirement",types.get("requirement"),"验收需求",null,null,version,null,null,null,"P1",null,null,null,null)).get("id").toString();
     }
     @AfterEach void cleanup() {
         // Each test uses a unique tenant; committed fixtures are removed even after rollback tests.

@@ -321,6 +321,23 @@ html:not(.dark) .tech-sidebar {
 .task-page .work-item-panel :where(input:not(.ant-select-input):not([type='checkbox']):not([type='file']), textarea, select) {
   min-height: 40px;
 }
+.task-page .work-item-panel .requirement-hours-input.ant-input-number {
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+}
+.task-page .work-item-panel .requirement-hours-input .ant-input-number-input-wrap {
+  height: 100%;
+}
+.task-page .work-item-panel .requirement-hours-input .ant-input-number-input,
+.task-page .work-item-panel .requirement-hours-input .ant-input-number-input:focus,
+.task-page .work-item-panel .requirement-hours-input .ant-input-number-input:focus-visible {
+  height: 30px !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
 
 /* Light mode keeps the header shell dark, while making its controls legible and quiet. */
 html:not(.dark) .tech-header {

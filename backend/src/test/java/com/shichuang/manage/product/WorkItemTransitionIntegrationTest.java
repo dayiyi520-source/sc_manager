@@ -50,12 +50,14 @@ class WorkItemTransitionIntegrationTest extends AbstractApiIntegrationTest {
         assertTrue(WorkItemConfigurationService.enabled(result.get("successful")));
         assertNotNull(result.get("completedAt")); assertNull(result.get("actualStartAt"));
     }
-    @Test void unfinishedChildBlocksParentAndCompletedParentBlocksChildReopen() {
+    @Test void parentWithChildrenIsReadOnlyWhileChildStatusCanChange() {
         configuration.childRule(line,new ChildRule(type,type,true)); String child=create(id,null);
-        assertFalse(transitions.available(line,id).actions().stream().filter(a->a.edgeKey().equals("skip")).findFirst().orElseThrow().allowed());
-        assertThrows(ResponseStatusException.class,()->execute(id,"skip",0,"无需设计"));
-        execute(child,"skip",0,"子任务无需设计"); execute(id,"skip",0,"完成");
-        assertThrows(ResponseStatusException.class,()->execute(child,"resume",1,"重开"));
+        var parentActions=transitions.available(line,id);
+        assertTrue(parentActions.actions().stream().noneMatch(WorkItemTransitionService.Action::allowed));
+        assertTrue(parentActions.statuses().stream().filter(option->!option.current()).noneMatch(WorkItemTransitionService.StatusOption::allowed));
+        assertTrue(transitions.available(line,child).actions().stream().anyMatch(WorkItemTransitionService.Action::allowed));
+        execute(child,"skip",0,"子任务无需设计");
+        assertThrows(ResponseStatusException.class,()->execute(id,"skip",0,"完成"));
     }
     @Test void publishedIterationIsReadOnlyForEveryAction() {
         String version=UUID.randomUUID().toString();
@@ -83,7 +85,8 @@ class WorkItemTransitionIntegrationTest extends AbstractApiIntegrationTest {
     @Test void endpointValidatesRevisionAndExposesActions() throws Exception {
         String bearer="Bearer "+tokens.issue("u","admin",TENANT);
         mockMvc.perform(get("/api/work-items/{id}/transitions",id).param("productLineId",line).header("Authorization",bearer))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.revision").value(0));
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.revision").value(0))
+            .andExpect(jsonPath("$.data.statuses[0].name").value("待设计"));
         mockMvc.perform(post("/api/work-items/{id}/transitions",id).param("productLineId",line).header("Authorization",bearer)
                 .contentType("application/json").content("{\"edgeKey\":\"start\"}"))
             .andExpect(status().isBadRequest());
@@ -111,7 +114,7 @@ class WorkItemTransitionIntegrationTest extends AbstractApiIntegrationTest {
         assertFalse(transitions.available(line,task).actions().stream().filter(a->a.edgeKey().equals("disabled-action")).findFirst().orElseThrow().allowed());
     }
     private Map<String,Object> execute(String task,String edge,int revision,String reason) { return transitions.execute(line,task,new Transition(edge,revision,reason)); }
-    private String create(String parent,String version) { return storage.create(new CreateItem(UUID.randomUUID().toString(),line,"design",type,"设计任务",null,null,version,null,parent,null,"P2",null,null,null)).get("id").toString(); }
+    private String create(String parent,String version) { return storage.create(new CreateItem(UUID.randomUUID().toString(),line,"design",type,"设计任务",null,null,version,null,parent,null,"P2",null,null,null,null)).get("id").toString(); }
     private String publish(Workflow definition) { var draft=configuration.save(line,null,new SaveWorkflow("design","设计流程",definition,null)); String key=draft.get("id").toString(); configuration.publish(line,key,0); return key; }
     private void session(String role) { RequestContext.set(Map.of("sub","u","tenant",TENANT,"role",role)); }
     private static Workflow workflow() {

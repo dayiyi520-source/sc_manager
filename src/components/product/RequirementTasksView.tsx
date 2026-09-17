@@ -22,7 +22,7 @@ import { WorkItemStatusTag } from './WorkItemStatusTag';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { requirementRepository } from '../../services/requirementRepository';
-import { productRepository, UnifiedWorkItem } from '../../services/productRepository';
+import { productRepository, UnifiedWorkItem, WorkItemTransitionAction, WorkItemTransitionOptions } from '../../services/productRepository';
 import { readSession } from '../../services/session';
 
 type RequirementFilterState = {
@@ -295,6 +295,9 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         parentWorkItemId: item.parentWorkItemId || undefined,
         versionId: item.versionId || undefined,
         estimatedHours: Number(item.estimatedHours || 0),
+        actualHours: Number(item.actualHours || 0),
+        statusKey: item.statusKey || undefined,
+        statusColor: item.statusColor || undefined,
         createdAt: item.createdAt,
         revision: item.revision,
         hasChildren: item.hasChildren
@@ -320,6 +323,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const [childPlannedStartDate, setChildPlannedStartDate] = useState('');
   const [childDueDate, setChildDueDate] = useState('');
   const [childEstimatedHours, setChildEstimatedHours] = useState<number | ''>('');
+  const [childActualHours, setChildActualHours] = useState<number | ''>('');
   const [childCategory, setChildCategory] = useState<'design' | 'dev' | 'test' | 'bug'>('dev');
   const [childTypeId, setChildTypeId] = useState('');
   const [childTypes, setChildTypes] = useState<Array<{ id: string; name: string; enabled: boolean; category: string }>>([]);
@@ -329,6 +333,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const [childCreating, setChildCreating] = useState(false);
   const [listChildren, setListChildren] = useState<Record<string, RequirementTask[]>>({});
   const [expandedListRows, setExpandedListRows] = useState<string[]>([]);
+  const [transitionOptions, setTransitionOptions] = useState<Record<string, WorkItemTransitionOptions>>({});
+  const [transitionLoadingId, setTransitionLoadingId] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
   const controlsRef = useRef<HTMLDivElement>(null);
 
@@ -416,6 +422,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setChildPlannedStartDate('');
     setChildDueDate('');
     setChildEstimatedHours('');
+    setChildActualHours('');
     setChildModalOpen(true);
   };
 
@@ -447,7 +454,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         priority: apiPriority(childPriority),
         plannedStartDate: childPlannedStartDate || undefined,
         plannedEndDate: childDueDate || undefined,
-        estimatedHours: Number(childEstimatedHours || 0)
+        estimatedHours: Number(childEstimatedHours || 0),
+        actualHours: Number(childActualHours || 0)
       });
       addToast('success', '子任务已创建');
       setChildModalOpen(false);
@@ -532,6 +540,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const [formCustomerName, setFormCustomerName] = useState('');
   const [formProductLineName, setFormProductLineName] = useState('');
   const [formEstimatedHours, setFormEstimatedHours] = useState<number | ''>('');
+  const [formActualHours, setFormActualHours] = useState<number | ''>('');
   const [formRequirementType, setFormRequirementType] = useState('');
   const [configuredWorkItemTypes, setConfiguredWorkItemTypes] = useState<Array<{ id: string; name: string; enabled: boolean }>>([]);
   const [formCcNames, setFormCcNames] = useState<string[]>([]);
@@ -591,6 +600,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setFormCustomerName('');
     setFormProductLineName('');
     setFormEstimatedHours('');
+    setFormActualHours('');
     setFormRequirementType('');
     setFormCcNames([]);
     setFormPlannedStartDate('');
@@ -621,6 +631,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setSelectedWorkOrderIds(requirementTaskDraft.sourceWorkOrderIds || []);
     setSelectedRequirementTaskIds(requirementTaskDraft.requirementId ? [requirementTaskDraft.requirementId] : []);
     setFormEstimatedHours(40);
+    setFormActualHours(requirementTaskDraft.actualHours || 0);
     setFormMedia([]);
     setIsModalOpen(true);
     setRequirementTaskDraft(null);
@@ -639,6 +650,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setFormCustomerName(task.customerName || '国家电网华东分部数智调度中心');
     setFormProductLineName(task.productLineName);
     setFormEstimatedHours(task.estimatedHours);
+    setFormActualHours(task.actualHours || 0);
     setFormRequirementType(task.requirementType || '业务需求');
     setFormCcNames(task.ccNames || []);
     setFormPlannedStartDate(task.plannedStartDate || '');
@@ -697,6 +709,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         customerName: formCustomerName,
         productLineName: formProductLineName,
         estimatedHours: Number(formEstimatedHours),
+        actualHours: Number(formActualHours),
         requirementType: formRequirementType,
         workItemTypeId: selectedWorkItemType?.id,
         ccNames: formCcNames,
@@ -723,7 +736,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           priority: apiPriority(formPriority),
           plannedStartDate: formPlannedStartDate || undefined,
           plannedEndDate: formDueDate || undefined,
-          estimatedHours: Number(formEstimatedHours) || 0
+          estimatedHours: Number(formEstimatedHours) || 0,
+          actualHours: Number(formActualHours) || 0
         });
         await unifiedQuery.refetch();
         addToast('success', `${itemLabel}已创建`, `已关联产品线子类型“${selectedWorkItemType.name}”及其最新状态流程`);
@@ -744,6 +758,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         ownerName: formOwnerName,
         dueDate: formDueDate,
         estimatedHours: Number(formEstimatedHours),
+        actualHours: Number(formActualHours),
         customerName: formCustomerName,
         expectedGoal: formTarget,
         descriptionHtml: formDescriptionHtml,
@@ -810,12 +825,94 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     plannedStartDate: item.plannedStartDate ? String(item.plannedStartDate) : undefined,
     dueDate: item.plannedEndDate ? String(item.plannedEndDate) : fallback?.dueDate || '',
     estimatedHours: Number(item.estimatedHours || 0),
+    actualHours: Number(item.actualHours || 0),
+    statusKey: item.statusKey ? String(item.statusKey) : fallback?.statusKey,
+    statusColor: item.statusColor ? String(item.statusColor) : fallback?.statusColor,
     createdAt: item.createdAt ? String(item.createdAt) : undefined,
     revision: item.revision == null ? undefined : Number(item.revision),
     description: String(item.description || ''),
     expectedGoal: String(item.expectedGoal || ''),
     hasChildren: Boolean(item.hasChildren)
   });
+
+  const loadTransitionOptions = async (task: RequirementTask, force = false) => {
+    if (!task.productLineId || task.hasChildren || (!force && transitionOptions[task.id])) return;
+    setTransitionLoadingId(task.id);
+    try {
+      const options = await productRepository.workItemTransitions(task.productLineId, task.id);
+      setTransitionOptions((current) => ({ ...current, [task.id]: options }));
+    } catch (error) {
+      addToast('error', '状态配置读取失败', error instanceof Error ? error.message : '请稍后重试');
+    } finally {
+      setTransitionLoadingId((current) => current === task.id ? '' : current);
+    }
+  };
+
+  const performTaskTransition = async (task: RequirementTask, action: WorkItemTransitionAction, revision: number, reason = '') => {
+    if (!task.productLineId) return;
+    setTransitionLoadingId(task.id);
+    try {
+      const updated = storedTask(await productRepository.transitionWorkItem(task.productLineId, task.id, { edgeKey: action.edgeKey, revision, reason }), task);
+      setListChildren((current) => {
+        const next: Record<string, RequirementTask[]> = {};
+        Object.keys(current).forEach((parentId) => {
+          next[parentId] = current[parentId].map((child) => child.id === task.id ? updated : child);
+        });
+        return next;
+      });
+      setSelectedTask((current) => current?.id === task.id ? updated : current);
+      setTransitionOptions((current) => { const next = { ...current }; delete next[task.id]; return next; });
+      await unifiedQuery.refetch();
+      addToast('success', '任务状态已更新', `已进入“${updated.status}”`);
+    } catch (error) {
+      addToast('error', '任务状态更新失败', error instanceof Error ? error.message : '请刷新后重试');
+    } finally {
+      setTransitionLoadingId((current) => current === task.id ? '' : current);
+    }
+  };
+
+  const requestTaskTransition = (task: RequirementTask, statusKey: string) => {
+    const options = transitionOptions[task.id];
+    if (!options || statusKey === task.statusKey) return;
+    const action = options.actions.find((item) => item.to === statusKey && item.allowed);
+    if (!action) { addToast('warning', '当前状态不能直接切换到所选状态'); return; }
+    if (action.requiredFields.includes('reason')) {
+      let reason = '';
+      Modal.confirm({
+        title: `将状态改为“${options.statuses.find((item) => item.key === statusKey)?.name || action.name}”`,
+        content: <Input.TextArea rows={4} placeholder="请输入状态变更原因" onChange={(event) => { reason = event.target.value; }} />,
+        okText: '确认变更', cancelText: '取消',
+        onOk: async () => {
+          if (!reason.trim()) { addToast('warning', '请填写状态变更原因'); throw new Error('状态变更原因不能为空'); }
+          await performTaskTransition(task, action, options.revision, reason.trim());
+        }
+      });
+      return;
+    }
+    void performTaskTransition(task, action, options.revision);
+  };
+
+  const taskStatusControl = (task: RequirementTask, fullWidth = false) => {
+    if (task.hasChildren) return <WorkItemStatusTag name={task.status || '待处理'} />;
+    if (!unifiedCategory || !task.productLineId || !task.statusKey) {
+      return <Select aria-label={`${task.title}状态`} variant={fullWidth ? 'outlined' : 'borderless'} style={{ width: fullWidth ? '100%' : 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.status} options={STAGES.map((status, index) => ({ label: status, value: status, disabled: index < STAGES.indexOf(task.status) }))} onChange={(status) => updateTask(task.id, { status })} />;
+    }
+    const options = transitionOptions[task.id];
+    const statuses = options?.statuses?.length ? options.statuses : [{ key: task.statusKey, name: task.status, color: task.statusColor || 'neutral', current: true, allowed: true, reasons: [] }];
+    return <Select
+      aria-label={`${task.title}状态`}
+      variant={fullWidth ? 'outlined' : 'borderless'}
+      style={{ width: fullWidth ? '100%' : 120 }}
+      popupMatchSelectWidth={180}
+      showSearch
+      optionFilterProp="label"
+      value={task.statusKey}
+      loading={transitionLoadingId === task.id}
+      options={statuses.map((status) => ({ label: status.name, value: status.key, disabled: !status.current && !status.allowed, title: status.reasons.join('；') }))}
+      onOpenChange={(open) => { if (open) void loadTransitionOptions(task); }}
+      onChange={(statusKey) => requestTaskTransition(task, statusKey)}
+    />;
+  };
 
   const copyTask = async (task: RequirementTask, linked: boolean) => {
     const category = ['requirement', 'design', 'dev', 'test', 'bug'].includes(String(task.category)) ? task.category as 'requirement' | 'design' | 'dev' | 'test' | 'bug' : unifiedCategory;
@@ -834,7 +931,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         priority: apiPriority(task.priority),
         plannedStartDate: task.plannedStartDate || undefined,
         plannedEndDate: task.dueDate || undefined,
-        estimatedHours: Number(task.estimatedHours || 0)
+        estimatedHours: Number(task.estimatedHours || 0),
+        actualHours: Number(task.actualHours || 0)
       });
       if (linked) await productRepository.createWorkItemRelation(task.productLineId, task.id, String(created.id));
       await unifiedQuery.refetch();
@@ -1053,7 +1151,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     if (listChildren[task.id] || !task.productLineId) return;
     try {
       const detail = await productRepository.workItemDetail(task.productLineId, task.id);
-      setListChildren((current) => ({ ...current, [task.id]: (detail.children || []).map((item: Record<string, unknown>) => storedTask(item, task)) }));
+      const children = Array.isArray(detail.children) ? detail.children : [];
+      setListChildren((current) => ({ ...current, [task.id]: children.map((item: Record<string, unknown>) => storedTask(item, task)) }));
     } catch (error) {
       setExpandedListRows((rows) => rows.filter((item) => item !== task.id));
       addToast('error', '子任务加载失败', error instanceof Error ? error.message : '请稍后重试');
@@ -1077,7 +1176,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           </div>
         </td>
         <td className="px-4 py-3.5">
-          {isChild ? <WorkItemStatusTag name={task.status || '待处理'} /> : <Select aria-label={`${task.title}状态`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.status} options={STAGES.map((status, index) => ({ label: status, value: status, disabled: index < STAGES.indexOf(task.status) }))} onChange={(status) => updateTask(task.id, { status })} />}
+          {taskStatusControl(task)}
         </td>
         <td className="px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>
         <td className="max-w-[240px] px-4 py-3.5 text-[var(--text-body)]"><span className="line-clamp-2 font-mono text-[var(--primary)]" title={task.versionName || '未关联'}>{task.versionName || '未关联'}</span></td>
@@ -1214,7 +1313,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
               <SearchableSelect label="所属产品线" value={selectedTask.productLineName || ''} options={productLines.map((line) => line.name)} onChange={(productLineName) => saveDetailUpdates({ productLineName, productLineId: productLines.find((line) => line.name === productLineName)?.id, versionName: '' })} placeholder="未设置" />
-              <SearchableSelect label="当前状态" value={selectedTask.status} options={STAGES} onChange={(status) => saveDetailUpdates({ status })} />
+              <div><span className="block text-[var(--text-muted)]">当前状态</span><div className="mt-1">{taskStatusControl(selectedTask, true)}</div></div>
               <SearchableSelect label="需求类型" value={selectedTask.requirementType || ''} options={['业务需求', '产品优化', '技术需求', '合规需求']} onChange={(requirementType) => saveDetailUpdates({ requirementType })} placeholder="未设置" clearable />
               <SearchableSelect label="负责人" value={selectedTask.ownerName || ''} options={employees} onChange={(ownerName) => saveDetailUpdates({ ownerName })} placeholder="未设置" />
               <SearchableSelect label="优先级" value={normalizePriority(selectedTask.priority)} options={['紧急', '高', '中', '低']} onChange={(priority) => saveDetailUpdates({ priority: priority as RequirementTask['priority'] })} />
@@ -1342,7 +1441,8 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           <Form.Item label="优先级" required><Select value={childPriority} onChange={setChildPriority} options={['紧急', '高', '中', '低'].map((value) => ({ value, label: value }))} /></Form.Item>
           <Form.Item label="计划开始时间"><DatePicker value={childPlannedStartDate ? dayjs(childPlannedStartDate) : null} onChange={(date) => setChildPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" /></Form.Item>
           <Form.Item label="计划完成时间"><DatePicker value={childDueDate ? dayjs(childDueDate) : null} onChange={(date) => setChildDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" /></Form.Item>
-          <Form.Item label="预计工时（小时）"><InputNumber min={0} value={childEstimatedHours === '' ? null : childEstimatedHours} onChange={(value) => setChildEstimatedHours(value ?? '')} className="w-full" /></Form.Item>
+          <Form.Item label="预计工时（小时）"><InputNumber min={0} precision={2} value={childEstimatedHours === '' ? null : childEstimatedHours} onChange={(value) => setChildEstimatedHours(value ?? '')} className="requirement-hours-input w-full" /></Form.Item>
+          <Form.Item label="实际工时（小时）"><InputNumber min={0} precision={2} value={childActualHours === '' ? null : childActualHours} onChange={(value) => setChildActualHours(value ?? '')} className="requirement-hours-input w-full" /></Form.Item>
         </Form>}
       >
         <Form layout="vertical" className="w-full">
@@ -1366,17 +1466,18 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           </>
         }
         properties={<Form layout="vertical" className="requirement-create-properties" requiredMark>
+          <Form.Item label="所属产品线" required><Select showSearch optionFilterProp="label" value={formProductLineName || undefined} onChange={(value) => { setFormProductLineName(value); setFormVersionName(''); setFormRequirementType(''); }} options={productLines.map((line) => ({ label: line.name, value: line.name }))} placeholder="请选择所属产品线" /></Form.Item>
           <Form.Item label={`${itemLabel}类型`} required><Select showSearch optionFilterProp="label" value={formRequirementType || undefined} onChange={setFormRequirementType} options={configuredWorkItemTypes.map((item) => ({ label: item.name, value: item.name }))} disabled={!configuredWorkItemTypes.length} placeholder={configuredWorkItemTypes.length ? `请选择${itemLabel}类型` : '请先在产品线工作项设置中启用类型'} /></Form.Item>
           <Form.Item label="负责人" required><Select showSearch optionFilterProp="label" value={formOwnerName || undefined} onChange={setFormOwnerName} options={employees.map((value) => ({ label: value, value }))} placeholder="搜索并选择负责人" /></Form.Item>
           <Form.Item label="优先级" required><Select value={formPriority || undefined} onChange={(value) => setFormPriority(value)} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>
-          <Form.Item label="所属产品线" required><Select showSearch optionFilterProp="label" value={formProductLineName || undefined} onChange={(value) => { setFormProductLineName(value); setFormVersionName(''); }} options={productLines.map((line) => ({ label: line.name, value: line.name }))} placeholder="请选择所属产品线" /></Form.Item>
           <Form.Item label="计划开始时间" required><DatePicker value={formPlannedStartDate ? dayjs(formPlannedStartDate) : null} onChange={(date) => setFormPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
           <Form.Item label="计划完成时间" required><DatePicker value={formDueDate ? dayjs(formDueDate) : null} onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
           <Form.Item label="期望完成时间"><DatePicker value={formExpectedCompleteDate ? dayjs(formExpectedCompleteDate) : null} onChange={(date) => setFormExpectedCompleteDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
           <Form.Item label="迭代版本"><Select showSearch allowClear optionFilterProp="label" value={formVersionName || undefined} onChange={(value) => setFormVersionName(value || '')} options={versions.filter((version) => !version.productLineName || version.productLineName === formProductLineName).map((version) => ({ label: version.name, value: version.name }))} placeholder="暂不关联" /></Form.Item>
           <Form.Item label="关联客户"><Select showSearch allowClear optionFilterProp="label" value={formCustomerName || undefined} onChange={(value) => setFormCustomerName(value || '')} options={customers.map((customer) => ({ label: customer.name, value: customer.name }))} placeholder="暂不关联" /></Form.Item>
           <Form.Item label="参与人"><Select mode="multiple" showSearch allowClear optionFilterProp="label" value={formCcNames} onChange={setFormCcNames} options={employees.map((value) => ({ label: value, value }))} placeholder="搜索并选择参与人" /></Form.Item>
-          <Form.Item label="预计工时（小时）"><InputNumber min={0} value={formEstimatedHours === '' ? null : formEstimatedHours} onChange={(value) => setFormEstimatedHours(value ?? '')} className="w-full" placeholder="请输入预计工时" /></Form.Item>
+          <Form.Item label="预计工时（小时）"><InputNumber min={0} precision={2} value={formEstimatedHours === '' ? null : formEstimatedHours} onChange={(value) => setFormEstimatedHours(value ?? '')} className="requirement-hours-input w-full" placeholder="请输入预计工时" /></Form.Item>
+          <Form.Item label="实际工时（小时）"><InputNumber min={0} precision={2} value={formActualHours === '' ? null : formActualHours} onChange={(value) => setFormActualHours(value ?? '')} className="requirement-hours-input w-full" placeholder="请输入实际工时" /></Form.Item>
           <Form.Item label="附件">
             <Upload accept=".txt,.doc,.docx,.xls,.xlsx,.pdf" multiple showUploadList={false} beforeUpload={(file) => { appendDocumentMedia([file]); return Upload.LIST_IGNORE; }}><Button block icon={<Paperclip className="h-4 w-4" />}>添加文档附件</Button></Upload>
             {formMedia.map((item) => <div key={item.id} className="mt-2 flex items-center gap-2 text-[var(--text-body)]"><FileText className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{item.name}</span><Button type="text" danger size="small" aria-label={`移除附件${item.name}`} onClick={() => setFormMedia((items) => items.filter((media) => media.id !== item.id))} icon={<X className="h-4 w-4" />} /></div>)}

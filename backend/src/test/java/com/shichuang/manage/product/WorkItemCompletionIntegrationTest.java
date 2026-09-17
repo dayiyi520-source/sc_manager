@@ -86,12 +86,14 @@ class WorkItemCompletionIntegrationTest extends AbstractApiIntegrationTest {
         assertThrows(RuntimeException.class,()->finish(tasks.get("test")));
         assertEquals("doing",storage.detail(line,requirement).get("statusKey"));
     }
-    @Test void requiredChildPreventsCompletionUntilItSucceeds() {
+    @Test void parentWithRequiredChildCannotBeChangedManually() {
         configurations.childRule(line,new ChildRule(types.get("dev"),types.get("dev"),true));
-        String child=storage.create(new CreateItem(UUID.randomUUID().toString(),line,"dev",types.get("dev"),"子任务",null,null,version,requirement,tasks.get("dev"),null,"P2",null,null,null)).get("id").toString();
-        move(tasks.get("dev"),"start"); assertThrows(RuntimeException.class,()->move(tasks.get("dev"),"finish"));
-        finish(child); move(tasks.get("dev"),"finish"); finish(tasks.get("design")); finish(tasks.get("test"));
-        assertEquals("done",storage.detail(line,requirement).get("statusKey"));
+        String child=storage.create(new CreateItem(UUID.randomUUID().toString(),line,"dev",types.get("dev"),"子任务",null,null,version,requirement,tasks.get("dev"),null,"P2",null,null,null,null)).get("id").toString();
+        assertThrows(RuntimeException.class,()->move(tasks.get("dev"),"start"));
+        finish(child);
+        assertEquals("done",storage.detail(line,child).get("statusKey"));
+        assertThrows(RuntimeException.class,()->move(tasks.get("dev"),"start"));
+        assertEquals("open",storage.detail(line,tasks.get("dev")).get("statusKey"));
     }
     @Test void completingExternalPrerequisiteUnblocksAndCompletesRequirement() {
         String external=create("dev",null);
@@ -115,7 +117,7 @@ class WorkItemCompletionIntegrationTest extends AbstractApiIntegrationTest {
         edges.add(new Edge("auto",acceptance?"accepted":"doing","done","自动完成",null,null,null,true)); return new Workflow(states,edges);
     }
     private String publish(String category,Workflow workflow) { var flow=configurations.save(line,null,new SaveWorkflow(category,"流程",workflow,null)); String id=flow.get("id").toString(); configurations.publish(line,id,0); return id; }
-    private String create(String category,String parent) { return storage.create(new CreateItem(UUID.randomUUID().toString(),line,category,types.get(category),category,null,null,version,parent,null,null,"P1",null,null,null)).get("id").toString(); }
+    private String create(String category,String parent) { return storage.create(new CreateItem(UUID.randomUUID().toString(),line,category,types.get(category),category,null,null,version,parent,null,null,"P1",null,null,null,null)).get("id").toString(); }
     private void move(String id,String edge) { transitions.execute(line,id,new Transition(edge,((Number)storage.detail(line,id).get("revision")).intValue(),null)); }
     private void finish(String id) { move(id,"start"); move(id,"finish"); }
 }

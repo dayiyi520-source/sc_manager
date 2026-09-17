@@ -156,13 +156,13 @@ const ProductLineSettingsPanel: React.FC<{
                 const members: ProductLineMember[] = ownerName && !persistedMembers.some((member) => member.name === ownerName)
                   ? [{ id: `owner-${productLine.id}`, name: ownerName, role: '管理员' }, ...persistedMembers]
                   : persistedMembers;
-                const memberTabs = ['全部', '管理员', '参与人', '产品', '设计', '研发', '测试'];
+                const memberTabs = ['全部', '管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'];
                 const visibleMembers = memberTab === '全部' ? members : members.filter((member) => member.role === memberTab);
                 return <>
                   <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">{memberTabs.map((tab) => { const count = tab === '全部' ? members.length : members.filter((member) => member.role === tab).length; return <button key={tab} type="button" onClick={() => setMemberTab(tab)} className={`h-10 px-3 text-sm font-medium border-b-2 transition-colors ${memberTab === tab ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{tab}</span><span className="ml-1 text-base font-normal text-[var(--primary)]">{count}</span></button>; })}</div>
                   <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
                     <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-[11px] text-[var(--text-muted)]"><span>成员</span><span>角色</span><span className="text-right">操作</span></div>
-                    {visibleMembers.length ? visibleMembers.map((member) => <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><div className="flex min-w-0 items-center gap-2"><Avatar size={28}>{member.name.slice(0, 1)}</Avatar><span className="truncate font-medium text-[var(--text-primary)]">{member.name}</span></div><Select className="w-full" value={member.role} options={['管理员', '参与人', '产品', '设计', '研发', '测试'].map((role) => ({ value: role, label: role }))} onChange={async (role) => { try { if (member.id.startsWith('owner-')) { await updateProductLine(productLine.id, { members: [{ id: member.id, name: member.name, role }, ...persistedMembers] }); } else { await updateProductLineMember(productLine.id, member.id, role); } addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
+                    {visibleMembers.length ? visibleMembers.map((member) => <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><div className="flex min-w-0 items-center gap-2"><Avatar size={28}>{member.name.slice(0, 1)}</Avatar><span className="truncate font-medium text-[var(--text-primary)]">{member.name}</span></div><Select className="w-full" value={member.role} options={['管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'].map((role) => ({ value: role, label: role }))} onChange={async (role) => { try { if (member.id.startsWith('owner-')) { await updateProductLine(productLine.id, { members: [{ id: member.id, name: member.name, role }, ...persistedMembers] }); } else { await updateProductLineMember(productLine.id, member.id, role); } addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
                   </div>
                 </>;
               })()}
@@ -491,6 +491,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     if (role === '研发' || role.includes('技术') || role.includes('架构') || role.includes('研发')) return '研发';
     if (role === '设计' || role.includes('设计') || role.includes('UI') || role.includes('UX')) return '设计';
     if (role === '测试' || role.includes('测试') || role.includes('QA')) return '测试';
+    if (role === '交付主管') return '交付主管';
     return '参与人';
   };
   const baseDetailMembers: ProductLineMember[] = (productLine.members || []).map((member, index) => (
@@ -516,7 +517,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     productLine.techOwner,
     productLine.testOwner
   ].filter(Boolean)).size;
-  const memberRoleGroups = ['管理员', '产品', '研发', '设计', '测试', '参与人']
+  const memberRoleGroups = ['管理员', '产品', '研发', '设计', '测试', '交付主管', '参与人']
     .map((label) => ({ label, members: detailMembers.filter((member) => normalizeRole(member.role) === label) }))
     .filter((group) => group.members.length > 0);
   const activityItems: ProductLineActivity[] = productLine.activities?.length

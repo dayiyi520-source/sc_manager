@@ -35,8 +35,19 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('await Promise.allSettled(refreshes)');
   });
 
-  it('uses Ant Design for estimated hours and omits acceptance criteria from create', () => {
+  it('puts product line first and uses Ant Design for both hour fields', () => {
+    const properties = requirementSource.slice(requirementSource.indexOf('properties={<Form layout="vertical" className="requirement-create-properties" requiredMark>'));
+    expect(properties.indexOf('label="所属产品线"')).toBeLessThan(properties.indexOf('label={`${itemLabel}类型`}'));
     expect(requirementSource).toContain('<DetailNumberInput label="预计工时（小时）"');
+    expect(requirementSource).toContain('label="实际工时（小时）"><InputNumber');
+    expect(requirementSource).toContain('className="requirement-hours-input w-full"');
     expect(requirementSource).not.toContain('<Form.Item label="验收标准"');
+  });
+
+  it('uses configured workflow states and keeps parents with children read-only', () => {
+    expect(requirementSource).toContain('productRepository.workItemTransitions');
+    expect(requirementSource).toContain('productRepository.transitionWorkItem');
+    expect(requirementSource).toContain("if (task.hasChildren) return <WorkItemStatusTag");
+    expect(requirementSource).toContain('options.statuses');
   });
 });

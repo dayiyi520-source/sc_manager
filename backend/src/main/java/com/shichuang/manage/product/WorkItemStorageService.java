@@ -30,6 +30,8 @@ public class WorkItemStorageService {
         if (body.plannedStartDate()!=null && body.plannedEndDate()!=null && body.plannedEndDate().isBefore(body.plannedStartDate())) throw new IllegalArgumentException("计划完成日期不能早于开始日期");
         if (body.estimatedHours()!=null && (body.estimatedHours().signum()<0 || body.estimatedHours().compareTo(new java.math.BigDecimal("99999999.99"))>0 || body.estimatedHours().scale()>2))
             throw new IllegalArgumentException("预计工时须为非负数，最多两位小数且不超过99999999.99");
+        if (body.actualHours()!=null && (body.actualHours().signum()<0 || body.actualHours().compareTo(new java.math.BigDecimal("99999999.99"))>0 || body.actualHours().scale()>2))
+            throw new IllegalArgumentException("实际工时须为非负数，最多两位小数且不超过99999999.99");
         String line=body.productLineId(),tenant=RequestContext.tenantId(),user=RequestContext.userId();
         String hash=hash(configurations.encode(body));
         Map<String,Object> duplicate=mapper.request(tenant,line,body.requestId());

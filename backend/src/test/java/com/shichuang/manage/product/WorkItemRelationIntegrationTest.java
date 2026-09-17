@@ -133,5 +133,5 @@ class WorkItemRelationIntegrationTest extends AbstractApiIntegrationTest {
     }
     private Map<String,Object> link(String from,String to,String type,String scope) { return relations.create(line,from,new WorkItemRelationService.CreateRelation(to,type,scope)); }
     private void move(String id,String edge) { transitions.execute(line,id,new Transition(edge,((Number)storage.detail(line,id).get("revision")).intValue(),null)); }
-    private String create(String category,String priority,String requirement,String version) { return storage.create(new CreateItem(UUID.randomUUID().toString(),line,category,types.get(category),category,null,null,version,requirement,null,null,priority,null,null,null)).get("id").toString(); }
+    private String create(String category,String priority,String requirement,String version) { return storage.create(new CreateItem(UUID.randomUUID().toString(),line,category,types.get(category),category,null,null,version,requirement,null,null,priority,null,null,null,null)).get("id").toString(); }
 }

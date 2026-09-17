@@ -118,7 +118,7 @@ class WorkItemRegressionIntegrationTest extends AbstractApiIntegrationTest {
         assertThrows(RuntimeException.class,()->regressions.onlineIssue(item("test",UUID.randomUUID().toString(),null,null)));
     }
     private WorkItemRegressionService.CreateRegression input(String request) { return new WorkItemRegressionService.CreateRegression(request,((Number)storage.detail(line,bug).get("revision")).intValue(),types.get("test"),"回归测试",null,null,null); }
-    private CreateItem item(String category,String request,String requirement,String version) { return new CreateItem(request,line,category,types.get(category),category,"描述","目标",version,requirement,null,null,"P1",null,null,null); }
+    private CreateItem item(String category,String request,String requirement,String version) { return new CreateItem(request,line,category,types.get(category),category,"描述","目标",version,requirement,null,null,"P1",null,null,null,null); }
     private void move(String id,String edge) { transitions.execute(line,id,new Transition(edge,((Number)storage.detail(line,id).get("revision")).intValue(),null)); }
     private void session(String user,String role,String scope) { RequestContext.set(Map.of("sub",user,"tenant",scope,"role",role)); }
     private String version(String status) { String id=UUID.randomUUID().toString(); jdbc.update("INSERT INTO t_product_line_version(id_,tenant_id_,product_line_id_,code_,name_,status_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,'版本',?,'u','u',NOW(),NOW())",id,tenant,line,id,status); return id; }

@@ -22,7 +22,8 @@ public class WorkItemTransitionService {
         this.mapper=mapper; this.access=access; this.configurations=configurations; this.approvals=approvals; this.relations=relations; this.completion=completion;
     }
     public record Action(String edgeKey,String name,String to,List<String> requiredFields,boolean allowed,List<String> reasons) {}
-    public record Actions(int revision,List<Action> actions) {}
+    public record StatusOption(String key,String name,String color,boolean current,boolean allowed,List<String> reasons) {}
+    public record Actions(int revision,List<Action> actions,List<StatusOption> statuses) {}
 
     @Transactional public Actions available(String line,String id) {
         access.check(line,false);
@@ -37,7 +38,13 @@ public class WorkItemTransitionService {
             List<String> reasons=reasons(line,item,edge,target,null,false);
             actions.add(new Action(edge.key(),edge.name(),edge.to(),edge.effectiveRequiredFields(),reasons.isEmpty(),reasons));
         }
-        return new Actions(((Number)item.get("revision")).intValue(),actions);
+        List<StatusOption> statuses=workflow.states().stream().filter(State::enabled).map(state -> {
+            boolean current=state.key().equals(item.get("statusKey"));
+            Action action=actions.stream().filter(value->value.to().equals(state.key())).findFirst().orElse(null);
+            List<String> reasons=current?List.of():action==null?List.of("当前状态不可直接流转"):action.reasons();
+            return new StatusOption(state.key(),state.name(),state.color(),current,current || action!=null && action.allowed(),reasons);
+        }).toList();
+        return new Actions(((Number)item.get("revision")).intValue(),actions,statuses);
     }
 
     @Transactional public Map<String,Object> execute(String line,String id,Transition input) {
@@ -69,6 +76,7 @@ public class WorkItemTransitionService {
         List<String> result=new ArrayList<>();
         String tenant=RequestContext.tenantId();
         if (!edge.effectiveRoles().contains(RequestContext.role())) result.add("当前角色不能执行该流转");
+        if (mapper.hasChildren(tenant,line,item.get("id").toString())) result.add("主任务存在子任务，状态不可手工修改");
         if (!target.enabled()) result.add("目标状态已停用");
         String versionId=optional(Objects.toString(item.get("versionId"),null));
         if (versionId!=null) {

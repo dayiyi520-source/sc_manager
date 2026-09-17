@@ -20,7 +20,16 @@ export type UnifiedWorkItem = {
   requirementId?: string | null; assigneeName?: string; status?: { name?: string; group?: string; successful?: boolean };
   taskTypeId?: string | null; workflowId?: string | null; statusKey?: string | null; statusColor?: string;
   priority?: string; parentWorkItemId?: string | null; versionId?: string | null; dueDate?: string | null;
-  estimatedHours?: number; createdAt?: string; revision?: number; potentialBlockingDefect?: boolean; hasChildren?: boolean;
+  estimatedHours?: number; actualHours?: number; createdAt?: string; revision?: number; potentialBlockingDefect?: boolean; hasChildren?: boolean;
+};
+export type WorkItemTransitionAction = {
+  edgeKey: string; name: string; to: string; requiredFields: string[]; allowed: boolean; reasons: string[];
+};
+export type WorkItemStatusOption = {
+  key: string; name: string; color: string; current: boolean; allowed: boolean; reasons: string[];
+};
+export type WorkItemTransitionOptions = {
+  revision: number; actions: WorkItemTransitionAction[]; statuses: WorkItemStatusOption[];
 };
 export type AutomationRule = {
   id: string; name: string; enabled: boolean; triggerType: 'STATUS_CHANGED'; triggerTypeId: string;
@@ -62,7 +71,9 @@ export const productRepository = {
   automationLogs: (id: string) => apiRequest<AutomationLog[]>(`/api/product-lines/${id}/automation-rules/logs`),
   workItemDetail: (lineId: string, id: string) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(lineId)}`),
   workItems: (productLineId: string, category = '', keyword = '') => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=1&pageSize=100`),
-  createWorkItem: (body: { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; description?: string; expectedGoal?: string; versionId?: string; requirementId?: string; parentWorkItemId?: string; assigneeId?: string; priority: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
+  createWorkItem: (body: { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; description?: string; expectedGoal?: string; versionId?: string; requirementId?: string; parentWorkItemId?: string; assigneeId?: string; priority: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
+  workItemTransitions: (productLineId: string, id: string) => apiRequest<WorkItemTransitionOptions>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`),
+  transitionWorkItem: (productLineId: string, id: string, body: { edgeKey: string; revision: number; reason?: string }) => apiRequest<Record<string, any>>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`, { method: 'POST', body: JSON.stringify(body) }),
   deleteWorkItem: (productLineId: string, id: string, revision: number) => apiRequest<void>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}&revision=${revision}`, { method: 'DELETE' }),
   createWorkItemRelation: (productLineId: string, id: string, targetId: string) => apiRequest<Record<string, unknown>>(`/api/work-items/${id}/relations?productLineId=${encodeURIComponent(productLineId)}`, { method: 'POST', body: JSON.stringify({ targetId, type: 'RELATES_TO', scope: 'FINISH' }) }),
   workItemRelations: (productLineId: string, id: string) => apiRequest<{ relations: Array<{ id: string; sourceId: string; targetId: string; type: string; scope?: string; revision?: number }> }>(`/api/work-items/${id}/relations?productLineId=${encodeURIComponent(productLineId)}`),

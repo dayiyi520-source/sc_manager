@@ -42,7 +42,7 @@ public class WorkItemApprovalService {
             String requestId=UUID.nameUUIDFromBytes((tenant+":"+line+":"+id+":"+kind).getBytes(StandardCharsets.UTF_8)).toString();
             var created=storage.create(new CreateItem(requestId,line,kind,types[i],title,null,null,
                 Objects.toString(requirement.get("versionId"),null),id,null,null,
-                requirement.get("priority").toString(),null,null,null));
+                requirement.get("priority").toString(),null,null,null,null));
             ids.put(kind,created.get("id").toString());
         }
         mapper.activity(tenant,line,id,"REQUIREMENT_TASKS_DISPATCHED",configurations.encode(ids),user);
