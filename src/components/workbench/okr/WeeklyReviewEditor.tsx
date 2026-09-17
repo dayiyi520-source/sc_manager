@@ -22,6 +22,7 @@ import type { OkrPayload, OkrWork } from '../../../services/okrRepository';
 import { AlertTriangle, Plus, Save, Search, Send, Trash2 } from '@/components/common/octicons-compat';
 import { periodWork, workSource } from './workAggregation';
 import { reviewPeriod } from './simpleReview';
+import { mergeCopiedKrReviews } from './reviewCopy';
 
 type Health = 'normal' | 'risk' | 'blocked';
 type PickerSource = 'task' | 'ticket';
@@ -76,6 +77,7 @@ interface WeeklyReviewEditorProps {
   onAddObjective?: () => void;
   reviewerName?: string;
   directSubmit?: boolean;
+  initialPayload?: OkrPayload;
 }
 
 export function WeeklyReviewEditor({
@@ -90,7 +92,8 @@ export function WeeklyReviewEditor({
   onCancel,
   onAddObjective,
   reviewerName,
-  directSubmit = false
+  directSubmit = false,
+  initialPayload
 }: WeeklyReviewEditorProps) {
   const period = useMemo(() => reviewPeriod('week'), []);
   const start = dayjs(period.startDate);
@@ -109,8 +112,8 @@ export function WeeklyReviewEditor({
 
   const reviewTitle = `[周报] ${cycleTitle}`;
 
-  const [selfScore] = useState<number>(90);
-  const [sync, setSync] = useState<boolean>(true);
+  const [selfScore] = useState<number>(initialPayload?.selfScore ?? 90);
+  const [sync, setSync] = useState<boolean>(initialPayload?.syncKrProgress ?? true);
   const [submitModalOpen, setSubmitModalOpen] = useState<boolean>(false);
   const [collapsedObjectives, setCollapsedObjectives] = useState<Record<string, boolean>>({});
   const [picker, setPicker] = useState<PickerState>(null);
@@ -132,7 +135,7 @@ export function WeeklyReviewEditor({
   }, []);
 
   const [krs, setKrs] = useState<KrReviewDraft[]>(() => {
-    return okrs.flatMap(o =>
+    const currentKrs = okrs.flatMap(o =>
       (o.keyResults || []).filter(k => k.progress < 100).map((k, kIdx) => ({
           objectiveId: o.id,
           objectiveTitle: o.objective,
@@ -147,6 +150,7 @@ export function WeeklyReviewEditor({
           workIds: []
         }))
     );
+    return mergeCopiedKrReviews(currentKrs, initialPayload?.krReviews || []);
   });
 
   const [workNotes, setWorkNotes] = useState<Record<string, string>>({});
@@ -159,14 +163,27 @@ export function WeeklyReviewEditor({
     notes: Record<string, string>;
   }>({
     workIds: [],
-    description: '',
-    impact: 'none',
+    description: initialPayload?.extraWork?.description || '',
+    impact: initialPayload?.extraWork?.impact || 'none',
     notes: {}
   });
 
-  const [manualWorks, setManualWorks] = useState<ManualWork[]>([]);
+  const [manualWorks, setManualWorks] = useState<ManualWork[]>(() => {
+    const description = initialPayload?.extraWork?.description;
+    if (!description?.startsWith('[')) return [];
+    try {
+      const parsed: unknown = JSON.parse(description);
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is ManualWork => typeof item === 'object' && item !== null)
+        : [];
+    } catch {
+      return [];
+    }
+  });
 
-  const [helpNeeded, setHelpNeeded] = useState<string>('');
+  const [helpNeeded, setHelpNeeded] = useState<string>(
+    initialPayload?.helpNeeded || initialPayload?.assistance?.[0]?.result || ''
+  );
 
   const candidates = useMemo(
     () => periodWork(work, period.startDate, period.endDate),

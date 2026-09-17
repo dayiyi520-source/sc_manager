@@ -5,10 +5,12 @@ import type { OKRItem } from '../../../types';
 import type { OkrKrReview, OkrPayload, OkrRecord } from '../../../services/okrRepository';
 import { AlertTriangle, CheckCircle, ChevronDown, FileText, Save, Send, Target } from '@/components/common/octicons-compat';
 import { aggregateKrReview, aggregateMonthlyTasks, eligibleWeeklyReviews, monthPeriod, monthlyEvidenceTimeline, suggestMonthlySummary } from './monthlyReview';
+import { mergeCopiedKrReviews } from './reviewCopy';
 
 type Health = OkrKrReview['health'];
 
 interface MonthlyReviewEditorProps {
+  key?: React.Key;
   okrs: OKRItem[];
   records: OkrRecord[];
   currentUserId: string;
@@ -16,24 +18,28 @@ interface MonthlyReviewEditorProps {
   onSaveDraft: (payload: OkrPayload) => Promise<boolean>;
   onSubmit: (payload: OkrPayload) => Promise<boolean>;
   onCancel: () => void;
+  initialPayload?: OkrPayload;
 }
 
-export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSaveDraft, onSubmit, onCancel }: MonthlyReviewEditorProps) {
+export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSaveDraft, onSubmit, onCancel, initialPayload }: MonthlyReviewEditorProps) {
   const month = useMemo(() => dayjs().startOf('month'), []);
   const monthlyOkrs = useMemo(() => okrs.filter(objective => objective.cycle === month.format('YYYY-MM')), [okrs, month]);
   const weeklyReviews = useMemo(() => eligibleWeeklyReviews(records, currentUserId, month), [records, currentUserId, month]);
-  const initialKrs = useMemo(() => monthlyOkrs.flatMap(objective => objective.keyResults.map(keyResult => ({
-    ...aggregateKrReview(objective.id, keyResult.id, keyResult.content, keyResult.progress, weeklyReviews),
-    currentProgress: keyResult.progress,
-    objectiveTitle: objective.objective
-  }))), [monthlyOkrs, weeklyReviews]);
+  const initialKrs = useMemo(() => mergeCopiedKrReviews(
+    monthlyOkrs.flatMap(objective => objective.keyResults.map(keyResult => ({
+      ...aggregateKrReview(objective.id, keyResult.id, keyResult.content, keyResult.progress, weeklyReviews),
+      currentProgress: keyResult.progress,
+      objectiveTitle: objective.objective
+    }))),
+    initialPayload?.krReviews || []
+  ), [monthlyOkrs, weeklyReviews, initialPayload]);
   const [krs, setKrs] = useState(initialKrs);
   const [selectedKrIds, setSelectedKrIds] = useState(() => initialKrs.map(item => item.keyResultId));
   const [activeKrId, setActiveKrId] = useState(() => initialKrs[0]?.keyResultId || '');
-  const [summary, setSummary] = useState(() => suggestMonthlySummary(weeklyReviews));
-  const [otherNotes, setOtherNotes] = useState('');
-  const [nextMonthArrangement, setNextMonthArrangement] = useState('');
-  const [syncKrProgress, setSyncKrProgress] = useState(true);
+  const [summary, setSummary] = useState(() => initialPayload?.summary || suggestMonthlySummary(weeklyReviews));
+  const [otherNotes, setOtherNotes] = useState(initialPayload?.otherNotes || '');
+  const [nextMonthArrangement, setNextMonthArrangement] = useState(initialPayload?.nextMonthArrangement || '');
+  const [syncKrProgress, setSyncKrProgress] = useState(initialPayload?.syncKrProgress ?? true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -68,9 +74,9 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
     otherNotes: otherNotes.trim(),
     nextMonthArrangement: nextMonthArrangement.trim(),
     nextMonthPlans: [],
-    assistance: [],
-    helpNeeded: '',
-    extraWork: { workIds: [], description: '', impact: 'none' },
+    assistance: initialPayload?.assistance || [],
+    helpNeeded: initialPayload?.helpNeeded || '',
+    extraWork: initialPayload?.extraWork || { workIds: [], description: '', impact: 'none' },
     syncKrProgress,
     items: []
   });

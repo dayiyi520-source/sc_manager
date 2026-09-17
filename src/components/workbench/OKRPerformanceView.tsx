@@ -13,6 +13,9 @@ import { ObjectiveForm, type ObjectiveFormHandle } from './okr/ObjectiveForm';
 import { WeeklyReviewEditor } from './okr/WeeklyReviewEditor';
 import { MonthlyReviewEditor } from './okr/MonthlyReviewEditor';
 import { runObjectiveBatch } from './okr/objectiveBatch';
+import { filterReviewsByMonth, toggleReviewMonth } from './okr/reviewMonthFilter';
+import { ReviewReadOnlyView } from './okr/ReviewReadOnlyView';
+import { createReviewCopyDraft } from './okr/reviewCopy';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
 
@@ -57,6 +60,8 @@ const OriginalWorkspace: React.FC = () => {
   // Review Sub Tabs: 写总结、我的总结、我收到的
   const [reviewSubTab, setReviewSubTab] = useState<'write' | 'my' | 'received'>('write');
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
+  const [reviewDetailId, setReviewDetailId] = useState<string | null>(null);
+  const [copiedReviewId, setCopiedReviewId] = useState<string | null>(null);
   const [expandedReviewIds, setExpandedReviewIds] = useState<Set<string>>(() => new Set());
   const [draftToSubmit, setDraftToSubmit] = useState<string | null>(null);
   const [receivedSearch, setReceivedSearch] = useState('');
@@ -64,6 +69,7 @@ const OriginalWorkspace: React.FC = () => {
   const [selectedReceivedId, setSelectedReceivedId] = useState<string | null>(null);
   const [myReviewFilter, setMyReviewFilter] = useState<'all'|'week'|'month'>('all');
   const [myYear, setMyYear] = useState(dayjs().format('YYYY'));
+  const [selectedReviewMonth, setSelectedReviewMonth] = useState<string | null>(null);
 
   // Add OKR Modal State
   const [objectiveForms, setObjectiveForms] = useState<string[]>([]);
@@ -101,7 +107,11 @@ const OriginalWorkspace: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
   const selectedReceived = receivedFiltered.find(performance => performance.id === selectedReceivedId) || receivedFiltered[0];
-  const myPerformances = performances.filter(performance => performance.authorId === currentUser.id && (myReviewFilter === 'all' || performance.type === myReviewFilter) && performance.createdAt.startsWith(myYear));
+  const myYearPerformances = performances.filter(performance => performance.authorId === currentUser.id && (myReviewFilter === 'all' || performance.type === myReviewFilter) && performance.createdAt.startsWith(myYear));
+  const myPerformances = filterReviewsByMonth(myYearPerformances, selectedReviewMonth);
+  const detailReview = performances.find(performance => performance.id === reviewDetailId && performance.authorId === currentUser.id);
+  const copiedReview = records.find(record => record.id === copiedReviewId && record.kind === 'review');
+  const copiedInitialPayload = copiedReview ? createReviewCopyDraft(copiedReview.payload) : undefined;
 
   const handleSaveOkr = async (payload: Parameters<typeof saveObjective>[1]) => {
     if (await saveObjective(newOkrCycle, payload)) {
@@ -112,7 +122,22 @@ const OriginalWorkspace: React.FC = () => {
   };
 
   const openReviewForm = (type: 'week' | 'month') => {
+    setCopiedReviewId(null);
     setReviewType(type);
+    setReviewSubTab('write');
+    setIsReviewFormOpen(true);
+  };
+
+  const openCopiedReview = (reviewId: string, type: 'week' | 'month') => {
+    const source = records.find(record => record.id === reviewId && record.kind === 'review' && record.ownerId === currentUser.id);
+    if (!source) {
+      addToast('error', '复盘原始记录不存在或已刷新');
+      return;
+    }
+    setCopiedReviewId(reviewId);
+    setReviewDetailId(null);
+    setReviewType(type);
+    setReviewSubTab('write');
     setIsReviewFormOpen(true);
   };
 
@@ -292,7 +317,7 @@ const OriginalWorkspace: React.FC = () => {
           <Tabs
             className={reviewSubTab === 'write' && isReviewFormOpen ? "!mb-0" : ""}
             activeKey={reviewSubTab}
-            onChange={v=>{setReviewSubTab(v as typeof reviewSubTab);setIsReviewFormOpen(false);}}
+            onChange={v=>{setReviewSubTab(v as typeof reviewSubTab);setIsReviewFormOpen(false);setCopiedReviewId(null);setReviewDetailId(null);}}
             items={[
               {key:'write',label:'写复盘总结'},
               {key:'my',label:`我的复盘列表 (${performances.filter(p=>p.authorId===currentUser.id).length})`},
@@ -327,27 +352,46 @@ const OriginalWorkspace: React.FC = () => {
 
           {reviewSubTab === 'write' && isReviewFormOpen && (
             reviewType === 'week' ? (
-              <WeeklyReviewEditor key="weekly-review" okrs={okrs.filter(o=>o.ownerId===currentUser.id)} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>setIsReviewFormOpen(false)} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setOkrCategoryTab('my');setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
+              <WeeklyReviewEditor key={`weekly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={okrs.filter(o=>o.ownerId===currentUser.id)} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setOkrCategoryTab('my');setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
             ) : (
-              <MonthlyReviewEditor okrs={okrs.filter(o=>o.ownerId===currentUser.id)} records={records} currentUserId={currentUser.id} busy={busy} onCancel={()=>setIsReviewFormOpen(false)} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}}/>
+              <MonthlyReviewEditor key={`monthly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={okrs.filter(o=>o.ownerId===currentUser.id)} records={records} currentUserId={currentUser.id} busy={busy} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}}/>
             )
           )}
 
           {reviewSubTab === 'my' && (
+            detailReview ? <ReviewReadOnlyView review={detailReview} onBack={() => setReviewDetailId(null)} onCopy={() => openCopiedReview(detailReview.id, detailReview.type)} /> :
             <div className="okr-my-reviews space-y-5">
               <div className="okr-review-filter-tabs">
                 {(['all','week','month'] as const).map(filter => <button key={filter} className={myReviewFilter === filter ? 'is-active' : ''} onClick={() => setMyReviewFilter(filter)}>{filter === 'all' ? '全部' : filter === 'week' ? '周报' : '月报'}</button>)}
               </div>
               <div className="okr-review-month-rail" aria-label="复盘月份">
-                {Array.from({length: 12}, (_, index) => { const month = `${myYear}-${String(index + 1).padStart(2, '0')}`; const count = myPerformances.filter(performance => performance.createdAt.startsWith(month)).length; return <div key={month} className={count ? 'has-review' : ''}><span>{index + 1}月</span><i>{count ? '●' : '○'}</i></div>; })}
+                {Array.from({length: 12}, (_, index) => {
+                  const month = `${myYear}-${String(index + 1).padStart(2, '0')}`;
+                  const count = myYearPerformances.filter(performance => performance.createdAt.startsWith(month)).length;
+                  const selected = selectedReviewMonth === month;
+                  return (
+                    <button
+                      type="button"
+                      key={month}
+                      className={`${count ? 'has-review' : ''}${selected ? ' is-selected' : ''}`}
+                      aria-label={`${index + 1}月，${count ? `${count}条复盘` : '暂无复盘'}${selected ? '，已选中' : ''}`}
+                      aria-pressed={selected}
+                      disabled={loading || !!error}
+                      onClick={() => setSelectedReviewMonth(current => toggleReviewMonth(current, month))}
+                    >
+                      <span>{index + 1}月</span>
+                      <i aria-hidden="true">{count ? '●' : '○'}</i>
+                    </button>
+                  );
+                })}
               </div>
-              {myPerformances.length === 0 ? <div className="review-empty-state okr-review-empty"><Empty description="暂无历史复盘" /></div> : <div className="okr-my-review-grid">
+              {myPerformances.length === 0 ? <div className="review-empty-state okr-review-empty"><Empty description={selectedReviewMonth ? `${Number(selectedReviewMonth.slice(5))}月暂无复盘` : '暂无历史复盘'} /></div> : <div className="okr-my-review-grid">
                 {myPerformances.map(perf => { const krReviews = perf.krReviews || []; const average = krReviews.length ? Math.round(krReviews.reduce((sum, kr) => sum + kr.currentProgress, 0) / krReviews.length) : perf.selfScore; const health = {normal: 0, risk: 0, blocked: 0}; krReviews.forEach(kr => { health[kr.health] += 1; }); return <Card key={perf.id} className="okr-my-review-card">
                   <div className="okr-my-review-card-head"><div><Tag color={perf.type === 'week' ? 'blue' : 'purple'}>{perf.type === 'week' ? '周报' : '月报'}</Tag><h3>{perf.cycleName || `${myYear}年复盘`}</h3><span>{perf.createdAt.slice(0, 10)} · 自评 {perf.selfScore} 分</span></div><Tag color={perf.status === 'reviewed' ? 'success' : perf.status === 'submitted' ? 'processing' : 'default'}>{perf.status === 'reviewed' ? '已评价' : perf.status === 'submitted' ? '已提交' : '草稿'}</Tag></div>
                   <div className="okr-my-review-score"><Progress type="circle" percent={average} size={68} /><div><b>KR 平均进度</b><strong>{average}%</strong></div></div>
                   <div className="okr-my-review-metrics"><span><Target />{krReviews.length} 个 KR</span><span><FileText />{perf.extraWork?.workIds?.length || 0} 项任务</span><span><FileSpreadsheet />{perf.linkedWorkItems?.length || 0} 个工单</span></div>
                   <div className="okr-my-review-summary"><b>本期摘要</b><p>{perf.summary || '暂无摘要内容，点击查看详情继续补充。'}</p><div><span className="is-normal">● 正常 {health.normal}</span><span className="is-risk">● 风险 {health.risk}</span><span className="is-blocked">● 阻塞 {health.blocked}</span></div></div>
-                  <div className="okr-my-review-actions">{perf.status === 'draft' && <Button type="primary" onClick={() => setDraftToSubmit(perf.id)}>提交</Button>}<Button onClick={() => setExpandedReviewIds(current => new Set(current).add(perf.id))}>查看详情</Button><Button onClick={() => openReviewForm(perf.type)}>复制为本期</Button></div>
+                  <div className="okr-my-review-actions">{perf.status === 'draft' && <Button type="primary" onClick={() => setDraftToSubmit(perf.id)}>提交</Button>}<Button onClick={() => setReviewDetailId(perf.id)}>查看详情</Button><Button onClick={() => openCopiedReview(perf.id, perf.type)}>复制为本期</Button></div>
                 </Card>; })}
               </div>}
             </div>
