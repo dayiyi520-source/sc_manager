@@ -74,6 +74,8 @@ const OriginalWorkspace: React.FC = () => {
   // Write Review Form State
   const [reviewType, setReviewType] = useState<'week' | 'month'>('month');
   const me = people.find(p => p.id === currentUser.id);
+  const reviewerName = me?.supervisorId ? people.find(person => person.id === me.supervisorId)?.name : undefined;
+  const directReviewSubmit = Boolean(me?.rootFlag);
   const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === newOkrCycle && o.status === 'active');
   const periods = cycleOptions(records, currentUser.id);
   const cyclePaths = periods.flatMap(group=>group.children.filter(c=>selectedCycles.includes(c.value)).map(c=>[group.value,c.value]));
@@ -325,7 +327,7 @@ const OriginalWorkspace: React.FC = () => {
 
           {reviewSubTab === 'write' && isReviewFormOpen && (
             reviewType === 'week' ? (
-              <WeeklyReviewEditor key="weekly-review" okrs={okrs.filter(o=>o.ownerId===currentUser.id)} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>setIsReviewFormOpen(false)} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setOkrCategoryTab('my');setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}}/>
+              <WeeklyReviewEditor key="weekly-review" okrs={okrs.filter(o=>o.ownerId===currentUser.id)} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>setIsReviewFormOpen(false)} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setOkrCategoryTab('my');setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
             ) : (
               <MonthlyReviewEditor okrs={okrs.filter(o=>o.ownerId===currentUser.id)} records={records} currentUserId={currentUser.id} busy={busy} onCancel={()=>setIsReviewFormOpen(false)} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);}return saved;}}/>
             )
@@ -589,12 +591,17 @@ const OriginalWorkspace: React.FC = () => {
         okText="确认提交"
         cancelText="取消"
         confirmLoading={busy}
+        okButtonProps={{ disabled: !directReviewSubmit && !reviewerName }}
         onCancel={()=>setDraftToSubmit(null)}
         onOk={async()=>{
           if(draftToSubmit && await submitReviewDraft(draftToSubmit))setDraftToSubmit(null);
         }}
       >
         <p className="m-0 text-sm text-[var(--text-body)]">提交后复盘将进入主管评价流程，确认提交当前草稿吗？</p>
+        <p className="mb-0 mt-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-sm text-[var(--text-body)]">
+          审批人：<strong className="text-[var(--text-primary)]">{directReviewSubmit ? '组织根负责人直接提交' : reviewerName || '未配置直属上级'}</strong>
+          {!directReviewSubmit && reviewerName && <span className="ml-2 text-xs text-[var(--text-muted)]">直属上级（系统自动设置）</span>}
+        </p>
       </Modal>
 
     </div>

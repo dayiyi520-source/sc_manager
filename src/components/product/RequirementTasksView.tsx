@@ -323,6 +323,10 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const [childCategory, setChildCategory] = useState<'design' | 'dev' | 'test' | 'bug'>('dev');
   const [childTypeId, setChildTypeId] = useState('');
   const [childTypes, setChildTypes] = useState<Array<{ id: string; name: string; enabled: boolean; category: string }>>([]);
+  const [childTypesLoading, setChildTypesLoading] = useState(false);
+  const [childTypesError, setChildTypesError] = useState(false);
+  const [childTypesReloadKey, setChildTypesReloadKey] = useState(0);
+  const [childCreating, setChildCreating] = useState(false);
   const [listChildren, setListChildren] = useState<Record<string, RequirementTask[]>>({});
   const [expandedListRows, setExpandedListRows] = useState<string[]>([]);
   const [commentDraft, setCommentDraft] = useState('');
@@ -368,27 +372,43 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const childCategoryOptions = useMemo(() => {
     if (!selectedTask) return [];
     if (selectedTask.category === 'test') return [{ value: 'bug' as const, label: '缺陷' }];
+    if (selectedTask.category === 'bug') return [{ value: 'bug' as const, label: '缺陷' }];
     if (selectedTask.category === 'design') return [{ value: 'dev' as const, label: '研发' }, { value: 'test' as const, label: '测试' }];
     if (selectedTask.category === 'dev') return [{ value: 'dev' as const, label: '研发' }, { value: 'test' as const, label: '测试' }];
     return [{ value: 'design' as const, label: '设计' }, { value: 'dev' as const, label: '研发' }, { value: 'test' as const, label: '测试' }];
   }, [selectedTask]);
 
-  useEffect(() => {
-    if (!childModalOpen || !selectedTask?.productLineId) return;
-    productRepository.workItemTypes(selectedTask.productLineId)
-      .then((items) => setChildTypes(items.filter((item) => item.enabled) as Array<{ id: string; name: string; enabled: boolean; category: string }>))
-      .catch(() => setChildTypes([]));
-  }, [childModalOpen, selectedTask?.productLineId]);
+  const childTypeOptions = useMemo(() => childTypes
+    .filter((item) => item.category === workItemCategoryLabel[childCategory])
+    .map((item) => ({ value: item.id, label: item.name })), [childCategory, childTypes]);
 
   useEffect(() => {
-    const first = childTypes.find((item) => item.category === childCategory);
-    setChildTypeId(first?.id || '');
-  }, [childCategory, childTypes]);
+    if (!childModalOpen || !selectedTask?.productLineId) return;
+    let active = true;
+    setChildTypes([]);
+    setChildTypesError(false);
+    setChildTypesLoading(true);
+    productRepository.workItemTypes(selectedTask.productLineId)
+      .then((items) => {
+        if (active) setChildTypes(items.filter((item) => item.enabled) as Array<{ id: string; name: string; enabled: boolean; category: string }>);
+      })
+      .catch(() => {
+        if (active) setChildTypesError(true);
+      })
+      .finally(() => {
+        if (active) setChildTypesLoading(false);
+      });
+    return () => { active = false; };
+  }, [childModalOpen, childTypesReloadKey, selectedTask?.productLineId]);
+
+  useEffect(() => {
+    setChildTypeId(childTypeOptions[0]?.value || '');
+  }, [childTypeOptions]);
 
   const openChildModal = (task: RequirementTask | null = selectedTask) => {
     if (!task?.productLineId) return;
     setSelectedTask(task);
-    const firstCategory = task.category === 'test' ? 'bug' : task.category === 'design' || task.category === 'dev' ? 'dev' : 'design';
+    const firstCategory = task.category === 'test' || task.category === 'bug' ? 'bug' : task.category === 'design' || task.category === 'dev' ? 'dev' : 'design';
     setChildCategory(firstCategory);
     setChildTitle('');
     setChildDescription('');
@@ -399,23 +419,30 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     setChildModalOpen(true);
   };
 
+  const cancelChildCreation = () => {
+    setChildModalOpen(false);
+    setSelectedTask(null);
+  };
+
   const createChildWorkItem = async () => {
     if (!selectedTask?.productLineId || !childTitle.trim() || !childTypeId) {
       addToast('warning', '请填写子任务名称并选择已配置的工作项类型');
       return;
     }
+    const parentTask = selectedTask;
     try {
+      setChildCreating(true);
       await productRepository.createWorkItem({
-        requestId: `child-${selectedTask.id}-${Date.now()}`,
-        productLineId: selectedTask.productLineId,
+        requestId: `child-${parentTask.id}-${Date.now()}`,
+        productLineId: parentTask.productLineId!,
         category: childCategory,
         taskTypeId: childTypeId,
         title: childTitle.trim(),
         description: childDescription,
         expectedGoal: '',
-        versionId: selectedTask.versionId || undefined,
-        requirementId: selectedTask.requirementId || (selectedTask.category === 'requirement' ? selectedTask.id : undefined),
-        parentWorkItemId: selectedTask.id,
+        versionId: parentTask.versionId || undefined,
+        requirementId: parentTask.requirementId || (parentTask.category === 'requirement' ? parentTask.id : undefined),
+        parentWorkItemId: parentTask.id,
         assigneeId: undefined,
         priority: apiPriority(childPriority),
         plannedStartDate: childPlannedStartDate || undefined,
@@ -424,11 +451,19 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       });
       addToast('success', '子任务已创建');
       setChildModalOpen(false);
-      const detail = await productRepository.workItemDetail(selectedTask.productLineId, selectedTask.id);
-      setChildWorkItems(Array.isArray(detail.children) ? detail.children : []);
-      setListChildren((current) => ({ ...current, [selectedTask.id]: (detail.children || []).map((item: Record<string, unknown>) => storedTask(item, selectedTask)) }));
+      setSelectedTask(null);
+      const refreshes: Promise<unknown>[] = [
+        productRepository.workItemDetail(parentTask.productLineId!, parentTask.id).then((detail) => {
+          const children = Array.isArray(detail.children) ? detail.children : [];
+          setListChildren((current) => ({ ...current, [parentTask.id]: children.map((item: Record<string, unknown>) => storedTask(item, parentTask)) }));
+        })
+      ];
+      if (unifiedCategory && remoteEnabled) refreshes.push(unifiedQuery.refetch());
+      await Promise.allSettled(refreshes);
     } catch (error) {
       addToast('error', '子任务创建失败', error instanceof Error ? error.message : '请检查工作流和父子类型配置');
+    } finally {
+      setChildCreating(false);
     }
   };
 
@@ -1156,7 +1191,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       </div>
 
       {/* Task Detail Drawer */}
-      {selectedTask && (
+      {selectedTask && !childModalOpen && (
         <WorkItemCreatePanel
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
@@ -1288,13 +1323,22 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
       )}
       <WorkItemCreatePanel
         isOpen={childModalOpen}
-        onClose={() => setChildModalOpen(false)}
+        onClose={cancelChildCreation}
         title="添加子任务"
         showContinueOption={false}
-        footer={<><Button onClick={() => setChildModalOpen(false)}>取消</Button><Button type="primary" onClick={() => void createChildWorkItem()}>创建</Button></>}
+        footer={<><Button disabled={childCreating} onClick={cancelChildCreation}>取消</Button><Button type="primary" loading={childCreating} disabled={childTypesLoading || childTypesError || !childTypeId} onClick={() => void createChildWorkItem()}>创建</Button></>}
         properties={<Form layout="vertical" className="requirement-create-properties">
           <Form.Item label="子任务分类" required><Select value={childCategory} options={childCategoryOptions} onChange={setChildCategory} /></Form.Item>
-          <Form.Item label="工作项类型" required><Select value={childTypeId || undefined} placeholder="请选择已配置类型" options={childTypes.filter((item) => item.category === childCategory).map((item) => ({ value: item.id, label: item.name }))} onChange={setChildTypeId} /></Form.Item>
+          <Form.Item
+            label="工作项类型"
+            required
+            validateStatus={childTypesError ? 'error' : undefined}
+            help={childTypesError
+              ? <span>工作项类型读取失败，<Button type="link" size="small" onClick={() => setChildTypesReloadKey((value) => value + 1)}>重新加载</Button></span>
+              : !childTypesLoading && childTypeOptions.length === 0 ? '当前分类未配置可用工作项类型' : undefined}
+          >
+            <Select showSearch optionFilterProp="label" value={childTypeId || undefined} loading={childTypesLoading} disabled={childTypesLoading || childTypesError || childTypeOptions.length === 0} placeholder={childTypesLoading ? '正在加载工作项类型' : '请选择已配置类型'} options={childTypeOptions} onChange={setChildTypeId} />
+          </Form.Item>
           <Form.Item label="优先级" required><Select value={childPriority} onChange={setChildPriority} options={['紧急', '高', '中', '低'].map((value) => ({ value, label: value }))} /></Form.Item>
           <Form.Item label="计划开始时间"><DatePicker value={childPlannedStartDate ? dayjs(childPlannedStartDate) : null} onChange={(date) => setChildPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" /></Form.Item>
           <Form.Item label="计划完成时间"><DatePicker value={childDueDate ? dayjs(childDueDate) : null} onChange={(date) => setChildDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" /></Form.Item>

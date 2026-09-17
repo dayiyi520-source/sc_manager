@@ -24,6 +24,17 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('父级任务');
   });
 
+  it('replaces the detail drawer while creating a child and maps API category labels', () => {
+    expect(requirementSource).toContain('{selectedTask && !childModalOpen && (');
+    expect(requirementSource).toContain("item.category === workItemCategoryLabel[childCategory]");
+    expect(requirementSource).toContain("selectedTask.category === 'bug'");
+    expect(requirementSource).toContain('工作项类型读取失败');
+    expect(requirementSource).toContain('onClose={cancelChildCreation}');
+    expect(requirementSource).toMatch(/const cancelChildCreation = \(\) => \{[\s\S]*setChildModalOpen\(false\);[\s\S]*setSelectedTask\(null\);[\s\S]*\};/);
+    expect(requirementSource).toMatch(/addToast\('success', '子任务已创建'\);[\s\S]*setChildModalOpen\(false\);[\s\S]*setSelectedTask\(null\);/);
+    expect(requirementSource).toContain('await Promise.allSettled(refreshes)');
+  });
+
   it('uses Ant Design for estimated hours and omits acceptance criteria from create', () => {
     expect(requirementSource).toContain('<DetailNumberInput label="预计工时（小时）"');
     expect(requirementSource).not.toContain('<Form.Item label="验收标准"');

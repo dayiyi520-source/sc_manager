@@ -74,6 +74,8 @@ interface WeeklyReviewEditorProps {
   onSubmit: (payload: OkrPayload) => Promise<boolean>;
   onCancel: () => void;
   onAddObjective?: () => void;
+  reviewerName?: string;
+  directSubmit?: boolean;
 }
 
 export function WeeklyReviewEditor({
@@ -86,7 +88,9 @@ export function WeeklyReviewEditor({
   onSaveDraft,
   onSubmit,
   onCancel,
-  onAddObjective
+  onAddObjective,
+  reviewerName,
+  directSubmit = false
 }: WeeklyReviewEditorProps) {
   const period = useMemo(() => reviewPeriod('week'), []);
   const start = dayjs(period.startDate);
@@ -205,6 +209,9 @@ export function WeeklyReviewEditor({
 
   const requestSubmit = () => {
     const errors: string[] = [];
+    if (!directSubmit && !reviewerName) {
+      errors.push('尚未配置直属上级，无法确定审批人');
+    }
     if (selectedKrs.some(kr => !kr.achievement.trim())) {
       errors.push('请补充所有已选 KR 的本期成果');
     }
@@ -1014,6 +1021,10 @@ export function WeeklyReviewEditor({
           <p className="text-sm text-[var(--text-body)]">
             您即将提交本期周报，以下是您的关键结果进度更新汇总：
           </p>
+          <div className="rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-sm text-[var(--text-body)]">
+            审批人：<strong className="text-[var(--text-primary)]">{directSubmit ? '组织根负责人直接提交' : reviewerName}</strong>
+            {!directSubmit && <span className="ml-2 text-xs text-[var(--text-muted)]">直属上级（系统自动设置）</span>}
+          </div>
           <div className="okr-review-submit-summary">
             {objectiveGroups.length ? objectiveGroups.map(({ objective, krs: objectiveKrs }, objectiveIndex) => (
               <section key={objective.id} className="okr-review-submit-objective">
