@@ -54,7 +54,7 @@ public class WorkItemStorageService {
         }
         if (requirementId!=null) {
             Map<String,Object> requirement=mapper.item(tenant,line,requirementId);
-            if (requirement==null ? !mapper.legacyRequirement(tenant,line,requirementId) : !"requirement".equals(requirement.get("category")))
+            if (requirement==null || !"requirement".equals(requirement.get("category")))
                 throw new IllegalArgumentException("关联需求不存在或不属于当前产品线");
         }
         if (versionId!=null) {
@@ -76,6 +76,30 @@ public class WorkItemStorageService {
     }
     public Map<String,Object> detail(String line,String id) { access.check(line,false); requireItem(line,id); return mapper.timedItem(RequestContext.tenantId(),line,id); }
     public List<Map<String,Object>> activities(String line,String id) { access.check(line,false); requireItem(line,id); return mapper.activities(RequestContext.tenantId(),line,id); }
+    @Transactional public Map<String,Object> update(String line,String id,UpdateItem body) {
+        access.check(line,true);
+        Map<String,Object> item=requireItem(line,id);
+        if (body.revision()==null || body.revision()!=((Number)item.get("revision")).intValue()) throw conflict("任务已被其他人修改，请刷新后重试");
+        if (body.title()!=null) required(body.title(),"标题",255);
+        if (body.description()!=null && body.description().length()>200000) throw new IllegalArgumentException("描述超出长度限制");
+        if (body.expectedGoal()!=null && body.expectedGoal().length()>10000) throw new IllegalArgumentException("验收目标超出长度限制");
+        if (body.priority()!=null && !Set.of("P0","P1","P2","P3").contains(body.priority())) throw new IllegalArgumentException("优先级必须为P0至P3");
+        if (body.plannedStartDate()!=null && body.plannedEndDate()!=null && body.plannedEndDate().isBefore(body.plannedStartDate())) throw new IllegalArgumentException("计划完成日期不能早于开始日期");
+        validateHours(body.estimatedHours(),"预计工时");
+        validateHours(body.actualHours(),"实际工时");
+        String versionId=optional(body.versionId());
+        if (versionId!=null && mapper.version(RequestContext.tenantId(),line,versionId)==null) throw new IllegalArgumentException("版本不存在或不属于当前产品线");
+        String assigneeId=null,assigneeName=body.assigneeName();
+        if (assigneeName!=null && !assigneeName.isBlank()) {
+            Map<String,Object> assignee=mapper.assigneeByName(RequestContext.tenantId(),assigneeName.trim());
+            if (assignee==null) throw new IllegalArgumentException("负责人不存在或已停用");
+            assigneeId=assignee.get("id").toString(); assigneeName=assignee.get("name").toString();
+        }
+        int updated=mapper.updateItem(RequestContext.tenantId(),line,id,body,versionId,assigneeId,assigneeName,RequestContext.userId());
+        if(updated!=1) throw conflict("任务已变化，请刷新后重试");
+        mapper.activity(RequestContext.tenantId(),line,id,"WORK_ITEM_UPDATED",configurations.encode(Map.of("revision",body.revision())),RequestContext.userId());
+        return requireItem(line,id);
+    }
     @Transactional public void delete(String line,String id,int revision) {
         access.check(line,true);
         Map<String,Object> item=requireItem(line,id);
@@ -87,6 +111,10 @@ public class WorkItemStorageService {
         Map<String,Object> item=mapper.item(RequestContext.tenantId(),line,id);
         if (item==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"统一工作项不存在");
         return item;
+    }
+    private static void validateHours(java.math.BigDecimal value,String label) {
+        if(value!=null && (value.signum()<0 || value.compareTo(new java.math.BigDecimal("99999999.99"))>0 || value.scale()>2))
+            throw new IllegalArgumentException(label+"须为非负数，最多两位小数且不超过99999999.99");
     }
     private static String hash(String input) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8))); }

@@ -39,6 +39,9 @@ public final class WorkItemDefinition {
         String title, String description, String expectedGoal, String versionId, String requirementId,
         String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
         LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours) {}
+    public record UpdateItem(String title, String description, String expectedGoal, String versionId,
+        String assigneeName, String priority, LocalDate plannedStartDate, LocalDate plannedEndDate,
+        BigDecimal estimatedHours, BigDecimal actualHours, Integer revision) {}
 
     public static String category(String value) {
         if (!CATEGORIES.containsKey(value == null ? "" : value)) throw new IllegalArgumentException("工作项分类无效");

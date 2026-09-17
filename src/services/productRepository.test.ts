@@ -86,4 +86,15 @@ describe('productRepository task API contract', () => {
     await productRepository.workItemRelations('line-1', 'task-1');
     expect(fetchMock.mock.calls[0][0]).toBe('/api/work-items/task-1/relations?productLineId=line-1');
   });
+
+  it('updates task fields through the unified work-item route', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: { id: 'task-1', revision: 2 }, message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await productRepository.updateWorkItem('line-1', 'task-1', { title: '统一任务', actualHours: 3.5, revision: 1 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/work-items/task-1?productLineId=line-1');
+    expect(fetchMock.mock.calls[0][1].method).toBe('PUT');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ title: '统一任务', actualHours: 3.5, revision: 1 });
+  });
 });

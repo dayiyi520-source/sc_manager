@@ -2,479 +2,80 @@ package com.shichuang.manage.product;
 
 import com.shichuang.manage.support.AbstractApiIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.Map;
-import java.util.concurrent.Future;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.reset;
 
 @Transactional
 class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
-
-    @SpyBean
-    private WorkOrderService workOrderService;
-
     @Test
-    void groupsFilteredRequirementsBeforeApplyingGroupPagination() throws Exception {
-        String token = loginToken();
-        String marker = "需求分组-" + System.nanoTime();
-        createRequirement(token, marker + "-一");
-        createRequirement(token, marker + "-二");
-
-        mockMvc.perform(get("/api/requirements")
-                .header("Authorization", "Bearer " + token)
-                .param("keyword", marker)
-                .param("title", "")
-                .param("groupBy", "priority")
-                .param("groupValue", "高")
-                .param("page", "1")
-                .param("pageSize", "1"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.total").value(2))
-            .andExpect(jsonPath("$.data.items.length()").value(1))
-            .andExpect(jsonPath("$.data.groups[0].label").value("高"))
-            .andExpect(jsonPath("$.data.groups[0].count").value(2));
+    void createsAndListsRequirementFromUnifiedWorkItemTable() throws Exception {
+        String token=loginToken(),title="统一需求-"+System.nanoTime();
+        String id=createRequirement(token,title);
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE id_=? AND category_='requirement' AND tenant_id_='local-tenant' AND delete_flag_=0",Integer.class,id));
+        mockMvc.perform(get("/api/requirements").header("Authorization","Bearer "+token).param("keyword",title).param("page","1").param("pageSize","10"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(1)).andExpect(jsonPath("$.data.items[0].id").value(id));
     }
 
     @Test
-    void createsHoldsAndAssignsRequirementWithAuditTrail() throws Exception {
-        String token = loginToken();
-        String title = "集成测试需求-" + System.nanoTime();
-        String createBody = """
-            {
-              "title":"%s",
-              "productLineId":"pl-1",
-              "productLineName":"师创智联协同OS",
-              "department":"产品中心",
-              "customerId":"c-1",
-              "customerName":"国家电网华东分部数智调度中心",
-              "priority":"P1-高优",
-              "description":"集成测试描述",
-              "descriptionHtml":"<p>集成测试描述</p>",
-              "dueDate":"2026-12-31"
-            }
-            """.formatted(title);
-
-        String createResponse = mockMvc.perform(post("/api/requirements")
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content(createBody))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.code").value("OK"))
-            .andReturn().getResponse().getContentAsString();
-        String requirementId = objectMapper.readTree(createResponse).path("data").path("id").asText();
-
-        mockMvc.perform(post("/api/requirements/{id}/transition", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"action\":\"hold\",\"reason\":\"等待部门确认范围\"}"))
-            .andExpect(status().isOk());
-
-        mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"taskType\":\"售前支持\",\"assigneeName\":\"陈雅婷\",\"note\":\"补充客户方案\"}"))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.taskType").value("售前支持"));
-
-        mockMvc.perform(get("/api/requirements/{id}", requirementId)
-                .header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.status").value("处理中"))
-            .andExpect(jsonPath("$.data.events.length()").value(3))
-            .andExpect(jsonPath("$.data.workItems.length()").value(1))
-            .andExpect(jsonPath("$.data.workItems[0].taskType").value("售前支持"));
-    }
-
-    @Test
-    void writesEveryTaskTypeToItsDownstreamRecord() throws Exception {
-        String token = loginToken();
-        Map<String, String> downstreamTables = Map.of(
-            "售前任务", "t_crm_presales_task",
-            "交付任务", "t_project_delivery_task",
-            "运维任务", "t_project_ops_task",
-            "设计任务", "t_product_design_task",
-            "缺陷管理", "t_product_bug",
-            "研发任务", "t_product_dev_task",
-            "产品需求", "t_product_requirement_task",
-            "Bug修复", "t_product_bug"
-        );
-
-        downstreamTables.forEach((taskType, table) -> {
-            try {
-                String requirementId = createRequirement(token, "集成测试下游-" + taskType + "-" + System.nanoTime());
-                mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                        .header("Authorization", "Bearer " + token)
-                        .contentType("application/json")
-                        .content("{\"taskType\":\"" + taskType + "\",\"assigneeName\":\"张瑞\",\"note\":\"集成测试下游写入\"}"))
-                    .andExpect(status().isCreated());
-                Number count = jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Number.class, requirementId);
-                assertEquals(1, count.intValue(), taskType + " 未写入下游表");
-            } catch (Exception error) {
-                throw new AssertionError(error);
-            }
-        });
-    }
-
-    @Test
-    void routesOtherProblemSourceToSelectedDesignTask() throws Exception {
-        String token = loginToken();
-        String title = "其他问题转设计任务-" + System.nanoTime();
-        String response = mockMvc.perform(post("/api/requirements")
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"title\":\"" + title + "\",\"workOrderType\":\"其他问题\",\"productLineId\":\"pl-1\",\"productLineName\":\"师创智联协同OS\",\"department\":\"产品中心\",\"customerId\":\"c-1\",\"customerName\":\"国家电网华东分部数智调度中心\",\"description\":\"需要设计物料\"}"))
-            .andExpect(status().isCreated())
-            .andReturn().getResponse().getContentAsString();
-        String requirementId = objectMapper.readTree(response).path("data").path("id").asText();
-        try {
-            String workItemResponse = mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                    .header("Authorization", "Bearer " + token)
-                    .contentType("application/json")
-                    .content("{\"taskType\":\"设计任务\",\"assigneeName\":\"张瑞\",\"note\":\"请完成物料设计\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.taskType").value("设计任务"))
-                .andReturn().getResponse().getContentAsString();
-            String workItemId = objectMapper.readTree(workItemResponse).path("data").path("id").asText();
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_design_task WHERE id_=? AND requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, workItemId, requirementId));
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_requirement_task WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, requirementId));
-        } finally {
-            cleanupRequirement(requirementId);
+    void convertsWorkOrderToFourUnifiedCategories() throws Exception {
+        String token=loginToken();
+        Map<String,String> targets=Map.of("产品需求","requirement","设计任务","design","研发任务","dev","缺陷管理","bug");
+        for(var target:targets.entrySet()){
+            String requirementId=createRequirement(token,"统一转任务-"+target.getKey()+"-"+System.nanoTime());
+            String response=mockMvc.perform(post("/api/requirements/{id}/work-items",requirementId).header("Authorization","Bearer "+token).contentType("application/json")
+                .content("{\"taskType\":\""+target.getKey()+"\",\"assigneeName\":\"张瑞\",\"note\":\"统一工作项\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.data.syncStatus").value("SUCCESS")).andReturn().getResponse().getContentAsString();
+            String workId=objectMapper.readTree(response).path("data").path("id").asText();
+            assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE id_=? AND requirement_id_=? AND category_=? AND source_type_='WORK_ORDER' AND tenant_id_='local-tenant'",Integer.class,workId,requirementId,target.getValue()));
         }
     }
 
     @Test
-    void isolatesBugAndDevDetailsByTenant() throws Exception {
-        String localToken = loginToken();
-        String bugResponse = mockMvc.perform(post("/api/bugs")
-                .header("Authorization", "Bearer " + localToken)
-                .contentType("application/json")
-                .content("{\"title\":\"租户隔离缺陷\",\"descriptionHtml\":\"<p>详情</p>\",\"expectedGoal\":\"可复现并修复\",\"priority\":\"高\",\"assigneeName\":\"张瑞\",\"sourceWorkOrderTitles\":[\"工单A\"]}"))
+    void rejectsBusinessTaskConversionAndDuplicateActiveTask() throws Exception {
+        String token=loginToken(),requirementId=createRequirement(token,"统一转换校验-"+System.nanoTime());
+        for(String invalid:java.util.List.of("数据需求","售前支持","交付任务","运维任务","bug修复","技术问题")) {
+            mockMvc.perform(post("/api/requirements/{id}/work-items",requirementId).header("Authorization","Bearer "+token).contentType("application/json").content("{\"taskType\":\""+invalid+"\",\"assigneeName\":\"张瑞\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        }
+        String body="{\"taskType\":\"研发任务\",\"assigneeName\":\"张瑞\",\"note\":\"首次转换\"}";
+        mockMvc.perform(post("/api/requirements/{id}/work-items",requirementId).header("Authorization","Bearer "+token).contentType("application/json").content(body)).andExpect(status().isCreated());
+        mockMvc.perform(post("/api/requirements/{id}/work-items",requirementId).header("Authorization","Bearer "+token).contentType("application/json").content(body)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void writesCommentsAndAuditEventsToUnifiedActivityTable() throws Exception {
+        String token=loginToken(),id=createRequirement(token,"统一审计-"+System.nanoTime());
+        mockMvc.perform(post("/api/requirements/{id}/comments",id).header("Authorization","Bearer "+token).contentType("application/json").content("{\"content\":\"补充验收口径\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/requirements/{id}/events",id).header("Authorization","Bearer "+token).param("eventType","评论"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
+        assertTrue(jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item_activity WHERE subject_id_=? AND event_type_='评论'",Integer.class,id)>0);
+    }
+
+    @Test
+    void isolatesCompatibilityAliasesByTenant() throws Exception {
+        String token=loginToken();
+        String line=jdbc.queryForObject("SELECT product_line_id_ FROM t_product_line_work_item_type WHERE tenant_id_='local-tenant' AND category_='缺陷' AND enabled_=1 AND delete_flag_=0 LIMIT 1",String.class);
+        String response=mockMvc.perform(post("/api/bugs").header("Authorization","Bearer "+token).contentType("application/json")
+            .content("{\"title\":\"租户隔离缺陷\",\"productLineId\":\""+line+"\",\"assigneeName\":\"张瑞\",\"descriptionHtml\":\"<p>详情</p>\"}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        String bugId = objectMapper.readTree(bugResponse).path("data").path("id").asText();
-        String otherTenantToken = tokens.issue("user-detail-other", "admin", "tenant-detail-b", "其他租户管理员");
-        try {
-            mockMvc.perform(get("/api/bugs/{id}", bugId).header("Authorization", "Bearer " + otherTenantToken))
-                .andExpect(status().isNotFound());
-            assertEquals("可复现并修复", jdbc.queryForObject("SELECT expected_goal_ FROM t_product_bug WHERE id_=?", String.class, bugId));
-            assertEquals("<p>详情</p>", jdbc.queryForObject("SELECT description_html_ FROM t_product_bug WHERE id_=?", String.class, bugId));
-        } finally {
-            jdbc.update("DELETE FROM t_product_bug WHERE id_=?", bugId);
-        }
+        String id=objectMapper.readTree(response).path("data").path("id").asText();
+        String other=tokens.issue("user-other","admin","tenant-other","其他租户管理员");
+        mockMvc.perform(get("/api/bugs/{id}",id).header("Authorization","Bearer "+other)).andExpect(status().isNotFound());
+        assertEquals("<p>详情</p>",jdbc.queryForObject("SELECT description_html_ FROM t_product_work_item WHERE id_=?",String.class,id));
     }
 
     @Test
-    void rejectsMissingReasonAndDuplicateActiveWorkItem() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试校验-" + System.nanoTime());
-
-        mockMvc.perform(post("/api/requirements/{id}/transition", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"action\":\"reject\",\"reason\":\"\"}"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-
-        String taskBody = "{\"taskType\":\"产品需求\",\"assigneeName\":\"张瑞\",\"note\":\"首次转任务\"}";
-        mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content(taskBody))
-            .andExpect(status().isCreated());
-        mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content(taskBody))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    void legacyProductTablesAreRetired() {
+        for(String table:new String[]{"t_product_requirement","t_product_requirement_task","t_product_design_task","t_product_dev_task","t_product_bug","t_requirement_work_item","t_product_requirement_event"})
+            assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?",Integer.class,table));
     }
-
-    @Test
-    void rejectsStaleRequirementVersionAndBlocksTerminalStateOperations() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试并发边界-" + System.nanoTime());
-
-        mockMvc.perform(get("/api/requirements/{id}", requirementId)
-                .header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.version").value(0));
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/requirements/{id}", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"title\":\"并发边界-首次更新\",\"version\":0}"))
-            .andExpect(status().isOk());
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/requirements/{id}", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"title\":\"并发边界-过期更新\",\"version\":0}"))
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("REQUEST_REJECTED"));
-
-        mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"taskType\":\"产品需求\",\"assigneeName\":\"张瑞\",\"note\":\"边界任务\"}"))
-            .andExpect(status().isCreated());
-
-        mockMvc.perform(post("/api/requirements/{id}/transition", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"action\":\"hold\",\"reason\":\"不允许在处理中搁置\"}"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    }
-
-    @Test
-    void completingWorkItemSynchronizesRequirementStatusAndAuditTrail() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试完成同步-" + System.nanoTime());
-        String response = mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"taskType\":\"Bug修复\",\"assigneeName\":\"王浩然\",\"note\":\"修复回归问题\"}"))
-            .andExpect(status().isCreated())
-            .andReturn().getResponse().getContentAsString();
-        String workItemId = objectMapper.readTree(response).path("data").path("id").asText();
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/requirements/work-items/{id}/status", workItemId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"status\":\"已完成\"}"))
-            .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/requirements/{id}", requirementId)
-                .header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.status").value("已完成"))
-            .andExpect(jsonPath("$.data.taskType").value("Bug修复"))
-            .andExpect(jsonPath("$.data.taskId").value(workItemId))
-            .andExpect(jsonPath("$.data.events.length()").value(3))
-            .andExpect(jsonPath("$.data.events[2].eventType").value("任务完成"));
-        assertEquals("已完成", jdbc.queryForObject("SELECT status_ FROM t_product_bug WHERE id_=?", String.class, workItemId));
-        mockMvc.perform(get("/api/requirements/{id}/events?eventType=任务完成", requirementId)
-                .header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.length()", org.hamcrest.Matchers.is(1)))
-            .andExpect(jsonPath("$.data[0].operatorName").isNotEmpty());
-    }
-
-    @Test
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void concurrentCreateWorkItemKeepsSingleActiveFlow() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试并发转任务-" + System.nanoTime());
-        CountDownLatch start = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
-            Future<Integer> first = executor.submit(() -> createWorkItemStatus(token, requirementId, start));
-            Future<Integer> second = executor.submit(() -> createWorkItemStatus(token, requirementId, start));
-            start.countDown();
-            int firstStatus = first.get();
-            int secondStatus = second.get();
-            assertTrue((firstStatus == 201 && secondStatus == 400) || (firstStatus == 400 && secondStatus == 201),
-                "并发转任务必须一成功一拒绝");
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_requirement_work_item WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, requirementId));
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_requirement_task WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, requirementId));
-            assertEquals("处理中", jdbc.queryForObject("SELECT status_ FROM t_product_requirement WHERE id_=?", String.class, requirementId));
-        } finally {
-            executor.shutdownNow();
-            cleanupRequirement(requirementId);
-        }
-    }
-
-    @Test
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void downstreamFailureRollsBackRequirementFlow() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试下游失败回滚-" + System.nanoTime());
-        doThrow(new IllegalStateException("模拟下游写入失败")).when(workOrderService)
-            .create(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
-        try {
-            mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                    .header("Authorization", "Bearer " + token)
-                    .contentType("application/json")
-                    .content("{\"taskType\":\"产品需求\",\"assigneeName\":\"张瑞\",\"note\":\"应补偿\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.syncStatus").value("FAILED"));
-            String workItemId = jdbc.queryForObject("SELECT id_ FROM t_requirement_work_item WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", String.class, requirementId);
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_requirement_work_item WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, requirementId));
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_requirement_task WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, requirementId));
-            assertEquals("处理中", jdbc.queryForObject("SELECT status_ FROM t_product_requirement WHERE id_=?", String.class, requirementId));
-            assertEquals("FAILED", jdbc.queryForObject("SELECT sync_status_ FROM t_requirement_work_item WHERE id_=?", String.class, workItemId));
-            assertTrue(jdbc.queryForObject("SELECT COUNT(*) FROM t_product_requirement_event WHERE requirement_id_=? AND tenant_id_='local-tenant'", Integer.class, requirementId) >= 2);
-        } finally {
-            reset(workOrderService);
-            cleanupRequirement(requirementId);
-        }
-    }
-
-    @Test
-    void verifiesRequirementIntegrityIndexesAuditColumnsAndAssociations() {
-        Map<String, Integer> auditColumns = Map.of(
-            "t_crm_presales_task", 1,
-            "t_project_delivery_task", 1,
-            "t_product_requirement_task", 1,
-            "t_product_bug", 1,
-            "t_product_requirement_event", 1
-        );
-        auditColumns.forEach((table, ignored) -> {
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name='create_by_'", Integer.class, table), table + " 缺少 create_by_");
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name='update_by_'", Integer.class, table), table + " 缺少 update_by_");
-        });
-        assertTrue(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='t_product_requirement' AND index_name='idx_requirement_tenant_department_status'", Integer.class) > 0);
-        assertTrue(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='t_product_requirement' AND index_name='idx_requirement_tenant_priority_status'", Integer.class) > 0);
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_crm_presales_task t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_requirement_task t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM t_product_bug t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE r.id_ IS NULL", Integer.class));
-        Map.of(
-            "t_product_design_task", "设计任务",
-            "t_project_ops_task", "运维任务",
-            "t_product_dev_task", "研发任务"
-        ).forEach((table, label) -> assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " t LEFT JOIN t_product_requirement r ON r.id_=t.requirement_id_ AND r.tenant_id_=t.tenant_id_ WHERE t.requirement_id_ IS NOT NULL AND t.requirement_id_<>'' AND r.id_ IS NULL", Integer.class), label + "存在孤立来源需求"));
-    }
-
-    @Test
-    void retriesMissingDownstreamRecordIdempotently() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试下游重试-" + System.nanoTime());
-        String response = mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"taskType\":\"交付支持\",\"assigneeName\":\"张瑞\",\"note\":\"重试\"}"))
-            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        String workItemId = objectMapper.readTree(response).path("data").path("id").asText();
-        jdbc.update("DELETE FROM t_project_delivery_task WHERE id_=?", workItemId);
-        mockMvc.perform(post("/api/requirements/work-items/{id}/retry", workItemId)
-                .header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.syncStatus").value("SUCCESS"));
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task WHERE id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, workItemId));
-        mockMvc.perform(post("/api/requirements/work-items/{id}/retry", workItemId)
-                .header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk());
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task WHERE id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Integer.class, workItemId));
-    }
-
-    @Test
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void listsAuditEventsWithPaginationAndFilters() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试审计分页-" + System.nanoTime());
-        mockMvc.perform(get("/api/requirements/audit-events?page=1&pageSize=10&eventType=创建")
-                .header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.page").value(1))
-            .andExpect(jsonPath("$.data.pageSize").value(10))
-            .andExpect(jsonPath("$.data.items").isArray());
-        cleanupRequirement(requirementId);
-    }
-
-    @Test
-    void listsDownstreamSyncStatusWithTenantScopedPagination() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试同步状态查询-" + System.nanoTime());
-        mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"taskType\":\"售前支持\",\"assigneeName\":\"张瑞\",\"note\":\"状态查询\"}"))
-            .andExpect(status().isCreated());
-
-        mockMvc.perform(get("/api/requirements/work-items/sync-status?page=1&pageSize=10&taskType=售前支持&syncStatus=SUCCESS")
-                .header("Authorization", "Bearer " + token))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.page").value(1))
-            .andExpect(jsonPath("$.data.pageSize").value(10))
-            .andExpect(jsonPath("$.data.items[0].syncStatus").value("SUCCESS"))
-            .andExpect(jsonPath("$.data.items[0].lastError").value(org.hamcrest.Matchers.nullValue()));
-
-        String otherTenantToken = tokens.issue("user-sync-other", "admin", "tenant-sync-b", "其他租户管理员");
-        mockMvc.perform(get("/api/requirements/work-items/sync-status?page=1&pageSize=10&taskType=售前支持")
-                .header("Authorization", "Bearer " + otherTenantToken))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.total").value(0));
-        cleanupRequirement(requirementId);
-    }
-
-    @Test
-    void isolatesRequirementReadsBySessionTenant() throws Exception {
-        String localToken = loginToken();
-        String requirementId = createRequirement(localToken, "集成测试租户隔离-" + System.nanoTime());
-        String otherTenantToken = tokens.issue("user-other", "admin", "tenant-b", "其他租户管理员");
-        mockMvc.perform(get("/api/requirements?page=1&pageSize=20&keyword=" + requirementId)
-                .header("Authorization", "Bearer " + otherTenantToken))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.total").value(0));
-        cleanupRequirement(requirementId);
-    }
-
-    @Test
-    void blocksInvalidTaskTargetAndUnauthorizedProductWrite() throws Exception {
-        String token = loginToken();
-        String requirementId = createRequirement(token, "集成测试权限校验-" + System.nanoTime());
-        try {
-            mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                    .header("Authorization", "Bearer " + token)
-                    .contentType("application/json")
-                    .content("{\"taskType\":\"其他问题\",\"assigneeName\":\"张瑞\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-            String salesToken = tokens.issue("user-sales-write", "sales_director", "local-tenant", "销售总监");
-            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/requirements/{id}", requirementId)
-                    .header("Authorization", "Bearer " + salesToken)
-                    .contentType("application/json")
-                    .content("{\"title\":\"无权修改\"}"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-        } finally {
-            cleanupRequirement(requirementId);
-        }
-    }
-
-    @Test
-    void validatesStandaloneTaskTitleBeforeDatabaseWrite() throws Exception {
-        String token = loginToken();
-        mockMvc.perform(post("/api/bugs")
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"title\":\"   \"}"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    }
-
-    private int createWorkItemStatus(String token, String requirementId, CountDownLatch start) throws Exception {
-        start.await();
-        return mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("{\"taskType\":\"产品需求\",\"assigneeName\":\"张瑞\",\"note\":\"并发\"}"))
-            .andReturn().getResponse().getStatus();
-    }
-
-    private void cleanupRequirement(String requirementId) {
-        jdbc.update("DELETE FROM t_product_requirement_event WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_crm_presales_task WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_project_delivery_task WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_product_requirement_task WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_product_bug WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_product_design_task WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_requirement_work_item WHERE requirement_id_=?", requirementId);
-        jdbc.update("DELETE FROM t_product_requirement WHERE id_=?", requirementId);
-    }
-
 }

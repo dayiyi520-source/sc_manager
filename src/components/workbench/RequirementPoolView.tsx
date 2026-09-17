@@ -62,12 +62,8 @@ const statuses: RequirementTask["status"][] = [
 ];
 const taskTypes: RequirementTaskType[] = [
   "产品需求",
-  "数据需求",
   "缺陷管理",
   "设计任务",
-  "售前任务",
-  "交付任务",
-  "运维任务",
   "研发任务",
 ];
 const opportunityStagesBeforeWin = new Set(["发现商机", "需求确认", "方案设计", "商务谈判", "招投标"]);

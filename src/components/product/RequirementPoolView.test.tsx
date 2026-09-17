@@ -94,6 +94,11 @@ describe('work-order workflow form regression', () => {
       expect(dialog).not.toHaveClass('max-w-xl');
     }
   });
+  it('only offers the four unified product work-item categories', async () => {
+    await openWorkflow();
+    const options = Array.from((screen.getByLabelText('任务类型 *') as HTMLSelectElement).options).map((option) => option.text);
+    expect(options).toEqual(['选择任务类型', '产品需求', '缺陷管理', '设计任务', '研发任务']);
+  });
   it('resets drafts on reopening and inherits dates for new rows', async () => {
     await openWorkflow();
     fireEvent.click(screen.getByRole('button', { name: '+ 增加任务' }));

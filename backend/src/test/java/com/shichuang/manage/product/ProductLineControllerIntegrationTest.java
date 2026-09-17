@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -15,6 +16,57 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @Transactional
 class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
+
+    @Test
+    void filtersProductLineListByVisibilityCreatorAndMembership() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String outsider = "user-outsider-" + suffix;
+        String member = "user-member-" + suffix;
+        jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,description_,visibility_,status_,current_version_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?, ?,?,?,NOW(),NOW())",
+            "line-public-" + suffix,"local-tenant","PUBLIC-" + suffix,"公开产品线","","公开","启用中","1.0.0","user-admin","user-admin");
+        jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,description_,visibility_,status_,current_version_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?, ?,?,?,NOW(),NOW())",
+            "line-member-" + suffix,"local-tenant","MEMBER-" + suffix,"成员私密产品线","","私密","启用中","1.0.0","user-admin","user-admin");
+        jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,description_,visibility_,status_,current_version_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?, ?,?,?,NOW(),NOW())",
+            "line-hidden-" + suffix,"local-tenant","HIDDEN-" + suffix,"不可见私密产品线","","私密","启用中","1.0.0","user-admin","user-admin");
+        jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,description_,visibility_,status_,current_version_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?, ?,?,?,NOW(),NOW())",
+            "line-owned-" + suffix,"local-tenant","OWNED-" + suffix,"本人创建产品线","","仅创建者可见","启用中","1.0.0",outsider,outsider);
+        jdbc.update("INSERT INTO t_product_line_member(id_,tenant_id_,product_line_id_,user_id_,member_name_,role_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,?,NOW(),NOW())",
+            "member-" + suffix,"local-tenant","line-member-" + suffix,member,"成员用户","参与人","user-admin","user-admin");
+
+        String memberResponse = mockMvc.perform(get("/api/product-lines")
+                .header("Authorization", "Bearer " + tokens.issue(member,"product_manager","local-tenant","成员用户")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String memberJson = objectMapper.readTree(memberResponse).path("data").toString();
+        assertTrue(memberJson.contains("PUBLIC-" + suffix));
+        assertTrue(memberJson.contains("MEMBER-" + suffix));
+        assertFalse(memberJson.contains("HIDDEN-" + suffix));
+        assertFalse(memberJson.contains("OWNED-" + suffix));
+
+        String ownerResponse = mockMvc.perform(get("/api/product-lines")
+                .header("Authorization", "Bearer " + tokens.issue(outsider,"product_manager","local-tenant","创建人")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertTrue(objectMapper.readTree(ownerResponse).path("data").toString().contains("OWNED-" + suffix));
+
+        String adminResponse = mockMvc.perform(get("/api/product-lines")
+                .header("Authorization", "Bearer " + loginToken()))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertTrue(objectMapper.readTree(adminResponse).path("data").toString().contains("HIDDEN-" + suffix));
+    }
+
+    @Test
+    void rejectsDuplicateActiveProductLineMember() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        String response = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"成员唯一测试\",\"code\":\"MEMBER-UNIQUE-" + System.nanoTime() + "\",\"ownerName\":\"林志豪\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String lineId = objectMapper.readTree(response).path("data").path("id").asText();
+        String body = "{\"name\":\"张瑞\",\"role\":\"产品\"}";
+        mockMvc.perform(post("/api/product-lines/{id}/members", lineId).header("Authorization", authorization).contentType("application/json").content(body))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/product-lines/{id}/members", lineId).header("Authorization", authorization).contentType("application/json").content(body))
+            .andExpect(status().isConflict());
+    }
 
     @Test
     void acceptsDeliverySupervisorAsProductLineMemberRole() throws Exception {
@@ -125,23 +177,12 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
         String versionId = jdbc.queryForObject(
             "SELECT id_ FROM t_product_line_version WHERE product_line_id_=? AND code_='V9.9.9' AND delete_flag_=0",
             String.class, lineId);
-        String requirementResponse = mockMvc.perform(post("/api/requirements")
-                .header("Authorization", "Bearer " + token)
-                .contentType("application/json")
-                .content("""
-                    {
-                      "title":"待规划工作项-%s",
-                      "productLineId":"%s",
-                      "productLineName":"%s",
-                      "ownerName":"张瑞",
-                      "department":"产品中心",
-                      "priority":"P1-高优",
-                      "dueDate":"2026-10-01"
-                    }
-                    """.formatted(System.nanoTime(), lineId, name)))
-            .andExpect(status().isCreated())
-            .andReturn().getResponse().getContentAsString();
-        String requirementId = objectMapper.readTree(requirementResponse).path("data").path("id").asText();
+        String requirementId = java.util.UUID.randomUUID().toString();
+        jdbc.update("""
+            INSERT INTO t_product_work_item(id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,workflow_id_,status_key_,status_name_,status_group_,status_color_,successful_,priority_,estimated_hours_,actual_hours_,source_type_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_)
+            SELECT ?,tenant_id_,?,'requirement',task_type_id_,CONCAT('WI-PLAN-',UNIX_TIMESTAMP()),?,workflow_id_,status_key_,status_name_,status_group_,status_color_,successful_,'P1',0,0,'MANUAL',?,SHA2(?,256),'user-admin','user-admin',NOW(6),NOW(6)
+            FROM t_product_work_item WHERE tenant_id_='local-tenant' AND category_='requirement' AND delete_flag_=0 LIMIT 1
+            """, requirementId, lineId, "待规划工作项-" + System.nanoTime(), "plan-" + requirementId, "plan-" + requirementId);
 
         mockMvc.perform(post("/api/product-lines/{id}/versions/{versionId}/requirements/{requirementId}", lineId, versionId, requirementId)
                 .header("Authorization", "Bearer " + token))
@@ -149,10 +190,10 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(jsonPath("$.code").value("OK"));
 
         assertEquals(versionId, jdbc.queryForObject(
-            "SELECT version_id_ FROM t_product_requirement WHERE id_=? AND tenant_id_='local-tenant'",
+            "SELECT version_id_ FROM t_product_work_item WHERE id_=? AND tenant_id_='local-tenant'",
             String.class, requirementId));
         assertEquals("产品线集成测试版本", jdbc.queryForObject(
-            "SELECT version_name_ FROM t_product_requirement WHERE id_=? AND tenant_id_='local-tenant'",
+            "SELECT v.name_ FROM t_product_work_item w JOIN t_product_line_version v ON v.id_=w.version_id_ AND v.tenant_id_=w.tenant_id_ WHERE w.id_=? AND w.tenant_id_='local-tenant'",
             String.class, requirementId));
         assertTrue(jdbc.queryForObject(
             "SELECT COUNT(*) FROM t_product_line_activity WHERE product_line_id_=? AND action_ IN ('创建产品线','添加成员角色','创建版本','规划工作项')",

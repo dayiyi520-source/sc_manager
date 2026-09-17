@@ -35,29 +35,17 @@ public class OkrMapper {
     }
     public List<Map<String,Object>> work(String tenant,String ownerName) {
         var result = new ArrayList<Map<String,Object>>();
-        // Names are a legacy work-item contract. The service rejects ambiguous names.
-        for (String table : List.of("t_product_requirement","t_product_design_task","t_product_dev_task","t_product_bug","t_crm_presales_task","t_project_delivery_task","t_project_ops_task")) {
+        // Business tasks remain independent domains; all product work uses the unified table below.
+        for (String table : List.of("t_crm_presales_task","t_project_delivery_task","t_project_ops_task")) {
             String kind = table.substring(2);
-            String sources = Set.of("t_product_requirement","t_product_dev_task","t_product_bug").contains(table) ? "source_work_order_ids_" : "JSON_ARRAY(requirement_id_)";
-            result.addAll(jdbc.queryForList("SELECT CONCAT(?,':',id_) AS id,id_ AS sourceId,? AS kind,title_ AS title,status_ AS status,owner_name_ AS ownerName,creator_name_ AS creatorName,actual_hours_ AS actualHours,estimated_hours_ AS estimatedHours,due_date_ AS dueDate,create_time_ AS createdAt,update_time_ AS updatedAt," + sources + " AS sourceWorkOrderIds FROM " + table + " WHERE tenant_id_=? AND owner_name_=? AND delete_flag_=0 ORDER BY update_time_ DESC",kind,kind,tenant,ownerName));
+            result.addAll(jdbc.queryForList("SELECT CONCAT(?,':',id_) AS id,id_ AS sourceId,? AS kind,title_ AS title,status_ AS status,owner_name_ AS ownerName,creator_name_ AS creatorName,actual_hours_ AS actualHours,estimated_hours_ AS estimatedHours,due_date_ AS dueDate,create_time_ AS createdAt,update_time_ AS updatedAt,CASE WHEN requirement_id_ IS NULL THEN JSON_ARRAY() ELSE JSON_ARRAY(requirement_id_) END AS sourceWorkOrderIds FROM " + table + " WHERE tenant_id_=? AND owner_name_=? AND delete_flag_=0 ORDER BY update_time_ DESC",kind,kind,tenant,ownerName));
         }
         result.addAll(jdbc.queryForList("""
-            SELECT CONCAT('requirement_work_item:',w.id_) AS id,w.id_ AS sourceId,'requirement_work_item' AS kind,
-                   w.title_ AS title,w.status_ AS status,w.assignee_name_ AS ownerName,COALESCE(u.name_,w.create_by_) AS creatorName,
-                   0 AS actualHours,0 AS estimatedHours,r.due_date_ AS dueDate,w.create_time_ AS createdAt,w.update_time_ AS updatedAt,
-                   JSON_ARRAY(w.requirement_id_) AS sourceWorkOrderIds
-            FROM t_requirement_work_item w
-            JOIN t_product_requirement r ON r.id_=w.requirement_id_ AND r.tenant_id_=w.tenant_id_ AND r.delete_flag_=0
-            LEFT JOIN t_sys_user u ON u.id_=w.create_by_ AND u.tenant_id_=w.tenant_id_
-            WHERE w.tenant_id_=? AND w.assignee_name_=? AND w.delete_flag_=0
-            ORDER BY w.update_time_ DESC
-            """,tenant,ownerName));
-        result.addAll(jdbc.queryForList("""
-            SELECT CONCAT('core:',w.id_) AS id,w.id_ AS sourceId,w.category_ AS kind,w.title_ AS title,
+            SELECT CONCAT('work_item:',w.id_) AS id,w.id_ AS sourceId,w.category_ AS kind,w.title_ AS title,
                    w.status_name_ AS status,w.assignee_name_ AS ownerName,COALESCE(u.name_,w.create_by_) AS creatorName,w.actual_hours_ AS actualHours,
                    w.estimated_hours_ AS estimatedHours,w.planned_end_date_ AS dueDate,w.create_time_ AS createdAt,
                    w.update_time_ AS updatedAt,
-                   CASE WHEN w.requirement_id_ IS NULL THEN JSON_ARRAY() ELSE JSON_ARRAY(w.requirement_id_) END AS sourceWorkOrderIds
+                   COALESCE(w.source_work_order_ids_,CASE WHEN w.requirement_id_ IS NULL THEN JSON_ARRAY() ELSE JSON_ARRAY(w.requirement_id_) END) AS sourceWorkOrderIds
             FROM t_product_work_item w LEFT JOIN t_sys_user u ON u.id_=w.create_by_ AND u.tenant_id_=w.tenant_id_
             WHERE w.tenant_id_=? AND w.assignee_name_=? AND w.delete_flag_=0
             ORDER BY w.update_time_ DESC

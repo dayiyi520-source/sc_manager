@@ -2,13 +2,14 @@ package com.shichuang.manage.product;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shichuang.manage.api.PageResult;
-import com.shichuang.manage.auth.RequestContext;
 import com.shichuang.manage.auth.AuthorizationService;
+import com.shichuang.manage.auth.RequestContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -22,320 +23,113 @@ import java.util.UUID;
 @Service
 public class RequirementService {
     private final RequirementMapper mapper;
+    private final TaskAliasMapper taskMapper;
+    private final TaskAliasService tasks;
+    private final WorkItemStorageService storage;
+    private final WorkItemTransitionService transitions;
     private final WorkOrderService workOrders;
     private final ObjectMapper objectMapper;
-    private final WorkItemConfigurationService configurations;
 
-    public RequirementService(RequirementMapper mapper, WorkOrderService workOrders, ObjectMapper objectMapper, WorkItemConfigurationService configurations) {
-        this.mapper = mapper;
-        this.workOrders = workOrders;
-        this.objectMapper = objectMapper;
-        this.configurations = configurations;
+    public RequirementService(RequirementMapper mapper,TaskAliasMapper taskMapper,TaskAliasService tasks,WorkItemStorageService storage,
+        WorkItemTransitionService transitions,WorkOrderService workOrders,ObjectMapper objectMapper) {
+        this.mapper=mapper;this.taskMapper=taskMapper;this.tasks=tasks;this.storage=storage;this.transitions=transitions;this.workOrders=workOrders;this.objectMapper=objectMapper;
     }
 
-    public PageResult<Map<String, Object>> list(int page, int pageSize, String keyword, String productLine, String department, String priority, String status, String ownerName, String workItemKind) {
+    public PageResult<Map<String,Object>> list(int page,int pageSize,String keyword,String productLine,String department,String priority,String status,String ownerName,String workItemKind) {
         AuthorizationService.requireRead("product");
-        int currentPage = Math.max(1, page);
-        int size = Math.min(100, Math.max(1, pageSize));
-        int offset = (currentPage - 1) * size;
-        String tenantId = RequestContext.tenantId();
-        String like = "%" + keyword.trim() + "%";
-        String kind = "design".equalsIgnoreCase(workItemKind) ? "design" : "requirement";
-        String where = "tenant_id_=? AND delete_flag_=0 AND work_item_kind_=? AND (title_ LIKE ? OR description_ LIKE ? OR owner_name_ LIKE ? OR product_line_name_ LIKE ? OR department_ LIKE ?) AND (?='' OR product_line_name_=?) AND (?='' OR department_=?) AND (?='' OR priority_=?) AND (?='' OR status_=?) AND (?='' OR owner_name_=?)";
-        Object[] args = { tenantId, kind, like, like, like, like, like, productLine, productLine, department, department, priority, priority, status, status, ownerName, ownerName };
-        return new PageResult<>(mapper.list(where, args, size, offset), currentPage, size, mapper.count(where, args));
+        int current=Math.max(1,page),size=Math.min(100,Math.max(1,pageSize));
+        String like="%"+safe(keyword)+"%",kind="design".equalsIgnoreCase(workItemKind)?"design":"requirement";
+        String where="tenant_id_=? AND delete_flag_=0 AND work_item_kind_=? AND (title_ LIKE ? OR description_ LIKE ? OR owner_name_ LIKE ? OR product_line_name_ LIKE ? OR department_ LIKE ?) AND (?='' OR product_line_name_=?) AND (?='' OR department_=?) AND (?='' OR priority_=?) AND (?='' OR status_=?) AND (?='' OR owner_name_=?)";
+        Object[] args={RequestContext.tenantId(),kind,like,like,like,like,like,safe(productLine),safe(productLine),safe(department),safe(department),safe(priority),safe(priority),safe(status),safe(status),safe(ownerName),safe(ownerName)};
+        return new PageResult<>(mapper.list(where,args,size,(current-1)*size),current,size,mapper.count(where,args));
     }
 
-    public TaskPageResult<Map<String, Object>> list(int page, int pageSize, TaskListFilter filter) {
+    public TaskPageResult<Map<String,Object>> list(int page,int pageSize,TaskListFilter filter) {
         AuthorizationService.requireRead("product");
-        int currentPage = Math.max(1, page);
-        int size = Math.min(100, Math.max(1, pageSize));
-        TaskListPredicate predicate = TaskListPredicate.build(RequestContext.tenantId(), "", "owner_name_", filter, true);
-        String where = predicate.sql() + " AND work_item_kind_=?";
-        Object[] args = java.util.Arrays.copyOf(predicate.args(), predicate.args().length + 1);
-        args[args.length - 1] = "requirement";
-        TaskListPredicate groupPredicate = TaskListPredicate.build(RequestContext.tenantId(), "", "owner_name_", filter.withoutGroupValue(), true);
-        String groupWhere = groupPredicate.sql() + " AND work_item_kind_=?";
-        Object[] groupArgs = java.util.Arrays.copyOf(groupPredicate.args(), groupPredicate.args().length + 1);
-        groupArgs[groupArgs.length - 1] = "requirement";
-        String expression = TaskListPredicate.groupExpression("", "owner_name_", filter.groupBy(), true);
-        List<Map<String,Object>> groups = expression == null ? List.of() : mapper.groups(groupWhere, groupArgs, expression);
-        return new TaskPageResult<>(mapper.listFiltered(where, args, size, (currentPage - 1) * size), currentPage, size, mapper.count(where, args), groups);
+        int current=Math.max(1,page),size=Math.min(100,Math.max(1,pageSize));
+        TaskListPredicate predicate=TaskListPredicate.build(RequestContext.tenantId(),"","owner_name_",filter,true);
+        String where=predicate.sql()+" AND work_item_kind_='requirement'";
+        TaskListPredicate groupPredicate=TaskListPredicate.build(RequestContext.tenantId(),"","owner_name_",filter.withoutGroupValue(),true);
+        String groupWhere=groupPredicate.sql()+" AND work_item_kind_='requirement'";
+        String expression=TaskListPredicate.groupExpression("","owner_name_",filter.groupBy(),true);
+        List<Map<String,Object>> groups=expression==null?List.of():mapper.groups(groupWhere,groupPredicate.args(),expression);
+        return new TaskPageResult<>(mapper.listFiltered(where,predicate.args(),size,(current-1)*size),current,size,mapper.count(where,predicate.args()),groups);
     }
 
-    public List<Map<String, Object>> departments() {
-        AuthorizationService.requireRead("product");
-        return mapper.departments(RequestContext.tenantId());
-    }
+    public List<Map<String,Object>> departments(){AuthorizationService.requireRead("product");return mapper.departments(RequestContext.tenantId());}
 
-    public Map<String, Object> detail(String id) {
+    public Map<String,Object> detail(String id) {
         AuthorizationService.requireRead("product");
-        String tenantId = RequestContext.tenantId();
-        List<Map<String, Object>> rows = mapper.find(tenantId, id);
-        if (rows.isEmpty()) throw notFound("需求不存在");
-        Map<String, Object> result = new LinkedHashMap<>(rows.get(0));
-        result.put("events", mapper.events(tenantId, id));
-        result.put("workItems", mapper.workItems(tenantId, id));
+        List<Map<String,Object>> rows=mapper.find(RequestContext.tenantId(),id);
+        if(rows.isEmpty())throw notFound("需求不存在");
+        Map<String,Object> result=new LinkedHashMap<>(rows.get(0));
+        result.put("events",mapper.events(RequestContext.tenantId(),id));
+        result.put("workItems",mapper.workItems(RequestContext.tenantId(),id));
         return result;
     }
 
-    public List<Map<String, Object>> events(String id, String eventType, String operatorName) {
-        AuthorizationService.requireRead("product");
-        String tenantId = RequestContext.tenantId();
-        if (mapper.find(tenantId, id).isEmpty()) throw notFound("需求不存在");
-        return mapper.events(tenantId, id, safe(eventType), safe(operatorName));
+    public List<Map<String,Object>> events(String id,String eventType,String operatorName){AuthorizationService.requireRead("product");requirement(id);return mapper.events(RequestContext.tenantId(),id,safe(eventType),safe(operatorName));}
+
+    public PageResult<Map<String,Object>> auditEvents(int page,int pageSize,String requirementId,String eventType,String operatorName,String from,String to){
+        AuthorizationService.requireRead("product");int current=Math.max(1,page),size=Math.min(100,Math.max(1,pageSize));LocalDateTime fromTime=parseDateTime(from,false),toTime=parseDateTime(to,true);
+        return new PageResult<>(mapper.auditEvents(RequestContext.tenantId(),safe(requirementId),safe(eventType),safe(operatorName),fromTime,toTime,size,(current-1)*size),current,size,mapper.auditCount(RequestContext.tenantId(),safe(requirementId),safe(eventType),safe(operatorName),fromTime,toTime));
     }
 
-    public PageResult<Map<String, Object>> auditEvents(int page, int pageSize, String requirementId, String eventType, String operatorName, String from, String to) {
-        AuthorizationService.requireRead("product");
-        int currentPage = Math.max(1, page);
-        int size = Math.min(100, Math.max(1, pageSize));
-        int offset = (currentPage - 1) * size;
-        String tenantId = RequestContext.tenantId();
-        LocalDateTime fromTime = parseDateTime(from, false);
-        LocalDateTime toTime = parseDateTime(to, true);
-        return new PageResult<>(
-            mapper.auditEvents(tenantId, safe(requirementId), safe(eventType), safe(operatorName), fromTime, toTime, size, offset),
-            currentPage,
-            size,
-            mapper.auditCount(tenantId, safe(requirementId), safe(eventType), safe(operatorName), fromTime, toTime)
-        );
-    }
-
-    @Transactional
-    public Map<String, Object> create(Map<String, Object> body) {
+    @Transactional public Map<String,Object> create(Map<String,Object> body) {
         AuthorizationService.requireWrite("product");
-        String title = text(body, "title");
-        String productLine = text(body, "productLineName");
-        String tenantId = RequestContext.tenantId();
-        String legacyDepartment = text(body, "department");
-        String ownerName = text(body, "ownerName");
-        if (ownerName.isBlank() && !legacyDepartment.isBlank()) ownerName = mapper.manager(tenantId, legacyDepartment);
-        String department = ownerName.isBlank() ? legacyDepartment : mapper.employeeDepartment(tenantId, ownerName);
-        String customerId = text(body, "customerId");
-        if (title.isBlank()) throw new IllegalArgumentException("需求名称不能为空");
-        if (body.get("workItemTypeId") != null) configurations.requireTypeForLegacy(text(body, "productLineId"), text(body, "workItemTypeId"), "requirement");
-        if (ownerName.isBlank() || department.isBlank()) throw new IllegalArgumentException("负责人不能为空且必须是组织员工");
-        if (!customerId.isBlank() && mapper.customerExists(tenantId, customerId) == 0) throw new IllegalArgumentException("关联客户无效");
-        String id = UUID.randomUUID().toString();
-        String code = "REQ-" + LocalDate.now().getYear() + "-" + String.format("%03d", mapper.nextCode(tenantId));
-        Map<String, Object> persistenceBody = new LinkedHashMap<>(body);
-        persistenceBody.put("department", department);
-        persistenceBody.put("ownerName", ownerName);
-        persistenceBody.put("specialFieldsJson", json(body.get("specialFields")));
-        mapper.insert(tenantId, id, code, persistenceBody, RequestContext.operatorName(), RequestContext.userId(), defaultText(body, "dueDate", LocalDate.now().toString()), json(body.get("media")));
-        event(id, "创建", null, "待处理", "", Map.of("ownerName", ownerName));
-        mapper.notifyOwner(tenantId, ownerName, title, id);
-        return Map.of("id", id, "code", code);
+        String customerId=text(body,"customerId");
+        if(!customerId.isBlank()&&mapper.customerExists(RequestContext.tenantId(),customerId)==0)throw new IllegalArgumentException("关联客户无效");
+        Map<String,Object> created=tasks.create("requirement",body);
+        String owner=text(body,"ownerName");
+        if(!owner.isBlank())mapper.notifyOwner(RequestContext.tenantId(),owner,text(body,"title"),created.get("id").toString());
+        return created;
     }
 
-    public void update(String id, Map<String, Object> body) {
-        AuthorizationService.requireWrite("product");
-        String tenantId = RequestContext.tenantId();
-        Map<String, Object> current = mapper.lock(tenantId, id);
-        if (mapper.update(tenantId, RequestContext.userId(), id, body, body.containsKey("media") ? jsonNullable(body.get("media")) : null) == 0) {
-            throw conflict("需求已被其他人更新，请刷新后重试");
-        }
-        Map<String, String> labels = Map.ofEntries(
-            Map.entry("status", "变更状态"), Map.entry("ownerName", "变更负责人"), Map.entry("ccNames", "修改参与人"),
-            Map.entry("title", "修改需求名称"), Map.entry("description", "修改任务描述"), Map.entry("expectedGoal", "修改验收标准"),
-            Map.entry("priority", "修改优先级"), Map.entry("productLineName", "修改所属产品线"), Map.entry("versionName", "修改迭代版本"),
-            Map.entry("customerName", "修改关联客户"), Map.entry("plannedStartDate", "修改计划开始时间"), Map.entry("dueDate", "修改计划完成时间"),
-            Map.entry("expectedCompleteDate", "修改期望完成时间"), Map.entry("estimatedHours", "修改预计工时")
-        );
-        labels.forEach((field, label) -> {
-            if (!body.containsKey(field)) return;
-            String before = Objects.toString(current.get(field), "");
-            String after = Objects.toString(body.get(field), "");
-            if (Objects.equals(before, after)) return;
-            String from = "status".equals(field) ? before : "";
-            String to = "status".equals(field) ? after : "";
-            event(id, label, from, to, "", Map.of("from", before, "to", after));
-        });
-        if (body.containsKey("sourceWorkOrderIds")) {
-            String before = Objects.toString(current.get("sourceWorkOrderIds"), "[]");
-            String after = json(body.get("sourceWorkOrderIds"));
-            if (!Objects.equals(before, after)) {
-                event(id, "修改关联工单", "", "", "", Map.of("from", before, "to", after, "titles", body.getOrDefault("sourceWorkOrderTitles", List.of())));
-            }
-        }
+    @Transactional public void update(String id,Map<String,Object> body){AuthorizationService.requireWrite("product");requirement(id);tasks.update("requirement",id,body);}
+
+    @Transactional public void comment(String id,Map<String,Object> body){
+        AuthorizationService.requireWrite("product");requirement(id);String content=text(body,"content");if(content.isBlank())throw new IllegalArgumentException("评论内容不能为空");event(id,"评论","","",content,Map.of("content",content));
     }
 
-    @Transactional
-    public void comment(String id, Map<String, Object> body) {
-        AuthorizationService.requireWrite("product");
-        String content = text(body, "content");
-        if (content.isBlank()) throw new IllegalArgumentException("评论内容不能为空");
-        if (mapper.find(RequestContext.tenantId(), id).isEmpty()) throw notFound("需求不存在");
-        event(id, "评论", "", "", content, Map.of("content", content));
+    @Transactional public void transition(String id,Map<String,Object> body){
+        AuthorizationService.requireWrite("product");Map<String,Object> current=requirement(id);String action=text(body,"action"),target=switch(action){case "hold"->"已搁置";case "reject"->"已驳回";default->text(body,"status");};
+        executeStatus(current,target,text(body,"reason"));
     }
 
-    @Transactional
-    public void transition(String id, Map<String, Object> body) {
-        AuthorizationService.requireWrite("product");
-        String tenantId = RequestContext.tenantId();
-        Map<String, Object> current = mapper.lock(tenantId, id);
-        String action = text(body, "action");
-        String reason = text(body, "reason");
-        String from = String.valueOf(current.get("status"));
-        String to = switch (action) {
-            case "hold" -> "已搁置";
-            case "reject" -> "已驳回";
-            default -> throw new IllegalArgumentException("不支持的需求操作");
-        };
-        if (reason.isBlank()) throw new IllegalArgumentException("请输入操作原因");
-        if (("hold".equals(action) && !RequirementStatusPolicy.canHold(from)) || ("reject".equals(action) && !RequirementStatusPolicy.canReject(from))) {
-            throw new IllegalArgumentException("当前需求状态不允许执行该操作");
-        }
-        if (mapper.transition(tenantId, RequestContext.userId(), id, from, to) == 0) throw conflict("需求状态已变化，请刷新后重试");
-        event(id, "hold".equals(action) ? "搁置" : "驳回", from, to, reason, Map.of());
+    @Transactional public Map<String,Object> createWorkItem(String id,Map<String,Object> body){
+        AuthorizationService.requireWrite("product");Map<String,Object> current=requirement(id);String taskType=text(body,"taskType"),category=TaskTypes.category(taskType);
+        if(category==null)throw new IllegalArgumentException("工单仅支持转需求、设计、研发或缺陷");
+        String assignee=text(body,"assigneeName");if(assignee.isBlank())throw new IllegalArgumentException("请选择下一步负责人");
+        String assigneeId=taskMapper.userId(assignee);if(assigneeId==null)throw new IllegalArgumentException("负责人不存在或已停用");
+        String line=String.valueOf(current.get("productLineId")),typeId=text(body,"workItemTypeId");if(typeId.isBlank())typeId=taskMapper.defaultType(line,category);
+        if(typeId==null||typeId.isBlank())throw new IllegalArgumentException("请先配置并启用目标分类的工作项类型");
+        if(mapper.activeWorkItems(RequestContext.tenantId(),id)>0)throw new IllegalArgumentException("当前需求已有进行中的工作项");
+        String title=defaultText(body,"title",String.valueOf(current.get("title"))),note=text(body,"note");
+        WorkItemDefinition.CreateItem input=new WorkItemDefinition.CreateItem("work-order-"+UUID.randomUUID(),line,category,typeId,title,note,"",nullable(current.get("versionId")),id,null,assigneeId,priority(current.get("priority")),null,date(current.get("dueDate")),BigDecimal.ZERO,BigDecimal.ZERO);
+        Map<String,Object> created=storage.create(input);
+        mapper.markWorkOrder(RequestContext.tenantId(),created.get("id").toString(),taskType,id,String.valueOf(current.get("title")),note,RequestContext.userId());
+        event(id,"转任务",String.valueOf(current.get("status")),String.valueOf(current.get("status")),note,Map.of("taskType",taskType,"taskId",created.get("id"),"taskTitle",title,"assigneeName",assignee,"targetPage",targetPage(category)));
+        return Map.of("id",created.get("id"),"taskType",taskType,"syncStatus","SUCCESS","retryCount",0);
     }
 
-    @Transactional
-    public Map<String, Object> createWorkItem(String id, Map<String, Object> body) {
-        AuthorizationService.requireWrite("product");
-        String tenantId = RequestContext.tenantId();
-        Map<String, Object> current = mapper.lock(tenantId, id);
-        String type = text(body, "taskType");
-        String assignee = text(body, "assigneeName");
-        String note = text(body, "note");
-        String status = String.valueOf(current.get("status"));
-        if (!TaskTypes.isValidTarget(type)) throw new IllegalArgumentException("请选择有效任务类型");
-        if (assignee.isBlank()) throw new IllegalArgumentException("请选择下一步负责人");
-        if (!RequirementStatusPolicy.canCreateWorkItem(status)) throw new IllegalArgumentException("当前需求状态不允许转任务");
-        if (mapper.activeWorkItems(tenantId, id) > 0) throw new IllegalArgumentException("当前需求已有进行中的工作项");
-        String title = defaultText(body, "title", String.valueOf(current.get("title")));
-        String workId = UUID.randomUUID().toString();
-        mapper.insertWorkItem(tenantId, workId, id, type, title, assignee, note, RequestContext.userId());
-        if (mapper.assignWorkItem(tenantId, RequestContext.userId(), id, status, type, workId, assignee, note) == 0) throw conflict("需求状态已变化，请刷新后重试");
-        event(id, "转任务", status, "处理中", note, Map.of("taskType", type, "taskId", workId, "taskTitle", title, "assigneeName", assignee, "targetPage", targetPage(type)));
-        WorkOrderService.SyncResult sync;
-        try {
-            sync = workOrders.create(tenantId, type, workId, id, title, assignee, note, RequestContext.userId());
-        } catch (RuntimeException error) {
-            workOrders.markSyncFailed(tenantId, workId, error.getMessage(), RequestContext.userId());
-            sync = WorkOrderService.SyncResult.failed(error.getMessage());
-        }
-        if (!sync.succeeded()) {
-            event(id, "下游同步失败", "处理中", "处理中", sync.error(), Map.of("taskType", type, "taskId", workId, "retryable", true));
-        }
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", workId);
-        result.put("taskType", type);
-        result.put("syncStatus", sync.status());
-        result.put("retryCount", sync.succeeded() ? 0 : 1);
-        if (!sync.succeeded()) result.put("syncError", sync.error());
-        return result;
-    }
+    public List<Map<String,Object>> workItems(String type){AuthorizationService.requireRead("product");return workOrders.list(RequestContext.tenantId(),safe(type));}
+    public List<Map<String,Object>> workOrderCandidates(String keyword,String type,String requirementId,int limit){AuthorizationService.requireRead("product");return mapper.workOrderCandidates(RequestContext.tenantId(),safe(keyword),safe(type),safe(requirementId),Math.min(200,Math.max(1,limit)));}
 
-    public List<Map<String, Object>> workItems(String type) {
-        AuthorizationService.requireRead("product");
-        return workOrders.list(RequestContext.tenantId(), type);
-    }
+    public PageResult<Map<String,Object>> syncStatus(int page,int pageSize,String taskType,String syncStatus){AuthorizationService.requireRead("product");int current=Math.max(1,page),size=Math.min(100,Math.max(1,pageSize));if(!safe(syncStatus).isBlank()&&!"SUCCESS".equalsIgnoreCase(syncStatus))return new PageResult<>(List.of(),current,size,0);return new PageResult<>(workOrders.syncStatus(RequestContext.tenantId(),safe(taskType),"SUCCESS",size,(current-1)*size),current,size,workOrders.syncStatusCount(RequestContext.tenantId(),safe(taskType),"SUCCESS"));}
 
-    public List<Map<String, Object>> workOrderCandidates(String keyword, String type, String requirementId, int limit) {
-        AuthorizationService.requireRead("product");
-        String tenantId = RequestContext.tenantId();
-        int safeLimit = Math.min(200, Math.max(1, limit));
-        return mapper.workOrderCandidates(tenantId, safe(keyword), safe(type), safe(requirementId), safeLimit);
-    }
+    @Transactional public void updateWorkItemStatus(String id,Map<String,Object> body){AuthorizationService.requireWrite("product");workOrders.updateStatus(RequestContext.tenantId(),id,text(body,"status"),RequestContext.userId());}
+    public Map<String,Object> retryWorkItem(String id){AuthorizationService.requireWrite("product");workOrders.find(RequestContext.tenantId(),id);return Map.of("syncStatus","SUCCESS","retryableFailures",0);}
 
-    public PageResult<Map<String, Object>> syncStatus(int page, int pageSize, String taskType, String syncStatus) {
-        AuthorizationService.requireRead("product");
-        int currentPage = Math.max(1, page);
-        int size = Math.min(100, Math.max(1, pageSize));
-        String normalizedType = safe(taskType);
-        String normalizedStatus = safe(syncStatus).toUpperCase();
-        if (!normalizedType.isBlank() && !TaskTypes.isValidTarget(normalizedType)) {
-            throw new IllegalArgumentException("请选择有效任务类型");
-        }
-        if (!normalizedStatus.isBlank() && !Set.of("PENDING", "SUCCESS", "FAILED").contains(normalizedStatus)) {
-            throw new IllegalArgumentException("请选择有效同步状态");
-        }
-        int offset = (currentPage - 1) * size;
-        String tenantId = RequestContext.tenantId();
-        return new PageResult<>(
-            workOrders.syncStatus(tenantId, normalizedType, normalizedStatus, size, offset),
-            currentPage,
-            size,
-            workOrders.syncStatusCount(tenantId, normalizedType, normalizedStatus)
-        );
-    }
-
-    @Transactional
-    public void updateWorkItemStatus(String id, Map<String, Object> body) {
-        AuthorizationService.requireWrite("product");
-        String status = text(body, "status");
-        if (!Set.of("待处理", "处理中", "已完成", "已取消").contains(status)) throw new IllegalArgumentException("不支持的工作项状态");
-        String tenantId = RequestContext.tenantId();
-        Map<String, Object> item = workOrders.find(tenantId, id);
-        workOrders.updateStatus(tenantId, id, status, RequestContext.userId());
-        if ("已完成".equals(status)) {
-            event(String.valueOf(item.get("requirementId")), "任务完成", String.valueOf(item.get("status")), "已完成", "", Map.of("taskId", id));
-        }
-    }
-
-    @Transactional
-    public Map<String, Object> retryWorkItem(String id) {
-        AuthorizationService.requireWrite("product");
-        String tenantId = RequestContext.tenantId();
-        Map<String, Object> item = workOrders.find(tenantId, id);
-        WorkOrderService.SyncResult sync = workOrders.retry(tenantId, id, RequestContext.userId());
-        event(String.valueOf(item.get("requirementId")), sync.succeeded() ? "下游同步成功" : "下游同步重试失败", String.valueOf(item.get("status")), String.valueOf(item.get("status")), sync.error(), Map.of("taskId", id, "taskType", String.valueOf(item.get("taskType")), "syncStatus", sync.status()));
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("syncStatus", sync.status());
-        result.put("retryableFailures", workOrders.retryableFailures(tenantId));
-        if (!sync.succeeded()) result.put("syncError", sync.error());
-        return result;
-    }
-
-    private void event(String requirementId, String type, String from, String to, String reason, Map<String, Object> metadata) {
-        try {
-            mapper.event(RequestContext.tenantId(), requirementId, type, from, to, reason, RequestContext.operatorName(), RequestContext.userId(), objectMapper.writeValueAsString(metadata));
-        } catch (Exception error) {
-            throw new IllegalArgumentException("流转记录格式无效", error);
-        }
-    }
-
-    private static String targetPage(String type) {
-        return switch (type) {
-            case "售前任务", "售前支持" -> "crm_presales_tasks";
-            case "产品需求", "数据需求" -> "prod_req_tasks";
-            case "设计任务" -> "prod_design_tasks";
-            case "缺陷管理", "bug修复", "Bug修复" -> "prod_bugs";
-            case "交付任务", "项目交付", "交付支持" -> "proj_delivery_tasks";
-            case "运维任务", "运维部署" -> "proj_ops_tasks";
-            case "研发任务", "技术问题" -> "prod_rd_tasks";
-            default -> "prod_req_tasks";
-        };
-    }
-
-    private String json(Object value) {
-        try {
-            return value == null ? "[]" : value instanceof String string ? string : objectMapper.writeValueAsString(value);
-        } catch (Exception error) {
-            throw new IllegalArgumentException("媒体数据格式无效");
-        }
-    }
-
-    private String jsonNullable(Object value) { return value == null ? null : json(value); }
-
-    private static LocalDateTime parseDateTime(String value, boolean endExclusive) {
-        if (value == null || value.isBlank()) return null;
-        try {
-            if (value.length() == 10) {
-                LocalDate date = LocalDate.parse(value);
-                return endExclusive ? date.plusDays(1).atStartOfDay() : date.atStartOfDay();
-            }
-            return LocalDateTime.parse(value);
-        } catch (DateTimeParseException error) {
-            throw new IllegalArgumentException("审计时间格式无效");
-        }
-    }
-
-    private static String text(Map<String, Object> body, String key) { return Objects.toString(body.get(key), "").trim(); }
-    private static String defaultText(Map<String, Object> body, String key, String fallback) { String value = text(body, key); return value.isBlank() ? fallback : value; }
-    private static String safe(String value) { return value == null ? "" : value.trim(); }
-    private ResponseStatusException notFound(String message) { return new ResponseStatusException(HttpStatus.NOT_FOUND, message); }
-    private ResponseStatusException conflict(String message) { return new ResponseStatusException(HttpStatus.CONFLICT, message); }
+    private Map<String,Object> requirement(String id){List<Map<String,Object>> rows=mapper.find(RequestContext.tenantId(),id);if(rows.isEmpty())throw notFound("需求不存在");return rows.get(0);}
+    private void executeStatus(Map<String,Object> current,String target,String reason){if(target.isBlank())throw new IllegalArgumentException("请选择目标状态");WorkItemTransitionService.Actions available=transitions.available(String.valueOf(current.get("productLineId")),String.valueOf(current.get("id")));WorkItemTransitionService.Action action=available.actions().stream().filter(value->value.to().equals(target)||value.name().equals(target)||available.statuses().stream().anyMatch(status->status.key().equals(value.to())&&status.name().equals(target))).findFirst().orElseThrow(()->new IllegalArgumentException("当前流程不允许流转到该状态"));transitions.execute(String.valueOf(current.get("productLineId")),String.valueOf(current.get("id")),new WorkItemDefinition.Transition(action.edgeKey(),available.revision(),reason));}
+    private void event(String id,String type,String from,String to,String reason,Map<String,Object> metadata){try{mapper.event(RequestContext.tenantId(),id,type,from,to,reason,RequestContext.operatorName(),RequestContext.userId(),objectMapper.writeValueAsString(metadata));}catch(Exception error){throw new IllegalArgumentException("流转记录格式无效",error);}}
+    private static String targetPage(String category){return switch(category){case "design"->"prod_design_tasks";case "dev"->"prod_rd_tasks";case "bug"->"prod_bugs";default->"prod_req_tasks";};}
+    private static String priority(Object value){String text=Objects.toString(value,"P2");if(text.startsWith("P0"))return "P0";if(text.startsWith("P1"))return "P1";if(text.startsWith("P3"))return "P3";return "P2";}
+    private static LocalDate date(Object value){String text=Objects.toString(value,"");return text.isBlank()?null:LocalDate.parse(text);}
+    private static String nullable(Object value){String text=Objects.toString(value,"");return text.isBlank()?null:text;}
+    private static LocalDateTime parseDateTime(String value,boolean endExclusive){if(value==null||value.isBlank())return null;try{if(value.length()==10){LocalDate date=LocalDate.parse(value);return endExclusive?date.plusDays(1).atStartOfDay():date.atStartOfDay();}return LocalDateTime.parse(value);}catch(DateTimeParseException error){throw new IllegalArgumentException("审计时间格式无效");}}
+    private static String text(Map<String,Object> body,String key){return Objects.toString(body.get(key),"").trim();}
+    private static String defaultText(Map<String,Object> body,String key,String fallback){String value=text(body,key);return value.isBlank()?fallback:value;}
+    private static String safe(String value){return value==null?"":value.trim();}
+    private static ResponseStatusException notFound(String message){return new ResponseStatusException(HttpStatus.NOT_FOUND,message);}
 }

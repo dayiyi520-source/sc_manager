@@ -22,6 +22,7 @@ const MyTasksView = lazyNamed(() => import('./components/workbench/MyTasksView')
 const KnowledgeBaseView = lazyNamed(() => import('./components/workbench/KnowledgeBaseView'), 'KnowledgeBaseView');
 const CRMDashboardView = lazyNamed(() => import('./components/crm/CRMDashboardView'), 'CRMDashboardView');
 const RequirementTasksView = lazyNamed(() => import('./components/product/RequirementTasksView'), 'RequirementTasksView');
+const TestAndDefectView = lazyNamed(() => import('./components/product/TestAndDefectView'), 'TestAndDefectView');
 const RequirementPoolView = lazyNamed(() => import('./components/workbench/RequirementPoolView'), 'RequirementPoolView');
 const OKRPerformanceView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'OKRPerformanceView');
 
@@ -142,7 +143,7 @@ const MainContent: React.FC = () => {
       case 'prod_dev_tasks':
         return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="研发任务" taskKind="dev" />;
       case 'prod_bugs':
-        return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="缺陷管理" taskKind="bug" />;
+        return <TestAndDefectView productLineFilter={productLineFilter} />;
       case 'prod_test_tasks':
         return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="测试任务" taskKind="test" />;
       case 'prod_reviews':

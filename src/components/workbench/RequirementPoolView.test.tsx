@@ -129,6 +129,12 @@ describe('workbench work-order creation layout', () => {
     fireEvent.click(screen.getByRole('button', { name: '工单流转' }));
     const workflowType = screen.getByLabelText('流转类型 *');
     fireEvent.mouseDown(workflowType);
+    fireEvent.click(await screen.findByText('转任务', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('任务类型 *'));
+    const productOption = await screen.findByText('产品需求', { selector: '.ant-select-item-option-content' });
+    expect(Array.from(productOption.closest('.ant-select-dropdown')?.querySelectorAll('.ant-select-item-option-content') || []).map((item) => item.textContent)).toEqual(['产品需求', '缺陷管理', '设计任务', '研发任务']);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.mouseDown(workflowType);
     fireEvent.click(await screen.findByText('转派给他人', { selector: '.ant-select-item-option-content' }));
     expect(workflowType.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('转派给他人');
     fireEvent.click(screen.getByRole('button', { name: '取消' }));

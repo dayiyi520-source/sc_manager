@@ -177,22 +177,6 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     }
     return addRequirementTask(task);
   };
-  const updateTask = (id: string, updates: Partial<RequirementTask>) => {
-    if (taskKind === 'design') return updateDesignTask(id, updates);
-    if (isBusinessTask) {
-      setBusinessTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
-      void productRepository.updateBusinessTask(taskKind, id, updates as Record<string, unknown>).catch((error) => addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试'));
-      return;
-    }
-    if (isSpecialTask) {
-      setSpecialTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
-      const body = taskKind === 'bug' ? { ...updates, assigneeName: updates.ownerName } : { ...updates, developer: updates.ownerName };
-      void productRepository.updateTask(taskKind, id, body as Record<string, unknown>).catch((error) => addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试'));
-      return;
-    }
-    return updateRequirementTask(id, updates);
-  };
-
   const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -305,6 +289,49 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     }
   });
   const activeTasks = unifiedCategory && remoteEnabled ? unifiedQuery.data || [] : contextTasks;
+  const updateTask = async (id: string, updates: Partial<RequirementTask>): Promise<boolean> => {
+    if (unifiedCategory && remoteEnabled) {
+      const current = activeTasks.find((task) => task.id === id);
+      if (!current?.productLineId || current.revision == null) {
+        addToast('error', `${itemLabel}同步失败`, '工作项不存在或版本信息缺失，请刷新后重试');
+        return false;
+      }
+      try {
+        await productRepository.updateWorkItem(current.productLineId, id, {
+          title: updates.title,
+          description: updates.description,
+          expectedGoal: updates.expectedGoal,
+          versionId: updates.versionId,
+          assigneeName: updates.ownerName,
+          priority: updates.priority ? apiPriority(updates.priority) : undefined,
+          plannedStartDate: updates.plannedStartDate,
+          plannedEndDate: updates.dueDate,
+          estimatedHours: updates.estimatedHours,
+          actualHours: updates.actualHours,
+          revision: current.revision
+        });
+        await unifiedQuery.refetch();
+        return true;
+      } catch (error) {
+        addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试');
+        return false;
+      }
+    }
+    if (taskKind === 'design') { updateDesignTask(id, updates); return true; }
+    if (isBusinessTask) {
+      setBusinessTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
+      try { await productRepository.updateBusinessTask(taskKind, id, updates as Record<string, unknown>); return true; }
+      catch (error) { addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试'); return false; }
+    }
+    if (isSpecialTask) {
+      setSpecialTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
+      const body = taskKind === 'bug' ? { ...updates, assigneeName: updates.ownerName } : { ...updates, developer: updates.ownerName };
+      try { await productRepository.updateTask(taskKind, id, body as Record<string, unknown>); return true; }
+      catch (error) { addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试'); return false; }
+    }
+    updateRequirementTask(id, updates);
+    return true;
+  };
 
   const [selectedTask, setSelectedTask] = useState<RequirementTask | null>(null);
   const [detailEditing, setDetailEditing] = useState(false);
@@ -497,7 +524,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
 
   const saveDetailUpdates = (updates: Partial<RequirementTask>) => {
     if (!selectedTask) return;
-    updateTask(selectedTask.id, updates);
+    void updateTask(selectedTask.id, updates);
     setSelectedTask((current) => current ? { ...current, ...updates } : current);
   };
 
@@ -552,11 +579,18 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const descriptionEditor = useRef<HTMLDivElement>(null);
   const [formDescriptionHtml, setFormDescriptionHtml] = useState('');
   const [employees, setEmployees] = useState<string[]>([currentUser.name]);
+  const [employeeOptions, setEmployeeOptions] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     requirementRepository.employees()
-      .then((items) => setEmployees(Array.from(new Set([currentUser.name, ...items.map((item) => item.name)]))))
-      .catch(() => setEmployees(Array.from(new Set([currentUser.name, ...requirementTasks.map((item) => item.ownerName).filter(Boolean)]))));
+      .then((items) => {
+        setEmployeeOptions(items);
+        setEmployees(Array.from(new Set([currentUser.name, ...items.map((item) => item.name)])));
+      })
+      .catch(() => {
+        setEmployeeOptions([]);
+        setEmployees(Array.from(new Set([currentUser.name, ...requirementTasks.map((item) => item.ownerName).filter(Boolean)])));
+      });
   }, [currentUser.name, requirementTasks]);
 
   const configuredCategory = taskKind === 'requirement' ? '需求' : taskKind === 'design' ? '设计' : taskKind === 'dev' ? '研发' : taskKind === 'test' ? '测试' : taskKind === 'bug' ? '缺陷' : undefined;
@@ -695,7 +729,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     const selectedVersion = versions.find((version) => version.name === formVersionName);
     let saveSucceeded = true;
     if (editingTask) {
-      updateTask(editingTask.id, {
+      saveSucceeded = await updateTask(editingTask.id, {
         title: formTitle,
         description: formDescription,
         descriptionHtml: formDescriptionHtml,
@@ -720,7 +754,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         requirementId: selectedRequirementTaskIds[0] || '',
         media: formMedia
       });
-      addToast('success', `${itemLabel}信息已更新`);
+      if (saveSucceeded) addToast('success', `${itemLabel}信息已更新`);
     } else if (configuredCategory && selectedProductLine && selectedWorkItemType && unifiedCategory) {
       try {
         await productRepository.createWorkItem({
@@ -733,6 +767,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           expectedGoal: formTarget,
           versionId: selectedVersion?.id,
           requirementId: unifiedCategory === 'requirement' ? undefined : selectedRequirementTaskIds[0] || undefined,
+          assigneeId: employeeOptions.find((item) => item.name === formOwnerName)?.id,
           priority: apiPriority(formPriority),
           plannedStartDate: formPlannedStartDate || undefined,
           plannedEndDate: formDueDate || undefined,
@@ -928,6 +963,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
         expectedGoal: task.expectedGoal || '',
         versionId: task.versionId || undefined,
         requirementId: category === 'requirement' ? undefined : task.requirementId || undefined,
+        assigneeId: employeeOptions.find((item) => item.name === task.ownerName)?.id,
         priority: apiPriority(task.priority),
         plannedStartDate: task.plannedStartDate || undefined,
         plannedEndDate: task.dueDate || undefined,

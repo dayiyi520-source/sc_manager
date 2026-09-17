@@ -559,6 +559,27 @@ html:not(.dark) .tech-main .requirement-scope-tab[role="tab"][aria-selected="tru
   color: var(--primary) !important;
   box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 12%, transparent) !important;
 }
+
+html:not(.dark) .tech-main .test-and-defect-tabs [role="tab"][aria-selected="true"],
+.dark .tech-main .test-and-defect-tabs [role="tab"][aria-selected="true"] {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--primary) !important;
+}
+html:not(.dark) .tech-main .test-and-defect-tabs [role="tab"][aria-selected="true"] *,
+.dark .tech-main .test-and-defect-tabs [role="tab"][aria-selected="true"] * {
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--primary) !important;
+  text-shadow: none;
+}
+.test-and-defect-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  height: 3px;
+  background: var(--primary);
+}
 html:not(.dark) .product-line-card {
   background: #FFFFFF !important;
   border-color: #D7E0EC !important;

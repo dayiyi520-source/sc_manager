@@ -60,11 +60,6 @@ import {
   INITIAL_BIDDINGS,
   INITIAL_BIDDING_REVIEWS,
   INITIAL_CONTRACTS,
-  INITIAL_PRODUCT_LINES,
-  INITIAL_REQUIREMENT_TASKS,
-  INITIAL_VERSIONS,
-  INITIAL_BUGS,
-  INITIAL_REQUIREMENT_POOL,
   INITIAL_APPROVALS,
   INITIAL_PROJECTS,
   INITIAL_SERVERS,
@@ -72,7 +67,6 @@ import {
   INITIAL_DELIVERABLES,
   INITIAL_CHANGE_REQUESTS,
   INITIAL_RISKS,
-  INITIAL_DEV_TASKS,
   INITIAL_PAYMENT_SCHEDULES,
   INITIAL_INVOICES
 } from '../data/mockData';
@@ -406,27 +400,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [winningEngagements, setWinningEngagements] = useState<WinningEngagement[]>([]);
   const [biddingReviews, setBiddingReviews] = useState<BiddingReview[]>(INITIAL_BIDDING_REVIEWS);
   const [contracts, setContracts] = useState<Contract[]>([]);
-  const [productLines, setProductLines] = useState<ProductLine[]>(INITIAL_PRODUCT_LINES);
-  const [requirementTasks, setRequirementTasks] = useState<RequirementTask[]>(() => {
-    try {
-      const saved = localStorage.getItem('shichuang_requirement_tasks');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_REQUIREMENT_TASKS.map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: '', versionName: '' }));
-  });
+  const [productLines, setProductLines] = useState<ProductLine[]>([]);
+  const [requirementTasks, setRequirementTasks] = useState<RequirementTask[]>([]);
   const [designTasks, setDesignTasks] = useState<RequirementTask[]>([]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('shichuang_requirement_tasks', JSON.stringify(requirementTasks));
-    } catch {}
-  }, [requirementTasks]);
-  const [versions, setVersions] = useState<VersionIteration[]>(INITIAL_VERSIONS);
-  const [bugs, setBugs] = useState<DefectBug[]>(INITIAL_BUGS);
-  const [requirementPool, setRequirementPool] = useState<RequirementPoolItem[]>(INITIAL_REQUIREMENT_POOL);
+  const [versions, setVersions] = useState<VersionIteration[]>([]);
+  const [bugs, setBugs] = useState<DefectBug[]>([]);
+  const [requirementPool, setRequirementPool] = useState<RequirementPoolItem[]>([]);
   const [requirementTaskDraft, setRequirementTaskDraft] = useState<RequirementTaskDraft | null>(null);
   const [approvals, setApprovals] = useState<ApprovalFlow[]>(INITIAL_APPROVALS);
   const [projects, setProjects] = useState<ProjectItem[]>(INITIAL_PROJECTS);
@@ -439,7 +418,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [deliverables, setDeliverables] = useState<Deliverable[]>(INITIAL_DELIVERABLES);
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>(INITIAL_CHANGE_REQUESTS);
   const [risks, setRisks] = useState<RiskItem[]>(INITIAL_RISKS);
-  const [devTasks, setDevTasks] = useState<DevTask[]>(INITIAL_DEV_TASKS);
+  const [devTasks, setDevTasks] = useState<DevTask[]>([]);
   const [paymentSchedules, setPaymentSchedules] = useState<PaymentSchedule[]>(INITIAL_PAYMENT_SCHEDULES);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(INITIAL_INVOICES);
   const [invoiceApprovals, setInvoiceApprovals] = useState<InvoiceApprovalRecord[]>([]);
@@ -592,6 +571,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addRequirementTask = async (task: Partial<RequirementTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '工单创建失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
     const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const newTask: RequirementTask = {
       id: `req-${Date.now()}`,
@@ -643,28 +626,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ]
     };
     setRequirementTasks((prev) => [newTask, ...prev]);
-    if (requirementBackendEnabled) {
-      try {
-        await requirementRepository.create(newTask);
-        await requirementQuery.refetch();
-        addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);
-        return true;
-      } catch (error) {
-        setRequirementTasks((prev) => prev.filter((item) => item.id !== newTask.id));
-        addToast('error', '工单创建失败', error instanceof Error ? error.message : '服务暂不可用，请稍后重试');
-        return false;
-      }
+    try {
+      await requirementRepository.create(newTask);
+      await requirementQuery.refetch();
+      addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);
+      return true;
+    } catch (error) {
+      setRequirementTasks((prev) => prev.filter((item) => item.id !== newTask.id));
+      addToast('error', '工单创建失败', error instanceof Error ? error.message : '服务暂不可用，请稍后重试');
+      return false;
     }
-    addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);
-    return true;
   };
 
   const addDesignTask = async (task: Partial<RequirementTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '设计任务保存失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
     const newTask: RequirementTask = { ...task, id: `design-${Date.now()}`, title: task.title || '新建设计任务', description: task.description || '', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, productLineName: task.productLineName || '师创智联协同OS', versionName: task.versionName || '', estimatedHours: task.estimatedHours || 0, dueDate: task.dueDate || '' };
-    if (requirementBackendEnabled) {
-      try { await productRepository.createDesignTask({ ...newTask, requirementId: task.requirementId || '' }); await designQuery.refetch(); }
-      catch (error) { addToast('error', '设计任务保存失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
-    } else setDesignTasks((prev) => [newTask, ...prev]);
+    try { await productRepository.createDesignTask({ ...newTask, requirementId: task.requirementId || '' }); await designQuery.refetch(); }
+    catch (error) { addToast('error', '设计任务保存失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
     return true;
   };
 
@@ -705,6 +686,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addBug = (bug: Partial<DefectBug>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '缺陷保存失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
     const newBug: DefectBug = {
       id: `bug-${Date.now()}`,
       code: `BUG-2026-${String(bugs.length + 1).padStart(3, '0')}`,
@@ -724,12 +709,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ,sourceWorkOrderIds: bug.sourceWorkOrderIds || []
       ,sourceWorkOrderTitles: bug.sourceWorkOrderTitles || []
     };
-    if (requirementBackendEnabled) {
-      void productRepository.createTask('bug', newBug).then(() => bugQuery.refetch()).then(() => addToast('success', '缺陷已提报', newBug.title)).catch((error) => addToast('error', '缺陷保存失败', error instanceof Error ? error.message : '请稍后重试'));
-      return;
-    }
-    setBugs((prev) => [newBug, ...prev]);
-    addToast('error', '缺陷已提报', `缺陷单：${newBug.code} [${newBug.severity}]`);
+    void productRepository.createTask('bug', newBug).then(() => bugQuery.refetch()).then(() => addToast('success', '缺陷已提报', newBug.title)).catch((error) => addToast('error', '缺陷保存失败', error instanceof Error ? error.message : '请稍后重试'));
   };
 
   const approveFlow = (flowId: string, comment?: string) => {
@@ -1041,6 +1021,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addDevTask = (dt: Partial<DevTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '研发任务保存失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
     const newDt: DevTask = {
       id: `dt-${Date.now()}`,
       title: dt.title || '新建研发任务',
@@ -1056,23 +1040,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       spentHours: 0,
       dueDate: dt.dueDate || '2026-09-10'
     };
-    if (requirementBackendEnabled) {
-      void productRepository.createTask('dev', newDt).then(() => devTaskQuery.refetch()).then(() => addToast('success', '研发任务创建成功', newDt.title)).catch((error) => addToast('error', '研发任务保存失败', error instanceof Error ? error.message : '请稍后重试'));
-      return;
-    }
-    setDevTasks((prev) => [newDt, ...prev]);
-    addToast('success', '研发任务创建成功', newDt.title);
+    void productRepository.createTask('dev', newDt).then(() => devTaskQuery.refetch()).then(() => addToast('success', '研发任务创建成功', newDt.title)).catch((error) => addToast('error', '研发任务保存失败', error instanceof Error ? error.message : '请稍后重试'));
   };
 
   const updateDevTask = (id: string, updates: Partial<DevTask>) => {
-    if (requirementBackendEnabled) {
-      void productRepository.updateTask('dev', id, updates as Record<string, unknown>).then(() => devTaskQuery.refetch()).then(() => addToast('info', '研发任务已更新')).catch((error) => addToast('error', '研发任务更新失败', error instanceof Error ? error.message : '请稍后重试'));
+    if (!requirementBackendEnabled) {
+      addToast('error', '研发任务更新失败', '当前未连接后端服务，数据未保存');
       return;
     }
-    setDevTasks((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, ...updates } : d))
-    );
-    addToast('info', '研发任务已更新');
+    void productRepository.updateTask('dev', id, updates as Record<string, unknown>).then(() => devTaskQuery.refetch()).then(() => addToast('info', '研发任务已更新')).catch((error) => addToast('error', '研发任务更新失败', error instanceof Error ? error.message : '请稍后重试'));
   };
 
   const addPaymentSchedule = (ps: Partial<PaymentSchedule>) => {
@@ -1186,6 +1162,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addProductLine = (line: Partial<ProductLine>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '产品线保存失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
     const ownerName = line.owner || line.ownerName || currentUser.name;
     const newLine: ProductLine = {
       id: `pl-${Date.now()}`,
@@ -1216,72 +1196,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       health: (line.health as any) || '健康',
       createdAt: '2026-08-31'
     };
-    if (requirementBackendEnabled) {
-      void productRepository.createProductLine(newLine).then(() => productLineQuery.refetch()).then(() => addToast('success', '产品线创建成功', newLine.name)).catch((error) => addToast('error', '产品线保存失败', error instanceof Error ? error.message : '请稍后重试'));
-      return;
-    }
-    setProductLines((prev) => [newLine, ...prev]);
-    addToast('success', '产品线创建成功', newLine.name);
+    void productRepository.createProductLine(newLine).then(() => productLineQuery.refetch()).then(() => addToast('success', '产品线创建成功', newLine.name)).catch((error) => addToast('error', '产品线保存失败', error instanceof Error ? error.message : '请稍后重试'));
   };
 
   const updateProductLine = async (id: string, updates: Partial<ProductLine>) => {
-    if (requirementBackendEnabled) {
-      await productRepository.updateProductLine(id, updates);
-      await productLineQuery.refetch();
-      addToast('success', '产品线配置已保存');
-      return;
+    if (!requirementBackendEnabled) {
+      throw new Error('当前未连接后端服务，数据未保存');
     }
-    setProductLines((prev) => prev.map((line) => line.id === id ? { ...line, ...updates } : line));
+    await productRepository.updateProductLine(id, updates);
+    await productLineQuery.refetch();
     addToast('success', '产品线配置已保存');
   };
 
   const addProductLineMembers = async (id: string, members: ProductLineMember[]) => {
-    if (requirementBackendEnabled) {
-      await Promise.all(members.map(({ name, role }) => productRepository.addProductLineMember(id, { name, role })));
-      await productLineQuery.refetch();
-      return;
-    }
-    setProductLines((prev) => prev.map((line) => line.id === id
-      ? {
-          ...line,
-          members: [...(line.members || []), ...members],
-          activities: [
-            ...(line.activities || []),
-            ...members.map((member) => ({
-              id: `activity-${Date.now()}-${member.id}`,
-              action: '添加成员角色',
-              detail: `${member.name} · ${member.role}`,
-              operatorName: currentUser.name,
-              createdAt: new Date().toISOString()
-            }))
-          ]
-        }
-      : line));
+    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    await Promise.all(members.map(({ name, role }) => productRepository.addProductLineMember(id, { name, role })));
+    await productLineQuery.refetch();
   };
 
   const updateProductLineMember = async (id: string, memberId: string, role: ProductLineMember['role']) => {
-    if (requirementBackendEnabled) {
-      await productRepository.updateProductLineMember(id, memberId, { role });
-      await productLineQuery.refetch();
-      return;
-    }
-    setProductLines((prev) => prev.map((line) => line.id === id
-      ? { ...line, members: (line.members || []).map((member) => typeof member === 'string' || member.id !== memberId ? member : { ...member, role }) }
-      : line));
+    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    await productRepository.updateProductLineMember(id, memberId, { role });
+    await productLineQuery.refetch();
   };
 
   const removeProductLineMember = async (id: string, memberId: string) => {
-    if (requirementBackendEnabled) {
-      await productRepository.removeProductLineMember(id, memberId);
-      await productLineQuery.refetch();
-      return;
-    }
-    setProductLines((prev) => prev.map((line) => line.id === id
-      ? { ...line, members: (line.members || []).filter((member) => typeof member === 'string' || member.id !== memberId) }
-      : line));
+    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    await productRepository.removeProductLineMember(id, memberId);
+    await productLineQuery.refetch();
   };
 
   const addVersion = async (v: Partial<VersionIteration>): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '版本保存失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
     const newVer: VersionIteration = {
       id: `ver-${Date.now()}`,
       code: v.code || `V${versions.length + 1}.0.0`,
@@ -1302,7 +1251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       linkedRequirementIds: v.linkedRequirementIds || [],
       isReviewed: false
     };
-    if (requirementBackendEnabled && newVer.productLineId) {
+    if (newVer.productLineId) {
       try {
         await productRepository.createVersion(newVer.productLineId, newVer);
         await productLineQuery.refetch();
@@ -1313,122 +1262,106 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
     }
-    setVersions((prev) => [newVer, ...prev]);
-    addToast('success', '版本规划创建成功', `${newVer.name} (${newVer.code})`);
-    return true;
+    addToast('error', '版本保存失败', '请选择有效的产品线');
+    return false;
   };
 
   const updateVersion = async (id: string, updates: Partial<VersionIteration>): Promise<boolean> => {
-    if (requirementBackendEnabled) {
-      const current = versions.find((version) => version.id === id);
-      if (current?.productLineId) {
-        try {
-          await productRepository.updateVersion(current.productLineId, id, updates);
-          await productLineQuery.refetch();
-          addToast('info', '版本迭代状态已更新');
-          return true;
-        } catch (error) {
-          addToast('error', '版本更新失败', error instanceof Error ? error.message : '请稍后重试');
-          return false;
-        }
+    if (!requirementBackendEnabled) {
+      addToast('error', '版本更新失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const current = versions.find((version) => version.id === id);
+    if (current?.productLineId) {
+      try {
+        await productRepository.updateVersion(current.productLineId, id, updates);
+        await productLineQuery.refetch();
+        addToast('info', '版本迭代状态已更新');
+        return true;
+      } catch (error) {
+        addToast('error', '版本更新失败', error instanceof Error ? error.message : '请稍后重试');
+        return false;
       }
     }
-    setVersions((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, ...updates } : v))
-    );
-    addToast('info', '版本迭代状态已更新');
-    return true;
+    addToast('error', '版本更新失败', '版本不存在或未绑定产品线');
+    return false;
   };
 
   const deleteVersion = (id: string) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '迭代删除失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
     const current = versions.find((version) => version.id === id);
-    if (requirementBackendEnabled && current?.productLineId) {
+    if (current?.productLineId) {
       void productRepository.deleteVersion(current.productLineId, id).then(() => productLineQuery.refetch()).then(() => addToast('success', '迭代已删除', current.name)).catch((error) => addToast('error', '迭代删除失败', error instanceof Error ? error.message : '请稍后重试'));
       return;
     }
-    setVersions((prev) => prev.filter((version) => version.id !== id));
-    addToast('success', '迭代已删除', current?.name);
+    addToast('error', '迭代删除失败', '版本不存在或未绑定产品线');
   };
 
   const assignRequirementToVersion = async (requirementId: string, versionId: string): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '工作项规划失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
     const version = versions.find((item) => item.id === versionId);
     const requirement = requirementTasks.find((item) => item.id === requirementId);
     if (!version?.productLineId || !requirement) {
       addToast('error', '工作项规划失败', '目标迭代或工作项不存在，请刷新后重试');
       return false;
     }
-    if (requirementBackendEnabled) {
-      try {
-        await productRepository.assignRequirementToVersion(version.productLineId, version.id, requirement.id);
-        setRequirementTasks((prev) => prev.map((item) => item.id === requirement.id ? {
-          ...item,
-          versionId: version.id,
-          versionName: version.name,
-          productLineId: version.productLineId,
-          productLineName: version.productLineName || item.productLineName
-        } : item));
-        await Promise.all([requirementQuery.refetch(), productLineQuery.refetch()]);
-        return true;
-      } catch (error) {
-        addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试');
-        return false;
-      }
+    try {
+      await productRepository.assignRequirementToVersion(version.productLineId, version.id, requirement.id);
+      await Promise.all([requirementQuery.refetch(), productLineQuery.refetch()]);
+      return true;
+    } catch (error) {
+      addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试');
+      return false;
     }
-    setRequirementTasks((prev) => prev.map((item) => item.id === requirement.id ? {
-      ...item,
-      versionId: version.id,
-      versionName: version.name,
-      productLineId: version.productLineId,
-      productLineName: version.productLineName || item.productLineName
-    } : item));
-    return true;
   };
 
   const assignWorkItemToVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '工作项规划失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
     const version = versions.find((item) => item.id === versionId);
     if (!version?.productLineId) { addToast('error', '工作项规划失败', '目标迭代不存在，请刷新后重试'); return false; }
     const collection = kind === 'requirement' ? requirementTasks : kind === 'design' ? designTasks : kind === 'bug' ? bugs : devTasks;
     const item = collection.find((candidate) => candidate.id === itemId);
     if (!item) { addToast('error', '工作项规划失败', '工作项不存在，请刷新后重试'); return false; }
     if (kind === 'requirement') return assignRequirementToVersion(itemId, versionId);
-    if (requirementBackendEnabled) {
-      try { await productRepository.assignWorkItemToVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
-      catch (error) { addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
-    }
-    const updates = { versionId: version.id, versionName: version.name, productLineId: version.productLineId, productLineName: version.productLineName || item.productLineName };
-    if (kind === 'design') setDesignTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
-    if (kind === 'bug') setBugs((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
-    if (kind === 'dev') setDevTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    try { await productRepository.assignWorkItemToVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
+    catch (error) { addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
     return true;
   };
 
   const unassignWorkItemFromVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '移出迭代失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
     const version = versions.find((item) => item.id === versionId);
     if (!version?.productLineId) return false;
-    if (requirementBackendEnabled) {
-      try { await productRepository.unassignWorkItemFromVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), requirementQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
-      catch (error) { addToast('error', '移出迭代失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
-    }
-    const updates = { versionId: '', versionName: '' };
-    if (kind === 'requirement') setRequirementTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
-    if (kind === 'design') setDesignTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
-    if (kind === 'bug') setBugs((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
-    if (kind === 'dev') setDevTasks((prev) => prev.map((candidate) => candidate.id === itemId ? { ...candidate, ...updates } : candidate));
+    try { await productRepository.unassignWorkItemFromVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), requirementQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
+    catch (error) { addToast('error', '移出迭代失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
     return true;
   };
 
   const updateBug = (id: string, updates: Partial<DefectBug>) => {
-    if (requirementBackendEnabled) {
-      void productRepository.updateTask('bug', id, updates as Record<string, unknown>).then(() => bugQuery.refetch()).then(() => addToast('info', '缺陷状态已更新')).catch((error) => addToast('error', '缺陷更新失败', error instanceof Error ? error.message : '请稍后重试'));
+    if (!requirementBackendEnabled) {
+      addToast('error', '缺陷更新失败', '当前未连接后端服务，数据未保存');
       return;
     }
-    setBugs((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, ...updates } : b))
-    );
-    addToast('info', '缺陷状态已更新');
+    void productRepository.updateTask('bug', id, updates as Record<string, unknown>).then(() => bugQuery.refetch()).then(() => addToast('info', '缺陷状态已更新')).catch((error) => addToast('error', '缺陷更新失败', error instanceof Error ? error.message : '请稍后重试'));
   };
 
   const updateRequirementTask = (id: string, updates: Partial<RequirementTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '需求同步失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
     const current = requirementTasks.find((task) => task.id === id);
     const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const events: RequirementEvent[] = [];
@@ -1466,19 +1399,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
     const nextUpdates = events.length ? { ...updates, events: [...(current?.events || []), ...events] } : updates;
-    setRequirementTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...nextUpdates } : t))
-    );
-    if (dataMode === 'remote' && current) requirementRepository.update(id, { ...updates, version: (current as RequirementTask & { version?: number }).version }).catch((error) => addToast('error', '需求同步失败', error instanceof Error ? error.message : '请稍后重试'));
+    if (!current) {
+      addToast('error', '需求同步失败', '工作项不存在，请刷新后重试');
+      return;
+    }
+    setRequirementTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...nextUpdates } : t)));
+    requirementRepository.update(id, { ...updates, version: (current as RequirementTask & { version?: number }).version })
+      .then(() => requirementQuery.refetch())
+      .catch((error) => {
+        setRequirementTasks((prev) => prev.map((task) => task.id === id ? current : task));
+        addToast('error', '需求同步失败', error instanceof Error ? error.message : '请稍后重试');
+      });
   };
   const updateDesignTask = (id: string, updates: Partial<RequirementTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '设计任务同步失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    const current = designTasks.find((task) => task.id === id);
     setDesignTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
-    if (requirementBackendEnabled) void productRepository.updateDesignTask(id, updates as Record<string, unknown>).then(() => designQuery.refetch()).catch((error) => addToast('error', '设计任务同步失败', error instanceof Error ? error.message : '请稍后重试'));
+    void productRepository.updateDesignTask(id, updates as Record<string, unknown>).then(() => designQuery.refetch()).catch((error) => {
+      if (current) setDesignTasks((prev) => prev.map((task) => task.id === id ? current : task));
+      addToast('error', '设计任务同步失败', error instanceof Error ? error.message : '请稍后重试');
+    });
   };
 
   const addRequirementTaskComment = (id: string, content: string) => {
     const trimmed = content.trim();
     if (!trimmed) return;
+    if (!requirementBackendEnabled) {
+      addToast('error', '评论发布失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
     const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const event: RequirementEvent = {
       id: `event-${Date.now()}-comment`,
@@ -1488,8 +1440,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: now
     };
     setRequirementTasks((prev) => prev.map((task) => task.id === id ? { ...task, events: [...(task.events || []), event] } : task));
-    if (dataMode === 'remote') requirementRepository.comment(id, trimmed).catch((error) => addToast('error', '评论同步失败', error instanceof Error ? error.message : '请稍后重试'));
-    addToast('success', '评论已发布');
+    requirementRepository.comment(id, trimmed)
+      .then(() => addToast('success', '评论已发布'))
+      .catch((error) => {
+        setRequirementTasks((prev) => prev.map((task) => task.id === id ? { ...task, events: (task.events || []).filter((item) => item.id !== event.id) } : task));
+        addToast('error', '评论同步失败', error instanceof Error ? error.message : '请稍后重试');
+      });
   };
 
   const updateRequirementPoolItem = (id: string, updates: Partial<RequirementPoolItem>) => {

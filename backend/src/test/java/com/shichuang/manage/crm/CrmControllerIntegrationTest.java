@@ -20,17 +20,17 @@ class CrmControllerIntegrationTest extends AbstractApiIntegrationTest {
     @Test
     void returnsUnifiedCustomerJourneyAcrossCrmAndWorkOrders() throws Exception {
         String token = loginToken();
-        String presalesRequirementId = createRequirement(token, "客户历程售前关联-" + System.nanoTime());
-        mockMvc.perform(post("/api/requirements/{id}/work-items", presalesRequirementId)
+        String designRequirementId = createRequirement(token, "客户历程设计关联-" + System.nanoTime());
+        mockMvc.perform(post("/api/requirements/{id}/work-items", designRequirementId)
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")
-                .content("{\"taskType\":\"售前支持\",\"assigneeName\":\"陈雅婷\"}"))
+                .content("{\"taskType\":\"设计任务\",\"assigneeName\":\"张瑞\"}"))
             .andExpect(status().isCreated());
-        String deliveryRequirementId = createRequirement(token, "客户历程交付关联-" + System.nanoTime());
-        mockMvc.perform(post("/api/requirements/{id}/work-items", deliveryRequirementId)
+        String devRequirementId = createRequirement(token, "客户历程研发关联-" + System.nanoTime());
+        mockMvc.perform(post("/api/requirements/{id}/work-items", devRequirementId)
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")
-                .content("{\"taskType\":\"交付支持\",\"assigneeName\":\"王浩然\"}"))
+                .content("{\"taskType\":\"研发任务\",\"assigneeName\":\"王浩然\"}"))
             .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/crm/journey")
@@ -39,8 +39,8 @@ class CrmControllerIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total", greaterThanOrEqualTo(7)))
             .andExpect(jsonPath("$.data.items[*].eventType", hasItem("客户建立")))
-            .andExpect(jsonPath("$.data.items[*].eventType", hasItem("售前任务")))
-            .andExpect(jsonPath("$.data.items[*].eventType", hasItem("交付任务")))
+            .andExpect(jsonPath("$.data.items[*].eventType", hasItem("设计任务")))
+            .andExpect(jsonPath("$.data.items[*].eventType", hasItem("研发任务")))
             .andExpect(jsonPath("$.data.items[*].customerId", hasItem("c-1")));
 
         String otherTenantToken = tokens.issue("user-journey-other", "admin", "tenant-journey-b", "其他租户管理员");
@@ -157,24 +157,25 @@ class CrmControllerIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(post("/api/requirements/{id}/work-items", requirementId)
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")
-                .content("{\"taskType\":\"售前支持\",\"assigneeName\":\"陈雅婷\",\"note\":\"售前关联\"}"))
+                .content("{\"taskType\":\"设计任务\",\"assigneeName\":\"张瑞\",\"note\":\"设计关联\"}"))
             .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/requirements/work-items")
-                .param("taskType", "售前支持")
+                .param("taskType", "设计任务")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].requirementId").value(requirementId))
-            .andExpect(jsonPath("$.data[0].taskType").value("售前支持"));
+            .andExpect(jsonPath("$.data[0].taskType").value("设计任务"));
 
-        String deliveryRequirementId = createRequirement(token, "集成测试交付关联-" + System.nanoTime());
-        mockMvc.perform(post("/api/requirements/{id}/work-items", deliveryRequirementId)
+        String devRequirementId = createRequirement(token, "集成测试研发关联-" + System.nanoTime());
+        String devResponse = mockMvc.perform(post("/api/requirements/{id}/work-items", devRequirementId)
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")
-                .content("{\"taskType\":\"交付支持\",\"assigneeName\":\"王浩然\",\"note\":\"交付关联\"}"))
-            .andExpect(status().isCreated());
-        Number deliveryCount = jdbc.queryForObject("SELECT COUNT(*) FROM t_project_delivery_task WHERE requirement_id_=? AND tenant_id_='local-tenant' AND delete_flag_=0", Number.class, deliveryRequirementId);
-        assertTrue(deliveryCount != null && deliveryCount.intValue() == 1);
+                .content("{\"taskType\":\"研发任务\",\"assigneeName\":\"王浩然\",\"note\":\"研发关联\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String devId=objectMapper.readTree(devResponse).path("data").path("id").asText();
+        Number devCount = jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE id_=? AND requirement_id_=? AND category_='dev' AND tenant_id_='local-tenant' AND delete_flag_=0", Number.class, devId, devRequirementId);
+        assertTrue(devCount != null && devCount.intValue() == 1);
     }
 
     @Test

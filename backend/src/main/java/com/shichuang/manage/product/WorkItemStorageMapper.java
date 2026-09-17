@@ -85,12 +85,27 @@ public class WorkItemStorageMapper {
     public Map<String,Object> version(String tenant,String line,String id) {
         return one("SELECT id_ AS id,status_ AS status FROM t_product_line_version WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0 FOR UPDATE",tenant,line,id);
     }
-    public boolean legacyRequirement(String tenant,String line,String id) {
-        return one("SELECT id_ FROM t_product_requirement WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND work_item_kind_='requirement' AND delete_flag_=0",tenant,line,id) != null;
-    }
     public String assignee(String tenant,String userId) {
         Map<String,Object> user = one("SELECT name_ AS name FROM t_sys_user WHERE tenant_id_=? AND id_=? AND delete_flag_=0 AND status_='enabled'",tenant,userId);
         return user == null ? null : Objects.toString(user.get("name"),"");
+    }
+    public Map<String,Object> assigneeByName(String tenant,String name) {
+        return one("SELECT id_ AS id,name_ AS name FROM t_sys_user WHERE tenant_id_=? AND name_=? AND delete_flag_=0 AND status_='enabled' ORDER BY create_time_ LIMIT 1",tenant,name);
+    }
+    public int updateItem(String tenant,String line,String id,WorkItemDefinition.UpdateItem input,String versionId,
+        String assigneeId,String assigneeName,String user) {
+        return jdbc.update("""
+            UPDATE t_product_work_item SET
+              title_=COALESCE(?,title_),description_=COALESCE(?,description_),expected_goal_=COALESCE(?,expected_goal_),
+              version_id_=COALESCE(?,version_id_),assignee_id_=CASE WHEN ? THEN ? ELSE assignee_id_ END,
+              assignee_name_=CASE WHEN ? THEN ? ELSE assignee_name_ END,priority_=COALESCE(?,priority_),
+              planned_start_date_=COALESCE(?,planned_start_date_),planned_end_date_=COALESCE(?,planned_end_date_),
+              estimated_hours_=COALESCE(?,estimated_hours_),actual_hours_=COALESCE(?,actual_hours_),
+              version_=version_+1,update_by_=?,update_time_=NOW(6)
+            WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND delete_flag_=0
+            """,input.title()==null?null:input.title().trim(),input.description(),input.expectedGoal(),versionId,
+            input.assigneeName()!=null,assigneeId,input.assigneeName()!=null,assigneeName,input.priority(),input.plannedStartDate(),
+            input.plannedEndDate(),input.estimatedHours(),input.actualHours(),user,tenant,line,id,input.revision());
     }
     public void insertItem(String tenant,String id,String code,WorkItemDefinition.CreateItem input,String versionId,String requirementId,
         String parentId,String assigneeName,String workflowId,WorkItemDefinition.State initial,String hash,String user) {

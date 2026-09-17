@@ -62,6 +62,17 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(0,new java.math.BigDecimal("8.50").compareTo((java.math.BigDecimal)created.get("estimatedHours")));
         assertEquals(0,new java.math.BigDecimal("3.25").compareTo((java.math.BigDecimal)created.get("actualHours")));
     }
+    @Test void updatesUnifiedFieldsWithOptimisticRevision() {
+        jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES('assignee-user',?,'assignee-user','测试负责人','测试部','product_manager','测试负责人','enabled','test-user','test-user',NOW(),NOW())",tenant);
+        var created=storage.create(input("update-fields","test",type,null,null,null));
+        var update=new UpdateItem("更新后的统一任务","新描述","新目标",null,"测试负责人","P2",java.time.LocalDate.now(),java.time.LocalDate.now().plusDays(3),new java.math.BigDecimal("12.50"),new java.math.BigDecimal("2.25"),0);
+        var changed=storage.update(line,created.get("id").toString(),update);
+        assertEquals("更新后的统一任务",changed.get("title"));
+        assertEquals("测试负责人",changed.get("assigneeName"));
+        assertEquals("P2",changed.get("priority"));
+        assertEquals(1,((Number)changed.get("revision")).intValue());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.update(line,created.get("id").toString(),update)).getStatusCode().value());
+    }
     @Test void usedTypeCanBeDisabledButNotDeletedOrRecategorized() {
         storage.create(input("type-use","test",type,null,null,null));
         assertThrows(IllegalArgumentException.class,()->productLines.deleteWorkItemType(line,type));
@@ -188,6 +199,12 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
                 .param("productLineId",line).header("Authorization",authorization))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.category").value("test"));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/work-items/{id}",id)
+                .param("productLineId",line).header("Authorization",authorization).contentType("application/json")
+                .content(objectMapper.writeValueAsString(new UpdateItem("接口更新任务",null,null,null,null,"P2",null,null,null,null,0))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.title").value("接口更新任务"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.revision").value(1));
     }
     private String type(String category,String name) {
         return productLines.addWorkItemType(line,new HashMap<>(Map.of("category",CATEGORIES.get(category),"name",name,"enabled",true))).get("id").toString();

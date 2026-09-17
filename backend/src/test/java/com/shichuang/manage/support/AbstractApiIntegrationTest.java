@@ -31,9 +31,11 @@ public abstract class AbstractApiIntegrationTest {
     }
 
     protected String createRequirement(String token, String title) throws Exception {
+        String productLineId = jdbc.queryForObject("SELECT product_line_id_ FROM t_product_line_work_item_type WHERE tenant_id_='local-tenant' AND category_='需求' AND enabled_=1 AND delete_flag_=0 ORDER BY create_time_ LIMIT 1", String.class);
+        String productLineName = jdbc.queryForObject("SELECT name_ FROM t_product_line WHERE id_=? AND tenant_id_='local-tenant'", String.class, productLineId);
         String body = """
-            {"title":"%s","productLineId":"pl-1","productLineName":"师创智联协同OS","department":"产品中心","customerId":"c-1","customerName":"国家电网华东分部数智调度中心","priority":"P1-高优","description":"集成测试描述","descriptionHtml":"<p>集成测试描述</p>","dueDate":"2026-12-31"}
-            """.formatted(title);
+            {"title":"%s","productLineId":"%s","productLineName":"%s","department":"产品中心","customerId":"c-1","customerName":"国家电网华东分部数智调度中心","priority":"P1-高优","description":"集成测试描述","descriptionHtml":"<p>集成测试描述</p>","dueDate":"2026-12-31"}
+            """.formatted(title, productLineId, productLineName);
         String response = mockMvc.perform(post("/api/requirements")
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")

@@ -58,6 +58,7 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
   String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
   var krs=List.of(Map.of("id","kr","title","交付结果","weight",100,"progress",0));String parent=create(admin,"objective",Map.of("title","组织方向","keyResults",krs));action(admin,parent,"submit",0);
   String objective=create(tech,"objective",Map.of("title","个人方向","parentObjectiveId",parent,"keyResults",krs));action(tech,objective,"submit",0);action(admin,objective,"approve",1);
+  jdbc.update("UPDATE t_product_work_item SET assignee_id_='user-tech',assignee_name_='王浩然' WHERE tenant_id_='local-tenant' AND delete_flag_=0 ORDER BY create_time_ LIMIT 1");
   var response=mockMvc.perform(get("/api/okr/work?ownerId=user-tech").header("Authorization","Bearer "+tech)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
   var work=objectMapper.readTree(response).path("data").get(0);assertNotNull(work);String workId=work.path("id").asText();
   mockMvc.perform(put("/api/okr/work/link").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("workId",workId,"objectiveId",objective,"keyResultId","kr","version",work.path("linkVersion").asInt())))).andExpect(status().isOk());
@@ -72,15 +73,16 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
  }
  @Test void simpleReviewLinksCompletedWorkWithoutKrOrPerItemNarrative()throws Exception{
   String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
-  jdbc.update("UPDATE t_product_requirement SET owner_name_=?,status_=?,update_time_=? WHERE tenant_id_=? AND id_=?","王浩然","已完成","2026-09-14 12:00:00","local-tenant","req-1");
+  String requirementId=jdbc.queryForObject("SELECT id_ FROM t_product_work_item WHERE tenant_id_='local-tenant' AND category_='requirement' AND delete_flag_=0 LIMIT 1",String.class);
+  jdbc.update("UPDATE t_product_work_item SET assignee_id_='user-tech',assignee_name_=?,status_name_=?,status_group_='COMPLETED',successful_=1,update_time_=? WHERE tenant_id_=? AND id_=?","王浩然","已完成","2026-09-14 12:00:00","local-tenant",requirementId);
   String workJson=mockMvc.perform(get("/api/okr/work?ownerId=user-tech").header("Authorization","Bearer "+tech)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-  String workId="";for(var w:objectMapper.readTree(workJson).path("data"))if("req-1".equals(w.path("sourceId").asText())){workId=w.path("id").asText();assertEquals("product_requirement",w.path("kind").asText());}assertFalse(workId.isBlank());
+  String workId="";for(var w:objectMapper.readTree(workJson).path("data"))if(requirementId.equals(w.path("sourceId").asText())){workId=w.path("id").asText();assertEquals("requirement",w.path("kind").asText());}assertFalse(workId.isBlank());
   var payload=new java.util.LinkedHashMap<String,Object>();
   payload.put("title","完成工作关联验收");payload.put("startDate","2026-09-14");payload.put("endDate","2026-09-20");payload.put("reviewMode","completed");payload.put("reviewType","week");payload.put("summary","完成本周任务");payload.put("selfScore",90);payload.put("sendTo",List.of());payload.put("items",List.of(Map.of("workId",workId)));
   var request=Map.of("kind","review","periodKey","2026-09-14/2026-09-20","payload",payload,"submit",true);
   String response=mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(request))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
   String id=objectMapper.readTree(response).path("data").path("id").asText();var saved=objectMapper.readTree(jdbc.queryForObject("SELECT payload_ FROM t_okr_record WHERE id_=?",String.class,id));assertEquals(workId,saved.path("items").get(0).path("workId").asText());assertEquals("已完成",saved.path("items").get(0).path("status").asText());
-  jdbc.update("UPDATE t_product_requirement SET status_=? WHERE tenant_id_=? AND id_=?","研发中","local-tenant","req-1");
+  jdbc.update("UPDATE t_product_work_item SET status_name_=?,status_group_='IN_PROGRESS',successful_=0 WHERE tenant_id_=? AND id_=?","研发中","local-tenant",requirementId);
   mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(request))).andExpect(status().isBadRequest());
  }
  @Test void includesUnifiedWorkItemsInOkrEvidence()throws Exception{
@@ -88,31 +90,29 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
    INSERT INTO t_product_work_item
    (id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,workflow_id_,status_key_,status_name_,status_group_,assignee_id_,assignee_name_,priority_,planned_end_date_,estimated_hours_,actual_hours_,source_type_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_,delete_flag_,version_)
    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6),0,0)
-   """, "okr-core-work", "local-tenant", "line-okr", "development", "type-dev", "WI-OKR-CORE", "统一研发工作项", "workflow-okr", "doing", "开发中", "ACTIVE", "user-tech", "王浩然", "P1", "2026-09-30", 8, 3, "MANUAL", "okr-core-request", "okr-core-hash", "user-tech", "user-tech");
+   """, "okr-core-work", "local-tenant", "line-okr", "dev", "type-dev", "WI-OKR-CORE", "统一研发工作项", "workflow-okr", "doing", "开发中", "IN_PROGRESS", "user-tech", "王浩然", "P1", "2026-09-30", 8, 3, "MANUAL", "okr-core-request", "okr-core-hash", "user-tech", "user-tech");
   String tech=login("tech");
   var response=mockMvc.perform(get("/api/okr/work?ownerId=user-tech").header("Authorization","Bearer "+tech))
     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
   boolean found=false;
   for(var item:objectMapper.readTree(response).path("data")){
-   if("okr-core-work".equals(item.path("sourceId").asText())){assertEquals("core:okr-core-work",item.path("id").asText());found=true;}
+   if("okr-core-work".equals(item.path("sourceId").asText())){assertEquals("work_item:okr-core-work",item.path("id").asText());found=true;}
   }
   assertTrue(found,"统一工作项应进入 OKR 工作项证据列表");
  }
  @Test void transferredRequirementWorkItemCanBeSubmittedFromLegacyReviewDraft()throws Exception{
   String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
-  jdbc.update("""
-   INSERT INTO t_requirement_work_item
-   (id_,tenant_id_,requirement_id_,task_type_,title_,assignee_name_,note_,status_,sync_status_,retry_count_,create_by_,update_by_,create_time_,update_time_,delete_flag_,version_)
-   VALUES (?,?,?,?,?,?,?,'处理中','SUCCESS',0,?,?,?, ?,0,0)
-   ""","okr-transferred-ticket","local-tenant","req-1","development","转派给我的工单","王浩然","处理转派工单","user-admin","user-admin","2026-09-14 09:00:00","2026-09-15 10:00:00");
+  String transferredId=jdbc.queryForObject("SELECT id_ FROM t_product_work_item WHERE tenant_id_='local-tenant' AND category_='dev' AND delete_flag_=0 LIMIT 1",String.class);
+  String sourceRequirementId=jdbc.queryForObject("SELECT id_ FROM t_product_work_item WHERE tenant_id_='local-tenant' AND category_='requirement' AND delete_flag_=0 LIMIT 1",String.class);
+  jdbc.update("UPDATE t_product_work_item SET title_='转派给我的工单',assignee_id_='user-tech',assignee_name_='王浩然',requirement_id_=?,source_type_='WORK_ORDER',work_order_type_='研发任务',update_time_='2026-09-15 10:00:00' WHERE id_=?",sourceRequirementId,transferredId);
   String workJson=mockMvc.perform(get("/api/okr/work?ownerId=user-tech").header("Authorization","Bearer "+tech)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-  String workId="";for(var item:objectMapper.readTree(workJson).path("data"))if("okr-transferred-ticket".equals(item.path("sourceId").asText())){workId=item.path("id").asText();assertEquals("requirement_work_item",item.path("kind").asText());}assertFalse(workId.isBlank());
+  String workId="";for(var item:objectMapper.readTree(workJson).path("data"))if(transferredId.equals(item.path("sourceId").asText())){workId=item.path("id").asText();assertEquals("dev",item.path("kind").asText());}assertFalse(workId.isBlank());
   var payload=new java.util.LinkedHashMap<String,Object>();
   payload.put("title","旧草稿兼容提交");payload.put("startDate","2026-09-14");payload.put("endDate","2026-09-20");payload.put("reviewMode","structured");payload.put("reviewType","week");payload.put("selfScore",90);payload.put("krReviews",List.of());payload.put("assistance",List.of());payload.put("extraWork",Map.of("workIds",List.of(workId),"description","","impact","无明显影响"));payload.put("syncKrProgress",false);payload.put("items",List.of(Map.of("workId",workId)));
   String draft=create(tech,"review",payload);
   action(tech,draft,"submit",0);
   var saved=objectMapper.readTree(jdbc.queryForObject("SELECT payload_ FROM t_okr_record WHERE id_=?",String.class,draft));
-  assertEquals("none",saved.path("extraWork").path("impact").asText());assertEquals("ticket",saved.path("items").get(0).path("workType").asText());
+  assertEquals("none",saved.path("extraWork").path("impact").asText());assertEquals("task",saved.path("items").get(0).path("workType").asText());
   assertEquals("submitted",jdbc.queryForObject("SELECT status_ FROM t_okr_record WHERE id_=?",String.class,draft));
  }
  @Test void simpleReviewPersistsOriginalFieldsAndSubmitsAtomically()throws Exception{
