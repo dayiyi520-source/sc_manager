@@ -32,4 +32,18 @@ describe('工作项状态配置', () => {
 
     expect(definition.states[2]).toMatchObject({ key: code, successful: true, color: 'purple' });
   });
+
+  it('用例分类使用约定的四个状态及通用阶段', () => {
+    const states = createDefaultWorkItemStates('case');
+    const definition = buildWorkflowDefinition(states);
+
+    expect(states.map(({ name, group }) => ({ name, group }))).toEqual([
+      { name: '待测试', group: 'NOT_STARTED' },
+      { name: '测试中', group: 'IN_PROGRESS' },
+      { name: '暂缓', group: 'IN_PROGRESS' },
+      { name: '已完成', group: 'COMPLETED' }
+    ]);
+    expect(states.every((state) => state.stage === 'test')).toBe(true);
+    expect(definition.transitions).toHaveLength(5);
+  });
 });

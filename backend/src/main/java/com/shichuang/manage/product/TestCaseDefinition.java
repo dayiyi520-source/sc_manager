@@ -15,7 +15,7 @@ public final class TestCaseDefinition {
     public record BatchUpdate(List<String> caseIds, String operation, String value) {}
     public record SaveCase(String directoryId, String sourceRequirementId, String title,
         String precondition, String priority, String ownerId, List<String> tags,
-        List<StepInput> steps, Integer revision) {}
+        List<StepInput> steps, String workItemTypeId, String statusKey, Integer revision) {}
     public record Query(String directoryId, String keyword, String priority,
         String ownerId, Boolean enabled, int page, int pageSize) {}
     public record DirectoryView(String id, String parentId, String name, int sort, long caseCount, String productLineId, String productLineName) {
@@ -24,7 +24,9 @@ public final class TestCaseDefinition {
     public record CaseView(String id, String code, String productLineId, String directoryId,
         String directoryName, String sourceRequirementId, String sourceRequirementTitle,
         String title, String precondition, String priority, String ownerId, String ownerName,
-        List<String> tags, boolean enabled, int revision, long referenceCount,
+        List<String> tags, String workItemTypeId, String workItemTypeName, String workflowId,
+        String statusKey, String statusName, String statusGroup, String statusColor,
+        boolean enabled, int revision, long referenceCount,
         String latestResult, LocalDateTime createdAt, LocalDateTime updatedAt,
         List<StepInput> steps) {}
     public record CasePage(List<CaseView> items, int page, int pageSize, long total) {}

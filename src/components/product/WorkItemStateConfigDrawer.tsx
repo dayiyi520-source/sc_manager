@@ -9,7 +9,7 @@ export type StateGroup = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLE
 export type StateTagColor = 'neutral' | 'blue' | 'cyan' | 'green' | 'yellow' | 'red' | 'purple';
 export type EditableWorkflowState = { key: string; name: string; group: StateGroup; initial: boolean; successful: boolean; enabled: boolean; stage: string; color: StateTagColor };
 
-export const CATEGORY_KEYS: Record<ProductLineWorkItemCategory, WorkItemCategoryKey> = { 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug' };
+export const CATEGORY_KEYS: Record<ProductLineWorkItemCategory, WorkItemCategoryKey> = { 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' };
 const GROUP_OPTIONS: Array<{ value: StateGroup; label: string }> = [
   { value: 'NOT_STARTED', label: '未开始' },
   { value: 'IN_PROGRESS', label: '进行中' },
@@ -27,9 +27,14 @@ const TAG_COLOR_OPTIONS: Array<{ value: StateTagColor; label: string; token: str
 ];
 const TAG_COLOR_VALUES = new Set(TAG_COLOR_OPTIONS.map((option) => option.value));
 
-const stateStage = (category: WorkItemCategoryKey) => category === 'bug' ? 'dev' : category;
+const stateStage = (category: WorkItemCategoryKey) => category === 'bug' ? 'dev' : category === 'case' ? 'test' : category;
 const createKey = () => `status_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-export const createDefaultWorkItemStates = (category: WorkItemCategoryKey): EditableWorkflowState[] => [
+export const createDefaultWorkItemStates = (category: WorkItemCategoryKey): EditableWorkflowState[] => category === 'case' ? [
+  { key: 'status_pending', name: '待测试', group: 'NOT_STARTED', initial: true, successful: false, enabled: true, stage: 'test', color: 'neutral' },
+  { key: 'status_in_progress', name: '测试中', group: 'IN_PROGRESS', initial: false, successful: false, enabled: true, stage: 'test', color: 'blue' },
+  { key: 'status_deferred', name: '暂缓', group: 'IN_PROGRESS', initial: false, successful: false, enabled: true, stage: 'test', color: 'yellow' },
+  { key: 'status_completed', name: '已完成', group: 'COMPLETED', initial: false, successful: true, enabled: true, stage: 'test', color: 'green' }
+] : [
   { key: 'status_pending', name: '待处理', group: 'NOT_STARTED', initial: true, successful: false, enabled: true, stage: stateStage(category), color: 'neutral' },
   { key: 'status_in_progress', name: '处理中', group: 'IN_PROGRESS', initial: false, successful: false, enabled: true, stage: stateStage(category), color: 'blue' },
   { key: 'status_completed', name: '已完成', group: 'COMPLETED', initial: false, successful: true, enabled: true, stage: stateStage(category), color: 'green' }
@@ -48,6 +53,15 @@ const normalizeStates = (workflow: WorkItemWorkflow | undefined, category: WorkI
 };
 export const buildWorkflowDefinition = (states: EditableWorkflowState[]) => {
   const derivedStates = states.map((state) => ({ ...state, successful: state.group === 'COMPLETED' }));
+  if (derivedStates.length === 4 && ['status_pending', 'status_in_progress', 'status_deferred', 'status_completed'].every((key) => derivedStates.some((state) => state.key === key))) {
+    return { states: derivedStates, transitions: [
+      { key: 'start_testing', from: 'status_pending', to: 'status_in_progress', name: '开始测试', roles: ['admin', 'product_manager', 'tech_lead'], requiredFields: [] },
+      { key: 'defer_pending', from: 'status_pending', to: 'status_deferred', name: '暂缓测试', roles: ['admin', 'product_manager', 'tech_lead'], requiredFields: [] },
+      { key: 'defer_testing', from: 'status_in_progress', to: 'status_deferred', name: '暂缓测试', roles: ['admin', 'product_manager', 'tech_lead'], requiredFields: [] },
+      { key: 'resume_testing', from: 'status_deferred', to: 'status_in_progress', name: '恢复测试', roles: ['admin', 'product_manager', 'tech_lead'], requiredFields: [] },
+      { key: 'complete_testing', from: 'status_in_progress', to: 'status_completed', name: '完成测试', roles: ['admin', 'product_manager', 'tech_lead'], requiredFields: [] }
+    ] };
+  }
   const initial = derivedStates.find((state) => state.initial)!;
   const active = [initial, ...derivedStates.filter((state) => !state.initial && state.group !== 'COMPLETED' && state.group !== 'CANCELLED')];
   const terminal = derivedStates.filter((state) => state.group === 'COMPLETED' || state.group === 'CANCELLED');

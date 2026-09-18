@@ -4,10 +4,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 
-/** Configuration contracts shared by all five categories. */
+/** Configuration contracts shared by all work item categories. */
 public final class WorkItemDefinition {
     private WorkItemDefinition() {}
-    public static final Map<String,String> CATEGORIES = Map.of("requirement","需求","design","设计","dev","研发","test","测试","bug","缺陷");
+    public static final Map<String,String> CATEGORIES = Map.of(
+        "requirement","需求","design","设计","dev","研发","test","测试","bug","缺陷","case","用例");
     public static final Set<String> STATE_COLORS = Set.of("neutral","blue","cyan","green","yellow","red","purple");
     public record State(String key, String name, WorkItemStatus.Group group, boolean initial,
                         boolean successful, boolean enabled, String stage, String color) {

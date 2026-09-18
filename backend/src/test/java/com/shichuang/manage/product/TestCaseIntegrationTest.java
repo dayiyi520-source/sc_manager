@@ -23,19 +23,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class TestCaseIntegrationTest extends AbstractApiIntegrationTest {
     @Autowired TestCaseService service;
+    @Autowired ProductLineService productLines;
 
     private final String tenant = "test-case-integration";
     private String line;
     private String owner;
     private String directory;
+    private String caseType;
 
     @BeforeEach
-    void fixture() {
+    void fixture() throws Exception {
         RequestContext.set(Map.of("sub", "test-user", "name", "测试用户", "tenant", tenant, "role", "admin"));
         line = UUID.randomUUID().toString();
         owner = UUID.randomUUID().toString();
         jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'测试产品线','test-user','test-user',NOW(6),NOW(6))", line, tenant, "TC-" + line);
         jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,'product_manager','产品经理','enabled','test-user','test-user',NOW(6),NOW(6))", owner, tenant, owner, "用例负责人", "测试部");
+        configureCaseType();
         directory = service.createDirectory(line, new SaveDirectory(null, "核心流程", 1)).id();
     }
 
@@ -48,16 +51,28 @@ class TestCaseIntegrationTest extends AbstractApiIntegrationTest {
     void createsListsUpdatesAndDisablesCase() {
         CaseView created = service.create(line, input("登录主流程", null));
         assertEquals("TC-000001", created.code());
+        assertEquals(caseType, created.workItemTypeId());
+        assertEquals("功能测试", created.workItemTypeName());
+        assertEquals("待测试", created.statusName());
+        assertNull(created.latestResult());
         assertEquals(2, created.steps().size());
         assertEquals(1, service.directories(line).get(0).caseCount());
         assertEquals(created.id(), service.list(line, new Query(directory, "登录", null, null, true, 1, 20)).items().get(0).id());
 
         SaveCase update = new SaveCase(directory, null, "登录主流程更新", "已创建账号", "P1", owner,
-            List.of("smoke"), created.steps(), created.revision());
+            List.of("smoke"), created.steps(), caseType, "status_in_progress", created.revision());
         CaseView changed = service.update(line, created.id(), update);
         assertEquals("登录主流程更新", changed.title());
-        assertEquals(1, changed.revision());
-        assertFalse(service.setEnabled(line, created.id(), changed.revision(), false).enabled());
+        assertEquals("测试中", changed.statusName());
+        assertThrows(IllegalArgumentException.class, () -> productLines.deleteWorkItemType(line, caseType));
+        productLines.updateWorkItemType(line, caseType, new java.util.HashMap<>(Map.of("enabled", false)));
+        SaveCase disabledTypeUpdate = new SaveCase(directory, null, "停用类型下仍可维护", changed.precondition(), "P1", owner,
+            changed.tags(), changed.steps(), caseType, "status_in_progress", changed.revision());
+        CaseView maintained = service.update(line, created.id(), disabledTypeUpdate);
+        assertEquals("停用类型下仍可维护", maintained.title());
+        assertThrows(IllegalArgumentException.class, () -> service.create(line, input("停用类型不能新建", null)));
+        assertEquals(2, maintained.revision());
+        assertFalse(service.setEnabled(line, created.id(), maintained.revision(), false).enabled());
     }
 
     @Test
@@ -84,13 +99,19 @@ class TestCaseIntegrationTest extends AbstractApiIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> service.create(line, input("停用负责人", null)));
         jdbc.update("UPDATE t_sys_user SET status_='enabled' WHERE tenant_id_=? AND id_=?", tenant, owner);
 
-        SaveCase empty = new SaveCase(directory, null, "空步骤", null, "P1", owner, List.of(), List.of(), null);
+        SaveCase empty = new SaveCase(directory, null, "空步骤", null, "P1", owner, List.of(), List.of(), caseType, "status_pending", null);
         assertThrows(IllegalArgumentException.class, () -> service.create(line, empty));
         CaseView created = service.create(line, input("乐观锁", null));
         service.update(line, created.id(), withRevision(input("第一次修改", null), created.revision()));
         ResponseStatusException stale = assertThrows(ResponseStatusException.class,
             () -> service.update(line, created.id(), withRevision(input("旧版本覆盖", null), created.revision())));
         assertEquals(HttpStatus.CONFLICT, stale.getStatusCode());
+
+        CaseView staged = service.create(line, input("非法阶段跳转", null));
+        SaveCase directComplete = new SaveCase(directory, null, staged.title(), staged.precondition(), staged.priority(), owner,
+            staged.tags(), staged.steps(), caseType, "status_completed", staged.revision());
+        IllegalArgumentException invalidStage = assertThrows(IllegalArgumentException.class, () -> service.update(line, staged.id(), directComplete));
+        assertEquals("用例阶段不允许直接流转到所选阶段", invalidStage.getMessage());
     }
 
     @Test
@@ -125,11 +146,20 @@ class TestCaseIntegrationTest extends AbstractApiIntegrationTest {
         return new SaveCase(directoryOverride == null ? directory : directoryOverride, null, title, "用户已登录", "P1", owner,
             List.of("smoke", "核心"), List.of(
                 new StepInput(null, 1, "打开工作首页", "展示我的待办"),
-                new StepInput(null, 2, "点击测试任务", "打开任务列表")), null);
+                new StepInput(null, 2, "点击测试任务", "打开任务列表")), caseType, "status_pending", null);
     }
 
     private SaveCase withRevision(SaveCase source, int revision) {
         return new SaveCase(source.directoryId(), source.sourceRequirementId(), source.title(), source.precondition(),
-            source.priority(), source.ownerId(), source.tags(), source.steps(), revision);
+            source.priority(), source.ownerId(), source.tags(), source.steps(), source.workItemTypeId(), source.statusKey(), revision);
+    }
+
+    private void configureCaseType() throws Exception {
+        caseType = UUID.randomUUID().toString();
+        String workflow = UUID.randomUUID().toString();
+        var type = WorkItemTemplate.types().stream().filter(value -> "功能测试".equals(value.name())).findFirst().orElseThrow();
+        String definition = objectMapper.writeValueAsString(WorkItemTemplate.workflow(type).definition());
+        jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,description_,creator_name_,enabled_,is_default_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'用例','功能测试','测试类型','测试用户',1,1,'test-user','test-user',NOW(6),NOW(6))", caseType, tenant, line);
+        jdbc.update("INSERT INTO t_product_workflow(id_,tenant_id_,product_line_id_,category_,task_type_id_,workflow_version_,name_,status_,definition_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'case',?,1,'功能测试阶段配置','PUBLISHED',CAST(? AS JSON),'test-user','test-user',NOW(6),NOW(6))", workflow, tenant, line, caseType, definition);
     }
 }

@@ -417,7 +417,7 @@ export interface ProductLineMember {
   phone?: string;
 }
 
-export type ProductLineWorkItemCategory = '需求' | '设计' | '研发' | '测试' | '缺陷';
+export type ProductLineWorkItemCategory = '需求' | '设计' | '研发' | '测试' | '缺陷' | '用例';
 
 export interface ProductLineWorkItemType {
   id: string;
@@ -523,7 +523,7 @@ export interface RequirementTask {
   dueDate: string;
   createdAt?: string;
   todoList?: { id: string; text: string; done: boolean }[];
-  category?: 'my_responsible' | 'my_dept' | 'assigned_to_me' | 'other_dept' | 'requirement' | 'design' | 'dev' | 'test' | 'bug';
+  category?: 'my_responsible' | 'my_dept' | 'assigned_to_me' | 'other_dept' | 'requirement' | 'design' | 'dev' | 'test' | 'bug' | 'case';
   workOrderType?: WorkOrderType;
   specialFields?: Record<string, string | number | null> | string;
   sourceWorkOrderIds?: string[];

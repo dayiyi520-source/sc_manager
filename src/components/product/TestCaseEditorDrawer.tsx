@@ -58,7 +58,22 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
   const [error, setError] = useState('');
   const [preconditionValue, setPreconditionValue] = useState('');
   const preconditionEditor = useRef<HTMLDivElement | null>(null);
+  const selectedDirectoryPath = Form.useWatch('directoryPath', form);
+  const selectedTypeId = Form.useWatch('workItemTypeId', form);
+  const selectedDirectoryId = selectedDirectoryPath?.at(-1);
+  const actualLineId = productLineId === 'all'
+    ? directories.find((directory) => directory.id === selectedDirectoryId)?.productLineId || ''
+    : productLineId;
   const employees = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: open, retry: false });
+  const caseTypes = useQuery({ queryKey: ['case-work-item-types', actualLineId], queryFn: () => productRepository.workItemTypes(actualLineId, '用例'), enabled: open && !!actualLineId, retry: false });
+  const workflows = useQuery({ queryKey: ['case-type-workflows', actualLineId, selectedTypeId], queryFn: () => productRepository.typeWorkflows(actualLineId, selectedTypeId), enabled: open && !!actualLineId && !!selectedTypeId, retry: false });
+  const activeWorkflow = workflows.data?.find((workflow) => workflow.id === initialCase?.workflowId && initialCase.workItemTypeId === selectedTypeId)
+    || workflows.data?.find((workflow) => workflow.status === 'PUBLISHED');
+  const availableStates = activeWorkflow?.definition.states.filter((state) => {
+    if (!state.enabled) return false;
+    if (!initialCase || initialCase.workItemTypeId !== selectedTypeId) return state.initial;
+    return state.key === initialCase.statusKey || activeWorkflow.definition.transitions.some((edge) => edge.from === initialCase.statusKey && edge.to === state.key);
+  }) || [];
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +88,8 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
       ownerId: initialCase.ownerId,
       tags: initialCase.tags,
       tagsText: initialCase.tags.join('、'),
+      workItemTypeId: initialCase.workItemTypeId,
+      statusKey: initialCase.statusKey,
       steps: initialCase.steps.map((step, index) => ({ ...step, sort: index + 1 })),
     } : {
       directoryPath: directoryPath(directories, directories[0]?.id),
@@ -83,6 +100,18 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
       steps: [{ sort: 1, action: '', expectedResult: '' }],
     });
   }, [open, initialCase, sourceRequirementId, directories, form]);
+
+  useEffect(() => {
+    if (!open || initialCase || !caseTypes.data?.length || form.getFieldValue('workItemTypeId')) return;
+    form.setFieldValue('workItemTypeId', caseTypes.data.find((type) => type.isDefault && type.enabled)?.id || caseTypes.data.find((type) => type.enabled)?.id);
+  }, [open, initialCase, caseTypes.data, form]);
+
+  useEffect(() => {
+    if (!open || !activeWorkflow) return;
+    const current = form.getFieldValue('statusKey');
+    if (availableStates.some((state) => state.key === current)) return;
+    form.setFieldValue('statusKey', availableStates.find((state) => state.initial)?.key || availableStates[0]?.key);
+  }, [open, activeWorkflow, availableStates, form]);
 
   const submit = async () => {
     setError('');
@@ -99,6 +128,8 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
         priority: values.priority as TestPriority,
         ownerId: values.ownerId,
         tags: (values.tagsText || '').split(/[、,]/).map((tag) => tag.trim()).filter(Boolean),
+        workItemTypeId: values.workItemTypeId,
+        statusKey: values.statusKey,
         steps: values.steps.map((step, index) => ({ ...step, sort: index + 1 })),
         revision: initialCase?.revision,
       };
@@ -124,13 +155,16 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
     <WorkItemCreatePanel isOpen={open} onClose={onClose} title={initialCase ? `编辑用例 ${initialCase.code}` : '新建用例'} presentation="workspace" showContinueOption={!initialCase} continueChecked={continueCreating} onContinueCheckedChange={setContinueCreating} footer={<><Button onClick={onClose} disabled={saving}>取消</Button><Button type="primary" onClick={() => void submit()} loading={saving} disabled={!productLineId}>{initialCase ? '保存' : '新建'}</Button></>} properties={<aside className="test-case-properties">
       <h3>用例属性</h3>
       <Form.Item name="ownerId" label="负责人" rules={[{ required: true, message: '请选择负责人' }]}><Select showSearch loading={employees.isLoading} optionFilterProp="label" options={(employees.data || []).map((employee) => ({ label: `${employee.name} · ${employee.department || '未分配部门'}`, value: employee.id }))} placeholder="搜索并选择负责人" /></Form.Item>
-      <Form.Item label="用例类型"><div className="test-case-property-value">测试用例</div></Form.Item>
+      <Form.Item name="workItemTypeId" label="用例类型" rules={[{ required: true, message: '请选择用例类型' }]}><Select showSearch optionFilterProp="label" loading={caseTypes.isLoading} status={caseTypes.isError ? 'error' : undefined} options={(caseTypes.data || []).filter((type) => type.enabled).map((type) => ({ label: type.name, value: type.id }))} placeholder="请选择用例类型" /></Form.Item>
+      <Form.Item name="statusKey" label="用例阶段" rules={[{ required: true, message: '请选择用例阶段' }]}><Select loading={workflows.isLoading} status={workflows.isError ? 'error' : undefined} options={availableStates.map((state) => ({ label: state.name, value: state.key }))} placeholder="请选择用例阶段" /></Form.Item>
       <Form.Item name="priority" label="优先级" rules={[{ required: true, message: '请选择优先级' }]}><Select allowClear options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>
       <Form.Item name="tagsText" label="标签"><Input placeholder="使用逗号或顿号分隔" maxLength={240} /></Form.Item>
       <section className="test-case-attachment-placeholder"><h4>附件</h4><p>暂无附件</p></section>
     </aside>}>
       {!productLineId && <Alert type="warning" showIcon title="请先选择产品线" />}
       {employees.isError && <Alert className="mb-4" type="error" showIcon title="负责人加载失败" action={<Button size="small" onClick={() => employees.refetch()}>重试</Button>} />}
+      {caseTypes.isError && <Alert className="mb-4" type="error" showIcon title="用例类型加载失败" action={<Button size="small" onClick={() => caseTypes.refetch()}>重试</Button>} />}
+      {workflows.isError && <Alert className="mb-4" type="error" showIcon title="用例阶段加载失败" action={<Button size="small" onClick={() => workflows.refetch()}>重试</Button>} />}
       {error && <Alert className="mb-4" type="error" showIcon title="保存失败" description={error.includes('409') ? '用例已被其他人修改，请关闭后重新打开。' : error} />}
       <div className="test-case-editor-main">
         <Form.Item name="title" label="用例标题" rules={[{ required: true, whitespace: true, message: '请填写用例标题' }]}><Input size="large" maxLength={255} showCount placeholder="请输入标题" /></Form.Item>

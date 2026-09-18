@@ -18,6 +18,9 @@ public class WorkItemStorageMapper {
     public Map<String,Object> type(String tenant, String line, String id) {
         return one("SELECT id_ AS id,category_ AS category,enabled_ AS enabled FROM t_product_line_work_item_type WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",tenant,line,id);
     }
+    public Map<String,Object> defaultType(String tenant,String line,String category) {
+        return one("SELECT id_ AS id FROM t_product_line_work_item_type WHERE tenant_id_=? AND product_line_id_=? AND category_=? AND enabled_=1 AND delete_flag_=0 ORDER BY is_default_ DESC,create_time_,id_ LIMIT 1",tenant,line,category);
+    }
     private static final String WORKFLOW = "SELECT id_ AS id,category_ AS category,task_type_id_ AS taskTypeId,name_ AS name,workflow_version_ AS workflowVersion,status_ AS status,definition_ AS definition,version_ AS revision FROM t_product_workflow WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0";
     public List<Map<String,Object>> workflows(String tenant,String line) { return jdbc.queryForList(WORKFLOW+" ORDER BY category_,workflow_version_ DESC",tenant,line); }
     public List<Map<String,Object>> workflows(String tenant,String line,String taskTypeId) { return jdbc.queryForList(WORKFLOW+" AND task_type_id_=? ORDER BY workflow_version_ DESC",tenant,line,taskTypeId); }

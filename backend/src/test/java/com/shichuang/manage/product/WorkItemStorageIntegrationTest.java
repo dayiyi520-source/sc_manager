@@ -40,7 +40,7 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
             assertEquals("neutral",item.get("statusColor"));
             assertEquals(1,storage.activities(line,item.get("id").toString()).size());
         }
-        assertEquals(5,jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE tenant_id_=?",Integer.class,tenant));
+        assertEquals(CATEGORIES.size(),jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE tenant_id_=?",Integer.class,tenant));
         var result=unified.list(line,"","test","",1,20).page().items().get(0);
         assertEquals(type,result.taskTypeId());
         assertEquals(workflow,result.workflowId());

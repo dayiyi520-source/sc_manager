@@ -10,19 +10,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class TestDomainMigrationIntegrationTest extends AbstractApiIntegrationTest {
     @Test
     void testDomainTablesAndUniqueKeysExist() {
-        assertEquals(10, jdbc.queryForObject("""
+        assertEquals(12, jdbc.queryForObject("""
             SELECT COUNT(*) FROM information_schema.tables
             WHERE table_schema = DATABASE() AND table_name IN (
               't_product_test_case_directory','t_product_test_case','t_product_test_case_step',
               't_product_test_case_work_item','t_product_test_plan','t_product_test_plan_case',
               't_product_test_execution','t_product_test_execution_case',
-              't_product_test_execution_evidence','t_product_test_execution_defect')
+              't_product_test_execution_evidence','t_product_test_execution_defect',
+              't_product_version_test_report','t_product_version_test_report_plan')
             """, Integer.class));
 
         assertIndex("t_product_test_case", "uk_test_case_code");
-        assertIndex("t_product_test_plan", "uk_test_plan_work_item");
+        assertIndex("t_product_test_case", "idx_test_case_type_stage");
+        assertIndex("t_product_test_plan", "idx_test_plan_work_item");
         assertIndex("t_product_test_execution", "uk_test_execution_round");
         assertIndex("t_product_test_execution_defect", "uk_test_result_defect");
+        assertIndex("t_product_version_test_report_plan", "uk_version_test_report_plan");
         assertEquals(0, jdbc.queryForObject("""
             SELECT COUNT(*) FROM t_product_line_work_item_type parent
             JOIN t_product_line_work_item_type child
@@ -35,6 +38,30 @@ class TestDomainMigrationIntegrationTest extends AbstractApiIntegrationTest {
                 WHERE rule.tenant_id_=parent.tenant_id_ AND rule.product_line_id_=parent.product_line_id_
                   AND rule.parent_type_id_=parent.id_ AND rule.child_type_id_=child.id_
                   AND rule.enabled_=1 AND rule.delete_flag_=0
+              )
+            """, Integer.class));
+        assertEquals(0, jdbc.queryForObject("""
+            SELECT COUNT(*) FROM t_product_line line
+            WHERE line.delete_flag_=0 AND (
+              SELECT COUNT(*) FROM t_product_line_work_item_type type
+              WHERE type.tenant_id_=line.tenant_id_ AND type.product_line_id_=line.id_
+                AND type.category_='用例' AND type.enabled_=1 AND type.delete_flag_=0
+                AND type.name_ IN ('功能测试','性能测试','兼容性测试','易用性测试','安全性测试','稳定性测试','接口测试','自动化测试','按照部署测试','冒烟测试','回归测试','其他')
+            ) <> 12
+            """, Integer.class));
+        assertEquals(0, jdbc.queryForObject("""
+            SELECT COUNT(*) FROM t_product_line_work_item_type type
+            WHERE type.category_='用例' AND type.enabled_=1 AND type.delete_flag_=0
+              AND NOT EXISTS (
+                SELECT 1 FROM t_product_workflow workflow
+                WHERE workflow.tenant_id_=type.tenant_id_ AND workflow.product_line_id_=type.product_line_id_
+                  AND workflow.task_type_id_=type.id_ AND workflow.category_='case'
+                  AND workflow.status_='PUBLISHED' AND workflow.delete_flag_=0
+                  AND JSON_LENGTH(workflow.definition_,'$.states')=4
+                  AND JSON_UNQUOTE(JSON_EXTRACT(workflow.definition_,'$.states[0].name'))='待测试'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(workflow.definition_,'$.states[1].name'))='测试中'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(workflow.definition_,'$.states[2].name'))='暂缓'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(workflow.definition_,'$.states[3].name'))='已完成'
               )
             """, Integer.class));
     }

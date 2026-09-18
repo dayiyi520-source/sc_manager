@@ -177,7 +177,7 @@ const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({
   <div className="max-w-2xl space-y-2 text-xs"><h3 className="text-sm font-bold text-[var(--text-primary)]">{title}</h3><p className="text-[var(--text-muted)]">{description}</p><div className="mt-5 border border-dashed border-[var(--border-main)] p-5 text-[var(--text-muted)]">暂无可配置项</div></div>
 );
 
-const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '测试', '缺陷'];
+const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '测试', '缺陷', '用例'];
 
 const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
   const { addToast, setProductLines } = useApp();
@@ -242,7 +242,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
         if (editingItem) await productRepository.updateWorkItemType(productLine.id, editingItem.id, { ...form, name, description: form.description.trim() });
         else {
           const category = CATEGORY_KEYS[form.category];
-          const states = initialWorkflowStates.map((state) => ({ ...state, name: state.name.trim(), stage: category === 'bug' ? 'dev' : category }));
+          const states = initialWorkflowStates.map((state) => ({ ...state, name: state.name.trim(), stage: category === 'bug' ? 'dev' : category === 'case' ? 'test' : category }));
           await productRepository.createWorkItemType(productLine.id, {
             ...form,
             name,

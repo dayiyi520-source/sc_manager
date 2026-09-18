@@ -27,7 +27,19 @@ final class WorkItemTemplate {
         new Type("缺陷", "bug", "系统缺陷", true),
         new Type("缺陷", "bug", "样式缺陷", false),
         new Type("缺陷", "bug", "线上故障", false),
-        new Type("缺陷", "bug", "安全漏洞", false)
+        new Type("缺陷", "bug", "安全漏洞", false),
+        new Type("用例", "case", "功能测试", true),
+        new Type("用例", "case", "性能测试", false),
+        new Type("用例", "case", "兼容性测试", false),
+        new Type("用例", "case", "易用性测试", false),
+        new Type("用例", "case", "安全性测试", false),
+        new Type("用例", "case", "稳定性测试", false),
+        new Type("用例", "case", "接口测试", false),
+        new Type("用例", "case", "自动化测试", false),
+        new Type("用例", "case", "按照部署测试", false),
+        new Type("用例", "case", "冒烟测试", false),
+        new Type("用例", "case", "回归测试", false),
+        new Type("用例", "case", "其他", false)
     );
 
     private WorkItemTemplate() {}
@@ -35,11 +47,12 @@ final class WorkItemTemplate {
     static List<Type> types() { return TYPES; }
 
     static SaveWorkflow workflow(Type type) {
+        if ("case".equals(type.apiCategory())) return caseWorkflow(type);
         String stage = "bug".equals(type.apiCategory()) ? "dev" : type.apiCategory();
         Workflow definition = new Workflow(
             List.of(
-                new State("status_pending", "待处理", WorkItemStatus.Group.NOT_STARTED, true, false, true, stage, "neutral"),
-                new State("status_in_progress", "处理中", WorkItemStatus.Group.IN_PROGRESS, false, false, true, stage, "blue"),
+                new State("status_pending", "待开始", WorkItemStatus.Group.NOT_STARTED, true, false, true, stage, "neutral"),
+                new State("status_in_progress", "进行中", WorkItemStatus.Group.IN_PROGRESS, false, false, true, stage, "blue"),
                 new State("status_completed", "已完成", WorkItemStatus.Group.COMPLETED, false, true, true, stage, "green"),
                 new State("status_cancelled", "已取消", WorkItemStatus.Group.CANCELLED, false, false, true, stage, "neutral")
             ),
@@ -48,6 +61,25 @@ final class WorkItemTemplate {
                 new Edge("complete", "status_in_progress", "status_completed", "完成"),
                 new Edge("cancel_pending", "status_pending", "status_cancelled", "取消"),
                 new Edge("cancel_processing", "status_in_progress", "status_cancelled", "取消")
+            )
+        );
+        return new SaveWorkflow(type.apiCategory(), type.name() + "状态配置", definition, null);
+    }
+
+    private static SaveWorkflow caseWorkflow(Type type) {
+        Workflow definition = new Workflow(
+            List.of(
+                new State("status_pending", "待测试", WorkItemStatus.Group.NOT_STARTED, true, false, true, "test", "neutral"),
+                new State("status_in_progress", "测试中", WorkItemStatus.Group.IN_PROGRESS, false, false, true, "test", "blue"),
+                new State("status_deferred", "暂缓", WorkItemStatus.Group.IN_PROGRESS, false, false, true, "test", "yellow"),
+                new State("status_completed", "已完成", WorkItemStatus.Group.COMPLETED, false, true, true, "test", "green")
+            ),
+            List.of(
+                new Edge("start_testing", "status_pending", "status_in_progress", "开始测试"),
+                new Edge("defer_pending", "status_pending", "status_deferred", "暂缓测试"),
+                new Edge("defer_testing", "status_in_progress", "status_deferred", "暂缓测试"),
+                new Edge("resume_testing", "status_deferred", "status_in_progress", "恢复测试"),
+                new Edge("complete_testing", "status_in_progress", "status_completed", "完成测试")
             )
         );
         return new SaveWorkflow(type.apiCategory(), type.name() + "状态配置", definition, null);

@@ -16,8 +16,10 @@ import static com.shichuang.manage.product.TestCaseDefinition.*;
 public class TestCaseService {
     private final TestCaseMapper mapper;
     private final WorkItemAccess access;
+    private final WorkItemStorageMapper workItems;
+    private final WorkItemConfigurationService configurations;
     private final ObjectMapper json;
-    public TestCaseService(TestCaseMapper mapper,WorkItemAccess access,ObjectMapper json){this.mapper=mapper;this.access=access;this.json=json;}
+    public TestCaseService(TestCaseMapper mapper,WorkItemAccess access,WorkItemStorageMapper workItems,WorkItemConfigurationService configurations,ObjectMapper json){this.mapper=mapper;this.access=access;this.workItems=workItems;this.configurations=configurations;this.json=json;}
 
     public List<DirectoryView> directories(String line){
         if (!"all".equals(line)) access.check(line,false);
@@ -62,14 +64,16 @@ public class TestCaseService {
     @Transactional public CaseView create(String line,SaveCase input){
         String actualLine = "all".equals(line) ? text(mapper.directory(RequestContext.tenantId(),"all",required(input.directoryId(),"功能目录",36)),"productLineId") : line;
         access.check(actualLine,true);validate(actualLine,input,false);String tenant=RequestContext.tenantId();Map<String,Object> owner=mapper.employee(tenant,input.ownerId());
-        String id=UUID.randomUUID().toString(),code="TC-"+String.format("%06d",mapper.nextCode(tenant,line));
-        try{mapper.insertCase(tenant,actualLine,id,code,input,text(owner,"name"),encode(input.tags()),RequestContext.userId());mapper.replaceSteps(tenant,id,input.steps(),RequestContext.userId());}
+        CaseState binding=initialState(actualLine,input.workItemTypeId(),input.statusKey());
+        String id=UUID.randomUUID().toString(),code="TC-"+String.format("%06d",mapper.nextCode(tenant,actualLine));
+        try{mapper.insertCase(tenant,actualLine,id,code,input,text(owner,"name"),encode(input.tags()),binding.typeId(),binding.workflowId(),binding.state(),RequestContext.userId());mapper.replaceSteps(tenant,id,input.steps(),RequestContext.userId());}
         catch(DataIntegrityViolationException e){throw conflict("用例编号或目录数据发生冲突，请重试");}
         return require(actualLine,id);
     }
     @Transactional public CaseView update(String line,String id,SaveCase input){
-        access.check(line,true);require(line,id);validate(line,input,true);String tenant=RequestContext.tenantId();Map<String,Object> owner=mapper.employee(tenant,input.ownerId());
-        if(mapper.updateCase(tenant,line,id,input,text(owner,"name"),encode(input.tags()),RequestContext.userId())!=1)throw conflict("测试用例已被其他人修改，请刷新后重试");
+        access.check(line,true);CaseView current=require(line,id);validate(line,input,true);String tenant=RequestContext.tenantId();Map<String,Object> owner=mapper.employee(tenant,input.ownerId());
+        CaseState binding=updatedState(line,current,input.workItemTypeId(),input.statusKey());
+        if(mapper.updateCase(tenant,line,id,input,text(owner,"name"),encode(input.tags()),binding.typeId(),binding.workflowId(),binding.state(),RequestContext.userId())!=1)throw conflict("测试用例已被其他人修改，请刷新后重试");
         mapper.replaceSteps(tenant,id,input.steps(),RequestContext.userId());return require(line,id);
     }
     @Transactional public CaseView setEnabled(String line,String id,int revision,boolean enabled){
@@ -103,16 +107,47 @@ public class TestCaseService {
         String id=UUID.randomUUID().toString();try{mapper.insertDirectory(tenant,line,id,parent,name,number(source,"sort"),RequestContext.userId());}catch(DataIntegrityViolationException e){throw conflict("目标位置已存在同名目录");}
         for(Map<String,Object> sourceCase:mapper.casesInDirectory(tenant,line,text(source,"id"))){
             List<StepInput> steps=mapper.steps(tenant,text(sourceCase,"id")).stream().map(step->new StepInput(null,number(step,"sort"),text(step,"action"),text(step,"expectedResult"))).toList();
-            SaveCase copy=new SaveCase(id,nullable(sourceCase,"sourceRequirementId"),text(sourceCase,"title"),nullable(sourceCase,"precondition"),text(sourceCase,"priority"),text(sourceCase,"ownerId"),decode(sourceCase.get("tags")),steps,null);
-            String caseId=UUID.randomUUID().toString(),code="TC-"+String.format("%06d",mapper.nextCode(tenant,line));mapper.insertCase(tenant,line,caseId,code,copy,text(sourceCase,"ownerName"),encode(copy.tags()),RequestContext.userId());mapper.replaceSteps(tenant,caseId,steps,RequestContext.userId());if(!enabled(sourceCase.get("enabled")))mapper.setEnabled(tenant,line,caseId,0,false,RequestContext.userId());
+            SaveCase copy=new SaveCase(id,nullable(sourceCase,"sourceRequirementId"),text(sourceCase,"title"),nullable(sourceCase,"precondition"),text(sourceCase,"priority"),text(sourceCase,"ownerId"),decode(sourceCase.get("tags")),steps,text(sourceCase,"workItemTypeId"),text(sourceCase,"statusKey"),null);
+            CaseState binding=state(line,text(sourceCase,"workItemTypeId"),text(sourceCase,"workflowId"),text(sourceCase,"statusKey"));
+            String caseId=UUID.randomUUID().toString(),code="TC-"+String.format("%06d",mapper.nextCode(tenant,line));mapper.insertCase(tenant,line,caseId,code,copy,text(sourceCase,"ownerName"),encode(copy.tags()),binding.typeId(),binding.workflowId(),binding.state(),RequestContext.userId());mapper.replaceSteps(tenant,caseId,steps,RequestContext.userId());if(!enabled(sourceCase.get("enabled")))mapper.setEnabled(tenant,line,caseId,0,false,RequestContext.userId());
         }
         for(Map<String,Object> child:mapper.childDirectories(tenant,line,text(source,"id")))copyDirectoryTree(tenant,line,child,id,text(child,"name"));
         return id;
     }
     private CaseView view(Map<String,Object> row){
         String id=text(row,"id");List<StepInput> steps=mapper.steps(RequestContext.tenantId(),id).stream().map(s->new StepInput(text(s,"id"),number(s,"sort"),text(s,"action"),text(s,"expectedResult"))).toList();
-        return new CaseView(id,text(row,"code"),text(row,"productLineId"),text(row,"directoryId"),text(row,"directoryName"),nullable(row,"sourceRequirementId"),nullable(row,"sourceRequirementTitle"),text(row,"title"),nullable(row,"precondition"),text(row,"priority"),text(row,"ownerId"),text(row,"ownerName"),decode(row.get("tags")),enabled(row.get("enabled")),number(row,"revision"),longNumber(row,"referenceCount"),nullable(row,"latestResult"),time(row.get("createdAt")),time(row.get("updatedAt")),steps);
+        return new CaseView(id,text(row,"code"),text(row,"productLineId"),text(row,"directoryId"),text(row,"directoryName"),nullable(row,"sourceRequirementId"),nullable(row,"sourceRequirementTitle"),text(row,"title"),nullable(row,"precondition"),text(row,"priority"),text(row,"ownerId"),text(row,"ownerName"),decode(row.get("tags")),text(row,"workItemTypeId"),text(row,"workItemTypeName"),text(row,"workflowId"),text(row,"statusKey"),text(row,"statusName"),text(row,"statusGroup"),text(row,"statusColor"),enabled(row.get("enabled")),number(row,"revision"),longNumber(row,"referenceCount"),nullable(row,"latestResult"),time(row.get("createdAt")),time(row.get("updatedAt")),steps);
     }
+    private CaseState initialState(String line,String requestedType,String requestedStatus){
+        String tenant=RequestContext.tenantId();String typeId=blank(requestedType);
+        if(typeId==null){Map<String,Object> defaultType=workItems.defaultType(tenant,line,"用例");if(defaultType==null)throw bad("当前产品线未配置可用的用例类型");typeId=text(defaultType,"id");}
+        configurations.requireTypeForLegacy(line,typeId,"case");
+        Map<String,Object> workflow=workItems.publishedWorkflow(tenant,line,"case",typeId);
+        if(workflow==null||!typeId.equals(workflow.get("taskTypeId")))throw conflict("所选用例类型没有已发布的阶段流程");
+        WorkItemDefinition.State initial=configurations.decode(workflow.get("definition")).states().stream().filter(WorkItemDefinition.State::initial).findFirst().orElseThrow();
+        if(blank(requestedStatus)!=null&&!initial.key().equals(requestedStatus))throw bad("新建用例必须使用默认阶段");
+        return new CaseState(typeId,text(workflow,"id"),initial);
+    }
+    private CaseState updatedState(String line,CaseView current,String requestedType,String requestedStatus){
+        String typeId=required(requestedType,"用例类型",36);
+        if(!typeId.equals(current.workItemTypeId()))return initialState(line,typeId,requestedStatus);
+        String targetKey=required(requestedStatus,"用例阶段",64);
+        CaseState target=state(line,typeId,current.workflowId(),targetKey);
+        if(!targetKey.equals(current.statusKey())){
+            WorkItemDefinition.Workflow workflow=configurations.decode(configurations.requireWorkflow(line,current.workflowId()).get("definition"));
+            boolean allowed=workflow.transitions().stream().anyMatch(edge->edge.from().equals(current.statusKey())&&edge.to().equals(targetKey));
+            if(!allowed)throw bad("用例阶段不允许直接流转到所选阶段");
+        }
+        return target;
+    }
+    private CaseState state(String line,String typeId,String workflowId,String statusKey){
+        configurations.requireType(line,typeId,"case",false);
+        Map<String,Object> workflow=configurations.requireWorkflow(line,required(workflowId,"阶段流程",36));
+        if(!"PUBLISHED".equals(workflow.get("status"))||!"case".equals(workflow.get("category"))||!typeId.equals(workflow.get("taskTypeId")))throw bad("用例绑定的阶段流程无效");
+        WorkItemDefinition.State state=configurations.decode(workflow.get("definition")).states().stream().filter(value->value.enabled()&&value.key().equals(statusKey)).findFirst().orElseThrow(()->bad("用例阶段不存在或已停用"));
+        return new CaseState(typeId,workflowId,state);
+    }
+    private record CaseState(String typeId,String workflowId,WorkItemDefinition.State state){}
     private String encode(List<String> tags){try{return json.writeValueAsString(tags==null?List.of():tags.stream().filter(Objects::nonNull).map(String::trim).filter(v->!v.isBlank()).distinct().limit(20).toList());}catch(Exception e){throw bad("标签格式无效");}}
     private List<String> decode(Object value){try{return value==null?List.of():json.readValue(value.toString(),new TypeReference<>(){});}catch(Exception e){return List.of();}}
     private static String required(String value,String label,int max){String v=blank(value);if(v==null)throw bad("请填写"+label);if(v.length()>max)throw bad(label+"超出长度限制");return v;}

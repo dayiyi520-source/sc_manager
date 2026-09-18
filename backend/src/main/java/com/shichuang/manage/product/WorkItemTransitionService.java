@@ -18,8 +18,9 @@ public class WorkItemTransitionService {
     private final WorkItemApprovalService approvals;
     private final WorkItemRelationService relations;
     private final WorkItemCompletionService completion;
-    public WorkItemTransitionService(WorkItemStorageMapper mapper,WorkItemAccess access,WorkItemConfigurationService configurations,WorkItemApprovalService approvals,WorkItemRelationService relations,WorkItemCompletionService completion) {
-        this.mapper=mapper; this.access=access; this.configurations=configurations; this.approvals=approvals; this.relations=relations; this.completion=completion;
+    private final AutomationRuleService automations;
+    public WorkItemTransitionService(WorkItemStorageMapper mapper,WorkItemAccess access,WorkItemConfigurationService configurations,WorkItemApprovalService approvals,WorkItemRelationService relations,WorkItemCompletionService completion,AutomationRuleService automations) {
+        this.mapper=mapper; this.access=access; this.configurations=configurations; this.approvals=approvals; this.relations=relations; this.completion=completion; this.automations=automations;
     }
     public record Action(String edgeKey,String name,String to,List<String> requiredFields,boolean allowed,List<String> reasons) {}
     public record StatusOption(String key,String name,String color,boolean current,boolean allowed,List<String> reasons) {}
@@ -68,6 +69,7 @@ public class WorkItemTransitionService {
         mapper.activity(RequestContext.tenantId(),line,id,"WORK_ITEM_TRANSITIONED",configurations.encode(Map.of(
             "edgeKey",edge.key(),"from",edge.from(),"to",edge.to(),"fromName",item.get("statusName"),
             "toName",target.name(),"reason",Objects.toString(input.reason(),""),"revision",input.revision()+1)),RequestContext.userId());
+        automations.statusChanged(line,Objects.requireNonNull(mapper.timedItem(RequestContext.tenantId(),line,id)));
         relations.recordChanges(line,blockersBefore);
         return mapper.timedItem(RequestContext.tenantId(),line,id);
     }

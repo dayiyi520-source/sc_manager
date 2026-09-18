@@ -1,11 +1,11 @@
 import { apiRequest } from './apiClient';
 import type { ProductLine, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, VersionIteration, RequirementTask, DefectBug, DevTask } from '../types';
 import type { PageResult } from './apiClient';
-import type { CreateTestExecutionInput, SaveTestCaseInput, SaveTestPlanInput, TestCase, TestCaseDirectory, TestCasePage, TestEvidence, TestExecution, TestExecutionScope, TestPlan, TestResultStatus, TestTaskOverview } from '../types/testManagement';
+import type { CreateTestExecutionInput, SaveTestCaseInput, SaveTestPlanInput, SaveVersionTestReportInput, TestCase, TestCaseDirectory, TestCasePage, TestEvidence, TestExecution, TestExecutionScope, TestPlan, TestResultStatus, TestTaskOverview, VersionTestReport, VersionTestReportListItem, VersionTestReportPlan } from '../types/testManagement';
 
 type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
-export type WorkItemCategoryKey = 'requirement' | 'design' | 'dev' | 'test' | 'bug';
+export type WorkItemCategoryKey = 'requirement' | 'design' | 'dev' | 'test' | 'bug' | 'case';
 export type WorkItemWorkflow = {
   id: string;
   category: WorkItemCategoryKey;
@@ -14,7 +14,10 @@ export type WorkItemWorkflow = {
   workflowVersion: number;
   status: 'DRAFT' | 'PUBLISHED' | string;
   revision: number;
-  definition: { states: Array<Record<string, unknown>>; transitions: Array<Record<string, unknown>> };
+  definition: {
+    states: Array<{ key: string; name: string; group: string; initial: boolean; successful: boolean; enabled: boolean; stage: string; color: string }>;
+    transitions: Array<{ key: string; from: string; to: string; name: string }>;
+  };
 };
 export type UnifiedWorkItem = {
   id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;
@@ -35,7 +38,7 @@ export type WorkItemTransitionOptions = {
 export type AutomationRule = {
   id: string; name: string; enabled: boolean; triggerType: 'STATUS_CHANGED'; triggerTypeId: string;
   triggerStateKey: string; conditionType: 'NONE' | 'TASK_TYPE' | 'PRIORITY' | 'MULTI'; conditionValue?: string | null;
-  conditions?: Array<Record<string, unknown>>; actionType: 'CREATE_SUBTASK' | 'DERIVE_PARENT_STATUS' | 'MULTI';
+  conditions?: Array<Record<string, unknown>>; actionType: 'CREATE_SUBTASK' | 'DERIVE_PARENT_STATUS' | 'DISPATCH_REQUIREMENT_TASKS' | 'SET_ACTUAL_START_TIME' | 'MULTI';
   actions?: Array<Record<string, unknown>>; actionConfig: Record<string, unknown> | string;
   revision: number; updatedAt?: string;
 };
@@ -125,4 +128,10 @@ export const productRepository = {
   ,endTestExecution: (executionId: string, revision: number) => apiRequest<TestExecution>(`/api/test-executions/${encodeURIComponent(executionId)}/end`, { method: 'POST', body: JSON.stringify({ revision }) })
   ,linkTestResultDefect: (resultId: string, defectWorkItemId: string, revision: number) => apiRequest<TestExecution>(`/api/test-execution-cases/${encodeURIComponent(resultId)}/defects`, { method: 'POST', body: JSON.stringify({ defectWorkItemId, revision }) })
   ,testTaskOverview: (workItemId: string) => apiRequest<TestTaskOverview>(`/api/work-items/${encodeURIComponent(workItemId)}/test-overview`)
+  ,versionTestReports: (lineId: string, versionId: string) => apiRequest<VersionTestReportListItem[]>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports`)
+  ,versionTestReportPlans: (lineId: string, versionId: string) => apiRequest<VersionTestReportPlan[]>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/plans`)
+  ,versionTestReport: (lineId: string, versionId: string, reportId: string) => apiRequest<VersionTestReport>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/${encodeURIComponent(reportId)}`)
+  ,createVersionTestReport: (lineId: string, versionId: string, body: SaveVersionTestReportInput) => apiRequest<VersionTestReport>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports`, { method: 'POST', body: JSON.stringify(body) })
+  ,updateVersionTestReport: (lineId: string, versionId: string, reportId: string, body: SaveVersionTestReportInput) => apiRequest<VersionTestReport>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/${encodeURIComponent(reportId)}`, { method: 'PUT', body: JSON.stringify(body) })
+  ,deleteVersionTestReport: (lineId: string, versionId: string, reportId: string, revision: number) => apiRequest<void>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/${encodeURIComponent(reportId)}?revision=${revision}`, { method: 'DELETE' })
 };

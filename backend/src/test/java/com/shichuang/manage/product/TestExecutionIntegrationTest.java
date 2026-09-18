@@ -30,9 +30,10 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
     private String rootWorkItem;
     private String workItem;
     private CaseView testCase;
+    private String caseType;
 
     @BeforeEach
-    void fixture() {
+    void fixture() throws Exception {
         RequestContext.set(Map.of("sub", "test-user", "name", "测试用户", "tenant", tenant, "role", "admin"));
         line = UUID.randomUUID().toString();
         owner = UUID.randomUUID().toString();
@@ -44,6 +45,12 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
         jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,'product_manager','测试负责人','enabled','test-user','test-user',NOW(6),NOW(6))", owner, tenant, owner, "执行负责人", "测试部");
         jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'测试','测试主任务','test-user','test-user',NOW(6),NOW(6))", rootType, tenant, line);
         jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'测试','测试','test-user','test-user',NOW(6),NOW(6))", type, tenant, line);
+        caseType = UUID.randomUUID().toString();
+        String caseWorkflow = UUID.randomUUID().toString();
+        var caseTemplate = WorkItemTemplate.types().stream().filter(value -> "功能测试".equals(value.name())).findFirst().orElseThrow();
+        String caseDefinition = objectMapper.writeValueAsString(WorkItemTemplate.workflow(caseTemplate).definition());
+        jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,description_,creator_name_,enabled_,is_default_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'用例','功能测试','测试类型','测试用户',1,1,'test-user','test-user',NOW(6),NOW(6))", caseType, tenant, line);
+        jdbc.update("INSERT INTO t_product_workflow(id_,tenant_id_,product_line_id_,category_,task_type_id_,workflow_version_,name_,status_,definition_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'case',?,1,'功能测试阶段配置','PUBLISHED',CAST(? AS JSON),'test-user','test-user',NOW(6),NOW(6))", caseWorkflow, tenant, line, caseType, caseDefinition);
         insertWorkItem(rootWorkItem, rootType, "TEST-ROOT", "测试主任务", null, false, "P1");
         jdbc.update("""
             INSERT INTO t_product_work_item(id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,parent_work_item_id_,workflow_id_,status_key_,status_name_,status_group_,priority_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_)
@@ -51,7 +58,7 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
             """, workItem, tenant, line, type, rootWorkItem);
         String directory = cases.createDirectory(line, new SaveDirectory(null, "核心流程", 1)).id();
         testCase = cases.create(line, new SaveCase(directory, null, "登录流程", "已有账号", "P1", owner,
-            List.of("smoke"), List.of(new StepInput(null, 1, "提交登录", "进入首页")), null));
+            List.of("smoke"), List.of(new StepInput(null, 1, "提交登录", "进入首页")), caseType, "status_pending", null));
     }
 
     @AfterEach
@@ -71,7 +78,7 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals("NOT_EXECUTED", result.get("result"));
 
         cases.update(line, testCase.id(), new SaveCase(testCase.directoryId(), null, "已修改标题", null, "P1", owner,
-            List.of(), List.of(new StepInput(null, 1, "新步骤", "新结果")), testCase.revision()));
+            List.of(), List.of(new StepInput(null, 1, "新步骤", "新结果")), caseType, "status_in_progress", testCase.revision()));
         assertEquals("登录流程", firstResult(executions.execution(executionId)).get("title"));
 
         String resultId = result.get("id").toString();

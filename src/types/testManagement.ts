@@ -34,6 +34,13 @@ export interface TestCase {
   ownerId: string;
   ownerName: string;
   tags: string[];
+  workItemTypeId: string;
+  workItemTypeName: string;
+  workflowId: string;
+  statusKey: string;
+  statusName: string;
+  statusGroup: string;
+  statusColor: string;
   enabled: boolean;
   revision: number;
   referenceCount: number;
@@ -58,6 +65,8 @@ export interface SaveTestCaseInput {
   priority: TestPriority;
   ownerId: string;
   tags: string[];
+  workItemTypeId: string;
+  statusKey: string;
   steps: TestCaseStep[];
   revision?: number;
 }
@@ -93,6 +102,54 @@ export interface SaveTestPlanInput {
   startDate?: string | null;
   endDate?: string | null;
   revision: number;
+}
+
+export interface VersionTestReportPlan {
+  id: string;
+  name: string;
+  taskTitle: string;
+  ownerName: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  environment?: string | null;
+  status?: string;
+  total?: number;
+  passed?: number;
+  failed?: number;
+  notExecuted?: number;
+  passRate?: number;
+}
+
+export interface VersionTestReportListItem {
+  id: string;
+  name: string;
+  summary?: string;
+  creatorName: string;
+  firstPlanName?: string;
+  planCount: number;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TestReportMetric { name: string; value: number }
+
+export interface VersionTestReport extends VersionTestReportListItem {
+  versionName: string;
+  plans: VersionTestReportPlan[];
+  statistics: { total: number; defects: number; urgent: number; severe: number };
+  resultDistribution: TestReportMetric[];
+  repairDistribution: TestReportMetric[];
+  severityDistribution: TestReportMetric[];
+  priorityDistribution: TestReportMetric[];
+  urgentDefects: Array<{ id: string; code: string; title: string; status: string; priority: string; severity: string; assigneeName?: string }>;
+}
+
+export interface SaveVersionTestReportInput {
+  name: string;
+  testPlanIds: string[];
+  summary?: string;
+  revision?: number;
 }
 
 export interface TestEvidence {

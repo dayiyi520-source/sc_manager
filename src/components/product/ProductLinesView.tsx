@@ -405,7 +405,7 @@ export const ProductLinesView: React.FC = () => {
           <div className="flex items-center justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3">
             <div>
               <div className="font-semibold text-[var(--text-body)]">工作项设置模板</div>
-              <p className="mt-1 text-[11px] text-[var(--text-muted)]">自动创建需求、设计、研发、测试和缺陷类型及基础状态。</p>
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">自动创建需求、设计、研发、测试、缺陷和用例类型及基础状态。</p>
             </div>
             <Switch aria-label="工作项设置模板" checked={initializeWorkItemTemplate} disabled={isCreating} onChange={setInitializeWorkItemTemplate} />
           </div>

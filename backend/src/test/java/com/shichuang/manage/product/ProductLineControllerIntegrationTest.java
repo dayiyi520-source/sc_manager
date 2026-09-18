@@ -27,16 +27,30 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String enabledLineId = objectMapper.readTree(enabledResponse).path("data").path("id").asText();
 
-        assertEquals(21, jdbc.queryForObject(
+        assertEquals(33, jdbc.queryForObject(
             "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND delete_flag_=0", Integer.class, enabledLineId));
-        assertEquals(5, jdbc.queryForObject(
+        assertEquals(6, jdbc.queryForObject(
             "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND enabled_=1 AND is_default_=1 AND delete_flag_=0", Integer.class, enabledLineId));
-        assertEquals(5, jdbc.queryForObject(
+        assertEquals(6, jdbc.queryForObject(
             "SELECT COUNT(DISTINCT category_) FROM t_product_line_work_item_type WHERE product_line_id_=? AND is_default_=1 AND delete_flag_=0", Integer.class, enabledLineId));
         assertEquals(21, jdbc.queryForObject(
-            "SELECT COUNT(*) FROM t_product_workflow WHERE product_line_id_=? AND task_type_id_ IS NOT NULL AND status_='PUBLISHED' AND JSON_LENGTH(definition_,'$.states')=4 AND JSON_LENGTH(definition_,'$.transitions')=4 AND delete_flag_=0", Integer.class, enabledLineId));
-        assertEquals(21, jdbc.queryForObject(
-            "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND name_ IN ('产品类型需求','技术类需求','数据类需求','其他需求','需求设计','物料设计','其他设计','开发任务','缺陷修复任务','样式优化任务','性能优化任务','其他任务','测试任务','用例编写','测试验收','安全测试','回归测试','系统缺陷','样式缺陷','线上故障','安全漏洞')", Integer.class, enabledLineId));
+            "SELECT COUNT(*) FROM t_product_workflow WHERE product_line_id_=? AND category_<>'case' AND task_type_id_ IS NOT NULL AND status_='PUBLISHED' AND JSON_LENGTH(definition_,'$.states')=4 AND JSON_LENGTH(definition_,'$.transitions')=4 AND delete_flag_=0", Integer.class, enabledLineId));
+        assertEquals(12, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_workflow WHERE product_line_id_=? AND category_='case' AND task_type_id_ IS NOT NULL AND status_='PUBLISHED' AND JSON_LENGTH(definition_,'$.states')=4 AND JSON_LENGTH(definition_,'$.transitions')=5 AND delete_flag_=0", Integer.class, enabledLineId));
+        assertEquals(12, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND category_='用例' AND name_ IN ('功能测试','性能测试','兼容性测试','易用性测试','安全性测试','稳定性测试','接口测试','自动化测试','按照部署测试','冒烟测试','回归测试','其他')", Integer.class, enabledLineId));
+        assertEquals(12, jdbc.queryForObject("""
+            SELECT COUNT(*) FROM t_product_workflow
+            WHERE product_line_id_=? AND category_='case' AND status_='PUBLISHED' AND delete_flag_=0
+              AND JSON_UNQUOTE(JSON_EXTRACT(definition_,'$.states[0].name'))='待测试'
+              AND JSON_UNQUOTE(JSON_EXTRACT(definition_,'$.states[0].group'))='NOT_STARTED'
+              AND JSON_UNQUOTE(JSON_EXTRACT(definition_,'$.states[1].name'))='测试中'
+              AND JSON_UNQUOTE(JSON_EXTRACT(definition_,'$.states[1].group'))='IN_PROGRESS'
+              AND JSON_UNQUOTE(JSON_EXTRACT(definition_,'$.states[2].name'))='暂缓'
+              AND JSON_UNQUOTE(JSON_EXTRACT(definition_,'$.states[2].group'))='IN_PROGRESS'
+              AND JSON_UNQUOTE(JSON_EXTRACT(definition_,'$.states[3].name'))='已完成'
+              AND JSON_UNQUOTE(JSON_EXTRACT(definition_,'$.states[3].group'))='COMPLETED'
+            """, Integer.class, enabledLineId));
         assertEquals(5, jdbc.queryForObject("""
             SELECT COUNT(*) FROM t_product_work_item_child_rule rule
             JOIN t_product_line_work_item_type parent ON parent.id_=rule.parent_type_id_ AND parent.product_line_id_=rule.product_line_id_

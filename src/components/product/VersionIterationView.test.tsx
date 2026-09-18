@@ -66,6 +66,7 @@ vi.mock('../../context/AppContext', () => ({
 
 vi.mock('./CreateVersionModal', () => ({ CreateVersionModal: ({ isOpen, productLine }: { isOpen: boolean; productLine?: { id: string } }) => isOpen ? <div role="dialog" aria-label="创建迭代版本">产品线：{productLine?.id || '未选择'}</div> : null }));
 vi.mock('./WorkItemCreatePanel', () => ({ WorkItemCreatePanel: ({ isOpen, title }: { isOpen: boolean; title: string }) => isOpen ? <div role="dialog" aria-label={title}>{title}</div> : null }));
+vi.mock('./VersionTestReportPanel', () => ({ VersionTestReportPanel: () => <div>暂无测试报告</div> }));
 vi.mock('../common/Feedback', () => ({ showDeleteConfirm: appMocks.showDeleteConfirm }));
 
 describe('VersionIterationView', () => {
@@ -94,7 +95,7 @@ describe('VersionIterationView', () => {
     expect(screen.getByText('张瑞')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '迭代工时' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /迭代任务/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '安全测试' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '测试报告' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '版本评审' })).toBeInTheDocument();
     expect(screen.getByText('工作项分布')).toBeInTheDocument();
     expect(screen.getByText('工作项排名')).toBeInTheDocument();
@@ -105,8 +106,8 @@ describe('VersionIterationView', () => {
     expect(screen.getByText('已纳入迭代的工作项')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '已纳入迭代的工作项' }));
     expect(screen.getByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '安全测试' }));
-    expect(screen.getByText('暂无安全测试')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '测试报告' }));
+    expect(screen.getByText('暂无测试报告')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '版本评审' }));
     expect(screen.getByText('暂无版本评审')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '完成迭代' }));

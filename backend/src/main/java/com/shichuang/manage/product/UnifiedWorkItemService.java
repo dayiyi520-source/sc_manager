@@ -19,7 +19,7 @@ import java.util.Set;
 @Service
 @Transactional(readOnly = true)
 public class UnifiedWorkItemService {
-    private static final Set<String> CATEGORIES = Set.of("requirement", "design", "dev", "test", "bug");
+    private static final Set<String> CATEGORIES = Set.of("requirement", "design", "dev", "test", "bug", "case");
     private static final List<String> LIMITATIONS = List.of(
         "历史工作项尚未绑定分类流程版本", "历史数据或未配置交付规则的需求不能判定自动完成与可发布资格");
     private final UnifiedWorkItemMapper mapper;
