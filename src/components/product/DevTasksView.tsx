@@ -21,6 +21,7 @@ import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
+import { CollapsibleDescription } from './CollapsibleDescription';
 
 export const DevTasksView: React.FC = () => {
   const { devTasks, requirementTasks, addDevTask, updateDevTask, addToast } = useApp();
@@ -288,7 +289,7 @@ export const DevTasksView: React.FC = () => {
             </div>
             {detailTab === 'requirement' ? <DetailField label="关联需求">{requirementTasks.find((item) => item.id === selectedTask.requirementId)?.title || '未关联需求'}</DetailField> : <>
             <DetailField label="研发任务名称"><span className="font-medium">{selectedTask.title}</span></DetailField>
-            <DetailField label="任务描述"><p className="min-h-28 whitespace-pre-wrap break-words leading-6">{selectedTask.description || '未填写任务描述'}</p></DetailField>
+            <DetailField label="任务描述"><CollapsibleDescription value={selectedTask.description} emptyText="未填写任务描述" /></DetailField>
             </>}
           </div>
         </WorkItemCreatePanel>

@@ -1714,20 +1714,30 @@ html.dark .review-empty-icon {
 .test-case-library-toolbar { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border-main); padding: 0 4px 12px; }
 .test-case-library-toolbar h2 { margin: 0; color: var(--text-primary); font-size: 18px; line-height: 26px; font-weight: 700; }
 .test-case-library-toolbar p { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
-.test-case-library-actions { display: flex; flex: 0 0 auto; gap: 8px; }
-.test-case-library-grid { display: grid; grid-template-columns: minmax(200px, 232px) minmax(560px, 1fr) minmax(200px, 240px); min-height: 560px; overflow: hidden; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface); }
+.test-case-library-actions { display: flex; flex: 1 1 auto; justify-content: flex-end; gap: 8px; }
+.test-case-library-actions .ant-input { width: min(260px, 22vw); }
+.test-case-library-actions .ant-select { width: 120px; }
+.test-case-library-grid { display: grid; grid-template-columns: minmax(200px, 232px) minmax(560px, 1fr); min-height: 560px; overflow: hidden; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface); }
 .test-case-directory-rail, .test-case-inspector { min-width: 0; background: var(--bg-surface-soft); }
+.test-case-directory-rail { width: 232px; overflow: hidden; }
 .test-case-directory-rail { border-right: 1px solid var(--border-main); padding: 8px; }
 .test-case-inspector { border-left: 1px solid var(--border-main); padding: 8px 12px; }
 .test-case-panel-heading { display: flex; min-height: 40px; align-items: center; justify-content: space-between; padding: 0 4px 8px; color: var(--text-primary); font-size: 12px; font-weight: 700; }
 .test-case-directory-title { display: flex; min-width: 0; width: 100%; align-items: center; justify-content: space-between; gap: 8px; }
 .test-case-directory-title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .test-case-directory-title > b { color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; font-weight: 500; }
+.test-case-directory-title:hover > b { display: none; }
+.test-case-directory-actions { display: none; align-items: center; gap: 4px; }
+.test-case-directory-title:hover .test-case-directory-actions { display: inline-flex; }
+.test-case-directory-add, .test-case-directory-more { border: 0; padding: 2px 4px; color: var(--primary); background: transparent; cursor: pointer; }
+.test-case-directory-more { color: var(--text-muted); }
 .test-case-data-plane { min-width: 0; overflow: hidden; background: var(--bg-surface); }
 .test-case-filters { display: grid; grid-template-columns: minmax(240px, 1fr) 128px 128px; gap: 8px; border-bottom: 1px solid var(--border-main); padding: 12px; }
 .test-case-table-state { padding: 24px; }
+.test-case-batch-bar { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-main); padding: 10px 12px; color: var(--text-primary); }
+.test-case-empty { display: grid; justify-items: center; gap: 8px; }
 .test-case-code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: var(--active-text); font-size: 11px; }
-.test-case-title-button { display: block; max-width: 100%; overflow: hidden; border: 0; padding: 0; background: transparent; color: var(--text-primary); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; transition: color 160ms ease; }
+.test-case-title-button { display: block; width: min(260px, 100%); max-width: 10em; overflow: hidden; border: 0; padding: 0; background: transparent; color: var(--text-primary); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; transition: color 160ms ease; }
 .test-case-title-button:hover, .test-case-title-button:focus-visible { color: var(--primary-hover); outline: none; }
 .test-case-muted { color: var(--text-muted); }
 .test-case-inspector dl { display: grid; gap: 0; margin: 0; }
@@ -1881,6 +1891,9 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 .test-defect-row { grid-template-columns: auto minmax(0, 1fr) auto; }
 .test-defect-link { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 8px; }
 .test-task-overview { display: grid; gap: 16px; }
+.test-task-basic-info { display: grid; gap: 16px; }
+.test-task-basic-description { border: 1px solid var(--border-main); border-radius: 8px; padding: 16px; background: var(--bg-surface-soft); }
+.test-task-basic-description h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 14px; }
 .test-task-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border-main); border-radius: 8px; }
 .test-task-metrics > div { display: grid; gap: 4px; border-right: 1px solid var(--border-main); padding: 12px; }
 .test-task-metrics > div:last-child { border-right: 0; }
@@ -1896,6 +1909,13 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 .test-task-result-strip i.failed { background: var(--danger); }
 .test-defect-summary { grid-template-columns: 88px minmax(0, 1fr) auto 88px; }
 .test-case-authoring-state { border: 1px dashed var(--border-main); border-radius: 8px; padding: 24px; text-align: center; }
+.test-case-directory-title { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.test-case-directory-add { display: none; border: 0; padding: 0; color: var(--text-muted); background: transparent; cursor: pointer; }
+.test-case-directory-title:hover .test-case-directory-add { display: inline-flex; }
+.collapsible-description-wrap { min-width: 0; }
+.collapsible-description { min-height: 120px; max-height: 240px; overflow: hidden; margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text-body); line-height: 24px; }
+.collapsible-description.is-expanded { max-height: none; }
+.collapsible-description-toggle { margin-top: 8px; border: 0; padding: 0; color: var(--primary); background: transparent; cursor: pointer; font-size: 12px; }
 .test-case-authoring-state h3 { margin: 0; color: var(--text-primary); font-size: 14px; }
 .test-case-authoring-state p { margin: 8px auto 0; max-width: 560px; color: var(--text-muted); font-size: 12px; line-height: 20px; }
 

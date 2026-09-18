@@ -22,9 +22,11 @@ import { WorkItemStatusTag } from './WorkItemStatusTag';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { requirementRepository } from '../../services/requirementRepository';
+import { teamRepository } from '../../services/teamRepository';
 import { productRepository, UnifiedWorkItem, WorkItemTransitionAction, WorkItemTransitionOptions } from '../../services/productRepository';
 import { readSession } from '../../services/session';
 import { preferredWorkItemTypeName } from './workItemTypeDefaults';
+import { CollapsibleDescription } from './CollapsibleDescription';
 
 type RequirementFilterState = {
   title: { operator: TextFilterOperator; value: string };
@@ -489,7 +491,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         versionId: parentTask.versionId || undefined,
         requirementId: parentTask.requirementId || (parentTask.category === 'requirement' ? parentTask.id : undefined),
         parentWorkItemId: parentTask.id,
-        assigneeId: undefined,
+        assigneeId: employeeOptions.find((item) => item.name === formOwnerName)?.id,
         priority: apiPriority(childPriority),
         plannedStartDate: childPlannedStartDate || undefined,
         plannedEndDate: childDueDate || undefined,
@@ -594,7 +596,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const [employeeOptions, setEmployeeOptions] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
-    requirementRepository.employees()
+    teamRepository.options()
       .then((items) => {
         setEmployeeOptions(items);
         setEmployees(Array.from(new Set([currentUser.name, ...items.map((item) => item.name)])));
@@ -1241,7 +1243,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         <td className="px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>
         <td className="max-w-[240px] px-4 py-3.5 text-[var(--text-body)]"><span className="line-clamp-2 font-mono text-[var(--primary)]" title={task.versionName || '未关联'}>{task.versionName || '未关联'}</span></td>
         <td className="px-4 py-3.5 text-[var(--text-muted)]">
-          {isChild ? task.ownerName || '未设置' : <Select aria-label={`${task.title}负责人`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.ownerName || undefined} placeholder="未设置" options={employees.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => updateTask(task.id, { ownerName })} />}
+          {isChild ? <Select aria-label={`${task.title}负责人`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.ownerName || undefined} placeholder="未设置" options={employees.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => updateTask(task.id, { ownerName })} /> : task.ownerName || '未设置'}
         </td>
         <td className="px-4 py-3.5 text-[var(--text-muted)]">{task.creatorName || currentUser.name}</td>
         <td className="px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt || '—'}</td>
@@ -1375,7 +1377,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               <SearchableSelect label="所属产品线" value={selectedTask.productLineName || ''} options={productLines.map((line) => line.name)} onChange={(productLineName) => saveDetailUpdates({ productLineName, productLineId: productLines.find((line) => line.name === productLineName)?.id, versionName: '' })} placeholder="未设置" />
               <div><span className="block text-[var(--text-muted)]">当前状态</span><div className="mt-1">{taskStatusControl(selectedTask, true)}</div></div>
               <SearchableSelect label="需求类型" value={selectedTask.requirementType || ''} options={['业务需求', '产品优化', '技术需求', '合规需求']} onChange={(requirementType) => saveDetailUpdates({ requirementType })} placeholder="未设置" clearable />
-              <SearchableSelect label="负责人" value={selectedTask.ownerName || ''} options={employees} onChange={(ownerName) => saveDetailUpdates({ ownerName })} placeholder="未设置" />
+              {selectedTask.parentWorkItemId ? <SearchableSelect label="负责人" value={selectedTask.ownerName || ''} options={employees} onChange={(ownerName) => saveDetailUpdates({ ownerName })} placeholder="未设置" /> : <div><span className="block text-[var(--text-muted)]">负责人</span><span className="mt-1 block text-[var(--text-body)]">{selectedTask.ownerName || '未设置'}</span></div>}
               <SearchableSelect label="优先级" value={normalizePriority(selectedTask.priority)} options={['紧急', '高', '中', '低']} onChange={(priority) => saveDetailUpdates({ priority: priority as RequirementTask['priority'] })} />
               <DetailDateInput label="计划开始时间" value={selectedTask.plannedStartDate} onSave={(plannedStartDate) => saveDetailUpdates({ plannedStartDate })} />
               <DetailDateInput label="计划完成时间" value={selectedTask.dueDate} onSave={(dueDate) => saveDetailUpdates({ dueDate })} />
@@ -1408,11 +1410,10 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
             </section>}
             {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems })}</section>}
             <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
-              {taskKind === 'requirement' && <DetailTextInput label="验收标准" value={selectedTask.expectedGoal || ''} onSave={(expectedGoal) => saveDetailUpdates({ expectedGoal })} multiline />}
               <label className="block text-[var(--text-muted)]">
                 <span>任务描述</span>
                 <div className="mt-1">
-                  <RichTextEditor 
+                  {detailEditing ? <RichTextEditor
                     key={`detail-${selectedTask.id}-${detailEditing ? 'edit' : 'readonly'}`}
                     readOnly={!detailEditing}
                     editor={detailDescriptionEditor}
@@ -1427,7 +1428,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                       descriptionHtml: detailDescriptionHtml 
                     })}
                     placeholder="详细记录需求背景、业务场景和实现说明..."
-                  />
+                  /> : <CollapsibleDescription value={detailDescription} emptyText="未填写任务描述" />}
                 </div>
               </label>
             </div>

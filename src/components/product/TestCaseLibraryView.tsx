@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Button, Empty, Input, Modal, Select, Spin, Switch, Table, Tag, Tree } from 'antd';
-import { EditOutlined, FolderAddOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { Alert, Button, Dropdown, Empty, Form, Input, Modal, Select, Spin, Table, Tag, Tree } from 'antd';
+import { CopyOutlined, DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { productRepository } from '../../services/productRepository';
 import type { TestCase, TestCaseDirectory, TestPriority, TestResultStatus } from '../../types/testManagement';
@@ -9,10 +9,8 @@ import { TestCaseEditorDrawer } from './TestCaseEditorDrawer';
 type TestCaseLibraryViewProps = { productLineFilter?: string };
 const RESULT_LABEL: Record<TestResultStatus, string> = { NOT_EXECUTED: '未执行', PASSED: '通过', FAILED: '失败' };
 
-const BananaEmptyMark = () => <div className="test-case-banana" aria-hidden="true"><span /><i /></div>;
-
 export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ productLineFilter = 'all' }) => {
-  const lineId = productLineFilter === 'all' ? '' : productLineFilter;
+  const lineId = productLineFilter === 'all' ? 'all' : productLineFilter;
   const queryClient = useQueryClient();
   const [directoryId, setDirectoryId] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -23,67 +21,80 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
   const [editingCase, setEditingCase] = useState<TestCase | null>(null);
   const [directoryModalOpen, setDirectoryModalOpen] = useState(false);
   const [directoryName, setDirectoryName] = useState('');
+  const [directoryProductLineId, setDirectoryProductLineId] = useState('');
   const [actionError, setActionError] = useState('');
+  const [selectedCaseIds, setSelectedCaseIds] = useState<React.Key[]>([]);
+  const [batchAction, setBatchAction] = useState<string>();
 
-  const directories = useQuery({ queryKey: ['test-case-directories', lineId], queryFn: () => productRepository.testCaseDirectories(lineId), enabled: !!lineId, retry: false });
-  const cases = useQuery({ queryKey: ['test-cases', lineId, directoryId, keyword, priority, enabled, page], queryFn: () => productRepository.testCases(lineId, { directoryId, keyword, priority, enabled, page, pageSize: 20 }), enabled: !!lineId, retry: false });
+  const directories = useQuery({ queryKey: ['test-case-directories', lineId], queryFn: () => productRepository.testCaseDirectories(lineId), enabled: true, retry: false });
+  const productLines = useQuery({ queryKey: ['test-case-product-lines'], queryFn: () => productRepository.productLines(), enabled: true, retry: false });
+  const cases = useQuery({ queryKey: ['test-cases', lineId, directoryId, keyword, priority, enabled, page], queryFn: () => productRepository.testCases(lineId, { directoryId, keyword, priority, enabled, page, pageSize: 20 }), enabled: true, retry: false });
   const createDirectory = useMutation({
-    mutationFn: () => productRepository.createTestCaseDirectory(lineId, { parentId: directoryId || null, name: directoryName.trim() }),
-    onSuccess: () => { setDirectoryModalOpen(false); setDirectoryName(''); void queryClient.invalidateQueries({ queryKey: ['test-case-directories', lineId] }); },
+    mutationFn: () => productRepository.createTestCaseDirectory(lineId, { parentId: directoryId || null, productLineId: productLineFilter === 'all' ? directoryProductLineId : productLineFilter, name: directoryName.trim() }),
+    onSuccess: () => { setDirectoryModalOpen(false); setDirectoryName(''); setDirectoryProductLineId(''); void queryClient.invalidateQueries({ queryKey: ['test-case-directories', lineId] }); },
     onError: (reason) => setActionError(reason instanceof Error ? reason.message : '创建目录失败'),
   });
 
   const directoryTree = useMemo(() => {
-    const build = (parentId: string | null): Array<{ key: string; title: React.ReactNode; children: ReturnType<typeof build> }> => (directories.data || []).filter((item) => (item.parentId || null) === parentId).map((item) => ({
+    const build = (parentId: string | null, lineId?: string): Array<{ key: string; title: React.ReactNode; children: ReturnType<typeof build> }> => (directories.data || []).filter((item) => (item.parentId || null) === parentId && (!lineId || item.productLineId === lineId)).map((item) => ({
       key: item.id,
-      title: <span className="test-case-directory-title"><span>{item.name}</span><b>{item.caseCount}</b></span>,
-      children: build(item.id),
+      title: <span className="test-case-directory-title"><span>{item.name}</span><b>{item.caseCount}</b><span className="test-case-directory-actions"><button type="button" className="test-case-directory-add" aria-label={`在${item.name}下新建子目录`} onClick={(event) => { event.stopPropagation(); setDirectoryId(item.id); setDirectoryProductLineId(item.productLineId || productLineFilter); setDirectoryModalOpen(true); }}><PlusOutlined /></button><Dropdown trigger={['click']} menu={{ onClick: ({ key }) => { if (key === 'rename') renameDirectory(item); if (key === 'delete') removeDirectory(item); }, items: [{ key: 'rename', label: '重命名', icon: <EditOutlined /> }, { key: 'delete', label: '删除', icon: <DeleteOutlined />, danger: true }, { key: 'copy', label: '复制', icon: <CopyOutlined /> }] }}><button type="button" className="test-case-directory-more" aria-label={`${item.name}更多操作`} onClick={(event) => event.stopPropagation()}><MoreOutlined /></button></Dropdown></span></span>,
+      children: build(item.id, item.productLineId),
     }));
-    return build(null);
-  }, [directories.data]);
+    if (productLineFilter !== 'all') return build(null, productLineFilter);
+    const lineIds = [...new Set((directories.data || []).map((item) => item.productLineId).filter(Boolean))] as string[];
+    return lineIds.map((lineId) => ({
+      key: `product-line:${lineId}`,
+      title: <span className="test-case-directory-title"><span>{directories.data?.find((item) => item.productLineId === lineId)?.productLineName || '未命名产品线'}</span><b>{directories.data?.filter((item) => item.productLineId === lineId).reduce((total, item) => total + item.caseCount, 0) || 0}</b></span>,
+      children: build(null, lineId),
+    }));
+  }, [directories.data, productLineFilter]);
 
   const refresh = () => { void directories.refetch(); void cases.refetch(); };
   const openEditor = (value?: TestCase) => { setEditingCase(value || null); setEditorOpen(true); };
   const updateEnabled = async (value: TestCase, next: boolean) => {
     setActionError('');
     try {
-      await productRepository.setTestCaseEnabled(lineId, value.id, value.revision, next);
+      await productRepository.setTestCaseEnabled(value.productLineId || lineId, value.id, value.revision, next);
       await Promise.all([cases.refetch(), directories.refetch()]);
     } catch (reason) { setActionError(reason instanceof Error ? reason.message : '更新状态失败'); }
   };
-
-  if (!lineId) return <div className="test-case-library-state"><BananaEmptyMark /><h2>请选择产品线</h2><p>用例目录、编号和负责人均按产品线隔离。</p><Button type="primary" aria-label="新建用例" disabled icon={<PlusOutlined />}>新建用例</Button></div>;
+  const handleBatchAction = (value: string) => {
+    if (value === 'delete') {
+      Modal.confirm({ title: '确认删除用例？', content: `将删除选中的 ${selectedCaseIds.length} 条用例。`, okText: '确认删除', cancelText: '取消', okButtonProps: { danger: true }, onOk: () => setSelectedCaseIds([]) });
+      return;
+    }
+    setBatchAction(value);
+  };
+  const directoryLine = (item: TestCaseDirectory) => item.productLineId || (productLineFilter === 'all' ? '' : productLineFilter);
+  const renameDirectory = (item: TestCaseDirectory) => { const name = window.prompt('请输入新的目录名称', item.name); if (name?.trim()) void productRepository.renameTestCaseDirectory(directoryLine(item), item.id, name.trim()).then(() => directories.refetch()); };
+  const removeDirectory = (item: TestCaseDirectory) => { Modal.confirm({ title: '确认删除目录？', content: '仅允许删除空目录。', okText: '删除', cancelText: '取消', okButtonProps: { danger: true }, onOk: () => productRepository.deleteTestCaseDirectory(directoryLine(item), item.id).then(() => directories.refetch()) }); };
 
   return <div className="test-case-library">
     {actionError && <Alert closable onClose={() => setActionError('')} type="error" showIcon title="操作失败" description={actionError} />}
     <header className="test-case-library-toolbar">
-      <div><h2>测试用例库</h2><p>维护可复用步骤，并在测试计划中引用。</p></div>
-      <div className="test-case-library-actions"><Button aria-label="刷新用例库" icon={<ReloadOutlined />} loading={cases.isFetching} onClick={refresh} /><Button type="primary" icon={<PlusOutlined />} disabled={!directories.data?.length} onClick={() => openEditor()}>新建用例</Button></div>
+      <div><h2>测试用例库</h2></div>
+      <div className="test-case-library-actions"><Input allowClear prefix={<SearchOutlined />} value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} placeholder="搜索编号或标题" /><Select allowClear value={priority || undefined} onChange={(value) => { setPriority(value || ''); setPage(1); }} placeholder="优先级" options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} /><Select value={enabled === undefined ? 'all' : String(enabled)} onChange={(value) => { setEnabled(value === 'all' ? undefined : value === 'true'); setPage(1); }} options={[{ label: '全部状态', value: 'all' }, { label: '已启用', value: 'true' }, { label: '已停用', value: 'false' }]} /><Select placeholder="匹配操作" options={[{ label: '匹配全部', value: 'all' }, { label: '匹配标题', value: 'title' }, { label: '匹配编号', value: 'code' }]} /><Button aria-label="刷新用例库" icon={<ReloadOutlined />} loading={cases.isFetching} onClick={refresh} /><Button type="primary" icon={<PlusOutlined />} disabled={directories.isLoading || directories.isError} onClick={() => openEditor()}>新建用例</Button></div>
     </header>
     <div className="test-case-library-grid">
       <aside className="test-case-directory-rail">
-        <div className="test-case-panel-heading"><span>功能目录</span><Button type="text" aria-label="新建功能目录" icon={<FolderAddOutlined />} onClick={() => setDirectoryModalOpen(true)} /></div>
-        {directories.isLoading ? <Spin /> : directories.isError ? <Alert type="error" showIcon title="目录加载失败" action={<Button size="small" onClick={() => directories.refetch()}>重试</Button>} /> : <Tree blockNode selectedKeys={directoryId ? [directoryId] : []} treeData={[{ key: '', title: <span className="test-case-directory-title"><span>全部用例</span><b>{cases.data?.total || 0}</b></span>, children: directoryTree }]} onSelect={(keys) => { setDirectoryId(String(keys[0] || '')); setPage(1); }} />}
+        <div className="test-case-panel-heading"><span>功能目录</span><Button type="text" aria-label="新建功能目录" icon={<PlusOutlined />} onClick={() => { setDirectoryId(''); setDirectoryProductLineId(productLineFilter === 'all' ? '' : productLineFilter); setDirectoryModalOpen(true); }} /></div>
+        {directories.isLoading ? <Spin /> : directories.isError ? <Alert type="error" showIcon title="目录加载失败" action={<Button size="small" onClick={() => directories.refetch()}>重试</Button>} /> : <Tree blockNode selectedKeys={directoryId ? [directoryId] : []} treeData={productLineFilter === 'all' ? directoryTree : [{ key: '__current-product-line__', title: <span className="test-case-directory-title"><span>{productLines.data?.find((line) => line.id === productLineFilter)?.name || '当前产品线'}</span><b>{cases.data?.total || 0}</b></span>, children: directoryTree }]} onSelect={(keys) => { const key = String(keys[0] || ''); if (key.startsWith('__') || key.startsWith('product-line:')) return; setDirectoryId(key); setPage(1); }} />}
       </aside>
       <main className="test-case-data-plane">
-        <div className="test-case-filters"><Input allowClear prefix={<SearchOutlined />} value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} placeholder="搜索编号或标题" /><Select allowClear value={priority || undefined} onChange={(value) => { setPriority(value || ''); setPage(1); }} placeholder="优先级" options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} /><Select value={enabled === undefined ? 'all' : String(enabled)} onChange={(value) => { setEnabled(value === 'all' ? undefined : value === 'true'); setPage(1); }} options={[{ label: '全部状态', value: 'all' }, { label: '已启用', value: 'true' }, { label: '已停用', value: 'false' }]} /></div>
-        {cases.isError ? <div className="test-case-table-state"><Alert type="error" showIcon title="用例加载失败" description="请检查网络后重试。" action={<Button onClick={() => cases.refetch()}>重试</Button>} /></div> : <Table<TestCase> rowKey="id" loading={cases.isLoading} dataSource={cases.data?.items || []} scroll={{ x: 1040 }} pagination={{ current: page, pageSize: 20, total: cases.data?.total || 0, showSizeChanger: false, onChange: setPage }} locale={{ emptyText: <Empty image={<BananaEmptyMark />} description="当前目录暂无测试用例" /> }} columns={[
+        {selectedCaseIds.length > 0 && <div className="test-case-batch-bar"><span>已选中 {selectedCaseIds.length} 条用例</span><Select value={undefined} placeholder={`批量操作${selectedCaseIds.length}条`} onChange={handleBatchAction} options={[{ label: '移动用例', value: 'move' }, { label: '删除用例', value: 'delete' }, { label: '修改负责人', value: 'owner' }, { label: '修改优先级', value: 'priority' }, { label: '修改类型', value: 'type' }]} /><Button onClick={() => setSelectedCaseIds([])}>取消选择</Button></div>}
+        {cases.isError ? <div className="test-case-table-state"><Alert type="error" showIcon title="用例加载失败" description="请检查网络后重试。" action={<Button onClick={() => cases.refetch()}>重试</Button>} /></div> : <Table<TestCase> rowKey="id" rowSelection={{ selectedRowKeys: selectedCaseIds, onChange: setSelectedCaseIds }} loading={cases.isLoading} dataSource={cases.data?.items || []} scroll={{ x: 1040 }} pagination={{ current: page, pageSize: 20, total: cases.data?.total || 0, showSizeChanger: false, onChange: setPage }} locale={{ emptyText: <div className="test-case-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前目录暂无测试用例" /><Button type="primary" icon={<PlusOutlined />} disabled={directories.isLoading || directories.isError} onClick={() => openEditor()}>添加用例</Button></div> }} columns={[
           { title: '编号', dataIndex: 'code', width: 120, render: (value) => <span className="test-case-code">{value}</span> },
-          { title: '用例标题', dataIndex: 'title', width: 280, ellipsis: true, render: (value, row) => <button className="test-case-title-button" title={value} onClick={() => openEditor(row)}>{value}</button> },
-          { title: '优先级', dataIndex: 'priority', width: 88, render: (value) => <Tag>{value}</Tag> },
+          { title: '标题', dataIndex: 'title', width: 280, ellipsis: true, render: (value, row) => <button className="test-case-title-button" title={value} onClick={() => openEditor(row)}>{value}</button> },
+          { title: '创建时间', dataIndex: 'createdAt', width: 160, render: (value?: string) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-' },
           { title: '负责人', dataIndex: 'ownerName', width: 120, ellipsis: true },
-          { title: '最新结果', dataIndex: 'latestResult', width: 108, render: (value?: TestResultStatus) => value ? <Tag color={value === 'PASSED' ? 'success' : value === 'FAILED' ? 'error' : 'default'}>{RESULT_LABEL[value]}</Tag> : <span className="test-case-muted">无记录</span> },
-          { title: '引用', dataIndex: 'referenceCount', width: 72 },
-          { title: '状态', dataIndex: 'enabled', width: 92, render: (value, row) => <Switch size="small" checked={value} aria-label={`${row.title}启用状态`} onChange={(next) => void updateEnabled(row, next)} /> },
-          { title: '操作', key: 'actions', width: 72, fixed: 'right', render: (_, row) => <Button type="text" aria-label={`编辑${row.title}`} icon={<EditOutlined />} onClick={() => openEditor(row)} /> },
+          { title: '优先级', dataIndex: 'priority', width: 88, render: (value) => <Tag>{value}</Tag> },
+          { title: '类型', key: 'type', width: 100, render: () => '测试用例' },
         ]} />}
       </main>
-      <aside className="test-case-inspector">
-        <div className="test-case-panel-heading"><span>库概览</span></div>
-        <dl><div><dt>当前范围</dt><dd>{directoryId ? directories.data?.find((item) => item.id === directoryId)?.name : '全部目录'}</dd></div><div><dt>用例数量</dt><dd>{cases.data?.total || 0}</dd></div><div><dt>过滤状态</dt><dd>{enabled === undefined ? '全部' : enabled ? '已启用' : '已停用'}</dd></div></dl>
-      </aside>
     </div>
-    <Modal title={directoryId ? '新建子目录' : '新建根目录'} open={directoryModalOpen} onCancel={() => setDirectoryModalOpen(false)} onOk={() => createDirectory.mutate()} confirmLoading={createDirectory.isPending} okButtonProps={{ disabled: !directoryName.trim() }}><Input autoFocus value={directoryName} onChange={(event) => setDirectoryName(event.target.value)} maxLength={120} placeholder="请输入目录名称" /></Modal>
+    <Modal title={batchAction === 'move' ? '移动用例' : batchAction === 'owner' ? '修改负责人' : batchAction === 'priority' ? '修改优先级' : '修改类型'} open={!!batchAction} onCancel={() => setBatchAction(undefined)} onOk={() => setBatchAction(undefined)} okText="保存" cancelText="取消"><Select className="w-full" placeholder={batchAction === 'move' ? '选择目标目录' : batchAction === 'owner' ? '选择负责人' : batchAction === 'priority' ? '选择优先级' : '选择类型'} options={batchAction === 'move' ? (directories.data || []).map((item) => ({ label: item.name, value: item.id })) : batchAction === 'priority' ? ['P0', 'P1', 'P2', 'P3'].map((value) => ({ label: value, value })) : batchAction === 'type' ? [{ label: '测试用例', value: '测试用例' }] : []} /></Modal>
+    <Modal title={directoryId ? '新建子目录' : '新建根目录'} open={directoryModalOpen} onCancel={() => setDirectoryModalOpen(false)} footer={[<Button key="cancel" onClick={() => setDirectoryModalOpen(false)}>取消</Button>, <Button key="save" type="primary" loading={createDirectory.isPending} disabled={!directoryName.trim() || (productLineFilter === 'all' && !directoryProductLineId)} onClick={() => createDirectory.mutate()}>保存</Button>]}><Form layout="vertical"><Form.Item label="产品线" required={productLineFilter === 'all'}>{productLineFilter === 'all' ? <Select placeholder="请选择产品线" value={directoryProductLineId || undefined} onChange={setDirectoryProductLineId} options={(productLines.data || []).map((item) => ({ label: item.name, value: item.id }))} /> : <Input value={productLines.data?.find((item) => item.id === productLineFilter)?.name || '当前产品线'} disabled />}</Form.Item><Form.Item label="目录名称" required><Input autoFocus value={directoryName} onChange={(event) => setDirectoryName(event.target.value)} maxLength={120} placeholder="请输入目录名称" /></Form.Item></Form></Modal>
     <TestCaseEditorDrawer open={editorOpen} productLineId={lineId} directories={directories.data || []} initialCase={editingCase} onClose={() => setEditorOpen(false)} onSaved={() => { setEditorOpen(false); void cases.refetch(); void directories.refetch(); }} />
   </div>;
 };

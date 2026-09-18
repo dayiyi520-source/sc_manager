@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, Button, Empty, Progress, Tabs, Tag } from 'antd';
+import { Alert, Button, Descriptions, Empty, Progress, Tabs, Tag } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { productRepository } from '../../services/productRepository';
 import type { TestTaskOverview } from '../../types/testManagement';
 import { RequirementTasksView, type WorkItemDetailContext } from './RequirementTasksView';
 import { TestExecutionResults } from './TestExecutionResults';
 import { TestPlanPanel } from './TestPlanPanel';
+import { CollapsibleDescription } from './CollapsibleDescription';
 
 const BLOCKER_LABEL: Record<string, string> = {
   REQUIRED_CHILD_INCOMPLETE: '仍有必需子任务未完成',
@@ -13,7 +14,7 @@ const BLOCKER_LABEL: Record<string, string> = {
   OPEN_BLOCKING_DEFECTS: '仍有未关闭的 P0/P1 缺陷',
 };
 
-const TestRootOverview: React.FC<{ workItemId: string }> = ({ workItemId }) => {
+const TestRootOverview: React.FC<{ workItemId: string; task: WorkItemDetailContext['task'] }> = ({ workItemId, task }) => {
   const overview = useQuery({ queryKey: ['test-task-overview', workItemId], queryFn: () => productRepository.testTaskOverview(workItemId), retry: false });
   if (overview.isLoading) return <div className="test-task-loading">正在计算主任务汇总...</div>;
   if (overview.isError || !overview.data) return <Alert type="error" showIcon title="主任务汇总加载失败" action={<Button onClick={() => overview.refetch()}>重试</Button>} />;
@@ -27,10 +28,12 @@ const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task }) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const types = useQuery({ queryKey: ['test-work-item-types', task.productLineId], queryFn: () => productRepository.workItemTypes(task.productLineId || '', '测试'), enabled: !!task.productLineId, retry: false });
   const typeName = types.data?.find((item) => item.id === task.workItemTypeId)?.name || task.requirementType || '';
-  if (!task.parentWorkItemId) return <TestRootOverview workItemId={task.id} />;
+  if (!task.parentWorkItemId) return <TestRootOverview workItemId={task.id} task={task} />;
   if (types.isLoading) return <div className="test-task-loading">正在识别测试子任务类型...</div>;
   if (typeName === '用例编写') return <div className="test-case-authoring-state"><h3>关联用例</h3><p>在“用例库”中按当前来源需求创建或维护用例，再由可执行测试子任务加入测试计划。</p></div>;
+  const basicInfo = <div className="test-task-basic-info"><Descriptions column={2} size="small" bordered items={[{ key: 'owner', label: '负责人', children: task.ownerName || '未设置' }, { key: 'status', label: '状态', children: task.status || '未设置' }, { key: 'priority', label: '优先级', children: task.priority || '未设置' }, { key: 'version', label: '版本', children: task.versionName || '未设置' }, { key: 'product', label: '产品线', children: task.productLineName || '未设置' }, { key: 'due', label: '截止时间', children: task.dueDate || '未设置' }]} /><section className="test-task-basic-description"><h3>任务描述</h3><CollapsibleDescription value={task.description} /></section></div>;
   return <Tabs className="test-task-detail-tabs" items={[
+    { key: 'basic', label: '基本信息', children: basicInfo },
     { key: 'plan', label: '测试计划', children: <TestPlanPanel workItemId={task.id} productLineId={task.productLineId || ''} sourceRequirementId={task.requirementId} onExecutionCreated={() => setRefreshKey((value) => value + 1)} /> },
     { key: 'executions', label: '执行记录', children: <TestExecutionResults workItemId={task.id} productLineId={task.productLineId || ''} refreshKey={refreshKey} /> },
     { key: 'defects', label: '关联缺陷', children: <div className="test-case-authoring-state"><h3>关联缺陷</h3><p>失败结果可关联多个同需求缺陷，详情与状态继续由现有缺陷管理页面维护。</p></div> },

@@ -13,21 +13,26 @@ public class TestCaseMapper {
         List<Map<String,Object>> rows=jdbc.queryForList(sql,args); return rows.isEmpty()?null:rows.get(0);
     }
     public Map<String,Object> directory(String tenant,String line,String id) {
-        return one("SELECT id_ AS id,parent_id_ AS parentId,name_ AS name,sort_ AS sort,version_ AS revision FROM t_product_test_case_directory WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",tenant,line,id);
+        return one("SELECT d.id_ AS id,d.parent_id_ AS parentId,d.name_ AS name,d.sort_ AS sort,d.product_line_id_ AS productLineId,p.name_ AS productLineName,d.version_ AS revision FROM t_product_test_case_directory d JOIN t_product_line p ON p.tenant_id_=d.tenant_id_ AND p.id_=d.product_line_id_ AND p.delete_flag_=0 WHERE d.tenant_id_=? AND (?='all' OR d.product_line_id_=?) AND d.id_=? AND d.delete_flag_=0",tenant,line,line,id);
     }
     public List<Map<String,Object>> directories(String tenant,String line) {
         return jdbc.queryForList("""
-            SELECT d.id_ AS id,d.parent_id_ AS parentId,d.name_ AS name,d.sort_ AS sort,d.version_ AS revision,
+            SELECT d.id_ AS id,d.parent_id_ AS parentId,d.name_ AS name,d.sort_ AS sort,d.product_line_id_ AS productLineId,p.name_ AS productLineName,d.version_ AS revision,
               COUNT(c.id_) AS caseCount
             FROM t_product_test_case_directory d
+            JOIN t_product_line p ON p.tenant_id_=d.tenant_id_ AND p.id_=d.product_line_id_ AND p.delete_flag_=0
             LEFT JOIN t_product_test_case c ON c.tenant_id_=d.tenant_id_ AND c.product_line_id_=d.product_line_id_ AND c.directory_id_=d.id_ AND c.delete_flag_=0
-            WHERE d.tenant_id_=? AND d.product_line_id_=? AND d.delete_flag_=0
-            GROUP BY d.id_,d.parent_id_,d.name_,d.sort_,d.version_ ORDER BY d.sort_,d.create_time_,d.id_
-            """,tenant,line);
+            WHERE d.tenant_id_=? AND (?='all' OR d.product_line_id_=?) AND d.delete_flag_=0
+            GROUP BY d.id_,d.parent_id_,d.name_,d.sort_,d.product_line_id_,p.name_,d.version_ ORDER BY d.sort_,d.create_time_,d.id_
+            """,tenant,line,line);
     }
     public void insertDirectory(String tenant,String line,String id,String parent,String name,int sort,String user) {
         jdbc.update("INSERT INTO t_product_test_case_directory(id_,tenant_id_,product_line_id_,parent_id_,name_,sort_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,?,NOW(6),NOW(6))",id,tenant,line,parent,name,sort,user,user);
     }
+    public int renameDirectory(String tenant,String line,String id,String name,String user) { return jdbc.update("UPDATE t_product_test_case_directory SET name_= ?,version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",name,user,tenant,line,id); }
+    public int deleteDirectory(String tenant,String line,String id,String user) { return jdbc.update("UPDATE t_product_test_case_directory SET delete_flag_=1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",user,tenant,line,id); }
+    public boolean hasChildren(String tenant,String line,String id) { Long n=jdbc.queryForObject("SELECT COUNT(*) FROM t_product_test_case_directory WHERE tenant_id_=? AND product_line_id_=? AND parent_id_=? AND delete_flag_=0",Long.class,tenant,line,id); return n!=null&&n>0; }
+    public boolean hasCases(String tenant,String line,String id) { Long n=jdbc.queryForObject("SELECT COUNT(*) FROM t_product_test_case WHERE tenant_id_=? AND product_line_id_=? AND directory_id_=? AND delete_flag_=0",Long.class,tenant,line,id); return n!=null&&n>0; }
     private static final String CASE_SELECT="""
         SELECT c.id_ AS id,c.code_ AS code,c.product_line_id_ AS productLineId,c.directory_id_ AS directoryId,
           d.name_ AS directoryName,c.source_requirement_id_ AS sourceRequirementId,r.title_ AS sourceRequirementTitle,
@@ -38,15 +43,15 @@ public class TestCaseMapper {
         FROM t_product_test_case c
         JOIN t_product_test_case_directory d ON d.tenant_id_=c.tenant_id_ AND d.product_line_id_=c.product_line_id_ AND d.id_=c.directory_id_ AND d.delete_flag_=0
         LEFT JOIN t_product_work_item r ON r.tenant_id_=c.tenant_id_ AND r.product_line_id_=c.product_line_id_ AND r.id_=c.source_requirement_id_ AND r.delete_flag_=0
-        WHERE c.tenant_id_=? AND c.product_line_id_=? AND c.delete_flag_=0
+        WHERE c.tenant_id_=? AND (?='all' OR c.product_line_id_=?) AND c.delete_flag_=0
         """;
-    public Map<String,Object> item(String tenant,String line,String id) { return one(CASE_SELECT+" AND c.id_=?",tenant,line,id); }
+    public Map<String,Object> item(String tenant,String line,String id) { return one(CASE_SELECT+" AND c.id_=?",tenant,line,line,id); }
     public long count(String tenant,String line,TestCaseDefinition.Query q) {
-        StringBuilder sql=new StringBuilder("SELECT COUNT(*) FROM t_product_test_case c WHERE c.tenant_id_=? AND c.product_line_id_=? AND c.delete_flag_=0");
-        List<Object>a=new ArrayList<>(List.of(tenant,line)); filters(sql,a,q); return jdbc.queryForObject(sql.toString(),Long.class,a.toArray());
+        StringBuilder sql=new StringBuilder("SELECT COUNT(*) FROM t_product_test_case c WHERE c.tenant_id_=? AND (?='all' OR c.product_line_id_=?) AND c.delete_flag_=0");
+        List<Object>a=new ArrayList<>(List.of(tenant,line,line)); filters(sql,a,q); return jdbc.queryForObject(sql.toString(),Long.class,a.toArray());
     }
     public List<Map<String,Object>> list(String tenant,String line,TestCaseDefinition.Query q) {
-        StringBuilder sql=new StringBuilder(CASE_SELECT); List<Object>a=new ArrayList<>(List.of(tenant,line)); filters(sql,a,q);
+        StringBuilder sql=new StringBuilder(CASE_SELECT); List<Object>a=new ArrayList<>(List.of(tenant,line,line)); filters(sql,a,q);
         sql.append(" ORDER BY c.create_time_ DESC,c.id_ LIMIT ? OFFSET ?"); a.add(q.pageSize());a.add((q.page()-1)*q.pageSize());
         return jdbc.queryForList(sql.toString(),a.toArray());
     }

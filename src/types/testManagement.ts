@@ -16,6 +16,8 @@ export interface TestCaseDirectory {
   name: string;
   sort: number;
   caseCount: number;
+  productLineId?: string;
+  productLineName?: string;
 }
 
 export interface TestCase {

@@ -63,9 +63,10 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
         revision: initialCase?.revision,
       };
       setSaving(true);
+      const actualLineId = productLineId === 'all' ? directories.find((directory) => directory.id === values.directoryId)?.productLineId || productLineId : productLineId;
       const saved = initialCase
-        ? await productRepository.updateTestCase(productLineId, initialCase.id, body)
-        : await productRepository.createTestCase(productLineId, body);
+        ? await productRepository.updateTestCase(actualLineId, initialCase.id, body)
+        : await productRepository.createTestCase(actualLineId, body);
       onSaved(saved);
     } catch (reason) {
       if (reason instanceof Error) setError(reason.message || '保存测试用例失败');
@@ -79,13 +80,13 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
     {employees.isError && <Alert className="mb-4" type="error" showIcon title="负责人加载失败" action={<Button size="small" onClick={() => employees.refetch()}>重试</Button>} />}
     {error && <Alert className="mb-4" type="error" showIcon title="保存失败" description={error.includes('409') ? '用例已被其他人修改，请关闭后重新打开。' : error} />}
     <Form form={form} layout="vertical" disabled={!productLineId || saving} requiredMark>
+      <Form.Item name="title" label="用例标题" rules={[{ required: true, whitespace: true, message: '请填写用例标题' }]}><Input size="large" prefix={<span aria-hidden="true">▣</span>} maxLength={255} showCount placeholder="请输入标题" /></Form.Item>
       <div className="test-case-editor-grid">
         <Form.Item name="directoryId" label="功能目录" rules={[{ required: true, message: '请选择功能目录' }]}><Select showSearch optionFilterProp="label" options={directories.map((directory) => ({ label: directory.name, value: directory.id }))} /></Form.Item>
         <Form.Item name="priority" label="优先级" rules={[{ required: true }]}><Select options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} /></Form.Item>
         <Form.Item name="ownerId" label="负责人" rules={[{ required: true, message: '请选择负责人' }]}><Select showSearch loading={employees.isLoading} optionFilterProp="label" options={(employees.data || []).map((employee) => ({ label: `${employee.name} · ${employee.department || '未分配部门'}`, value: employee.id }))} /></Form.Item>
         <Form.Item name="tagsText" label="标签"><Input placeholder="使用逗号或顿号分隔" maxLength={240} /></Form.Item>
       </div>
-      <Form.Item name="title" label="用例标题" rules={[{ required: true, whitespace: true, message: '请填写用例标题' }]}><Input maxLength={255} showCount /></Form.Item>
       <Form.Item name="precondition" label="前置条件"><Input.TextArea rows={3} maxLength={5000} showCount /></Form.Item>
       <section className="test-case-step-section">
         <div className="test-case-step-heading"><div><h3>测试步骤</h3><span>执行时将保存当前内容快照</span></div></div>

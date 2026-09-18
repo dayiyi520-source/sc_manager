@@ -99,7 +99,9 @@ export const productRepository = {
   createBusinessTask: (kind: BusinessTaskKind, body: Partial<RequirementTask>) => apiRequest<{ id: string; code: string }>(businessTaskPath(kind), { method: 'POST', body: JSON.stringify(body) }),
   updateBusinessTask: (kind: BusinessTaskKind, id: string, body: Record<string, unknown>) => apiRequest<void>(`${businessTaskPath(kind)}/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   ,testCaseDirectories: (lineId: string) => apiRequest<TestCaseDirectory[]>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories`)
-  ,createTestCaseDirectory: (lineId: string, body: { parentId?: string | null; name: string; sort?: number }) => apiRequest<TestCaseDirectory>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories`, { method: 'POST', body: JSON.stringify(body) })
+  ,createTestCaseDirectory: (lineId: string, body: { parentId?: string | null; productLineId?: string; name: string; sort?: number }) => apiRequest<TestCaseDirectory>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories`, { method: 'POST', body: JSON.stringify(body) })
+  ,renameTestCaseDirectory: (lineId: string, directoryId: string, name: string) => apiRequest<TestCaseDirectory>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories/${encodeURIComponent(directoryId)}`, { method: 'PUT', body: JSON.stringify({ name }) })
+  ,deleteTestCaseDirectory: (lineId: string, directoryId: string) => apiRequest<void>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories/${encodeURIComponent(directoryId)}`, { method: 'DELETE' })
   ,testCases: (lineId: string, filters: { directoryId?: string; keyword?: string; priority?: string; ownerId?: string; enabled?: boolean; page?: number; pageSize?: number } = {}) => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });

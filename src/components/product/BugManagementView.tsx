@@ -23,6 +23,7 @@ import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
 import { SearchableSelect } from '../common';
 import { BugItem } from '../../types';
+import { CollapsibleDescription } from './CollapsibleDescription';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
@@ -396,7 +397,7 @@ export const BugManagementView: React.FC = () => {
             {detailTab === 'requirement' ? <DetailField label="关联需求">{requirementTasks.find((item) => item.id === selectedBug.requirementId)?.title || '未关联需求'}</DetailField> : <>
             <DetailField label="缺陷编号"><span className="font-mono">{selectedBug.code || '未设置'}</span></DetailField>
             <DetailField label="缺陷名称"><span className="font-medium">{selectedBug.title}</span></DetailField>
-            <DetailField label="复现步骤 / 缺陷描述"><p className="min-h-28 whitespace-pre-wrap break-words leading-6">{selectedBug.description || '未填写缺陷描述'}</p></DetailField>
+            <DetailField label="复现步骤 / 缺陷描述"><CollapsibleDescription value={selectedBug.description} emptyText="未填写缺陷描述" /></DetailField>
             <DetailField label="关联工单">
               {selectedBug.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedBug.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : '未关联工单'}
             </DetailField>
