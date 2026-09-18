@@ -1881,7 +1881,9 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 }
 
 .test-task-detail-extension { border-bottom: 1px solid var(--border-main); padding-bottom: 20px; }
-.test-task-detail-header { margin-bottom: 20px; border-bottom: 1px solid var(--border-main); padding-bottom: 16px; }
+.test-task-detail-header { display: grid; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--border-main); padding-bottom: 16px; }
+.test-task-detail-title { margin: 0; color: var(--text-primary); font-size: 18px; line-height: 26px; font-weight: 700; }
+.test-task-detail-title-input { max-width: 760px; font-size: 16px; font-weight: 600; }
 .test-task-detail-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; color: var(--text-body); font-size: 12px; }
 .test-task-detail-meta span { min-width: 0; }
 .test-task-detail-meta i { width: 1px; height: 16px; flex: 0 0 1px; background: var(--border-main); }
@@ -1890,6 +1892,7 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 .test-task-section-heading h3, .test-execution-header h3 { margin: 0; color: var(--text-primary); font-size: 14px; line-height: 20px; }
 .test-task-section-heading span, .test-execution-header span { color: var(--text-muted); font-size: 11px; }
 .test-plan-panel { display: grid; gap: 16px; min-width: 0; }
+.test-plan-item { display: grid; gap: 8px; min-width: 0; }
 .test-plan-empty { display: grid; min-height: 320px; place-items: center; border: 1px dashed var(--border-main); border-radius: 8px; background: var(--bg-surface); }
 .test-plan-summary { display: grid; grid-template-columns: 24px minmax(180px, 1.3fr) minmax(96px, .6fr) minmax(190px, 1fr) 136px minmax(120px, .8fr) 88px; align-items: center; gap: 12px; min-height: 64px; border: 1px solid var(--border-main); border-radius: 8px; padding: 12px 16px; background: var(--bg-surface); color: var(--text-body); cursor: pointer; }
 .test-plan-summary:hover, .test-plan-summary:focus-visible { border-color: var(--primary); outline: none; }
@@ -1953,13 +1956,13 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 .test-task-overview { display: grid; gap: 16px; }
 .test-task-basic-info { display: grid; gap: 16px; }
 .test-task-basic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--border-main); border-radius: 8px; }
-.test-task-basic-grid > label { display: grid; grid-template-columns: 132px minmax(0, 1fr); min-height: 48px; align-items: center; border-right: 1px solid var(--border-main); border-bottom: 1px solid var(--border-main); }
+.test-task-basic-grid > label { display: grid; grid-template-columns: 132px minmax(0, 1fr); min-width: 0; min-height: 48px; align-items: center; border-right: 1px solid var(--border-main); border-bottom: 1px solid var(--border-main); }
 .test-task-basic-grid > label:nth-child(2n) { border-right: 0; }
 .test-task-basic-grid > label:nth-last-child(-n+2) { border-bottom: 0; }
 .test-task-basic-grid > label > span { align-self: stretch; display: flex; align-items: center; padding: 0 12px; background: var(--bg-surface-soft); color: var(--text-muted); font-size: 11px; }
-.test-task-basic-grid > label > b, .test-task-basic-grid > label > .ant-select, .test-task-basic-grid > label > .ant-picker, .test-task-basic-grid > label > .ant-input-number, .test-task-basic-grid > label > div { margin: 8px 12px; }
+.test-task-basic-grid > label > b, .test-task-basic-grid > label > .ant-select, .test-task-basic-grid > label > .ant-picker, .test-task-basic-grid > label > .ant-input-number, .test-task-basic-grid > label > .ant-input, .test-task-basic-grid > label > div { margin: 8px 12px; }
 .test-task-basic-grid > label > b { color: var(--text-primary); font-size: 12px; font-weight: 500; }
-.test-task-basic-grid .ant-select, .test-task-basic-grid .ant-picker, .test-task-basic-grid .ant-input-number { width: calc(100% - 24px); }
+.test-task-basic-grid .ant-select, .test-task-basic-grid .ant-picker, .test-task-basic-grid .ant-input-number, .test-task-basic-grid .ant-input { width: calc(100% - 24px); min-width: 0; max-width: calc(100% - 24px); box-sizing: border-box; }
 .test-task-basic-description { border: 1px solid var(--border-main); border-radius: 8px; padding: 16px; background: var(--bg-surface-soft); }
 .test-task-basic-description h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 14px; }
 .test-task-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border-main); border-radius: 8px; }

@@ -961,10 +961,10 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     void performTaskTransition(task, action, options.revision);
   };
 
-  const taskStatusControl = (task: RequirementTask, fullWidth = false) => {
+  const taskStatusControl = (task: RequirementTask, fullWidth = false, disabled = false) => {
     if (task.hasChildren) return <WorkItemStatusTag name={task.status || '待处理'} />;
     if (!unifiedCategory || !task.productLineId || !task.statusKey) {
-      return <Select aria-label={`${task.title}状态`} variant={fullWidth ? 'outlined' : 'borderless'} style={{ width: fullWidth ? '100%' : 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.status} options={STAGES.map((status, index) => ({ label: status, value: status, disabled: index < STAGES.indexOf(task.status) }))} onChange={(status) => updateTask(task.id, { status })} />;
+      return <Select disabled={disabled} aria-label={`${task.title}状态`} variant={fullWidth ? 'outlined' : 'borderless'} style={{ width: fullWidth ? '100%' : 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.status} options={STAGES.map((status, index) => ({ label: status, value: status, disabled: index < STAGES.indexOf(task.status) }))} onChange={(status) => updateTask(task.id, { status })} />;
     }
     const options = transitionOptions[task.id];
     const statuses = options?.statuses?.length ? options.statuses : [{ key: task.statusKey, name: task.status, color: task.statusColor || 'neutral', current: true, allowed: true, reasons: [] }];
@@ -974,6 +974,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       style={{ width: fullWidth ? '100%' : 120 }}
       popupMatchSelectWidth={180}
       showSearch
+      disabled={disabled}
       optionFilterProp="label"
       value={task.statusKey}
       loading={transitionLoadingId === task.id}
@@ -1254,7 +1255,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           {isChild ? <Select aria-label={`${task.title}负责人`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.ownerName || undefined} placeholder="未设置" options={employees.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => updateTask(task.id, { ownerName })} /> : task.ownerName || '未设置'}
         </td>
         <td className="px-4 py-3.5 text-[var(--text-muted)]">{task.creatorName || currentUser.name}</td>
-        <td className="px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt || '—'}</td>
+        <td className="px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt ? dayjs(task.createdAt).format('YYYY-MM-DD') : '—'}</td>
         <td className="px-4 py-3.5 text-right">
           <Dropdown menu={operationMenu(task)} trigger={['click']}>
             <Button type="text" icon={<MoreOutlined />} aria-label={`操作${task.title}`} />
@@ -1364,7 +1365,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         <WorkItemCreatePanel
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
-          title={taskKind === 'test' ? selectedTask.title : `${itemLabel}详情`}
+          title={taskKind === 'test' ? '测试任务详情' : `${itemLabel}详情`}
           presentation="drawer"
           showContinueOption={false}
           footer={
@@ -1416,7 +1417,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                 <span className="truncate">{String(parentWorkItem.title || '')}</span>
               </button>
             </section>}
-            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems, editing: detailEditing, onUpdate: saveDetailUpdates, employeeNames: employees, versions, statusControl: taskStatusControl(selectedTask, true) })}</section>}
+            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems, editing: detailEditing, onUpdate: saveDetailUpdates, employeeNames: employees, versions, statusControl: taskStatusControl(selectedTask, true, !detailEditing) })}</section>}
             {taskKind !== 'test' && <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
               <label className="block text-[var(--text-muted)]">
                 <span>任务描述</span>

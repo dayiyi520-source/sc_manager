@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, DatePicker, Empty, InputNumber, Progress, Select, Table, Tabs, Tag } from 'antd';
+import { Alert, Button, DatePicker, Empty, Input, InputNumber, Progress, Select, Table, Tabs, Tag } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { productRepository } from '../../services/productRepository';
@@ -41,10 +41,11 @@ const TestTaskDefects: React.FC<{ workItemId: string }> = ({ workItemId }) => {
 
 const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, editing, onUpdate, employeeNames, versions, statusControl }) => {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || '');
   const [descriptionHtml, setDescriptionHtml] = useState(task.descriptionHtml || '');
   const descriptionEditor = useRef<HTMLDivElement | null>(null);
-  useEffect(() => { setDescription(task.description || ''); setDescriptionHtml(task.descriptionHtml || ''); }, [task.id, task.description, task.descriptionHtml]);
+  useEffect(() => { setTitle(task.title); setDescription(task.description || ''); setDescriptionHtml(task.descriptionHtml || ''); }, [task.id, task.title, task.description, task.descriptionHtml]);
   const types = useQuery({ queryKey: ['test-work-item-types', task.productLineId], queryFn: () => productRepository.workItemTypes(task.productLineId || '', '测试'), enabled: !!task.productLineId, retry: false });
   const typeName = types.data?.find((item) => item.id === task.workItemTypeId)?.name || task.requirementType || '';
   if (types.isLoading) return <div className="test-task-loading">正在识别测试子任务类型...</div>;
@@ -53,20 +54,20 @@ const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, editing, onUpda
   const lineVersions = versions.filter((version) => !version.productLineName || version.productLineName === task.productLineName);
   const basicInfo = <div className="test-task-basic-info">
     <div className="test-task-basic-grid">
-      <label><span>负责人</span>{editing ? <Select showSearch optionFilterProp="label" value={task.ownerName || undefined} options={employeeNames.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => onUpdate({ ownerName })} placeholder="未设置" /> : <b>{task.ownerName || '未设置'}</b>}</label>
-      <label><span>状态</span>{editing ? statusControl : <b>{task.status || '未设置'}</b>}</label>
-      <label><span>优先级</span>{editing ? <Select value={task.priority || undefined} options={['P0', 'P1', 'P2', 'P3'].map((value) => ({ value, label: value }))} onChange={(priority) => onUpdate({ priority })} /> : <b>{task.priority || '未设置'}</b>}</label>
-      <label><span>迭代版本</span>{editing ? <Select allowClear showSearch optionFilterProp="label" value={task.versionId || undefined} options={lineVersions.map((version) => ({ label: version.name, value: version.id }))} onChange={(versionId) => onUpdate({ versionId, versionName: lineVersions.find((version) => version.id === versionId)?.name || '' })} placeholder="未设置" /> : <b>{task.versionName || '未设置'}</b>}</label>
-      <label><span>产品线</span><b>{task.productLineName || '未设置'}</b></label>
-      <label><span>计划开始时间</span>{editing ? <DatePicker value={task.plannedStartDate ? dayjs(task.plannedStartDate) : null} onChange={(date) => onUpdate({ plannedStartDate: date?.format('YYYY-MM-DD') || '' })} /> : <b>{task.plannedStartDate || '未设置'}</b>}</label>
-      <label><span>计划完成时间</span>{editing ? <DatePicker value={task.dueDate ? dayjs(task.dueDate) : null} onChange={(date) => onUpdate({ dueDate: date?.format('YYYY-MM-DD') || '' })} /> : <b>{task.dueDate || '未设置'}</b>}</label>
-      <label><span>预计工时（小时）</span>{editing ? <InputNumber min={0} precision={2} value={task.estimatedHours || 0} onChange={(estimatedHours) => onUpdate({ estimatedHours: estimatedHours || 0 })} /> : <b>{task.estimatedHours || 0}</b>}</label>
+      <label><span>负责人</span><Select disabled={!editing} showSearch optionFilterProp="label" value={task.ownerName || undefined} options={employeeNames.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => onUpdate({ ownerName })} placeholder="未设置" /></label>
+      <label><span>状态</span><div>{statusControl}</div></label>
+      <label><span>优先级</span><Select disabled={!editing} value={task.priority || undefined} options={['P0', 'P1', 'P2', 'P3'].map((value) => ({ value, label: value }))} onChange={(priority) => onUpdate({ priority })} placeholder="未设置" /></label>
+      <label><span>迭代版本</span><Select disabled={!editing} allowClear showSearch optionFilterProp="label" value={task.versionId || undefined} options={lineVersions.map((version) => ({ label: version.name, value: version.id }))} onChange={(versionId) => onUpdate({ versionId, versionName: lineVersions.find((version) => version.id === versionId)?.name || '' })} placeholder="未设置" /></label>
+      <label><span>产品线</span><Input disabled value={task.productLineName || '未设置'} /></label>
+      <label><span>计划开始时间</span><DatePicker disabled={!editing} value={task.plannedStartDate ? dayjs(task.plannedStartDate) : null} onChange={(date) => onUpdate({ plannedStartDate: date?.format('YYYY-MM-DD') || '' })} placeholder="未设置" /></label>
+      <label><span>计划完成时间</span><DatePicker disabled={!editing} value={task.dueDate ? dayjs(task.dueDate) : null} onChange={(date) => onUpdate({ dueDate: date?.format('YYYY-MM-DD') || '' })} placeholder="未设置" /></label>
+      <label><span>预计工时（小时）</span><InputNumber disabled={!editing} min={0} precision={2} value={task.estimatedHours || 0} onChange={(estimatedHours) => onUpdate({ estimatedHours: estimatedHours || 0 })} /></label>
     </div>
     <section className="test-task-basic-description"><h3>任务描述</h3>{editing ? <RichTextEditor key={`test-detail-${task.id}`} editor={descriptionEditor} value={description} htmlValue={descriptionHtml} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} onBlur={() => onUpdate({ description, descriptionHtml })} placeholder="详细记录测试范围、环境和验收标准..." /> : <CollapsibleDescription value={description} emptyText="未填写任务描述" />}</section>
   </div>;
-  return <div className="test-task-detail-page"><header className="test-task-detail-header"><div className="test-task-detail-meta"><span>所属需求：{requirementLabel}</span><i /> <span>产品线/版本号：{task.productLineName || '未设置'} / {task.versionName || '未设置'}</span><i /> <span>负责人：{task.ownerName || '未设置'}</span></div></header><Tabs className="test-task-detail-tabs" items={[
+  return <div className="test-task-detail-page"><header className="test-task-detail-header">{editing ? <Input className="test-task-detail-title-input" value={title} onChange={(event) => setTitle(event.target.value)} onBlur={() => { const nextTitle = title.trim(); if (nextTitle && nextTitle !== task.title) onUpdate({ title: nextTitle }); else setTitle(task.title); }} /> : <h2 className="test-task-detail-title">{task.title}</h2>}<div className="test-task-detail-meta"><span>所属需求：{requirementLabel}</span><i /> <span>产品线/版本号：{task.productLineName || '未设置'} / {task.versionName || '未设置'}</span><i /> <span>负责人：{task.ownerName || '未设置'}</span></div></header><Tabs className="test-task-detail-tabs" items={[
     { key: 'basic', label: '基本信息', children: basicInfo },
-    { key: 'plan', label: '测试计划', children: <TestPlanPanel task={task} workItemId={task.id} productLineId={task.productLineId || ''} sourceRequirementId={task.requirementId} onExecutionCreated={() => setRefreshKey((value) => value + 1)} /> },
+    { key: 'plan', label: '测试计划', children: <TestPlanPanel task={task} workItemId={task.id} productLineId={task.productLineId || ''} sourceRequirementId={task.requirementId} employeeNames={employeeNames} onExecutionCreated={() => setRefreshKey((value) => value + 1)} /> },
     { key: 'executions', label: '执行记录', children: <TestExecutionResults workItemId={task.id} productLineId={task.productLineId || ''} refreshKey={refreshKey} /> },
     { key: 'defects', label: '关联缺陷', children: <TestTaskDefects workItemId={task.id} /> },
   ]} /></div>;

@@ -20,20 +20,24 @@ public class TestExecutionService {
     private final WorkItemRelationService relations; private final ObjectMapper json;
     public TestExecutionService(TestExecutionMapper mapper,WorkItemAccess access,WorkItemStorageMapper storage,WorkItemRelationService relations,ObjectMapper json){this.mapper=mapper;this.access=access;this.storage=storage;this.relations=relations;this.json=json;}
 
-    public Map<String,Object> plan(String workItem){Map<String,Object> item=requireItem(workItem,false);Map<String,Object> plan=mapper.plan(RequestContext.tenantId(),workItem);return planView(item,plan);}
-    @Transactional public Map<String,Object> savePlan(String workItem,SavePlan input){
+    public Map<String,Object> plan(String workItem){Map<String,Object> item=requireItem(workItem,false);return planView(item,mapper.plan(RequestContext.tenantId(),workItem));}
+    public List<Map<String,Object>> plans(String workItem){Map<String,Object> item=requireItem(workItem,false);return mapper.plans(RequestContext.tenantId(),workItem).stream().map(plan->planView(item,plan)).toList();}
+    @Transactional public Map<String,Object> createPlan(String workItem,SavePlan input){return savePlan(workItem,null,input);}
+    @Transactional public Map<String,Object> savePlan(String workItem,String planId,SavePlan input){
         Map<String,Object> item=requireExecutable(workItem,true);String tenant=RequestContext.tenantId(),line=item.get("productLineId").toString();
         List<String> ids=input.testCaseIds()==null?List.of():input.testCaseIds().stream().filter(Objects::nonNull).distinct().toList();for(String id:ids)requireEnabledCase(tenant,line,id);
-        Map<String,Object> plan=mapper.plan(tenant,workItem);String planId;
-        if(plan==null){if(input.revision()!=null&&input.revision()!=0)throw conflict("测试计划已变化，请刷新后重试");planId=UUID.randomUUID().toString();mapper.insertPlan(tenant,planId,item,input.environment(),RequestContext.userId());}
-        else{planId=plan.get("id").toString();if(input.revision()==null||mapper.updatePlan(tenant,planId,input.revision(),input.environment(),RequestContext.userId())!=1)throw conflict("测试计划已变化，请刷新后重试");}
-        mapper.replacePlanCases(tenant,planId,ids,RequestContext.userId());return plan(workItem);
+        String name=required(input.name(),"计划名称",120);if(input.startDate()!=null&&input.endDate()!=null&&input.startDate().isAfter(input.endDate()))throw bad("计划开始时间不能晚于结束时间");
+        Map<String,Object> existing=planId==null?null:mapper.plan(tenant,workItem,planId);String savedId=planId;
+        if(planId==null){if(input.revision()!=null&&input.revision()!=0)throw conflict("测试计划已变化，请刷新后重试");savedId=UUID.randomUUID().toString();mapper.insertPlan(tenant,savedId,item,name,blank(input.environment()),input.startDate(),input.endDate(),RequestContext.userId());}
+        else{if(existing==null)throw missing("测试计划不存在");if(input.revision()==null||mapper.updatePlan(tenant,planId,input.revision(),name,blank(input.environment()),input.startDate(),input.endDate(),RequestContext.userId())!=1)throw conflict("测试计划已变化，请刷新后重试");}
+        mapper.replacePlanCases(tenant,savedId,ids,RequestContext.userId());return planView(item,mapper.plan(tenant,workItem,savedId));
     }
+    @Transactional public Map<String,Object> savePlan(String workItem,SavePlan input){Map<String,Object> existing=mapper.plan(RequestContext.tenantId(),workItem);return existing==null?createPlan(workItem,input):savePlan(workItem,existing.get("id").toString(),input);}
     public List<Map<String,Object>> executions(String workItem){requireExecutable(workItem,false);return mapper.executions(RequestContext.tenantId(),workItem);}
     @Transactional public Map<String,Object> createExecution(String workItem,CreateExecution input){
-        Map<String,Object> item=requireExecutable(workItem,true);String tenant=RequestContext.tenantId(),line=item.get("productLineId").toString();Map<String,Object> plan=mapper.plan(tenant,workItem);if(plan==null)throw bad("请先创建测试计划");
+        Map<String,Object> item=requireExecutable(workItem,true);String tenant=RequestContext.tenantId(),line=item.get("productLineId").toString();Map<String,Object> plan=blank(input.planId())==null?mapper.plan(tenant,workItem):mapper.plan(tenant,workItem,input.planId());if(plan==null)throw bad("请先创建测试计划");
         List<Map<String,Object>> planCases=mapper.planCases(tenant,plan.get("id").toString());if(planCases.isEmpty())throw bad("测试计划尚未选择用例");
-        String request=required(input.requestId(),"请求标识",64),payload=input.scopeType()+"|"+Objects.toString(input.testCaseIds(),"")+"|"+Objects.toString(input.name(),"")+"|"+Objects.toString(input.environment(),"")+"|"+Objects.toString(input.buildVersion(),"");String hash=hash(payload);
+        String request=required(input.requestId(),"请求标识",64),payload=plan.get("id")+"|"+input.scopeType()+"|"+Objects.toString(input.testCaseIds(),"")+"|"+Objects.toString(input.name(),"")+"|"+Objects.toString(input.environment(),"")+"|"+Objects.toString(input.buildVersion(),"");String hash=hash(payload);
         Map<String,Object> prior=mapper.executionRequest(tenant,workItem,request);if(prior!=null){if(!hash.equals(prior.get("requestHash")))throw conflict("请求标识已用于其他执行轮次");return execution(prior.get("id").toString());}
         List<String> ids=switch(input.scopeType()==null?ScopeType.ALL:input.scopeType()){
             case ALL->planCases.stream().map(v->v.get("testCaseId").toString()).toList();
@@ -66,8 +70,8 @@ public class TestExecutionService {
         Map<String,Object> root=requireItem(workItem,false);String tenant=RequestContext.tenantId();List<Map<String,Object>> children=mapper.descendants(tenant,workItem);List<Map<String,Object>> targets=new ArrayList<>();targets.add(root);targets.addAll(children);
         List<Map<String,Object>> latestExecutions=new ArrayList<>();Set<String>caseIds=new HashSet<>();Map<String,Map<String,Object>> defects=new LinkedHashMap<>();Map<String,Map<String,Object>> latestDefects=new LinkedHashMap<>();
         for(Map<String,Object> child:targets){
-            String childId=child.get("id").toString();Map<String,Object> plan=mapper.plan(tenant,childId);
-            if(plan!=null)mapper.planCases(tenant,plan.get("id").toString()).forEach(v->caseIds.add(v.get("testCaseId").toString()));
+            String childId=child.get("id").toString();
+            mapper.plans(tenant,childId).forEach(plan->mapper.planCases(tenant,plan.get("id").toString()).forEach(v->caseIds.add(v.get("testCaseId").toString())));
             mapper.defectsForWorkItem(tenant,childId).forEach(defect->defects.put(defect.get("id").toString(),defect));
             Map<String,Object> latest=mapper.latestEndedExecution(tenant,childId);if(latest==null)continue;
             mapper.executionCases(tenant,latest.get("id").toString()).forEach(result->mapper.defects(tenant,result.get("id").toString()).forEach(defect->latestDefects.put(defect.get("id").toString(),defect)));

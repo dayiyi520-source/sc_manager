@@ -78,9 +78,21 @@ export interface TestPlan {
   id?: string | null;
   workItemId: string;
   executable: boolean;
+  name?: string;
   environment?: string;
+  startDate?: string | null;
+  endDate?: string | null;
   revision: number;
   cases: TestPlanCase[];
+}
+
+export interface SaveTestPlanInput {
+  testCaseIds: string[];
+  name: string;
+  environment?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  revision: number;
 }
 
 export interface TestEvidence {
@@ -121,6 +133,8 @@ export interface TestExecutionCase {
 export interface TestExecution {
   id: string;
   workItemId: string;
+  testPlanId: string;
+  planName?: string;
   roundNo: number;
   name: string;
   scopeType: TestExecutionScope;
@@ -140,6 +154,7 @@ export interface TestExecution {
 
 export interface CreateTestExecutionInput {
   requestId: string;
+  planId: string;
   scopeType: TestExecutionScope;
   testCaseIds: string[];
   name: string;

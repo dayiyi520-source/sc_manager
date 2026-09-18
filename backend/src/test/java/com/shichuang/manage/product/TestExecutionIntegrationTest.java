@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -60,11 +61,11 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
     void createsImmutableRoundAndEnforcesResultStateMachine() {
-        Map<String, Object> plan = executions.savePlan(workItem, new SavePlan(List.of(testCase.id()), "测试环境", 0));
+        Map<String, Object> plan = executions.savePlan(workItem, new SavePlan(List.of(testCase.id()), "主流程计划", "测试环境", null, null, 0));
         assertEquals(1, ((List<?>) plan.get("cases")).size());
 
         Map<String, Object> round = executions.createExecution(workItem,
-            new CreateExecution("round-1", ScopeType.ALL, List.of(), "第一轮", "测试环境", "build-1"));
+            new CreateExecution("round-1", null, ScopeType.ALL, List.of(), "第一轮", "测试环境", "build-1"));
         String executionId = round.get("id").toString();
         Map<String, Object> result = firstResult(round);
         assertEquals("NOT_EXECUTED", result.get("result"));
@@ -96,40 +97,52 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
         jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'测试','测试任务','test-user','test-user',NOW(6),NOW(6))", type, tenant, line);
         insertWorkItem(standalone, type, "TEST-STANDALONE", "独立测试任务", null, false, "P1");
 
-        Map<String, Object> plan = executions.savePlan(standalone, new SavePlan(List.of(testCase.id()), "测试环境", 0));
+        Map<String, Object> plan = executions.savePlan(standalone, new SavePlan(List.of(testCase.id()), "独立任务计划", "测试环境", null, null, 0));
         assertNotNull(plan.get("id"));
         Map<String, Object> round = executions.createExecution(standalone,
-            new CreateExecution("standalone-round", ScopeType.ALL, List.of(), "第一轮", "测试环境", null));
+            new CreateExecution("standalone-round", null, ScopeType.ALL, List.of(), "第一轮", "测试环境", null));
         assertEquals(1, ((List<?>) round.get("cases")).size());
     }
 
     @Test
+    void supportsMultiplePlansWithIndependentExecutionRounds() {
+        Map<String, Object> first = executions.createPlan(workItem, new SavePlan(List.of(testCase.id()), "冒烟计划", "集成环境", LocalDate.of(2026, 9, 19), LocalDate.of(2026, 9, 20), 0));
+        Map<String, Object> second = executions.createPlan(workItem, new SavePlan(List.of(testCase.id()), "回归计划", "预发环境", LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 22), 0));
+
+        assertEquals(2, executions.plans(workItem).size());
+        Map<String, Object> round = executions.createExecution(workItem,
+            new CreateExecution("second-plan-round", second.get("id").toString(), ScopeType.ALL, List.of(), "回归第一轮", null, null));
+        assertEquals(second.get("id"), round.get("testPlanId"));
+        assertNotEquals(first.get("id"), round.get("testPlanId"));
+    }
+
+    @Test
     void reusesIdempotentRequestAndBuildsFailedOnlyRound() {
-        executions.savePlan(workItem, new SavePlan(List.of(testCase.id()), null, 0));
-        CreateExecution input = new CreateExecution("same-request", ScopeType.ALL, List.of(), "第一轮", null, null);
+        executions.savePlan(workItem, new SavePlan(List.of(testCase.id()), "回归计划", null, null, null, 0));
+        CreateExecution input = new CreateExecution("same-request", null, ScopeType.ALL, List.of(), "第一轮", null, null);
         Map<String, Object> first = executions.createExecution(workItem, input);
         assertEquals(first.get("id"), executions.createExecution(workItem, input).get("id"));
         assertThrows(ResponseStatusException.class, () -> executions.createExecution(workItem,
-            new CreateExecution("same-request", ScopeType.ALL, List.of(), "不同载荷", null, null)));
+            new CreateExecution("same-request", null, ScopeType.ALL, List.of(), "不同载荷", null, null)));
 
         Map<String, Object> result = firstResult(first);
         executions.saveResult(result.get("id").toString(), new SaveResult(ResultStatus.FAILED, "失败", List.of(), 0));
         executions.end(first.get("id").toString(), 0);
         Map<String, Object> regression = executions.createExecution(workItem,
-            new CreateExecution("round-2", ScopeType.FAILED_ONLY, List.of(), "失败用例回归", null, null));
+            new CreateExecution("round-2", null, ScopeType.FAILED_ONLY, List.of(), "失败用例回归", null, null));
         assertEquals(2, ((Number) regression.get("roundNo")).intValue());
         assertEquals(1, ((List<?>) regression.get("cases")).size());
     }
 
     @Test
     void rejectsEmptyPlanAndOversizedEvidence() {
-        executions.savePlan(workItem, new SavePlan(List.of(), null, 0));
+        executions.savePlan(workItem, new SavePlan(List.of(), "空计划", null, null, null, 0));
         assertThrows(IllegalArgumentException.class, () -> executions.createExecution(workItem,
-            new CreateExecution("empty", ScopeType.ALL, List.of(), null, null, null)));
+            new CreateExecution("empty", null, ScopeType.ALL, List.of(), null, null, null)));
 
-        executions.savePlan(workItem, new SavePlan(List.of(testCase.id()), null, 0));
+        executions.savePlan(workItem, new SavePlan(List.of(testCase.id()), "证据计划", null, null, null, 0));
         Map<String, Object> round = executions.createExecution(workItem,
-            new CreateExecution("evidence", ScopeType.ALL, List.of(), null, null, null));
+            new CreateExecution("evidence", null, ScopeType.ALL, List.of(), null, null, null));
         Map<String, Object> result = firstResult(round);
         assertThrows(IllegalArgumentException.class, () -> executions.saveResult(result.get("id").toString(),
             new SaveResult(ResultStatus.FAILED, "失败", List.of(new EvidenceInput("过大.pdf", "application/pdf", 10L * 1024 * 1024 + 1, "data:application/pdf;base64,AA==")), 0)));
@@ -137,9 +150,9 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
     void linksMultipleDefectsAndAggregatesOnlyLatestEndedRound() {
-        executions.savePlan(workItem, new SavePlan(List.of(testCase.id()), null, 0));
+        executions.savePlan(workItem, new SavePlan(List.of(testCase.id()), "缺陷计划", null, null, null, 0));
         Map<String, Object> first = executions.createExecution(workItem,
-            new CreateExecution("aggregate-1", ScopeType.ALL, List.of(), "第一轮", null, null));
+            new CreateExecution("aggregate-1", null, ScopeType.ALL, List.of(), "第一轮", null, null));
         Map<String, Object> failed = firstResult(first);
         Map<String, Object> saved = executions.saveResult(failed.get("id").toString(),
             new SaveResult(ResultStatus.FAILED, "失败", List.of(), 0));
@@ -154,7 +167,7 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
         executions.end(first.get("id").toString(), 0);
 
         Map<String, Object> second = executions.createExecution(workItem,
-            new CreateExecution("aggregate-2", ScopeType.FAILED_ONLY, List.of(), "第二轮回归", null, null));
+            new CreateExecution("aggregate-2", null, ScopeType.FAILED_ONLY, List.of(), "第二轮回归", null, null));
         executions.saveResult(firstResult(second).get("id").toString(), new SaveResult(ResultStatus.PASSED, null, List.of(), 0));
         executions.end(second.get("id").toString(), 0);
 

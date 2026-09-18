@@ -1,7 +1,7 @@
 import { apiRequest } from './apiClient';
 import type { ProductLine, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, VersionIteration, RequirementTask, DefectBug, DevTask } from '../types';
 import type { PageResult } from './apiClient';
-import type { CreateTestExecutionInput, SaveTestCaseInput, TestCase, TestCaseDirectory, TestCasePage, TestEvidence, TestExecution, TestExecutionScope, TestPlan, TestResultStatus, TestTaskOverview } from '../types/testManagement';
+import type { CreateTestExecutionInput, SaveTestCaseInput, SaveTestPlanInput, TestCase, TestCaseDirectory, TestCasePage, TestEvidence, TestExecution, TestExecutionScope, TestPlan, TestResultStatus, TestTaskOverview } from '../types/testManagement';
 
 type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
@@ -115,7 +115,9 @@ export const productRepository = {
   ,setTestCaseEnabled: (lineId: string, caseId: string, revision: number, enabled: boolean) => apiRequest<TestCase>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/${encodeURIComponent(caseId)}/enabled`, { method: 'PUT', body: JSON.stringify({ revision, enabled }) })
   ,batchUpdateTestCases: (lineId: string, body: { caseIds: string[]; operation: 'MOVE' | 'OWNER' | 'PRIORITY' | 'DELETE' | 'TYPE'; value?: string }) => apiRequest<void>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/batch`, { method: 'POST', body: JSON.stringify(body) })
   ,testPlan: (workItemId: string) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plan`)
-  ,saveTestPlan: (workItemId: string, body: { testCaseIds: string[]; environment?: string; revision: number }) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plan`, { method: 'PUT', body: JSON.stringify(body) })
+  ,testPlans: (workItemId: string) => apiRequest<TestPlan[]>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans`)
+  ,createTestPlan: (workItemId: string, body: SaveTestPlanInput) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans`, { method: 'POST', body: JSON.stringify(body) })
+  ,saveTestPlan: (workItemId: string, planId: string, body: SaveTestPlanInput) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans/${encodeURIComponent(planId)}`, { method: 'PUT', body: JSON.stringify(body) })
   ,testExecutions: (workItemId: string) => apiRequest<TestExecution[]>(`/api/work-items/${encodeURIComponent(workItemId)}/test-executions`)
   ,createTestExecution: (workItemId: string, body: CreateTestExecutionInput) => apiRequest<TestExecution>(`/api/work-items/${encodeURIComponent(workItemId)}/test-executions`, { method: 'POST', body: JSON.stringify(body) })
   ,testExecutionDetail: (executionId: string) => apiRequest<TestExecution>(`/api/test-executions/${encodeURIComponent(executionId)}`)
