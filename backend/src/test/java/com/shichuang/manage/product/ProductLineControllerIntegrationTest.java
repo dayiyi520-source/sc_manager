@@ -19,6 +19,80 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
+    void initializesCompleteWorkItemTemplateOnlyWhenRequested() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        String enabledResponse = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"模板产品线\",\"code\":\"TPL-" + System.nanoTime() + "\",\"ownerUserId\":\"user-admin\",\"initializeWorkItemTemplate\":true}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String enabledLineId = objectMapper.readTree(enabledResponse).path("data").path("id").asText();
+
+        assertEquals(21, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND delete_flag_=0", Integer.class, enabledLineId));
+        assertEquals(5, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND enabled_=1 AND is_default_=1 AND delete_flag_=0", Integer.class, enabledLineId));
+        assertEquals(5, jdbc.queryForObject(
+            "SELECT COUNT(DISTINCT category_) FROM t_product_line_work_item_type WHERE product_line_id_=? AND is_default_=1 AND delete_flag_=0", Integer.class, enabledLineId));
+        assertEquals(21, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_workflow WHERE product_line_id_=? AND task_type_id_ IS NOT NULL AND status_='PUBLISHED' AND JSON_LENGTH(definition_,'$.states')=4 AND JSON_LENGTH(definition_,'$.transitions')=4 AND delete_flag_=0", Integer.class, enabledLineId));
+        assertEquals(21, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND name_ IN ('产品类型需求','技术类需求','数据类需求','其他需求','需求设计','物料设计','其他设计','开发任务','缺陷修复任务','样式优化任务','性能优化任务','其他任务','测试任务','用例编写','测试验收','安全测试','回归测试','系统缺陷','样式缺陷','线上故障','安全漏洞')", Integer.class, enabledLineId));
+
+        String disabledResponse = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"空模板产品线\",\"code\":\"NO-TPL-" + System.nanoTime() + "\",\"ownerUserId\":\"user-admin\",\"initializeWorkItemTemplate\":false}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String disabledLineId = objectMapper.readTree(disabledResponse).path("data").path("id").asText();
+        assertEquals(0, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND delete_flag_=0", Integer.class, disabledLineId));
+    }
+
+    @Test
+    void keepsAtMostOneEnabledDefaultTypePerCategory() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        String response = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"默认类型产品线\",\"code\":\"DEFAULT-" + System.nanoTime() + "\",\"ownerUserId\":\"user-admin\",\"initializeWorkItemTemplate\":true}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String lineId = objectMapper.readTree(response).path("data").path("id").asText();
+        String nextDefaultId = jdbc.queryForObject(
+            "SELECT id_ FROM t_product_line_work_item_type WHERE product_line_id_=? AND category_='需求' AND name_='技术类需求'", String.class, lineId);
+
+        mockMvc.perform(put("/api/product-lines/{id}/work-item-types/{typeId}", lineId, nextDefaultId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"isDefault\":true}"))
+            .andExpect(status().isOk());
+        assertEquals("技术类需求", jdbc.queryForObject(
+            "SELECT name_ FROM t_product_line_work_item_type WHERE product_line_id_=? AND category_='需求' AND is_default_=1 AND delete_flag_=0", String.class, lineId));
+        assertEquals(1, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND category_='需求' AND is_default_=1 AND delete_flag_=0", Integer.class, lineId));
+
+        mockMvc.perform(put("/api/product-lines/{id}/work-item-types/{typeId}", lineId, nextDefaultId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"enabled\":false}"))
+            .andExpect(status().isOk());
+        assertEquals(0, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND category_='需求' AND is_default_=1 AND delete_flag_=0", Integer.class, lineId));
+
+        String enabledTypeId = jdbc.queryForObject(
+            "SELECT id_ FROM t_product_line_work_item_type WHERE product_line_id_=? AND category_='需求' AND name_='产品类型需求'", String.class, lineId);
+        mockMvc.perform(put("/api/product-lines/{id}/work-item-types/{typeId}", lineId, enabledTypeId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"isDefault\":true}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/api/product-lines/{id}/work-item-types/{typeId}", lineId, nextDefaultId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"isDefault\":true}"))
+            .andExpect(status().isOk());
+        assertEquals("产品类型需求", jdbc.queryForObject(
+            "SELECT name_ FROM t_product_line_work_item_type WHERE product_line_id_=? AND category_='需求' AND is_default_=1 AND delete_flag_=0", String.class, lineId));
+
+        mockMvc.perform(get("/api/product-lines/{id}/work-item-types", lineId).header("Authorization", authorization))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].isDefault").exists());
+    }
+
+    @Test
     void filtersProductLineListByVisibilityCreatorAndMembership() throws Exception {
         String suffix = String.valueOf(System.nanoTime());
         String outsider = "user-outsider-" + suffix;

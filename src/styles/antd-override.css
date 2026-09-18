@@ -72,9 +72,9 @@
 }
 
 /* The DatePicker wrapper owns its border and focus ring, not its inner input. */
-.tech-shell .task-page .work-item-panel .ant-picker .ant-picker-input > input,
-.tech-shell .task-page .work-item-panel .ant-picker .ant-picker-input > input:hover,
-.tech-shell .task-page .work-item-panel .ant-picker .ant-picker-input > input:focus-visible {
+.tech-shell .ant-picker .ant-picker-input > input,
+.tech-shell .ant-picker .ant-picker-input > input:hover,
+.tech-shell .ant-picker .ant-picker-input > input:focus-visible {
   border: 0 !important;
   border-radius: 0 !important;
   outline: none !important;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Input, Button, Select } from "antd";
+import { Input, Button, Select, Switch } from "antd";
 import { SearchOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -44,6 +44,8 @@ export const ProductLinesView: React.FC = () => {
   const [formOwnerUserId, setFormOwnerUserId] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formWebsite, setFormWebsite] = useState('');
+  const [initializeWorkItemTemplate, setInitializeWorkItemTemplate] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
 
   // If a product line is selected, show its full detail view
   if (selectedProductLineId) {
@@ -72,10 +74,11 @@ export const ProductLinesView: React.FC = () => {
     setFormOwnerUserId('');
     setFormDescription('');
     setFormWebsite('');
+    setInitializeWorkItemTemplate(true);
   };
 
   // Submit new product line
-  const handleSaveLine = (e: React.FormEvent) => {
+  const handleSaveLine = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim() || !formCode.trim() || !formOwnerUserId) {
       addToast('warning', '请填写产品线名称、编码并选择负责人');
@@ -87,7 +90,8 @@ export const ProductLinesView: React.FC = () => {
       return;
     }
 
-    addProductLine({
+    setIsCreating(true);
+    const saved = await addProductLine({
       name: formName.trim(),
       code: formCode.trim().toUpperCase(),
       ownerUserId: selectedOwner.id,
@@ -116,18 +120,13 @@ export const ProductLinesView: React.FC = () => {
       currentVersion: 'V1.0.0',
       versionCount: 1,
       customerCount: 0,
-      health: '启用中'
+      health: '启用中',
+      initializeWorkItemTemplate
     });
-
+    setIsCreating(false);
+    if (!saved) return;
     setIsModalOpen(false);
-
-    // Reset form
-    setFormName('');
-    setFormCode('');
-    setFormDescription('');
-    setFormOwnerUserId('');
-    setFormWebsite('');
-    setFormWebsite('https://os.shichuang.cloud');
+    resetCreateForm();
   };
 
   // Helper to compute statistics for each card
@@ -331,6 +330,7 @@ export const ProductLinesView: React.FC = () => {
               type="primary"
               htmlType="submit"
               form="create-product-line-form"
+              loading={isCreating}
             >
               保存
             </Button>
@@ -396,6 +396,14 @@ export const ProductLinesView: React.FC = () => {
               onChange={(e) => setFormDescription(e.target.value)}
               placeholder="明确该产品线的技术架构、核心攻坚方向与支撑的企业应用生态..."
             />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3">
+            <div>
+              <div className="font-semibold text-[var(--text-body)]">工作项设置模板</div>
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">自动创建需求、设计、研发、测试和缺陷类型及基础状态。</p>
+            </div>
+            <Switch aria-label="工作项设置模板" checked={initializeWorkItemTemplate} disabled={isCreating} onChange={setInitializeWorkItemTemplate} />
           </div>
 
         </form>

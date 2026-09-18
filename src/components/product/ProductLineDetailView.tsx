@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Avatar, Input, Select, Button, Switch, Checkbox, Drawer } from 'antd';
+import { Avatar, Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import {
   ArrowLeft,
@@ -182,14 +182,14 @@ const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计',
 const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
   const { addToast, setProductLines } = useApp();
   const [activeCategory, setActiveCategory] = useState<ProductLineWorkItemCategory>('需求');
-  const normalizeItems = (nextItems: ProductLineWorkItemType[]) => nextItems.map((item) => ({ ...item, enabled: Boolean(item.enabled) }));
+  const normalizeItems = (nextItems: ProductLineWorkItemType[]) => nextItems.map((item) => ({ ...item, enabled: Boolean(item.enabled), isDefault: Boolean(item.isDefault) }));
   const [items, setItems] = useState<ProductLineWorkItemType[]>(normalizeItems(productLine.workItemTypes || []));
   const [editingItem, setEditingItem] = useState<ProductLineWorkItemType | null>(null);
   const [itemToDelete, setItemToDelete] = useState<ProductLineWorkItemType | null>(null);
   const [stateConfigItem, setStateConfigItem] = useState<ProductLineWorkItemType | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [form, setForm] = useState<{ category: ProductLineWorkItemCategory; name: string; description: string; enabled: boolean }>({ category: '需求', name: '', description: '', enabled: true });
+  const [form, setForm] = useState<{ category: ProductLineWorkItemCategory; name: string; description: string; enabled: boolean; isDefault: boolean }>({ category: '需求', name: '', description: '', enabled: true, isDefault: false });
   const [initialWorkflowStates, setInitialWorkflowStates] = useState<EditableWorkflowState[]>(createDefaultWorkItemStates('requirement'));
 
   useEffect(() => {
@@ -208,13 +208,13 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
   };
   const openCreate = () => {
     setEditingItem(null);
-    setForm({ category: activeCategory, name: '', description: '', enabled: true });
+    setForm({ category: activeCategory, name: '', description: '', enabled: true, isDefault: false });
     setInitialWorkflowStates(createDefaultWorkItemStates(CATEGORY_KEYS[activeCategory]));
     setIsEditorOpen(true);
   };
   const openEdit = (item: ProductLineWorkItemType) => {
     setEditingItem(item);
-    setForm({ category: item.category, name: item.name, description: item.description || '', enabled: item.enabled });
+    setForm({ category: item.category, name: item.name, description: item.description || '', enabled: item.enabled, isDefault: Boolean(item.isDefault) });
     setIsEditorOpen(true);
   };
   const reloadRemoteItems = async () => {
@@ -255,7 +255,11 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
         const localItem: ProductLineWorkItemType = editingItem
           ? { ...editingItem, ...form, name, description: form.description.trim() }
           : { id: `work-item-type-${Date.now()}`, ...form, name, description: form.description.trim(), creatorName: '当前用户', createdAt: new Date().toISOString() };
-        const nextItems = editingItem ? items.map((item) => item.id === editingItem.id ? localItem : item) : [localItem, ...items];
+        const baseItems = localItem.isDefault
+          ? items.map((item) => item.category === localItem.category ? { ...item, isDefault: false } : item)
+          : items;
+        const normalizedLocalItem = localItem.enabled ? localItem : { ...localItem, isDefault: false };
+        const nextItems = editingItem ? baseItems.map((item) => item.id === editingItem.id ? normalizedLocalItem : item) : [normalizedLocalItem, ...baseItems];
         persistLocalItems(nextItems);
       }
       setIsEditorOpen(false);
@@ -272,7 +276,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
         await productRepository.updateWorkItemType(productLine.id, item.id, { enabled });
         await reloadRemoteItems();
       } else {
-        persistLocalItems(items.map((candidate) => candidate.id === item.id ? { ...candidate, enabled } : candidate));
+        persistLocalItems(items.map((candidate) => candidate.id === item.id ? { ...candidate, enabled, isDefault: enabled ? candidate.isDefault : false } : candidate));
       }
     } catch (error) {
       addToast('error', '工作项类型状态更新失败', error instanceof Error ? error.message : '请稍后重试');
@@ -309,7 +313,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
       </div>
       <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
         <div className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>类型名称</span><span>描述</span><span>添加人</span><span>添加时间</span><span>是否启用</span><span className="text-right">操作</span></div>
-        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="truncate font-medium text-[var(--text-primary)]" title={item.name}>{item.name}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}状态`} title="状态配置" icon={<ApartmentOutlined />} onClick={() => setStateConfigItem(item)} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{activeCategory}工作项类型，点击右上角“新增类型”添加</div>}
+        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]" title={item.name}><span className="truncate">{item.name}</span>{item.isDefault && <Tag color="blue">默认</Tag>}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}状态`} title="状态配置" icon={<ApartmentOutlined />} onClick={() => setStateConfigItem(item)} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{activeCategory}工作项类型，点击右上角“新增类型”添加</div>}
       </div>
       <Drawer
         width={editingItem ? 560 : 840}
@@ -326,6 +330,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
             <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型名称 *</span><Input maxLength={128} value={form.name} onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))} placeholder="请输入类型名称" /></label>
             <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>描述</span><Input.TextArea rows={3} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} placeholder="请输入类型描述" /></label>
             <div className="flex items-center justify-between"><div><div className="font-medium text-[var(--text-body)]">是否启用</div><p className="mt-1 text-[11px] text-[var(--text-muted)]">停用后不能新建该类型的工作项。</p></div><Switch className="product-line-switch" checked={form.enabled} onChange={(enabled) => setForm((previous) => ({ ...previous, enabled }))} /></div>
+            <div className="flex items-center justify-between"><div><div className="font-medium text-[var(--text-body)]">是否默认</div><p className="mt-1 text-[11px] text-[var(--text-muted)]">设为默认后，新建该分类任务时优先选择此类型。</p></div><Switch aria-label="是否默认" className="product-line-switch" checked={form.isDefault} disabled={!form.enabled} onChange={(isDefault) => setForm((previous) => ({ ...previous, isDefault }))} /></div>
           </section>
           {!editingItem && <section className="space-y-4 border-t border-[var(--border-main)] pt-5">
             <div><h3 className="text-sm font-bold text-[var(--text-primary)]">初始化状态</h3><p className="mt-1 text-[var(--text-muted)]">状态名称可自定义，每个状态必须归属未开始、进行中、已完成或已取消。</p></div>

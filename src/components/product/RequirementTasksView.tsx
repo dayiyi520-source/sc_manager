@@ -16,7 +16,7 @@ import { MessageSquare, Paperclip, X } from '@/components/common/octicons-compat
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
 import { DateField } from '../common';
-import { DefectBug, DevTask, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
+import { DefectBug, DevTask, ProductLineWorkItemType, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { WorkItemStatusTag } from './WorkItemStatusTag';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
@@ -24,6 +24,7 @@ import { Pagination } from '../common/Pagination';
 import { requirementRepository } from '../../services/requirementRepository';
 import { productRepository, UnifiedWorkItem, WorkItemTransitionAction, WorkItemTransitionOptions } from '../../services/productRepository';
 import { readSession } from '../../services/session';
+import { preferredWorkItemTypeName } from './workItemTypeDefaults';
 
 type RequirementFilterState = {
   title: { operator: TextFilterOperator; value: string };
@@ -569,7 +570,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const [formEstimatedHours, setFormEstimatedHours] = useState<number | ''>('');
   const [formActualHours, setFormActualHours] = useState<number | ''>('');
   const [formRequirementType, setFormRequirementType] = useState('');
-  const [configuredWorkItemTypes, setConfiguredWorkItemTypes] = useState<Array<{ id: string; name: string; enabled: boolean }>>([]);
+  const [configuredWorkItemTypes, setConfiguredWorkItemTypes] = useState<ProductLineWorkItemType[]>([]);
   const [formCcNames, setFormCcNames] = useState<string[]>([]);
   const [formPlannedStartDate, setFormPlannedStartDate] = useState('');
   const [formExpectedCompleteDate, setFormExpectedCompleteDate] = useState('');
@@ -598,9 +599,17 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     const line = productLines.find((item) => item.name === formProductLineName) || productLines.find((item) => item.id === productLineFilter);
     if (!line || !configuredCategory) { setConfiguredWorkItemTypes([]); return; }
     const localItems = (line.workItemTypes || []).filter((item) => item.category === configuredCategory && item.enabled);
-    if (localItems.length || !remoteApiEnabled) { setConfiguredWorkItemTypes(localItems); return; }
-    productRepository.workItemTypes(line.id, configuredCategory).then((items) => setConfiguredWorkItemTypes(items.filter((item) => item.enabled))).catch(() => setConfiguredWorkItemTypes([]));
-  }, [configuredCategory, formProductLineName, productLineFilter, productLines, remoteApiEnabled]);
+    const applyItems = (items: ProductLineWorkItemType[]) => {
+      setConfiguredWorkItemTypes(items);
+      if (!editingTask) setFormRequirementType((current) => preferredWorkItemTypeName(items, current));
+    };
+    if (localItems.length || !remoteApiEnabled) { applyItems(localItems); return; }
+    let active = true;
+    productRepository.workItemTypes(line.id, configuredCategory)
+      .then((items) => { if (active) applyItems(items.filter((item) => item.enabled)); })
+      .catch(() => { if (active) applyItems([]); });
+    return () => { active = false; };
+  }, [configuredCategory, editingTask, formProductLineName, productLineFilter, productLines, remoteApiEnabled]);
 
   useEffect(() => {
     const handleOutsidePointerDown = (event: PointerEvent) => {
@@ -1507,7 +1516,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
           <Form.Item label="负责人" required><Select showSearch optionFilterProp="label" value={formOwnerName || undefined} onChange={setFormOwnerName} options={employees.map((value) => ({ label: value, value }))} placeholder="搜索并选择负责人" /></Form.Item>
           <Form.Item label="优先级" required><Select value={formPriority || undefined} onChange={(value) => setFormPriority(value)} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>
           <Form.Item label="计划开始时间" required><DatePicker value={formPlannedStartDate ? dayjs(formPlannedStartDate) : null} onChange={(date) => setFormPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
-          <Form.Item label="计划完成时间" required><DatePicker value={formDueDate ? dayjs(formDueDate) : null} onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
+          <Form.Item label="计划完成时间"><DatePicker value={formDueDate ? dayjs(formDueDate) : null} onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
           <Form.Item label="期望完成时间"><DatePicker value={formExpectedCompleteDate ? dayjs(formExpectedCompleteDate) : null} onChange={(date) => setFormExpectedCompleteDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
           <Form.Item label="迭代版本"><Select showSearch allowClear optionFilterProp="label" value={formVersionName || undefined} onChange={(value) => setFormVersionName(value || '')} options={versions.filter((version) => !version.productLineName || version.productLineName === formProductLineName).map((version) => ({ label: version.name, value: version.name }))} placeholder="暂不关联" /></Form.Item>
           <Form.Item label="关联客户"><Select showSearch allowClear optionFilterProp="label" value={formCustomerName || undefined} onChange={(value) => setFormCustomerName(value || '')} options={customers.map((customer) => ({ label: customer.name, value: customer.name }))} placeholder="暂不关联" /></Form.Item>

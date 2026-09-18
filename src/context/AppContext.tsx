@@ -311,7 +311,7 @@ export interface AppContextType {
   updateBiddingLifecycle: (opportunityId: string, updates: Record<string, unknown>) => Promise<void>;
   addBiddingReview: (rev: Partial<BiddingReview>) => void;
   addBidReview: (rev: Partial<BiddingReview>) => void;
-  addProductLine: (line: Partial<ProductLine>) => void;
+  addProductLine: (line: Partial<ProductLine>) => Promise<boolean>;
   updateProductLine: (id: string, updates: Partial<ProductLine>) => Promise<void>;
   addProductLineMembers: (id: string, members: ProductLineMember[]) => Promise<void>;
   updateProductLineMember: (id: string, memberId: string, role: ProductLineMember['role']) => Promise<void>;
@@ -1161,10 +1161,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await refreshCrm();
   };
 
-  const addProductLine = (line: Partial<ProductLine>) => {
+  const addProductLine = async (line: Partial<ProductLine>) => {
     if (!requirementBackendEnabled) {
       addToast('error', '产品线保存失败', '当前未连接后端服务，数据未保存');
-      return;
+      return false;
     }
     const ownerName = line.ownerName || line.owner || currentUser.name;
     const newLine: ProductLine = {
@@ -1198,9 +1198,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       versionCount: line.versionCount ?? 1,
       customerCount: line.customerCount ?? 0,
       health: (line.health as any) || '健康',
+      initializeWorkItemTemplate: line.initializeWorkItemTemplate,
       createdAt: '2026-08-31'
     };
-    void productRepository.createProductLine(newLine).then(() => productLineQuery.refetch()).then(() => addToast('success', '产品线创建成功', newLine.name)).catch((error) => addToast('error', '产品线保存失败', error instanceof Error ? error.message : '请稍后重试'));
+    try {
+      await productRepository.createProductLine(newLine);
+      await productLineQuery.refetch();
+      addToast('success', '产品线创建成功', newLine.name);
+      return true;
+    } catch (error) {
+      addToast('error', '产品线保存失败', error instanceof Error ? error.message : '请稍后重试');
+      return false;
+    }
   };
 
   const updateProductLine = async (id: string, updates: Partial<ProductLine>) => {

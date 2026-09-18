@@ -427,6 +427,7 @@ export interface ProductLineWorkItemType {
   creatorName?: string;
   createdAt?: string;
   enabled: boolean;
+  isDefault?: boolean;
 }
 
 export interface ProductLineActivity {
@@ -468,6 +469,7 @@ export interface ProductLine {
   coverUrl?: string;
   members?: ProductLineMember[] | string[];
   workItemTypes?: ProductLineWorkItemType[];
+  initializeWorkItemTemplate?: boolean;
   currentVersion?: string;
   totalRequirements?: number;
   inProgressReqs?: number;

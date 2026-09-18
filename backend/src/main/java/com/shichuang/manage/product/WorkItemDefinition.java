@@ -32,7 +32,11 @@ public final class WorkItemDefinition {
     public record Transition(String edgeKey, Integer revision, String reason) {}
     public record Workflow(List<State> states, List<Edge> transitions) {}
     public record SaveWorkflow(String category, String name, Workflow definition, Integer revision) {}
-    public record CreateWorkItemType(String category, String name, String description, Boolean enabled, SaveWorkflow workflow) {}
+    public record CreateWorkItemType(String category, String name, String description, Boolean enabled, Boolean isDefault, SaveWorkflow workflow) {
+        public CreateWorkItemType(String category, String name, String description, Boolean enabled, SaveWorkflow workflow) {
+            this(category, name, description, enabled, false, workflow);
+        }
+    }
     public record Revision(int revision) {}
     public record ChildRule(String parentTypeId, String childTypeId, boolean enabled) {}
     public record CreateItem(String requestId, String productLineId, String category, String taskTypeId,
