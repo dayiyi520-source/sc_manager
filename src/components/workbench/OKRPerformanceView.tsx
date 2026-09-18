@@ -172,9 +172,9 @@ const OriginalWorkspace: React.FC = () => {
       {error && <Alert type="error" title="目标与绩效加载失败" description="服务暂不可用，请重试。已填写的内容仍保留。" action={<Button onClick={refresh}>重试</Button>}/>}
       {/* Top Main Navigation Tabs */}
       <div className="okr-page-toolbar">
-        <div className="okr-primary-tabs" role="tablist" aria-label="目标与绩效视图">
-          <Button id="tab-okrs" type={mainTab === 'okrs' ? 'primary' : 'text'} icon={<Target/>} onClick={()=>setMainTab('okrs')}>目标 OKRs</Button>
-          <Button id="tab-reviews" type={mainTab === 'reviews' ? 'primary' : 'text'} icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
+        <div className="okr-primary-tabs primary-line-tabs" role="tablist" aria-label="目标与绩效视图">
+          <Button id="tab-okrs" role="tab" aria-selected={mainTab === 'okrs'} type="text" icon={<Target/>} onClick={()=>setMainTab('okrs')}>目标 OKRs</Button>
+          <Button id="tab-reviews" role="tab" aria-selected={mainTab === 'reviews'} type="text" icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
         </div>
 
         {mainTab === 'okrs' && (

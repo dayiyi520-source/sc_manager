@@ -48,13 +48,13 @@ export const KnowledgeBaseView: React.FC = () => {
     <div className="space-y-6">
       {/* 顶部导航标签 */}
       <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
-        <div className="flex items-center gap-2">
+        <div className="primary-line-tabs flex items-center gap-2" role="tablist" aria-label="知识库视图">
           <button
-            onClick={() => setActiveTab('home')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            role="tab" aria-selected={activeTab === 'home'} onClick={() => setActiveTab('home')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all ${
               activeTab === 'home'
-                ? 'bg-[var(--primary)] text-white shadow-sm'
-                : 'text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]'
+                ? 'text-[var(--primary)]'
+                : 'text-[var(--text-body)]'
             }`}
           >
             <LayoutDashboard className="w-4 h-4" />
@@ -62,11 +62,11 @@ export const KnowledgeBaseView: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('center')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            role="tab" aria-selected={activeTab === 'center'} onClick={() => setActiveTab('center')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all ${
               activeTab === 'center'
-                ? 'bg-[var(--primary)] text-white shadow-sm'
-                : 'text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]'
+                ? 'text-[var(--primary)]'
+                : 'text-[var(--text-body)]'
             }`}
           >
             <BookOpen className="w-4 h-4" />

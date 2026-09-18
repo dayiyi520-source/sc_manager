@@ -194,7 +194,7 @@ const MainContent: React.FC = () => {
     <main className="tech-main flex-1 overflow-y-auto p-4 lg:p-6">
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
         {/* 产品线范围由任务工作区与测试资产共同复用。 */}
-        {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' || routedTabId === 'prod_bugs') && (
+        {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' || routedTabId === 'prod_rd_tasks' || routedTabId === 'prod_dev_tasks' || routedTabId === 'prod_test_tasks' || routedTabId === 'prod_bugs') && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] pb-4 border-b border-[var(--border-main)]">
             <span>产品线</span>
             <Select

@@ -513,10 +513,10 @@ export const VersionIterationView: React.FC = () => {
     <button
       type="button"
       onClick={() => { setMode(key); setShowDetail(false); }}
-      className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-semibold transition-all ${
+      className={`inline-flex h-11 items-center justify-center gap-2 border-b-2 px-5 text-sm font-semibold transition-all ${
         mode === key
-          ? 'bg-[var(--primary)] text-white shadow-sm hover:bg-[var(--primary-hover)]'
-          : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface-soft)] hover:text-[var(--text-primary)]'
+          ? 'border-[var(--primary)] text-[var(--active-text)]'
+          : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
       }`}
     >
       {icon}{label}
@@ -779,7 +779,7 @@ export const VersionIterationView: React.FC = () => {
     <div className="space-y-3 text-xs">
       <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-main)] pb-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex items-center gap-3">{tabButton('list', '迭代列表', <ListTodo className="h-4 w-4" />)}{tabButton('planning', '迭代规划', <GitBranch className="h-4 w-4" />)}</div>
+          <div className="primary-line-tabs flex items-center gap-3" role="tablist" aria-label="版本迭代视图">{tabButton('list', '迭代列表', <ListTodo className="h-4 w-4" />)}{tabButton('planning', '迭代规划', <GitBranch className="h-4 w-4" />)}</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <div className="w-40">
@@ -828,7 +828,7 @@ export const VersionIterationView: React.FC = () => {
           </button>
       </div>}
       {mode === 'list' && (showDetail ? renderDetail() : renderList())}
-      {mode === 'planning' && renderPlanning()}
+      {mode === 'planning' && <div className="pt-3">{renderPlanning()}</div>}
       {selectedWorkItem && (
         <WorkItemCreatePanel
           isOpen

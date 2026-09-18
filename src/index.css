@@ -502,6 +502,54 @@ html:not(.dark) .tech-main .fixed.inset-0 button:disabled {
   opacity: 0.72;
 }
 
+/* Shared first-level tabs use the Ant Design line pattern across workbench modules. */
+.tech-main .primary-line-tabs {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  position: relative;
+  z-index: 1;
+}
+.tech-main .primary-line-tabs > :is([role="tab"], button) {
+  position: relative;
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 0 !important;
+  padding: 8px 4px 10px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-muted) !important;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.tech-main .primary-line-tabs > :is([role="tab"], button)::after {
+  position: absolute;
+  right: 0;
+  bottom: -13px;
+  left: 0;
+  height: 2px;
+  content: '';
+  background: transparent;
+}
+.tech-main .primary-line-tabs > :is([role="tab"], button):hover,
+.tech-main .primary-line-tabs > :is([role="tab"], button):focus-visible {
+  color: var(--text-primary) !important;
+}
+.tech-main .primary-line-tabs > :is([role="tab"][aria-selected="true"], button[class*="border-[var(--primary)]"]) {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+.tech-main .primary-line-tabs > :is([role="tab"][aria-selected="true"], button[class*="border-[var(--primary)]"])::after { background: var(--primary); }
+.tech-main .primary-line-tabs > :is([role="tab"], button) * { color: currentColor !important; }
+.tech-main .test-and-defect-tabs > .ant-tabs-nav::before { border-bottom-color: var(--border-main); }
+.tech-main .test-and-defect-tabs > .ant-tabs-nav .ant-tabs-tab { border-radius: 0; background: transparent; }
+.tech-main .test-and-defect-tabs > .ant-tabs-nav .ant-tabs-tab { font-size: 14px; }
+.tech-main .test-and-defect-tabs > .ant-tabs-nav .ant-tabs-tab-active .ant-tabs-tab-btn { color: var(--primary); }
+.tech-main .test-and-defect-tabs > .ant-tabs-nav .ant-tabs-ink-bar { height: 2px; background: var(--primary); }
+
 /* Semantic tab markup is used by the right-side page workspace. */
 html:not(.dark) .tech-main [role="tablist"]:not(.original-okr *) {
   background: transparent;
@@ -1716,6 +1764,72 @@ html.dark .review-empty-icon {
   .test-case-editor-grid { grid-template-columns: 1fr; }
   .test-case-step-row { grid-template-columns: 32px minmax(0, 1fr) 32px; }
   .test-case-step-row .ant-form-item:nth-of-type(2) { grid-column: 2 / 3; }
+}
+
+/* Keep first-level navigation consistent after legacy theme overrides. */
+.tech-main .primary-line-tabs[role="tablist"] {
+  background: transparent !important;
+  border: 0;
+  border-bottom: 0 !important;
+  border-radius: 0;
+  padding: 0;
+}
+.tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button),
+.dark .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button) {
+  border: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-muted) !important;
+}
+.tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button):hover,
+.tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button):focus-visible {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+.tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"][aria-selected="true"], button[class*="border-[var(--primary)]"]),
+.dark .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"][aria-selected="true"], button[class*="border-[var(--primary)]"]) {
+  background: transparent !important;
+  color: var(--primary) !important;
+  box-shadow: none !important;
+}
+.tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"][aria-selected="true"], button[class*="border-[var(--primary)]"])::after,
+.dark .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"][aria-selected="true"], button[class*="border-[var(--primary)]"])::after { background: var(--primary); }
+.tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button) * {
+  color: currentColor !important;
+}
+
+/* Final first-level tab contract: no filled active state, semibold labels. */
+html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button),
+.dark .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button) {
+  background: transparent !important;
+  font-weight: 600 !important;
+}
+html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"][aria-selected="true"], button[class*="border-[var(--primary)]"]),
+.dark .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"][aria-selected="true"], button[class*="border-[var(--primary)]"]) {
+  background: transparent !important;
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+.tech-main .test-and-defect-tabs > .ant-tabs-nav .ant-tabs-tab-btn {
+  font-weight: 600;
+}
+
+/* First-level icons follow the active label color, including legacy utility classes. */
+.tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button) svg,
+.tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"], button) svg * {
+  color: currentColor !important;
+  fill: currentColor !important;
+}
+
+/* Match the version workspace: keep first-level tabs 24px above the content. */
+.tech-main .test-and-defect-tabs > .ant-tabs-nav {
+  margin-bottom: 24px;
+}
+.tech-main .test-and-defect-tabs > .ant-tabs-content-holder {
+  padding-top: 0;
 }
 
 .test-task-detail-extension { border-bottom: 1px solid var(--border-main); padding-bottom: 20px; }
