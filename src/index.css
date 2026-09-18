@@ -39,6 +39,7 @@
     --text-primary: #F8FAFC;
     --text-body: #A5ADBA;
     --text-muted: #7C8796;
+    --text-on-primary: #FFFFFF;
   }
 
   html:not(.dark) {
@@ -438,8 +439,31 @@ html:not(.dark) .product-line-detail button[class*="bg-[#2F66F6]"] {
   color: #FFFFFF !important;
 }
 
-.product-line-gantt-content {
-  width: max(53.75rem, calc(11.25rem + var(--gantt-week-count) * 6rem));
+.product-line-gantt-grid { display: grid; grid-template-columns: 260px minmax(0, 1fr); color: var(--text-muted); font-size: 11px; }
+.product-line-gantt-heading { min-width: 0; padding: 0 12px 12px 0; }
+.product-line-gantt-time-heading { border-left: 1px solid var(--border-main); padding-left: 16px; }
+.product-line-gantt-labels { display: grid; gap: 12px; min-width: 0; padding-right: 12px; }
+.product-line-gantt-scroll { min-width: 0; overflow-x: auto; border-left: 1px solid var(--border-main); padding-left: 16px; padding-bottom: 8px; }
+
+.work-item-category-icon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-main);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--primary);
+  font-size: 13px;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.work-item-category-icon:hover {
+  border-color: var(--primary);
+  background: var(--bg-surface-soft);
+  color: var(--primary-hover);
 }
 
 /* Right-workspace dialogs share the light surface contract. Navigation chrome
@@ -1892,7 +1916,8 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 .test-task-loading { display: grid; min-height: 160px; place-items: center; color: var(--text-muted); font-size: 12px; }
 .test-task-section-heading, .test-execution-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border-main); padding-bottom: 12px; }
 .test-task-section-heading h3, .test-execution-header h3 { margin: 0; color: var(--text-primary); font-size: 14px; line-height: 20px; }
-.test-task-section-heading span, .test-execution-header span { color: var(--text-muted); font-size: 11px; }
+.test-task-section-heading > div > span, .test-execution-header > div > span { color: var(--text-muted); font-size: 11px; }
+.test-task-section-heading .ant-btn-primary, .test-task-section-heading .ant-btn-primary span { color: var(--text-on-primary) !important; }
 .test-plan-panel { display: grid; gap: 16px; min-width: 0; }
 .test-plan-item { display: grid; gap: 8px; min-width: 0; }
 .test-plan-empty { display: grid; min-height: 320px; place-items: center; border: 1px dashed var(--border-main); border-radius: 8px; background: var(--bg-surface); }

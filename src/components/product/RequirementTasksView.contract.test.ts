@@ -27,10 +27,17 @@ describe('requirement task Ant Design contract', () => {
     expect(saveBasicInfo).not.toContain('code: code.trim()');
   });
 
-  it('opens a selected version from the weekly sticky gantt view', () => {
+  it('opens a selected version from the weekly fixed-column gantt view', () => {
     expect(productLineSource).toContain('时间区间（按周）');
     expect(productLineSource).toContain("sessionStorage.setItem('shichuang.productLineTargetVersionId', versionId)");
-    expect(productLineSource).toContain('sticky left-0');
+    expect(productLineSource).toContain('product-line-gantt-scroll');
+    expect(productLineSource).toContain('product-line-gantt-time-heading');
+  });
+
+  it('uses category icons instead of text tags before task titles', () => {
+    expect(requirementSource).toContain('workItemCategoryIcon');
+    expect(requirementSource).toContain('work-item-category-icon');
+    expect(requirementSource).not.toContain('shrink-0 rounded border border-[var(--border-main)] bg-[var(--bg-surface)] px-1.5');
   });
 
   it('keeps children and relations in dedicated detail tabs', () => {

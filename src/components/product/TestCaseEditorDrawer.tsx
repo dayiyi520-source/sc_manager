@@ -62,7 +62,7 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
   const selectedTypeId = Form.useWatch('workItemTypeId', form);
   const selectedDirectoryId = selectedDirectoryPath?.at(-1);
   const actualLineId = productLineId === 'all'
-    ? directories.find((directory) => directory.id === selectedDirectoryId)?.productLineId || ''
+    ? initialCase?.productLineId || directories.find((directory) => directory.id === selectedDirectoryId)?.productLineId || ''
     : productLineId;
   const employees = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: open, retry: false });
   const caseTypes = useQuery({ queryKey: ['case-work-item-types', actualLineId], queryFn: () => productRepository.workItemTypes(actualLineId, '用例'), enabled: open && !!actualLineId, retry: false });

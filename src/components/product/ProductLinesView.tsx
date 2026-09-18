@@ -138,7 +138,7 @@ export const ProductLinesView: React.FC = () => {
     const lineBugs = bugs.filter((b) => b.productLineId === line.id || b.productLineName === line.name);
     const lineTasks = devTasks.filter((t) => t.productLineName === line.name);
 
-    const pendingReqs = lineReqs.filter((r) => r.status !== '已转任务' && r.status !== '已转版本' && r.status !== '已拒绝').length;
+    const pendingReqs = Number(line.pendingRequirementCount ?? line.pendingReqCount ?? lineReqs.filter((r) => r.status !== '已转任务' && r.status !== '已转版本' && r.status !== '已拒绝').length);
     const pendingBugs = lineBugs.filter((b) => b.status !== '已关闭' && b.status !== '已拒绝').length;
     const activeTasks = lineTasks.filter((t) => t.status !== '已合并上线').length;
 

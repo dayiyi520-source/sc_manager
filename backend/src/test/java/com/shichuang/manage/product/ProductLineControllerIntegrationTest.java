@@ -19,6 +19,34 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
+    void countsOnlyUnfinishedAndUncancelledRequirementsAsPending() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        String response = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"待办统计产品线\",\"code\":\"PENDING-" + System.nanoTime() + "\",\"ownerUserId\":\"user-admin\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String lineId = objectMapper.readTree(response).path("data").path("id").asText();
+        insertWorkItem(lineId, "pending-requirement", "requirement", "IN_PROGRESS", false);
+        insertWorkItem(lineId, "completed-requirement", "requirement", "COMPLETED", true);
+        insertWorkItem(lineId, "cancelled-requirement", "requirement", "CANCELLED", false);
+        insertWorkItem(lineId, "pending-development", "dev", "IN_PROGRESS", false);
+
+        mockMvc.perform(get("/api/product-lines/{id}", lineId).header("Authorization", authorization))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.pendingRequirementCount").value(1));
+        String listResponse = mockMvc.perform(get("/api/product-lines").param("keyword", "待办统计产品线").header("Authorization", authorization))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(1, objectMapper.readTree(listResponse).path("data").get(0).path("pendingRequirementCount").asInt());
+    }
+
+    private void insertWorkItem(String lineId, String id, String category, String statusGroup, boolean successful) {
+        jdbc.update("""
+            INSERT INTO t_product_work_item(id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,workflow_id_,status_key_,status_name_,status_group_,successful_,priority_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_)
+            VALUES(?,'local-tenant',?,?,?, ?,?,?,'state','状态',?,?, 'P2',?,?, 'user-admin','user-admin',NOW(6),NOW(6))
+            """, java.util.UUID.randomUUID().toString(), lineId, category, "type-" + id, "CODE-" + id + "-" + System.nanoTime(), id, "workflow-" + id, statusGroup, successful ? 1 : 0, "request-" + id, "hash-" + id);
+    }
+
+    @Test
     void initializesCompleteWorkItemTemplateOnlyWhenRequested() throws Exception {
         String authorization = "Bearer " + loginToken();
         String enabledResponse = mockMvc.perform(post("/api/product-lines")

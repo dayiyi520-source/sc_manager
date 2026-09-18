@@ -485,6 +485,7 @@ export interface ProductLine {
   testOwnerUserId?: string;
   products?: ProductItemInLine[];
   pendingReqCount?: number;
+  pendingRequirementCount?: number;
   pendingBugCount?: number;
   activeTaskCount?: number;
   versions?: VersionIteration[];

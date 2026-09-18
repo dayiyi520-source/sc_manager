@@ -460,7 +460,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId))
     .map((member) => ({ value: member.userId, label: `${member.name} · ${member.role}` }));
 
-  const pendingReqsCount = lineReqs.filter((r) => r.status !== '已转任务' && r.status !== '已转版本' && r.status !== '已拒绝').length;
+  const pendingReqsCount = Number(productLine.pendingRequirementCount ?? productLine.pendingReqCount ?? lineReqs.filter((r) => r.status !== '已转任务' && r.status !== '已转版本' && r.status !== '已拒绝').length);
   const pendingBugsCount = lineBugs.filter((b) => b.status !== '已关闭' && b.status !== '已拒绝').length;
   const pendingTasksCount = lineDevTasks.filter((t) => t.status !== '已合并上线').length;
   const totalTasksCount = lineDevTasks.length;
@@ -780,9 +780,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
-            <div className="min-w-[860px]">
-            <div className="mb-3 grid grid-cols-[minmax(180px,0.8fr)_minmax(680px,3fr)] gap-3 text-[11px] text-[var(--text-muted)]"><span className="sticky left-0 z-10 bg-[var(--bg-surface)]">版本名称 / 版本号</span><span>时间区间（按周）</span></div>
+          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
             {lineVersions.length > 0 && (() => {
               const dayMs = 86400000;
               const toTime = (value?: string) => value ? new Date(value).getTime() : Date.now();
@@ -796,20 +794,30 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               const span = Math.max(timelineEnd - timelineStart, 7 * dayMs);
               const weekCount = Math.max(1, Math.ceil(span / (7 * dayMs)));
               const ticks = Array.from({ length: weekCount + 1 }, (_, index) => new Date(timelineStart + index * 7 * dayMs));
-              return <div className="product-line-gantt-content space-y-3" style={{ '--gantt-week-count': weekCount } as React.CSSProperties}>
-                <div className="grid grid-cols-[minmax(180px,0.8fr)_minmax(680px,3fr)] gap-3"><span className="sticky left-0 z-10 bg-[var(--bg-surface)]" /><div className="relative h-8 border-b border-[var(--border-main)]">{ticks.map((tick, index) => <span key={tick.toISOString()} className="absolute top-0 -translate-x-1/2 text-[10px] text-[var(--text-muted)]" style={{ left: `${Math.min(100, (index / weekCount) * 100)}%` }}>{tick.toISOString().slice(0, 10)}</span>)}</div></div>
-                {lineVersions.map((version) => {
+              const timelineWidth = Math.max(680, weekCount * 96);
+              return <div className="product-line-gantt-grid">
+                <div className="product-line-gantt-heading">版本名称 / 版本号</div>
+                <div className="product-line-gantt-heading product-line-gantt-time-heading">时间区间（按周）</div>
+                <div className="product-line-gantt-labels">
+                  <div className="h-8 border-b border-[var(--border-main)]" />
+                  {lineVersions.map((version) => <div key={`gantt-label-${version.id}`} className="flex h-8 items-center"><button type="button" onClick={() => openVersionDetail(version.id)} className="block min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"><span className="block truncate text-xs font-semibold text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.name}</span><span className="mt-0.5 block truncate font-mono text-[11px] text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.code || '未设置版本号'}</span></button></div>)}
+                </div>
+                <div className="product-line-gantt-scroll">
+                  <div className="space-y-3" style={{ width: timelineWidth }}>
+                    <div className="relative h-8 border-b border-[var(--border-main)]">{ticks.map((tick, index) => <span key={tick.toISOString()} className="absolute top-0 -translate-x-1/2 text-[10px] text-[var(--text-muted)]" style={{ left: `${Math.min(100, (index / weekCount) * 100)}%` }}>{tick.toISOString().slice(0, 10)}</span>)}</div>
+                    {lineVersions.map((version) => {
                   const start = toTime(version.startDate || version.releaseDate);
                   const end = Math.max(toTime(version.endDate || version.releaseDate || version.startDate), start + 86400000);
                   const visibleStart = Math.max(start, timelineStart);
                   const left = Math.max(0, ((visibleStart - timelineStart) / span) * 100);
                   const width = Math.max(2, ((end - visibleStart) / span) * 100);
                   const interval = `${version.startDate || '--'} ~ ${version.endDate || version.releaseDate || '--'}`;
-                  return <div key={`gantt-${version.id}`} className="grid grid-cols-[minmax(180px,0.8fr)_minmax(680px,3fr)] items-center gap-3"><div className="sticky left-0 z-10 min-w-0 bg-[var(--bg-surface)]"><button type="button" onClick={() => openVersionDetail(version.id)} className="block min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"><span className="block truncate text-xs font-semibold text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.name}</span><span className="mt-0.5 block truncate font-mono text-[11px] text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.code || '未设置版本号'}</span></button></div><div className="relative h-8 rounded bg-[var(--bg-surface-soft)]"><span className="absolute top-1.5 h-5 min-w-[8px] rounded bg-[var(--primary)]/80 px-2 pt-0.5 text-[10px] text-white" style={{ left: `${left}%`, width: `${width}%` }} title={interval}>{interval}</span></div></div>;
-                })}
+                  return <div key={`gantt-${version.id}`} className="relative h-8 rounded bg-[var(--bg-surface-soft)]"><span className="absolute top-1.5 h-5 min-w-[8px] overflow-hidden whitespace-nowrap rounded bg-[var(--primary)]/80 px-2 pt-0.5 text-[10px] text-white" style={{ left: `${left}%`, width: `${width}%` }} title={interval}>{interval}</span></div>;
+                    })}
+                  </div>
+                </div>
               </div>;
             })()}
-            </div>
           </div>
 
           {lineVersions.length === 0 && <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">暂无版本迭代记录，点击右上角“创建新版本”规划版本交付</div>}
