@@ -11,6 +11,8 @@ public final class TestCaseDefinition {
         public SaveDirectory(String parentId, String name, Integer sort) { this(parentId,name,sort,null); }
     }
     public record RenameDirectory(String name) {}
+    public record CopyDirectory(String parentId, String name) {}
+    public record BatchUpdate(List<String> caseIds, String operation, String value) {}
     public record SaveCase(String directoryId, String sourceRequirementId, String title,
         String precondition, String priority, String ownerId, List<String> tags,
         List<StepInput> steps, Integer revision) {}

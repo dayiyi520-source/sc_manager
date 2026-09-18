@@ -58,6 +58,8 @@ public class WorkItemConfigurationService {
         validate(decode(current.get("definition")));
         validateApproval(line,current.get("category").toString(),decode(current.get("definition")),true);
         if (mapper.publish(RequestContext.tenantId(),line,id,revision,RequestContext.userId())!=1) throw conflict("流程已变更，请刷新后重试");
+        State initial=decode(current.get("definition")).states().stream().filter(State::initial).findFirst().orElseThrow();
+        mapper.migrateNotStarted(RequestContext.tenantId(),line,current.get("category").toString(),Objects.toString(current.get("taskTypeId"),null),id,initial,RequestContext.userId());
         mapper.activity(RequestContext.tenantId(),line,id,"WORKFLOW_PUBLISHED","{}",RequestContext.userId());
         return view(requireWorkflow(line,id));
     }

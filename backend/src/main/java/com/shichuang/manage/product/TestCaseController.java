@@ -20,6 +20,8 @@ public class TestCaseController {
     public ApiResponse<DirectoryView> createDirectory(@PathVariable String lineId,@RequestBody SaveDirectory input){return ApiResponse.ok(service.createDirectory(lineId,input));}
     @PutMapping("/test-case-directories/{directoryId}") public ApiResponse<DirectoryView> renameDirectory(@PathVariable String lineId,@PathVariable String directoryId,@RequestBody RenameDirectory input){return ApiResponse.ok(service.renameDirectory(lineId,directoryId,input));}
     @DeleteMapping("/test-case-directories/{directoryId}") @ResponseStatus(HttpStatus.NO_CONTENT) public void deleteDirectory(@PathVariable String lineId,@PathVariable String directoryId){service.deleteDirectory(lineId,directoryId);}
+    @PostMapping("/test-case-directories/{directoryId}/copy") @Operation(summary="复制测试用例目录")
+    public ApiResponse<DirectoryView> copyDirectory(@PathVariable String lineId,@PathVariable String directoryId,@RequestBody CopyDirectory input){return ApiResponse.ok(service.copyDirectory(lineId,directoryId,input));}
     @GetMapping("/test-cases") @Operation(summary="分页查询产品线测试用例")
     public ApiResponse<CasePage> list(@PathVariable String lineId,@RequestParam(required=false) String directoryId,@RequestParam(defaultValue="") String keyword,@RequestParam(required=false) String priority,@RequestParam(required=false) String ownerId,@RequestParam(required=false) Boolean enabled,@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize){return ApiResponse.ok(service.list(lineId,new Query(directoryId,keyword,priority,ownerId,enabled,page,pageSize)));}
     @PostMapping("/test-cases") @ResponseStatus(HttpStatus.CREATED) @Operation(summary="创建产品线测试用例")
@@ -30,5 +32,7 @@ public class TestCaseController {
     public ApiResponse<CaseView> update(@PathVariable String lineId,@PathVariable String caseId,@RequestBody SaveCase input){return ApiResponse.ok(service.update(lineId,caseId,input));}
     @PutMapping("/test-cases/{caseId}/enabled") @Operation(summary="启用或停用测试用例")
     public ApiResponse<CaseView> enabled(@PathVariable String lineId,@PathVariable String caseId,@RequestBody EnabledInput input){return ApiResponse.ok(service.setEnabled(lineId,caseId,input.revision(),input.enabled()));}
+    @PostMapping("/test-cases/batch") @Operation(summary="批量更新测试用例")
+    public ApiResponse<Void> batch(@PathVariable String lineId,@RequestBody BatchUpdate input){service.batch(lineId,input);return ApiResponse.ok(null);}
     public record EnabledInput(int revision,boolean enabled){}
 }

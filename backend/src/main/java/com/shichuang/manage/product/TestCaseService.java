@@ -33,8 +33,26 @@ public class TestCaseService {
         catch(DataIntegrityViolationException e){throw conflict("同级目录名称已存在");}
         return new DirectoryView(id,parent,name,input.sort()==null?0:input.sort(),0,actualLine,null);
     }
-    @Transactional public DirectoryView renameDirectory(String line,String id,RenameDirectory input){ String actual="all".equals(line)?text(mapper.directory(RequestContext.tenantId(),"all",id),"productLineId"):line; access.check(actual,true); String name=required(input.name(),"目录名称",120); if(mapper.renameDirectory(RequestContext.tenantId(),actual,id,name,RequestContext.userId())!=1) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"目录不存在"); return directories(actual).stream().filter(v->v.id().equals(id)).findFirst().orElseThrow(); }
-    @Transactional public void deleteDirectory(String line,String id){ String actual="all".equals(line)?text(mapper.directory(RequestContext.tenantId(),"all",id),"productLineId"):line; access.check(actual,true); if(mapper.hasChildren(RequestContext.tenantId(),actual,id)||mapper.hasCases(RequestContext.tenantId(),actual,id)) throw bad("目录下仍有子目录或测试用例，无法删除"); if(mapper.deleteDirectory(RequestContext.tenantId(),actual,id,RequestContext.userId())!=1) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"目录不存在"); }
+    @Transactional public DirectoryView renameDirectory(String line,String id,RenameDirectory input){ Map<String,Object> existing=mapper.directory(RequestContext.tenantId(),"all",id);if(existing==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"目录不存在");String actual=text(existing,"productLineId");access.check(actual,true);String name=required(input.name(),"目录名称",120);try{if(mapper.renameDirectory(RequestContext.tenantId(),actual,id,name,RequestContext.userId())!=1) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"目录不存在");}catch(DataIntegrityViolationException e){throw conflict("同级目录名称已存在");}return directories(actual).stream().filter(v->v.id().equals(id)).findFirst().orElseThrow(); }
+    @Transactional public void deleteDirectory(String line,String id){
+        String tenant=RequestContext.tenantId();
+        Map<String,Object> existing=mapper.directory(tenant,"all",id);
+        if(existing==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"目录不存在");
+        String actual=text(existing,"productLineId");
+        access.check(actual,true);
+        if(mapper.hasChildren(tenant,actual,id)||mapper.hasCases(tenant,actual,id)) throw bad("目录下仍有子目录或测试用例，无法删除");
+        if(mapper.deleteDirectory(tenant,actual,id,RequestContext.userId())!=1) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"目录不存在");
+    }
+    @Transactional public DirectoryView copyDirectory(String line,String id,CopyDirectory input){
+        String tenant=RequestContext.tenantId();Map<String,Object> source=mapper.directory(tenant,line,id);
+        if(source==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"目录不存在");
+        String actual=text(source,"productLineId");access.check(actual,true);String parent=blank(input.parentId());
+        if(parent==null)parent=nullable(source,"parentId");
+        if(parent!=null){Map<String,Object> target=mapper.directory(tenant,actual,parent);if(target==null)throw bad("目标父目录不存在或不属于当前产品线");if(id.equals(parent)||descendant(tenant,actual,id,parent))throw bad("不能将目录复制到自身或其子目录下");}
+        String name=blank(input.name());if(name==null)name=text(source,"name")+" - 副本";
+        String copiedId=copyDirectoryTree(tenant,actual,source,parent,required(name,"目录名称",120));
+        return directories(actual).stream().filter(value->value.id().equals(copiedId)).findFirst().orElseThrow();
+    }
     public CasePage list(String line,Query input){
         if (!"all".equals(line)) access.check(line,false);int page=Math.max(1,input.page()),size=Math.min(100,Math.max(1,input.pageSize()));
         Query q=new Query(blank(input.directoryId()),blank(input.keyword()),blank(input.priority()),blank(input.ownerId()),input.enabled(),page,size);
@@ -57,6 +75,19 @@ public class TestCaseService {
     @Transactional public CaseView setEnabled(String line,String id,int revision,boolean enabled){
         access.check(line,true);require(line,id);if(mapper.setEnabled(RequestContext.tenantId(),line,id,revision,enabled,RequestContext.userId())!=1)throw conflict("测试用例已变化，请刷新后重试");return require(line,id);
     }
+    @Transactional public void batch(String line,BatchUpdate input){
+        List<String> ids=input.caseIds()==null?List.of():input.caseIds().stream().filter(Objects::nonNull).map(String::trim).filter(v->!v.isBlank()).distinct().toList();
+        if(ids.isEmpty())throw bad("请选择至少一条测试用例");if(ids.size()>100)throw bad("单次最多处理100条测试用例");
+        String tenant=RequestContext.tenantId(),operation=required(input.operation(),"批量操作",20).toUpperCase(Locale.ROOT),value=blank(input.value());
+        Map<String,List<String>> byLine=new LinkedHashMap<>();List<Map<String,Object>> rows=new ArrayList<>();
+        for(String id:ids){Map<String,Object> row=mapper.item(tenant,line,id);if(row==null)throw bad("所选测试用例不存在或不在当前范围内");String actual=text(row,"productLineId");access.check(actual,true);byLine.computeIfAbsent(actual,key->new ArrayList<>()).add(id);rows.add(row);}
+        if("MOVE".equals(operation)){if(value==null)throw bad("请选择目标目录");Map<String,Object> directory=mapper.directory(tenant,"all",value);if(directory==null)throw bad("目标目录不存在");String targetLine=text(directory,"productLineId");if(byLine.size()!=1||!byLine.containsKey(targetLine))throw bad("测试用例只能移动到同一产品线的目录");if(mapper.moveCases(tenant,targetLine,ids,value,RequestContext.userId())!=ids.size())throw conflict("部分测试用例已变化，请刷新后重试");return;}
+        if("OWNER".equals(operation)){Map<String,Object> owner=value==null?null:mapper.employee(tenant,value);if(owner==null)throw bad("负责人不存在或已停用");byLine.forEach((actual,caseIds)->mapper.updateOwner(tenant,actual,caseIds,value,text(owner,"name"),RequestContext.userId()));return;}
+        if("PRIORITY".equals(operation)){if(!Set.of("P0","P1","P2","P3").contains(value))throw bad("优先级必须为P0至P3");byLine.forEach((actual,caseIds)->mapper.updatePriority(tenant,actual,caseIds,value,RequestContext.userId()));return;}
+        if("DELETE".equals(operation)){if(rows.stream().anyMatch(row->longNumber(row,"referenceCount")>0))throw bad("已被测试任务引用的用例不能删除");byLine.forEach((actual,caseIds)->mapper.deleteCases(tenant,actual,caseIds,RequestContext.userId()));return;}
+        if("TYPE".equals(operation))throw bad("测试用例库中的类型固定为测试用例，不能修改");
+        throw bad("不支持的批量操作");
+    }
     private void validate(String line,SaveCase input,boolean updating){
         required(input.title(),"用例标题",255);if(mapper.directory(RequestContext.tenantId(),line,required(input.directoryId(),"功能目录",36))==null)throw bad("功能目录不存在或不属于当前产品线");
         if(!Set.of("P0","P1","P2","P3").contains(input.priority()))throw bad("优先级必须为P0至P3");
@@ -67,6 +98,17 @@ public class TestCaseService {
         if(updating&&input.revision()==null)throw bad("修改测试用例必须提供数据版本");
     }
     private CaseView require(String line,String id){Map<String,Object> row=mapper.item(RequestContext.tenantId(),line,id);if(row==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"测试用例不存在");return view(row);}
+    private boolean descendant(String tenant,String line,String sourceId,String candidate){String current=candidate;while(current!=null){if(sourceId.equals(current))return true;Map<String,Object> row=mapper.directory(tenant,line,current);current=row==null?null:nullable(row,"parentId");}return false;}
+    private String copyDirectoryTree(String tenant,String line,Map<String,Object> source,String parent,String name){
+        String id=UUID.randomUUID().toString();try{mapper.insertDirectory(tenant,line,id,parent,name,number(source,"sort"),RequestContext.userId());}catch(DataIntegrityViolationException e){throw conflict("目标位置已存在同名目录");}
+        for(Map<String,Object> sourceCase:mapper.casesInDirectory(tenant,line,text(source,"id"))){
+            List<StepInput> steps=mapper.steps(tenant,text(sourceCase,"id")).stream().map(step->new StepInput(null,number(step,"sort"),text(step,"action"),text(step,"expectedResult"))).toList();
+            SaveCase copy=new SaveCase(id,nullable(sourceCase,"sourceRequirementId"),text(sourceCase,"title"),nullable(sourceCase,"precondition"),text(sourceCase,"priority"),text(sourceCase,"ownerId"),decode(sourceCase.get("tags")),steps,null);
+            String caseId=UUID.randomUUID().toString(),code="TC-"+String.format("%06d",mapper.nextCode(tenant,line));mapper.insertCase(tenant,line,caseId,code,copy,text(sourceCase,"ownerName"),encode(copy.tags()),RequestContext.userId());mapper.replaceSteps(tenant,caseId,steps,RequestContext.userId());if(!enabled(sourceCase.get("enabled")))mapper.setEnabled(tenant,line,caseId,0,false,RequestContext.userId());
+        }
+        for(Map<String,Object> child:mapper.childDirectories(tenant,line,text(source,"id")))copyDirectoryTree(tenant,line,child,id,text(child,"name"));
+        return id;
+    }
     private CaseView view(Map<String,Object> row){
         String id=text(row,"id");List<StepInput> steps=mapper.steps(RequestContext.tenantId(),id).stream().map(s->new StepInput(text(s,"id"),number(s,"sort"),text(s,"action"),text(s,"expectedResult"))).toList();
         return new CaseView(id,text(row,"code"),text(row,"productLineId"),text(row,"directoryId"),text(row,"directoryName"),nullable(row,"sourceRequirementId"),nullable(row,"sourceRequirementTitle"),text(row,"title"),nullable(row,"precondition"),text(row,"priority"),text(row,"ownerId"),text(row,"ownerName"),decode(row.get("tags")),enabled(row.get("enabled")),number(row,"revision"),longNumber(row,"referenceCount"),nullable(row,"latestResult"),time(row.get("createdAt")),time(row.get("updatedAt")),steps);

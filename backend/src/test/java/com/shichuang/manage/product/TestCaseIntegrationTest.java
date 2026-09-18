@@ -93,6 +93,34 @@ class TestCaseIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(HttpStatus.CONFLICT, stale.getStatusCode());
     }
 
+    @Test
+    void copiesDirectoryTreeAndPersistsBatchChanges() {
+        CaseView rootCase = service.create(line, input("根目录用例", null));
+        String child = service.createDirectory(line, new SaveDirectory(directory, "子目录", 2)).id();
+        CaseView childCase = service.create(line, input("子目录用例", child));
+
+        DirectoryView copied = service.copyDirectory(line, directory, new CopyDirectory(null, "核心流程副本"));
+        List<DirectoryView> directories = service.directories(line);
+        assertEquals(4, directories.size());
+        assertEquals(2, service.list(line, new Query(copied.id(), "", null, null, null, 1, 20)).items().size() +
+            directories.stream().filter(value -> copied.id().equals(value.parentId())).mapToInt(value -> (int) service.list(line, new Query(value.id(), "", null, null, null, 1, 20)).total()).sum());
+
+        String target = service.createDirectory(line, new SaveDirectory(null, "批量目标", 3)).id();
+        service.batch(line, new BatchUpdate(List.of(rootCase.id(), childCase.id()), "PRIORITY", "P3"));
+        assertEquals("P3", service.detail(line, rootCase.id()).priority());
+        service.batch(line, new BatchUpdate(List.of(rootCase.id(), childCase.id()), "MOVE", target));
+        assertEquals(2, service.list(line, new Query(target, "", null, null, null, 1, 20)).total());
+        service.batch(line, new BatchUpdate(List.of(rootCase.id()), "OWNER", owner));
+        assertEquals(owner, service.detail(line, rootCase.id()).ownerId());
+        service.batch(line, new BatchUpdate(List.of(rootCase.id()), "DELETE", null));
+        assertEquals(1, service.list(line, new Query(target, "", null, null, null, 1, 20)).total());
+
+        assertThrows(IllegalArgumentException.class, () -> service.deleteDirectory(line, directory));
+        String emptyDirectory = service.createDirectory(line, new SaveDirectory(null, "待删除目录", 4)).id();
+        service.deleteDirectory(line, emptyDirectory);
+        assertThrows(ResponseStatusException.class, () -> service.deleteDirectory(line, emptyDirectory));
+    }
+
     private SaveCase input(String title, String directoryOverride) {
         return new SaveCase(directoryOverride == null ? directory : directoryOverride, null, title, "用户已登录", "P1", owner,
             List.of("smoke", "核心"), List.of(

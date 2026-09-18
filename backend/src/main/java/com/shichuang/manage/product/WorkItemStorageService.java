@@ -80,6 +80,8 @@ public class WorkItemStorageService {
         access.check(line,true);
         Map<String,Object> item=requireItem(line,id);
         if (body.revision()==null || body.revision()!=((Number)item.get("revision")).intValue()) throw conflict("任务已被其他人修改，请刷新后重试");
+        if (body.assigneeName()!=null && item.get("parentWorkItemId")==null)
+            throw new IllegalArgumentException("主任务负责人不可修改，请调整子任务负责人");
         if (body.title()!=null) required(body.title(),"标题",255);
         if (body.description()!=null && body.description().length()>200000) throw new IllegalArgumentException("描述超出长度限制");
         if (body.expectedGoal()!=null && body.expectedGoal().length()>10000) throw new IllegalArgumentException("验收目标超出长度限制");

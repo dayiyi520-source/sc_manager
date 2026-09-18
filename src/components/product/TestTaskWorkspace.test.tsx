@@ -16,7 +16,7 @@ describe('TestTaskWorkspace', () => {
     expect(mocks.props).toHaveBeenCalledWith(expect.objectContaining({
       productLineFilter: 'line-1',
       taskKind: 'test',
-      createPolicy: expect.objectContaining({ requireRequirement: true }),
+      createPolicy: expect.not.objectContaining({ requireRequirement: true }),
       renderDetail: expect.any(Function),
     }));
   });

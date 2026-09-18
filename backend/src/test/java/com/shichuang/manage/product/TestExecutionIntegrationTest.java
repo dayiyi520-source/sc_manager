@@ -42,7 +42,7 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
         jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'执行产品线','test-user','test-user',NOW(6),NOW(6))", line, tenant, "EX-" + line);
         jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,'product_manager','测试负责人','enabled','test-user','test-user',NOW(6),NOW(6))", owner, tenant, owner, "执行负责人", "测试部");
         jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'测试','测试主任务','test-user','test-user',NOW(6),NOW(6))", rootType, tenant, line);
-        jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'测试','测试任务','test-user','test-user',NOW(6),NOW(6))", type, tenant, line);
+        jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'测试','测试','test-user','test-user',NOW(6),NOW(6))", type, tenant, line);
         insertWorkItem(rootWorkItem, rootType, "TEST-ROOT", "测试主任务", null, false, "P1");
         jdbc.update("""
             INSERT INTO t_product_work_item(id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,parent_work_item_id_,workflow_id_,status_key_,status_name_,status_group_,priority_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_)
@@ -87,6 +87,20 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
         ResponseStatusException readOnly = assertThrows(ResponseStatusException.class,
             () -> executions.saveResult(resultId, new SaveResult(ResultStatus.PASSED, null, List.of(), 1)));
         assertEquals(HttpStatus.CONFLICT, readOnly.getStatusCode());
+    }
+
+    @Test
+    void allowsStandaloneTestTaskToCreatePlanAndExecution() {
+        String standalone = UUID.randomUUID().toString();
+        String type = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO t_product_line_work_item_type(id_,tenant_id_,product_line_id_,category_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'测试','测试任务','test-user','test-user',NOW(6),NOW(6))", type, tenant, line);
+        insertWorkItem(standalone, type, "TEST-STANDALONE", "独立测试任务", null, false, "P1");
+
+        Map<String, Object> plan = executions.savePlan(standalone, new SavePlan(List.of(testCase.id()), "测试环境", 0));
+        assertNotNull(plan.get("id"));
+        Map<String, Object> round = executions.createExecution(standalone,
+            new CreateExecution("standalone-round", ScopeType.ALL, List.of(), "第一轮", "测试环境", null));
+        assertEquals(1, ((List<?>) round.get("cases")).size());
     }
 
     @Test
@@ -148,7 +162,9 @@ class TestExecutionIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(1L, overview.get("total"));
         assertEquals(1L, overview.get("passed"));
         assertEquals(0L, overview.get("failed"));
-        assertEquals(0L, ((Number) overview.get("defectCount")).longValue());
+        assertEquals(2L, ((Number) overview.get("defectCount")).longValue());
+        assertEquals(0L, ((Number) overview.get("blockingDefectCount")).longValue());
+        assertEquals(2, ((List<?>) overview.get("defects")).size());
     }
 
     @SuppressWarnings("unchecked")

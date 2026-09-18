@@ -127,7 +127,15 @@ const WorkOrderPicker: React.FC<{
   </div>;
 };
 
-export type WorkItemDetailContext = { task: RequirementTask; children: Array<Record<string, unknown>> };
+export type WorkItemDetailContext = {
+  task: RequirementTask;
+  children: Array<Record<string, unknown>>;
+  editing: boolean;
+  onUpdate: (updates: Partial<RequirementTask>) => void;
+  employeeNames: string[];
+  versions: Array<{ id: string; name: string; productLineName?: string }>;
+  statusControl: React.ReactNode;
+};
 export type WorkItemCreatePolicy = { requireRequirement?: boolean; allowedChildTypeNames?: string[] };
 type RequirementTasksViewProps = {
   productLineFilter?: string;
@@ -379,8 +387,6 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const controlsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setDetailDescription(selectedTask?.description || '');
-    setDetailDescriptionHtml(selectedTask?.descriptionHtml || '');
     setDetailTab('activity');
     setCommentDraft('');
     setDetailEditing(false);
@@ -388,6 +394,11 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     setParentWorkItem(null);
     setRelatedWorkItems([]);
   }, [selectedTask?.id]);
+
+  useEffect(() => {
+    setDetailDescription(selectedTask?.description || '');
+    setDetailDescriptionHtml(selectedTask?.descriptionHtml || '');
+  }, [selectedTask?.id, selectedTask?.description, selectedTask?.descriptionHtml]);
 
   useEffect(() => {
     if (!selectedTask) return;
@@ -406,6 +417,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     const relationsRequest = productRepository.workItemRelations(selectedTask.productLineId, selectedTask.id);
     Promise.all([detailRequest, summaryRequest, relationsRequest])
       .then(async ([detail, summary, relationView]) => {
+        setSelectedTask((current) => current?.id === detail.id ? storedTask(detail, current) : current);
         setChildWorkItems(Array.isArray(detail.children) && detail.children.length ? detail.children : (summary.linkedItems || []).filter((item) => item.id !== selectedTask.id));
         setParentWorkItem(detail.parent && typeof detail.parent === 'object' ? detail.parent : null);
         const relatedIds = (relationView.relations || []).filter((relation) => relation.type === 'RELATES_TO').map((relation) => relation.sourceId === selectedTask.id ? relation.targetId : relation.sourceId);
@@ -740,10 +752,6 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     }
     if (configuredCategory && !formRequirementType) {
       addToast('warning', `请选择${itemLabel}类型`);
-      return;
-    }
-    if (!editingTask && createPolicy?.requireRequirement && selectedRequirementTaskIds.length === 0) {
-      addToast('warning', `新建${itemLabel}必须关联来源需求`);
       return;
     }
     const selectedProductLine = productLines.find((line) => line.name === formProductLineName);
@@ -1356,7 +1364,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         <WorkItemCreatePanel
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
-          title={`${itemLabel}详情`}
+          title={taskKind === 'test' ? selectedTask.title : `${itemLabel}详情`}
           presentation="drawer"
           showContinueOption={false}
           footer={
@@ -1371,7 +1379,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               </button>
             </>
           }
-          properties={<div className={`space-y-6 text-xs ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
+          properties={taskKind === 'test' ? undefined : <div className={`space-y-6 text-xs ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
               <SearchableSelect label="所属产品线" value={selectedTask.productLineName || ''} options={productLines.map((line) => line.name)} onChange={(productLineName) => saveDetailUpdates({ productLineName, productLineId: productLines.find((line) => line.name === productLineName)?.id, versionName: '' })} placeholder="未设置" />
@@ -1398,9 +1406,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           </div>}
         >
           <div className="w-full space-y-5 text-xs">
-            <div className={detailEditing ? '' : 'pointer-events-none opacity-80'}>
+            {taskKind !== 'test' && <div className={detailEditing ? '' : 'pointer-events-none opacity-80'}>
               <DetailTextInput label={`${itemLabel}名称`} value={selectedTask.title} onSave={(title) => title.trim() && saveDetailUpdates({ title })} />
-            </div>
+            </div>}
             {parentWorkItem && <section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2">
               <span className="block text-[var(--text-muted)]">父级任务</span>
               <button type="button" onClick={() => setSelectedTask(storedTask(parentWorkItem, selectedTask))} className="mt-1 flex max-w-full items-center gap-2 text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">
@@ -1408,8 +1416,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                 <span className="truncate">{String(parentWorkItem.title || '')}</span>
               </button>
             </section>}
-            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems })}</section>}
-            <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
+            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems, editing: detailEditing, onUpdate: saveDetailUpdates, employeeNames: employees, versions, statusControl: taskStatusControl(selectedTask, true) })}</section>}
+            {taskKind !== 'test' && <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
               <label className="block text-[var(--text-muted)]">
                 <span>任务描述</span>
                 <div className="mt-1">
@@ -1431,8 +1439,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                   /> : <CollapsibleDescription value={detailDescription} emptyText="未填写任务描述" />}
                 </div>
               </label>
-            </div>
-            <section className="border-t border-[var(--border-main)] pt-4">
+            </div>}
+            {taskKind !== 'test' && <section className="border-t border-[var(--border-main)] pt-4">
               <div className="mb-4 border-b border-[var(--border-main)] px-3 py-2">
                 <Segmented
                   value={detailTab}
@@ -1478,7 +1486,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                   </div>
                 </div>
               )}
-            </section>
+            </section>}
           </div>
         </WorkItemCreatePanel>
       )}

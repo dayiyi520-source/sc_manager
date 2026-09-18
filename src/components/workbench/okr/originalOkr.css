@@ -8,8 +8,11 @@
 .okr-loading-state { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--text-muted); font-size: 12px; }
 .okr-page-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-main); }
 .okr-primary-tabs, .okr-page-actions { display: flex; align-items: center; gap: 8px; }
-.okr-primary-tabs { padding: 4px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface-soft); }
-.okr-primary-tabs .ant-btn { min-height: 32px; }
+.okr-primary-tabs { border-bottom: 1px solid var(--border-main); }
+.okr-primary-tabs .ant-btn { min-height: 40px; padding: 8px 4px 10px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text-muted); box-shadow: none; }
+.okr-primary-tabs .ant-btn:hover { background: transparent; color: var(--text-primary); }
+.okr-primary-tabs .ant-btn[aria-selected='true'] { border-bottom-color: var(--primary); color: var(--primary); font-weight: 600; }
+.okr-primary-tabs .ant-btn .anticon { color: currentColor; }
 .okr-page-actions { flex-wrap: wrap; justify-content: flex-end; }
 .okr-cycle-control { position: relative; width: 224px; }
 .okr-cycle-filter { width: 100%; }

@@ -66,9 +66,9 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES('assignee-user',?,'assignee-user','测试负责人','测试部','product_manager','测试负责人','enabled','test-user','test-user',NOW(),NOW())",tenant);
         var created=storage.create(input("update-fields","test",type,null,null,null));
         var update=new UpdateItem("更新后的统一任务","新描述","新目标",null,"测试负责人","P2",java.time.LocalDate.now(),java.time.LocalDate.now().plusDays(3),new java.math.BigDecimal("12.50"),new java.math.BigDecimal("2.25"),0);
-        var changed=storage.update(line,created.get("id").toString(),update);
+        assertThrows(IllegalArgumentException.class,()->storage.update(line,created.get("id").toString(),update));
+        var changed=storage.update(line,created.get("id").toString(),new UpdateItem("更新后的统一任务","新描述","新目标",null,null,"P2",java.time.LocalDate.now(),java.time.LocalDate.now().plusDays(3),new java.math.BigDecimal("12.50"),new java.math.BigDecimal("2.25"),0));
         assertEquals("更新后的统一任务",changed.get("title"));
-        assertEquals("测试负责人",changed.get("assigneeName"));
         assertEquals("P2",changed.get("priority"));
         assertEquals(1,((Number)changed.get("revision")).intValue());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.update(line,created.get("id").toString(),update)).getStatusCode().value());

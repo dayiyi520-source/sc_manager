@@ -1,14 +1,44 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Button, Empty, Table, Tag } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Alert, Button, Drawer, Empty, Progress, Table, Tag } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { productRepository } from '../../services/productRepository';
 import type { TestExecution } from '../../types/testManagement';
 import { TestExecutionWorkspace } from './TestExecutionWorkspace';
 
 export const TestExecutionResults: React.FC<{ workItemId: string; productLineId: string; refreshKey?: number }> = ({ workItemId, productLineId, refreshKey = 0 }) => {
-  const rounds = useQuery({ queryKey: ['test-executions', workItemId, refreshKey], queryFn: () => productRepository.testExecutions(workItemId), retry: false });
+  const rounds = useQuery({
+    queryKey: ['test-executions-with-details', workItemId, refreshKey],
+    queryFn: async () => {
+      const summaries = await productRepository.testExecutions(workItemId);
+      return Promise.all(summaries.map((item) => productRepository.testExecutionDetail(item.id)));
+    },
+    retry: false,
+  });
   const [selectedId, setSelectedId] = useState('');
-  useEffect(() => { if (!selectedId && rounds.data?.[0]) setSelectedId(rounds.data[0].id); }, [rounds.data, selectedId]);
+  const summary = useMemo(() => {
+    const items = rounds.data || [];
+    const total = items.reduce((sum, item) => sum + item.total, 0);
+    const passed = items.reduce((sum, item) => sum + item.passed, 0);
+    const failed = items.reduce((sum, item) => sum + item.failed, 0);
+    const notExecuted = items.reduce((sum, item) => sum + item.notExecuted, 0);
+    const defects = new Set(items.flatMap((item) => item.cases.flatMap((testCase) => testCase.defects.map((defect) => defect.id)))).size;
+    return { total, passed, failed, notExecuted, defects, rate: total ? Math.round((passed / total) * 100) : 0 };
+  }, [rounds.data]);
   if (rounds.isError) return <Alert type="error" showIcon title="执行记录加载失败" action={<Button onClick={() => rounds.refetch()}>重试</Button>} />;
-  return <div className="test-execution-results"><Table<TestExecution> size="small" loading={rounds.isLoading} rowKey="id" dataSource={rounds.data || []} pagination={false} locale={{ emptyText: <Empty description="尚未创建测试执行轮次" /> }} onRow={(row) => ({ onClick: () => setSelectedId(row.id) })} rowClassName={(row) => row.id === selectedId ? 'test-round-selected' : ''} columns={[{ title: '轮次', dataIndex: 'roundNo', width: 72, render: (value) => `#${value}` }, { title: '名称', dataIndex: 'name', ellipsis: true }, { title: '状态', dataIndex: 'status', width: 96, render: (value) => <Tag color={value === 'IN_PROGRESS' ? 'processing' : 'default'}>{value === 'IN_PROGRESS' ? '执行中' : '已结束'}</Tag> }, { title: '通过', dataIndex: 'passed', width: 72 }, { title: '失败', dataIndex: 'failed', width: 72 }, { title: '未执行', dataIndex: 'notExecuted', width: 80 }]} />{selectedId && <TestExecutionWorkspace executionId={selectedId} productLineId={productLineId} onChanged={() => void rounds.refetch()} />}</div>;
+  return <div className="test-execution-results">
+    <div className="test-execution-metrics"><div><span>执行用例</span><b>{summary.total}</b></div><div><span>通过</span><b className="success">{summary.passed}</b></div><div><span>失败</span><b className="danger">{summary.failed}</b></div><div><span>未执行</span><b>{summary.notExecuted}</b></div><div><span>通过率</span><b>{summary.rate}%</b></div><div><span>缺陷</span><b className="warning">{summary.defects}</b></div></div>
+    <div className="test-execution-progress"><span>全部轮次</span><Progress percent={summary.rate} success={{ percent: summary.rate }} showInfo={false} /><strong>{summary.rate}%</strong></div>
+    <Table<TestExecution> size="small" loading={rounds.isLoading} rowKey="id" dataSource={rounds.data || []} pagination={false} locale={{ emptyText: <Empty description="尚未创建测试执行轮次" /> }} columns={[
+      { title: '执行轮次', dataIndex: 'name', ellipsis: true, render: (value, row) => <span><b>{value}</b><small className="test-round-number">第 {row.roundNo} 轮</small></span> },
+      { title: '通过', dataIndex: 'passed', width: 80, render: (value) => <span className="test-result-success">{value}</span> },
+      { title: '失败', dataIndex: 'failed', width: 80, render: (value) => <span className="test-result-danger">{value}</span> },
+      { title: '未执行', dataIndex: 'notExecuted', width: 88 },
+      { title: '缺陷', width: 72, render: (_value, row) => new Set(row.cases.flatMap((item) => item.defects.map((defect) => defect.id))).size },
+      { title: '状态', dataIndex: 'status', width: 96, render: (value) => <Tag color={value === 'IN_PROGRESS' ? 'processing' : 'success'}>{value === 'IN_PROGRESS' ? '执行中' : '已完成'}</Tag> },
+      { title: '操作', width: 80, render: (_value, row) => <Button type="link" onClick={() => setSelectedId(row.id)}>查看</Button> },
+    ]} />
+    <Drawer title={(rounds.data || []).find((item) => item.id === selectedId)?.name || '执行详情'} open={!!selectedId} onClose={() => setSelectedId('')} width="min(1040px, 78vw)" destroyOnClose>
+      {selectedId && <TestExecutionWorkspace executionId={selectedId} productLineId={productLineId} onChanged={() => void rounds.refetch()} />}
+    </Drawer>
+  </div>;
 };

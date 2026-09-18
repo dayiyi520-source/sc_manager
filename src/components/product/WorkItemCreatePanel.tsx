@@ -12,8 +12,10 @@ export const WorkItemCreatePanel: React.FC<{
   footer?: React.ReactNode;
   secondaryAction?: React.ReactNode;
   showContinueOption?: boolean;
+  continueChecked?: boolean;
+  onContinueCheckedChange?: (checked: boolean) => void;
   presentation?: 'workspace' | 'drawer';
-}> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, showContinueOption = true, presentation = 'workspace' }) => {
+}> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, showContinueOption = true, continueChecked, onContinueCheckedChange, presentation = 'workspace' }) => {
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
@@ -35,7 +37,7 @@ export const WorkItemCreatePanel: React.FC<{
           <button type="button" onClick={onClose} aria-label="关闭" className="rounded-lg p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"><X className="h-5 w-5" /></button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto"><div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_320px]"> <main className="min-w-0 px-8 py-6">{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-6 lg:sticky lg:top-0 lg:self-start lg:max-h-full" aria-label="字段设置">{properties}</aside>}</div></div>
-        {footer && <footer className="flex shrink-0 items-center gap-3 border-t border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-3">{showContinueOption && <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" />继续新建下一个</label>}<span className="flex-1" />{secondaryAction}{footer}</footer>}
+        {footer && <footer className="flex shrink-0 items-center gap-3 border-t border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-3">{showContinueOption && <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><input type="checkbox" checked={continueChecked} onChange={(event) => onContinueCheckedChange?.(event.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />继续新建下一个</label>}<span className="flex-1" />{secondaryAction}{footer}</footer>}
       </aside>
     </div>
   );

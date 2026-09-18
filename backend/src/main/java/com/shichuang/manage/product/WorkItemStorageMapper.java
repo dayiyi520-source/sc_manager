@@ -37,6 +37,15 @@ public class WorkItemStorageMapper {
     public int publish(String tenant,String line,String id,int revision,String user) {
         return jdbc.update("UPDATE t_product_workflow SET status_='PUBLISHED',version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND status_='DRAFT' AND delete_flag_=0",user,tenant,line,id,revision);
     }
+    public int migrateNotStarted(String tenant,String line,String category,String taskTypeId,String workflowId,WorkItemDefinition.State initial,String user) {
+        return jdbc.update("""
+            UPDATE t_product_work_item SET workflow_id_=?,status_key_=?,status_name_=?,status_group_=?,status_color_=?,successful_=? ,
+              version_=version_+1,update_by_= ?,update_time_=NOW(6)
+            WHERE tenant_id_=? AND product_line_id_=? AND category_=?
+              AND ((? IS NULL AND task_type_id_ IS NULL) OR task_type_id_=?)
+              AND status_group_='NOT_STARTED' AND delete_flag_=0
+            """,workflowId,initial.key(),initial.name(),initial.group().name(),initial.color(),initial.successful(),user,tenant,line,category,taskTypeId,taskTypeId);
+    }
     public List<Map<String,Object>> childRules(String tenant,String line) {
         return jdbc.queryForList("SELECT id_ AS id,parent_type_id_ AS parentTypeId,child_type_id_ AS childTypeId,enabled_ AS enabled,version_ AS revision FROM t_product_work_item_child_rule WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0 ORDER BY create_time_,id_",tenant,line);
     }

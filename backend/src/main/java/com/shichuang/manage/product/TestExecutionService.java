@@ -15,7 +15,6 @@ import static com.shichuang.manage.product.TestExecutionDefinition.*;
 @Service
 @Transactional(readOnly=true)
 public class TestExecutionService {
-    private static final Set<String> EXECUTABLE_TYPES=Set.of("测试任务","测试验收","安全测试","回归测试");
     private static final Set<String> EVIDENCE_TYPES=Set.of("image/png","image/jpeg","image/webp","text/plain","application/pdf","application/json");
     private final TestExecutionMapper mapper; private final WorkItemAccess access; private final WorkItemStorageMapper storage;
     private final WorkItemRelationService relations; private final ObjectMapper json;
@@ -64,25 +63,25 @@ public class TestExecutionService {
         return execution(result.get("executionId").toString());
     }
     public Map<String,Object> overview(String workItem){
-        Map<String,Object> root=requireItem(workItem,false);String tenant=RequestContext.tenantId();List<Map<String,Object>> children=mapper.descendants(tenant,workItem);
-        List<Map<String,Object>> latestExecutions=new ArrayList<>();Set<String>caseIds=new HashSet<>();Map<String,Map<String,Object>> defects=new LinkedHashMap<>();
-        for(Map<String,Object> child:children){
+        Map<String,Object> root=requireItem(workItem,false);String tenant=RequestContext.tenantId();List<Map<String,Object>> children=mapper.descendants(tenant,workItem);List<Map<String,Object>> targets=new ArrayList<>();targets.add(root);targets.addAll(children);
+        List<Map<String,Object>> latestExecutions=new ArrayList<>();Set<String>caseIds=new HashSet<>();Map<String,Map<String,Object>> defects=new LinkedHashMap<>();Map<String,Map<String,Object>> latestDefects=new LinkedHashMap<>();
+        for(Map<String,Object> child:targets){
             String childId=child.get("id").toString();Map<String,Object> plan=mapper.plan(tenant,childId);
             if(plan!=null)mapper.planCases(tenant,plan.get("id").toString()).forEach(v->caseIds.add(v.get("testCaseId").toString()));
+            mapper.defectsForWorkItem(tenant,childId).forEach(defect->defects.put(defect.get("id").toString(),defect));
             Map<String,Object> latest=mapper.latestEndedExecution(tenant,childId);if(latest==null)continue;
+            mapper.executionCases(tenant,latest.get("id").toString()).forEach(result->mapper.defects(tenant,result.get("id").toString()).forEach(defect->latestDefects.put(defect.get("id").toString(),defect)));
             latestExecutions.add(latest);
-            for(Map<String,Object> result:mapper.executionCases(tenant,latest.get("id").toString()))
-                mapper.defects(tenant,result.get("id").toString()).forEach(defect->defects.put(defect.get("id").toString(),defect));
         }
         long total=latestExecutions.stream().mapToLong(v->num(v,"total")).sum(),passed=latestExecutions.stream().mapToLong(v->num(v,"passed")).sum(),failed=latestExecutions.stream().mapToLong(v->num(v,"failed")).sum(),unexecuted=latestExecutions.stream().mapToLong(v->num(v,"notExecuted")).sum();
-        long incomplete=children.stream().filter(v->!enabled(v.get("successful"))).count();long blockingDefects=defects.values().stream().filter(d->Set.of("P0","P1").contains(Objects.toString(d.get("priority"),""))&&!enabled(d.get("successful"))).count();
+        long incomplete=children.stream().filter(v->!enabled(v.get("successful"))).count();long blockingDefects=latestDefects.values().stream().filter(d->Set.of("P0","P1").contains(Objects.toString(d.get("priority"),""))&&!enabled(d.get("successful"))).count();
         List<String> blockers=new ArrayList<>();if(incomplete>0)blockers.add("REQUIRED_CHILD_INCOMPLETE");if(unexecuted>0)blockers.add("UNEXECUTED_CASES");if(blockingDefects>0)blockers.add("OPEN_BLOCKING_DEFECTS");
-        String conclusion=!blockers.isEmpty()?"NOT_PASSED":defects.isEmpty()?"PASSED":"CONDITIONAL_PASS";
+        String conclusion=!blockers.isEmpty()?"NOT_PASSED":latestDefects.isEmpty()?"PASSED":"CONDITIONAL_PASS";
         Map<String,Object> out=new LinkedHashMap<>();out.put("workItemId",root.get("id"));out.put("childCount",children.size());out.put("completedChildCount",children.size()-incomplete);out.put("caseCount",caseIds.size());out.put("executionCount",latestExecutions.size());out.put("total",total);out.put("passed",passed);out.put("failed",failed);out.put("notExecuted",unexecuted);out.put("defectCount",defects.size());out.put("blockingDefectCount",blockingDefects);out.put("conclusion",conclusion);out.put("blockers",blockers);out.put("defects",List.copyOf(defects.values()));out.put("children",children);return out;
     }
-    private Map<String,Object> planView(Map<String,Object> item,Map<String,Object> plan){Map<String,Object> out=new LinkedHashMap<>();out.put("workItemId",item.get("id"));out.put("executable",EXECUTABLE_TYPES.contains(Objects.toString(item.get("taskTypeName"),"")));if(plan==null){out.put("id",null);out.put("revision",0);out.put("environment","");out.put("cases",List.of());}else{out.putAll(plan);out.put("cases",mapper.planCases(RequestContext.tenantId(),plan.get("id").toString()));}return out;}
+    private Map<String,Object> planView(Map<String,Object> item,Map<String,Object> plan){Map<String,Object> out=new LinkedHashMap<>();out.put("workItemId",item.get("id"));out.put("executable",true);if(plan==null){out.put("id",null);out.put("revision",0);out.put("environment","");out.put("cases",List.of());}else{out.putAll(plan);out.put("cases",mapper.planCases(RequestContext.tenantId(),plan.get("id").toString()));}return out;}
     private Map<String,Object> requireItem(String id,boolean write){Map<String,Object> item=mapper.item(RequestContext.tenantId(),id);if(item==null)throw missing("测试任务不存在");access.check(item.get("productLineId").toString(),write);if(!"test".equals(item.get("category")))throw bad("工作项不是测试分类");return item;}
-    private Map<String,Object> requireExecutable(String id,boolean write){Map<String,Object> item=requireItem(id,write);if(item.get("parentWorkItemId")==null)throw bad("测试主任务仅用于汇总，请在可执行子任务中维护测试计划");if(!EXECUTABLE_TYPES.contains(Objects.toString(item.get("taskTypeName"),"")))throw bad("当前子任务类型不支持测试执行");return item;}
+    private Map<String,Object> requireExecutable(String id,boolean write){return requireItem(id,write);}
     private Map<String,Object> requireResult(String id,boolean write){Map<String,Object> row=mapper.result(RequestContext.tenantId(),id);if(row==null)throw missing("用例执行结果不存在");access.check(row.get("productLineId").toString(),write);return row;}
     private Map<String,Object> requireEnabledCase(String tenant,String line,String id){Map<String,Object> c=mapper.testCase(tenant,line,id);if(c==null||!enabled(c.get("enabled")))throw bad("测试用例不存在、已停用或不属于当前产品线");return c;}
     private void validateEvidence(EvidenceInput e){required(e.name(),"证据名称",255);if(!EVIDENCE_TYPES.contains(e.contentType()))throw bad("证据文件类型不支持");if(e.size()<0||e.size()>10L*1024*1024)throw bad("单个证据文件不能超过10MB");if(e.dataUrl()==null||!e.dataUrl().startsWith("data:"+e.contentType()+";base64,"))throw bad("证据内容格式无效");}

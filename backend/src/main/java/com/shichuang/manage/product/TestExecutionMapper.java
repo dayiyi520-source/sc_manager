@@ -79,6 +79,17 @@ public class TestExecutionMapper {
       FROM t_product_test_execution_defect d JOIN t_product_work_item w ON w.tenant_id_=d.tenant_id_ AND w.id_=d.defect_work_item_id_ AND w.delete_flag_=0
       WHERE d.tenant_id_=? AND d.execution_case_id_=? AND d.delete_flag_=0 ORDER BY d.create_time_
       """,tenant,result);}
+    public List<Map<String,Object>> defectsForWorkItem(String tenant,String workItem){return jdbc.queryForList("""
+      SELECT d.id_ AS id,d.code_ AS code,d.title_ AS title,d.status_name_ AS status,d.priority_ AS priority,d.assignee_name_ AS assigneeName,d.successful_ AS successful,
+        MAX(ed.create_time_) AS linkedAt
+      FROM t_product_test_execution e
+      JOIN t_product_test_execution_case ec ON ec.tenant_id_=e.tenant_id_ AND ec.execution_id_=e.id_ AND ec.delete_flag_=0
+      JOIN t_product_test_execution_defect ed ON ed.tenant_id_=ec.tenant_id_ AND ed.execution_case_id_=ec.id_ AND ed.delete_flag_=0
+      JOIN t_product_work_item d ON d.tenant_id_=ed.tenant_id_ AND d.id_=ed.defect_work_item_id_ AND d.delete_flag_=0
+      WHERE e.tenant_id_=? AND e.work_item_id_=? AND e.delete_flag_=0
+      GROUP BY d.id_,d.code_,d.title_,d.status_name_,d.priority_,d.assignee_name_,d.successful_
+      ORDER BY linkedAt DESC
+      """,tenant,workItem);}
     public void insertDefectLink(String tenant,String line,String result,String defect,String user){jdbc.update("INSERT INTO t_product_test_execution_defect(id_,tenant_id_,product_line_id_,execution_case_id_,defect_work_item_id_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,?,NOW(6))",UUID.randomUUID().toString(),tenant,line,result,defect,user,user,java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));}
     public List<Map<String,Object>> descendants(String tenant,String root){return jdbc.queryForList("""
       WITH RECURSIVE children AS (
