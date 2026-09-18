@@ -438,6 +438,10 @@ html:not(.dark) .product-line-detail button[class*="bg-[#2F66F6]"] {
   color: #FFFFFF !important;
 }
 
+.product-line-gantt-content {
+  width: max(53.75rem, calc(11.25rem + var(--gantt-week-count) * 6rem));
+}
+
 /* Right-workspace dialogs share the light surface contract. Navigation chrome
  * is deliberately excluded so the dark sidebar remains unchanged in light mode. */
 html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed):not(.drawer-backdrop) {

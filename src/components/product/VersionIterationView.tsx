@@ -329,14 +329,17 @@ export const VersionIterationView: React.FC = () => {
     const consumeProductLineContext = () => {
       const lineId = sessionStorage.getItem('shichuang.productLineFilter');
       const targetTab = sessionStorage.getItem('shichuang.productLineTargetTab');
+      const targetVersionId = sessionStorage.getItem('shichuang.productLineTargetVersionId');
       if (lineId) setProductLineFilter(lineId);
+      if (targetVersionId) setSelectedId(targetVersionId);
       if (targetTab === 'detail') {
         setMode('list');
         setShowDetail(true);
       }
-      if (lineId || targetTab) {
+      if (lineId || targetTab || targetVersionId) {
         sessionStorage.removeItem('shichuang.productLineFilter');
         sessionStorage.removeItem('shichuang.productLineTargetTab');
+        sessionStorage.removeItem('shichuang.productLineTargetVersionId');
       }
     };
     consumeProductLineContext();
@@ -625,7 +628,7 @@ export const VersionIterationView: React.FC = () => {
         : { label: '开启迭代', nextStatus: '迭代中', icon: <Play className="h-4 w-4" /> };
     const detailTabs: Array<{ key: DetailTab; label: string; count?: number; icon: React.ReactNode }> = [
       { key: 'hours', label: '迭代工时', icon: <Calendar className="h-4 w-4" /> },
-      { key: 'workItems', label: '工作项', count: selectedStats.total, icon: <ListTodo className="h-4 w-4" /> },
+      { key: 'workItems', label: '迭代任务', count: selectedStats.total, icon: <ListTodo className="h-4 w-4" /> },
       { key: 'securityTests', label: '安全测试', icon: <Beaker className="h-4 w-4" /> },
       { key: 'review', label: '版本评审', icon: <CheckCircle className="h-4 w-4" /> }
     ];

@@ -17,6 +17,22 @@ describe('requirement task Ant Design contract', () => {
     expect(productLineSource.match(/aria-selected=/g)).toHaveLength(3);
   });
 
+  it('keeps the persisted product-line code read-only in settings', () => {
+    expect(productLineSource).toContain('value={code} disabled readOnly');
+    expect(productLineSource).toContain('编码创建后不可更改');
+    const saveBasicInfo = productLineSource.slice(
+      productLineSource.indexOf('const saveBasicInfo'),
+      productLineSource.indexOf('const sections')
+    );
+    expect(saveBasicInfo).not.toContain('code: code.trim()');
+  });
+
+  it('opens a selected version from the weekly sticky gantt view', () => {
+    expect(productLineSource).toContain('时间区间（按周）');
+    expect(productLineSource).toContain("sessionStorage.setItem('shichuang.productLineTargetVersionId', versionId)");
+    expect(productLineSource).toContain('sticky left-0');
+  });
+
   it('keeps children and relations in dedicated detail tabs', () => {
     expect(requirementSource).toContain("value: 'relations'");
     expect(requirementSource).toContain("value: 'children'");

@@ -82,14 +82,13 @@ const ProductLineSettingsPanel: React.FC<{
 
   const saveBasicInfo = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!name.trim() || !code.trim()) {
-      addToast('warning', '请填写产品线名称和编码');
+    if (!name.trim() || !productLine.code.trim()) {
+      addToast('warning', '请填写产品线名称');
       return;
     }
     try {
       await updateProductLine(productLine.id, {
         name: name.trim(),
-        code: code.trim(),
         description: description.trim() || '该产品线还没有任何简介内容。',
         visibility,
         status
@@ -136,7 +135,7 @@ const ProductLineSettingsPanel: React.FC<{
               <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">维护产品线的名称、编码、可见范围和简介。</p></div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线名称 *</span><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入产品线名称" /></label>
-                <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线编码 *</span><Input value={code} onChange={(event) => setCode(event.target.value)} placeholder="请输入产品线编码" /></label>
+                <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线编码</span><Input value={code} disabled readOnly aria-describedby="product-line-code-help" placeholder="产品线编码创建后不可更改" /><span id="product-line-code-help" className="text-[11px] font-normal text-[var(--text-muted)]">编码创建后不可更改</span></label>
               </div>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>可见范围</span><Select className="w-full" value={visibility} onChange={setVisibility} options={[{ value: '公开', label: '公开（组织全员可访问）' }, { value: '私密', label: '私密（仅成员可见）' }, { value: '仅创建者可见', label: '仅创建者可见' }]} /></label>
               <div className="flex items-center justify-between gap-4">
@@ -484,6 +483,14 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     openPageTab(menuId);
   };
 
+  const openVersionDetail = (versionId: string) => {
+    sessionStorage.setItem('shichuang.productLineFilter', productLine.id);
+    sessionStorage.setItem('shichuang.productLineTargetTab', 'detail');
+    sessionStorage.setItem('shichuang.productLineTargetVersionId', versionId);
+    window.dispatchEvent(new Event('shichuang:product-line-context'));
+    openPageTab('prod_versions');
+  };
+
   const normalizeRole = (role?: string) => {
     if (!role) return '参与人';
     if (role === '管理员' || role.includes('综合负责人')) return '管理员';
@@ -790,26 +797,36 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             </div>
           </div>
 
-          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
-            <div className="mb-3 grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] gap-3 text-[11px] text-[var(--text-muted)]"><span>版本名称 / 版本号</span><span>时间区间</span></div>
+          <div className="overflow-x-auto rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
+            <div className="min-w-[860px]">
+            <div className="mb-3 grid grid-cols-[minmax(180px,0.8fr)_minmax(680px,3fr)] gap-3 text-[11px] text-[var(--text-muted)]"><span className="sticky left-0 z-10 bg-[var(--bg-surface)]">版本名称 / 版本号</span><span>时间区间（按周）</span></div>
             {lineVersions.length > 0 && (() => {
+              const dayMs = 86400000;
               const toTime = (value?: string) => value ? new Date(value).getTime() : Date.now();
-              const timelineStart = Math.min(...lineVersions.map((item) => toTime(item.startDate || item.releaseDate)));
-              const timelineEnd = Math.max(...lineVersions.map((item) => toTime(item.endDate || item.releaseDate || item.startDate)), timelineStart + 86400000);
-              const span = Math.max(timelineEnd - timelineStart, 86400000);
-              const ticks = Array.from({ length: 6 }, (_, index) => new Date(timelineStart + span * index / 5));
-              return <div className="space-y-3">
-                <div className="grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] gap-3"><span /><div className="relative h-8 border-b border-[var(--border-main)]">{ticks.map((tick, index) => <span key={tick.toISOString()} className="absolute top-0 -translate-x-1/2 text-[10px] text-[var(--text-muted)]" style={{ left: `${index * 20}%` }}>{tick.toISOString().slice(0, 10)}</span>)}</div></div>
+              const now = new Date();
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+              const maxVersionEnd = Math.max(...lineVersions.map((item) => toTime(item.endDate || item.releaseDate || item.startDate)));
+              const rawEnd = new Date(Math.max(monthEnd.getTime(), maxVersionEnd));
+              const timelineStart = monthStart.getTime();
+              const timelineEnd = new Date(rawEnd.getFullYear(), rawEnd.getMonth(), rawEnd.getDate() + ((7 - rawEnd.getDay()) % 7) + 1).getTime();
+              const span = Math.max(timelineEnd - timelineStart, 7 * dayMs);
+              const weekCount = Math.max(1, Math.ceil(span / (7 * dayMs)));
+              const ticks = Array.from({ length: weekCount + 1 }, (_, index) => new Date(timelineStart + index * 7 * dayMs));
+              return <div className="product-line-gantt-content space-y-3" style={{ '--gantt-week-count': weekCount } as React.CSSProperties}>
+                <div className="grid grid-cols-[minmax(180px,0.8fr)_minmax(680px,3fr)] gap-3"><span className="sticky left-0 z-10 bg-[var(--bg-surface)]" /><div className="relative h-8 border-b border-[var(--border-main)]">{ticks.map((tick, index) => <span key={tick.toISOString()} className="absolute top-0 -translate-x-1/2 text-[10px] text-[var(--text-muted)]" style={{ left: `${Math.min(100, (index / weekCount) * 100)}%` }}>{tick.toISOString().slice(0, 10)}</span>)}</div></div>
                 {lineVersions.map((version) => {
                   const start = toTime(version.startDate || version.releaseDate);
                   const end = Math.max(toTime(version.endDate || version.releaseDate || version.startDate), start + 86400000);
-                  const left = Math.max(0, ((start - timelineStart) / span) * 100);
-                  const width = Math.max(2, ((end - start) / span) * 100);
+                  const visibleStart = Math.max(start, timelineStart);
+                  const left = Math.max(0, ((visibleStart - timelineStart) / span) * 100);
+                  const width = Math.max(2, ((end - visibleStart) / span) * 100);
                   const interval = `${version.startDate || '--'} ~ ${version.endDate || version.releaseDate || '--'}`;
-                  return <div key={`gantt-${version.id}`} className="grid grid-cols-[minmax(180px,0.8fr)_minmax(0,3fr)] items-center gap-3"><div className="min-w-0"><div className="truncate text-xs font-semibold text-[var(--text-primary)]">{version.name}</div><div className="mt-0.5 truncate font-mono text-[11px] text-[var(--active-text)]">{version.code || '未设置版本号'}</div></div><div className="relative h-8 rounded bg-[var(--bg-surface-soft)]"><span className="absolute top-1.5 h-5 min-w-[8px] rounded bg-[var(--primary)]/80 px-2 pt-0.5 text-[10px] text-white" style={{ left: `${left}%`, width: `${width}%` }} title={interval}>{interval}</span></div></div>;
+                  return <div key={`gantt-${version.id}`} className="grid grid-cols-[minmax(180px,0.8fr)_minmax(680px,3fr)] items-center gap-3"><div className="sticky left-0 z-10 min-w-0 bg-[var(--bg-surface)]"><button type="button" onClick={() => openVersionDetail(version.id)} className="block min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"><span className="block truncate text-xs font-semibold text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.name}</span><span className="mt-0.5 block truncate font-mono text-[11px] text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.code || '未设置版本号'}</span></button></div><div className="relative h-8 rounded bg-[var(--bg-surface-soft)]"><span className="absolute top-1.5 h-5 min-w-[8px] rounded bg-[var(--primary)]/80 px-2 pt-0.5 text-[10px] text-white" style={{ left: `${left}%`, width: `${width}%` }} title={interval}>{interval}</span></div></div>;
                 })}
               </div>;
             })()}
+            </div>
           </div>
 
           {lineVersions.length === 0 && <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">暂无版本迭代记录，点击右上角“创建新版本”规划版本交付</div>}

@@ -91,7 +91,7 @@ describe('VersionIterationView', () => {
     expect(screen.queryByRole('button', { name: '返回迭代列表' })).not.toBeInTheDocument();
     expect(screen.getByText('张瑞')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '迭代工时' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /工作项/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /迭代任务/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '安全测试' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '版本评审' })).toBeInTheDocument();
     expect(screen.getByText('工作项分布')).toBeInTheDocument();
@@ -99,7 +99,7 @@ describe('VersionIterationView', () => {
     expect(screen.getByText('工时排名')).toBeInTheDocument();
     expect(screen.getAllByText('王丽')).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole('button', { name: /工作项/ }));
+    fireEvent.click(screen.getByRole('button', { name: /迭代任务/ }));
     expect(screen.getByText('已纳入迭代的工作项')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '已纳入迭代的工作项' }));
     expect(screen.getByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
@@ -109,6 +109,17 @@ describe('VersionIterationView', () => {
     expect(screen.getByText('暂无版本评审')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '完成迭代' }));
     await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '已完成' }));
+  });
+
+  it('opens the requested version detail from product-line gantt context', () => {
+    sessionStorage.setItem('shichuang.productLineFilter', 'line-1');
+    sessionStorage.setItem('shichuang.productLineTargetTab', 'detail');
+    sessionStorage.setItem('shichuang.productLineTargetVersionId', 'version-1');
+
+    render(<VersionIterationView />);
+
+    expect(screen.getByRole('button', { name: /迭代任务/ })).toBeInTheDocument();
+    expect(sessionStorage.getItem('shichuang.productLineTargetVersionId')).toBeNull();
   });
 
   it('persists a dragged work item into the target iteration', async () => {
