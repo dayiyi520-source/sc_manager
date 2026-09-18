@@ -1741,8 +1741,10 @@ html.dark .review-empty-icon {
 .test-case-batch-bar { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-main); padding: 10px 12px; color: var(--text-primary); }
 .test-case-empty { display: grid; justify-items: center; gap: 8px; }
 .test-case-code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: var(--active-text); font-size: 11px; }
+.test-case-code-button { border: 0; padding: 0; background: transparent; cursor: pointer; text-align: left; }
 .test-case-title-button { display: block; width: min(260px, 100%); max-width: 10em; overflow: hidden; border: 0; padding: 0; background: transparent; color: var(--text-primary); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; transition: color 160ms ease; }
-.test-case-title-button:hover, .test-case-title-button:focus-visible { color: var(--primary-hover); outline: none; }
+.test-case-title-button { color: var(--active-text); }
+.test-case-code-button:hover, .test-case-code-button:focus-visible, .test-case-title-button:hover, .test-case-title-button:focus-visible { color: var(--primary-hover); outline: none; }
 .test-case-muted { color: var(--text-muted); }
 .test-case-inspector dl { display: grid; gap: 0; margin: 0; }
 .test-case-inspector dl > div { display: grid; gap: 4px; border-bottom: 1px solid var(--border-main); padding: 12px 4px; }
@@ -1765,7 +1767,7 @@ html.dark .review-empty-icon {
 .test-case-directory-cascader { width: 100%; }
 .test-case-step-table .ant-table-cell { vertical-align: top; }
 .test-case-step-table .ant-form-item { margin-bottom: 0; }
-.test-case-step-table .ant-input { min-height: 56px; resize: vertical; }
+.test-case-step-table .ant-input { resize: vertical; }
 .test-case-editor-modal .ant-modal-body { max-height: 78vh; overflow: auto; }
 .test-case-editor-modal .ant-modal-content { padding: 0; overflow: hidden; }
 .test-case-editor-modal .ant-modal-header, .test-case-editor-modal .ant-modal-footer { padding: 18px 24px; }

@@ -20,7 +20,7 @@ type TestCaseEditorDrawerProps = {
 
 type EditorValues = Omit<SaveTestCaseInput, 'revision' | 'directoryId'> & { directoryPath?: string[]; tagsText?: string };
 
-type DirectoryOption = { value: string; label: string; children?: DirectoryOption[] };
+type DirectoryOption = { value: string; label: string; children?: DirectoryOption[]; isProductLine?: boolean; isLeaf?: boolean };
 
 const directoryOptions = (directories: TestCaseDirectory[]): DirectoryOption[] => {
   const build = (parentId: string | null): DirectoryOption[] => directories
@@ -30,13 +30,25 @@ const directoryOptions = (directories: TestCaseDirectory[]): DirectoryOption[] =
       const children = build(item.id);
       return { value: item.id, label: item.name, ...(children.length ? { children } : {}) };
     });
-  return build(null);
+  const lineIds = [...new Set(directories.map((item) => item.productLineId).filter(Boolean))] as string[];
+  return lineIds.map((lineId) => {
+    const children = build(null).filter((item) => directories.find((directory) => directory.id === item.value)?.productLineId === lineId);
+    return {
+      value: `product-line:${lineId}`,
+      label: directories.find((item) => item.productLineId === lineId)?.productLineName || '当前产品线',
+      isProductLine: true,
+      isLeaf: false,
+      ...(children.length ? { children } : {}),
+    };
+  });
 };
 
 const directoryPath = (directories: TestCaseDirectory[], id?: string): string[] => {
   if (!id) return [];
   const item = directories.find((directory) => directory.id === id);
-  return item ? [...directoryPath(directories, item.parentId || undefined), item.id] : [];
+  if (!item) return [];
+  const parentPath = directoryPath(directories, item.parentId || undefined);
+  return parentPath.length ? [...parentPath, item.id] : [`product-line:${item.productLineId}`, item.id];
 };
 
 export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open, productLineId, directories, initialCase, sourceRequirementId, onClose, onSaved }) => {
@@ -65,7 +77,7 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
     } : {
       directoryPath: directoryPath(directories, directories[0]?.id),
       sourceRequirementId,
-      priority: 'P1',
+      priority: undefined,
       tags: [],
       tagsText: '',
       steps: [{ sort: 1, action: '', expectedResult: '' }],
@@ -76,8 +88,9 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
     setError('');
     try {
       const values = await form.validateFields();
-      const directoryId = values.directoryPath?.at(-1);
-      if (!directoryId) throw new Error('请选择功能目录');
+      const selectedPath = values.directoryPath || [];
+      const directoryId = selectedPath.at(-1)?.startsWith('product-line:') ? undefined : selectedPath.at(-1);
+      if (!directoryId) throw new Error('请选择具体目录');
       const body: SaveTestCaseInput = {
         directoryId,
         sourceRequirementId: values.sourceRequirementId || null,
@@ -110,9 +123,9 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
     <Form.Item name="sourceRequirementId" hidden><Input /></Form.Item>
     <WorkItemCreatePanel isOpen={open} onClose={onClose} title={initialCase ? `编辑用例 ${initialCase.code}` : '新建用例'} presentation="workspace" showContinueOption={!initialCase} continueChecked={continueCreating} onContinueCheckedChange={setContinueCreating} footer={<><Button onClick={onClose} disabled={saving}>取消</Button><Button type="primary" onClick={() => void submit()} loading={saving} disabled={!productLineId}>{initialCase ? '保存' : '新建'}</Button></>} properties={<aside className="test-case-properties">
       <h3>用例属性</h3>
-      <Form.Item name="ownerId" label="负责人" rules={[{ required: true, message: '请选择负责人' }]}><Select showSearch loading={employees.isLoading} optionFilterProp="label" options={(employees.data || []).map((employee) => ({ label: `${employee.name} · ${employee.department || '未分配部门'}`, value: employee.id }))} /></Form.Item>
+      <Form.Item name="ownerId" label="负责人" rules={[{ required: true, message: '请选择负责人' }]}><Select showSearch loading={employees.isLoading} optionFilterProp="label" options={(employees.data || []).map((employee) => ({ label: `${employee.name} · ${employee.department || '未分配部门'}`, value: employee.id }))} placeholder="搜索并选择负责人" /></Form.Item>
       <Form.Item label="用例类型"><div className="test-case-property-value">测试用例</div></Form.Item>
-      <Form.Item name="priority" label="优先级" rules={[{ required: true }]}><Select options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} /></Form.Item>
+      <Form.Item name="priority" label="优先级" rules={[{ required: true, message: '请选择优先级' }]}><Select allowClear options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>
       <Form.Item name="tagsText" label="标签"><Input placeholder="使用逗号或顿号分隔" maxLength={240} /></Form.Item>
       <section className="test-case-attachment-placeholder"><h4>附件</h4><p>暂无附件</p></section>
     </aside>}>
@@ -121,8 +134,8 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
       {error && <Alert className="mb-4" type="error" showIcon title="保存失败" description={error.includes('409') ? '用例已被其他人修改，请关闭后重新打开。' : error} />}
       <div className="test-case-editor-main">
         <Form.Item name="title" label="用例标题" rules={[{ required: true, whitespace: true, message: '请填写用例标题' }]}><Input size="large" maxLength={255} showCount placeholder="请输入标题" /></Form.Item>
-        <Form.Item name="directoryPath" label="选择分组" rules={[{ required: true, message: '请选择功能目录' }]}>
-          <Cascader className="test-case-directory-cascader" options={directoryOptions(directories)} showSearch changeOnSelect prefix={<FolderOpenOutlined />} placeholder="全部用例 / 选择功能目录" />
+        <Form.Item name="directoryPath" label="选择目录" rules={[{ required: true, message: '请选择具体目录' }]}>
+          <Cascader className="test-case-directory-cascader" options={directoryOptions(directories)} showSearch changeOnSelect prefix={<FolderOpenOutlined />} placeholder="请选择产品线或目录" />
         </Form.Item>
         <Form.Item name="precondition" label="前置条件">
           <RichTextEditor editor={preconditionEditor} value={preconditionValue} onInput={(text) => { setPreconditionValue(text); form.setFieldValue('precondition', text); }} placeholder="请输入前置条件" />
