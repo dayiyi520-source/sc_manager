@@ -125,7 +125,17 @@ const WorkOrderPicker: React.FC<{
   </div>;
 };
 
-export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLabel?: string; taskKind?: 'requirement' | 'design' | 'test' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops' }> = ({ productLineFilter = 'all', itemLabel = '需求任务', taskKind = 'requirement' }) => {
+export type WorkItemDetailContext = { task: RequirementTask; children: Array<Record<string, unknown>> };
+export type WorkItemCreatePolicy = { requireRequirement?: boolean; allowedChildTypeNames?: string[] };
+type RequirementTasksViewProps = {
+  productLineFilter?: string;
+  itemLabel?: string;
+  taskKind?: 'requirement' | 'design' | 'test' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops';
+  renderDetail?: (context: WorkItemDetailContext) => React.ReactNode;
+  createPolicy?: WorkItemCreatePolicy;
+};
+
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '需求任务', taskKind = 'requirement', renderDetail, createPolicy }) => {
   const {
     requirementTasks,
     designTasks,
@@ -405,7 +415,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
 
   const childCategoryOptions = useMemo(() => {
     if (!selectedTask) return [];
-    if (selectedTask.category === 'test') return [{ value: 'bug' as const, label: '缺陷' }];
+    if (selectedTask.category === 'test') return [{ value: 'test' as const, label: '测试' }, { value: 'bug' as const, label: '缺陷' }];
     if (selectedTask.category === 'bug') return [{ value: 'bug' as const, label: '缺陷' }];
     if (selectedTask.category === 'design') return [{ value: 'dev' as const, label: '研发' }, { value: 'test' as const, label: '测试' }];
     if (selectedTask.category === 'dev') return [{ value: 'dev' as const, label: '研发' }, { value: 'test' as const, label: '测试' }];
@@ -414,6 +424,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
 
   const childTypeOptions = useMemo(() => childTypes
     .filter((item) => item.category === workItemCategoryLabel[childCategory])
+    .filter((item) => !createPolicy?.allowedChildTypeNames?.length || childCategory !== 'test' || createPolicy.allowedChildTypeNames.includes(item.name))
     .map((item) => ({ value: item.id, label: item.name })), [childCategory, childTypes]);
 
   useEffect(() => {
@@ -442,7 +453,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
   const openChildModal = (task: RequirementTask | null = selectedTask) => {
     if (!task?.productLineId) return;
     setSelectedTask(task);
-    const firstCategory = task.category === 'test' || task.category === 'bug' ? 'bug' : task.category === 'design' || task.category === 'dev' ? 'dev' : 'design';
+    const firstCategory = task.category === 'test' ? 'test' : task.category === 'bug' ? 'bug' : task.category === 'design' || task.category === 'dev' ? 'dev' : 'design';
     setChildCategory(firstCategory);
     setChildTitle('');
     setChildDescription('');
@@ -727,6 +738,10 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
     }
     if (configuredCategory && !formRequirementType) {
       addToast('warning', `请选择${itemLabel}类型`);
+      return;
+    }
+    if (!editingTask && createPolicy?.requireRequirement && selectedRequirementTaskIds.length === 0) {
+      addToast('warning', `新建${itemLabel}必须关联来源需求`);
       return;
     }
     const selectedProductLine = productLines.find((line) => line.name === formProductLineName);
@@ -1391,6 +1406,7 @@ export const RequirementTasksView: React.FC<{ productLineFilter?: string; itemLa
                 <span className="truncate">{String(parentWorkItem.title || '')}</span>
               </button>
             </section>}
+            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems })}</section>}
             <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
               {taskKind === 'requirement' && <DetailTextInput label="验收标准" value={selectedTask.expectedGoal || ''} onSave={(expectedGoal) => saveDetailUpdates({ expectedGoal })} multiline />}
               <label className="block text-[var(--text-muted)]">

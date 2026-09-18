@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Tabs } from 'antd';
 import { RequirementTasksView } from './RequirementTasksView';
+import { TestCaseLibraryView } from './TestCaseLibraryView';
+import { TestTaskWorkspace } from './TestTaskWorkspace';
 
 type TestAndDefectViewProps = {
   productLineFilter?: string;
@@ -20,12 +22,13 @@ export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ productLin
             key: 'test',
             label: '测试任务',
             children: (
-              <RequirementTasksView
-                productLineFilter={productLineFilter}
-                itemLabel="测试任务"
-                taskKind="test"
-              />
+              <TestTaskWorkspace productLineFilter={productLineFilter} />
             )
+          },
+          {
+            key: 'case-library',
+            label: '用例库',
+            children: <TestCaseLibraryView productLineFilter={productLineFilter} />
           },
           {
             key: 'bug',

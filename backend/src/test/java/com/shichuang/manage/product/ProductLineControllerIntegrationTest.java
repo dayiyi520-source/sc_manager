@@ -37,6 +37,14 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
             "SELECT COUNT(*) FROM t_product_workflow WHERE product_line_id_=? AND task_type_id_ IS NOT NULL AND status_='PUBLISHED' AND JSON_LENGTH(definition_,'$.states')=4 AND JSON_LENGTH(definition_,'$.transitions')=4 AND delete_flag_=0", Integer.class, enabledLineId));
         assertEquals(21, jdbc.queryForObject(
             "SELECT COUNT(*) FROM t_product_line_work_item_type WHERE product_line_id_=? AND name_ IN ('产品类型需求','技术类需求','数据类需求','其他需求','需求设计','物料设计','其他设计','开发任务','缺陷修复任务','样式优化任务','性能优化任务','其他任务','测试任务','用例编写','测试验收','安全测试','回归测试','系统缺陷','样式缺陷','线上故障','安全漏洞')", Integer.class, enabledLineId));
+        assertEquals(5, jdbc.queryForObject("""
+            SELECT COUNT(*) FROM t_product_work_item_child_rule rule
+            JOIN t_product_line_work_item_type parent ON parent.id_=rule.parent_type_id_ AND parent.product_line_id_=rule.product_line_id_
+            JOIN t_product_line_work_item_type child ON child.id_=rule.child_type_id_ AND child.product_line_id_=rule.product_line_id_
+            WHERE rule.product_line_id_=? AND rule.enabled_=1 AND rule.delete_flag_=0
+              AND parent.name_='测试任务'
+              AND child.name_ IN ('用例编写','测试任务','测试验收','安全测试','回归测试')
+            """, Integer.class, enabledLineId));
 
         String disabledResponse = mockMvc.perform(post("/api/product-lines")
                 .header("Authorization", authorization).contentType("application/json")

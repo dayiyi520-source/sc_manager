@@ -193,8 +193,8 @@ const MainContent: React.FC = () => {
   return (
     <main className="tech-main flex-1 overflow-y-auto p-4 lg:p-6">
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
-        {/* 产品线筛选器（保留用于需求任务和设计任务页面） */}
-        {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks') && (
+        {/* 产品线范围由任务工作区与测试资产共同复用。 */}
+        {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' || routedTabId === 'prod_bugs') && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] pb-4 border-b border-[var(--border-main)]">
             <span>产品线</span>
             <Select

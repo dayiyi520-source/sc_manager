@@ -1,6 +1,7 @@
 import { apiRequest } from './apiClient';
 import type { ProductLine, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, VersionIteration, RequirementTask, DefectBug, DevTask } from '../types';
 import type { PageResult } from './apiClient';
+import type { CreateTestExecutionInput, SaveTestCaseInput, TestCase, TestCaseDirectory, TestCasePage, TestEvidence, TestExecution, TestExecutionScope, TestPlan, TestResultStatus, TestTaskOverview } from '../types/testManagement';
 
 type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
@@ -97,4 +98,25 @@ export const productRepository = {
   businessTask: (kind: BusinessTaskKind, id: string) => apiRequest<RequirementTask>(`${businessTaskPath(kind)}/${id}`),
   createBusinessTask: (kind: BusinessTaskKind, body: Partial<RequirementTask>) => apiRequest<{ id: string; code: string }>(businessTaskPath(kind), { method: 'POST', body: JSON.stringify(body) }),
   updateBusinessTask: (kind: BusinessTaskKind, id: string, body: Record<string, unknown>) => apiRequest<void>(`${businessTaskPath(kind)}/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  ,testCaseDirectories: (lineId: string) => apiRequest<TestCaseDirectory[]>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories`)
+  ,createTestCaseDirectory: (lineId: string, body: { parentId?: string | null; name: string; sort?: number }) => apiRequest<TestCaseDirectory>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories`, { method: 'POST', body: JSON.stringify(body) })
+  ,testCases: (lineId: string, filters: { directoryId?: string; keyword?: string; priority?: string; ownerId?: string; enabled?: boolean; page?: number; pageSize?: number } = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
+    const query = params.toString();
+    return apiRequest<TestCasePage>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases${query ? `?${query}` : ''}`);
+  }
+  ,testCaseDetail: (lineId: string, caseId: string) => apiRequest<TestCase>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/${encodeURIComponent(caseId)}`)
+  ,createTestCase: (lineId: string, body: SaveTestCaseInput) => apiRequest<TestCase>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases`, { method: 'POST', body: JSON.stringify(body) })
+  ,updateTestCase: (lineId: string, caseId: string, body: SaveTestCaseInput) => apiRequest<TestCase>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/${encodeURIComponent(caseId)}`, { method: 'PUT', body: JSON.stringify(body) })
+  ,setTestCaseEnabled: (lineId: string, caseId: string, revision: number, enabled: boolean) => apiRequest<TestCase>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/${encodeURIComponent(caseId)}/enabled`, { method: 'PUT', body: JSON.stringify({ revision, enabled }) })
+  ,testPlan: (workItemId: string) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plan`)
+  ,saveTestPlan: (workItemId: string, body: { testCaseIds: string[]; environment?: string; revision: number }) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plan`, { method: 'PUT', body: JSON.stringify(body) })
+  ,testExecutions: (workItemId: string) => apiRequest<TestExecution[]>(`/api/work-items/${encodeURIComponent(workItemId)}/test-executions`)
+  ,createTestExecution: (workItemId: string, body: CreateTestExecutionInput) => apiRequest<TestExecution>(`/api/work-items/${encodeURIComponent(workItemId)}/test-executions`, { method: 'POST', body: JSON.stringify(body) })
+  ,testExecutionDetail: (executionId: string) => apiRequest<TestExecution>(`/api/test-executions/${encodeURIComponent(executionId)}`)
+  ,saveTestResult: (resultId: string, body: { result: Exclude<TestResultStatus, 'NOT_EXECUTED'>; actualResult?: string; evidence: TestEvidence[]; revision: number }) => apiRequest<TestExecution>(`/api/test-execution-cases/${encodeURIComponent(resultId)}/result`, { method: 'PUT', body: JSON.stringify(body) })
+  ,endTestExecution: (executionId: string, revision: number) => apiRequest<TestExecution>(`/api/test-executions/${encodeURIComponent(executionId)}/end`, { method: 'POST', body: JSON.stringify({ revision }) })
+  ,linkTestResultDefect: (resultId: string, defectWorkItemId: string, revision: number) => apiRequest<TestExecution>(`/api/test-execution-cases/${encodeURIComponent(resultId)}/defects`, { method: 'POST', body: JSON.stringify({ defectWorkItemId, revision }) })
+  ,testTaskOverview: (workItemId: string) => apiRequest<TestTaskOverview>(`/api/work-items/${encodeURIComponent(workItemId)}/test-overview`)
 };
