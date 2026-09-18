@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Input, Button, Select } from "antd";
 import { SearchOutlined, PlusOutlined } from '@ant-design/icons';
+import { useQuery } from '@tanstack/react-query';
 import {
   Boxes,
   Layers,
@@ -14,6 +15,7 @@ import { useApp } from '../../context/AppContext';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { ProductLine } from '../../types';
 import { ProductLineDetailView, type ProductLineSettingsSection } from './ProductLineDetailView';
+import { teamRepository } from '../../services/teamRepository';
 
 export const ProductLinesView: React.FC = () => {
   const {
@@ -24,9 +26,9 @@ export const ProductLinesView: React.FC = () => {
     bugs,
     devTasks,
     addToast,
-    currentUser,
     openPageTab
   } = useApp();
+  const employeeOptionsQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
 
   // Active detail view state
   const [selectedProductLineId, setSelectedProductLineId] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export const ProductLinesView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formName, setFormName] = useState('');
   const [formCode, setFormCode] = useState('');
-  const [formOwner, setFormOwner] = useState('');
+  const [formOwnerUserId, setFormOwnerUserId] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formWebsite, setFormWebsite] = useState('');
 
@@ -67,7 +69,7 @@ export const ProductLinesView: React.FC = () => {
   const resetCreateForm = () => {
     setFormName('');
     setFormCode('');
-    setFormOwner('');
+    setFormOwnerUserId('');
     setFormDescription('');
     setFormWebsite('');
   };
@@ -75,16 +77,21 @@ export const ProductLinesView: React.FC = () => {
   // Submit new product line
   const handleSaveLine = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !formCode.trim()) {
-      addToast('warning', '请填写产品线名称与编码');
+    if (!formName.trim() || !formCode.trim() || !formOwnerUserId) {
+      addToast('warning', '请填写产品线名称、编码并选择负责人');
+      return;
+    }
+    const selectedOwner = employeeOptionsQuery.data?.find((employee) => employee.id === formOwnerUserId);
+    if (!selectedOwner) {
+      addToast('error', '负责人不可用', '请刷新团队组织后重新选择');
       return;
     }
 
     addProductLine({
       name: formName.trim(),
       code: formCode.trim().toUpperCase(),
-      owner: formOwner.trim(),
-      ownerName: formOwner.trim(),
+      ownerUserId: selectedOwner.id,
+      ownerName: selectedOwner.name,
       description: formDescription.trim() || '该产品线还没有任何简介内容。',
       website: formWebsite.trim() || undefined,
       requirementOwner: '',
@@ -92,7 +99,8 @@ export const ProductLinesView: React.FC = () => {
       testOwner: '',
       members: [{
         id: `mem-${Date.now()}`,
-        name: formOwner.trim() || currentUser.name,
+        userId: selectedOwner.id,
+        name: selectedOwner.name,
         role: '管理员'
       }],
       products: [
@@ -117,7 +125,7 @@ export const ProductLinesView: React.FC = () => {
     setFormName('');
     setFormCode('');
     setFormDescription('');
-    setFormOwner('');
+    setFormOwnerUserId('');
     setFormWebsite('');
     setFormWebsite('https://os.shichuang.cloud');
   };
@@ -139,13 +147,10 @@ export const ProductLinesView: React.FC = () => {
     };
   };
 
-  const ownerOptions = Array.from(new Set([
-    currentUser?.name,
-    ...productLines.flatMap((line) => [line.owner, line.ownerName]),
-    ...requirementPool.flatMap((task) => [task.ownerName, task.creatorName]),
-    ...devTasks.map((task) => task.developer),
-    ...bugs.map((bug) => bug.assignee)
-  ].filter(Boolean) as string[]));
+  const ownerOptions = (employeeOptionsQuery.data || []).map((employee) => ({
+    value: employee.id,
+    label: `${employee.name} · ${employee.department || '未分配部门'}${employee.roleTitle ? ` · ${employee.roleTitle}` : ''}`,
+  }));
   const openLineTaskPage = (line: ProductLine, menuId: string) => {
     sessionStorage.setItem('shichuang.productLineFilter', line.id);
     openPageTab(menuId);
@@ -353,13 +358,17 @@ export const ProductLinesView: React.FC = () => {
             <Select
               showSearch
               allowClear
-              value={formOwner || undefined}
-              onChange={(value) => setFormOwner(value || '')}
-              options={ownerOptions.map((opt: string) => ({ label: opt, value: opt }))}
+              value={formOwnerUserId || undefined}
+              onChange={(value) => setFormOwnerUserId(value || '')}
+              options={ownerOptions}
               placeholder="搜索并选择负责人"
               className="w-full"
               optionFilterProp="label"
+              loading={employeeOptionsQuery.isLoading}
+              disabled={employeeOptionsQuery.isLoading || employeeOptionsQuery.isError}
+              status={employeeOptionsQuery.isError ? 'error' : undefined}
             />
+            {employeeOptionsQuery.isError && <p className="mt-1 text-[11px] text-[var(--danger)]">有效员工加载失败，请先检查团队组织数据</p>}
           </div>
             <div>
               <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">

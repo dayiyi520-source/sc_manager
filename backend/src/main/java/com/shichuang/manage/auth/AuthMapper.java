@@ -26,7 +26,7 @@ public class AuthMapper {
     Map<String, Object> findEnabledUser(String tenantId, String username) {
         return first(jdbc.queryForList(
             "SELECT id_,tenant_id_,username_,name_,avatar_,department_,role_,role_title_ " +
-                "FROM t_sys_user WHERE tenant_id_=? AND username_=? AND status_='enabled' AND delete_flag_=0",
+                "FROM t_sys_user WHERE tenant_id_=? AND username_=? AND username_ IS NOT NULL AND status_='enabled' AND delete_flag_=0",
             tenantId, username
         ));
     }
@@ -42,7 +42,7 @@ public class AuthMapper {
     List<Map<String, Object>> enabledAccounts(String tenantId) {
         return jdbc.queryForList(
             "SELECT id_ AS id,username_ AS username,name_ AS name,department_ AS department,role_ AS role,role_title_ AS roleTitle " +
-                "FROM t_sys_user WHERE tenant_id_=? AND status_='enabled' AND delete_flag_=0 ORDER BY username_",
+                "FROM t_sys_user WHERE tenant_id_=? AND username_ IS NOT NULL AND username_<>'' AND status_='enabled' AND delete_flag_=0 ORDER BY username_",
             tenantId
         );
     }

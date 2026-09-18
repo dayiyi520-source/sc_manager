@@ -11,7 +11,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Transactional
 class OkrIntegrationTest extends AbstractApiIntegrationTest {
- private String login(String user)throws Exception{return objectMapper.readTree(mockMvc.perform(post("/api/auth/dev-login").contentType("application/json").content("{\"username\":\""+user+"\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data").path("token").asText();}
+ private String login(String user)throws Exception{
+  if("admin".equals(user))return loginToken();
+  return switch(user){
+   case "tech" -> tokens.issue("user-tech","tech_lead","local-tenant","王浩然");
+   case "sales" -> tokens.issue("user-sales","sales_director","local-tenant","陈雅婷");
+   default -> throw new IllegalArgumentException("未知测试身份: "+user);
+  };
+ }
  private void reporting(String token,String id,String supervisor,boolean root)throws Exception{
   var response=mockMvc.perform(get("/api/okr/people").header("Authorization","Bearer "+token)).andReturn().getResponse().getContentAsString();int version=-1;
   for(var p:objectMapper.readTree(response).path("data"))if(id.equals(p.path("id").asText()))version=p.path("version").asInt();

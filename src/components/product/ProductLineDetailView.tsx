@@ -150,22 +150,18 @@ const ProductLineSettingsPanel: React.FC<{
             <div className="mx-auto w-full max-w-2xl space-y-5 text-xs">
               <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">项目成员</h3><p className="mt-1 text-[var(--text-muted)]">配置产品线成员及其角色。</p></div><Button type="primary" onClick={onOpenMembers} icon={<UserAddOutlined />}>添加成员</Button></div>
               {(() => {
-                const persistedMembers: ProductLineMember[] = (productLine.members || []).map((member, index) => typeof member === 'string' ? { id: `legacy-${index}-${member}`, name: member, role: '参与人' } : member);
-                const ownerName = productLine.owner || productLine.ownerName;
-                const members: ProductLineMember[] = ownerName && !persistedMembers.some((member) => member.name === ownerName)
-                  ? [{ id: `owner-${productLine.id}`, name: ownerName, role: '管理员' }, ...persistedMembers]
-                  : persistedMembers;
+                const members: ProductLineMember[] = (productLine.members || []).map((member, index) => typeof member === 'string' ? { id: `legacy-${index}-${member}`, userId: '', name: member, role: '参与人' } : member);
                 const memberTabs = ['全部', '管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'];
                 const visibleMembers = memberTab === '全部' ? members : members.filter((member) => member.role === memberTab);
                 return <>
                   <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">{memberTabs.map((tab) => { const count = tab === '全部' ? members.length : members.filter((member) => member.role === tab).length; return <button key={tab} type="button" onClick={() => setMemberTab(tab)} className={`h-10 px-3 text-sm font-medium border-b-2 transition-colors ${memberTab === tab ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{tab}</span><span className="ml-1 text-base font-normal text-[var(--primary)]">{count}</span></button>; })}</div>
                   <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
                     <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-[11px] text-[var(--text-muted)]"><span>成员</span><span>角色</span><span className="text-right">操作</span></div>
-                    {visibleMembers.length ? visibleMembers.map((member) => <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><div className="flex min-w-0 items-center gap-2"><Avatar size={28}>{member.name.slice(0, 1)}</Avatar><span className="truncate font-medium text-[var(--text-primary)]">{member.name}</span></div><Select className="w-full" value={member.role} options={['管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'].map((role) => ({ value: role, label: role }))} onChange={async (role) => { try { if (member.id.startsWith('owner-')) { await updateProductLine(productLine.id, { members: [{ id: member.id, name: member.name, role }, ...persistedMembers] }); } else { await updateProductLineMember(productLine.id, member.id, role); } addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
+                    {visibleMembers.length ? visibleMembers.map((member) => <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><div className="flex min-w-0 items-center gap-2"><Avatar size={28}>{member.name.slice(0, 1)}</Avatar><span className="truncate font-medium text-[var(--text-primary)]">{member.name}</span></div><Select className="w-full" value={member.role} options={['管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'].map((role) => ({ value: role, label: role }))} onChange={async (role) => { try { await updateProductLineMember(productLine.id, member.id, role); addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
                   </div>
                 </>;
               })()}
-              <Modal isOpen={Boolean(memberToRemove)} onClose={() => setMemberToRemove(null)} title="移除项目成员" footer={<><Button onClick={() => setMemberToRemove(null)}>取消</Button><Button type="primary" danger onClick={async () => { if (!memberToRemove) return; if (memberToRemove.id.startsWith('owner-')) { addToast('warning', '产品线负责人默认保留为管理员成员'); setMemberToRemove(null); return; } try { await removeProductLineMember(productLine.id, memberToRemove.id); addToast('success', '成员已移除'); setMemberToRemove(null); } catch (error) { addToast('error', '成员移除失败', error instanceof Error ? error.message : '请稍后重试'); } }}>确认移除</Button></>}><p className="text-sm text-[var(--text-body)]">确定将“{memberToRemove?.name}”移除产品线吗？</p></Modal>
+              <Modal isOpen={Boolean(memberToRemove)} onClose={() => setMemberToRemove(null)} title="移除项目成员" footer={<><Button onClick={() => setMemberToRemove(null)}>取消</Button><Button type="primary" danger onClick={async () => { if (!memberToRemove) return; try { await removeProductLineMember(productLine.id, memberToRemove.id); addToast('success', '成员已移除'); setMemberToRemove(null); } catch (error) { addToast('error', '成员移除失败', error instanceof Error ? error.message : '请稍后重试'); } }}>确认移除</Button></>}><p className="text-sm text-[var(--text-body)]">确定将“{memberToRemove?.name}”移除产品线吗？</p></Modal>
             </div>
           )}
           {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
@@ -423,9 +419,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const [activeTab, setActiveTab] = useState<'versions' | 'members' | 'activity'>('activity');
 
   // Edit Leads Form state
-  const [leadReqOwner, setLeadReqOwner] = useState(productLine?.requirementOwner || '');
-  const [leadTechOwner, setLeadTechOwner] = useState(productLine?.techOwner || '');
-  const [leadTestOwner, setLeadTestOwner] = useState(productLine?.testOwner || '');
+  const [leadReqOwnerUserId, setLeadReqOwnerUserId] = useState(productLine?.requirementOwnerUserId || '');
+  const [leadTechOwnerUserId, setLeadTechOwnerUserId] = useState(productLine?.techOwnerUserId || '');
+  const [leadTestOwnerUserId, setLeadTestOwnerUserId] = useState(productLine?.testOwnerUserId || '');
 
   if (!productLine) {
     return (
@@ -455,18 +451,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const lineDevTasks = devTasks.filter(
     (t) => t.productLineName === productLine.name
   );
-  const leadOptions = Array.from(new Set([
-    currentUser?.name,
-    ...productLines.flatMap((line) => [line.owner, line.ownerName, line.requirementOwner, line.techOwner, line.testOwner]),
-    ...productLine.members?.map((member) => typeof member === 'string' ? member : member.name) || [],
-    ...requirementPool.flatMap((task) => [task.ownerName, task.creatorName]),
-    ...devTasks.map((task) => task.developer),
-    ...bugs.map((bug) => bug.assignee),
-    '王浩然',
-    '陈小敏',
-    '张瑞',
-    '林志豪'
-  ].filter(Boolean) as string[]));
+  const leadOptions = (productLine.members || [])
+    .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId))
+    .map((member) => ({ value: member.userId, label: `${member.name} · ${member.role}` }));
 
   const pendingReqsCount = lineReqs.filter((r) => r.status !== '已转任务' && r.status !== '已转版本' && r.status !== '已拒绝').length;
   const pendingBugsCount = lineBugs.filter((b) => b.status !== '已关闭' && b.status !== '已拒绝').length;
@@ -503,19 +490,10 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   };
   const baseDetailMembers: ProductLineMember[] = (productLine.members || []).map((member, index) => (
     typeof member === 'string'
-      ? { id: `legacy-${index}-${member}`, name: member, role: '参与人' }
+      ? { id: `legacy-${index}-${member}`, userId: '', name: member, role: '参与人' }
       : { ...member, role: normalizeRole(member.role) }
   ));
-  const configuredLeadMembers = [
-    { name: productLine.owner || productLine.ownerName, role: '管理员' },
-    { name: productLine.requirementOwner, role: '产品' },
-    { name: productLine.techOwner, role: '研发' },
-    { name: productLine.testOwner, role: '测试' }
-  ].filter((lead): lead is { name: string; role: string } => Boolean(lead.name));
-  const detailMemberNames = new Set(baseDetailMembers.map((member) => member.name));
-  const detailMembers = [...baseDetailMembers, ...configuredLeadMembers
-    .filter((lead) => !detailMemberNames.has(lead.name))
-    .map((lead, index) => ({ id: `lead-${index}-${lead.name}`, name: lead.name, role: lead.role }))];
+  const detailMembers = baseDetailMembers;
   const memberCount = new Set([
     ...detailMembers.map((member) => member.name),
     productLine.owner,
@@ -532,9 +510,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     : lineVersions.map((version) => ({ id: version.id, action: '创建了版本', detail: version.code || version.name, operatorName: currentUser.name, createdAt: version.createdAt || version.releaseDate || '' }));
 
   const resetLeadForm = () => {
-    setLeadReqOwner(productLine.requirementOwner || '');
-    setLeadTechOwner(productLine.techOwner || '');
-    setLeadTestOwner(productLine.testOwner || '');
+    setLeadReqOwnerUserId(productLine.requirementOwnerUserId || '');
+    setLeadTechOwnerUserId(productLine.techOwnerUserId || '');
+    setLeadTestOwnerUserId(productLine.testOwnerUserId || '');
   };
 
   // Handle Save Leads
@@ -542,9 +520,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     e.preventDefault();
     try {
       await updateProductLine(productLine.id, {
-        requirementOwner: leadReqOwner.trim(),
-        techOwner: leadTechOwner.trim(),
-        testOwner: leadTestOwner.trim()
+        requirementOwnerUserId: leadReqOwnerUserId,
+        techOwnerUserId: leadTechOwnerUserId,
+        testOwnerUserId: leadTestOwnerUserId
       });
       setIsEditLeadsOpen(false);
     } catch (error) {
@@ -916,9 +894,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               showSearch
               allowClear
               className="w-full"
-              value={leadReqOwner || undefined}
-              onChange={(value) => setLeadReqOwner(value || '')}
-              options={Array.from(new Set([...leadOptions, leadReqOwner].filter(Boolean))).map((value) => ({ value, label: value }))}
+              value={leadReqOwnerUserId || undefined}
+              onChange={(value) => setLeadReqOwnerUserId(value || '')}
+              options={leadOptions}
               placeholder="搜索并选择负责人"
               optionFilterProp="label"
             />
@@ -934,9 +912,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               showSearch
               allowClear
               className="w-full"
-              value={leadTechOwner || undefined}
-              onChange={(value) => setLeadTechOwner(value || '')}
-              options={Array.from(new Set([...leadOptions, leadTechOwner].filter(Boolean))).map((value) => ({ value, label: value }))}
+              value={leadTechOwnerUserId || undefined}
+              onChange={(value) => setLeadTechOwnerUserId(value || '')}
+              options={leadOptions}
               placeholder="搜索并选择负责人"
               optionFilterProp="label"
             />
@@ -952,9 +930,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               showSearch
               allowClear
               className="w-full"
-              value={leadTestOwner || undefined}
-              onChange={(value) => setLeadTestOwner(value || '')}
-              options={Array.from(new Set([...leadOptions, leadTestOwner].filter(Boolean))).map((value) => ({ value, label: value }))}
+              value={leadTestOwnerUserId || undefined}
+              onChange={(value) => setLeadTestOwnerUserId(value || '')}
+              options={leadOptions}
               placeholder="搜索并选择负责人"
               optionFilterProp="label"
             />

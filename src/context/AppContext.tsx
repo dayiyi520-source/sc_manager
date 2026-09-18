@@ -1166,7 +1166,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast('error', '产品线保存失败', '当前未连接后端服务，数据未保存');
       return;
     }
-    const ownerName = line.owner || line.ownerName || currentUser.name;
+    const ownerName = line.ownerName || line.owner || currentUser.name;
     const newLine: ProductLine = {
       id: `pl-${Date.now()}`,
       name: line.name || '新建产品线',
@@ -1174,17 +1174,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description: line.description || '该产品线还没有任何简介内容。',
       ownerName,
       owner: ownerName,
+      ownerUserId: line.ownerUserId,
       website: line.website,
       subProducts: line.subProducts || [],
       productOwner: line.productOwner || '',
       technicalOwner: line.technicalOwner || '',
       requirementOwner: line.requirementOwner || '',
+      requirementOwnerUserId: line.requirementOwnerUserId,
       techOwner: line.techOwner || '',
+      techOwnerUserId: line.techOwnerUserId,
       testOwner: line.testOwner || '',
+      testOwnerUserId: line.testOwnerUserId,
       visibility: '公开',
       coverColor: 'from-blue-600 to-indigo-700',
       coverUrl: line.coverUrl,
-      members: line.members?.length ? line.members : [{ id: `mem-${Date.now()}`, name: ownerName, role: '管理员' }],
+      members: line.members?.length ? line.members : line.ownerUserId ? [{ id: `mem-${Date.now()}`, userId: line.ownerUserId, name: ownerName, role: '管理员' }] : [],
       products: line.products || [],
       currentVersion: 'V1.0.0',
       totalRequirements: line.totalRequirements ?? 0,
@@ -1210,7 +1214,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addProductLineMembers = async (id: string, members: ProductLineMember[]) => {
     if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
-    await Promise.all(members.map(({ name, role }) => productRepository.addProductLineMember(id, { name, role })));
+    await Promise.all(members.map(({ userId, role }) => productRepository.addProductLineMember(id, { userId, role })));
     await productLineQuery.refetch();
   };
 

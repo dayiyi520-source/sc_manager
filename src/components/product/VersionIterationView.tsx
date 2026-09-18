@@ -534,6 +534,7 @@ export const VersionIterationView: React.FC = () => {
                 <th className="px-3 py-3 font-medium">版本号</th>
                 <th className="px-3 py-3 font-medium">状态</th>
                 <th className="px-3 py-3 font-medium">起止时间</th>
+                <th className="px-3 py-3 font-medium">所属产品线</th>
                 <th className="px-3 py-3 font-medium">负责人</th>
                 <th className="px-3 py-3 font-medium">完成度</th>
                 <th className="px-4 py-3 text-right font-medium">操作</th>
@@ -553,6 +554,7 @@ export const VersionIterationView: React.FC = () => {
                     <td className="px-3 py-3 font-mono text-[var(--text-body)]">{version.code || '--'}</td>
                     <td className="px-3 py-3"><StatusTag status={version.status} /></td>
                     <td className="px-3 py-3 text-[var(--text-body)]">{version.startDate || '--'} ~ {version.endDate || version.releaseDate || '--'}</td>
+                    <td className="max-w-48 px-3 py-3 text-[var(--text-body)]"><span className="block truncate" title={version.productLineName || '未关联产品线'}>{version.productLineName || '未关联产品线'}</span></td>
                     <td className="px-3 py-3">
                       <span className="inline-flex items-center gap-1.5 text-[var(--text-body)]">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] text-white" style={{ background: avatarColors[index % avatarColors.length] }}>{(version.ownerName || '未').slice(0, 1)}</span>

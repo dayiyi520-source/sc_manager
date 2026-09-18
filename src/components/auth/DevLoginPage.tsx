@@ -10,10 +10,6 @@ gsap.registerPlugin(Draggable, MorphSVGPlugin);
 
 const accounts = [
   { username: 'admin', name: '林志豪', role: '超级系统管理员' },
-  { username: 'sales', name: '陈雅婷', role: '销售总监' },
-  { username: 'product', name: '张瑞', role: '产品经理' },
-  { username: 'tech', name: '王浩然', role: '技术负责人' },
-  { username: 'tech-supervisor', name: '研发主管（测试）', role: '研发主管' },
 ];
 
 function playPullSound() {

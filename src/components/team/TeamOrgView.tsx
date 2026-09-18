@@ -1,354 +1,120 @@
-import React, { useState } from 'react';
-import { Button, Space, Avatar } from 'antd';
-import { PlusOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
-import { Users, Building, Shield, UserCheck, Briefcase } from '@/components/common/octicons-compat';
+import React, { useMemo, useState } from 'react';
+import { Alert, Avatar, Button, Empty, Form, Input, Modal, Select, Space, Spin, Table, Tag, Tooltip } from 'antd';
+import { EditOutlined, MailOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UndoOutlined } from '@ant-design/icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Building, Shield, UserCheck, Users } from '@/components/common/octicons-compat';
+import { PageHeader, SearchBar } from '@/components/common';
 import { useApp } from '../../context/AppContext';
-import {
-  PageHeader,
-  SearchBar,
-  FilterPanel,
-  DataTable,
-  StatusBadge,
-  FormModal,
-  FormInput,
-  FormSelect,
-  message,
-} from '@/components/common';
-import { StatCard } from '@/components/common/UIComponents';
+import { teamRepository, type TeamMemberInput } from '../../services/teamRepository';
+import type { TeamMember } from '../../types';
 
-interface TeamMember {
-  id: string;
-  name: string;
-  title: string;
-  dept: string;
-  phone: string;
-  email: string;
-  status: 'active' | 'inactive';
-}
+type FormValues = Required<Pick<TeamMemberInput, 'name' | 'department' | 'jobTitle'>> & Pick<TeamMemberInput, 'phone' | 'email'>;
 
 export const TeamOrgView: React.FC = () => {
   const { addToast } = useApp();
+  const queryClient = useQueryClient();
+  const [form] = Form.useForm<FormValues>();
+  const [keyword, setKeyword] = useState('');
+  const [department, setDepartment] = useState('');
+  const [editing, setEditing] = useState<TeamMember | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [deptFilter, setDeptFilter] = useState<string>('all');
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // 表单状态
-  const [formData, setFormData] = useState({
-    name: '',
-    title: '',
-    dept: '',
-    phone: '',
-    email: '',
+  const membersQuery = useQuery({ queryKey: ['team-members'], queryFn: () => teamRepository.list(), retry: false });
+  const departmentsQuery = useQuery({ queryKey: ['team-member-departments'], queryFn: teamRepository.departments, retry: false });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['team-members'] });
+  const saveMutation = useMutation({
+    mutationFn: async (values: FormValues) => editing
+      ? teamRepository.update(editing.id, { ...values, version: editing.version })
+      : teamRepository.create(values),
+    onSuccess: async () => {
+      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ['team-member-options'] })]);
+      addToast('success', editing ? '成员信息已更新' : '成员已添加');
+      setFormOpen(false);
+      setEditing(null);
+      form.resetFields();
+    },
+    onError: (error) => addToast('error', editing ? '成员更新失败' : '成员添加失败', error instanceof Error ? error.message : '请稍后重试'),
+  });
+  const statusMutation = useMutation({
+    mutationFn: (member: TeamMember) => teamRepository.updateStatus(member.id, member.status === 'enabled' ? 'disabled' : 'enabled', member.version),
+    onSuccess: async (_, member) => {
+      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ['team-member-options'] })]);
+      addToast('success', member.status === 'enabled' ? '成员已停用' : '成员已启用');
+    },
+    onError: (error) => addToast('error', '成员状态更新失败', error instanceof Error ? error.message : '请稍后重试'),
   });
 
-  const [members, setMembers] = useState<TeamMember[]>([
-    {
-      id: 'm-1',
-      name: '陈志远',
-      title: '华东区商务总经理',
-      dept: '商务大区与市场部',
-      phone: '138-0011-8899',
-      email: 'chen.zhiyuan@shichuang.com',
-      status: 'active'
-    },
-    {
-      id: 'm-2',
-      name: '王雪琴',
-      title: '交付副总监',
-      dept: '工程交付与运维部',
-      phone: '139-2233-4455',
-      email: 'wang.xueqin@shichuang.com',
-      status: 'active'
-    },
-    {
-      id: 'm-3',
-      name: '李天成',
-      title: '首席架构师',
-      dept: '产品研发与技术中心',
-      phone: '186-5566-7788',
-      email: 'li.tiancheng@shichuang.com',
-      status: 'active'
-    },
-    {
-      id: 'm-4',
-      name: '张美玲',
-      title: '高级产品经理',
-      dept: '产品研发与技术中心',
-      phone: '151-9988-7766',
-      email: 'zhang.meiling@shichuang.com',
-      status: 'active'
-    },
-    {
-      id: 'm-5',
-      name: '刘建国',
-      title: '财务经理',
-      dept: '财务与资金管理部',
-      phone: '136-7788-5544',
-      email: 'liu.jianguo@shichuang.com',
-      status: 'active'
-    },
-    {
-      id: 'm-6',
-      name: '赵敏',
-      title: '人力资源主管',
-      dept: '综合行政与人事部',
-      phone: '158-3344-2211',
-      email: 'zhao.min@shichuang.com',
-      status: 'active'
-    }
-  ]);
+  const members = membersQuery.data || [];
+  const departments = departmentsQuery.data || [];
+  const visibleMembers = useMemo(() => members.filter((member) => {
+    const query = keyword.trim().toLowerCase();
+    const matchesKeyword = !query || [member.name, member.jobTitle, member.department].some((value) => value.toLowerCase().includes(query));
+    return matchesKeyword && (!department || member.department === department);
+  }), [department, keyword, members]);
+  const departmentCounts = useMemo(() => new Map(departments.map((item) => [item, members.filter((member) => member.status === 'enabled' && member.department === item).length])), [departments, members]);
+  const activeCount = members.filter((member) => member.status === 'enabled').length;
 
-  // 部门列表
-  const departments = [
-    { value: 'all', label: '全部部门' },
-    { value: '商务大区与市场部', label: '商务大区与市场部' },
-    { value: '工程交付与运维部', label: '工程交付与运维部' },
-    { value: '产品研发与技术中心', label: '产品研发与技术中心' },
-    { value: '财务与资金管理部', label: '财务与资金管理部' },
-    { value: '综合行政与人事部', label: '综合行政与人事部' },
-  ];
-
-  // 职位选项
-  const titleOptions = [
-    { value: '总监', label: '总监' },
-    { value: '经理', label: '经理' },
-    { value: '主管', label: '主管' },
-    { value: '架构师', label: '架构师' },
-    { value: '产品经理', label: '产品经理' },
-    { value: '工程师', label: '工程师' },
-  ];
-
-  // 筛选逻辑
-  const filteredMembers = members.filter((m) => {
-    const matchesSearch = !searchQuery || 
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesDept = deptFilter === 'all' || m.dept === deptFilter;
-    return matchesSearch && matchesDept;
-  });
-
-  // 统计数据
-  const stats = {
-    total: members.length,
-    active: members.filter((m) => m.status === 'active').length,
-    departments: new Set(members.map((m) => m.dept)).size,
+  const openCreate = () => {
+    setEditing(null);
+    form.resetFields();
+    setFormOpen(true);
+  };
+  const openEdit = (member: TeamMember) => {
+    setEditing(member);
+    form.setFieldsValue({ name: member.name, department: member.department, jobTitle: member.jobTitle, phone: member.phone, email: member.email });
+    setFormOpen(true);
+  };
+  const confirmStatus = (member: TeamMember) => {
+    Modal.confirm({
+      title: member.status === 'enabled' ? `确认停用“${member.name}”？` : `确认启用“${member.name}”？`,
+      content: member.status === 'enabled' ? '停用后该成员将不能再被选择为新的业务负责人，历史记录仍会保留。' : '启用后该成员将重新出现在业务负责人候选列表中。',
+      okText: member.status === 'enabled' ? '停用' : '启用',
+      okButtonProps: { danger: member.status === 'enabled' },
+      cancelText: '取消',
+      onOk: () => statusMutation.mutateAsync(member),
+    });
   };
 
-  // 表格列定义
   const columns = [
-    {
-      title: '姓名',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string) => (
-        <div className="flex items-center gap-2">
-          <Avatar size="small" style={{ backgroundColor: '#2F66F6' }}>
-            {name.charAt(0)}
-          </Avatar>
-          <span className="font-medium">{name}</span>
-        </div>
-      ),
-    },
-    {
-      title: '职位',
-      dataIndex: 'title',
-      key: 'title',
-    },
-    {
-      title: '部门',
-      dataIndex: 'dept',
-      key: 'dept',
-      render: (dept: string) => (
-        <div className="flex items-center gap-1.5 text-[var(--text-body)]">
-          <Building size={14} />
-          <span>{dept}</span>
-        </div>
-      ),
-    },
-    {
-      title: '联系方式',
-      key: 'contact',
-      render: (_: any, record: TeamMember) => (
-        <div className="space-y-1 text-xs">
-          <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
-            <PhoneOutlined />
-            <span>{record.phone}</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
-            <MailOutlined />
-            <span>{record.email}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <StatusBadge
-          status={status === 'active' ? 'success' : 'default'}
-          text={status === 'active' ? '在职' : '离职'}
-        />
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: () => (
-        <Space size="small">
-          <Button type="link" size="small">编辑</Button>
-          <Button type="link" size="small" danger>删除</Button>
-        </Space>
-      ),
-    },
+    { title: '成员', dataIndex: 'name', key: 'name', render: (name: string, member: TeamMember) => <div className="flex min-w-0 items-center gap-3"><Avatar className="shrink-0 bg-[var(--primary)]">{name.slice(0, 1)}</Avatar><div className="min-w-0"><div className="truncate font-semibold text-[var(--text-primary)]">{name}</div><div className="truncate text-xs text-[var(--text-muted)]">{member.jobTitle}</div></div></div> },
+    { title: '部门', dataIndex: 'department', key: 'department', render: (value: string) => <span className="inline-flex items-center gap-2 text-[var(--text-body)]"><Building className="h-4 w-4 text-[var(--text-muted)]" />{value}</span> },
+    { title: '联系方式', key: 'contact', render: (_: unknown, member: TeamMember) => <div className="space-y-1 text-xs text-[var(--text-muted)]"><div className="flex items-center gap-2"><PhoneOutlined />{member.phone || '未填写'}</div><div className="flex items-center gap-2"><MailOutlined />{member.email || '未填写'}</div></div> },
+    { title: '状态', dataIndex: 'status', key: 'status', render: (value: TeamMember['status'], member: TeamMember) => <Space size={6}><Tag color={value === 'enabled' ? 'success' : 'default'}>{value === 'enabled' ? '在职' : '已停用'}</Tag>{member.loginEnabled && <Tooltip title="唯一登录账号"><Tag color="blue">超级管理员</Tag></Tooltip>}</Space> },
+    { title: '操作', key: 'action', align: 'right' as const, render: (_: unknown, member: TeamMember) => <Space size="small"><Button type="text" icon={<EditOutlined />} aria-label={`编辑${member.name}`} onClick={() => openEdit(member)} /><Tooltip title={member.loginEnabled ? '超级管理员不能停用' : member.status === 'enabled' ? '停用' : '启用'}><Button type="text" danger={member.status === 'enabled'} disabled={member.loginEnabled || statusMutation.isPending} icon={member.status === 'enabled' ? <StopOutlined /> : <UndoOutlined />} aria-label={`${member.status === 'enabled' ? '停用' : '启用'}${member.name}`} onClick={() => confirmStatus(member)} /></Tooltip></Space> },
   ];
 
-  // 提交表单
-  const handleSubmit = async (values: any) => {
-    const newMember: TeamMember = {
-      id: `m-${Date.now()}`,
-      name: values.name,
-      title: values.title,
-      dept: values.dept,
-      phone: values.phone,
-      email: values.email,
-      status: 'active',
-    };
-    setMembers([...members, newMember]);
-    message.success('成员添加成功');
-    addToast('success', '成员添加成功', `${values.name} 已加入团队`);
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* 页面头部 */}
-      <PageHeader
-        title="团队与组织"
-        subtitle={`共 ${stats.total} 名成员，${stats.departments} 个部门`}
-        actions={[
-          <Button
-            key="add"
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setIsModalOpen(true)}
-          >
-            添加成员
-          </Button>,
-        ]}
-      />
-
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard
-          title="团队总人数"
-          value={stats.total}
-          suffix="人"
-          prefix={<Users className="w-4 h-4" />}
-        />
-        <StatCard
-          title="在职人员"
-          value={stats.active}
-          suffix="人"
-          prefix={<UserCheck className="w-4 h-4" />}
-        />
-        <StatCard
-          title="部门数量"
-          value={stats.departments}
-          suffix="个"
-          prefix={<Building className="w-4 h-4" />}
-        />
-        <StatCard
-          title="权限角色"
-          value={5}
-          suffix="个"
-          prefix={<Shield className="w-4 h-4" />}
-        />
-      </div>
-
-      {/* 搜索和表格 */}
-      <div className="bg-[var(--bg-surface)] p-4 rounded-lg space-y-4">
-        <SearchBar
-          placeholder="搜索成员姓名、职位"
-          value={searchQuery}
-          onChange={setSearchQuery}
-          showFilter
-          onFilterClick={() => setFilterOpen(true)}
-          filterActive={deptFilter !== 'all'}
-        />
-
-        <DataTable
-          columns={columns}
-          dataSource={filteredMembers}
-          rowKey="id"
-          emptyText="暂无团队成员"
-          emptyDescription="点击右上角按钮添加团队成员"
-        />
-      </div>
-
-      {/* 筛选面板 */}
-      <FilterPanel
-        open={filterOpen}
-        onClose={() => setFilterOpen(false)}
-        onReset={() => {
-          setDeptFilter('all');
-          message.info('已重置筛选条件');
-        }}
-        onApply={() => {
-          setFilterOpen(false);
-          message.success('已应用筛选');
-        }}
-      >
-        <FormSelect
-          label="部门"
-          value={deptFilter}
-          onChange={(value) => setDeptFilter(value as string)}
-          options={departments}
-          placeholder="选择部门"
-        />
-      </FilterPanel>
-
-      {/* 添加成员弹窗 */}
-      <FormModal
-        title="添加团队成员"
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmit}
-      >
-        <FormInput
-          label="姓名"
-          name="name"
-          required
-          placeholder="请输入姓名"
-        />
-        <FormInput
-          label="职位"
-          name="title"
-          required
-          placeholder="请输入职位"
-        />
-        <FormSelect
-          label="所属部门"
-          name="dept"
-          required
-          options={departments.filter(d => d.value !== 'all')}
-          placeholder="选择部门"
-        />
-        <FormInput
-          label="手机号"
-          name="phone"
-          required
-          placeholder="138-xxxx-xxxx"
-        />
-        <FormInput
-          label="企业邮箱"
-          name="email"
-          required
-          placeholder="xxx@shichuang.com"
-        />
-      </FormModal>
+  return <div className="space-y-5">
+    <PageHeader title="团队与组织" subtitle="统一维护业务负责人和产品线成员的员工名录" actions={[<Button key="add" type="primary" icon={<PlusOutlined />} onClick={openCreate}>添加成员</Button>]} />
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="flex items-center gap-3 border-b border-[var(--border-main)] px-1 py-3"><Users className="h-5 w-5 text-[var(--primary)]" /><div><div className="text-xs text-[var(--text-muted)]">团队成员</div><div className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{members.length} 人</div></div></div>
+      <div className="flex items-center gap-3 border-b border-[var(--border-main)] px-1 py-3"><UserCheck className="h-5 w-5 text-[var(--success)]" /><div><div className="text-xs text-[var(--text-muted)]">在职人员</div><div className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{activeCount} 人</div></div></div>
+      <div className="flex items-center gap-3 border-b border-[var(--border-main)] px-1 py-3"><Shield className="h-5 w-5 text-[var(--warning)]" /><div><div className="text-xs text-[var(--text-muted)]">登录账号</div><div className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{members.filter((member) => member.loginEnabled).length} 个</div></div></div>
     </div>
-  );
+    {(membersQuery.isError || departmentsQuery.isError) && <Alert type="error" showIcon title="团队组织加载失败" description={(membersQuery.error || departmentsQuery.error)?.message || '请检查服务连接后重试'} action={<Button icon={<ReloadOutlined />} onClick={() => { void membersQuery.refetch(); void departmentsQuery.refetch(); }}>重试</Button>} />}
+    <div className="grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="border-r border-[var(--border-main)] pr-4">
+        <div className="mb-3 text-xs font-semibold text-[var(--text-muted)]">部门</div>
+        <div className="space-y-1">
+          <button type="button" onClick={() => setDepartment('')} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${!department ? 'bg-[var(--primary)]/15 text-[var(--active-text)]' : 'text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]'}`}><span>全部成员</span><span className="text-xs">{activeCount}</span></button>
+          {departments.map((item) => <button type="button" key={item} onClick={() => setDepartment(item)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${department === item ? 'bg-[var(--primary)]/15 text-[var(--active-text)]' : 'text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]'}`}><span className="truncate">{item}</span><span className="ml-2 text-xs">{departmentCounts.get(item) || 0}</span></button>)}
+        </div>
+      </aside>
+      <section className="min-w-0 space-y-4">
+        <SearchBar placeholder="搜索姓名、职位或部门" value={keyword} onChange={setKeyword} />
+        {membersQuery.isLoading || departmentsQuery.isLoading ? <div className="flex min-h-72 items-center justify-center"><Spin description="正在加载团队组织" /></div> : <Table<TeamMember> rowKey="id" columns={columns} dataSource={visibleMembers} pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 名成员` }} scroll={{ x: 880 }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={keyword || department ? '没有符合条件的成员' : '暂无团队成员'} /> }} />}
+      </section>
+    </div>
+    <Modal open={formOpen} title={editing ? '编辑团队成员' : '添加团队成员'} okText="保存" cancelText="取消" confirmLoading={saveMutation.isPending} onCancel={() => { if (!saveMutation.isPending) { setFormOpen(false); setEditing(null); form.resetFields(); } }} onOk={() => form.submit()} destroyOnHidden>
+      <Form<FormValues> form={form} layout="vertical" requiredMark="optional" className="pt-3" onFinish={(values) => saveMutation.mutate(values)}>
+        <Form.Item name="name" label="姓名" rules={[{ required: true, whitespace: true, message: '请输入员工姓名' }, { max: 128, message: '姓名不能超过128个字符' }]}><Input placeholder="请输入员工姓名" autoFocus /></Form.Item>
+        <Form.Item name="department" label="所属部门" rules={[{ required: true, message: '请选择所属部门' }]}><Select showSearch optionFilterProp="label" placeholder="请选择所属部门" options={departments.map((item) => ({ value: item, label: item }))} /></Form.Item>
+        <Form.Item name="jobTitle" label="职位" rules={[{ required: true, whitespace: true, message: '请输入职位' }, { max: 128, message: '职位不能超过128个字符' }]}><Input placeholder="例如：产品经理" /></Form.Item>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Form.Item name="phone" label="手机号" rules={[{ max: 32, message: '手机号不能超过32个字符' }]}><Input placeholder="选填" /></Form.Item>
+          <Form.Item name="email" label="企业邮箱" rules={[{ type: 'email', message: '请输入有效邮箱' }]}><Input placeholder="选填" /></Form.Item>
+        </div>
+        {!editing && <Alert type="info" showIcon title="成员仅用于业务配置，不会创建登录账号或密码。" />}
+      </Form>
+    </Modal>
+  </div>;
 };

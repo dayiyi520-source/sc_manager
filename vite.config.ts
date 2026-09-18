@@ -22,12 +22,15 @@ function devApiMockPlugin() {
             try {
               const { username } = JSON.parse(body || '{}');
               const localUsers: Record<string, any> = {
-                admin: { id: 'user-admin', name: '林志豪', avatar: '', role: 'admin', roleTitle: '超级系统管理员', department: '平台架构部' },
-                sales: { id: 'user-sales', name: '陈雅婷', avatar: '', role: 'sales_director', roleTitle: '销售总监', department: '商务大客户部' },
-                product: { id: 'user-product', name: '张瑞', avatar: '', role: 'product_manager', roleTitle: '产品经理', department: '产品中心' },
-                tech: { id: 'user-tech', name: '王浩然', avatar: '', role: 'tech_lead', roleTitle: '技术负责人', department: '研发一组' }
+                admin: { id: 'user-admin', name: '林志豪', avatar: '', role: 'admin', roleTitle: '超级系统管理员', department: '软件研发部' }
               };
-              const user = localUsers[username] || localUsers.admin;
+              const user = localUsers[username];
+              if (!user) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ code: 'VALIDATION_ERROR', message: '登录账号不存在', data: null, requestId: 'dev-mock-login' }));
+                return;
+              }
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({
                 code: 'SUCCESS',
@@ -55,10 +58,7 @@ function devApiMockPlugin() {
             code: 'SUCCESS',
             message: '获取成功',
             data: [
-              { id: 'emp-001', name: '林志豪', department: '平台架构部', avatar: '' },
-              { id: 'emp-002', name: '陈雅婷', department: '商务大客户部', avatar: '' },
-              { id: 'emp-003', name: '张瑞', department: '产品中心', avatar: '' },
-              { id: 'emp-004', name: '王浩然', department: '研发一组', avatar: '' }
+              { id: 'user-admin', name: '林志豪', department: '软件研发部', avatar: '' }
             ],
             requestId: 'dev-mock-accounts'
           }));
@@ -72,10 +72,16 @@ function devApiMockPlugin() {
             code: 'SUCCESS',
             message: '获取成功',
             data: [
-              { id: 'dept-01', name: '平台架构部', code: 'ARCH' },
-              { id: 'dept-02', name: '产品中心', code: 'PROD' },
-              { id: 'dept-03', name: '研发一组', code: 'DEV1' },
-              { id: 'dept-04', name: '商务大客户部', code: 'SALES' }
+              { id: 'dept-01', name: '专家顾问部', code: 'CONSULT' },
+              { id: 'dept-02', name: '市场运营部', code: 'MARKET' },
+              { id: 'dept-03', name: '售前方案部', code: 'PRESALES' },
+              { id: 'dept-04', name: '产品规划部', code: 'PRODUCT' },
+              { id: 'dept-05', name: '项目管理交付中心', code: 'PMO' },
+              { id: 'dept-06', name: '师生服务交付中心', code: 'SERVICE' },
+              { id: 'dept-07', name: '数据应用部', code: 'DATA' },
+              { id: 'dept-08', name: '软件研发部', code: 'DEV' },
+              { id: 'dept-09', name: '交互设计部', code: 'DESIGN' },
+              { id: 'dept-10', name: '人力行政部', code: 'HR' }
             ],
             requestId: 'dev-mock-departments'
           }));

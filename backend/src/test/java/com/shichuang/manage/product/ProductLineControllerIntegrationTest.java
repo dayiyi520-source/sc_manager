@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -58,10 +59,10 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
         String authorization = "Bearer " + loginToken();
         String response = mockMvc.perform(post("/api/product-lines")
                 .header("Authorization", authorization).contentType("application/json")
-                .content("{\"name\":\"成员唯一测试\",\"code\":\"MEMBER-UNIQUE-" + System.nanoTime() + "\",\"ownerName\":\"林志豪\"}"))
+                .content("{\"name\":\"成员唯一测试\",\"code\":\"MEMBER-UNIQUE-" + System.nanoTime() + "\",\"ownerUserId\":\"user-admin\"}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String lineId = objectMapper.readTree(response).path("data").path("id").asText();
-        String body = "{\"name\":\"张瑞\",\"role\":\"产品\"}";
+        String body = "{\"userId\":\"user-product\",\"role\":\"产品\"}";
         mockMvc.perform(post("/api/product-lines/{id}/members", lineId).header("Authorization", authorization).contentType("application/json").content(body))
             .andExpect(status().isOk());
         mockMvc.perform(post("/api/product-lines/{id}/members", lineId).header("Authorization", authorization).contentType("application/json").content(body))
@@ -73,13 +74,13 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
         String authorization = "Bearer " + loginToken();
         String response = mockMvc.perform(post("/api/product-lines")
                 .header("Authorization", authorization).contentType("application/json")
-                .content("{\"name\":\"交付角色测试\",\"code\":\"DELIVERY-" + System.nanoTime() + "\",\"ownerName\":\"林志豪\"}"))
+                .content("{\"name\":\"交付角色测试\",\"code\":\"DELIVERY-" + System.nanoTime() + "\",\"ownerUserId\":\"user-admin\"}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String lineId = objectMapper.readTree(response).path("data").path("id").asText();
 
         mockMvc.perform(post("/api/product-lines/{id}/members", lineId)
                 .header("Authorization", authorization).contentType("application/json")
-                .content("{\"name\":\"张瑞\",\"role\":\"交付主管\"}"))
+                .content("{\"userId\":\"user-product\",\"role\":\"交付主管\"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("OK"));
 
         assertEquals(1, jdbc.queryForObject(
@@ -93,7 +94,7 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
         String authorization = "Bearer " + token;
         String lineResponse = mockMvc.perform(post("/api/product-lines")
                 .header("Authorization", authorization).contentType("application/json")
-                .content("{\"name\":\"日期回归测试\",\"code\":\"DATE-" + System.nanoTime() + "\",\"ownerName\":\"张瑞\"}"))
+                .content("{\"name\":\"日期回归测试\",\"code\":\"DATE-" + System.nanoTime() + "\",\"ownerUserId\":\"user-product\"}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String lineId = objectMapper.readTree(lineResponse).path("data").path("id").asText();
         mockMvc.perform(post("/api/product-lines/{id}/versions", lineId)
@@ -132,8 +133,8 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
                     {
                       "name":"%s",
                       "code":"PL-IT-%s",
-                      "ownerName":"林志豪",
-                      "members":[{"name":"林志豪","role":"管理员"}]
+                      "ownerUserId":"user-admin",
+                      "members":[{"userId":"user-admin","role":"管理员"}]
                     }
                     """.formatted(name, System.nanoTime())))
             .andExpect(status().isCreated())
@@ -150,7 +151,7 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(post("/api/product-lines/{id}/members", lineId)
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")
-                .content("{\"name\":\"张瑞\",\"role\":\"产品\"}"))
+                .content("{\"userId\":\"user-product\",\"role\":\"产品\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("OK"));
 
@@ -198,5 +199,41 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
         assertTrue(jdbc.queryForObject(
             "SELECT COUNT(*) FROM t_product_line_activity WHERE product_line_id_=? AND action_ IN ('创建产品线','添加成员角色','创建版本','规划工作项')",
             Integer.class, lineId) >= 5);
+    }
+
+    @Test
+    void usesUserIdsForResponsibilitiesAndProtectsAssignedMembers() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        String response = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"责任人标识测试\",\"code\":\"OWNER-ID-" + System.nanoTime() + "\",\"ownerUserId\":\"user-admin\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String lineId = objectMapper.readTree(response).path("data").path("id").asText();
+
+        mockMvc.perform(put("/api/product-lines/{id}", lineId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"requirementOwnerUserId\":\"user-product\"}"))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/product-lines/{id}/members", lineId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"userId\":\"user-product\",\"role\":\"产品\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/api/product-lines/{id}", lineId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"requirementOwnerUserId\":\"user-product\"}"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/product-lines/{id}", lineId).header("Authorization", authorization))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ownerUserId").value("user-admin"))
+            .andExpect(jsonPath("$.data.ownerName").value("林志豪"))
+            .andExpect(jsonPath("$.data.requirementOwnerUserId").value("user-product"))
+            .andExpect(jsonPath("$.data.requirementOwner").value("张瑞"));
+
+        String memberId = jdbc.queryForObject("SELECT id_ FROM t_product_line_member WHERE product_line_id_=? AND user_id_='user-product' AND delete_flag_=0", String.class, lineId);
+        mockMvc.perform(delete("/api/product-lines/{id}/members/{memberId}", lineId, memberId)
+                .header("Authorization", authorization))
+            .andExpect(status().isConflict());
     }
 }

@@ -86,6 +86,8 @@ describe('VersionIterationView', () => {
     expect(screen.queryByRole('button', { name: '详情' })).not.toBeInTheDocument();
     expect(screen.getByText('版本号')).toBeInTheDocument();
     expect(screen.getByText('V1.2.0')).toBeInTheDocument();
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent?.trim());
+    expect(headers.indexOf('所属产品线')).toBe(headers.indexOf('起止时间') + 1);
 
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
     expect(screen.queryByRole('button', { name: '返回迭代列表' })).not.toBeInTheDocument();

@@ -410,6 +410,7 @@ export interface Contract {
 // 产品与研发
 export interface ProductLineMember {
   id: string;
+  userId: string;
   name: string;
   role: string;
   email?: string;
@@ -451,6 +452,7 @@ export interface ProductLine {
   code: string;
   description: string;
   ownerName?: string;
+  ownerUserId?: string;
   owner?: string;
   website?: string;
   subProducts?: string[];
@@ -475,7 +477,10 @@ export interface ProductLine {
   createdAt?: string;
   coverImage?: string;
   requirementOwner?: string;
+  requirementOwnerUserId?: string;
   techOwner?: string;
+  techOwnerUserId?: string;
+  testOwnerUserId?: string;
   products?: ProductItemInLine[];
   pendingReqCount?: number;
   pendingBugCount?: number;
@@ -630,6 +635,18 @@ export interface EmployeeOption {
   department?: string;
   role?: string;
   roleTitle?: string;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  department: string;
+  jobTitle: string;
+  phone?: string;
+  email?: string;
+  status: 'enabled' | 'disabled';
+  loginEnabled: boolean;
+  version: number;
 }
 
 export interface VersionIteration {
