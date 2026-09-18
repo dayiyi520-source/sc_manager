@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { productLineVersionCount } from './ProductLinesView';
 import { preferredWorkItemTypeName } from './workItemTypeDefaults';
 
 const productLinesSource = readFileSync(new URL('./ProductLinesView.tsx', import.meta.url), 'utf8');
@@ -23,6 +24,15 @@ describe('product line work item defaults', () => {
     expect(productLinesSource).toContain('initializeWorkItemTemplate');
     expect(productLinesSource).toContain('aria-label="工作项设置模板"');
     expect(productLinesSource).toContain('if (!saved) return');
+  });
+
+  it('shows the actual product-line version count in the card action', () => {
+    expect(productLineVersionCount('line-1', [
+      { productLineId: 'line-1' },
+      { productLineId: 'line-2' },
+      { productLineId: 'line-1' },
+    ])).toBe(2);
+    expect(productLinesSource).toContain('版本管理 ({versionCount})');
   });
 
   it('edits and labels the default work item type', () => {

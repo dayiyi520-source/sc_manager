@@ -17,6 +17,9 @@ import { ProductLine } from '../../types';
 import { ProductLineDetailView, type ProductLineSettingsSection } from './ProductLineDetailView';
 import { teamRepository } from '../../services/teamRepository';
 
+export const productLineVersionCount = (productLineId: string, items: Array<{ productLineId?: string }>) =>
+  items.filter((version) => version.productLineId === productLineId).length;
+
 export const ProductLinesView: React.FC = () => {
   const {
     productLines,
@@ -184,6 +187,7 @@ export const ProductLinesView: React.FC = () => {
       <div className="product-lines-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {filteredLines.map((pl) => {
           const stats = getLineStats(pl);
+          const versionCount = productLineVersionCount(pl.id, versions);
 
           return (
             <div
@@ -216,7 +220,7 @@ export const ProductLinesView: React.FC = () => {
                 <div className="space-y-2 text-[11px] text-[var(--text-muted)]">
                   <div className="flex items-center justify-between gap-3"><span>负责人</span><strong className="truncate font-medium text-[var(--text-body)]">{pl.owner || pl.ownerName || '未设置'}</strong></div>
                   <div className="flex items-center justify-between gap-3"><span>当前版本</span><span className="font-mono text-[var(--text-body)]">{pl.currentVersion || 'V1.0.0'}</span></div>
-                  <div className="flex items-center justify-between gap-3"><span>版本数量</span><span className="text-[var(--text-body)]">{pl.versionCount || versions.filter((v) => v.productLineId === pl.id).length || 0} 个</span></div>
+                  <div className="flex items-center justify-between gap-3"><span>版本数量</span><span className="text-[var(--text-body)]">{versionCount} 个</span></div>
                 </div>
 
                 {/* Description */}
@@ -285,7 +289,7 @@ export const ProductLinesView: React.FC = () => {
                       }}
                       icon={<Layers className="w-3.5 h-3.5 text-[var(--primary)]" />}
                     >
-                      <span>版本管理</span>
+                      <span>版本管理 ({versionCount})</span>
                     </Button>
 
                     <Button
