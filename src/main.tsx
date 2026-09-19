@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { AIEDIT_TOKENS } from './theme/tokens';
 
 const queryClient = new QueryClient({defaultOptions:{queries:{retry:1,staleTime:15000}}});
+const routerBasePath = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 const cssToken = (name: string, fallback: string) => {
   if (typeof window === 'undefined') return fallback;
@@ -84,7 +85,7 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <ThemeWrapper>
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter><App /></BrowserRouter>
+          <BrowserRouter basename={routerBasePath}><App /></BrowserRouter>
         </QueryClientProvider>
       </ThemeWrapper>
     </ErrorBoundary>
