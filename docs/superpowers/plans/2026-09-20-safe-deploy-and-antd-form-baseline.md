@@ -70,7 +70,7 @@
 - [x] Run the canonical deployment script without `--replace-database`.
 - [x] Verify health, public routes, Flyway `20260920.1`, and unchanged pre-existing business-row counts.
 - [x] Update the deployment runbook with the verified date and release evidence.
-- [ ] Commit and push the verified runbook.
+- [x] Commit and push the verified runbook.
 
 ### Task 4: Restore Ant Design Form Ownership
 
@@ -104,4 +104,4 @@
 - [x] Set and verify the browser viewport at exactly 1920x1080.
 - [x] Check product management, My Work, OKR/performance, and assistance fields in normal, hover/focus, disabled, and error states.
 - [x] Confirm no text overlap, clipped focus ring, or double border.
-- [ ] Push the final commits to `github/shichuang-admin` and verify zero commit divergence.
+- [x] Push the final commits to `github/shichuang-admin` and verify zero commit divergence.
