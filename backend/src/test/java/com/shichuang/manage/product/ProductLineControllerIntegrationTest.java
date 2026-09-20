@@ -19,6 +19,37 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
+    void updatesAndClearsAValidatedProductLineWebsiteWithoutChangingCode() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        String code = "WEBSITE-" + System.nanoTime();
+        String response = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"网址维护产品线\",\"code\":\"" + code + "\",\"ownerUserId\":\"user-admin\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String lineId = objectMapper.readTree(response).path("data").path("id").asText();
+
+        mockMvc.perform(put("/api/product-lines/{id}", lineId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"website\":\"https://product.example.com/path\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/product-lines/{id}", lineId).header("Authorization", authorization))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.website").value("https://product.example.com/path"))
+            .andExpect(jsonPath("$.data.code").value(code));
+
+        mockMvc.perform(put("/api/product-lines/{id}", lineId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"website\":\"javascript:alert(1)\"}"))
+            .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/api/product-lines/{id}", lineId)
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"website\":\"\"}"))
+            .andExpect(status().isOk());
+        assertEquals("", jdbc.queryForObject("SELECT website_ FROM t_product_line WHERE id_=?", String.class, lineId));
+        assertEquals(code, jdbc.queryForObject("SELECT code_ FROM t_product_line WHERE id_=?", String.class, lineId));
+    }
+
+    @Test
     void countsOnlyUnfinishedAndUncancelledRequirementsAsPending() throws Exception {
         String authorization = "Bearer " + loginToken();
         String response = mockMvc.perform(post("/api/product-lines")

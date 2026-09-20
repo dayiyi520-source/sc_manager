@@ -19,12 +19,23 @@ describe('requirement task Ant Design contract', () => {
 
   it('keeps the persisted product-line code read-only in settings', () => {
     expect(productLineSource).toContain('value={code} disabled readOnly');
-    expect(productLineSource).toContain('编码创建后不可更改');
+    expect(productLineSource).not.toContain('编码创建后不可更改');
     const saveBasicInfo = productLineSource.slice(
       productLineSource.indexOf('const saveBasicInfo'),
       productLineSource.indexOf('const sections')
     );
     expect(saveBasicInfo).not.toContain('code: code.trim()');
+  });
+
+  it('allows a persisted product website to be edited above visibility', () => {
+    const basicInfo = productLineSource.slice(
+      productLineSource.indexOf("section === 'basic'"),
+      productLineSource.indexOf("section === 'members'")
+    );
+    expect(basicInfo).toContain('<span>产品线网址</span>');
+    expect(basicInfo.indexOf('<span>产品线网址</span>')).toBeLessThan(basicInfo.indexOf('<span>可见范围</span>'));
+    expect(productLineSource).toContain("website: normalizedWebsite || ''");
+    expect(productLineSource).toContain('loading={isSavingBasic}');
   });
 
   it('opens a selected version from the weekly fixed-column gantt view', () => {

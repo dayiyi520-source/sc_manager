@@ -43,6 +43,7 @@ import {
   WorkItemStateEditor
 } from './WorkItemStateConfigDrawer';
 import { AutomationRulesPanel } from './AutomationRulesPanel';
+import { normalizeProductWebsiteUrl } from './productWebsite';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -62,6 +63,9 @@ const ProductLineSettingsPanel: React.FC<{
   const [section, setSection] = useState<ProductLineSettingsSection>(initialSection || 'basic');
   const [name, setName] = useState(productLine.name);
   const [code, setCode] = useState(productLine.code);
+  const [website, setWebsite] = useState(productLine.website || '');
+  const [websiteError, setWebsiteError] = useState('');
+  const [isSavingBasic, setIsSavingBasic] = useState(false);
   const [description, setDescription] = useState(productLine.description);
   const [visibility, setVisibility] = useState<ProductLine['visibility']>(productLine.visibility === '部门可见' ? '私密' : productLine.visibility === '保密' ? '仅创建者可见' : productLine.visibility || '公开');
   const [status, setStatus] = useState<'启用中' | '已停用'>(productLine.health === '已停用' || productLine.status === '已停用' ? '已停用' : '启用中');
@@ -71,6 +75,8 @@ const ProductLineSettingsPanel: React.FC<{
   useEffect(() => {
     setName(productLine.name);
     setCode(productLine.code);
+    setWebsite(productLine.website || '');
+    setWebsiteError('');
     setDescription(productLine.description);
     setVisibility(productLine.visibility === '部门可见' ? '私密' : productLine.visibility === '保密' ? '仅创建者可见' : productLine.visibility || '公开');
     setStatus(productLine.health === '已停用' || productLine.status === '已停用' ? '已停用' : '启用中');
@@ -86,15 +92,26 @@ const ProductLineSettingsPanel: React.FC<{
       addToast('warning', '请填写产品线名称');
       return;
     }
+    const normalizedWebsite = normalizeProductWebsiteUrl(website);
+    if (website.trim() && !normalizedWebsite) {
+      setWebsiteError('请输入以 http:// 或 https:// 开头的有效网址');
+      addToast('warning', '请输入有效的产品线网址');
+      return;
+    }
+    setWebsiteError('');
+    setIsSavingBasic(true);
     try {
       await updateProductLine(productLine.id, {
         name: name.trim(),
         description: description.trim() || '该产品线还没有任何简介内容。',
+        website: normalizedWebsite || '',
         visibility,
         status
       });
     } catch (error) {
       addToast('error', '产品线设置保存失败', error instanceof Error ? error.message : '请稍后重试');
+    } finally {
+      setIsSavingBasic(false);
     }
   };
 
@@ -132,18 +149,19 @@ const ProductLineSettingsPanel: React.FC<{
         <section className="min-w-0 p-6">
           {section === 'basic' && (
             <form onSubmit={saveBasicInfo} className="mx-auto w-full max-w-2xl space-y-5 text-xs">
-              <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">维护产品线的名称、编码、可见范围和简介。</p></div>
+              <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">维护产品线的名称、编码、网址、可见范围和简介。</p></div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线名称 *</span><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入产品线名称" /></label>
-                <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线编码</span><Input value={code} disabled readOnly aria-describedby="product-line-code-help" placeholder="产品线编码创建后不可更改" /><span id="product-line-code-help" className="text-[11px] font-normal text-[var(--text-muted)]">编码创建后不可更改</span></label>
+                <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线编码</span><Input value={code} disabled readOnly /></label>
               </div>
+              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线网址</span><Input value={website} status={websiteError ? 'error' : undefined} aria-invalid={Boolean(websiteError)} onChange={(event) => { setWebsite(event.target.value); if (websiteError) setWebsiteError(''); }} placeholder="https://example.com" />{websiteError && <span className="text-[11px] font-normal text-[var(--danger)]">{websiteError}</span>}</label>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>可见范围</span><Select className="w-full" value={visibility} onChange={setVisibility} options={[{ value: '公开', label: '公开（组织全员可访问）' }, { value: '私密', label: '私密（仅成员可见）' }, { value: '仅创建者可见', label: '仅创建者可见' }]} /></label>
               <div className="flex items-center justify-between gap-4">
                 <div><div className="font-medium text-[var(--text-body)]">项目状态</div><p className="mt-[5px] text-[11px] text-[var(--text-muted)]">关闭后，产品线仅保留查看和历史记录能力。</p></div>
                 <Switch className="product-line-switch" checked={status === '启用中'} onChange={(checked) => setStatus(checked ? '启用中' : '已停用')} checkedChildren="启用中" unCheckedChildren="已停用" />
               </div>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线简介</span><Input.TextArea rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="请输入产品线简介" /></label>
-              <div className="flex justify-end"><Button type="primary" htmlType="submit">保存基本信息</Button></div>
+              <div className="flex justify-end"><Button type="primary" htmlType="submit" loading={isSavingBasic}>保存基本信息</Button></div>
             </form>
           )}
           {section === 'members' && (

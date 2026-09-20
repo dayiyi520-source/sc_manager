@@ -16,20 +16,12 @@ import { StatusTag, Modal } from '../common/UIComponents';
 import { ProductLine } from '../../types';
 import { ProductLineDetailView, type ProductLineSettingsSection } from './ProductLineDetailView';
 import { teamRepository } from '../../services/teamRepository';
+import { normalizeProductWebsiteUrl } from './productWebsite';
+
+export { normalizeProductWebsiteUrl } from './productWebsite';
 
 export const productLineVersionCount = (productLineId: string, items: Array<{ productLineId?: string }>) =>
   items.filter((version) => version.productLineId === productLineId).length;
-
-export const normalizeProductWebsiteUrl = (value?: string) => {
-  const candidate = value?.trim();
-  if (!candidate) return null;
-  try {
-    const parsed = new URL(candidate);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? candidate : null;
-  } catch {
-    return null;
-  }
-};
 
 export const ProductLinesView: React.FC = () => {
   const {
@@ -98,6 +90,11 @@ export const ProductLinesView: React.FC = () => {
       addToast('warning', '请填写产品线名称、编码并选择负责人');
       return;
     }
+    const normalizedWebsite = normalizeProductWebsiteUrl(formWebsite);
+    if (formWebsite.trim() && !normalizedWebsite) {
+      addToast('warning', '请输入有效的产品线网址', '网址须以 http:// 或 https:// 开头');
+      return;
+    }
     const selectedOwner = employeeOptionsQuery.data?.find((employee) => employee.id === formOwnerUserId);
     if (!selectedOwner) {
       addToast('error', '负责人不可用', '请刷新团队组织后重新选择');
@@ -111,7 +108,7 @@ export const ProductLinesView: React.FC = () => {
       ownerUserId: selectedOwner.id,
       ownerName: selectedOwner.name,
       description: formDescription.trim() || '该产品线还没有任何简介内容。',
-      website: formWebsite.trim() || undefined,
+      website: normalizedWebsite || undefined,
       requirementOwner: '',
       techOwner: '',
       testOwner: '',
