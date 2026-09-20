@@ -32,6 +32,9 @@ describe('requirement task Ant Design contract', () => {
     expect(productLineSource).toContain("sessionStorage.setItem('shichuang.productLineTargetVersionId', versionId)");
     expect(productLineSource).toContain('product-line-gantt-scroll');
     expect(productLineSource).toContain('product-line-gantt-time-heading');
+    expect(productLineSource).toContain('product-line-gantt-tick-first');
+    expect(productLineSource).toContain('product-line-gantt-tick-last');
+    expect(productLineSource).toContain("width: `max(100%, ${timelineWidth}px)`");
   });
 
   it('uses category icons instead of text tags before task titles', () => {

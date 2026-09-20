@@ -374,7 +374,7 @@ export const RequirementPoolView: React.FC = () => {
         setSelected((item) => item ? { ...item, status: "处理中" as RequirementTask["status"], assignedOwnerName: singleTask.assignee!.name } : item);
         setWorkOpen(false);
         openPageTab("prod_req_tasks");
-        addToast("success", "已打开需求任务创建界面", "事项信息已自动带入，请确认后保存");
+        addToast("success", "已打开产品任务创建界面", "事项信息已自动带入，请确认后保存");
         return;
       }
       let results: Array<{ task: typeof singleTask.task; assignee: NonNullable<typeof singleTask.assignee>; result: Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }>;

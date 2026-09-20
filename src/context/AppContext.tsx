@@ -128,7 +128,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     subMenus: [
       { id: 'prod_lines', title: '产品线', mainMenuId: 'product', icon: 'Box' },
       { id: 'prod_versions', title: '版本迭代', mainMenuId: 'product', icon: 'GitBranch' },
-      { id: 'prod_req_tasks', title: '需求任务', mainMenuId: 'product', icon: 'ListTodo', badge: '云效流', badgeType: 'default' },
+      { id: 'prod_req_tasks', title: '产品任务', mainMenuId: 'product', icon: 'ListTodo', badge: '云效流', badgeType: 'default' },
       { id: 'prod_design_tasks', title: '设计任务', mainMenuId: 'product', icon: 'Edit' },
       { id: 'prod_rd_tasks', title: '研发任务', mainMenuId: 'product', icon: 'Code' },
       { id: 'prod_test_tasks', title: '测试任务', mainMenuId: 'product', icon: 'Beaker' },
@@ -587,7 +587,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const newTask: RequirementTask = {
       id: `req-${Date.now()}`,
-      title: task.title || '新需求任务',
+      title: task.title || '新产品任务',
       description: task.description || '任务详细描述',
       expectedGoal: task.expectedGoal || '交付目标与指标验收标准',
       status: task.status || '待处理',

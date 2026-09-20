@@ -152,7 +152,7 @@ type RequirementTasksViewProps = {
   createPolicy?: WorkItemCreatePolicy;
 };
 
-export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '需求任务', taskKind = 'requirement', renderDetail, createPolicy }) => {
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', renderDetail, createPolicy }) => {
   const {
     requirementTasks,
     designTasks,

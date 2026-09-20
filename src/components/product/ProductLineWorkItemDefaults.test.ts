@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { productLineVersionCount } from './ProductLinesView';
+import { normalizeProductWebsiteUrl, productLineVersionCount } from './ProductLinesView';
 import { preferredWorkItemTypeName } from './workItemTypeDefaults';
 
 const productLinesSource = readFileSync(new URL('./ProductLinesView.tsx', import.meta.url), 'utf8');
@@ -33,6 +33,16 @@ describe('product line work item defaults', () => {
       { productLineId: 'line-1' },
     ])).toBe(2);
     expect(productLinesSource).toContain('版本管理 ({versionCount})');
+  });
+
+  it('opens only configured http product websites from the product-line card', () => {
+    expect(normalizeProductWebsiteUrl(' https://product.example.com/path ')).toBe('https://product.example.com/path');
+    expect(normalizeProductWebsiteUrl('https://product.example.com/')).toBe('https://product.example.com/');
+    expect(normalizeProductWebsiteUrl('javascript:alert(1)')).toBeNull();
+    expect(normalizeProductWebsiteUrl('')).toBeNull();
+    expect(productLinesSource).toContain('<span>产品网址</span>');
+    expect(productLinesSource).toContain('disabled={!productWebsiteUrl}');
+    expect(productLinesSource).toContain("window.open(productWebsiteUrl, '_blank', 'noopener,noreferrer')");
   });
 
   it('edits and labels the default work item type', () => {

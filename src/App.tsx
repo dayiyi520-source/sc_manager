@@ -222,7 +222,7 @@ const MainContent: React.FC = () => {
         )}
         <Suspense fallback={<div className="dark-panel flex min-h-80 items-center justify-center rounded-lg text-sm text-[var(--text-muted)]">正在加载页面…</div>}>
           <div className="animate-in fade-in duration-200">
-            {routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' ? <RequirementTasksView key={routedTabId} productLineFilter={productLineFilter} taskKind={routedTabId === 'prod_design_tasks' ? 'design' : 'requirement'} itemLabel={routedTabId === 'prod_design_tasks' ? '设计任务' : '需求任务'} /> : renderView()}
+            {routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' ? <RequirementTasksView key={routedTabId} productLineFilter={productLineFilter} taskKind={routedTabId === 'prod_design_tasks' ? 'design' : 'requirement'} itemLabel={routedTabId === 'prod_design_tasks' ? '设计任务' : '产品任务'} /> : renderView()}
           </div>
         </Suspense>
       </div>

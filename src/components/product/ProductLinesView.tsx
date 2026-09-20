@@ -20,6 +20,17 @@ import { teamRepository } from '../../services/teamRepository';
 export const productLineVersionCount = (productLineId: string, items: Array<{ productLineId?: string }>) =>
   items.filter((version) => version.productLineId === productLineId).length;
 
+export const normalizeProductWebsiteUrl = (value?: string) => {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? candidate : null;
+  } catch {
+    return null;
+  }
+};
+
 export const ProductLinesView: React.FC = () => {
   const {
     productLines,
@@ -188,6 +199,7 @@ export const ProductLinesView: React.FC = () => {
         {filteredLines.map((pl) => {
           const stats = getLineStats(pl);
           const versionCount = productLineVersionCount(pl.id, versions);
+          const productWebsiteUrl = normalizeProductWebsiteUrl(pl.website);
 
           return (
             <div
@@ -278,8 +290,9 @@ export const ProductLinesView: React.FC = () => {
 
                 {/* Footer Controls: 版本管理 & 成员管理 (满足需求2) */}
                 <div className="pt-2 border-t border-[var(--border-main)] flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Button
+                      size="small"
                       onClick={(e) => {
                         e.stopPropagation();
                         sessionStorage.setItem('shichuang.productLineFilter', pl.id);
@@ -293,6 +306,7 @@ export const ProductLinesView: React.FC = () => {
                     </Button>
 
                     <Button
+                      size="small"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedSettingsSection('members');
@@ -308,6 +322,20 @@ export const ProductLinesView: React.FC = () => {
                         pl.techOwner,
                         pl.testOwner
                       ].filter(Boolean)).size})</span>
+                    </Button>
+
+                    <Button
+                      size="small"
+                      disabled={!productWebsiteUrl}
+                      title={productWebsiteUrl ? '打开产品网址' : '暂未配置产品网址'}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!productWebsiteUrl) return;
+                        window.open(productWebsiteUrl, '_blank', 'noopener,noreferrer');
+                      }}
+                      icon={<Globe className="w-3.5 h-3.5 text-[var(--primary)]" />}
+                    >
+                      <span>产品网址</span>
                     </Button>
                   </div>
 

@@ -444,6 +444,10 @@ html:not(.dark) .product-line-detail button[class*="bg-[#2F66F6]"] {
 .product-line-gantt-time-heading { border-left: 1px solid var(--border-main); padding-left: 16px; }
 .product-line-gantt-labels { display: grid; gap: 12px; min-width: 0; padding-right: 12px; }
 .product-line-gantt-scroll { min-width: 0; overflow-x: auto; border-left: 1px solid var(--border-main); padding-left: 16px; padding-bottom: 8px; }
+.product-line-gantt-tick { white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.product-line-gantt-tick-first { transform: translateX(0); }
+.product-line-gantt-tick-middle { transform: translateX(-50%); }
+.product-line-gantt-tick-last { transform: translateX(-100%); }
 
 .work-item-category-icon {
   display: inline-flex;

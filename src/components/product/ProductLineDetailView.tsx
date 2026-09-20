@@ -803,8 +803,11 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                   {lineVersions.map((version) => <div key={`gantt-label-${version.id}`} className="flex h-8 items-center"><button type="button" onClick={() => openVersionDetail(version.id)} className="block min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"><span className="block truncate text-xs font-semibold text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.name}</span><span className="mt-0.5 block truncate font-mono text-[11px] text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.code || '未设置版本号'}</span></button></div>)}
                 </div>
                 <div className="product-line-gantt-scroll">
-                  <div className="space-y-3" style={{ width: timelineWidth }}>
-                    <div className="relative h-8 border-b border-[var(--border-main)]">{ticks.map((tick, index) => <span key={tick.toISOString()} className="absolute top-0 -translate-x-1/2 text-[10px] text-[var(--text-muted)]" style={{ left: `${Math.min(100, (index / weekCount) * 100)}%` }}>{tick.toISOString().slice(0, 10)}</span>)}</div>
+                  <div className="space-y-3" style={{ width: `max(100%, ${timelineWidth}px)` }}>
+                    <div className="relative h-8 border-b border-[var(--border-main)]">{ticks.map((tick, index) => {
+                      const edgeClass = index === 0 ? 'product-line-gantt-tick-first' : index === ticks.length - 1 ? 'product-line-gantt-tick-last' : 'product-line-gantt-tick-middle';
+                      return <span key={tick.toISOString()} className={`product-line-gantt-tick ${edgeClass} absolute top-0 text-[10px] text-[var(--text-muted)]`} style={{ left: `${Math.min(100, (index / weekCount) * 100)}%` }}>{tick.toISOString().slice(0, 10)}</span>;
+                    })}</div>
                     {lineVersions.map((version) => {
                   const start = toTime(version.startDate || version.releaseDate);
                   const end = Math.max(toTime(version.endDate || version.releaseDate || version.startDate), start + 86400000);
