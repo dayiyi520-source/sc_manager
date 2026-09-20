@@ -389,7 +389,7 @@ const OriginalWorkspace: React.FC = () => {
                 {myPerformances.map(perf => { const krReviews = perf.krReviews || []; const average = krReviews.length ? Math.round(krReviews.reduce((sum, kr) => sum + kr.currentProgress, 0) / krReviews.length) : perf.selfScore; const health = {normal: 0, risk: 0, blocked: 0}; krReviews.forEach(kr => { health[kr.health] += 1; }); return <Card key={perf.id} className="okr-my-review-card">
                   <div className="okr-my-review-card-head"><div><Tag color={perf.type === 'week' ? 'blue' : 'purple'}>{perf.type === 'week' ? '周报' : '月报'}</Tag><h3>{perf.cycleName || `${myYear}年复盘`}</h3><span>{perf.createdAt.slice(0, 10)} · 自评 {perf.selfScore} 分</span></div><Tag color={perf.status === 'reviewed' ? 'success' : perf.status === 'submitted' ? 'processing' : 'default'}>{perf.status === 'reviewed' ? '已评价' : perf.status === 'submitted' ? '已提交' : '草稿'}</Tag></div>
                   <div className="okr-my-review-score"><Progress type="circle" percent={average} size={68} /><div><b>KR 平均进度</b><strong>{average}%</strong></div></div>
-                  <div className="okr-my-review-metrics"><span><Target />{krReviews.length} 个 KR</span><span><FileText />{perf.extraWork?.workIds?.length || 0} 项任务</span><span><FileSpreadsheet />{perf.linkedWorkItems?.length || 0} 个工单</span></div>
+                  <div className="okr-my-review-metrics"><span><Target />{krReviews.length} 个 KR</span><span><FileText />{perf.extraWork?.workIds?.length || 0} 项任务</span><span><FileSpreadsheet />{perf.linkedWorkItems?.length || 0} 个事项</span></div>
                   <div className="okr-my-review-summary"><b>本期摘要</b><p>{perf.summary || '暂无摘要内容，点击查看详情继续补充。'}</p><div><span className="is-normal">● 正常 {health.normal}</span><span className="is-risk">● 风险 {health.risk}</span><span className="is-blocked">● 阻塞 {health.blocked}</span></div></div>
                   <div className="okr-my-review-actions">{perf.status === 'draft' && <Button type="primary" onClick={() => setDraftToSubmit(perf.id)}>提交</Button>}<Button onClick={() => setReviewDetailId(perf.id)}>查看详情</Button><Button onClick={() => openCopiedReview(perf.id, perf.type)}>复制为本期</Button></div>
                 </Card>; })}
@@ -547,7 +547,7 @@ const OriginalWorkspace: React.FC = () => {
                                 {rows.map((r, i) => (
                                   <div key={i} className="flex flex-wrap items-center justify-between gap-2 p-2 bg-[var(--bg-card)] border border-[var(--border-main)] rounded text-xs">
                                     <div className="flex items-center gap-2">
-                                      <Tag color={r.source === '工单' ? 'purple' : 'blue'}>{r.source}</Tag>
+                                      <Tag color={r.source === '工单' ? 'purple' : 'blue'}>{r.source === '工单' ? '事项' : r.source}</Tag>
                                       <span className="text-[var(--text-primary)]">{r.content}</span>
                                     </div>
                                     <div className="flex items-center gap-3 text-[var(--text-muted)]">

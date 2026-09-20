@@ -5,7 +5,7 @@ export function ReviewDetails({record,objectives}:{record:OkrRecord;objectives:O
  const data=record.payload;
  const snapshots=data.objectiveSnapshots||objectives.map(o=>({id:o.id,period:o.periodKey,payload:o.payload}));
  const renderItems=(items:OkrReviewItem[]) => <Table rowKey="workId" pagination={false} scroll={{x:700}} dataSource={items} columns={[
-  {title:'任务 / 工单',dataIndex:'title'}, {title:'进度状态',dataIndex:'status',render:s=><Tag>{s}</Tag>},
+  {title:'任务 / 事项',dataIndex:'title'}, {title:'进度状态',dataIndex:'status',render:s=><Tag>{s}</Tag>},
   {title:'本期产出',dataIndex:'result'},{title:'阻塞 / 延期影响',render:(_,item)=>{const affected=snapshots.find(o=>o.id===item.affectedObjectiveId);return <div>{affected&&<div>{affected.payload.title} / {affected.payload.keyResults?.find(k=>k.id===item.affectedKeyResultId)?.title}</div>}{item.impact}</div>;}},
   {title:'贡献确认',render:(_,item)=>item.included===undefined?'待评价':item.included?'计入评价':'保留记录'},
  ]}/>;

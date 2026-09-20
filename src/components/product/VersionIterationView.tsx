@@ -895,10 +895,10 @@ export const VersionIterationView: React.FC = () => {
               <DetailField label="任务描述"><p className="min-h-28 whitespace-pre-wrap break-words leading-6">{selectedWorkItem.item.description || '未填写需求描述'}</p></DetailField>
               <section className="border-t border-[var(--border-main)] pt-4">
                 <div className="mb-4 flex items-center gap-5 border-b border-[var(--border-main)] pb-2">
-                  <span className="border-b-2 border-[var(--primary)] pb-2 text-sm text-[var(--active-text)]">关联工单</span>
+                  <span className="border-b-2 border-[var(--primary)] pb-2 text-sm text-[var(--active-text)]">关联事项</span>
                   <span className="text-sm text-[var(--text-muted)]">动态 <span className="ml-1 text-[11px]">{selectedWorkItem.item.events?.length || 0}</span></span>
                 </div>
-                {selectedWorkItem.item.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedWorkItem.item.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : <p className="text-[var(--text-muted)]">未关联工单</p>}
+                {selectedWorkItem.item.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedWorkItem.item.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : <p className="text-[var(--text-muted)]">未关联事项</p>}
               </section>
             </div>
           ) : selectedWorkItem.kind === 'task' ? (
@@ -911,7 +911,7 @@ export const VersionIterationView: React.FC = () => {
               <DetailField label="缺陷编号"><span className="font-mono">{selectedWorkItem.item.code || '未设置'}</span></DetailField>
               <DetailField label="缺陷名称"><span className="font-medium">{selectedWorkItem.item.title}</span></DetailField>
               <DetailField label="复现步骤 / 缺陷描述"><p className="min-h-28 whitespace-pre-wrap break-words leading-6">{selectedWorkItem.item.description || '未填写缺陷描述'}</p></DetailField>
-              <DetailField label="关联工单">{selectedWorkItem.item.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedWorkItem.item.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : '未关联工单'}</DetailField>
+              <DetailField label="关联事项">{selectedWorkItem.item.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedWorkItem.item.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : '未关联事项'}</DetailField>
             </div>
           )}
         </WorkItemCreatePanel>

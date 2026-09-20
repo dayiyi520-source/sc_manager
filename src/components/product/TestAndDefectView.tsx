@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Tabs } from 'antd';
-import { RequirementTasksView } from './RequirementTasksView';
 import { TestCaseLibraryView } from './TestCaseLibraryView';
 import { TestTaskWorkspace } from './TestTaskWorkspace';
-import { Beaker, BookOpen, Bug } from '@/components/common/octicons-compat';
+import { VersionTestReportWorkspace } from './VersionTestReportWorkspace';
+import { Beaker, BookOpen, FileText } from '@/components/common/octicons-compat';
 
 type TestAndDefectViewProps = {
   productLineFilter?: string;
@@ -32,15 +32,9 @@ export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ productLin
             children: <TestCaseLibraryView productLineFilter={productLineFilter} />
           },
           {
-            key: 'bug',
-            label: <span className="inline-flex items-center gap-2"><Bug size={16} />缺陷管理</span>,
-            children: (
-              <RequirementTasksView
-                productLineFilter={productLineFilter}
-                itemLabel="缺陷管理"
-                taskKind="bug"
-              />
-            )
+            key: 'report',
+            label: <span className="inline-flex items-center gap-2"><FileText size={16} />测试报告</span>,
+            children: <VersionTestReportWorkspace productLineFilter={productLineFilter} />
           }
         ]}
       />

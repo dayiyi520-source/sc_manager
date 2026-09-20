@@ -51,6 +51,7 @@ export type SubMenuId =
   | 'prod_dev_tasks'
   | 'prod_bugs'
   | 'prod_test_tasks'
+  | 'prod_version_reviews'
   | 'wb_work_order'
 
   | 'prod_reviews'

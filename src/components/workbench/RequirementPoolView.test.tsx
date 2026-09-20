@@ -16,7 +16,7 @@ vi.mock('../../services/requirementRepository', () => ({
 vi.mock('../product/LazyRichTextEditor', () => ({
   LazyRichTextEditor: ({ size, onInput }: { size?: string; onInput: (text: string, html: string) => void }) => (
     <div data-testid="rich-text-editor" data-size={size}>
-      <button type="button" onClick={() => onInput('工单详细描述', '<p>工单详细描述</p>')}>填写工单描述</button>
+      <button type="button" onClick={() => onInput('事项详细描述', '<p>事项详细描述</p>')}>填写事项描述</button>
     </div>
   ),
 }));
@@ -51,7 +51,7 @@ describe('workbench work-order creation layout', () => {
   it('keeps one submit action in the sticky header and uses the large editor', async () => {
     await openCustomerRequest();
 
-    expect(screen.getByLabelText('工单标题 *')).toHaveClass('ant-input');
+    expect(screen.getByLabelText('事项标题 *')).toHaveClass('ant-input');
     expect(screen.getByLabelText('所属产品线 *').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('负责人 *').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('优先级').closest('.ant-select')).not.toBeNull();
@@ -59,8 +59,8 @@ describe('workbench work-order creation layout', () => {
     expect(screen.getByLabelText('诉求类型').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('诉求来源')).toHaveClass('ant-input');
 
-    const submit = screen.getByRole('button', { name: '提交工单' });
-    expect(screen.getAllByRole('button', { name: '提交工单' })).toHaveLength(1);
+    const submit = screen.getByRole('button', { name: '发起协助' });
+    expect(screen.getAllByRole('button', { name: '发起协助' })).toHaveLength(1);
     expect(submit.closest('.sticky')).not.toBeNull();
     expect(submit.closest('.sticky')).toHaveClass('-top-4', 'lg:-top-6', '-mt-6', 'px-6', 'py-4');
     expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-size', 'work-order');
@@ -75,7 +75,7 @@ describe('workbench work-order creation layout', () => {
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: new RegExp(type) }));
 
-    expect(screen.getByLabelText('工单标题 *')).toHaveClass('ant-input');
+    expect(screen.getByLabelText('事项标题 *')).toHaveClass('ant-input');
     labels.forEach((label) => expect(screen.getByLabelText(label)).toHaveClass('ant-input'));
   });
 
@@ -84,13 +84,13 @@ describe('workbench work-order creation layout', () => {
     addRequirementTask.mockReturnValue(new Promise<boolean>((resolve) => { complete = resolve; }));
     await openCustomerRequest();
 
-    fireEvent.change(screen.getByLabelText('工单标题 *'), { target: { value: '客户反馈工单' } });
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '客户反馈事项' } });
     fireEvent.mouseDown(screen.getByLabelText('所属产品线 *'));
     fireEvent.click(await screen.findByText('协同产品线', { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
     fireEvent.click(await screen.findByText('陈雅婷', { selector: '.ant-select-item-option-content' }));
-    fireEvent.click(screen.getByRole('button', { name: '填写工单描述' }));
-    fireEvent.click(screen.getByRole('button', { name: '提交工单' }));
+    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getByRole('button', { name: '发起协助' }));
 
     expect(screen.getByRole('button', { name: '提交中…' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '取消' })).toBeDisabled();
@@ -125,11 +125,11 @@ describe('workbench work-order creation layout', () => {
     } as unknown as ReturnType<typeof useApp>);
 
     render(<RequirementPoolView />);
-    fireEvent.click(screen.getByRole('tab', { name: '工单列表' }));
+    fireEvent.click(screen.getByRole('tab', { name: '事项列表' }));
     fireEvent.click(screen.getByRole('button', { name: '详情' }));
     await waitFor(() => expect(requirementRepository.detail).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '工单流转' }));
+    fireEvent.click(screen.getByRole('button', { name: '事项流转' }));
     const workflowType = screen.getByLabelText('流转类型 *');
     fireEvent.mouseDown(workflowType);
     fireEvent.click(await screen.findByText('转任务', { selector: '.ant-select-item-option-content' }));
@@ -142,10 +142,10 @@ describe('workbench work-order creation layout', () => {
     expect(workflowType.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('转派给他人');
     fireEvent.click(screen.getByRole('button', { name: '取消' }));
 
-    fireEvent.click(screen.getByRole('button', { name: '工单驳回' }));
+    fireEvent.click(screen.getByRole('button', { name: '事项驳回' }));
     const rejectReason = screen.getByLabelText('驳回原因 *');
     fireEvent.mouseDown(rejectReason);
-    const firstReason = await screen.findByText('工单内容不明确', { selector: '.ant-select-item-option-content' });
+    const firstReason = await screen.findByText('事项内容不明确', { selector: '.ant-select-item-option-content' });
     fireEvent.click(firstReason);
     expect(rejectReason.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent(firstReason.textContent || '');
   });
@@ -163,10 +163,10 @@ describe('workbench work-order creation layout', () => {
     } as unknown as ReturnType<typeof useApp>);
 
     render(<RequirementPoolView />);
-    fireEvent.click(screen.getByRole('tab', { name: '工单列表' }));
+    fireEvent.click(screen.getByRole('tab', { name: '事项列表' }));
     fireEvent.click(screen.getByRole('button', { name: '详情' }));
     await waitFor(() => expect(requirementRepository.detail).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '工单流转' }));
+    fireEvent.click(screen.getByRole('button', { name: '事项流转' }));
     fireEvent.mouseDown(screen.getByLabelText('流转类型 *'));
     fireEvent.click(await screen.findByText('转派给他人', { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('转派给负责人 *'));
@@ -174,7 +174,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.change(screen.getByPlaceholderText('请输入转派原因及交接说明...'), { target: { value: '工作调整' } });
     fireEvent.click(screen.getByRole('button', { name: '确认' }));
 
-    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '工单转派失败', '工单已变化，请刷新后重试'));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '事项转派失败', '工单已变化，请刷新后重试'));
     expect(screen.getByLabelText('转派给负责人 *')).toBeInTheDocument();
     expect(setRequirementTasks).not.toHaveBeenCalled();
   });

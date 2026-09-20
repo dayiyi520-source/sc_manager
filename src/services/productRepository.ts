@@ -2,6 +2,7 @@ import { apiRequest } from './apiClient';
 import type { ProductLine, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, VersionIteration, RequirementTask, DefectBug, DevTask } from '../types';
 import type { PageResult } from './apiClient';
 import type { CreateTestExecutionInput, SaveTestCaseInput, SaveTestPlanInput, SaveVersionTestReportInput, TestCase, TestCaseDirectory, TestCasePage, TestEvidence, TestExecution, TestExecutionScope, TestPlan, TestResultStatus, TestTaskOverview, VersionTestReport, VersionTestReportListItem, VersionTestReportPlan } from '../types/testManagement';
+import type { SaveVersionReviewInput, VersionReview, VersionReviewListItem } from '../types/versionReview';
 
 type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
@@ -134,4 +135,9 @@ export const productRepository = {
   ,createVersionTestReport: (lineId: string, versionId: string, body: SaveVersionTestReportInput) => apiRequest<VersionTestReport>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports`, { method: 'POST', body: JSON.stringify(body) })
   ,updateVersionTestReport: (lineId: string, versionId: string, reportId: string, body: SaveVersionTestReportInput) => apiRequest<VersionTestReport>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/${encodeURIComponent(reportId)}`, { method: 'PUT', body: JSON.stringify(body) })
   ,deleteVersionTestReport: (lineId: string, versionId: string, reportId: string, revision: number) => apiRequest<void>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/${encodeURIComponent(reportId)}?revision=${revision}`, { method: 'DELETE' })
+  ,versionReviews: (lineId: string, versionId: string) => apiRequest<VersionReviewListItem[]>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/reviews`)
+  ,versionReview: (lineId: string, versionId: string, reviewId: string) => apiRequest<VersionReview>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/reviews/${encodeURIComponent(reviewId)}`)
+  ,createVersionReview: (lineId: string, versionId: string, body: SaveVersionReviewInput) => apiRequest<VersionReview>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/reviews`, { method: 'POST', body: JSON.stringify(body) })
+  ,updateVersionReview: (lineId: string, versionId: string, reviewId: string, body: SaveVersionReviewInput) => apiRequest<VersionReview>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/reviews/${encodeURIComponent(reviewId)}`, { method: 'PUT', body: JSON.stringify(body) })
+  ,submitVersionReview: (lineId: string, versionId: string, reviewId: string, revision: number) => apiRequest<VersionReview>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/reviews/${encodeURIComponent(reviewId)}/submit`, { method: 'POST', body: JSON.stringify({ revision }) })
 };

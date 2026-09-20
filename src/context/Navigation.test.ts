@@ -15,4 +15,16 @@ describe('design task navigation', () => {
     const identifiers = MENU_GROUPS.flatMap((group) => group.subMenus.map((menu) => menu.id));
     expect(new Set(identifiers).size).toBe(identifiers.length);
   });
+
+  it('exposes assistance and the separated product quality menus', () => {
+    const workbench = MENU_GROUPS.find((group) => group.id === 'workbench')!.subMenus;
+    const product = MENU_GROUPS.find((group) => group.id === 'product')!.subMenus;
+
+    expect(workbench.find((menu) => menu.id === 'wb_work_order')?.title).toBe('协助事项');
+    expect(product).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'prod_test_tasks', title: '测试任务' }),
+      expect.objectContaining({ id: 'prod_bugs', title: '缺陷管理' }),
+      expect.objectContaining({ id: 'prod_version_reviews', title: '版本评审' })
+    ]));
+  });
 });

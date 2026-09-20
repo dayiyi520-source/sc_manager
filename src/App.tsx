@@ -44,6 +44,7 @@ const ProductPlanningView = lazyNamed(() => import('./components/product/Product
 const VersionIterationView = lazyNamed(() => import('./components/product/VersionIterationView'), 'VersionIterationView');
 const ProductLinesView = lazyNamed(() => import('./components/product/ProductLinesView'), 'ProductLinesView');
 const ProductReviewView = lazyNamed(() => import('./components/product/ProductReviewView'), 'ProductReviewView');
+const VersionReviewView = lazyNamed(() => import('./components/product/VersionReviewView'), 'VersionReviewView');
 
 // Approval & Comprehensive Center Views
 const ApprovalCenterView = lazyNamed(() => import('./components/approval/ApprovalCenterView'), 'ApprovalCenterView');
@@ -143,9 +144,11 @@ const MainContent: React.FC = () => {
       case 'prod_dev_tasks':
         return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="研发任务" taskKind="dev" />;
       case 'prod_bugs':
-        return <TestAndDefectView productLineFilter={productLineFilter} />;
+        return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="缺陷管理" taskKind="bug" />;
       case 'prod_test_tasks':
-        return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="测试任务" taskKind="test" />;
+        return <TestAndDefectView productLineFilter={productLineFilter} />;
+      case 'prod_version_reviews':
+        return <VersionReviewView productLineFilter={productLineFilter} />;
       case 'prod_reviews':
       case 'prod_review':
         return <ProductReviewView />;
@@ -194,7 +197,7 @@ const MainContent: React.FC = () => {
     <main className="tech-main flex-1 overflow-y-auto p-4 lg:p-6">
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
         {/* 产品线范围由任务工作区与测试资产共同复用。 */}
-        {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' || routedTabId === 'prod_rd_tasks' || routedTabId === 'prod_dev_tasks' || routedTabId === 'prod_test_tasks' || routedTabId === 'prod_bugs') && (
+        {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' || routedTabId === 'prod_rd_tasks' || routedTabId === 'prod_dev_tasks' || routedTabId === 'prod_test_tasks' || routedTabId === 'prod_bugs' || routedTabId === 'prod_version_reviews') && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] pb-4 border-b border-[var(--border-main)]">
             <span>产品线</span>
             <Select

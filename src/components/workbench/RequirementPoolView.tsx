@@ -301,7 +301,7 @@ export const RequirementPoolView: React.FC = () => {
       !selectedEmployee ||
       !descriptionText.trim()
     ) {
-      addToast("warning", "请补充产品线、工单标题、负责人和工单描述");
+      addToast("warning", "请补充产品线、事项标题、负责人和事项描述");
       return;
     }
     const customer = customers.find((item) => item.id === customerId)
@@ -374,14 +374,14 @@ export const RequirementPoolView: React.FC = () => {
         setSelected((item) => item ? { ...item, status: "处理中" as RequirementTask["status"], assignedOwnerName: singleTask.assignee!.name } : item);
         setWorkOpen(false);
         openPageTab("prod_req_tasks");
-        addToast("success", "已打开需求任务创建界面", "工单信息已自动带入，请确认后保存");
+        addToast("success", "已打开需求任务创建界面", "事项信息已自动带入，请确认后保存");
         return;
       }
       let results: Array<{ task: typeof singleTask.task; assignee: NonNullable<typeof singleTask.assignee>; result: Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }>;
       try {
         results = await Promise.all(taskInputs.map(async ({ task, assignee }) => ({ task, assignee: assignee!, result: await requirementRepository.createWorkItem(selected.id, { taskType: task.taskType!, assigneeName: assignee!.name, note: task.note }) })));
       } catch {
-        addToast("error", "下游任务同步失败", "已创建的任务会保留在关联工单中，请在详情中重试失败任务");
+        addToast("error", "下游任务同步失败", "已创建的任务会保留在关联事项中，请在详情中重试失败任务");
         return;
       }
       const localItems: RequirementWorkItem[] = results.map(({ task, assignee, result }) => ({ id: result.id, requirementId: selected.id, taskType: task.taskType!, title: selected.title, assigneeName: assignee.name, note: task.note, status: "待处理", createdAt: now }));
@@ -412,7 +412,7 @@ export const RequirementPoolView: React.FC = () => {
       setWorkItems((list) => [...localItems, ...list]);
       setEvents((list) => [...list, next.events![next.events!.length - 1]]);
       setWorkOpen(false);
-      addToast("success", "已创建下游工单", `已生成 ${localItems.length} 条任务，关联工单已自动建立`);
+      addToast("success", "已创建下游事项", `已生成 ${localItems.length} 条任务，关联事项已自动建立`);
     } else if (workflowAction === "reassign") {
       const selectedAssignee = employees.find((item) => item.name.trim().toLocaleLowerCase() === reassignAssignee.trim().toLocaleLowerCase());
       if (!selectedAssignee) {
@@ -434,9 +434,9 @@ export const RequirementPoolView: React.FC = () => {
         setSelected(next);
         setEvents(Array.isArray(next.events) ? next.events : []);
         setWorkOpen(false);
-        addToast("success", "工单转派成功", `已成功转派给 ${selectedAssignee.name}`);
+        addToast("success", "事项转派成功", `已成功转派给 ${selectedAssignee.name}`);
       } catch (error) {
-        addToast("error", "工单转派失败", error instanceof Error ? error.message : "服务未确认本次转派，请稍后重试");
+        addToast("error", "事项转派失败", error instanceof Error ? error.message : "服务未确认本次转派，请稍后重试");
       } finally {
         setWorkflowSubmitting(false);
       }
@@ -455,7 +455,7 @@ export const RequirementPoolView: React.FC = () => {
         setSelected(next);
         setEvents(Array.isArray(next.events) ? next.events : []);
         setWorkOpen(false);
-        addToast("success", "已保存为个人备忘录并归档工单");
+        addToast("success", "已保存为个人备忘录并归档事项");
       } catch (error) {
         addToast("error", "个人备忘录保存失败", error instanceof Error ? error.message : "服务未确认本次保存，请稍后重试");
       } finally {
@@ -487,7 +487,7 @@ export const RequirementPoolView: React.FC = () => {
       persisted = false;
     }
     if (!persisted) {
-      addToast("error", "工单操作失败", "服务未确认本次流转，请稍后重试");
+      addToast("error", "事项操作失败", "服务未确认本次流转，请稍后重试");
       return;
     }
     const eventItem: RequirementEvent = {
@@ -514,7 +514,7 @@ export const RequirementPoolView: React.FC = () => {
     setRejectCategory("");
     addToast(
       "success",
-      `工单${nextStatus}`,
+      `事项${nextStatus}`,
       persisted ? "流转记录已保存" : "后端暂不可用，已在当前会话记录",
     );
   };
@@ -605,7 +605,7 @@ export const RequirementPoolView: React.FC = () => {
     </span>
   );
   const fields = <div className="work-order-form grid grid-cols-1 gap-4">
-    <WorkOrderInput label="工单标题 *" value={title} onChange={setTitle} placeholder="请输入工单标题，简明描述问题或诉求" />
+    <WorkOrderInput label="事项标题 *" value={title} onChange={setTitle} placeholder="请输入事项标题，简明描述问题或诉求" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <WorkOrderSelect
         label="所属产品线 *"
@@ -652,7 +652,7 @@ export const RequirementPoolView: React.FC = () => {
       </div>
     )}
     <div>
-      <span className="text-xs text-[var(--text-muted)]">工单描述 *</span>
+      <span className="text-xs text-[var(--text-muted)]">事项描述 *</span>
       <RichTextEditor size="work-order" editor={editor} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} />
       <div className="mt-2 flex items-center gap-2">
         <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-body)]">
@@ -669,7 +669,7 @@ export const RequirementPoolView: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-150">
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
-        <div className="primary-line-tabs flex items-center gap-2" role="tablist" aria-label="工单中心视图">
+        <div className="primary-line-tabs flex items-center gap-2" role="tablist" aria-label="协助事项视图">
           <button
             role="tab"
             aria-selected={tab === "create"}
@@ -681,7 +681,7 @@ export const RequirementPoolView: React.FC = () => {
             }`}
           >
             <PenSquare className="w-4 h-4" />
-            提工单
+            发起协助
           </button>
           <button
             role="tab"
@@ -694,7 +694,7 @@ export const RequirementPoolView: React.FC = () => {
             }`}
           >
             <ListFilter className="w-4 h-4" />
-            工单列表
+            事项列表
           </button>
         </div>
       </div>
@@ -727,7 +727,7 @@ export const RequirementPoolView: React.FC = () => {
               <div className="sticky -top-4 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                    {workOrderType || "提工单"}
+                    {workOrderType || "发起协助"}
                   </h2>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     提交后将会自动通知到负责人
@@ -748,7 +748,7 @@ export const RequirementPoolView: React.FC = () => {
                     className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
-                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品线" : "提交工单"}
+                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品线" : "发起协助"}
                   </button>
                 </div>
               </div>
@@ -769,7 +769,7 @@ export const RequirementPoolView: React.FC = () => {
           <div className="dark-panel rounded-xl p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3 pb-1">
               <div className="inline-flex shrink-0 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1" role="group" aria-label="列表筛选模式">
-                <button type="button" title="按工单类型筛选" aria-label="按工单类型筛选" onClick={() => setFilterMode("type")} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "type" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><ListFilter className="h-4 w-4" /></button>
+                <button type="button" title="按事项类型筛选" aria-label="按事项类型筛选" onClick={() => setFilterMode("type")} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "type" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><ListFilter className="h-4 w-4" /></button>
                 <button type="button" title="查看与我有关" aria-label="查看与我有关" onClick={() => { setFilterMode("mine"); setScope("all"); }} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "mine" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><UserRound className="h-4 w-4" /></button>
               </div>
               <div className="inline-flex max-w-full flex-wrap items-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">
@@ -795,7 +795,7 @@ export const RequirementPoolView: React.FC = () => {
               className="ml-auto h-10 px-4 shrink-0 rounded-lg bg-[var(--primary)] text-sm font-semibold text-white"
             >
               <Plus className="mr-1 inline w-4 h-4" />
-              提工单
+              发起协助
             </button>
             </div>
           </div>
@@ -805,7 +805,7 @@ export const RequirementPoolView: React.FC = () => {
                 <thead>
                   <tr className="border-b border-[var(--border-main)] text-[var(--text-muted)]">
                     <th className="px-4 py-3">标题</th>
-                    <th className="px-4 py-3">工单类型</th>
+                    <th className="px-4 py-3">事项类型</th>
                     <th className="px-4 py-3">优先级</th>
                     <th className="px-4 py-3">关联客户</th>
                     <th className="px-4 py-3">负责人</th>
@@ -830,7 +830,7 @@ export const RequirementPoolView: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-[var(--text-body)]">
-                        <span>{item.workOrderType || "历史工单"}</span>
+                        <span>{item.workOrderType || "历史事项"}</span>
                       </td>
                       <td className="px-4 py-3">
                         <StatusTag status={item.priority} />
@@ -877,7 +877,7 @@ export const RequirementPoolView: React.FC = () => {
           isOpen={!!selected}
           onClose={() => setSelected(null)}
           hideSubtitle
-          title="工单详情"
+          title="事项详情"
           subtitle={`${selected.productLineName} · 负责人：${selected.ownerName || "未分配"}`}
           footer={
             <div className="flex w-full justify-between">
@@ -899,15 +899,15 @@ export const RequirementPoolView: React.FC = () => {
           }
         >
           <div className="mb-5 flex items-center gap-1 border-b border-[var(--border-main)]">
-            <button type="button" onClick={() => setDetailTab("info")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "info" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>工单信息</button>
-            <button type="button" onClick={() => setDetailTab("history")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "history" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>工单全历程</button>
+            <button type="button" onClick={() => setDetailTab("info")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "info" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>事项信息</button>
+            <button type="button" onClick={() => setDetailTab("history")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "history" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>事项全历程</button>
           </div>
           <div className={`space-y-5 text-sm ${detailTab === "history" ? "hidden" : ""}`}>
             <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
               <div className="flex items-start justify-between gap-4"><h2 className="text-lg font-semibold text-[var(--text-primary)]">{selected.title}</h2><StatusTag status={selected.status} /></div>
               <div className="my-4 border-t border-[var(--border-main)]" />
               <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-[var(--text-muted)]">工单类型</span><p className="mt-1 text-[var(--text-primary)]">{selected.workOrderType || "历史工单"}</p></div>
+              <div><span className="text-xs text-[var(--text-muted)]">事项类型</span><p className="mt-1 text-[var(--text-primary)]">{selected.workOrderType || "历史事项"}</p></div>
               <div>
                 <span className="text-xs text-[var(--text-muted)]">优先级</span>
                 <div className="mt-1">
@@ -947,7 +947,7 @@ export const RequirementPoolView: React.FC = () => {
             </div>
             <div>
               <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">
-                工单详细描述
+                事项详细描述
               </h3>
               <div
                 className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-body)]"
@@ -985,7 +985,7 @@ export const RequirementPoolView: React.FC = () => {
             </div>
           </div>
           <div className={`space-y-5 text-sm ${detailTab === "info" ? "hidden" : ""}`}>
-            <section><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">工单全历程</h3>{events.length ? <div className="space-y-3">{events.map((item) => { const meta = eventMetadata(item.metadata); const targetPage = meta.targetPage; return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3"><div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{item.createdAt?.slice(0, 16)}</span></div><div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{item.operatorName || "未知"} · 指派负责人：{meta.assigneeName || "未指派"}</div>{item.reason && <p className="mt-2 text-xs">{item.reason}</p>} {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => targetPage && openPageTab(targetPage as Parameters<typeof openPageTab>[0])}>{meta.taskType} · {meta.taskTitle || "关联任务"} <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></button></>}</div>; })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无工单流转记录</p>}</section>
+            <section><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项全历程</h3>{events.length ? <div className="space-y-3">{events.map((item) => { const meta = eventMetadata(item.metadata); const targetPage = meta.targetPage; return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3"><div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{item.createdAt?.slice(0, 16)}</span></div><div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{item.operatorName || "未知"} · 指派负责人：{meta.assigneeName || "未指派"}</div>{item.reason && <p className="mt-2 text-xs">{item.reason}</p>} {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => targetPage && openPageTab(targetPage as Parameters<typeof openPageTab>[0])}>{meta.taskType} · {meta.taskTitle || "关联任务"} <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></button></>}</div>; })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无事项流转记录</p>}</section>
             <section><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">解决过程记录</h3>{workItems.length ? workItems.map((item) => <div key={item.id} className="flex justify-between border-b border-[var(--border-main)] py-2 text-xs"><span>{item.taskType} · {item.title}</span><StatusTag status={item.status} /></div>) : <p className="text-xs text-[var(--text-muted)]">暂无解决过程记录</p>}</section>
           </div>
         </Drawer>
@@ -993,7 +993,7 @@ export const RequirementPoolView: React.FC = () => {
       <Modal
         isOpen={workOpen}
         onClose={() => setWorkOpen(false)}
-        title="工单流转"
+        title="事项流转"
         maxWidth="4xl"
       >
         <form onSubmit={handleWorkflowSubmit} className="work-order-dialog space-y-4">
@@ -1090,7 +1090,7 @@ export const RequirementPoolView: React.FC = () => {
                   required
                 />
               </label>
-              <p className="text-[11px] text-[var(--text-muted)]">保存为个人备忘录后，工单将归档或标记为已完成状态。</p>
+              <p className="text-[11px] text-[var(--text-muted)]">保存为个人备忘录后，事项将归档或标记为已完成状态。</p>
             </>
           )}
 
@@ -1116,7 +1116,7 @@ export const RequirementPoolView: React.FC = () => {
       <Modal
         isOpen={!!reasonType}
         onClose={() => setReasonType(null)}
-        title={reasonType === "hold" ? "工单搁置" : "工单驳回"}
+        title={reasonType === "hold" ? "事项搁置" : "事项驳回"}
       >
         <form onSubmit={transition} className="work-order-dialog space-y-4">
           {reasonType === "reject" && (

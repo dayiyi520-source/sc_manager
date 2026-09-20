@@ -98,7 +98,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'wb_my_tasks', title: '我的任务', mainMenuId: 'workbench', icon: 'CheckSquare', badge: 4, badgeType: 'danger' },
       { id: 'wb_okr_perf', title: '目标与绩效', mainMenuId: 'workbench', icon: 'Target' },
       { id: 'wb_knowledge', title: '知识库', mainMenuId: 'workbench', icon: 'BookOpen' },
-      { id: 'wb_work_order', title: '工单中心', mainMenuId: 'workbench', icon: 'Database' }
+      { id: 'wb_work_order', title: '协助事项', mainMenuId: 'workbench', icon: 'Database' }
     ]
   },
   {
@@ -131,7 +131,9 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'prod_req_tasks', title: '需求任务', mainMenuId: 'product', icon: 'ListTodo', badge: '云效流', badgeType: 'default' },
       { id: 'prod_design_tasks', title: '设计任务', mainMenuId: 'product', icon: 'Edit' },
       { id: 'prod_rd_tasks', title: '研发任务', mainMenuId: 'product', icon: 'Code' },
-      { id: 'prod_bugs', title: '测试与缺陷', mainMenuId: 'product', icon: 'Bug', badge: 3, badgeType: 'danger' },
+      { id: 'prod_test_tasks', title: '测试任务', mainMenuId: 'product', icon: 'Beaker' },
+      { id: 'prod_bugs', title: '缺陷管理', mainMenuId: 'product', icon: 'Bug', badge: 3, badgeType: 'danger' },
+      { id: 'prod_version_reviews', title: '版本评审', mainMenuId: 'product', icon: 'FileCheck' },
       { id: 'prod_reviews', title: '复盘管理', mainMenuId: 'product', icon: 'Archive' },
       { id: 'prod_planning', title: '产品规划', mainMenuId: 'product', icon: 'Compass' }
     ]
