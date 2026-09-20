@@ -96,6 +96,46 @@ public class RequirementService {
         executeStatus(current,target,text(body,"reason"));
     }
 
+    @Transactional public Map<String,Object> reassign(String id,Map<String,Object> body){
+        AuthorizationService.requireWrite("product");
+        Map<String,Object> current=requirement(id);
+        requireRevision(current,body);
+        rejectTerminal(current);
+        String reason=text(body,"reason");
+        if(reason.isBlank())throw new IllegalArgumentException("转派原因不能为空");
+        String assigneeId=text(body,"assigneeId");
+        Map<String,Object> employee=assigneeId.isBlank()?null:taskMapper.activeUser(assigneeId);
+        if(employee==null)throw new IllegalArgumentException("负责人不存在或已停用");
+        String oldOwner=Objects.toString(current.get("ownerName"),"");
+        String from=Objects.toString(current.get("status"),"");
+        if(!"处理中".equals(from)){
+            executeStatus(current,"处理中",reason);
+            current=requirement(id);
+        }
+        int currentRevision=((Number)current.get("revision")).intValue();
+        String assigneeName=Objects.toString(employee.get("name"),"");
+        if(mapper.reassign(RequestContext.tenantId(),id,currentRevision,assigneeId,assigneeName,RequestContext.userId())!=1)throw conflict();
+        event(id,"转派",from,Objects.toString(current.get("status"),from),reason,Map.of("fromAssigneeName",oldOwner,"assigneeId",assigneeId,"assigneeName",assigneeName));
+        return detail(id);
+    }
+
+    @Transactional public Map<String,Object> memo(String id,Map<String,Object> body){
+        AuthorizationService.requireWrite("product");
+        Map<String,Object> current=requirement(id);
+        requireRevision(current,body);
+        rejectTerminal(current);
+        String content=text(body,"content");
+        if(content.isBlank())throw new IllegalArgumentException("个人备忘内容不能为空");
+        String from=Objects.toString(current.get("status"),"");
+        if(!"处理中".equals(from)){
+            executeStatus(current,"处理中",content);
+            current=requirement(id);
+        }
+        executeStatus(current,"已完成",content);
+        event(id,"个人备忘录",from,"已完成",content,Map.of("content",content));
+        return detail(id);
+    }
+
     @Transactional public Map<String,Object> createWorkItem(String id,Map<String,Object> body){
         AuthorizationService.requireWrite("product");Map<String,Object> current=requirement(id);String taskType=text(body,"taskType"),category=TaskTypes.category(taskType);
         if(category==null)throw new IllegalArgumentException("工单仅支持转需求、设计、研发或缺陷");
@@ -121,6 +161,9 @@ public class RequirementService {
     public Map<String,Object> retryWorkItem(String id){AuthorizationService.requireWrite("product");workOrders.find(RequestContext.tenantId(),id);return Map.of("syncStatus","SUCCESS","retryableFailures",0);}
 
     private Map<String,Object> requirement(String id){List<Map<String,Object>> rows=mapper.find(RequestContext.tenantId(),id);if(rows.isEmpty())throw notFound("需求不存在");return rows.get(0);}
+    private static void requireRevision(Map<String,Object> current,Map<String,Object> body){Object value=body.get("revision");if(!(value instanceof Number revision))throw new IllegalArgumentException("请提交工单当前版本号");if(revision.intValue()!=((Number)current.get("revision")).intValue())throw conflict();}
+    private static void rejectTerminal(Map<String,Object> current){if(Set.of("已完成","已取消","已驳回").contains(Objects.toString(current.get("status"),"")))throw new ResponseStatusException(HttpStatus.CONFLICT,"当前工单已结束，不能继续操作");}
+    private static ResponseStatusException conflict(){return new ResponseStatusException(HttpStatus.CONFLICT,"工单已变化，请刷新后重试");}
     private void executeStatus(Map<String,Object> current,String target,String reason){if(target.isBlank())throw new IllegalArgumentException("请选择目标状态");WorkItemTransitionService.Actions available=transitions.available(String.valueOf(current.get("productLineId")),String.valueOf(current.get("id")));WorkItemTransitionService.Action action=available.actions().stream().filter(value->value.to().equals(target)||value.name().equals(target)||available.statuses().stream().anyMatch(status->status.key().equals(value.to())&&status.name().equals(target))).findFirst().orElseThrow(()->new IllegalArgumentException("当前流程不允许流转到该状态"));transitions.execute(String.valueOf(current.get("productLineId")),String.valueOf(current.get("id")),new WorkItemDefinition.Transition(action.edgeKey(),available.revision(),reason));}
     private void event(String id,String type,String from,String to,String reason,Map<String,Object> metadata){try{mapper.event(RequestContext.tenantId(),id,type,from,to,reason,RequestContext.operatorName(),RequestContext.userId(),objectMapper.writeValueAsString(metadata));}catch(Exception error){throw new IllegalArgumentException("流转记录格式无效",error);}}
     private static String targetPage(String category){return switch(category){case "design"->"prod_design_tasks";case "dev"->"prod_rd_tasks";case "bug"->"prod_bugs";default->"prod_req_tasks";};}

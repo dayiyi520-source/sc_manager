@@ -535,6 +535,7 @@ export interface RequirementTask {
   parentWorkItemId?: string;
   hasChildren?: boolean;
   revision?: number;
+  version?: number;
   ccNames?: string[];
   plannedStartDate?: string;
   expectedCompleteDate?: string;

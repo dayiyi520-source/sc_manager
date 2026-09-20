@@ -575,6 +575,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast('error', '工单创建失败', '当前未连接后端服务，数据未保存');
       return false;
     }
+    const selectedProductLine = task.productLineId
+      ? productLines.find((item) => item.id === task.productLineId)
+      : productLines.find((item) => item.name === task.productLineName);
+    if (!selectedProductLine) {
+      addToast('warning', '工单创建失败', '请选择所属产品线');
+      return false;
+    }
     const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const newTask: RequirementTask = {
       id: `req-${Date.now()}`,
@@ -588,8 +595,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       department: task.department || currentUser.department,
       versionId: task.versionId || '',
       versionName: task.versionName || '',
-      productLineId: task.productLineId || 'pl-1',
-      productLineName: task.productLineName || '师创智联协同OS',
+      productLineId: selectedProductLine.id,
+      productLineName: selectedProductLine.name,
       customerId: task.customerId,
       customerName: task.customerName,
       descriptionHtml: task.descriptionHtml,

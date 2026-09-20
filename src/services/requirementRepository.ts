@@ -18,6 +18,7 @@ export function normalizeRequirementTask(task: RequirementTask): RequirementTask
   const sourceWorkOrderTitles = parseJson(task.sourceWorkOrderTitles, []);
   return {
     ...task,
+    revision: task.revision ?? task.version,
     specialFields: specialFields && typeof specialFields === 'object' && !Array.isArray(specialFields) ? specialFields : {},
     media: Array.isArray(media) ? media : [],
     ccNames: Array.isArray(ccNames) ? ccNames : [],
@@ -45,6 +46,8 @@ export const requirementRepository = {
   departments: () => apiRequest<DepartmentOption[]>('/api/requirements/departments'),
   employees: () => apiRequest<EmployeeOption[]>('/api/auth/dev-accounts'),
   transition: (id: string, action: 'hold' | 'reject', reason: string) => apiRequest<void>(`/api/requirements/${id}/transition`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
+  reassign: (id: string, input: { assigneeId: string; reason: string; revision: number }) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/reassign`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
+  memo: (id: string, input: { content: string; revision: number }) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/memo`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
   createWorkItem: (id: string, input: { title?: string; taskType: string; assigneeName: string; note?: string }) => apiRequest<{ id: string; taskType: string; syncStatus?: string; retryCount?: number; syncError?: string }>(`/api/requirements/${id}/work-items`, { method: 'POST', body: JSON.stringify(input) }),
   workItems: (taskType = '') => apiRequest<RequirementWorkItem[]>(`/api/requirements/work-items?taskType=${encodeURIComponent(taskType)}`),
   syncStatus: (values: Record<string, string | number> = {}) => {

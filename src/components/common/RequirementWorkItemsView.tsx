@@ -74,6 +74,8 @@ export const RequirementWorkItemsView: React.FC<{ type: 'presales' | 'delivery' 
       await requirementRepository.createWorkItem(sourceId, { title: title.trim(), taskType: workType, assigneeName: assignee.trim(), note });
       await addRequirementTask({
         title: title.trim(),
+        productLineId: sourceRequirements.find((item) => item.id === sourceId)?.productLineId,
+        productLineName: sourceRequirements.find((item) => item.id === sourceId)?.productLineName,
         workOrderType: workType as any,
         taskType: workType as any,
         ownerName: assignee.trim(),

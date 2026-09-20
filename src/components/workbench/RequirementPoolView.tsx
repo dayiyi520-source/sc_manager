@@ -194,6 +194,7 @@ export const RequirementPoolView: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [title, setTitle] = useState("");
+  const [productLineId, setProductLineId] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [requirementPriority, setRequirementPriority] = useState<
     RequirementTask["priority"] | ""
@@ -205,6 +206,7 @@ export const RequirementPoolView: React.FC = () => {
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [media, setMedia] = useState<RequirementMedia[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [workflowSubmitting, setWorkflowSubmitting] = useState(false);
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
   const [workOpen, setWorkOpen] = useState(false);
   const [workflowAction, setWorkflowAction] = useState<"" | "convert" | "reassign" | "memo">("");
@@ -241,6 +243,7 @@ export const RequirementPoolView: React.FC = () => {
     ).map((name) => ({ id: name, name, department: currentUser.department }));
   const reset = () => {
     setTitle("");
+    setProductLineId("");
     setOwnerName("");
     setRequirementPriority("");
     setCustomerId("");
@@ -290,13 +293,15 @@ export const RequirementPoolView: React.FC = () => {
     const selectedEmployee = employees.find(
       (item) => item.name === ownerName.trim(),
     );
+    const selectedProductLine = productLines.find((item) => item.id === productLineId);
     const descriptionText = description || editor.current?.innerText || "";
     if (
       !title.trim() ||
+      !selectedProductLine ||
       !selectedEmployee ||
       !descriptionText.trim()
     ) {
-      addToast("warning", "请补充工单标题、负责人和工单描述");
+      addToast("warning", "请补充产品线、工单标题、负责人和工单描述");
       return;
     }
     const customer = customers.find((item) => item.id === customerId)
@@ -308,6 +313,8 @@ export const RequirementPoolView: React.FC = () => {
         description: descriptionText,
         descriptionHtml: descriptionHtml || editor.current?.innerHTML || "",
         media,
+        productLineId: selectedProductLine.id,
+        productLineName: selectedProductLine.name,
         ownerName: selectedEmployee.name,
         department: selectedEmployee.department,
         customerId: customer?.id || customerId || undefined,
@@ -416,52 +423,44 @@ export const RequirementPoolView: React.FC = () => {
         addToast("warning", "请输入转派原因说明");
         return;
       }
-      const next = {
-        ...selected,
-        ownerName: selectedAssignee.name,
-        status: "处理中" as RequirementTask["status"],
-        events: [
-          ...(selected.events || []),
-          {
-            id: `event-${Date.now()}`,
-            eventType: "转派",
-            fromStatus: selected.status,
-            toStatus: "处理中",
-            reason: `转派给 ${selectedAssignee.name}：${reassignReason.trim()}`,
-            operatorName: currentUser.name,
-            createdAt: now,
-          },
-        ],
-      };
-      setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
-      setSelected(next);
-      setWorkOpen(false);
-      addToast("success", "工单转派成功", `已成功转派给 ${selectedAssignee.name}`);
+      setWorkflowSubmitting(true);
+      try {
+        const next = await requirementRepository.reassign(selected.id, {
+          assigneeId: selectedAssignee.id,
+          reason: reassignReason.trim(),
+          revision: selected.revision ?? selected.version ?? 0,
+        });
+        setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
+        setSelected(next);
+        setEvents(Array.isArray(next.events) ? next.events : []);
+        setWorkOpen(false);
+        addToast("success", "工单转派成功", `已成功转派给 ${selectedAssignee.name}`);
+      } catch (error) {
+        addToast("error", "工单转派失败", error instanceof Error ? error.message : "服务未确认本次转派，请稍后重试");
+      } finally {
+        setWorkflowSubmitting(false);
+      }
     } else if (workflowAction === "memo") {
       if (!memoContent.trim()) {
         addToast("warning", "请输入个人备忘录内容");
         return;
       }
-      const next = {
-        ...selected,
-        status: "已完成" as RequirementTask["status"],
-        events: [
-          ...(selected.events || []),
-          {
-            id: `event-${Date.now()}`,
-            eventType: "个人备忘录",
-            fromStatus: selected.status,
-            toStatus: "已完成",
-            reason: memoContent.trim(),
-            operatorName: currentUser.name,
-            createdAt: now,
-          },
-        ],
-      };
-      setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
-      setSelected(next);
-      setWorkOpen(false);
-      addToast("success", "已保存为个人备忘录并归档工单");
+      setWorkflowSubmitting(true);
+      try {
+        const next = await requirementRepository.memo(selected.id, {
+          content: memoContent.trim(),
+          revision: selected.revision ?? selected.version ?? 0,
+        });
+        setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
+        setSelected(next);
+        setEvents(Array.isArray(next.events) ? next.events : []);
+        setWorkOpen(false);
+        addToast("success", "已保存为个人备忘录并归档工单");
+      } catch (error) {
+        addToast("error", "个人备忘录保存失败", error instanceof Error ? error.message : "服务未确认本次保存，请稍后重试");
+      } finally {
+        setWorkflowSubmitting(false);
+      }
     }
   };
   const transition = async (event: React.FormEvent) => {
@@ -608,6 +607,13 @@ export const RequirementPoolView: React.FC = () => {
   const fields = <div className="work-order-form grid grid-cols-1 gap-4">
     <WorkOrderInput label="工单标题 *" value={title} onChange={setTitle} placeholder="请输入工单标题，简明描述问题或诉求" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <WorkOrderSelect
+        label="所属产品线 *"
+        value={productLines.find((item) => item.id === productLineId)?.name || ""}
+        options={productLines.map((item) => item.name)}
+        placeholder={productLines.length ? "请选择所属产品线" : "暂无可用产品线"}
+        onChange={(value) => setProductLineId(productLines.find((item) => item.name === value)?.id || "")}
+      />
       <SearchSelect label="负责人 *" value={ownerName} options={employees.map((item) => item.name)} placeholder="输入负责人姓名搜索并选择" onChange={setOwnerName} />
       <SearchSelect label="关联客户" value={customerQuery} options={customers.map((item) => item.name)} placeholder="输入客户名称模糊搜索并选择" onChange={(name) => { setCustomerQuery(name); setCustomerId(customers.find((item) => item.name === name)?.id || ""); }} />
       <WorkOrderSelect label="优先级" value={requirementPriority} options={["紧急", "高", "中", "低"]} placeholder="请选择优先级" onChange={(value) => setRequirementPriority(value as RequirementTask["priority"])} />
@@ -738,11 +744,11 @@ export const RequirementPoolView: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || productLines.length === 0}
                     className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
-                    {isSubmitting ? "提交中…" : "提交工单"}
+                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品线" : "提交工单"}
                   </button>
                 </div>
               </div>
@@ -1092,15 +1098,17 @@ export const RequirementPoolView: React.FC = () => {
             <button
               type="button"
               onClick={() => setWorkOpen(false)}
-              className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]"
+              disabled={workflowSubmitting}
+              className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               取消
             </button>
             <button
               type="submit"
-              className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white"
+              disabled={workflowSubmitting}
+              className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              确认
+              {workflowSubmitting ? "处理中…" : "确认"}
             </button>
           </div>
         </form>

@@ -40,6 +40,10 @@ public class RequirementController {
     @PutMapping("/{id}") public ApiResponse<Void> update(@PathVariable String id,@RequestBody Map<String,Object>b){service.update(id,b);return ApiResponse.ok(null);}
     @PostMapping("/{id}/comments") public ApiResponse<Void> comment(@PathVariable String id,@RequestBody Map<String,Object>b){service.comment(id,b);return ApiResponse.ok(null);}
     @PostMapping("/{id}/transition") public ApiResponse<Void> transition(@PathVariable String id,@RequestBody Map<String,Object>b){service.transition(id,b);return ApiResponse.ok(null);}
+    @Operation(summary = "转派工单")
+    @PostMapping("/{id}/reassign") public ApiResponse<Map<String,Object>> reassign(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.reassign(id,b));}
+    @Operation(summary = "保存个人备忘并完成工单")
+    @PostMapping("/{id}/memo") public ApiResponse<Map<String,Object>> memo(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.memo(id,b));}
     @Operation(summary = "创建下游工作项并同步")
     @PostMapping("/{id}/work-items") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createWorkItem(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.createWorkItem(id,b));}
     @GetMapping("/work-items") public ApiResponse<List<Map<String,Object>>> workItems(@RequestParam(defaultValue="") String taskType){return ApiResponse.ok(service.workItems(taskType));}

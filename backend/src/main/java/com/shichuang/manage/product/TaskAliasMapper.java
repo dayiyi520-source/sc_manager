@@ -54,6 +54,11 @@ public class TaskAliasMapper {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
+    public Map<String,Object> activeUser(String id) {
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT id_ AS id,name_ AS name FROM t_sys_user WHERE tenant_id_=? AND id_=? AND status_='enabled' AND delete_flag_=0",RequestContext.tenantId(),id);
+        return rows.isEmpty()?null:rows.get(0);
+    }
+
     public void updateExtended(String id, Map<String,Object> body) {
         jdbc.update("""
             UPDATE t_product_work_item SET description_html_=COALESCE(?,description_html_),creator_name_=COALESCE(?,creator_name_),

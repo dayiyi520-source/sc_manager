@@ -55,6 +55,27 @@ describe('requirementRepository', () => {
     await expect(requirementRepository.transition('req-1', 'hold', '')).rejects.toMatchObject({ status: 400, code: 'VALIDATION_ERROR', message: '请输入原因' });
   });
 
+  it('posts persisted reassignment with employee id and revision', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', message: '', data: { id: 'req-1', ownerName: '张瑞', version: 3 }, requestId: 'r-reassign' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await requirementRepository.reassign('req-1', { assigneeId: 'employee-1', reason: '调整负责人', revision: 1 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/requirements/req-1/reassign');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ assigneeId: 'employee-1', reason: '调整负责人', revision: 1 });
+    expect(result.revision).toBe(3);
+  });
+
+  it('posts persisted memo content and revision', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', message: '', data: { id: 'req-1', status: '已完成', revision: 2 }, requestId: 'r-memo' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await requirementRepository.memo('req-1', { content: '无需继续处理', revision: 1 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/requirements/req-1/memo');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ content: '无需继续处理', revision: 1 });
+  });
+
   it('posts an idempotent downstream retry request', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', message: '', data: null, requestId: 'r3' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);

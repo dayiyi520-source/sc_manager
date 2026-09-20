@@ -11,7 +11,7 @@ import type { RequirementTask } from '../../types';
 
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
 vi.mock('../../services/requirementRepository', () => ({
-  requirementRepository: { employees: vi.fn(), detail: vi.fn() },
+  requirementRepository: { employees: vi.fn(), detail: vi.fn(), reassign: vi.fn(), memo: vi.fn(), createWorkItem: vi.fn() },
 }));
 vi.mock('../product/LazyRichTextEditor', () => ({
   LazyRichTextEditor: ({ size, onInput }: { size?: string; onInput: (text: string, html: string) => void }) => (
@@ -31,7 +31,7 @@ describe('workbench work-order creation layout', () => {
       requirementTasks: [],
       addRequirementTask,
       setRequirementTasks: vi.fn(),
-      productLines: [],
+      productLines: [{ id: 'line-1', name: '协同产品线' }],
       customers: [],
       biddings: [],
       opportunities: [],
@@ -52,6 +52,7 @@ describe('workbench work-order creation layout', () => {
     await openCustomerRequest();
 
     expect(screen.getByLabelText('工单标题 *')).toHaveClass('ant-input');
+    expect(screen.getByLabelText('所属产品线 *').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('负责人 *').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('优先级').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('期望完成时间').closest('.ant-picker')).not.toBeNull();
@@ -84,6 +85,8 @@ describe('workbench work-order creation layout', () => {
     await openCustomerRequest();
 
     fireEvent.change(screen.getByLabelText('工单标题 *'), { target: { value: '客户反馈工单' } });
+    fireEvent.mouseDown(screen.getByLabelText('所属产品线 *'));
+    fireEvent.click(await screen.findByText('协同产品线', { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
     fireEvent.click(await screen.findByText('陈雅婷', { selector: '.ant-select-item-option-content' }));
     fireEvent.click(screen.getByRole('button', { name: '填写工单描述' }));
@@ -111,7 +114,7 @@ describe('workbench work-order creation layout', () => {
       requirementTasks: [task],
       addRequirementTask,
       setRequirementTasks: vi.fn(),
-      productLines: [],
+      productLines: [{ id: 'line-1', name: '协同产品线' }],
       customers: [],
       biddings: [],
       opportunities: [],
@@ -145,5 +148,34 @@ describe('workbench work-order creation layout', () => {
     const firstReason = await screen.findByText('工单内容不明确', { selector: '.ant-select-item-option-content' });
     fireEvent.click(firstReason);
     expect(rejectReason.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent(firstReason.textContent || '');
+  });
+
+  it('keeps the reassignment dialog and local data when persistence fails', async () => {
+    const addToast = vi.fn();
+    const setRequirementTasks = vi.fn();
+    const task = { id: 'work-order-2', title: '转派失败工单', status: '待处理', priority: '中', ownerName: '林志豪', creatorName: '林志豪', productLineId: 'line-1', productLineName: '协同产品线', revision: 2, events: [] } as unknown as RequirementTask;
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ ...task, events: [], workItems: [] });
+    vi.mocked(requirementRepository.reassign).mockRejectedValue(new Error('工单已变化，请刷新后重试'));
+    vi.mocked(useApp).mockReturnValue({
+      requirementTasks: [task], addRequirementTask, setRequirementTasks,
+      productLines: [{ id: 'line-1', name: '协同产品线' }], customers: [], biddings: [], opportunities: [],
+      currentUser: { name: '林志豪', department: '管理部' }, addToast, openPageTab: vi.fn(), setRequirementTaskDraft: vi.fn(),
+    } as unknown as ReturnType<typeof useApp>);
+
+    render(<RequirementPoolView />);
+    fireEvent.click(screen.getByRole('tab', { name: '工单列表' }));
+    fireEvent.click(screen.getByRole('button', { name: '详情' }));
+    await waitFor(() => expect(requirementRepository.detail).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: '工单流转' }));
+    fireEvent.mouseDown(screen.getByLabelText('流转类型 *'));
+    fireEvent.click(await screen.findByText('转派给他人', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('转派给负责人 *'));
+    fireEvent.click(await screen.findByText('陈雅婷', { selector: '.ant-select-item-option-content' }));
+    fireEvent.change(screen.getByPlaceholderText('请输入转派原因及交接说明...'), { target: { value: '工作调整' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认' }));
+
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '工单转派失败', '工单已变化，请刷新后重试'));
+    expect(screen.getByLabelText('转派给负责人 *')).toBeInTheDocument();
+    expect(setRequirementTasks).not.toHaveBeenCalled();
   });
 });

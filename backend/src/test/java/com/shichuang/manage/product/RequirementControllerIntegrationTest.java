@@ -61,6 +61,54 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void reassignsRequirementWithOptimisticRevisionAndAuditEvent() throws Exception {
+        String token=loginToken(),id=createRequirement(token,"转派持久化-"+System.nanoTime());
+        String assigneeId=jdbc.queryForObject("SELECT id_ FROM t_sys_user WHERE tenant_id_='local-tenant' AND name_='张瑞' AND status_='enabled' AND delete_flag_=0 LIMIT 1",String.class);
+        int revision=jdbc.queryForObject("SELECT version_ FROM t_product_work_item WHERE id_=?",Integer.class,id);
+        String body="{\"assigneeId\":\""+assigneeId+"\",\"reason\":\"交由研发负责人跟进\",\"revision\":"+revision+"}";
+
+        mockMvc.perform(post("/api/requirements/{id}/reassign",id).header("Authorization","Bearer "+token).contentType("application/json").content(body))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.ownerName").value("张瑞")).andExpect(jsonPath("$.data.status").value("处理中"));
+
+        assertEquals("张瑞",jdbc.queryForObject("SELECT assignee_name_ FROM t_product_work_item WHERE id_=?",String.class,id));
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item_activity WHERE subject_id_=? AND event_type_='转派'",Integer.class,id));
+        mockMvc.perform(post("/api/requirements/{id}/reassign",id).header("Authorization","Bearer "+token).contentType("application/json").content(body))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void rejectsInvalidReassignmentInput() throws Exception {
+        String token=loginToken(),id=createRequirement(token,"转派校验-"+System.nanoTime());
+        int revision=jdbc.queryForObject("SELECT version_ FROM t_product_work_item WHERE id_=?",Integer.class,id);
+        mockMvc.perform(post("/api/requirements/{id}/reassign",id).header("Authorization","Bearer "+token).contentType("application/json")
+                .content("{\"assigneeId\":\"missing-user\",\"reason\":\"   \",\"revision\":"+revision+"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void persistsMemoAndCompletesRequirementThroughWorkflow() throws Exception {
+        String token=loginToken(),id=createRequirement(token,"备忘持久化-"+System.nanoTime());
+        int revision=jdbc.queryForObject("SELECT version_ FROM t_product_work_item WHERE id_=?",Integer.class,id);
+
+        mockMvc.perform(post("/api/requirements/{id}/memo",id).header("Authorization","Bearer "+token).contentType("application/json")
+                .content("{\"content\":\"已电话确认，无需继续处理\",\"revision\":"+revision+"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("已完成"));
+
+        assertEquals("已完成",jdbc.queryForObject("SELECT status_name_ FROM t_product_work_item WHERE id_=?",String.class,id));
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item_activity WHERE subject_id_=? AND event_type_='个人备忘录'",Integer.class,id));
+    }
+
+    @Test
+    void rejectsBlankMemoWithoutChangingRequirement() throws Exception {
+        String token=loginToken(),id=createRequirement(token,"备忘校验-"+System.nanoTime());
+        int revision=jdbc.queryForObject("SELECT version_ FROM t_product_work_item WHERE id_=?",Integer.class,id);
+        mockMvc.perform(post("/api/requirements/{id}/memo",id).header("Authorization","Bearer "+token).contentType("application/json")
+                .content("{\"content\":\"   \",\"revision\":"+revision+"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertEquals("待处理",jdbc.queryForObject("SELECT status_name_ FROM t_product_work_item WHERE id_=?",String.class,id));
+    }
+
+    @Test
     void isolatesCompatibilityAliasesByTenant() throws Exception {
         String token=loginToken();
         String line=jdbc.queryForObject("SELECT product_line_id_ FROM t_product_line_work_item_type WHERE tenant_id_='local-tenant' AND category_='缺陷' AND enabled_=1 AND delete_flag_=0 LIMIT 1",String.class);
