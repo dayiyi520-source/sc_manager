@@ -6,7 +6,7 @@ import { productRepository } from '../../services/productRepository';
 import { teamRepository } from '../../services/teamRepository';
 import type { TestCase, TestCaseDirectory, TestPriority, TestResultStatus } from '../../types/testManagement';
 import { TestCaseEditorDrawer } from './TestCaseEditorDrawer';
-import { employeeSelectOptions } from '../common/PersonIdentity';
+import { employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity';
 
 type TestCaseLibraryViewProps = { productLineFilter?: string };
 const RESULT_LABEL: Record<TestResultStatus, string> = { NOT_EXECUTED: '未执行', PASSED: '通过', FAILED: '失败' };
@@ -114,7 +114,7 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
           { title: '编号', dataIndex: 'code', width: 120, render: (value, row) => <button type="button" className="test-case-code test-case-code-button" title={`查看${value}`} onClick={() => openEditor(row)}>{value}</button> },
           { title: '标题', dataIndex: 'title', width: 280, ellipsis: true, render: (value, row) => <button className="test-case-title-button" title={value} onClick={() => openEditor(row)}>{value}</button> },
           { title: '创建时间', dataIndex: 'createdAt', width: 160, render: (value?: string) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-' },
-          { title: '负责人', dataIndex: 'ownerName', width: 120, ellipsis: true },
+          { title: '负责人', dataIndex: 'ownerName', width: 140, render: (value?: string) => <PersonIdentity name={value} emptyLabel="未设置" variant="list" /> },
           { title: '优先级', dataIndex: 'priority', width: 88, render: (value) => <Tag>{value}</Tag> },
           { title: '类型', dataIndex: 'workItemTypeName', width: 120, ellipsis: true },
           { title: '阶段', dataIndex: 'statusName', width: 100, render: (value) => <Tag>{value}</Tag> },

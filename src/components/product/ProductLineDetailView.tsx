@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
+import { Avatar, Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import {
@@ -492,8 +492,6 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId) && !directoryLeadIds.has(member.userId))
       .map((member) => ({ value: member.userId, label: `${member.name} · 未设置职位` })),
   ];
-  const employeesById = new Map((employeesQuery.data || []).map((employee) => [employee.id, employee]));
-
   const pendingReqsCount = Number(productLine.pendingRequirementCount ?? productLine.pendingReqCount ?? lineReqs.filter((r) => r.status !== '已转任务' && r.status !== '已转版本' && r.status !== '已拒绝').length);
   const pendingBugsCount = lineBugs.filter((b) => b.status !== '已关闭' && b.status !== '已拒绝').length;
   const pendingTasksCount = lineDevTasks.filter((t) => t.status !== '已合并上线').length;
@@ -882,7 +880,11 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <h4 className="mb-3 text-sm font-medium text-[var(--text-body)]">{group.label}</h4>
               <div className="flex flex-wrap gap-x-8 gap-y-4">
                 {group.members.map((member) => (
-                  <PersonIdentity key={member.id} name={member.name} subtitle={employeeJobTitle(employeesById.get(member.userId) || {}) || normalizeRole(member.role)} size={32} className="w-44" />
+                  <div key={member.id} className="w-28 text-center">
+                    <Avatar size={32}>{member.name.slice(0, 1)}</Avatar>
+                    <div className="mt-1 text-[10px] text-[var(--text-muted)]">{normalizeRole(member.role)}</div>
+                    <div className="mt-2 truncate text-xs text-[var(--text-body)]" title={member.name}>{member.name}</div>
+                  </div>
                 ))}
               </div>
             </section>
@@ -896,8 +898,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <div className="space-y-3">
             {activityItems.map((activity) => (
               <div key={activity.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 text-sm">
-                <PersonIdentity name={activity.operatorName || currentUser.name} size={32} />
-                <span className="text-[var(--text-body)]">{activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span>
+                <Avatar size={32}>{(activity.operatorName || currentUser.name || '系').slice(0, 1)}</Avatar>
+                <span className="text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span>
                 <span className="ml-auto text-xs text-[var(--text-muted)]">{activity.createdAt}</span>
               </div>
             ))}

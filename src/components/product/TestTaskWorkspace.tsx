@@ -9,7 +9,7 @@ import { TestExecutionResults } from './TestExecutionResults';
 import { TestPlanPanel } from './TestPlanPanel';
 import { CollapsibleDescription } from './CollapsibleDescription';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
-import { employeeSelectOptions } from '../common/PersonIdentity';
+import { employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity';
 
 const BLOCKER_LABEL: Record<string, string> = {
   REQUIRED_CHILD_INCOMPLETE: '仍有必需子任务未完成',
@@ -36,7 +36,7 @@ const TestTaskDefects: React.FC<{ workItemId: string }> = ({ workItemId }) => {
     { title: '缺陷标题', dataIndex: 'title', ellipsis: true },
     { title: '优先级', dataIndex: 'priority', width: 96, render: (value) => <Tag>{value}</Tag> },
     { title: '状态', dataIndex: 'status', width: 108 },
-    { title: '负责人', dataIndex: 'assigneeName', width: 120, render: (value) => value || '未设置' },
+    { title: '负责人', dataIndex: 'assigneeName', width: 140, render: (value) => <PersonIdentity name={value} emptyLabel="未设置" variant="list" /> },
   ]} />;
 };
 

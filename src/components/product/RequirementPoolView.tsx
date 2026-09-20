@@ -882,10 +882,10 @@ export const RequirementPoolView: React.FC = () => {
                         {item.customerName || "未关联"}
                       </td>
                       <td className="px-4 py-3 text-[var(--text-body)]">
-                        <PersonIdentity name={item.ownerName} emptyLabel="未分配" size={20} />
+                        <PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" />
                       </td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">
-                      {item.creatorName || item.ownerName}
+                      <PersonIdentity name={item.creatorName || item.ownerName} emptyLabel="未设置" variant="list" />
                     </td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">{item.createdAt || "-"}</td>
                       <td className="px-4 py-3">
@@ -973,9 +973,9 @@ export const RequirementPoolView: React.FC = () => {
               </div>
               <div>
                 <span className="text-xs text-[var(--text-muted)]">负责人</span>
-                <div className="mt-1 text-[var(--text-primary)]">
-                  <PersonIdentity name={selected.ownerName} emptyLabel="未分配" size={20} />
-                </div>
+                <p className="mt-1 text-[var(--text-primary)]">
+                  {selected.ownerName || "未分配"}
+                </p>
               </div>
               <div>
                 <span className="text-xs text-[var(--text-muted)]">提出人</span>

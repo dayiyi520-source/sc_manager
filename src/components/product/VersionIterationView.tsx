@@ -140,7 +140,7 @@ const RequirementRows: React.FC<{ items: RequirementTask[]; onOpen: (item: Requi
             <td className="px-3 py-3">
               <StatusTag status={item.status} />
             </td>
-            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" size={20} /></td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" /></td>
             <td className="px-3 py-3">
               <StatusTag status={item.priority} />
             </td>
@@ -180,7 +180,7 @@ const DevTaskRows: React.FC<{ items: DevTask[]; onOpen: (item: DevTask) => void 
             <td className="px-3 py-3">
               <StatusTag status={item.status} />
             </td>
-            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.developer} emptyLabel="未分配" size={20} /></td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.developer} emptyLabel="未分配" variant="list" /></td>
             <td className="px-3 py-3 text-[var(--text-muted)]">
               {item.spentHours || 0}/{item.estimatedHours || 0}h
             </td>
@@ -220,7 +220,7 @@ const BugRows: React.FC<{ items: DefectBug[]; onOpen: (item: DefectBug) => void 
             <td className="px-3 py-3">
               <StatusTag status={item.status} />
             </td>
-            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName || item.assignee} emptyLabel="未分配" size={20} /></td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName || item.assignee} emptyLabel="未分配" variant="list" /></td>
             <td className="px-3 py-3">
               <StatusTag status={item.severity} />
             </td>
@@ -261,7 +261,7 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; onOpen: (item: PlanningIte
               <button type="button" onClick={() => onOpen(item)} className="block max-w-full truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">{item.title}</button>
             </td>
             <td className="px-3 py-3"><StatusTag status={item.status} /></td>
-            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" size={20} /></td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" /></td>
             <td className="px-3 py-3"><StatusTag status={item.priority} /></td>
             <td className="px-3 py-3 text-[var(--text-muted)]">{item.estimatedHours} 小时</td>
             <td className="px-4 py-3 text-[var(--text-muted)]">{item.actualHours} 小时</td>
@@ -548,7 +548,7 @@ export const VersionIterationView: React.FC = () => {
                     <td className="px-3 py-3"><StatusTag status={version.status} /></td>
                     <td className="px-3 py-3 text-[var(--text-body)]">{version.startDate || '--'} ~ {version.endDate || version.releaseDate || '--'}</td>
                     <td className="max-w-48 px-3 py-3 text-[var(--text-body)]"><span className="block truncate" title={version.productLineName || '未关联产品线'}>{version.productLineName || '未关联产品线'}</span></td>
-                    <td className="px-3 py-3"><PersonIdentity name={version.ownerName} emptyLabel="未分配" size={24} /></td>
+                    <td className="px-3 py-3"><PersonIdentity name={version.ownerName} emptyLabel="未分配" variant="list" /></td>
                     <td className="px-3 py-3">
                       <div className="flex min-w-44 items-center gap-2">
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">

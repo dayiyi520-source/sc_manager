@@ -3,10 +3,10 @@ import { Avatar } from 'antd';
 import type { EmployeeOption } from '../../types';
 
 const AVATAR_TONES = [
-  'bg-[var(--accent-purple)]',
-  'bg-[var(--warning)]',
-  'bg-[var(--primary)]',
-  'bg-[var(--success)]',
+  'var(--accent-purple)',
+  'var(--warning)',
+  'var(--primary)',
+  'var(--success)',
 ] as const;
 
 const personInitial = (name?: string) => Array.from((name || '').trim())[0] || '未';
@@ -36,6 +36,7 @@ interface PersonIdentityProps {
   size?: number;
   className?: string;
   emptyLabel?: string;
+  variant?: 'default' | 'list';
 }
 
 export const PersonIdentity: React.FC<PersonIdentityProps> = ({
@@ -44,18 +45,28 @@ export const PersonIdentity: React.FC<PersonIdentityProps> = ({
   size = 24,
   className = '',
   emptyLabel = '未设置',
+  variant = 'default',
 }) => {
   const displayName = name?.trim() || emptyLabel;
+  const resolvedSize = variant === 'list' ? 24 : size;
   return (
-    <div className={`flex min-w-0 items-center gap-2 ${className}`.trim()} title={subtitle ? `${displayName} · ${subtitle}` : displayName}>
+    <div
+      className={`flex min-w-0 items-center gap-2 ${variant === 'list' ? 'h-6' : ''} ${className}`.trim()}
+      title={subtitle ? `${displayName} · ${subtitle}` : displayName}
+      data-person-variant={variant}
+    >
       <Avatar
-        size={size}
-        className={`shrink-0 ${personTone(displayName)} text-[10px] font-semibold text-white`}
+        size={resolvedSize}
+        className="shrink-0 text-[10px] font-semibold text-white"
+        style={{
+          backgroundColor: personTone(displayName),
+          fontSize: variant === 'list' ? 10 : undefined,
+        }}
       >
         {personInitial(displayName)}
       </Avatar>
       <div className="min-w-0">
-        <div className="truncate font-medium text-[var(--text-primary)]">{displayName}</div>
+        <div className={`truncate font-medium text-[var(--text-primary)] ${variant === 'list' ? 'text-xs leading-6' : ''}`.trim()}>{displayName}</div>
         {subtitle && <div className="truncate text-xs text-[var(--text-muted)]">{subtitle}</div>}
       </div>
     </div>
