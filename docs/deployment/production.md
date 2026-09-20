@@ -55,12 +55,15 @@ Rules:
 - Load deployment values from `.enterprise-app-factory/secrets/runtime.env` or existing environment variables.
 - After a deployment succeeds, update this runbook with the verified command, required preconditions, rollback notes, and last success date.
 
-Last successful deploy: 2026-09-19
+Last successful deploy: 2026-09-20
 
 Verified deployment:
 
-- Frontend, backend, complete database schema, template data, and existing local data were synchronized.
-- Production database contains 47 tables and 58 Flyway records; the latest migration is `20260919.4`.
+- Release `20260920155836` used the default application-only mode; no local business data was imported.
+- The production database contains 49 tables and 59 successful Flyway records; the latest migration is `20260920.1`.
+- The two added tables belong to version reviews. All 46 pre-existing business tables retained exactly the same row counts across the deployment.
+- The repaired `V1.0.26` history entry uses checksum `-1182548249`; no other migration history row was changed.
 - Browser navigation and refresh preserve the `/manage-admin/` prefix.
-- Existing root and `/tongren/` routes remain unchanged
-- Backup: `/opt/manage-admin/backups/20260918222947/`
+- The frontend, development-account API, backend health endpoint, service state, and Nginx configuration were verified after the switch.
+- Existing root and `/tongren/` routes remain unchanged.
+- Backup: `/opt/manage-admin/backups/20260920155836/`

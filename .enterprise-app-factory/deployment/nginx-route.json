@@ -1,4 +1,7 @@
 {
+  "schemaVersion": 1,
+  "projectId": "6d5b026d-a805-4593-9d91-299c1f7d0384",
+  "projectName": "manager_admin",
   "slug": "manage-admin",
   "frontendPath": "/manage-admin/",
   "apiPath": "/manage-admin/api/",
