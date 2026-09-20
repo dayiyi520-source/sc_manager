@@ -59,8 +59,10 @@ const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           colorTextPlaceholder: tokens.textSubtle,
           colorBgBase: tokens.bgMain,
           colorBgContainer: tokens.surface,
+          colorBgContainerDisabled: tokens.bgMain,
           colorBorder: tokens.border,
           colorBorderSecondary: tokens.borderStrong,
+          colorTextDisabled: tokens.textSubtle,
           
           // 圆角
           borderRadius: 8,
@@ -72,6 +74,16 @@ const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           padding: 16,
           paddingSM: 12,
           paddingXS: 8,
+        },
+        components: {
+          Input: {
+            hoverBorderColor: cssToken('--primary-hover', tokens.primaryHover),
+            activeBorderColor: cssToken('--primary', tokens.primary),
+            activeShadow: '0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent)',
+            errorActiveShadow: '0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent)',
+            hoverBg: tokens.surface,
+            activeBg: tokens.surface,
+          },
         },
       }}
     >

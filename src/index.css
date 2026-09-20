@@ -142,7 +142,7 @@
   .app-button-secondary:active:not(:disabled) { transform: translateY(1px); }
 
   .list-toolbar select,
-  .list-toolbar input:not(.ant-select-input):not([type='checkbox']):not([type='radio']) {
+  .list-toolbar input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input):not([type='checkbox']):not([type='radio']) {
     min-height: 32px;
     border: 1px solid var(--border-main);
     border-radius: 8px;
@@ -151,7 +151,7 @@
   }
   .list-toolbar select { padding: 0 2rem 0 0.75rem; }
 
-  .work-item-panel :where(input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='file']), select) {
+  .work-item-panel :where(input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input):not([type='checkbox']):not([type='radio']):not([type='file']), select) {
     height: 32px;
     min-height: 32px;
   }
@@ -269,7 +269,11 @@ html:not(.dark) .tech-shell table thead tr {
   border-color: var(--border-main) !important;
 }
 
-html:not(.dark) .tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])) {
+html:not(.dark) .tech-shell :where(:not(.original-okr *)):where(
+  select,
+  textarea:not(.ant-input),
+  input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
+) {
   background-color: var(--bg-card) !important;
   color: var(--text-primary) !important;
 }
@@ -304,7 +308,7 @@ html:not(.dark) .tech-sidebar {
 
 /* Task list family: keep toolbar, table rows and drawer form controls on the
  * same compact chrome as the requirement-task reference page. */
-.task-page-toolbar :where(input, select) {
+.task-page-toolbar :where(input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input), select) {
   height: 32px;
   min-height: 32px;
 }
@@ -316,10 +320,10 @@ html:not(.dark) .tech-sidebar {
 .task-page-table :where(tbody td) {
   vertical-align: middle;
 }
-.task-page [data-work-item-form] :where(input, textarea, select) {
+.task-page [data-work-item-form] :where(input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input), textarea:not(.ant-input), select) {
   min-height: 32px;
 }
-.task-page .work-item-panel :where(input:not(.ant-select-input):not([type='checkbox']):not([type='file']), textarea, select) {
+.task-page .work-item-panel :where(input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input):not([type='checkbox']):not([type='file']), textarea:not(.ant-input), select) {
   min-height: 40px;
 }
 .task-page .work-item-panel .requirement-hours-input.ant-input-number {
@@ -506,12 +510,12 @@ html:not(.dark) .tech-main .fixed.inset-0 [class*="text-[#A5ADBA]"] {
 html:not(.dark) .tech-main .fixed.inset-0 [class*="text-[#7C8796]"] {
   color: var(--text-muted) !important;
 }
-html:not(.dark) .tech-main .fixed.inset-0 :where(input:not(.ant-select-input), select, textarea)[class] {
+html:not(.dark) .tech-main .fixed.inset-0 :where(input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input), select, textarea:not(.ant-input))[class] {
   background: var(--bg-card) !important;
   color: var(--text-primary) !important;
   border-color: var(--border-main) !important;
 }
-html:not(.dark) .tech-main .fixed.inset-0 :where(input:not(.ant-select-input), select, textarea)[class]:focus {
+html:not(.dark) .tech-main .fixed.inset-0 :where(input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input), select, textarea:not(.ant-input))[class]:focus {
   border-color: var(--primary) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 18%, transparent);
 }
@@ -911,8 +915,8 @@ html:not(.dark) .tech-shell .work-item-panel {
  * classes, while every interactive field shares the same visual states. */
 .tech-shell :where(:not(.original-okr *)):where(
   select,
-  textarea,
-  input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
+  textarea:not(.ant-input),
+  input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
 ) {
   border-color: var(--border-main) !important;
   border-radius: 8px !important;
@@ -923,7 +927,7 @@ html:not(.dark) .tech-shell .work-item-panel {
 
 .tech-shell :where(:not(.original-okr *)):where(
   select,
-  input:not(.ant-select-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
+  input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden'])
 ) {
   min-height: 32px;
   height: 32px !important;
@@ -954,29 +958,29 @@ html:not(.dark) .tech-shell .work-item-panel {
   padding-bottom: 8px !important;
 }
 
-.tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input)):hover:not(:disabled) {
+.tech-shell :where(:not(.original-okr *)):where(select, textarea:not(.ant-input), input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input)):hover:not(:disabled) {
   border-color: var(--border-subtle) !important;
 }
 
-.tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input)):focus-visible {
+.tech-shell :where(:not(.original-okr *)):where(select, textarea:not(.ant-input), input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input)):focus-visible {
   border-color: var(--primary-hover) !important;
   outline: none !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent) !important;
 }
 
-.tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input)):disabled {
+.tech-shell :where(:not(.original-okr *)):where(select, textarea:not(.ant-input), input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input)):disabled {
   cursor: not-allowed;
   background-color: var(--bg-main) !important;
   color: var(--text-muted) !important;
   opacity: 0.7;
 }
 
-.tech-shell :where(:not(.original-okr *)):where(select, textarea, input:not(.ant-select-input))[aria-invalid='true'] {
+.tech-shell :where(:not(.original-okr *)):where(select, textarea:not(.ant-input), input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input))[aria-invalid='true'] {
   border-color: var(--danger) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent) !important;
 }
 
-.tech-shell :where(:not(.original-okr *)):where(input:not(.ant-select-input), textarea)::placeholder {
+.tech-shell :where(:not(.original-okr *)):where(input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input), textarea:not(.ant-input))::placeholder {
   color: var(--text-muted) !important;
   opacity: 1;
 }

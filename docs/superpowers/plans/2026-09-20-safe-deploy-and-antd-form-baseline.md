@@ -52,8 +52,8 @@
 - [x] Upload and require `database.sql.gz` only in replacement mode.
 - [x] Always back up the remote database, but only drop/import it in replacement mode.
 - [x] Document default deployment, explicit replacement, rollback, and data preservation acceptance.
-- [ ] Run the deployment contract test and PRD validator.
-- [ ] Commit the deployment safety change.
+- [x] Run the deployment contract test and PRD validator.
+- [x] Commit the deployment safety change.
 
 ### Task 3: Repair And Verify The Test Server
 
@@ -63,13 +63,13 @@
 - Consumes: the server environment at `/opt/manage-admin/backend/.env`.
 - Produces: a validated Flyway history and a code-only release on `103.236.98.125`.
 
-- [ ] Run deployment preparation and remote database preflight.
-- [ ] Verify `V1.0.26` still has checksum `2000797143` and the retired legacy tables are absent.
-- [ ] Update only that successful history row to checksum `-1182548249` and verify exactly one row changed.
-- [ ] Record table and selected business-row counts before deployment.
-- [ ] Run the canonical deployment script without `--replace-database`.
-- [ ] Verify health, public routes, Flyway `20260920.1`, and unchanged pre-existing business-row counts.
-- [ ] Update the deployment runbook with the verified date and release evidence.
+- [x] Run deployment preparation and remote database preflight.
+- [x] Verify `V1.0.26` still has checksum `2000797143` and the retired legacy tables are absent.
+- [x] Update only that successful history row to checksum `-1182548249` and verify exactly one row changed.
+- [x] Record table and selected business-row counts before deployment.
+- [x] Run the canonical deployment script without `--replace-database`.
+- [x] Verify health, public routes, Flyway `20260920.1`, and unchanged pre-existing business-row counts.
+- [x] Update the deployment runbook with the verified date and release evidence.
 - [ ] Commit and push the verified runbook.
 
 ### Task 4: Restore Ant Design Form Ownership
@@ -86,12 +86,12 @@
 - Consumes: AIEDIT design tokens and Ant Design component tokens.
 - Produces: consistent native-control compatibility and Ant Design-owned component states.
 
-- [ ] Add failing contract assertions that global native selectors exclude `.ant-input` and Ant internal inputs.
-- [ ] Narrow light and global native selectors without removing legacy control styling.
-- [ ] Configure Input component hover, active, error, and disabled tokens in `ConfigProvider`.
-- [ ] Remove redundant Ant Input state overrides while retaining intentional dimensions.
-- [ ] Run focused theme tests, TypeScript validation, and production build.
-- [ ] Validate the PRD and commit the UI baseline change.
+- [x] Add failing contract assertions that global native selectors exclude `.ant-input` and Ant internal inputs.
+- [x] Narrow light and global native selectors without removing legacy control styling.
+- [x] Configure Input component hover, active, error, and disabled tokens in `ConfigProvider`.
+- [x] Remove redundant Ant Input state overrides while retaining intentional dimensions.
+- [x] Run focused theme tests, TypeScript validation, and production build.
+- [x] Validate the PRD and commit the UI baseline change.
 
 ### Task 5: Browser Regression And Final Publish
 
@@ -101,7 +101,7 @@
 - Consumes: local frontend `3011` and backend `8080`.
 - Produces: verified 1920x1080 behavior and a synchronized GitHub branch.
 
-- [ ] Set and verify the browser viewport at exactly 1920x1080.
-- [ ] Check product management, My Work, OKR/performance, and assistance fields in normal, hover/focus, disabled, and error states.
-- [ ] Confirm no text overlap, clipped focus ring, or double border.
+- [x] Set and verify the browser viewport at exactly 1920x1080.
+- [x] Check product management, My Work, OKR/performance, and assistance fields in normal, hover/focus, disabled, and error states.
+- [x] Confirm no text overlap, clipped focus ring, or double border.
 - [ ] Push the final commits to `github/shichuang-admin` and verify zero commit divergence.
