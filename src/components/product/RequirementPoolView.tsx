@@ -42,6 +42,7 @@ import { requirementRepository } from "../../services/requirementRepository";
 import { RequirementActionButtons } from "./RequirementActionButtons";
 import { WorkflowAssigneeSelect } from "./WorkflowAssigneeSelect";
 import { LazyRichTextEditor as RichTextEditor } from "./LazyRichTextEditor";
+import { employeeSelectOptions, PersonIdentity } from "../common/PersonIdentity";
 import type {
   EmployeeOption,
   RequirementEvent,
@@ -579,8 +580,8 @@ export const RequirementPoolView: React.FC = () => {
               showSearch
               value={ownerName ? [ownerName] : undefined}
               onChange={(value) => setOwnerName(value?.[0] || '')}
-              options={employees.map((item) => ({ label: item.name, value: item.name }))}
-              placeholder="输入负责人姓名搜索并选择"
+              options={employeeSelectOptions(employees, 'name')}
+              placeholder="搜索姓名或职位"
               className="w-full"
             />
           </div>
@@ -881,7 +882,7 @@ export const RequirementPoolView: React.FC = () => {
                         {item.customerName || "未关联"}
                       </td>
                       <td className="px-4 py-3 text-[var(--text-body)]">
-                        {item.ownerName || "未分配"}
+                        <PersonIdentity name={item.ownerName} emptyLabel="未分配" size={20} />
                       </td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">
                       {item.creatorName || item.ownerName}
@@ -972,9 +973,9 @@ export const RequirementPoolView: React.FC = () => {
               </div>
               <div>
                 <span className="text-xs text-[var(--text-muted)]">负责人</span>
-                <p className="mt-1 text-[var(--text-primary)]">
-                  {selected.ownerName || "未分配"}
-                </p>
+                <div className="mt-1 text-[var(--text-primary)]">
+                  <PersonIdentity name={selected.ownerName} emptyLabel="未分配" size={20} />
+                </div>
               </div>
               <div>
                 <span className="text-xs text-[var(--text-muted)]">提出人</span>
@@ -1107,8 +1108,8 @@ export const RequirementPoolView: React.FC = () => {
                   <WorkflowAssigneeSelect
                     label="任务负责人 *"
                     value={t.assignee}
-                    options={employees.map((item) => item.name)}
-                    placeholder="输入负责人姓名搜索并选择"
+                    options={employees}
+                    placeholder="搜索姓名或职位"
                     onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))}
                   />
                   </div>
@@ -1131,7 +1132,7 @@ export const RequirementPoolView: React.FC = () => {
 
           {workflowAction === "reassign" && (
             <>
-              <WorkflowAssigneeSelect label="转派给负责人 *" value={reassignAssignee} options={employees.map((item) => item.name)} placeholder="输入新负责人姓名搜索并选择" onChange={setReassignAssignee} />
+              <WorkflowAssigneeSelect label="转派给负责人 *" value={reassignAssignee} options={employees} placeholder="搜索姓名或职位" onChange={setReassignAssignee} />
               <label className="block text-xs text-[var(--text-muted)]">
                 转派原因说明 *
                 <textarea

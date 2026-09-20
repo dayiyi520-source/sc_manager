@@ -1,11 +1,13 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { EmployeeOption } from '../../types';
+import { formatEmployeeOptionLabel } from '../common/PersonIdentity';
 import './WorkflowAssigneeSelect.css';
 
 type Props = {
   label: string;
   value: string;
-  options: string[];
+  options: Array<string | EmployeeOption>;
   placeholder?: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -19,7 +21,12 @@ export function WorkflowAssigneeSelect({ label, value, options, placeholder, onC
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const query = value.trim().toLocaleLowerCase();
-  const filtered = Array.from(new Set(options)).filter(option => option.toLocaleLowerCase().includes(query)).slice(0, 8);
+  const normalizedOptions = Array.from(new Map(options.map((option) => {
+    const name = typeof option === 'string' ? option : option.name;
+    const label = typeof option === 'string' ? option : formatEmployeeOptionLabel(option);
+    return [name, { name, label }];
+  })).values());
+  const filtered = normalizedOptions.filter(option => option.label.toLocaleLowerCase().includes(query)).slice(0, 8);
   const supportsFloating = typeof HTMLElement !== 'undefined'
     && typeof HTMLElement.prototype.showPopover === 'function'
     && typeof CSS !== 'undefined' && CSS.supports('position-anchor', '--owner');
@@ -42,13 +49,13 @@ export function WorkflowAssigneeSelect({ label, value, options, placeholder, onC
   }, [expanded]);
 
   const openMenu = () => { setActiveIndex(-1); setOpen(true); };
-  const selectOption = (option: string) => { onChange(option); setOpen(false); setActiveIndex(-1); };
+  const selectOption = (option: { name: string }) => { onChange(option.name); setOpen(false); setActiveIndex(-1); };
   const fieldClass = 'mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors hover:border-[var(--border-subtle)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-50';
 
   if (!supportsFloating) return <label className="block text-xs text-[var(--text-muted)]">{label}
     <select value={value} disabled={disabled} onChange={event => onChange(event.target.value)} className={fieldClass}>
       <option value="">{placeholder || '请选择负责人'}</option>
-      {Array.from(new Set(options)).map(option => <option key={option} value={option}>{option}</option>)}
+      {normalizedOptions.map(option => <option key={option.name} value={option.name}>{option.label}</option>)}
     </select>
   </label>;
 
@@ -102,15 +109,15 @@ export function WorkflowAssigneeSelect({ label, value, options, placeholder, onC
         onMouseDown={event => event.preventDefault()}
       >
         {filtered.length ? filtered.map((option, index) => <button
-          key={option}
+          key={option.name}
           id={`${id}-option-${index}`}
           type="button"
           role="option"
-          aria-selected={value === option}
+          aria-selected={value === option.name}
           tabIndex={-1}
           onClick={() => selectOption(option)}
           className={`block w-full break-words px-3 py-2 text-left transition-colors hover:bg-[var(--bg-surface-soft)] active:bg-[var(--bg-card)] ${activeIndex === index ? 'bg-[var(--bg-surface-soft)]' : ''}`}
-        >{option}</button>) : <p role="status" className="px-3 py-2 text-[var(--text-muted)]">暂无匹配负责人</p>}
+        >{option.label}</button>) : <p role="status" className="px-3 py-2 text-[var(--text-muted)]">暂无匹配负责人</p>}
       </div>, document.body,
     )}
   </>;

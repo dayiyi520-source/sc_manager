@@ -4,6 +4,7 @@ import { CopyOutlined, DeleteOutlined, FolderOpenOutlined, PlusOutlined } from '
 import { useQuery } from '@tanstack/react-query';
 import { productRepository } from '../../services/productRepository';
 import { teamRepository } from '../../services/teamRepository';
+import { employeeSelectOptions } from '../common/PersonIdentity';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import type { SaveTestCaseInput, TestCase, TestCaseDirectory, TestPriority } from '../../types/testManagement';
@@ -154,7 +155,7 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
     <Form.Item name="sourceRequirementId" hidden><Input /></Form.Item>
     <WorkItemCreatePanel isOpen={open} onClose={onClose} title={initialCase ? `编辑用例 ${initialCase.code}` : '新建用例'} presentation="workspace" showContinueOption={!initialCase} continueChecked={continueCreating} onContinueCheckedChange={setContinueCreating} footer={<><Button onClick={onClose} disabled={saving}>取消</Button><Button type="primary" onClick={() => void submit()} loading={saving} disabled={!productLineId}>{initialCase ? '保存' : '新建'}</Button></>} properties={<aside className="test-case-properties">
       <h3>用例属性</h3>
-      <Form.Item name="ownerId" label="负责人" rules={[{ required: true, message: '请选择负责人' }]}><Select showSearch loading={employees.isLoading} optionFilterProp="label" options={(employees.data || []).map((employee) => ({ label: `${employee.name} · ${employee.department || '未分配部门'}`, value: employee.id }))} placeholder="搜索并选择负责人" /></Form.Item>
+      <Form.Item name="ownerId" label="负责人" rules={[{ required: true, message: '请选择负责人' }]}><Select showSearch loading={employees.isLoading} optionFilterProp="label" options={employeeSelectOptions(employees.data || [])} placeholder="搜索并选择负责人" /></Form.Item>
       <Form.Item name="workItemTypeId" label="用例类型" rules={[{ required: true, message: '请选择用例类型' }]}><Select showSearch optionFilterProp="label" loading={caseTypes.isLoading} status={caseTypes.isError ? 'error' : undefined} options={(caseTypes.data || []).filter((type) => type.enabled).map((type) => ({ label: type.name, value: type.id }))} placeholder="请选择用例类型" /></Form.Item>
       <Form.Item name="statusKey" label="用例阶段" rules={[{ required: true, message: '请选择用例阶段' }]}><Select loading={workflows.isLoading} status={workflows.isError ? 'error' : undefined} options={availableStates.map((state) => ({ label: state.name, value: state.key }))} placeholder="请选择用例阶段" /></Form.Item>
       <Form.Item name="priority" label="优先级" rules={[{ required: true, message: '请选择优先级' }]}><Select allowClear options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>

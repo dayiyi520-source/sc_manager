@@ -7,6 +7,7 @@ import { productRepository } from '../../services/productRepository';
 import { teamRepository } from '../../services/teamRepository';
 import type { SaveVersionReviewInput, VersionReviewConclusion } from '../../types/versionReview';
 import { ProductVersionScope } from './ProductVersionScope';
+import { employeeSelectOptions } from '../common/PersonIdentity';
 
 type FormValues = {
   reviewDate?: Dayjs;
@@ -74,7 +75,7 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
     finally { setSaving(false); }
   };
   const startCreate = () => { setSelectedId(''); setCreating(true); setActionError(''); form.resetFields(); form.setFieldsValue({ participantIds: [] }); };
-  const employeeOptions = useMemo(() => (employees.data || []).map((item) => ({ value: item.id, label: `${item.name} · ${item.department || '未分配部门'}` })), [employees.data]);
+  const employeeOptions = useMemo(() => employeeSelectOptions(employees.data || []), [employees.data]);
 
   return <div className="space-y-4">
     <ProductVersionScope productLineFilter={productLineFilter} productLineId={lineId} versionId={versionId} onProductLineChange={changeLine} onVersionChange={changeVersion} />

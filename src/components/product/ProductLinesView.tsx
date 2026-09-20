@@ -17,6 +17,7 @@ import { ProductLine } from '../../types';
 import { ProductLineDetailView, type ProductLineSettingsSection } from './ProductLineDetailView';
 import { teamRepository } from '../../services/teamRepository';
 import { normalizeProductWebsiteUrl } from './productWebsite';
+import { employeeSelectOptions } from '../common/PersonIdentity';
 
 export { normalizeProductWebsiteUrl } from './productWebsite';
 
@@ -157,10 +158,7 @@ export const ProductLinesView: React.FC = () => {
     };
   };
 
-  const ownerOptions = (employeeOptionsQuery.data || []).map((employee) => ({
-    value: employee.id,
-    label: `${employee.name} · ${employee.department || '未分配部门'}${employee.roleTitle ? ` · ${employee.roleTitle}` : ''}`,
-  }));
+  const ownerOptions = employeeSelectOptions(employeeOptionsQuery.data || []);
   const openLineTaskPage = (line: ProductLine, menuId: string) => {
     sessionStorage.setItem('shichuang.productLineFilter', line.id);
     openPageTab(menuId);

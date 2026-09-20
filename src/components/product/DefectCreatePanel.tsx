@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button, Form, Input, Select } from 'antd';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
+import type { EmployeeOption } from '../../types';
+import { employeeSelectOptions } from '../common/PersonIdentity';
 
 export type DefectCreateValues = {
   title: string;
@@ -20,6 +22,7 @@ type DefectCreatePanelProps = {
   versionName?: string;
   requirementTitle?: string;
   employeeNames: string[];
+  employeeOptions: EmployeeOption[];
   initialTitle?: string;
   initialDescription?: string;
   saving?: boolean;
@@ -27,7 +30,7 @@ type DefectCreatePanelProps = {
   onSubmit: (values: DefectCreateValues) => Promise<void> | void;
 };
 
-export const DefectCreatePanel: React.FC<DefectCreatePanelProps> = ({ open, productLineName, versionName, requirementTitle, employeeNames, initialTitle = '', initialDescription = '', saving, onClose, onSubmit }) => {
+export const DefectCreatePanel: React.FC<DefectCreatePanelProps> = ({ open, productLineName, versionName, requirementTitle, employeeNames, employeeOptions, initialTitle = '', initialDescription = '', saving, onClose, onSubmit }) => {
   const [form] = Form.useForm<Omit<DefectCreateValues, 'description' | 'descriptionHtml'>>();
   const [description, setDescription] = useState(initialDescription);
   const [descriptionHtml, setDescriptionHtml] = useState('');
@@ -57,7 +60,7 @@ export const DefectCreatePanel: React.FC<DefectCreatePanelProps> = ({ open, prod
       <Form.Item name="severity" label="严重程度" rules={[{ required: true }]}><Select options={['致命阻断', '严重缺陷', '一般问题', '轻微优化'].map((value) => ({ value, label: value }))} /></Form.Item>
       <Form.Item name="priority" label="优先级" rules={[{ required: true }]}><Select options={['紧急', '高', '中', '低'].map((value) => ({ value, label: value }))} /></Form.Item>
       <Form.Item name="type" label="缺陷类型"><Select options={['功能缺陷', '性能缺陷', 'UI交互', '安全漏洞', '环境配置'].map((value) => ({ value, label: value }))} /></Form.Item>
-      <Form.Item name="assignee" label="责任处理人" rules={[{ required: true, message: '请选择责任处理人' }]}><Select showSearch optionFilterProp="label" options={employeeNames.map((value) => ({ value, label: value }))} /></Form.Item>
+      <Form.Item name="assignee" label="责任处理人" rules={[{ required: true, message: '请选择责任处理人' }]}><Select showSearch optionFilterProp="label" options={employeeSelectOptions(employeeOptions, 'name')} /></Form.Item>
       <Form.Item label="关联需求"><Input value={requirementTitle || '未关联'} disabled /></Form.Item>
       <Form.Item name="env" label="所属环境"><Input maxLength={120} /></Form.Item>
     </Form>}

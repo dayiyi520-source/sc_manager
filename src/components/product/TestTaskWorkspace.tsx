@@ -9,6 +9,7 @@ import { TestExecutionResults } from './TestExecutionResults';
 import { TestPlanPanel } from './TestPlanPanel';
 import { CollapsibleDescription } from './CollapsibleDescription';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
+import { employeeSelectOptions } from '../common/PersonIdentity';
 
 const BLOCKER_LABEL: Record<string, string> = {
   REQUIRED_CHILD_INCOMPLETE: '仍有必需子任务未完成',
@@ -39,7 +40,7 @@ const TestTaskDefects: React.FC<{ workItemId: string }> = ({ workItemId }) => {
   ]} />;
 };
 
-const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, editing, onUpdate, employeeNames, versions, statusControl }) => {
+const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, editing, onUpdate, employeeNames, employeeOptions, versions, statusControl }) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || '');
@@ -54,7 +55,7 @@ const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, editing, onUpda
   const lineVersions = versions.filter((version) => !version.productLineName || version.productLineName === task.productLineName);
   const basicInfo = <div className="test-task-basic-info">
     <div className="test-task-basic-grid">
-      <label><span>负责人</span><Select disabled={!editing} showSearch optionFilterProp="label" value={task.ownerName || undefined} options={employeeNames.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => onUpdate({ ownerName })} placeholder="未设置" /></label>
+      <label><span>负责人</span><Select disabled={!editing} showSearch optionFilterProp="label" value={task.ownerName || undefined} options={employeeSelectOptions(employeeOptions, 'name')} onChange={(ownerName) => onUpdate({ ownerName })} placeholder="未设置" /></label>
       <label><span>状态</span><div>{statusControl}</div></label>
       <label><span>优先级</span><Select disabled={!editing} value={task.priority || undefined} options={['P0', 'P1', 'P2', 'P3'].map((value) => ({ value, label: value }))} onChange={(priority) => onUpdate({ priority })} placeholder="未设置" /></label>
       <label><span>迭代版本</span><Select disabled={!editing} allowClear showSearch optionFilterProp="label" value={task.versionId || undefined} options={lineVersions.map((version) => ({ label: version.name, value: version.id }))} onChange={(versionId) => onUpdate({ versionId, versionName: lineVersions.find((version) => version.id === versionId)?.name || '' })} placeholder="未设置" /></label>
@@ -67,7 +68,7 @@ const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, editing, onUpda
   </div>;
   return <div className="test-task-detail-page"><header className="test-task-detail-header">{editing ? <Input className="test-task-detail-title-input" value={title} onChange={(event) => setTitle(event.target.value)} onBlur={() => { const nextTitle = title.trim(); if (nextTitle && nextTitle !== task.title) onUpdate({ title: nextTitle }); else setTitle(task.title); }} /> : <h2 className="test-task-detail-title">{task.title}</h2>}<div className="test-task-detail-meta"><span>所属需求：{requirementLabel}</span><i /> <span>产品线/版本号：{task.productLineName || '未设置'} / {task.versionName || '未设置'}</span><i /> <span>负责人：{task.ownerName || '未设置'}</span></div></header><Tabs className="test-task-detail-tabs" items={[
     { key: 'basic', label: '基本信息', children: basicInfo },
-    { key: 'plan', label: '测试计划', children: <TestPlanPanel task={task} workItemId={task.id} productLineId={task.productLineId || ''} sourceRequirementId={task.requirementId} employeeNames={employeeNames} onExecutionCreated={() => setRefreshKey((value) => value + 1)} /> },
+    { key: 'plan', label: '测试计划', children: <TestPlanPanel task={task} workItemId={task.id} productLineId={task.productLineId || ''} sourceRequirementId={task.requirementId} employeeNames={employeeNames} employeeOptions={employeeOptions} onExecutionCreated={() => setRefreshKey((value) => value + 1)} /> },
     { key: 'executions', label: '执行记录', children: <TestExecutionResults workItemId={task.id} productLineId={task.productLineId || ''} refreshKey={refreshKey} /> },
     { key: 'defects', label: '关联缺陷', children: <TestTaskDefects workItemId={task.id} /> },
   ]} /></div>;

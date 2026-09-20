@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Avatar, Button, Checkbox, Input, Select, Spin } from 'antd';
+import { Alert, Button, Checkbox, Input, Select, Spin } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Users } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { teamRepository } from '../../services/teamRepository';
 import type { ProductLine, ProductLineMember } from '../../types';
+import { employeeJobTitle, PersonIdentity } from '../common/PersonIdentity';
 
 interface ManageMembersModalProps {
   isOpen: boolean;
@@ -27,7 +28,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ isOpen, 
   const existingUserIds = useMemo(() => new Set(existingMembers.map((member) => member.userId).filter(Boolean)), [existingMembers]);
   const visibleEmployees = useMemo(() => (employeesQuery.data || []).filter((employee) => {
     const query = keyword.trim().toLowerCase();
-    return !query || [employee.name, employee.department || '', employee.roleTitle || ''].some((value) => value.toLowerCase().includes(query));
+    return !query || [employee.name, employee.department || '', employeeJobTitle(employee)].some((value) => value.toLowerCase().includes(query));
   }), [employeesQuery.data, keyword]);
 
   useEffect(() => {
@@ -80,8 +81,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ isOpen, 
             const selected = selectedUserIds.includes(employee.id);
             return <label key={employee.id} className={`flex items-center gap-3 rounded-md px-3 py-2 transition-colors ${alreadyMember ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-[var(--bg-elevated)]'}`}>
               <Checkbox disabled={alreadyMember} checked={alreadyMember || selected} onChange={() => setSelectedUserIds((previous) => selected ? previous.filter((id) => id !== employee.id) : [...previous, employee.id])} />
-              <Avatar size={32}>{employee.name.slice(0, 1)}</Avatar>
-              <div className="min-w-0"><div className="truncate text-sm font-medium text-[var(--text-primary)]">{employee.name}</div><div className="truncate text-[11px] text-[var(--text-muted)]">{employee.department || '未分配部门'}{employee.roleTitle ? ` · ${employee.roleTitle}` : ''}</div></div>
+              <PersonIdentity name={employee.name} subtitle={employeeJobTitle(employee) || '未设置职位'} size={32} />
             </label>;
           })}
           {!visibleEmployees.length && !employeesQuery.isError && <div className="py-8 text-center text-[var(--text-muted)]">暂无匹配的有效员工</div>}

@@ -52,6 +52,7 @@ import { sanitizeHtml } from "../../utils/sanitizeHtml";
 import { getRejectReasonsForType } from "../../constants/rejectReasons";
 import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
 import { DateField } from "../common";
+import { employeeSelectOptions } from "../common/PersonIdentity";
 
 const statuses: RequirementTask["status"][] = [
   "待处理",
@@ -127,6 +128,24 @@ const SearchSelect: React.FC<{ label: string; value: string; options: string[]; 
       showSearch
       optionFilterProp="label"
       options={toSelectOptions(options)}
+      placeholder={placeholder}
+      size="middle"
+      value={value || undefined}
+      onChange={(nextValue) => onChange(nextValue ?? "")}
+    />
+  </label>
+);
+
+const EmployeeSearchSelect: React.FC<{ label: string; value: string; employees: EmployeeOption[]; placeholder?: string; onChange: (value: string) => void }> = ({ label, value, employees, placeholder, onChange }) => (
+  <label className="work-order-field text-xs text-[var(--text-muted)]">
+    {label}
+    <Select
+      aria-label={label}
+      allowClear
+      className="w-full"
+      showSearch
+      optionFilterProp="label"
+      options={employeeSelectOptions(employees, 'name')}
       placeholder={placeholder}
       size="middle"
       value={value || undefined}
@@ -614,7 +633,7 @@ export const RequirementPoolView: React.FC = () => {
         placeholder={productLines.length ? "请选择所属产品线" : "暂无可用产品线"}
         onChange={(value) => setProductLineId(productLines.find((item) => item.name === value)?.id || "")}
       />
-      <SearchSelect label="负责人 *" value={ownerName} options={employees.map((item) => item.name)} placeholder="输入负责人姓名搜索并选择" onChange={setOwnerName} />
+      <EmployeeSearchSelect label="负责人 *" value={ownerName} employees={employees} placeholder="搜索姓名或职位" onChange={setOwnerName} />
       <SearchSelect label="关联客户" value={customerQuery} options={customers.map((item) => item.name)} placeholder="输入客户名称模糊搜索并选择" onChange={(name) => { setCustomerQuery(name); setCustomerId(customers.find((item) => item.name === name)?.id || ""); }} />
       <WorkOrderSelect label="优先级" value={requirementPriority} options={["紧急", "高", "中", "低"]} placeholder="请选择优先级" onChange={(value) => setRequirementPriority(value as RequirementTask["priority"])} />
       <DateField label="期望完成时间" value={dueDate} onChange={setDueDate} />
@@ -1044,7 +1063,7 @@ export const RequirementPoolView: React.FC = () => {
                     />
                   </label>
                   <div className="min-w-0 lg:col-span-3 [&>label]:block">
-                  <SearchSelect label="任务负责人 *" value={t.assignee} options={employees.map((item) => item.name)} placeholder="输入负责人姓名搜索并选择" onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))} />
+                  <EmployeeSearchSelect label="任务负责人 *" value={t.assignee} employees={employees} placeholder="搜索姓名或职位" onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))} />
                   </div>
                   <div className="min-w-0 lg:col-span-2"><DateField label="期望完成时间" value={t.expectedDueDate} onChange={(value) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, expectedDueDate: value } : item))} /></div>
                   <label className="work-order-dialog-field block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-4">
@@ -1064,7 +1083,7 @@ export const RequirementPoolView: React.FC = () => {
 
           {workflowAction === "reassign" && (
             <>
-              <SearchSelect label="转派给负责人 *" value={reassignAssignee} options={employees.map((item) => item.name)} placeholder="输入新负责人姓名搜索并选择" onChange={setReassignAssignee} />
+              <EmployeeSearchSelect label="转派给负责人 *" value={reassignAssignee} employees={employees} placeholder="搜索姓名或职位" onChange={setReassignAssignee} />
               <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
                 转派原因说明 *
                 <Input.TextArea

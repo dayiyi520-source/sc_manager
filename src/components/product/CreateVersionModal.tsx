@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Cascader, DatePicker, Input, Select } from 'antd';
 import dayjs from 'dayjs';
+import { useQuery } from '@tanstack/react-query';
 import { Calendar, Check, Clock, FileText, Layers } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { ProductLine, VersionIteration } from '../../types';
+import { teamRepository } from '../../services/teamRepository';
+import { employeeSelectOptions } from '../common/PersonIdentity';
 
 interface CreateVersionModalProps {
   isOpen: boolean;
@@ -37,6 +40,7 @@ export const shouldClearEndDate = (nextStartDate: string, endDate: string) => Bo
 
 export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, onClose, productLine, editingVersion = null, onSuccess }) => {
   const { addVersion, updateVersion, addToast, productLines } = useApp();
+  const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: isOpen, retry: false });
   const [selectedProductLineId, setSelectedProductLineId] = useState(productLine?.id || '');
   const [versionName, setVersionName] = useState(editingVersion?.name || '');
   const [versionCode, setVersionCode] = useState(editingVersion?.code || '');
@@ -104,6 +108,13 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
     activeProductLine?.ownerName, activeProductLine?.owner, activeProductLine?.requirementOwner, activeProductLine?.techOwner, activeProductLine?.testOwner,
     ...(activeProductLine?.members || []).map((member) => typeof member === 'string' ? member : member.name)
   ].filter(Boolean) as string[]));
+  const availableEmployeeNames = new Set(people);
+  const employeeOptions = employeeSelectOptions((employeesQuery.data || []).filter((employee) => availableEmployeeNames.has(employee.name)), 'name');
+  const employeeOptionNames = new Set(employeeOptions.map((option) => option.value));
+  const versionOwnerOptions = [
+    ...employeeOptions,
+    ...people.filter((name) => !employeeOptionNames.has(name)).map((name) => ({ value: name, label: `${name} · 未设置职位` })),
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
@@ -136,7 +147,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
         </div>
         <form id="create-version-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="md:col-span-2"><label className="block font-semibold text-[var(--text-body)] mb-1.5">版本名称 <span className="text-red-400">*</span></label><Input required value={versionName} onChange={(event) => setVersionName(event.target.value)} placeholder="请输入版本名称" /></div><div><label className="block font-semibold text-[var(--text-body)] mb-1.5">版本号 (Version Code) <span className="text-red-400">*</span></label><Input required value={versionCode} onChange={(event) => setVersionCode(event.target.value)} placeholder="请输入版本号" /></div></div>
-          <div><label className="block font-semibold text-[var(--text-body)] mb-1.5">版本负责人 <span className="text-red-400">*</span></label><Select showSearch allowClear value={versionOwner || undefined} onChange={(value) => setVersionOwner(value || '')} options={people.map((name) => ({ value: name, label: name }))} optionFilterProp="label" placeholder="请选择版本负责人" className="w-full" /></div>
+          <div><label className="block font-semibold text-[var(--text-body)] mb-1.5">版本负责人 <span className="text-red-400">*</span></label><Select showSearch allowClear value={versionOwner || undefined} onChange={(value) => setVersionOwner(value || '')} options={versionOwnerOptions} optionFilterProp="label" placeholder="搜索姓名或职位" className="w-full" /></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-[var(--primary)]" />预计开始时间</label><DatePicker value={startDate ? dayjs(startDate) : null} onChange={handleStartDateChange} className="w-full" placeholder="请选择日期" /></div><div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" />预计结束时间</label><DatePicker value={endDate ? dayjs(endDate) : null} onChange={(value) => setEndDate(value?.format('YYYY-MM-DD') || '')} disabledDate={(current) => isEndDateDisabled(current, startDate)} className="w-full" placeholder="请选择日期" /></div></div>
           <div><label className="block font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-[var(--active-text)]" />版本内容 / 发版说明范围</label><Input.TextArea rows={12} value={content} onChange={(event) => setContent(event.target.value)} placeholder={VERSION_RELEASE_NOTES_PLACEHOLDER} /></div>
         </form>

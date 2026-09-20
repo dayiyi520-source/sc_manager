@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Avatar, Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
+import { Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import {
   ArrowLeft,
@@ -44,6 +45,8 @@ import {
 } from './WorkItemStateConfigDrawer';
 import { AutomationRulesPanel } from './AutomationRulesPanel';
 import { normalizeProductWebsiteUrl } from './productWebsite';
+import { teamRepository } from '../../services/teamRepository';
+import { employeeJobTitle, employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -71,6 +74,8 @@ const ProductLineSettingsPanel: React.FC<{
   const [status, setStatus] = useState<'启用中' | '已停用'>(productLine.health === '已停用' || productLine.status === '已停用' ? '已停用' : '启用中');
   const [memberTab, setMemberTab] = useState('全部');
   const [memberToRemove, setMemberToRemove] = useState<ProductLineMember | null>(null);
+  const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
+  const employeesById = new Map((employeesQuery.data || []).map((employee) => [employee.id, employee]));
 
   useEffect(() => {
     setName(productLine.name);
@@ -133,7 +138,8 @@ const ProductLineSettingsPanel: React.FC<{
         <nav className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:border-b-0 md:border-r" aria-label="产品线设置菜单">
           <div className="mb-4 border-b border-[var(--border-main)] px-3 pb-4 select-none">
             <h2 className="text-base font-bold text-[var(--text-primary)]">产品线设置</h2>
-            <p className="mt-1 text-xs text-[var(--text-muted)]"><span className="font-medium text-[var(--active-text)]">{productLine.name}</span> ({productLine.code})</p>
+            <p className="mt-2 truncate text-xs font-medium text-[var(--active-text)]" title={productLine.name}>{productLine.name}</p>
+            <p className="mt-1 truncate font-mono text-[11px] text-[var(--text-muted)]" title={productLine.code}>{productLine.code}</p>
           </div>
           {sections.map((item) => (
             <button
@@ -175,7 +181,7 @@ const ProductLineSettingsPanel: React.FC<{
                   <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">{memberTabs.map((tab) => { const count = tab === '全部' ? members.length : members.filter((member) => member.role === tab).length; return <button key={tab} type="button" onClick={() => setMemberTab(tab)} className={`h-10 px-3 text-sm font-medium border-b-2 transition-colors ${memberTab === tab ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{tab}</span><span className="ml-1 text-base font-normal text-[var(--primary)]">{count}</span></button>; })}</div>
                   <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
                     <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-[11px] text-[var(--text-muted)]"><span>成员</span><span>角色</span><span className="text-right">操作</span></div>
-                    {visibleMembers.length ? visibleMembers.map((member) => <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><div className="flex min-w-0 items-center gap-2"><Avatar size={28}>{member.name.slice(0, 1)}</Avatar><span className="truncate font-medium text-[var(--text-primary)]">{member.name}</span></div><Select className="w-full" value={member.role} options={['管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'].map((role) => ({ value: role, label: role }))} onChange={async (role) => { try { await updateProductLineMember(productLine.id, member.id, role); addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
+                    {visibleMembers.length ? visibleMembers.map((member) => { const employee = employeesById.get(member.userId); return <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><PersonIdentity name={member.name} subtitle={employee ? employeeJobTitle(employee) || '未设置职位' : undefined} size={28} /><Select className="w-full" value={member.role} options={['管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'].map((role) => ({ value: role, label: role }))} onChange={async (role) => { try { await updateProductLineMember(productLine.id, member.id, role); addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>; }) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
                   </div>
                 </>;
               })()}
@@ -422,6 +428,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   } = useApp();
 
   const productLine = productLines.find((pl) => pl.id === productLineId);
+  const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
 
   // Modals state
   const [isCreateVersionOpen, setIsCreateVersionOpen] = useState(false);
@@ -474,9 +481,18 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const lineDevTasks = devTasks.filter(
     (t) => t.productLineName === productLine.name
   );
-  const leadOptions = (productLine.members || [])
+  const memberUserIds = new Set((productLine.members || [])
     .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId))
-    .map((member) => ({ value: member.userId, label: `${member.name} · ${member.role}` }));
+    .map((member) => member.userId));
+  const directoryLeadOptions = employeeSelectOptions((employeesQuery.data || []).filter((employee) => memberUserIds.has(employee.id)));
+  const directoryLeadIds = new Set(directoryLeadOptions.map((option) => option.value));
+  const leadOptions = [
+    ...directoryLeadOptions,
+    ...(productLine.members || [])
+      .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId) && !directoryLeadIds.has(member.userId))
+      .map((member) => ({ value: member.userId, label: `${member.name} · 未设置职位` })),
+  ];
+  const employeesById = new Map((employeesQuery.data || []).map((employee) => [employee.id, employee]));
 
   const pendingReqsCount = Number(productLine.pendingRequirementCount ?? productLine.pendingReqCount ?? lineReqs.filter((r) => r.status !== '已转任务' && r.status !== '已转版本' && r.status !== '已拒绝').length);
   const pendingBugsCount = lineBugs.filter((b) => b.status !== '已关闭' && b.status !== '已拒绝').length;
@@ -866,11 +882,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <h4 className="mb-3 text-sm font-medium text-[var(--text-body)]">{group.label}</h4>
               <div className="flex flex-wrap gap-x-8 gap-y-4">
                 {group.members.map((member) => (
-                  <div key={member.id} className="w-28 text-center">
-                    <Avatar size={32}>{member.name.slice(0, 1)}</Avatar>
-                    <div className="mt-1 text-[10px] text-[var(--text-muted)]">{normalizeRole(member.role)}</div>
-                    <div className="mt-2 truncate text-xs text-[var(--text-body)]" title={member.name}>{member.name}</div>
-                  </div>
+                  <PersonIdentity key={member.id} name={member.name} subtitle={employeeJobTitle(employeesById.get(member.userId) || {}) || normalizeRole(member.role)} size={32} className="w-44" />
                 ))}
               </div>
             </section>
@@ -884,8 +896,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <div className="space-y-3">
             {activityItems.map((activity) => (
               <div key={activity.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 text-sm">
-                <Avatar size={32}>{(activity.operatorName || currentUser.name || '系').slice(0, 1)}</Avatar>
-                <span className="text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span>
+                <PersonIdentity name={activity.operatorName || currentUser.name} size={32} />
+                <span className="text-[var(--text-body)]">{activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span>
                 <span className="ml-auto text-xs text-[var(--text-muted)]">{activity.createdAt}</span>
               </div>
             ))}

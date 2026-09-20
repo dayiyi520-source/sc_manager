@@ -4,15 +4,15 @@ import { DownOutlined, PlusOutlined, RightOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { productRepository } from '../../services/productRepository';
-import type { RequirementTask } from '../../types';
+import type { EmployeeOption, RequirementTask } from '../../types';
 import type { CreateTestExecutionInput, TestCase, TestExecution, TestExecutionCase, TestPlan, TestPlanCase, TestResultStatus } from '../../types/testManagement';
 import { DefectCreatePanel, type DefectCreateValues } from './DefectCreatePanel';
 import { TestCaseEditorDrawer } from './TestCaseEditorDrawer';
 
-type TestPlanPanelProps = { task: RequirementTask; workItemId: string; productLineId: string; sourceRequirementId?: string; employeeNames: string[]; onExecutionCreated?: (execution: TestExecution) => void };
+type TestPlanPanelProps = { task: RequirementTask; workItemId: string; productLineId: string; sourceRequirementId?: string; employeeNames: string[]; employeeOptions: EmployeeOption[]; onExecutionCreated?: (execution: TestExecution) => void };
 type PlanFormValues = { name: string; environment?: string; dateRange?: [Dayjs, Dayjs] };
 
-export const TestPlanPanel: React.FC<TestPlanPanelProps> = ({ task, workItemId, productLineId, sourceRequirementId, employeeNames, onExecutionCreated }) => {
+export const TestPlanPanel: React.FC<TestPlanPanelProps> = ({ task, workItemId, productLineId, sourceRequirementId, employeeNames, employeeOptions, onExecutionCreated }) => {
   const plans = useQuery({ queryKey: ['test-plans', workItemId], queryFn: () => productRepository.testPlans(workItemId), retry: false });
   const rounds = useQuery({ queryKey: ['test-executions', workItemId], queryFn: () => productRepository.testExecutions(workItemId), retry: false });
   const directories = useQuery({ queryKey: ['test-case-directories', productLineId], queryFn: () => productRepository.testCaseDirectories(productLineId), retry: false });
@@ -116,7 +116,7 @@ export const TestPlanPanel: React.FC<TestPlanPanelProps> = ({ task, workItemId, 
     <Modal title="新建人工测试执行" open={roundOpen} onCancel={() => setRoundOpen(false)} onOk={() => void createRound()} confirmLoading={saving}><Form form={roundForm} layout="vertical"><Form.Item name="scopeType" label="执行范围" rules={[{ required: true }]}><Radio.Group optionType="button" buttonStyle="solid" options={[{ label: '全部用例', value: 'ALL' }, { label: '失败用例回归', value: 'FAILED_ONLY' }, { label: '自定义范围', value: 'CUSTOM' }]} /></Form.Item><Form.Item name="name" label="轮次名称" rules={[{ required: true, whitespace: true }]}><Input maxLength={120} /></Form.Item><Form.Item name="environment" label="测试环境"><Input maxLength={255} /></Form.Item><Form.Item name="buildVersion" label="构建版本"><Input maxLength={120} /></Form.Item></Form></Modal>
     <Modal title="记录人工失败结果" open={!!resultCase} onCancel={() => setResultCase(null)} onOk={async () => { if (!resultCase || !failedReason.trim()) { setError('请填写实际结果和失败现象'); return; } await saveCaseResult(resultCase, 'FAILED', failedReason.trim()); setResultCase(null); }} confirmLoading={saving}><Input.TextArea rows={5} value={failedReason} onChange={(event) => setFailedReason(event.target.value)} placeholder="填写实际结果和失败现象" /></Modal>
     <Modal title="引用已有缺陷" open={referenceOpen} onCancel={() => { setReferenceOpen(false); setDefectId(''); }} onOk={() => void linkDefect()} okButtonProps={{ disabled: !defectId }} confirmLoading={saving}><Form layout="vertical"><Form.Item label="缺陷标题"><Select showSearch filterOption={false} onSearch={setDefectQuery} value={defectId || undefined} onChange={setDefectId} loading={defectOptions.isFetching} placeholder="输入缺陷标题搜索" options={(defectOptions.data?.page.items || []).map((item) => ({ value: item.id, label: `${item.code} · ${item.title}` }))} /></Form.Item></Form></Modal>
-    <DefectCreatePanel open={defectActionOpen} productLineName={task.productLineName} versionName={task.versionName} requirementTitle={task.sourceWorkOrderTitles?.[0]} employeeNames={employeeNames} initialTitle={defectCase ? `${defectCase.title}执行失败` : ''} initialDescription={defectCase?.actualResult || ''} saving={saving} onClose={() => setDefectActionOpen(false)} onSubmit={createDefect} />
+    <DefectCreatePanel open={defectActionOpen} productLineName={task.productLineName} versionName={task.versionName} requirementTitle={task.sourceWorkOrderTitles?.[0]} employeeNames={employeeNames} employeeOptions={employeeOptions} initialTitle={defectCase ? `${defectCase.title}执行失败` : ''} initialDescription={defectCase?.actualResult || ''} saving={saving} onClose={() => setDefectActionOpen(false)} onSubmit={createDefect} />
     <TestCaseEditorDrawer open={!!editorPlan} productLineId={productLineId} directories={directories.data || []} sourceRequirementId={sourceRequirementId} onClose={() => setEditorPlan(null)} onSaved={(created, continueCreating) => { if (!editorPlan) return; if (!continueCreating) setEditorPlan(null); const ids = Array.from(new Set([...editorPlan.cases.map((item) => item.testCaseId), created.id])); void savePlan(editorPlan, ids); }} />
   </div>;
 };

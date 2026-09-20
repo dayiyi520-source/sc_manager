@@ -640,6 +640,7 @@ export interface EmployeeOption {
   department?: string;
   role?: string;
   roleTitle?: string;
+  jobTitle?: string;
 }
 
 export interface TeamMember {

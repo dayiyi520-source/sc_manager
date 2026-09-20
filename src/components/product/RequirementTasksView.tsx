@@ -16,7 +16,7 @@ import { MessageSquare, Paperclip, X } from '@/components/common/octicons-compat
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
 import { DateField } from '../common';
-import { DefectBug, DevTask, ProductLineWorkItemType, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
+import { DefectBug, DevTask, EmployeeOption, ProductLineWorkItemType, RequirementEvent, RequirementMedia, RequirementPoolItem, RequirementTask, RequirementWorkOrderCandidate, RequirementWorkOrderType } from '../../types';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { WorkItemStatusTag } from './WorkItemStatusTag';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
@@ -27,6 +27,7 @@ import { productRepository, UnifiedWorkItem, WorkItemTransitionAction, WorkItemT
 import { readSession } from '../../services/session';
 import { preferredWorkItemTypeName } from './workItemTypeDefaults';
 import { CollapsibleDescription } from './CollapsibleDescription';
+import { employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity';
 
 type RequirementFilterState = {
   title: { operator: TextFilterOperator; value: string };
@@ -140,6 +141,7 @@ export type WorkItemDetailContext = {
   editing: boolean;
   onUpdate: (updates: Partial<RequirementTask>) => void;
   employeeNames: string[];
+  employeeOptions: EmployeeOption[];
   versions: Array<{ id: string; name: string; productLineName?: string }>;
   statusControl: React.ReactNode;
 };
@@ -612,7 +614,13 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const descriptionEditor = useRef<HTMLDivElement>(null);
   const [formDescriptionHtml, setFormDescriptionHtml] = useState('');
   const [employees, setEmployees] = useState<string[]>([currentUser.name]);
-  const [employeeOptions, setEmployeeOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [employeeOptions, setEmployeeOptions] = useState<EmployeeOption[]>([]);
+  const directoryEmployeeNames = new Set(employeeOptions.map((employee) => employee.name));
+  const resolvedEmployeeOptions: EmployeeOption[] = [
+    ...employeeOptions,
+    ...employees.filter((name) => !directoryEmployeeNames.has(name)).map((name) => ({ id: name, name })),
+  ];
+  const employeeNameOptions = employeeSelectOptions(resolvedEmployeeOptions, 'name');
 
   useEffect(() => {
     teamRepository.options()
@@ -1261,7 +1269,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         <td className="px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>
         <td className="max-w-[240px] px-4 py-3.5 text-[var(--text-body)]"><span className="line-clamp-2 font-mono text-[var(--primary)]" title={task.versionName || '未关联'}>{task.versionName || '未关联'}</span></td>
         <td className="px-4 py-3.5 text-[var(--text-muted)]">
-          {isChild ? <Select aria-label={`${task.title}负责人`} variant="borderless" style={{ width: 120 }} popupMatchSelectWidth={160} showSearch optionFilterProp="label" value={task.ownerName || undefined} placeholder="未设置" options={employees.map((name) => ({ label: name, value: name }))} onChange={(ownerName) => updateTask(task.id, { ownerName })} /> : task.ownerName || '未设置'}
+          {isChild ? <Select aria-label={`${task.title}负责人`} variant="borderless" style={{ width: 180 }} popupMatchSelectWidth={220} showSearch optionFilterProp="label" value={task.ownerName || undefined} placeholder="未设置" options={employeeNameOptions} onChange={(ownerName) => updateTask(task.id, { ownerName })} /> : <PersonIdentity name={task.ownerName} emptyLabel="未设置" size={20} />}
         </td>
         <td className="px-4 py-3.5 text-[var(--text-muted)]">{task.creatorName || currentUser.name}</td>
         <td className="px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt ? dayjs(task.createdAt).format('YYYY-MM-DD') : '—'}</td>
@@ -1305,7 +1313,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               >
                 <Button type="text" aria-label="分组" aria-pressed={groupOpen} icon={<List className="h-4 w-4" />} />
               </Popover>
-              {searchOpen && searchOwnerPickerOpen && <div className="absolute left-0 top-11 z-40 w-[min(88vw,300px)]"><Select aria-label="搜索负责人" mode="multiple" autoFocus open={searchOwnerPickerOpen} onDropdownVisibleChange={setSearchOwnerPickerOpen} showSearch allowClear optionFilterProp="label" value={searchOwnerNames} onChange={setSearchOwnerNames} options={employees.map((name) => ({ label: name, value: name }))} placeholder="搜索负责人" className="w-full" /></div>}
+              {searchOpen && searchOwnerPickerOpen && <div className="absolute left-0 top-11 z-40 w-[min(88vw,300px)]"><Select aria-label="搜索负责人" mode="multiple" autoFocus open={searchOwnerPickerOpen} onDropdownVisibleChange={setSearchOwnerPickerOpen} showSearch allowClear optionFilterProp="label" value={searchOwnerNames} onChange={setSearchOwnerNames} options={employeeNameOptions} placeholder="搜索负责人或职位" className="w-full" /></div>}
             </div>
             <Button
               type="primary"
@@ -1395,7 +1403,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               <SearchableSelect label="所属产品线" value={selectedTask.productLineName || ''} options={productLines.map((line) => line.name)} onChange={(productLineName) => saveDetailUpdates({ productLineName, productLineId: productLines.find((line) => line.name === productLineName)?.id, versionName: '' })} placeholder="未设置" />
               <div><span className="block text-[var(--text-muted)]">当前状态</span><div className="mt-1">{taskStatusControl(selectedTask, true)}</div></div>
               <SearchableSelect label="需求类型" value={selectedTask.requirementType || ''} options={['业务需求', '产品优化', '技术需求', '合规需求']} onChange={(requirementType) => saveDetailUpdates({ requirementType })} placeholder="未设置" clearable />
-              {selectedTask.parentWorkItemId ? <SearchableSelect label="负责人" value={selectedTask.ownerName || ''} options={employees} onChange={(ownerName) => saveDetailUpdates({ ownerName })} placeholder="未设置" /> : <div><span className="block text-[var(--text-muted)]">负责人</span><span className="mt-1 block text-[var(--text-body)]">{selectedTask.ownerName || '未设置'}</span></div>}
+              {selectedTask.parentWorkItemId ? <label className="block text-[var(--text-muted)]"><span>负责人</span><Select showSearch optionFilterProp="label" allowClear value={selectedTask.ownerName || undefined} onChange={(ownerName) => saveDetailUpdates({ ownerName: ownerName || '' })} options={employeeNameOptions} placeholder="搜索姓名或职位" className="mt-1 w-full" /></label> : <div><span className="block text-[var(--text-muted)]">负责人</span><div className="mt-1"><PersonIdentity name={selectedTask.ownerName} emptyLabel="未设置" size={20} /></div></div>}
               <SearchableSelect label="优先级" value={normalizePriority(selectedTask.priority)} options={['紧急', '高', '中', '低']} onChange={(priority) => saveDetailUpdates({ priority: priority as RequirementTask['priority'] })} />
               <DetailDateInput label="计划开始时间" value={selectedTask.plannedStartDate} onSave={(plannedStartDate) => saveDetailUpdates({ plannedStartDate })} />
               <DetailDateInput label="计划完成时间" value={selectedTask.dueDate} onSave={(dueDate) => saveDetailUpdates({ dueDate })} />
@@ -1426,7 +1434,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                 <span className="truncate">{String(parentWorkItem.title || '')}</span>
               </button>
             </section>}
-            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems, editing: detailEditing, onUpdate: saveDetailUpdates, employeeNames: employees, versions, statusControl: taskStatusControl(selectedTask, true, !detailEditing) })}</section>}
+            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems, editing: detailEditing, onUpdate: saveDetailUpdates, employeeNames: employees, employeeOptions: resolvedEmployeeOptions, versions, statusControl: taskStatusControl(selectedTask, true, !detailEditing) })}</section>}
             {taskKind !== 'test' && <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
               <label className="block text-[var(--text-muted)]">
                 <span>任务描述</span>
@@ -1548,14 +1556,14 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         properties={<Form layout="vertical" className="requirement-create-properties" requiredMark>
           <Form.Item label="所属产品线" required><Select showSearch optionFilterProp="label" value={formProductLineName || undefined} onChange={(value) => { setFormProductLineName(value); setFormVersionName(''); setFormRequirementType(''); }} options={productLines.map((line) => ({ label: line.name, value: line.name }))} placeholder="请选择所属产品线" /></Form.Item>
           <Form.Item label={`${itemLabel}类型`} required><Select showSearch optionFilterProp="label" value={formRequirementType || undefined} onChange={setFormRequirementType} options={configuredWorkItemTypes.map((item) => ({ label: item.name, value: item.name }))} disabled={!configuredWorkItemTypes.length} placeholder={configuredWorkItemTypes.length ? `请选择${itemLabel}类型` : '请先在产品线工作项设置中启用类型'} /></Form.Item>
-          <Form.Item label="负责人" required><Select showSearch optionFilterProp="label" value={formOwnerName || undefined} onChange={setFormOwnerName} options={employees.map((value) => ({ label: value, value }))} placeholder="搜索并选择负责人" /></Form.Item>
+          <Form.Item label="负责人" required><Select showSearch optionFilterProp="label" value={formOwnerName || undefined} onChange={setFormOwnerName} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>
           <Form.Item label="优先级" required><Select value={formPriority || undefined} onChange={(value) => setFormPriority(value)} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>
           <Form.Item label="计划开始时间" required><DatePicker value={formPlannedStartDate ? dayjs(formPlannedStartDate) : null} onChange={(date) => setFormPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
           <Form.Item label="计划完成时间"><DatePicker value={formDueDate ? dayjs(formDueDate) : null} onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
           <Form.Item label="期望完成时间"><DatePicker value={formExpectedCompleteDate ? dayjs(formExpectedCompleteDate) : null} onChange={(date) => setFormExpectedCompleteDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>
           <Form.Item label="迭代版本"><Select showSearch allowClear optionFilterProp="label" value={formVersionName || undefined} onChange={(value) => setFormVersionName(value || '')} options={versions.filter((version) => !version.productLineName || version.productLineName === formProductLineName).map((version) => ({ label: version.name, value: version.name }))} placeholder="暂不关联" /></Form.Item>
           <Form.Item label="关联客户"><Select showSearch allowClear optionFilterProp="label" value={formCustomerName || undefined} onChange={(value) => setFormCustomerName(value || '')} options={customers.map((customer) => ({ label: customer.name, value: customer.name }))} placeholder="暂不关联" /></Form.Item>
-          <Form.Item label="参与人"><Select mode="multiple" showSearch allowClear optionFilterProp="label" value={formCcNames} onChange={setFormCcNames} options={employees.map((value) => ({ label: value, value }))} placeholder="搜索并选择参与人" /></Form.Item>
+          <Form.Item label="参与人"><Select mode="multiple" showSearch allowClear optionFilterProp="label" value={formCcNames} onChange={setFormCcNames} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>
           <Form.Item label="预计工时（小时）"><InputNumber min={0} precision={2} value={formEstimatedHours === '' ? null : formEstimatedHours} onChange={(value) => setFormEstimatedHours(value ?? '')} className="requirement-hours-input w-full" placeholder="请输入预计工时" /></Form.Item>
           <Form.Item label="实际工时（小时）"><InputNumber min={0} precision={2} value={formActualHours === '' ? null : formActualHours} onChange={(value) => setFormActualHours(value ?? '')} className="requirement-hours-input w-full" placeholder="请输入实际工时" /></Form.Item>
           <Form.Item label="附件">

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Select, Avatar } from 'antd';
+import { Select } from 'antd';
 import type { SelectProps } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
+import { PersonIdentity } from '../PersonIdentity';
 
 export interface User {
   id: string;
@@ -47,15 +47,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
   const options = users.map((user) => ({
     value: user.id,
     label: (
-      <div className="flex items-center gap-2">
-        <Avatar size="small" src={user.avatar} icon={<UserOutlined />} />
-        <div className="flex-1">
-          <div className="text-sm">{user.name}</div>
-          {user.department && (
-            <div className="text-xs text-[var(--text-muted)]">{user.department}</div>
-          )}
-        </div>
-      </div>
+      <PersonIdentity name={user.name} subtitle={user.role || '未设置职位'} size={24} />
     ),
     searchLabel: `${user.name} ${user.department || ''} ${user.role || ''}`,
   }));

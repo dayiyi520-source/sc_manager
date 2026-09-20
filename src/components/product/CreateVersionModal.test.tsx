@@ -3,6 +3,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CreateVersionModal, isEndDateDisabled, shouldClearEndDate, VERSION_RELEASE_NOTES_PLACEHOLDER } from './CreateVersionModal';
 
 const mocks = vi.hoisted(() => ({
@@ -20,7 +21,8 @@ vi.mock('../../context/AppContext', () => ({
 
 describe('CreateVersionModal', () => {
   it('requires a product line and exposes the agreed release-note example', async () => {
-    render(<CreateVersionModal isOpen onClose={vi.fn()} />);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><CreateVersionModal isOpen onClose={vi.fn()} /></QueryClientProvider>);
 
     expect(screen.getByText(/所属产品线/)).toHaveTextContent('*');
     expect(document.querySelector('textarea')).toHaveAttribute('placeholder', VERSION_RELEASE_NOTES_PLACEHOLDER);

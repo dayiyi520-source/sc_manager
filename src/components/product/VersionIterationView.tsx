@@ -30,6 +30,7 @@ import { DefectBug, DevTask, RequirementTask, VersionIteration } from '../../typ
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { CreateVersionModal } from './CreateVersionModal';
 import { VersionTestReportPanel } from './VersionTestReportPanel';
+import { PersonIdentity } from '../common/PersonIdentity';
 
 type ViewMode = 'list' | 'planning';
 type DetailTab = 'hours' | 'workItems' | 'testReports' | 'review';
@@ -62,8 +63,6 @@ const planningKindIcon: Record<PlanningKind, React.ReactNode> = {
   bug: <Bug className="h-4 w-4 text-[var(--danger)]" />,
   dev: <GitBranch className="h-4 w-4 text-[var(--success)]" />
 };
-
-const avatarColors = ['var(--accent-purple)', 'var(--warning)', 'var(--primary)', 'var(--success)'];
 
 const normalize = (value?: string) => (value || '').trim().toLowerCase();
 
@@ -132,7 +131,7 @@ const RequirementRows: React.FC<{ items: RequirementTask[]; onOpen: (item: Requi
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--border-main)]">
-        {items.map((item, index) => (
+        {items.map((item) => (
           <tr key={item.id} className="hover:bg-[var(--bg-surface-soft)]">
             <td className="max-w-[360px] px-4 py-3">
               <button type="button" onClick={() => onOpen(item)} className="truncate text-left font-medium text-[var(--text-primary)] hover:text-[var(--primary)]">{item.title}</button>
@@ -141,17 +140,7 @@ const RequirementRows: React.FC<{ items: RequirementTask[]; onOpen: (item: Requi
             <td className="px-3 py-3">
               <StatusTag status={item.status} />
             </td>
-            <td className="px-3 py-3 text-[var(--text-body)]">
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white"
-                  style={{ background: avatarColors[index % avatarColors.length] }}
-                >
-                  {(item.ownerName || '未').slice(0, 1)}
-                </span>
-                {item.ownerName || '未分配'}
-              </span>
-            </td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" size={20} /></td>
             <td className="px-3 py-3">
               <StatusTag status={item.priority} />
             </td>
@@ -191,7 +180,7 @@ const DevTaskRows: React.FC<{ items: DevTask[]; onOpen: (item: DevTask) => void 
             <td className="px-3 py-3">
               <StatusTag status={item.status} />
             </td>
-            <td className="px-3 py-3 text-[var(--text-body)]">{item.developer || '未分配'}</td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.developer} emptyLabel="未分配" size={20} /></td>
             <td className="px-3 py-3 text-[var(--text-muted)]">
               {item.spentHours || 0}/{item.estimatedHours || 0}h
             </td>
@@ -231,7 +220,7 @@ const BugRows: React.FC<{ items: DefectBug[]; onOpen: (item: DefectBug) => void 
             <td className="px-3 py-3">
               <StatusTag status={item.status} />
             </td>
-            <td className="px-3 py-3 text-[var(--text-body)]">{item.ownerName || item.assignee || '未分配'}</td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName || item.assignee} emptyLabel="未分配" size={20} /></td>
             <td className="px-3 py-3">
               <StatusTag status={item.severity} />
             </td>
@@ -272,7 +261,7 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; onOpen: (item: PlanningIte
               <button type="button" onClick={() => onOpen(item)} className="block max-w-full truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">{item.title}</button>
             </td>
             <td className="px-3 py-3"><StatusTag status={item.status} /></td>
-            <td className="px-3 py-3 text-[var(--text-body)]">{item.ownerName || '未分配'}</td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" size={20} /></td>
             <td className="px-3 py-3"><StatusTag status={item.priority} /></td>
             <td className="px-3 py-3 text-[var(--text-muted)]">{item.estimatedHours} 小时</td>
             <td className="px-4 py-3 text-[var(--text-muted)]">{item.actualHours} 小时</td>
@@ -545,7 +534,7 @@ export const VersionIterationView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-main)]">
-              {filteredVersions.map((version, index) => {
+              {filteredVersions.map((version) => {
                 const stats = getVersionStats(version);
                 const progress = stats.total ? Math.round((stats.completed / stats.total) * 100) : 0;
                 return (
@@ -559,12 +548,7 @@ export const VersionIterationView: React.FC = () => {
                     <td className="px-3 py-3"><StatusTag status={version.status} /></td>
                     <td className="px-3 py-3 text-[var(--text-body)]">{version.startDate || '--'} ~ {version.endDate || version.releaseDate || '--'}</td>
                     <td className="max-w-48 px-3 py-3 text-[var(--text-body)]"><span className="block truncate" title={version.productLineName || '未关联产品线'}>{version.productLineName || '未关联产品线'}</span></td>
-                    <td className="px-3 py-3">
-                      <span className="inline-flex items-center gap-1.5 text-[var(--text-body)]">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] text-white" style={{ background: avatarColors[index % avatarColors.length] }}>{(version.ownerName || '未').slice(0, 1)}</span>
-                        {version.ownerName || '未分配'}
-                      </span>
-                    </td>
+                    <td className="px-3 py-3"><PersonIdentity name={version.ownerName} emptyLabel="未分配" size={24} /></td>
                     <td className="px-3 py-3">
                       <div className="flex min-w-44 items-center gap-2">
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">

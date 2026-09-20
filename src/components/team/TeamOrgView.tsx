@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Avatar, Button, Empty, Form, Input, Modal, Select, Space, Spin, Table, Tag, Tooltip } from 'antd';
+import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Table, Tag, Tooltip } from 'antd';
 import { EditOutlined, MailOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UndoOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building, Shield, UserCheck, Users } from '@/components/common/octicons-compat';
@@ -7,6 +7,7 @@ import { PageHeader, SearchBar } from '@/components/common';
 import { useApp } from '../../context/AppContext';
 import { teamRepository, type TeamMemberInput } from '../../services/teamRepository';
 import type { TeamMember } from '../../types';
+import { PersonIdentity } from '../common/PersonIdentity';
 
 type FormValues = Required<Pick<TeamMemberInput, 'name' | 'department' | 'jobTitle'>> & Pick<TeamMemberInput, 'phone' | 'email'>;
 
@@ -76,7 +77,7 @@ export const TeamOrgView: React.FC = () => {
   };
 
   const columns = [
-    { title: '成员', dataIndex: 'name', key: 'name', render: (name: string, member: TeamMember) => <div className="flex min-w-0 items-center gap-3"><Avatar className="shrink-0 bg-[var(--primary)]">{name.slice(0, 1)}</Avatar><div className="min-w-0"><div className="truncate font-semibold text-[var(--text-primary)]">{name}</div><div className="truncate text-xs text-[var(--text-muted)]">{member.jobTitle}</div></div></div> },
+    { title: '成员', dataIndex: 'name', key: 'name', render: (name: string, member: TeamMember) => <PersonIdentity name={name} subtitle={member.jobTitle || '未设置职位'} size={32} /> },
     { title: '部门', dataIndex: 'department', key: 'department', render: (value: string) => <span className="inline-flex items-center gap-2 text-[var(--text-body)]"><Building className="h-4 w-4 text-[var(--text-muted)]" />{value}</span> },
     { title: '联系方式', key: 'contact', render: (_: unknown, member: TeamMember) => <div className="space-y-1 text-xs text-[var(--text-muted)]"><div className="flex items-center gap-2"><PhoneOutlined />{member.phone || '未填写'}</div><div className="flex items-center gap-2"><MailOutlined />{member.email || '未填写'}</div></div> },
     { title: '状态', dataIndex: 'status', key: 'status', render: (value: TeamMember['status'], member: TeamMember) => <Space size={6}><Tag color={value === 'enabled' ? 'success' : 'default'}>{value === 'enabled' ? '在职' : '已停用'}</Tag>{member.loginEnabled && <Tooltip title="唯一登录账号"><Tag color="blue">超级管理员</Tag></Tooltip>}</Space> },

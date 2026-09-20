@@ -28,10 +28,20 @@ import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
+import { useQuery } from '@tanstack/react-query';
+import { teamRepository } from '../../services/teamRepository';
+import { employeeSelectOptions } from '../common/PersonIdentity';
 
 export const BugManagementView: React.FC = () => {
   const { bugs, addBug, updateBug, productLines, versions, currentUser, addToast, requirementTasks } = useApp();
-  const employees = Array.from(new Set([currentUser.name, ...bugs.map((bug) => bug.assignee).filter(Boolean)]));
+  const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
+  const employeeDirectory = employeesQuery.data || [];
+  const employees = Array.from(new Set([currentUser.name, ...employeeDirectory.map((employee) => employee.name), ...bugs.map((bug) => bug.assignee).filter(Boolean)]));
+  const directoryEmployeeNames = new Set(employeeDirectory.map((employee) => employee.name));
+  const employeeOptions = employeeSelectOptions([
+    ...employeeDirectory,
+    ...employees.filter((name) => !directoryEmployeeNames.has(name)).map((name) => ({ id: name, name })),
+  ], 'name');
   const bugStatuses = ['待处理', '设计中', '待开发', '开发中', '待测试', '测试中', '待验收', '已验收', '已发布', '已完成', '待修复', '修复中', '待验证', '已关闭'];
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -481,8 +491,8 @@ export const BugManagementView: React.FC = () => {
               showSearch
               value={formAssignee ? [formAssignee] : undefined}
               onChange={(value) => setFormAssignee(value?.[0])}
-              options={employees}
-              placeholder="搜索并选择处理人"
+              options={employeeOptions}
+              placeholder="搜索姓名或职位"
               className="w-full"
             />
           </div>
@@ -503,8 +513,8 @@ export const BugManagementView: React.FC = () => {
               showSearch
               allowClear value={formCc ? [formCc] : undefined}
               onChange={(value) => setFormCc(value?.[0])}
-              options={employees}
-              placeholder="搜索并选择参与人"
+              options={employeeOptions}
+              placeholder="搜索姓名或职位"
               className="w-full"
             />
           </div>
