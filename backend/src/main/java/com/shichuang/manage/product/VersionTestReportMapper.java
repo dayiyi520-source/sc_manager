@@ -22,16 +22,40 @@ public class VersionTestReportMapper {
 
     public List<Map<String, Object>> reports(String tenant, String lineId, String versionId) {
         return jdbc.queryForList("""
-            SELECT r.id_ AS id,r.name_ AS name,r.summary_ AS summary,r.creator_name_ AS creatorName,
+            SELECT r.id_ AS id,r.name_ AS name,'测试报告' AS reportType,r.summary_ AS summary,r.creator_name_ AS creatorName,
+              r.product_line_id_ AS productLineId,l.name_ AS productLineName,r.version_id_ AS versionId,v.name_ AS versionName,
               r.version_ AS revision,r.create_time_ AS createdAt,r.update_time_ AS updatedAt,
               COUNT(rp.id_) AS planCount,
               SUBSTRING_INDEX(GROUP_CONCAT(p.name_ ORDER BY rp.sort_ SEPARATOR '|||'),'|||',1) AS firstPlanName
             FROM t_product_version_test_report r
+            JOIN t_product_line l ON l.tenant_id_=r.tenant_id_ AND l.id_=r.product_line_id_ AND l.delete_flag_=0
+            JOIN t_product_line_version v ON v.tenant_id_=r.tenant_id_ AND v.id_=r.version_id_ AND v.delete_flag_=0
             LEFT JOIN t_product_version_test_report_plan rp ON rp.tenant_id_=r.tenant_id_ AND rp.report_id_=r.id_ AND rp.delete_flag_=0
             LEFT JOIN t_product_test_plan p ON p.tenant_id_=rp.tenant_id_ AND p.id_=rp.test_plan_id_ AND p.delete_flag_=0
             WHERE r.tenant_id_=? AND r.product_line_id_=? AND r.version_id_=? AND r.delete_flag_=0
-            GROUP BY r.id_ ORDER BY r.create_time_ DESC,r.id_
+            GROUP BY r.id_,l.name_,v.name_ ORDER BY r.create_time_ DESC,r.id_
             """, tenant, lineId, versionId);
+    }
+
+    public List<Map<String, Object>> reports(String tenant, List<String> lineIds) {
+        if (lineIds.isEmpty()) return List.of();
+        String placeholders = String.join(",", Collections.nCopies(lineIds.size(), "?"));
+        List<Object> args = new ArrayList<>();
+        args.add(tenant);
+        args.addAll(lineIds);
+        return jdbc.queryForList("""
+            SELECT r.id_ AS id,r.name_ AS name,'测试报告' AS reportType,r.summary_ AS summary,r.creator_name_ AS creatorName,
+              r.product_line_id_ AS productLineId,l.name_ AS productLineName,r.version_id_ AS versionId,v.name_ AS versionName,
+              r.version_ AS revision,r.create_time_ AS createdAt,r.update_time_ AS updatedAt,
+              COUNT(rp.id_) AS planCount,
+              SUBSTRING_INDEX(GROUP_CONCAT(p.name_ ORDER BY rp.sort_ SEPARATOR '|||'),'|||',1) AS firstPlanName
+            FROM t_product_version_test_report r
+            JOIN t_product_line l ON l.tenant_id_=r.tenant_id_ AND l.id_=r.product_line_id_ AND l.delete_flag_=0
+            JOIN t_product_line_version v ON v.tenant_id_=r.tenant_id_ AND v.id_=r.version_id_ AND v.delete_flag_=0
+            LEFT JOIN t_product_version_test_report_plan rp ON rp.tenant_id_=r.tenant_id_ AND rp.report_id_=r.id_ AND rp.delete_flag_=0
+            LEFT JOIN t_product_test_plan p ON p.tenant_id_=rp.tenant_id_ AND p.id_=rp.test_plan_id_ AND p.delete_flag_=0
+            WHERE r.tenant_id_=? AND r.product_line_id_ IN (""" + placeholders + ") AND r.delete_flag_=0 " +
+            "GROUP BY r.id_,l.name_,v.name_ ORDER BY r.create_time_ DESC,r.id_", args.toArray());
     }
 
     public Map<String, Object> report(String tenant, String lineId, String versionId, String reportId) {

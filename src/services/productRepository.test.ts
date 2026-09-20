@@ -114,7 +114,7 @@ describe('productRepository task API contract', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: {}, message: '', requestId: 'r' }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     await productRepository.createTestExecution('WI-1', {
-      requestId: 'round-2', scopeType: 'FAILED_ONLY', testCaseIds: [],
+      requestId: 'round-2', planId: 'plan-1', scopeType: 'FAILED_ONLY', testCaseIds: [],
       name: '第二轮回归', environment: '测试环境', buildVersion: 'V1.2.0-build.38'
     });
     await productRepository.saveTestResult('result-1', { result: 'FAILED', actualResult: '响应超时', evidence: [], revision: 1 });

@@ -130,6 +130,7 @@ export const productRepository = {
   ,linkTestResultDefect: (resultId: string, defectWorkItemId: string, revision: number) => apiRequest<TestExecution>(`/api/test-execution-cases/${encodeURIComponent(resultId)}/defects`, { method: 'POST', body: JSON.stringify({ defectWorkItemId, revision }) })
   ,testTaskOverview: (workItemId: string) => apiRequest<TestTaskOverview>(`/api/work-items/${encodeURIComponent(workItemId)}/test-overview`)
   ,versionTestReports: (lineId: string, versionId: string) => apiRequest<VersionTestReportListItem[]>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports`)
+  ,testReports: () => apiRequest<VersionTestReportListItem[]>('/api/test-reports')
   ,versionTestReportPlans: (lineId: string, versionId: string) => apiRequest<VersionTestReportPlan[]>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/plans`)
   ,versionTestReport: (lineId: string, versionId: string, reportId: string) => apiRequest<VersionTestReport>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/${encodeURIComponent(reportId)}`)
   ,createVersionTestReport: (lineId: string, versionId: string, body: SaveVersionTestReportInput) => apiRequest<VersionTestReport>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports`, { method: 'POST', body: JSON.stringify(body) })

@@ -2,9 +2,18 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { employeeSelectOptions, formatEmployeeOptionLabel, PersonIdentity } from './PersonIdentity';
+import { employeeSelectOptions, formatEmployeeOptionLabel, PersonAvatar, PersonIdentity } from './PersonIdentity';
 
 describe('PersonIdentity', () => {
+  it('shares the colored compact avatar style used by identity rows', () => {
+    const { container } = render(<PersonAvatar name="林志豪" size={32} />);
+    const avatar = container.querySelector('.ant-avatar');
+
+    expect(screen.getByText('林')).toBeInTheDocument();
+    expect(avatar).toHaveStyle({ width: '32px', height: '32px', fontSize: '10px' });
+    expect(avatar?.getAttribute('style')).toContain('background-color: var(--');
+  });
+
   it('renders surname avatar, name and position', () => {
     render(<PersonIdentity name="林志豪" subtitle="超级系统管理员" />);
     expect(screen.getByText('林')).toBeInTheDocument();

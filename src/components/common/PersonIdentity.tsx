@@ -39,6 +39,28 @@ interface PersonIdentityProps {
   variant?: 'default' | 'list';
 }
 
+interface PersonAvatarProps {
+  name?: string;
+  size?: number;
+  className?: string;
+}
+
+export const PersonAvatar: React.FC<PersonAvatarProps> = ({ name, size = 24, className = '' }) => {
+  const displayName = name?.trim() || '未设置';
+  return (
+    <Avatar
+      size={size}
+      className={`shrink-0 text-[10px] font-semibold text-white ${className}`.trim()}
+      style={{
+        backgroundColor: personTone(displayName),
+        fontSize: 10,
+      }}
+    >
+      {personInitial(displayName)}
+    </Avatar>
+  );
+};
+
 export const PersonIdentity: React.FC<PersonIdentityProps> = ({
   name,
   subtitle,
@@ -55,16 +77,7 @@ export const PersonIdentity: React.FC<PersonIdentityProps> = ({
       title={subtitle ? `${displayName} · ${subtitle}` : displayName}
       data-person-variant={variant}
     >
-      <Avatar
-        size={resolvedSize}
-        className="shrink-0 text-[10px] font-semibold text-white"
-        style={{
-          backgroundColor: personTone(displayName),
-          fontSize: variant === 'list' ? 10 : undefined,
-        }}
-      >
-        {personInitial(displayName)}
-      </Avatar>
+      <PersonAvatar name={displayName} size={resolvedSize} />
       <div className="min-w-0">
         <div className={`truncate font-medium text-[var(--text-primary)] ${variant === 'list' ? 'text-xs leading-6' : ''}`.trim()}>{displayName}</div>
         {subtitle && <div className="truncate text-xs text-[var(--text-muted)]">{subtitle}</div>}

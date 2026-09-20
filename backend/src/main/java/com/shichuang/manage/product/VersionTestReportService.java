@@ -14,10 +14,18 @@ import static com.shichuang.manage.product.VersionTestReportDefinition.SaveRepor
 public class VersionTestReportService {
     private final VersionTestReportMapper mapper;
     private final WorkItemAccess access;
+    private final ProductLineMapper productLines;
 
-    public VersionTestReportService(VersionTestReportMapper mapper, WorkItemAccess access) {
+    public VersionTestReportService(VersionTestReportMapper mapper, WorkItemAccess access, ProductLineMapper productLines) {
         this.mapper = mapper;
         this.access = access;
+        this.productLines = productLines;
+    }
+
+    public List<Map<String, Object>> listAll() {
+        String tenant = RequestContext.tenantId();
+        List<String> lineIds = productLines.list(tenant, "", RequestContext.userId(), "admin".equals(RequestContext.role())).stream().map(line -> String.valueOf(line.get("id"))).toList();
+        return mapper.reports(tenant, lineIds);
     }
 
     public List<Map<String, Object>> list(String lineId, String versionId) {

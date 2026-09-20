@@ -53,7 +53,12 @@ class VersionTestReportIntegrationTest extends AbstractApiIntegrationTest {
         Map<String, Object> created = reports.create(lineId, versionId, new SaveReport("迭代测试报告", List.of(planId), "初始总结", 0));
         String reportId = String.valueOf(created.get("id"));
         assertEquals(1, reports.list(lineId, versionId).size());
-        assertEquals("核心回归计划", reports.list(lineId, versionId).get(0).get("firstPlanName"));
+        Map<String, Object> listed = reports.list(lineId, versionId).get(0);
+        assertEquals("测试报告", listed.get("reportType"));
+        assertEquals("报告产品线", listed.get("productLineName"));
+        assertEquals("验收迭代", listed.get("versionName"));
+        assertEquals("核心回归计划", listed.get("firstPlanName"));
+        assertEquals(reportId, reports.listAll().get(0).get("id"));
 
         String executionId = UUID.randomUUID().toString();
         String resultId = UUID.randomUUID().toString();

@@ -1,16 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Dropdown, Empty, Form, Input, Modal, Select, Spin, Table, Tag, Tree } from 'antd';
+import { Alert, Button, Cascader, Dropdown, Empty, Form, Input, Modal, Select, Spin, Table, Tag, Tree } from 'antd';
 import { CopyOutlined, DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { productRepository } from '../../services/productRepository';
 import { teamRepository } from '../../services/teamRepository';
-import type { TestCase, TestCaseDirectory, TestPriority, TestResultStatus } from '../../types/testManagement';
-import { TestCaseEditorDrawer } from './TestCaseEditorDrawer';
+import type { TestCase, TestCaseDirectory, TestPriority } from '../../types/testManagement';
+import { directoryOptions, TestCaseEditorDrawer } from './TestCaseEditorDrawer';
 import { employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity';
 
 type TestCaseLibraryViewProps = { productLineFilter?: string };
-const RESULT_LABEL: Record<TestResultStatus, string> = { NOT_EXECUTED: '未执行', PASSED: '通过', FAILED: '失败' };
-
 export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ productLineFilter = 'all' }) => {
   const lineId = productLineFilter === 'all' ? 'all' : productLineFilter;
   const queryClient = useQueryClient();
@@ -29,11 +27,13 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
   const [selectedCaseIds, setSelectedCaseIds] = useState<React.Key[]>([]);
   const [batchAction, setBatchAction] = useState<string>();
   const [batchValue, setBatchValue] = useState<string>();
+  const [batchDirectoryPath, setBatchDirectoryPath] = useState<string[]>([]);
   const [copyingDirectory, setCopyingDirectory] = useState<TestCaseDirectory>();
   const [copyName, setCopyName] = useState('');
   const [renamingDirectory, setRenamingDirectory] = useState<TestCaseDirectory>();
   const [renameName, setRenameName] = useState('');
   const activeLineId = productLineFilter === 'all' ? selectedProductLineId || 'all' : productLineFilter;
+  const batchDirectoryId = batchDirectoryPath.at(-1)?.startsWith('product-line:') ? undefined : batchDirectoryPath.at(-1);
 
   const directories = useQuery({ queryKey: ['test-case-directories', lineId], queryFn: () => productRepository.testCaseDirectories(lineId), enabled: true, retry: false });
   const productLines = useQuery({ queryKey: ['test-case-product-lines'], queryFn: () => productRepository.productLines(), enabled: true, retry: false });
@@ -46,7 +46,7 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
     onError: (reason) => setActionError(reason instanceof Error ? reason.message : '创建目录失败'),
   });
   const batchUpdate = useMutation({
-    mutationFn: () => productRepository.batchUpdateTestCases(activeLineId, { caseIds: selectedCaseIds.map(String), operation: batchAction!.toUpperCase() as 'MOVE' | 'OWNER' | 'PRIORITY', value: batchValue }),
+    mutationFn: () => productRepository.batchUpdateTestCases(activeLineId, { caseIds: selectedCaseIds.map(String), operation: batchAction!.toUpperCase() as 'MOVE' | 'OWNER' | 'PRIORITY', value: batchAction === 'move' ? batchDirectoryId : batchValue }),
     onSuccess: async () => { setBatchAction(undefined); setBatchValue(undefined); setSelectedCaseIds([]); await Promise.all([cases.refetch(), directories.refetch()]); },
     onError: (reason) => setActionError(reason instanceof Error ? reason.message : '批量操作失败'),
   });
@@ -91,6 +91,7 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
       return;
     }
     setBatchValue(undefined);
+    setBatchDirectoryPath([]);
     setBatchAction(value);
   };
   const directoryLine = (item: TestCaseDirectory) => item.productLineId || (productLineFilter === 'all' ? '' : productLineFilter);
@@ -118,11 +119,12 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
           { title: '优先级', dataIndex: 'priority', width: 88, render: (value) => <Tag>{value}</Tag> },
           { title: '类型', dataIndex: 'workItemTypeName', width: 120, ellipsis: true },
           { title: '阶段', dataIndex: 'statusName', width: 100, render: (value) => <Tag>{value}</Tag> },
-          { title: '最新执行结果', dataIndex: 'latestResult', width: 120, render: (value) => value === 'PASSED' ? '已通过' : value === 'FAILED' ? '未通过' : '未执行' },
         ]} />}
       </main>
     </div>
-    <Modal title={batchAction === 'move' ? '移动用例' : batchAction === 'owner' ? '修改负责人' : '修改优先级'} open={!!batchAction} onCancel={() => { setBatchAction(undefined); setBatchValue(undefined); }} onOk={() => batchUpdate.mutate()} okButtonProps={{ disabled: !batchValue }} confirmLoading={batchUpdate.isPending} okText="保存" cancelText="取消"><Select className="w-full" showSearch optionFilterProp="label" value={batchValue} onChange={setBatchValue} loading={batchAction === 'owner' && employees.isLoading} status={batchAction === 'owner' && employees.isError ? 'error' : undefined} placeholder={batchAction === 'move' ? '选择目标目录' : batchAction === 'owner' ? '选择负责人' : '选择优先级'} options={batchAction === 'move' ? (directories.data || []).map((item) => ({ label: `${item.productLineName ? `${item.productLineName} / ` : ''}${item.name}`, value: item.id })) : batchAction === 'priority' ? ['P0', 'P1', 'P2', 'P3'].map((value) => ({ label: value, value })) : employeeSelectOptions(employees.data || [])} /></Modal>
+    <Modal title={batchAction === 'move' ? '移动用例' : batchAction === 'owner' ? '修改负责人' : '修改优先级'} open={!!batchAction} onCancel={() => { setBatchAction(undefined); setBatchValue(undefined); setBatchDirectoryPath([]); }} onOk={() => batchUpdate.mutate()} okButtonProps={{ disabled: batchAction === 'move' ? !batchDirectoryId : !batchValue }} confirmLoading={batchUpdate.isPending} okText="保存" cancelText="取消">
+      {batchAction === 'move' ? <Cascader className="w-full" options={directoryOptions(directories.data || [])} value={batchDirectoryPath} onChange={(path) => { setBatchDirectoryPath(path.map(String)); setBatchValue(path.at(-1) ? String(path.at(-1)) : undefined); }} showSearch changeOnSelect placeholder="请选择目标目录" /> : <Select className="w-full" showSearch optionFilterProp="label" value={batchValue} onChange={setBatchValue} loading={batchAction === 'owner' && employees.isLoading} status={batchAction === 'owner' && employees.isError ? 'error' : undefined} placeholder={batchAction === 'owner' ? '选择负责人' : '选择优先级'} options={batchAction === 'priority' ? ['P0', 'P1', 'P2', 'P3'].map((value) => ({ label: value, value })) : employeeSelectOptions(employees.data || [])} />}
+    </Modal>
     <Modal title="复制目录" open={!!copyingDirectory} onCancel={() => { setCopyingDirectory(undefined); setCopyName(''); }} onOk={() => copyDirectory.mutate()} okButtonProps={{ disabled: !copyName.trim() }} confirmLoading={copyDirectory.isPending} okText="复制" cancelText="取消"><Form layout="vertical"><Form.Item label="新目录名称" required><Input autoFocus value={copyName} onChange={(event) => setCopyName(event.target.value)} maxLength={120} /></Form.Item><div className="text-xs text-[var(--text-muted)]">目录下的子目录、测试用例和步骤将一并复制。</div></Form></Modal>
     <Modal title="重命名目录" open={!!renamingDirectory} onCancel={() => { setRenamingDirectory(undefined); setRenameName(''); }} onOk={() => renameDirectoryMutation.mutate()} okButtonProps={{ disabled: !renameName.trim() }} confirmLoading={renameDirectoryMutation.isPending} okText="保存" cancelText="取消"><Form layout="vertical"><Form.Item label="目录名称" required><Input autoFocus value={renameName} onChange={(event) => setRenameName(event.target.value)} maxLength={120} /></Form.Item></Form></Modal>
     <Modal title={directoryId ? '新建子目录' : '新建根目录'} open={directoryModalOpen} onCancel={() => setDirectoryModalOpen(false)} footer={[<Button key="cancel" onClick={() => setDirectoryModalOpen(false)}>取消</Button>, <Button key="save" type="primary" loading={createDirectory.isPending} disabled={!directoryName.trim() || (productLineFilter === 'all' && !directoryProductLineId)} onClick={() => createDirectory.mutate()}>保存</Button>]}><Form layout="vertical"><Form.Item label="产品线" required={productLineFilter === 'all'}>{productLineFilter === 'all' ? <Select placeholder="请选择产品线" value={directoryProductLineId || undefined} onChange={setDirectoryProductLineId} options={(productLines.data || []).map((item) => ({ label: item.name, value: item.id }))} /> : <Input value={productLines.data?.find((item) => item.id === productLineFilter)?.name || '当前产品线'} disabled />}</Form.Item><Form.Item label="目录名称" required><Input autoFocus value={directoryName} onChange={(event) => setDirectoryName(event.target.value)} maxLength={120} placeholder="请输入目录名称" /></Form.Item></Form></Modal>

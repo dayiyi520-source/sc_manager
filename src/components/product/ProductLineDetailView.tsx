@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Avatar, Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
+import { Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import {
@@ -46,7 +46,7 @@ import {
 import { AutomationRulesPanel } from './AutomationRulesPanel';
 import { normalizeProductWebsiteUrl } from './productWebsite';
 import { teamRepository } from '../../services/teamRepository';
-import { employeeJobTitle, employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity';
+import { employeeJobTitle, employeeSelectOptions, PersonAvatar, PersonIdentity } from '../common/PersonIdentity';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -881,8 +881,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               <div className="flex flex-wrap gap-x-8 gap-y-4">
                 {group.members.map((member) => (
                   <div key={member.id} className="w-28 text-center">
-                    <Avatar size={32}>{member.name.slice(0, 1)}</Avatar>
-                    <div className="mt-1 text-[10px] text-[var(--text-muted)]">{normalizeRole(member.role)}</div>
+                    <PersonAvatar name={member.name} size={32} />
                     <div className="mt-2 truncate text-xs text-[var(--text-body)]" title={member.name}>{member.name}</div>
                   </div>
                 ))}
@@ -898,7 +897,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <div className="space-y-3">
             {activityItems.map((activity) => (
               <div key={activity.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 text-sm">
-                <Avatar size={32}>{(activity.operatorName || currentUser.name || '系').slice(0, 1)}</Avatar>
+                <PersonAvatar name={activity.operatorName || currentUser.name || '系'} size={32} />
                 <span className="text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span>
                 <span className="ml-auto text-xs text-[var(--text-muted)]">{activity.createdAt}</span>
               </div>

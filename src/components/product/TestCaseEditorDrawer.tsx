@@ -21,9 +21,9 @@ type TestCaseEditorDrawerProps = {
 
 type EditorValues = Omit<SaveTestCaseInput, 'revision' | 'directoryId'> & { directoryPath?: string[]; tagsText?: string };
 
-type DirectoryOption = { value: string; label: string; children?: DirectoryOption[]; isProductLine?: boolean; isLeaf?: boolean };
+export type DirectoryOption = { value: string; label: string; children?: DirectoryOption[]; isProductLine?: boolean; isLeaf?: boolean };
 
-const directoryOptions = (directories: TestCaseDirectory[]): DirectoryOption[] => {
+export const directoryOptions = (directories: TestCaseDirectory[]): DirectoryOption[] => {
   const build = (parentId: string | null): DirectoryOption[] => directories
     .filter((item) => (item.parentId || null) === parentId)
     .sort((a, b) => a.sort - b.sort)

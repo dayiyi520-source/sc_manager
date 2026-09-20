@@ -125,6 +125,11 @@ export interface VersionTestReportListItem {
   name: string;
   summary?: string;
   creatorName: string;
+  reportType?: string;
+  productLineId?: string;
+  productLineName?: string;
+  versionId?: string;
+  versionName?: string;
   firstPlanName?: string;
   planCount: number;
   revision: number;
