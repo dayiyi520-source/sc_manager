@@ -97,4 +97,34 @@ describe('productRepository task API contract', () => {
     expect(fetchMock.mock.calls[0][1].method).toBe('PUT');
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ title: '统一任务', actualHours: 3.5, revision: 1 });
   });
+
+  it('encodes test-case filters and keeps writes in the API layer', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: { items: [], page: 1, pageSize: 20, total: 0 }, message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await productRepository.testCases('line/1', { directoryId: 'dir 1', keyword: '登录', enabled: true, page: 1, pageSize: 20 });
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/product-lines/line%2F1/test-cases?directoryId=dir+1&keyword=%E7%99%BB%E5%BD%95&enabled=true&page=1&pageSize=20');
+
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ code: 'OK', data: { id: 'case-1' }, message: '', requestId: 'r' }), { status: 200 }));
+    await productRepository.setTestCaseEnabled('line-1', 'case-1', 3, false);
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/product-lines/line-1/test-cases/case-1/enabled');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ revision: 3, enabled: false });
+  });
+
+  it('creates failed-only execution and saves results through stable routes', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: {}, message: '', requestId: 'r' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await productRepository.createTestExecution('WI-1', {
+      requestId: 'round-2', scopeType: 'FAILED_ONLY', testCaseIds: [],
+      name: '第二轮回归', environment: '测试环境', buildVersion: 'V1.2.0-build.38'
+    });
+    await productRepository.saveTestResult('result-1', { result: 'FAILED', actualResult: '响应超时', evidence: [], revision: 1 });
+    await productRepository.linkTestResultDefect('result-1', 'bug-1', 2);
+
+    expect(fetchMock.mock.calls.map((call) => [call[0], call[1].method])).toEqual([
+      ['/api/work-items/WI-1/test-executions', 'POST'],
+      ['/api/test-execution-cases/result-1', 'PUT'],
+      ['/api/test-execution-cases/result-1/defects', 'POST']
+    ]);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ scopeType: 'FAILED_ONLY', requestId: 'round-2' });
+  });
 });
