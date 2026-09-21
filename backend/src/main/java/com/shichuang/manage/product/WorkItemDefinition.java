@@ -43,13 +43,23 @@ public final class WorkItemDefinition {
     public record CreateItem(String requestId, String productLineId, String category, String taskTypeId,
         String title, String description, String descriptionHtml, String expectedGoal, String versionId, String requirementId,
         String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
-        LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours) {
+        LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours, String customerId, String customerName,
+        List<String> ccNames, List<Map<String,Object>> media) {
+        public CreateItem(String requestId, String productLineId, String category, String taskTypeId,
+            String title, String description, String descriptionHtml, String expectedGoal, String versionId, String requirementId,
+            String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
+            LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours, String customerId, String customerName) {
+            this(requestId, productLineId, category, taskTypeId, title, description, descriptionHtml, expectedGoal, versionId,
+                requirementId, parentWorkItemId, assigneeId, priority, plannedStartDate, plannedEndDate, estimatedHours, actualHours,
+                customerId, customerName, null, null);
+        }
         public CreateItem(String requestId, String productLineId, String category, String taskTypeId,
             String title, String description, String expectedGoal, String versionId, String requirementId,
             String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
             LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours) {
             this(requestId, productLineId, category, taskTypeId, title, description, null, expectedGoal, versionId,
-                requirementId, parentWorkItemId, assigneeId, priority, plannedStartDate, plannedEndDate, estimatedHours, actualHours);
+                requirementId, parentWorkItemId, assigneeId, priority, plannedStartDate, plannedEndDate, estimatedHours, actualHours,
+                null, null, null, null);
         }
     }
     public record UpdateItem(String title, String description, String descriptionHtml, String expectedGoal, String versionId,

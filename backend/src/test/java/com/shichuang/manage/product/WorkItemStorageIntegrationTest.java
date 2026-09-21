@@ -52,7 +52,8 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         var first=storage.create(input);
         assertEquals(first.get("id"),storage.create(input).get("id"));
         assertEquals(1,storage.activities(line,first.get("id").toString()).size());
-        var changed=new CreateItem(input.requestId(),line,"test",type,"不同标题",null,null,null,null,null,null,"P1",null,null,null,null);
+        var changed=new CreateItem(input.requestId(),line,"test",type,"不同标题",null,null,null,null,null,
+            null,null,"P1",null,null,null,null,null,null,null,null);
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.create(changed)).getStatusCode().value());
     }
     @Test void persistsEstimatedAndActualHoursOnCreation() {
@@ -63,11 +64,23 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(0,new java.math.BigDecimal("3.25").compareTo((java.math.BigDecimal)created.get("actualHours")));
     }
     @Test void persistsRichTextDescriptionOnCreateAndUpdate() {
-        var input=new CreateItem("rich-description",line,"test",type,"富文本任务","加粗内容","<p><strong>加粗内容</strong></p>",null,null,null,null,null,"P2",null,null,null,null);
+        var input=new CreateItem("rich-description",line,"test",type,"富文本任务","加粗内容","<p><strong>加粗内容</strong></p>",
+            null,null,null,null,null,"P2",null,null,null,null,null,null,null,null);
         var created=storage.create(input);
         assertEquals("<p><strong>加粗内容</strong></p>",created.get("descriptionHtml"));
         var changed=storage.update(line,created.get("id").toString(),new UpdateItem(null,"更新内容","<p><em>更新内容</em></p>",null,null,null,null,null,null,null,null,0));
         assertEquals("<p><em>更新内容</em></p>",changed.get("descriptionHtml"));
+    }
+    @Test void persistsParticipantsAndAttachmentsOnCreate() throws Exception {
+        jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES('participant-user',?,'participant-user','参与测试员','测试部','product_manager','测试员','enabled','test-user','test-user',NOW(),NOW())",tenant);
+        var media=List.<Map<String,Object>>of(Map.of("id","attachment-1","name","测试说明.pdf","type","file","dataUrl","data:application/pdf;base64,ZmFrZQ==","size",4,"mimeType","application/pdf"));
+        var input=new CreateItem("participants-and-attachments",line,"test",type,"带参与人和附件的任务",null,null,
+            null,null,null,null,null,"P2",null,null,null,null,null,null,List.of("参与测试员"),media);
+
+        var created=storage.create(input);
+
+        assertEquals(List.of("参与测试员"),objectMapper.readValue(created.get("ccNames").toString(),new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {}));
+        assertEquals("测试说明.pdf",objectMapper.readTree(created.get("media").toString()).get(0).path("name").asText());
     }
     @Test void updatesUnifiedFieldsWithOptimisticRevision() {
         jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES('assignee-user',?,'assignee-user','测试负责人','测试部','product_manager','测试负责人','enabled','test-user','test-user',NOW(),NOW())",tenant);

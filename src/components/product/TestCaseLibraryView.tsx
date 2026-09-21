@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Checkbox, Dropdown, Empty, Form, Input, Modal, Select, Spin, Table, Tag, Tree } from 'antd';
-import { CopyOutlined, DeleteOutlined, EditOutlined, FolderOutlined, MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Badge, Button, Checkbox, Dropdown, Empty, Form, Input, Modal, Select, Spin, Table, Tag, Tree } from 'antd';
+import { CopyOutlined, DeleteOutlined, EditOutlined, FolderOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { productRepository } from '../../services/productRepository';
 import { teamRepository } from '../../services/teamRepository';
@@ -8,10 +8,15 @@ import type { TestCase, TestCaseDirectory, TestPriority } from '../../types/test
 import { TestCaseEditorDrawer } from './TestCaseEditorDrawer';
 import { PersonIdentity } from '../common/PersonIdentity';
 import { TestCaseBatchActionModal, type TestCaseBatchAction } from './TestCaseBatchActionModal';
+import { Filter, Search, X } from '@/components/common/octicons-compat';
+import { readSession } from '../../services/session';
 
 type TestCaseLibraryViewProps = { productLineFilter?: string };
 export type TestCaseGroup = { key: string; title: string; path: string; items: TestCase[] };
 type TestCaseTableRow = TestCase | { id: string; __group: true; path: string; count: number };
+type CaseFilterState = { code: string; title: string; owner: string; createdFrom: string; createdTo: string; priority: string; type: string };
+
+const createEmptyCaseFilters = (): CaseFilterState => ({ code: '', title: '', owner: '', createdFrom: '', createdTo: '', priority: '', type: '' });
 
 const isGroupRow = (row: TestCaseTableRow): row is Extract<TestCaseTableRow, { __group: true }> => '__group' in row;
 
@@ -47,12 +52,21 @@ export function groupTestCasesByDirectory(items: TestCase[], directories: TestCa
 
 export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ productLineFilter = 'all' }) => {
   const lineId = productLineFilter === 'all' ? 'all' : productLineFilter;
+  const currentSessionUser = readSession()?.user;
+  const currentUserName = currentSessionUser?.name || '';
+  const currentUserId = currentSessionUser?.id || '';
   const queryClient = useQueryClient();
   const [directoryId, setDirectoryId] = useState('');
   const [selectedProductLineId, setSelectedProductLineId] = useState('');
   const [keyword, setKeyword] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchDraft, setSearchDraft] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created'>('all');
   const [priority, setPriority] = useState<TestPriority | ''>('');
   const [enabled, setEnabled] = useState<boolean | undefined>(true);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterDraft, setFilterDraft] = useState<CaseFilterState>(createEmptyCaseFilters);
+  const [appliedFilters, setAppliedFilters] = useState<CaseFilterState>(createEmptyCaseFilters);
   const [page, setPage] = useState(1);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCase, setEditingCase] = useState<TestCase | null>(null);
@@ -71,12 +85,24 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
   const [renameName, setRenameName] = useState('');
   const activeLineId = productLineFilter === 'all' ? selectedProductLineId || 'all' : productLineFilter;
   const batchDirectoryId = batchDirectoryPath.at(-1)?.startsWith('product-line:') ? undefined : batchDirectoryPath.at(-1);
+  const controlsRef = useRef<HTMLDivElement>(null);
 
   const directories = useQuery({ queryKey: ['test-case-directories', lineId], queryFn: () => productRepository.testCaseDirectories(lineId), enabled: true, retry: false });
   const productLines = useQuery({ queryKey: ['test-case-product-lines'], queryFn: () => productRepository.productLines(), enabled: true, retry: false });
+  const selectedLineTypes = useQuery({ queryKey: ['test-case-work-item-types', activeLineId], queryFn: () => productRepository.workItemTypes(activeLineId, '用例'), enabled: activeLineId !== 'all', retry: false });
   const employees = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: batchAction === 'owner', retry: false });
-  const cases = useQuery({ queryKey: ['test-cases', activeLineId, directoryId, keyword, priority, enabled, page], queryFn: () => productRepository.testCases(activeLineId, { directoryId, includeDescendants: Boolean(directoryId), keyword, priority, enabled, page, pageSize: 100 }), enabled: true, retry: false });
+  const cases = useQuery({ queryKey: ['test-cases', activeLineId, directoryId, keyword, priority, enabled, activeTab, currentUserName, currentUserId, page], queryFn: () => productRepository.testCases(activeLineId, { directoryId, includeDescendants: Boolean(directoryId), keyword, priority, ownerId: activeTab === 'my_owned' ? currentUserId : undefined, creatorName: activeTab === 'my_created' ? currentUserName : undefined, enabled, page, pageSize: 100 }), enabled: true, retry: false });
   useEffect(() => { setSelectedProductLineId(''); setDirectoryId(''); }, [productLineFilter]);
+  useEffect(() => {
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement;
+      if (controlsRef.current?.contains(target) || target.closest('.ant-select-dropdown, .ant-picker-dropdown, .ant-popover')) return;
+      setSearchOpen(false);
+      setFilterOpen(false);
+    };
+    document.addEventListener('pointerdown', handleOutsidePointerDown);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
+  }, []);
   const createDirectory = useMutation({
     mutationFn: () => productRepository.createTestCaseDirectory(lineId, { parentId: directoryId || null, productLineId: productLineFilter === 'all' ? directoryProductLineId : productLineFilter, name: directoryName.trim() }),
     onSuccess: () => { setDirectoryModalOpen(false); setDirectoryName(''); setDirectoryProductLineId(''); void queryClient.invalidateQueries({ queryKey: ['test-case-directories', lineId] }); },
@@ -133,7 +159,34 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
     setBatchAction(value as TestCaseBatchAction);
   };
   const directoryLine = (item: TestCaseDirectory) => item.productLineId || (productLineFilter === 'all' ? '' : productLineFilter);
-  const groups = useMemo(() => groupTestCasesByDirectory(cases.data?.items || [], directories.data || []), [cases.data?.items, directories.data]);
+  const scopedCases = useMemo(() => (cases.data?.items || []).filter((item) => activeTab === 'all' || (activeTab === 'my_owned' ? item.ownerName === currentUserName : item.creatorName === currentUserName)), [activeTab, cases.data?.items, currentUserName]);
+  const tabCounts = useMemo(() => ({ all: cases.data?.total || 0, my_owned: (cases.data?.items || []).filter((item) => item.ownerName === currentUserName).length, my_created: (cases.data?.items || []).filter((item) => item.creatorName === currentUserName).length }), [cases.data?.items, cases.data?.total, currentUserName]);
+  const filteredCases = useMemo(() => scopedCases.filter((item) => {
+    const created = item.createdAt ? String(item.createdAt).slice(0, 10) : '';
+    return (!appliedFilters.code || item.code.includes(appliedFilters.code)) && (!appliedFilters.title || item.title.toLocaleLowerCase().includes(appliedFilters.title.toLocaleLowerCase())) && (!appliedFilters.owner || item.ownerName === appliedFilters.owner) && (!appliedFilters.createdFrom || created >= appliedFilters.createdFrom) && (!appliedFilters.createdTo || created <= appliedFilters.createdTo) && (!appliedFilters.priority || item.priority === appliedFilters.priority) && (!appliedFilters.type || item.workItemTypeName === appliedFilters.type);
+  }), [scopedCases, appliedFilters]);
+  const activeFilterCount = [appliedFilters.code, appliedFilters.title, appliedFilters.owner, appliedFilters.createdFrom || appliedFilters.createdTo, appliedFilters.priority, appliedFilters.type].filter(Boolean).length;
+  const appliedFilterLabels: Array<{ key: keyof CaseFilterState; text: string }> = [
+    appliedFilters.code && { key: 'code', text: `编号：“${appliedFilters.code}”` },
+    appliedFilters.title && { key: 'title', text: `标题：“${appliedFilters.title}”` },
+    appliedFilters.owner && { key: 'owner', text: `执行人 ${appliedFilters.owner}` },
+    (appliedFilters.createdFrom || appliedFilters.createdTo) && { key: 'createdFrom', text: `创建时间 ${appliedFilters.createdFrom || '不限'} 至 ${appliedFilters.createdTo || '不限'}` },
+    appliedFilters.priority && { key: 'priority', text: `优先级 ${appliedFilters.priority}` },
+    appliedFilters.type && { key: 'type', text: `类型 ${appliedFilters.type}` },
+  ].filter(Boolean) as Array<{ key: keyof CaseFilterState; text: string }>;
+  const removeAppliedFilter = (key: keyof CaseFilterState) => {
+    setAppliedFilters((current) => ({ ...current, ...(key === 'createdFrom' ? { createdFrom: '', createdTo: '' } : { [key]: '' }) }));
+    setFilterDraft((current) => ({ ...current, ...(key === 'createdFrom' ? { createdFrom: '', createdTo: '' } : { [key]: '' }) }));
+  };
+  const ownerOptions = useMemo(() => [...new Set((cases.data?.items || []).map((item) => item.ownerName).filter(Boolean))].map((value) => ({ label: value, value })), [cases.data?.items]);
+  const typeOptions = useMemo(() => {
+    const configuredTypes = activeLineId === 'all'
+      ? (productLines.data || []).flatMap((line) => line.workItemTypes || [])
+      : selectedLineTypes.data || productLines.data?.find((line) => line.id === activeLineId)?.workItemTypes || [];
+    return [...new Set(configuredTypes.filter((item) => item.category === '用例' && item.enabled).map((item) => item.name))].map((value) => ({ label: value, value }));
+  }, [activeLineId, productLines.data, selectedLineTypes.data]);
+  const filterRow = (label: string, control: React.ReactNode) => <div className="test-case-filter-row"><div className="test-case-filter-label">{label}</div><div className="test-case-filter-value">{control}</div></div>;
+  const groups = useMemo(() => groupTestCasesByDirectory(filteredCases, directories.data || []), [filteredCases, directories.data]);
   const tableRows = useMemo<TestCaseTableRow[]>(() => groups.flatMap((group) => [{ id: `group:${group.key}`, __group: true, path: group.path, count: group.items.length }, ...group.items]), [groups]);
   const toggleGroupSelection = (group: TestCaseGroup, checked: boolean) => {
     const groupIds = group.items.map((item) => item.id);
@@ -159,9 +212,22 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
 
   return <div className="test-case-library">
     {actionError && <Alert closable onClose={() => setActionError('')} type="error" showIcon title="操作失败" description={actionError} />}
-    <header className="test-case-library-toolbar">
-      <div><h2>测试用例库</h2></div>
-      <div className="test-case-library-actions"><Input allowClear prefix={<SearchOutlined />} value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} placeholder="搜索编号或标题" /><Select allowClear value={priority || undefined} onChange={(value) => { setPriority(value || ''); setPage(1); }} placeholder="优先级" options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} /><Select value={enabled === undefined ? 'all' : String(enabled)} onChange={(value) => { setEnabled(value === 'all' ? undefined : value === 'true'); setPage(1); }} options={[{ label: '全部状态', value: 'all' }, { label: '已启用', value: 'true' }, { label: '已停用', value: 'false' }]} /><Select placeholder="匹配操作" options={[{ label: '匹配全部', value: 'all' }, { label: '匹配标题', value: 'title' }, { label: '匹配编号', value: 'code' }]} /><Button aria-label="刷新用例库" icon={<ReloadOutlined />} loading={cases.isFetching} onClick={refresh} /><Button type="primary" icon={<PlusOutlined />} disabled={directories.isLoading || directories.isError} onClick={() => openEditor()}>新建用例</Button></div>
+    <header className="test-case-library-toolbar" ref={controlsRef}>
+      <div className="test-case-library-toolbar-top">
+        <div role="tablist" aria-label="用例范围" className="requirement-scope-tabs inline-flex h-10 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">
+          {([['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeTab === value} onClick={() => { setActiveTab(value); setPage(1); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{tabCounts[value]}</button>)}
+        </div>
+        <div className="test-case-library-actions"><div className={`test-case-search ${searchOpen ? 'is-open' : ''}`}>{searchOpen && <Input allowClear prefix={<Search className="h-4 w-4" />} value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} onPressEnter={() => { setKeyword(searchDraft); setPage(1); setSearchOpen(false); }} placeholder="搜索编号或标题" />}<Button type="text" aria-label="搜索" aria-pressed={searchOpen} icon={<Search className="h-4 w-4" />} onClick={() => { setSearchDraft(keyword); setSearchOpen((value) => !value); setFilterOpen(false); }} /></div><Badge count={activeFilterCount} size="small" offset={[-2, 2]}><Button type="text" aria-label="过滤器" aria-pressed={filterOpen} icon={<Filter className="h-4 w-4" />} onClick={() => { setFilterDraft(appliedFilters); setFilterOpen((value) => !value); setSearchOpen(false); }} /></Badge><Button type="primary" icon={<PlusOutlined />} disabled={directories.isLoading || directories.isError} onClick={() => openEditor()}>新建用例</Button></div>
+      </div>
+      {filterOpen && <div className="test-case-filters"><div className="test-case-filter-grid">
+        {filterRow('编号', <Input aria-label="编号过滤值" variant="borderless" value={filterDraft.code} onChange={(event) => setFilterDraft((value) => ({ ...value, code: event.target.value }))} placeholder="请输入完整编号" />)}
+        {filterRow('标题', <Input aria-label="标题过滤值" variant="borderless" value={filterDraft.title} onChange={(event) => setFilterDraft((value) => ({ ...value, title: event.target.value }))} placeholder="请输入标题关键词" />)}
+        {filterRow('执行人', <Select aria-label="执行人" variant="borderless" allowClear showSearch optionFilterProp="label" value={filterDraft.owner || undefined} onChange={(value) => setFilterDraft((current) => ({ ...current, owner: value || '' }))} options={ownerOptions} placeholder="请选择或输入关键字查询" />)}
+        <div className="test-case-filter-row"><div className="test-case-filter-label">创建时间</div><div className="test-case-filter-date-value"><Input aria-label="创建时间开始" type="date" variant="borderless" value={filterDraft.createdFrom} onChange={(event) => setFilterDraft((value) => ({ ...value, createdFrom: event.target.value }))} /><span>-</span><Input aria-label="创建时间结束" type="date" variant="borderless" value={filterDraft.createdTo} onChange={(event) => setFilterDraft((value) => ({ ...value, createdTo: event.target.value }))} /></div></div>
+        {filterRow('优先级', <Select aria-label="优先级" variant="borderless" allowClear value={filterDraft.priority || undefined} onChange={(value) => setFilterDraft((current) => ({ ...current, priority: value || '' }))} options={(['P0', 'P1', 'P2', 'P3'] as TestPriority[]).map((value) => ({ label: value, value }))} placeholder="请选择优先级" />)}
+        {filterRow('类型', <Select aria-label="类型" variant="borderless" allowClear showSearch optionFilterProp="label" value={filterDraft.type || undefined} onChange={(value) => setFilterDraft((current) => ({ ...current, type: value || '' }))} options={typeOptions} placeholder="请选择类型" />)}
+      </div><div className="test-case-filter-actions"><Button onClick={() => { const empty = createEmptyCaseFilters(); setFilterDraft(empty); setAppliedFilters(empty); }}>清空</Button><Button type="primary" onClick={() => { setAppliedFilters(filterDraft); setFilterOpen(false); }}>应用过滤</Button></div></div>}
+      {activeFilterCount > 0 && <div className="test-case-applied-filters">{appliedFilterLabels.map(({ key, text }) => <span key={key} className="test-case-filter-tag">{text}<button type="button" aria-label={`删除${text}`} onClick={() => removeAppliedFilter(key)}><X className="h-3 w-3" /></button></span>)}<button type="button" className="test-case-clear-filters" onClick={() => { const empty = createEmptyCaseFilters(); setFilterDraft(empty); setAppliedFilters(empty); }}>清空过滤条件</button></div>}
     </header>
     <div className="test-case-library-grid">
       <aside className="test-case-directory-rail">

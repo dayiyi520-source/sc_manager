@@ -1743,11 +1743,15 @@ html.dark .review-empty-icon {
 
 /* Test management workspace */
 .test-case-library { display: grid; gap: 16px; min-width: 0; color: var(--text-body); }
-.test-case-library-toolbar { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border-main); padding: 0 4px 12px; }
+.test-case-library-toolbar { display: grid; gap: 12px; min-height: 64px; border: 1px solid var(--border-main); border-radius: 12px; background: var(--bg-card); padding: 16px; box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 6%, transparent); }
+.test-case-library-toolbar-top { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border-main); padding-bottom: 12px; }
 .test-case-library-toolbar h2 { margin: 0; color: var(--text-primary); font-size: 18px; line-height: 26px; font-weight: 700; }
 .test-case-library-toolbar p { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
 .test-case-library-actions { display: flex; flex: 1 1 auto; justify-content: flex-end; gap: 8px; }
-.test-case-library-actions .ant-input { width: min(260px, 22vw); }
+.test-case-search { display: flex; width: 32px; align-items: center; overflow: hidden; transition: width 160ms ease; }
+.test-case-search.is-open { width: min(260px, 22vw); }
+.test-case-search .ant-input-affix-wrapper { width: 0; min-width: 0; opacity: 0; transition: opacity 120ms ease; }
+.test-case-search.is-open .ant-input-affix-wrapper { width: calc(100% - 32px); opacity: 1; }
 .test-case-library-actions .ant-select { width: 120px; }
 .test-case-library-grid { display: grid; grid-template-columns: minmax(200px, 232px) minmax(560px, 1fr); min-height: 560px; overflow: hidden; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface); }
 .test-case-directory-rail, .test-case-inspector { min-width: 0; background: var(--bg-surface-soft); }
@@ -1811,7 +1815,23 @@ html.dark .review-empty-icon {
   .version-test-report-stat { border-right: 0; border-bottom: 1px solid var(--border-main); padding: 0 0 12px; }
   .version-test-report-stat:last-child { border-bottom: 0; }
 }
-.test-case-filters { display: grid; grid-template-columns: minmax(240px, 1fr) 128px 128px; gap: 8px; border-bottom: 1px solid var(--border-main); padding: 12px; }
+.test-case-filters { display: grid; flex: 0 0 100%; gap: 12px; overflow: visible; border-bottom: 1px solid var(--border-main); background: var(--bg-surface-soft); padding: 16px; }
+.test-case-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.test-case-filter-row { display: grid; min-width: 0; height: 36px; grid-template-columns: 96px minmax(0, 1fr); align-items: center; overflow: visible; border: 1px solid var(--border-main); border-radius: 6px; background: var(--bg-card); }
+.test-case-filter-label { display: flex; height: 100%; align-items: center; padding: 0 12px; color: var(--text-body); font-size: 12px; }
+.test-case-filter-label { font-weight: 500; }
+.test-case-filter-value { min-width: 0; overflow: visible; padding: 0 8px; }
+.test-case-filter-value .ant-select, .test-case-filter-value .ant-input { width: 100%; }
+.test-case-filter-value :where(.ant-select, .ant-input-affix-wrapper, .ant-input) { height: 36px; min-height: 36px; }
+.test-case-filter-value .ant-input { padding-top: 0; padding-bottom: 0; }
+.test-case-filter-date-value { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px; padding: 0 8px; color: var(--text-muted); }
+.test-case-filter-date-value .ant-input { min-width: 0; }
+.test-case-filter-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.test-case-applied-filters { display: flex; min-height: 44px; flex-wrap: wrap; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-main); padding: 8px 4px; font-size: 11px; }
+.test-case-filter-tag { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; background: color-mix(in srgb, var(--primary) 12%, transparent); padding: 4px 8px; color: var(--active-text); }
+.test-case-filter-tag button { display: inline-flex; border: 0; padding: 0; color: currentColor; background: transparent; cursor: pointer; opacity: .7; }
+.test-case-filter-tag button:hover { opacity: 1; }
+.test-case-clear-filters { border: 0; padding: 4px; color: var(--active-text); background: transparent; cursor: pointer; }
 .test-case-table-state { padding: 24px; }
 .test-case-batch-bar { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-main); padding: 10px 12px; color: var(--text-primary); }
 .test-case-empty { display: grid; justify-items: center; gap: 8px; }
@@ -1883,10 +1903,10 @@ html.dark .review-empty-icon {
   .test-case-inspector { display: none; }
 }
 @media (max-width: 768px) {
-  .test-case-library-toolbar { align-items: flex-start; flex-direction: column; }
+  .test-case-library-toolbar-top { align-items: flex-start; flex-direction: column; }
   .test-case-library-grid { grid-template-columns: minmax(680px, 1fr); overflow-x: auto; }
   .test-case-directory-rail { border-right: 0; border-bottom: 1px solid var(--border-main); }
-  .test-case-filters { grid-template-columns: 1fr; }
+  .test-case-filter-grid { grid-template-columns: 1fr; }
   .test-case-editor-grid { grid-template-columns: 1fr; }
   .test-case-step-table-head, .test-case-step-table .test-case-step-row { grid-template-columns: 52px minmax(160px, 1fr) minmax(160px, 1fr) 112px; }
 }

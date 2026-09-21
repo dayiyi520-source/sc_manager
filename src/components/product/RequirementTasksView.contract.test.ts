@@ -59,6 +59,10 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain("value: 'children'");
     expect(requirementSource).toContain('title="添加子任务"');
     expect(requirementSource).toContain('父级任务');
+    expect(requirementSource).toContain('openWorkItemDetail(child, selectedTask)');
+    expect(requirementSource).toContain('label="所属产品线"><Input value={selectedTask?.productLineName || \'未设置\'} disabled');
+    expect(requirementSource).toContain('label="迭代版本"><Input value={selectedTask?.versionName || \'未设置\'} disabled');
+    expect(requirementSource).toContain('label="关联客户"><Input value={selectedTask?.customerName || \'未关联\'} disabled');
   });
 
   it('creates children only from the parent category and uses child-task copy', () => {
@@ -100,5 +104,6 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('productRepository.transitionWorkItem');
     expect(requirementSource).toContain("if (task.hasChildren) return <WorkItemStatusTag");
     expect(requirementSource).toContain('options.statuses');
+    expect(requirementSource).toContain('disabled={Boolean(selectedTask.hasChildren && !selectedTask.parentWorkItemId)}');
   });
 });

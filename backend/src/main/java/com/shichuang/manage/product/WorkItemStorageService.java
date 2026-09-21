@@ -34,6 +34,9 @@ public class WorkItemStorageService {
         if (body.actualHours()!=null && (body.actualHours().signum()<0 || body.actualHours().compareTo(new java.math.BigDecimal("99999999.99"))>0 || body.actualHours().scale()>2))
             throw new IllegalArgumentException("实际工时须为非负数，最多两位小数且不超过99999999.99");
         String line=body.productLineId(),tenant=RequestContext.tenantId(),user=RequestContext.userId();
+        List<String> ccNames=validatedCcNames(body.ccNames(),tenant);
+        List<Map<String,Object>> media=validatedMedia(body.media());
+        body=new CreateItem(body.requestId(),body.productLineId(),body.category(),body.taskTypeId(),body.title(),body.description(),body.descriptionHtml(),body.expectedGoal(),body.versionId(),body.requirementId(),body.parentWorkItemId(),body.assigneeId(),body.priority(),body.plannedStartDate(),body.plannedEndDate(),body.estimatedHours(),body.actualHours(),body.customerId(),body.customerName(),ccNames,media);
         String hash=hash(configurations.encode(body));
         Map<String,Object> duplicate=mapper.request(tenant,line,body.requestId());
         if (duplicate!=null) {
@@ -52,7 +55,12 @@ public class WorkItemStorageService {
             if (inheritedRequirement==null && "requirement".equals(parent.get("category"))) inheritedRequirement=parentId;
             if (versionId!=null && !versionId.equals(inheritedVersion)) throw new IllegalArgumentException("子任务必须继承父任务版本");
             if (requirementId!=null && !requirementId.equals(inheritedRequirement)) throw new IllegalArgumentException("子任务必须继承父任务需求");
+            String inheritedCustomerId=optional(Objects.toString(parent.get("customerId"),null));
+            String inheritedCustomerName=optional(Objects.toString(parent.get("customerName"),null));
+            if (body.customerId()!=null && !Objects.equals(optional(body.customerId()), inheritedCustomerId)) throw new IllegalArgumentException("子任务必须继承父任务客户");
+            if (body.customerName()!=null && !Objects.equals(optional(body.customerName()), inheritedCustomerName)) throw new IllegalArgumentException("子任务必须继承父任务客户");
             versionId=inheritedVersion; requirementId=inheritedRequirement;
+            body = new CreateItem(body.requestId(), body.productLineId(), body.category(), body.taskTypeId(), body.title(), body.description(), body.descriptionHtml(), body.expectedGoal(), versionId, requirementId, body.parentWorkItemId(), body.assigneeId(), body.priority(), body.plannedStartDate(), body.plannedEndDate(), body.estimatedHours(), body.actualHours(), inheritedCustomerId, inheritedCustomerName, ccNames, media);
         }
         if (requirementId!=null) {
             Map<String,Object> requirement=mapper.item(tenant,line,requirementId);
@@ -72,7 +80,8 @@ public class WorkItemStorageService {
         Workflow definition=configurations.decode(workflow.get("definition"));
         State initial=definition.states().stream().filter(State::initial).findFirst().orElseThrow();
         String id=UUID.randomUUID().toString(),code="WI-"+id;
-        mapper.insertItem(tenant,id,code,body,versionId,requirementId,parentId,assigneeName,workflow.get("id").toString(),initial,hash,user);
+        mapper.insertItem(tenant,id,code,body,versionId,requirementId,optional(body.customerId()),optional(body.customerName()),
+            configurations.encode(body.ccNames()),configurations.encode(body.media()),parentId,assigneeName,workflow.get("id").toString(),initial,hash,user);
         mapper.activity(tenant,line,id,"WORK_ITEM_CREATED",configurations.encode(Map.of("title",body.title(),"category",body.category())),user);
         return requireItem(line,id);
     }
@@ -81,6 +90,7 @@ public class WorkItemStorageService {
     @Transactional public Map<String,Object> update(String line,String id,UpdateItem body) {
         access.check(line,true);
         Map<String,Object> item=requireItem(line,id);
+        if (item.get("parentWorkItemId")==null && mapper.hasChildren(RequestContext.tenantId(),line,id)) throw conflict("存在子任务的主任务不可修改基础字段，请调整子任务");
         if (body.revision()==null || body.revision()!=((Number)item.get("revision")).intValue()) throw conflict("任务已被其他人修改，请刷新后重试");
         if (body.assigneeName()!=null && item.get("parentWorkItemId")==null)
             throw new IllegalArgumentException("主任务负责人不可修改，请调整子任务负责人");
@@ -120,6 +130,33 @@ public class WorkItemStorageService {
     private static void validateHours(java.math.BigDecimal value,String label) {
         if(value!=null && (value.signum()<0 || value.compareTo(new java.math.BigDecimal("99999999.99"))>0 || value.scale()>2))
             throw new IllegalArgumentException(label+"须为非负数，最多两位小数且不超过99999999.99");
+    }
+    private List<String> validatedCcNames(List<String> values,String tenant) {
+        if (values==null || values.isEmpty()) return List.of();
+        if (values.size()>100) throw new IllegalArgumentException("参与人最多选择100人");
+        Set<String> names=new LinkedHashSet<>();
+        for (String value:values) {
+            String name=required(value,"参与人",128);
+            Map<String,Object> employee=mapper.assigneeByName(tenant,name);
+            if(employee==null) throw new IllegalArgumentException("参与人不存在或已停用");
+            names.add(employee.get("name").toString());
+        }
+        return List.copyOf(names);
+    }
+    private static List<Map<String,Object>> validatedMedia(List<Map<String,Object>> values) {
+        if (values==null || values.isEmpty()) return List.of();
+        if(values.size()>10) throw new IllegalArgumentException("附件最多上传10个");
+        long total=0;
+        for(Map<String,Object> value:values) {
+            if(value==null) throw new IllegalArgumentException("附件不能为空");
+            required(Objects.toString(value.get("name"),null),"附件名称",255);
+            String type=Objects.toString(value.get("type"),"");
+            if(!Set.of("image","video","file").contains(type)) throw new IllegalArgumentException("附件类型无效");
+            String dataUrl=required(Objects.toString(value.get("dataUrl"),null),"附件内容",6_000_000);
+            total+=dataUrl.length();
+            if(total>10_000_000) throw new IllegalArgumentException("附件总大小不能超过10MB");
+        }
+        return List.copyOf(values);
     }
     private static String hash(String input) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8))); }

@@ -62,7 +62,7 @@ public class TestCaseService {
         List<String> directoryIds = input.includeDescendants() && directory != null
             ? descendantDirectoryIds(tenant, line, directory)
             : List.of();
-        Query q=new Query(directory,blank(input.keyword()),blank(input.priority()),blank(input.ownerId()),input.enabled(),page,size,input.includeDescendants(),directoryIds);
+        Query q=new Query(directory,blank(input.keyword()),blank(input.priority()),blank(input.ownerId()),null,input.enabled(),page,size,input.includeDescendants(),directoryIds);
         return new CasePage(mapper.list(tenant,line,q).stream().map(this::view).toList(),page,size,mapper.count(tenant,line,q));
     }
     private List<String> descendantDirectoryIds(String tenant, String line, String root) {
@@ -135,7 +135,7 @@ public class TestCaseService {
     }
     private CaseView view(Map<String,Object> row){
         String id=text(row,"id");List<StepInput> steps=mapper.steps(RequestContext.tenantId(),id).stream().map(s->new StepInput(text(s,"id"),number(s,"sort"),text(s,"action"),text(s,"expectedResult"))).toList();
-        return new CaseView(id,text(row,"code"),text(row,"productLineId"),text(row,"directoryId"),text(row,"directoryName"),nullable(row,"sourceRequirementId"),nullable(row,"sourceRequirementTitle"),text(row,"title"),nullable(row,"precondition"),text(row,"priority"),text(row,"ownerId"),text(row,"ownerName"),decode(row.get("tags")),text(row,"workItemTypeId"),text(row,"workItemTypeName"),text(row,"workflowId"),text(row,"statusKey"),text(row,"statusName"),text(row,"statusGroup"),text(row,"statusColor"),enabled(row.get("enabled")),number(row,"revision"),longNumber(row,"referenceCount"),nullable(row,"latestResult"),time(row.get("createdAt")),time(row.get("updatedAt")),steps);
+        return new CaseView(id,text(row,"code"),text(row,"productLineId"),text(row,"directoryId"),text(row,"directoryName"),nullable(row,"sourceRequirementId"),nullable(row,"sourceRequirementTitle"),text(row,"title"),nullable(row,"precondition"),text(row,"priority"),text(row,"ownerId"),text(row,"ownerName"),text(row,"creatorName"),decode(row.get("tags")),text(row,"workItemTypeId"),text(row,"workItemTypeName"),text(row,"workflowId"),text(row,"statusKey"),text(row,"statusName"),text(row,"statusGroup"),text(row,"statusColor"),enabled(row.get("enabled")),number(row,"revision"),longNumber(row,"referenceCount"),nullable(row,"latestResult"),time(row.get("createdAt")),time(row.get("updatedAt")),steps);
     }
     private CaseState initialState(String line,String requestedType,String requestedStatus){
         String tenant=RequestContext.tenantId();String typeId=blank(requestedType);

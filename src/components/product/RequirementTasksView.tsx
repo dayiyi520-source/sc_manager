@@ -323,13 +323,14 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const activeTasks = unifiedCategory && remoteEnabled ? unifiedQuery.data || [] : contextTasks;
   const updateTask = async (id: string, updates: Partial<RequirementTask>): Promise<boolean> => {
     if (unifiedCategory && remoteEnabled) {
-      const current = activeTasks.find((task) => task.id === id);
-      if (!current?.productLineId || current.revision == null) {
+      const current = activeTasks.find((task) => task.id === id) || (Object.values(listChildren).flat() as RequirementTask[]).find((task) => task.id === id);
+      const productLineId = current?.productLineId || selectedTask?.productLineId;
+      if (!productLineId || current?.revision == null) {
         addToast('error', `${itemLabel}同步失败`, '工作项不存在或版本信息缺失，请刷新后重试');
         return false;
       }
       try {
-        await productRepository.updateWorkItem(current.productLineId, id, {
+        await productRepository.updateWorkItem(productLineId, id, {
           title: updates.title,
           description: updates.description,
           descriptionHtml: updates.descriptionHtml,
@@ -344,6 +345,10 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           revision: current.revision
         });
         await unifiedQuery.refetch();
+        if (current.parentWorkItemId) {
+          const parent = await productRepository.workItemDetail(productLineId, current.parentWorkItemId);
+          setListChildren((items) => ({ ...items, [current.parentWorkItemId!]: (Array.isArray(parent.children) ? parent.children : []).map((item: Record<string, unknown>) => storedTask(item, current)) }));
+        }
         return true;
       } catch (error) {
         addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试');
@@ -386,12 +391,16 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const [childDueDate, setChildDueDate] = useState('');
   const [childEstimatedHours, setChildEstimatedHours] = useState<number | ''>('');
   const [childActualHours, setChildActualHours] = useState<number | ''>('');
+  const [childOwnerName, setChildOwnerName] = useState('');
+  const [childCcNames, setChildCcNames] = useState<string[]>([]);
+  const [childMedia, setChildMedia] = useState<RequirementMedia[]>([]);
   const [childTypeId, setChildTypeId] = useState('');
   const [childTypes, setChildTypes] = useState<Array<{ id: string; name: string; enabled: boolean; category: string }>>([]);
   const [childTypesLoading, setChildTypesLoading] = useState(false);
   const [childTypesError, setChildTypesError] = useState(false);
   const [childTypesReloadKey, setChildTypesReloadKey] = useState(0);
   const [childCreating, setChildCreating] = useState(false);
+  const [childTypeRules, setChildTypeRules] = useState<Array<{ parentTypeId: string; childTypeId: string; enabled: boolean }>>([]);
   const [listChildren, setListChildren] = useState<Record<string, RequirementTask[]>>({});
   const [expandedListRows, setExpandedListRows] = useState<string[]>([]);
   const [transitionOptions, setTransitionOptions] = useState<Record<string, WorkItemTransitionOptions>>({});
@@ -445,18 +454,23 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
   const childTypeOptions = useMemo(() => childTypes
     .filter((item) => Boolean(selectedTask) && workItemCategoryLabel[selectedTask.category] === item.category)
+    .filter((item) => !selectedTask?.workItemTypeId || childTypeRules.some((rule) => rule.enabled && rule.parentTypeId === selectedTask.workItemTypeId && rule.childTypeId === item.id))
     .filter((item) => !createPolicy?.allowedChildTypeNames?.length || createPolicy.allowedChildTypeNames.includes(item.name))
-    .map((item) => ({ value: item.id, label: item.name })), [childTypes, createPolicy?.allowedChildTypeNames, selectedTask]);
+    .map((item) => ({ value: item.id, label: item.name })), [childTypes, childTypeRules, createPolicy?.allowedChildTypeNames, selectedTask]);
 
   useEffect(() => {
     if (!childModalOpen || !selectedTask?.productLineId) return;
     let active = true;
     setChildTypes([]);
+    setChildTypeRules([]);
     setChildTypesError(false);
     setChildTypesLoading(true);
-    productRepository.workItemTypes(selectedTask.productLineId)
-      .then((items) => {
-        if (active) setChildTypes(items.filter((item) => item.enabled) as Array<{ id: string; name: string; enabled: boolean; category: string }>);
+    Promise.all([productRepository.workItemTypes(selectedTask.productLineId), productRepository.childTypeRules(selectedTask.productLineId)])
+      .then(([items, rules]) => {
+        if (active) {
+          setChildTypes(items.filter((item) => item.enabled) as Array<{ id: string; name: string; enabled: boolean; category: string }>);
+          setChildTypeRules(rules || []);
+        }
       })
       .catch(() => {
         if (active) setChildTypesError(true);
@@ -482,6 +496,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     setChildDueDate('');
     setChildEstimatedHours('');
     setChildActualHours('');
+    setChildOwnerName(task.ownerName || '');
+    setChildCcNames(task.ccNames || []);
+    setChildMedia(task.media || []);
     setChildModalOpen(true);
   };
 
@@ -508,9 +525,13 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         descriptionHtml: childDescriptionHtml,
         expectedGoal: '',
         versionId: parentTask.versionId || undefined,
+        customerId: parentTask.customerId || undefined,
+        customerName: parentTask.customerName || undefined,
         requirementId: parentTask.requirementId || (parentTask.category === 'requirement' ? parentTask.id : undefined),
         parentWorkItemId: parentTask.id,
-        assigneeId: employeeOptions.find((item) => item.name === formOwnerName)?.id,
+        assigneeId: employeeOptions.find((item) => item.name === childOwnerName)?.id,
+        ccNames: childCcNames,
+        media: childMedia,
         priority: apiPriority(childPriority),
         plannedStartDate: childPlannedStartDate || undefined,
         plannedEndDate: childDueDate || undefined,
@@ -559,6 +580,18 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     if (!selectedTask) return;
     void updateTask(selectedTask.id, updates);
     setSelectedTask((current) => current ? { ...current, ...updates } : current);
+  };
+
+  const openWorkItemDetail = async (item: Record<string, unknown>, fallback?: RequirementTask) => {
+    const lineId = String(item.productLineId || fallback?.productLineId || '');
+    const id = String(item.id || '');
+    if (!lineId || !id) return;
+    try {
+      const detail = await productRepository.workItemDetail(lineId, id);
+      setSelectedTask(storedTask(detail, fallback));
+    } catch (error) {
+      addToast('error', '子任务详情加载失败', error instanceof Error ? error.message : '请稍后重试');
+    }
   };
 
   const submitComment = () => {
@@ -813,8 +846,12 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           description: formDescription,
           expectedGoal: formTarget,
           versionId: selectedVersion?.id,
+          customerId: customers.find((customer) => customer.name === formCustomerName)?.id,
+          customerName: formCustomerName || undefined,
           requirementId: unifiedCategory === 'requirement' ? undefined : selectedRequirementTaskIds[0] || undefined,
           assigneeId: employeeOptions.find((item) => item.name === formOwnerName)?.id,
+          ccNames: formCcNames,
+          media: formMedia,
           priority: apiPriority(formPriority),
           plannedStartDate: formPlannedStartDate || undefined,
           plannedEndDate: formDueDate || undefined,
@@ -877,7 +914,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     productLineId: item.productLineId,
     productLineName: productLines.find((line) => line.id === item.productLineId)?.name || fallback?.productLineName || '',
     versionId: item.versionId || undefined,
-    versionName: fallback?.versionName || '',
+    versionName: versions.find((version) => version.id === item.versionId)?.name || fallback?.versionName || '',
+    customerId: item.customerId ? String(item.customerId) : fallback?.customerId,
+    customerName: item.customerName ? String(item.customerName) : fallback?.customerName,
     requirementId: item.requirementId || undefined,
     parentWorkItemId: item.parentWorkItemId || undefined,
     workItemTypeId: item.taskTypeId || undefined,
@@ -900,7 +939,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     productLineId: String(item.productLineId || fallback?.productLineId || ''),
     productLineName: productLines.find((line) => line.id === String(item.productLineId || fallback?.productLineId || ''))?.name || fallback?.productLineName || '',
     versionId: item.versionId ? String(item.versionId) : fallback?.versionId,
-    versionName: fallback?.versionName || '',
+    versionName: versions.find((version) => version.id === item.versionId)?.name || fallback?.versionName || '',
+    customerId: item.customerId ? String(item.customerId) : fallback?.customerId,
+    customerName: item.customerName ? String(item.customerName) : fallback?.customerName,
     requirementId: item.requirementId ? String(item.requirementId) : fallback?.requirementId,
     parentWorkItemId: item.parentWorkItemId ? String(item.parentWorkItemId) : undefined,
     workItemTypeId: item.taskTypeId ? String(item.taskTypeId) : undefined,
@@ -1386,7 +1427,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           showContinueOption={false}
           footer={
             <>
-              <Button type="primary" ghost={!detailEditing} onClick={() => setDetailEditing((value) => !value)}>{detailEditing ? '保存' : '编辑'}</Button>
+              <Button type="primary" ghost={!detailEditing} disabled={Boolean(selectedTask.hasChildren && !selectedTask.parentWorkItemId)} onClick={() => setDetailEditing((value) => !value)}>{detailEditing ? '保存' : '编辑'}</Button>
               <button
                 type="button"
                 onClick={() => setSelectedTask(null)}
@@ -1396,7 +1437,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               </button>
             </>
           }
-          properties={taskKind === 'test' ? undefined : <div className={`space-y-6 text-xs ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
+          properties={taskKind === 'test' ? undefined : <div className={`space-y-6 text-xs ${detailEditing && !(selectedTask.hasChildren && !selectedTask.parentWorkItemId) ? '' : 'pointer-events-none opacity-80'}`}>
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
               <SearchableSelect label="所属产品线" value={selectedTask.productLineName || ''} options={productLines.map((line) => line.name)} onChange={(productLineName) => saveDetailUpdates({ productLineName, productLineId: productLines.find((line) => line.name === productLineName)?.id, versionName: '' })} placeholder="未设置" />
@@ -1423,7 +1464,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           </div>}
         >
           <div className="w-full space-y-5 text-xs">
-            {taskKind !== 'test' && <div className={detailEditing ? '' : 'pointer-events-none opacity-80'}>
+            {taskKind !== 'test' && <div className={detailEditing && !(selectedTask.hasChildren && !selectedTask.parentWorkItemId) ? '' : 'pointer-events-none opacity-80'}>
               <DetailTextInput label={`${itemLabel}名称`} value={selectedTask.title} onSave={(title) => title.trim() && saveDetailUpdates({ title })} />
             </div>}
             {taskKind !== 'test' && parentWorkItem && <section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2">
@@ -1480,7 +1521,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                   <div className="flex justify-end"><Button size="small" icon={<PlusOutlined />} onClick={() => openChildModal()}>添加子任务</Button></div>
                   {childWorkItems.length > 0 ? <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{childWorkItems.map((child) => <div key={String(child.id)} className="grid grid-cols-[90px_minmax(0,1fr)_100px_120px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0">
                     <span className="text-[var(--text-muted)]">{workItemCategoryLabel[String(child.category)] || String(child.category || '工作项')}</span>
-                    <button type="button" onClick={() => setSelectedTask(storedTask(child, selectedTask))} className="truncate text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">{String(child.title || '')}</button>
+                    <button type="button" onClick={() => void openWorkItemDetail(child, selectedTask)} className="truncate text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">{String(child.title || '')}</button>
                     <span className="text-[var(--text-body)]">{String(child.statusName || (child.status && typeof child.status === 'object' ? (child.status as { name?: string }).name : '') || '待处理')}</span>
                     <span className="truncate text-[var(--text-muted)]">{String(child.assigneeName || '未分配')}</span>
                   </div>)}</div> : <div className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">暂无子任务</div>}
@@ -1514,6 +1555,12 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         showContinueOption={false}
         footer={<><Button disabled={childCreating} onClick={cancelChildCreation}>取消</Button><Button type="primary" loading={childCreating} disabled={childTypesLoading || childTypesError || !childTypeId} onClick={() => void createChildWorkItem()}>创建</Button></>}
         properties={<Form layout="vertical" className="requirement-create-properties">
+          <Form.Item label="所属产品线"><Input value={selectedTask?.productLineName || '未设置'} disabled /></Form.Item>
+          <Form.Item label="迭代版本"><Input value={selectedTask?.versionName || '未设置'} disabled /></Form.Item>
+          <Form.Item label="关联客户"><Input value={selectedTask?.customerName || '未关联'} disabled /></Form.Item>
+          <Form.Item label="负责人"><Select showSearch optionFilterProp="label" allowClear value={childOwnerName || undefined} onChange={(value) => setChildOwnerName(value || '')} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>
+          <Form.Item label="参与人"><Select mode="multiple" showSearch optionFilterProp="label" allowClear value={childCcNames} onChange={setChildCcNames} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>
+          <Form.Item label="附件"><Upload accept=".txt,.doc,.docx,.xls,.xlsx,.pdf" multiple showUploadList={false} beforeUpload={(file) => { const reader = new FileReader(); reader.onload = () => setChildMedia((items) => [...items, { id: `${file.name}-${file.lastModified}`, name: file.name, type: 'file', dataUrl: String(reader.result), size: file.size, mimeType: file.type }]); reader.readAsDataURL(file); return Upload.LIST_IGNORE; }}><Button block icon={<Paperclip className="h-4 w-4" />}>添加文档附件</Button></Upload>{childMedia.map((item) => <div key={item.id} className="mt-2 flex items-center gap-2 text-[var(--text-body)]"><FileText className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{item.name}</span><Button type="text" danger size="small" onClick={() => setChildMedia((items) => items.filter((media) => media.id !== item.id))} icon={<X className="h-4 w-4" />} /></div>)}</Form.Item>
           <Form.Item
             label="子任务类型"
             required

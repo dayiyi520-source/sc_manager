@@ -17,11 +17,15 @@ public final class TestCaseDefinition {
         String precondition, String priority, String ownerId, List<String> tags,
         List<StepInput> steps, String workItemTypeId, String statusKey, Integer revision) {}
     public record Query(String directoryId, String keyword, String priority,
-        String ownerId, Boolean enabled, int page, int pageSize,
+        String ownerId, String creatorName, Boolean enabled, int page, int pageSize,
         boolean includeDescendants, List<String> directoryIds) {
         public Query(String directoryId, String keyword, String priority,
+                     String ownerId, String creatorName, Boolean enabled, int page, int pageSize) {
+            this(directoryId, keyword, priority, ownerId, creatorName, enabled, page, pageSize, false, List.of());
+        }
+        public Query(String directoryId, String keyword, String priority,
                      String ownerId, Boolean enabled, int page, int pageSize) {
-            this(directoryId, keyword, priority, ownerId, enabled, page, pageSize, false, List.of());
+            this(directoryId, keyword, priority, ownerId, null, enabled, page, pageSize, false, List.of());
         }
     }
     public record DirectoryView(String id, String parentId, String name, int sort, long caseCount, String productLineId, String productLineName) {
@@ -29,7 +33,7 @@ public final class TestCaseDefinition {
     }
     public record CaseView(String id, String code, String productLineId, String directoryId,
         String directoryName, String sourceRequirementId, String sourceRequirementTitle,
-        String title, String precondition, String priority, String ownerId, String ownerName,
+        String title, String precondition, String priority, String ownerId, String ownerName, String creatorName,
         List<String> tags, String workItemTypeId, String workItemTypeName, String workflowId,
         String statusKey, String statusName, String statusGroup, String statusColor,
         boolean enabled, int revision, long referenceCount,

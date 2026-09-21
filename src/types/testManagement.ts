@@ -33,6 +33,7 @@ export interface TestCase {
   priority: TestPriority;
   ownerId: string;
   ownerName: string;
+  creatorName?: string;
   tags: string[];
   workItemTypeId: string;
   workItemTypeName: string;

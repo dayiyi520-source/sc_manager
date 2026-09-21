@@ -38,7 +38,7 @@ public class TestCaseMapper {
     private static final String CASE_SELECT="""
         SELECT c.id_ AS id,c.code_ AS code,c.product_line_id_ AS productLineId,c.directory_id_ AS directoryId,
           d.name_ AS directoryName,c.source_requirement_id_ AS sourceRequirementId,r.title_ AS sourceRequirementTitle,
-          c.title_ AS title,c.precondition_ AS precondition,c.priority_ AS priority,c.owner_id_ AS ownerId,c.owner_name_ AS ownerName,
+          c.title_ AS title,c.precondition_ AS precondition,c.priority_ AS priority,c.owner_id_ AS ownerId,c.owner_name_ AS ownerName,c.create_by_ AS creatorName,
           c.tags_ AS tags,c.task_type_id_ AS workItemTypeId,type.name_ AS workItemTypeName,c.workflow_id_ AS workflowId,
           c.status_key_ AS statusKey,c.status_name_ AS statusName,c.status_group_ AS statusGroup,c.status_color_ AS statusColor,
           c.enabled_ AS enabled,c.version_ AS revision,c.create_time_ AS createdAt,c.update_time_ AS updatedAt,
@@ -68,6 +68,7 @@ public class TestCaseMapper {
         if(q.keyword()!=null&&!q.keyword().isBlank()){sql.append(" AND (c.code_ LIKE ? OR c.title_ LIKE ?)");String k="%"+q.keyword().trim()+"%";a.add(k);a.add(k);}
         if(q.priority()!=null&&!q.priority().isBlank()){sql.append(" AND c.priority_=?");a.add(q.priority());}
         if(q.ownerId()!=null&&!q.ownerId().isBlank()){sql.append(" AND c.owner_id_=?");a.add(q.ownerId());}
+        if(q.creatorName()!=null&&!q.creatorName().isBlank()){sql.append(" AND c.create_by_=?");a.add(q.creatorName());}
         if(q.enabled()!=null){sql.append(" AND c.enabled_=?");a.add(q.enabled());}
     }
     public List<Map<String,Object>> steps(String tenant,String caseId) {
