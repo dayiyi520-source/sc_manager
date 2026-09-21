@@ -18,7 +18,8 @@ import java.util.Set;
 @Tag(name = "需求池", description = "需求收集、流转、审计与下游同步")
 public class RequirementController {
     private final RequirementService service;
-    public RequirementController(RequirementService service) { this.service = service; }
+    private final AssistanceWorkflowService assistanceWorkflow;
+    public RequirementController(RequirementService service, AssistanceWorkflowService assistanceWorkflow) { this.service = service; this.assistanceWorkflow = assistanceWorkflow; }
 
     @Operation(summary = "分页查询需求")
     @GetMapping
@@ -42,10 +43,13 @@ public class RequirementController {
     @PostMapping("/{id}/transition") public ApiResponse<Void> transition(@PathVariable String id,@RequestBody Map<String,Object>b){service.transition(id,b);return ApiResponse.ok(null);}
     @Operation(summary = "转派工单")
     @PostMapping("/{id}/reassign") public ApiResponse<Map<String,Object>> reassign(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.reassign(id,b));}
-    @Operation(summary = "保存个人备忘并完成工单")
+    @Operation(summary = "保存个人备忘")
     @PostMapping("/{id}/memo") public ApiResponse<Map<String,Object>> memo(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.memo(id,b));}
+    @PostMapping("/reassign/{id}/accept") public ApiResponse<Map<String,Object>> acceptReassignment(@PathVariable String id,@RequestBody Map<String,Object> b){return ApiResponse.ok(assistanceWorkflow.accept(id, ((Number)b.getOrDefault("revision",0)).intValue()));}
+    @PostMapping("/reassign/{id}/reject") public ApiResponse<Map<String,Object>> rejectReassignment(@PathVariable String id,@RequestBody Map<String,Object> b){return ApiResponse.ok(assistanceWorkflow.reject(id, String.valueOf(b.getOrDefault("reason", ""))));}
     @Operation(summary = "创建下游工作项并同步")
     @PostMapping("/{id}/work-items") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createWorkItem(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.createWorkItem(id,b));}
+    @PostMapping("/{id}/work-items/batch") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> createWorkItemsBatch(@PathVariable String id,@RequestBody Map<String,Object>b){Object tasks=b.get("tasks");if(!(tasks instanceof List<?> list)) throw new IllegalArgumentException("tasks不能为空");return ApiResponse.ok(service.createWorkItemsBatch(id,list.stream().filter(Map.class::isInstance).map(value -> (Map<String,Object>)value).toList()));}
     @GetMapping("/work-items") public ApiResponse<List<Map<String,Object>>> workItems(@RequestParam(defaultValue="") String taskType){return ApiResponse.ok(service.workItems(taskType));}
     @Operation(summary = "查询关联工单候选")
     @GetMapping("/work-order-candidates") public ApiResponse<List<Map<String,Object>>> workOrderCandidates(@RequestParam(defaultValue="") String keyword,@RequestParam(defaultValue="") String type,@RequestParam(defaultValue="") String requirementId,@RequestParam(defaultValue="100") int limit){return ApiResponse.ok(service.workOrderCandidates(keyword,type,requirementId,limit));}

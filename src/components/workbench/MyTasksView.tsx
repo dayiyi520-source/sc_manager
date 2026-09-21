@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CheckSquare,
   FileCheck,
@@ -16,6 +16,8 @@ import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
 import { StatusBadge } from '@/components/common';
 import { WORKBENCH_FEEDS } from '../../data/mockData';
+import { requirementRepository } from '../../services/requirementRepository';
+import type { RequirementTask } from '../../types';
 
 type TabType = 'pending' | 'completed';
 type ApprovalTabType = 'pending' | 'my_apply' | 'cc_me' | 'approved';
@@ -34,10 +36,13 @@ export const MyTasksView: React.FC = () => {
   const [todoTab, setTodoTab] = useState<TabType>('pending');
   const [approvalTab, setApprovalTab] = useState<ApprovalTabType>('pending');
   const [feedTab, setFeedTab] = useState<FeedTabType>('dynamic');
+  const [realTasks, setRealTasks] = useState<RequirementTask[]>([]);
+  useEffect(() => { requirementRepository.list({ page: 1, pageSize: 100 }).then((page) => setRealTasks(page.items)).catch(() => setRealTasks([])); }, []);
 
   // 待办任务筛选
-  const pendingTodos = requirementTasks.filter((t) => t.status !== '已发布');
-  const completedTodos = requirementTasks.filter((t) => t.status === '已发布');
+  const taskSource = realTasks.length ? realTasks : requirementTasks.filter((task) => task.id && !String(task.id).startsWith('demo-'));
+  const pendingTodos = taskSource.filter((t) => !['已完成', '已发布', '已关闭'].includes(t.status));
+  const completedTodos = taskSource.filter((t) => ['已完成', '已发布', '已关闭'].includes(t.status));
   const displayTodos = todoTab === 'pending' ? pendingTodos : completedTodos;
 
   // 审批筛选

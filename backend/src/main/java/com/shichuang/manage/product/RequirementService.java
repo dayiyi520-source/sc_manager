@@ -29,10 +29,11 @@ public class RequirementService {
     private final WorkItemTransitionService transitions;
     private final WorkOrderService workOrders;
     private final ObjectMapper objectMapper;
+    private final AssistanceWorkflowService assistanceWorkflow;
 
     public RequirementService(RequirementMapper mapper,TaskAliasMapper taskMapper,TaskAliasService tasks,WorkItemStorageService storage,
-        WorkItemTransitionService transitions,WorkOrderService workOrders,ObjectMapper objectMapper) {
-        this.mapper=mapper;this.taskMapper=taskMapper;this.tasks=tasks;this.storage=storage;this.transitions=transitions;this.workOrders=workOrders;this.objectMapper=objectMapper;
+        WorkItemTransitionService transitions,WorkOrderService workOrders,ObjectMapper objectMapper,AssistanceWorkflowService assistanceWorkflow) {
+        this.mapper=mapper;this.taskMapper=taskMapper;this.tasks=tasks;this.storage=storage;this.transitions=transitions;this.workOrders=workOrders;this.objectMapper=objectMapper;this.assistanceWorkflow=assistanceWorkflow;
     }
 
     public PageResult<Map<String,Object>> list(int page,int pageSize,String keyword,String productLine,String department,String priority,String status,String ownerName,String workItemKind) {
@@ -65,7 +66,7 @@ public class RequirementService {
         Map<String,Object> result=new LinkedHashMap<>(rows.get(0));
         result.put("events",mapper.events(RequestContext.tenantId(),id));
         result.put("workItems",mapper.workItems(RequestContext.tenantId(),id));
-        return result;
+        return assistanceWorkflow.enrich(result);
     }
 
     public List<Map<String,Object>> events(String id,String eventType,String operatorName){AuthorizationService.requireRead("product");requirement(id);return mapper.events(RequestContext.tenantId(),id,safe(eventType),safe(operatorName));}
@@ -114,9 +115,10 @@ public class RequirementService {
         }
         int currentRevision=((Number)current.get("revision")).intValue();
         String assigneeName=Objects.toString(employee.get("name"),"");
-        if(mapper.reassign(RequestContext.tenantId(),id,currentRevision,assigneeId,assigneeName,RequestContext.userId())!=1)throw conflict();
-        event(id,"转派",from,Objects.toString(current.get("status"),from),reason,Map.of("fromAssigneeName",oldOwner,"assigneeId",assigneeId,"assigneeName",assigneeName));
-        return detail(id);
+        String pendingId=UUID.randomUUID().toString();
+        mapper.createPendingReassignment(RequestContext.tenantId(), id, pendingId, assigneeId, reason, text(body,"handoffNote"), RequestContext.userId());
+        event(id,"转派待受理",from,Objects.toString(current.get("status"),from),reason,Map.of("fromAssigneeName",oldOwner,"assigneeId",assigneeId,"assigneeName",assigneeName,"pendingReassignmentId",pendingId));
+        return Map.of("pendingReassignmentId",pendingId,"status","PENDING","owner",oldOwner,"revision",currentRevision);
     }
 
     @Transactional public Map<String,Object> memo(String id,Map<String,Object> body){
@@ -126,13 +128,7 @@ public class RequirementService {
         rejectTerminal(current);
         String content=text(body,"content");
         if(content.isBlank())throw new IllegalArgumentException("个人备忘内容不能为空");
-        String from=Objects.toString(current.get("status"),"");
-        if(!"处理中".equals(from)){
-            executeStatus(current,"处理中",content);
-            current=requirement(id);
-        }
-        executeStatus(current,"已完成",content);
-        event(id,"个人备忘录",from,"已完成",content,Map.of("content",content));
+        assistanceWorkflow.memo(id, content);
         return detail(id);
     }
 
@@ -143,13 +139,24 @@ public class RequirementService {
         String assigneeId=taskMapper.userId(assignee);if(assigneeId==null)throw new IllegalArgumentException("负责人不存在或已停用");
         String line=String.valueOf(current.get("productLineId")),typeId=text(body,"workItemTypeId");if(typeId.isBlank())typeId=taskMapper.defaultType(line,category);
         if(typeId==null||typeId.isBlank())throw new IllegalArgumentException("请先配置并启用目标分类的工作项类型");
-        if(mapper.activeWorkItems(RequestContext.tenantId(),id)>0)throw new IllegalArgumentException("当前需求已有进行中的工作项");
         String title=defaultText(body,"title",String.valueOf(current.get("title"))),note=text(body,"note");
         WorkItemDefinition.CreateItem input=new WorkItemDefinition.CreateItem("work-order-"+UUID.randomUUID(),line,category,typeId,title,note,"",nullable(current.get("versionId")),id,null,assigneeId,priority(current.get("priority")),null,date(current.get("dueDate")),BigDecimal.ZERO,BigDecimal.ZERO);
         Map<String,Object> created=storage.create(input);
         mapper.markWorkOrder(RequestContext.tenantId(),created.get("id").toString(),taskType,id,String.valueOf(current.get("title")),note,RequestContext.userId());
+        jdbcSetAssistanceProcessing(id);
         event(id,"转任务",String.valueOf(current.get("status")),String.valueOf(current.get("status")),note,Map.of("taskType",taskType,"taskId",created.get("id"),"taskTitle",title,"assigneeName",assignee,"targetPage",targetPage(category)));
         return Map.of("id",created.get("id"),"taskType",taskType,"syncStatus","SUCCESS","retryCount",0);
+    }
+
+    @Transactional public Map<String,Object> createWorkItemsBatch(String id, List<Map<String,Object>> inputs) {
+        if (inputs == null || inputs.isEmpty()) throw new IllegalArgumentException("至少创建一条下游任务");
+        List<Map<String,Object>> items = inputs.stream().map(input -> createWorkItem(id, input)).toList();
+        return Map.of("items", items, "count", items.size());
+    }
+
+    private void jdbcSetAssistanceProcessing(String id) {
+        // 通过现有工作项状态机保持兼容；专属状态列仅用于协助事项投影。
+        mapper.setAssistanceStatus(RequestContext.tenantId(), id, "处理中");
     }
 
     public List<Map<String,Object>> workItems(String type){AuthorizationService.requireRead("product");return workOrders.list(RequestContext.tenantId(),safe(type));}

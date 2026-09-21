@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Repository
@@ -107,6 +108,15 @@ public class RequirementMapper {
         return jdbc.update("UPDATE t_product_work_item SET assignee_id_=?,assignee_name_=?,version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND version_=? AND delete_flag_=0",assigneeId,assigneeName,user,tenantId,id,revision);
     }
 
+    void createPendingReassignment(String tenantId,String id,String reassignmentId,String toUserId,String reason,String handoffNote,String user) {
+        Map<String,Object> row = jdbc.queryForMap("SELECT assignee_id_ FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", tenantId, id);
+        jdbc.update("INSERT INTO t_product_assistance_reassignment(id_,tenant_id_,assistance_id_,from_user_id_,to_user_id_,reason_,handoff_note_,status_,revision_,create_by_,create_time_,update_by_,update_time_) VALUES(?,?,?,?,?,?,?,'PENDING',0,?,NOW(6),?,NOW(6))", reassignmentId, tenantId, id, Objects.toString(row.get("assignee_id_"), user), toUserId, reason, handoffNote, user, user);
+    }
+
+    void setAssistanceStatus(String tenantId, String id, String status) {
+        jdbc.update("UPDATE t_product_work_item SET assistance_status_=?,version_=version_+1,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", status, tenantId, id);
+    }
+
     void markWorkOrder(String tenantId,String id,String taskType,String requirementId,String sourceTitle,String note,String user) {
         jdbc.update("UPDATE t_product_work_item child JOIN t_product_work_item source ON source.id_=? AND source.tenant_id_=child.tenant_id_ AND source.category_='requirement' AND source.delete_flag_=0 SET child.source_type_='WORK_ORDER',child.work_order_type_=?,child.source_work_order_ids_=JSON_ARRAY(?),child.source_work_order_titles_=JSON_ARRAY(?),child.special_fields_=JSON_OBJECT('note',?),child.customer_id_=source.customer_id_,child.customer_name_=source.customer_name_,child.update_by_=?,child.update_time_=NOW(6) WHERE child.tenant_id_=? AND child.id_=? AND child.delete_flag_=0",requirementId,taskType,requirementId,sourceTitle,note,user,tenantId,id);
     }
@@ -120,7 +130,7 @@ public class RequirementMapper {
     }
 
     static String selectSql() {
-        return "SELECT t.id_ AS id,t.code_ AS code,t.title_ AS title,t.description_ AS description,t.description_html_ AS descriptionHtml,t.expected_goal_ AS expectedGoal,t.status_ AS status,t.priority_ AS priority,t.owner_name_ AS ownerName,t.creator_name_ AS creatorName,t.department_ AS department,t.version_id_ AS versionId,t.version_name_ AS versionName,t.product_line_id_ AS productLineId,t.product_line_name_ AS productLineName,t.customer_id_ AS customerId,t.customer_name_ AS customerName,t.estimated_hours_ AS estimatedHours,t.actual_hours_ AS actualHours,t.due_date_ AS dueDate,t.requirement_type_ AS requirementType,t.cc_names_ AS ccNames,t.planned_start_date_ AS plannedStartDate,t.due_date_ AS expectedCompleteDate,t.source_work_order_ids_ AS sourceWorkOrderIds,t.source_work_order_titles_ AS sourceWorkOrderTitles,t.media_ AS media,t.work_order_type_ AS workOrderType,t.special_fields_ AS specialFields,'requirement' AS workItemKind,t.task_type_id_ AS workItemTypeId,t.create_time_ AS createdAt,t.version_ AS version,t.version_ AS revision FROM ("+sourceSql()+") t";
+        return "SELECT t.id_ AS id,t.code_ AS code,t.title_ AS title,t.description_ AS description,t.description_html_ AS descriptionHtml,t.expected_goal_ AS expectedGoal,t.status_ AS status,t.assistance_status_ AS assistanceStatus,t.assistance_initiator_id_ AS assistanceInitiatorId,t.assistance_owner_id_ AS assistanceOwnerId,t.assistance_resolution_ AS assistanceResolution,t.priority_ AS priority,t.owner_name_ AS ownerName,t.creator_name_ AS creatorName,t.department_ AS department,t.version_id_ AS versionId,t.version_name_ AS versionName,t.product_line_id_ AS productLineId,t.product_line_name_ AS productLineName,t.customer_id_ AS customerId,t.customer_name_ AS customerName,t.estimated_hours_ AS estimatedHours,t.actual_hours_ AS actualHours,t.due_date_ AS dueDate,t.requirement_type_ AS requirementType,t.cc_names_ AS ccNames,t.planned_start_date_ AS plannedStartDate,t.due_date_ AS expectedCompleteDate,t.source_work_order_ids_ AS sourceWorkOrderIds,t.source_work_order_titles_ AS sourceWorkOrderTitles,t.media_ AS media,t.work_order_type_ AS workOrderType,t.special_fields_ AS specialFields,'requirement' AS workItemKind,t.task_type_id_ AS workItemTypeId,t.create_time_ AS createdAt,t.version_ AS version,t.version_ AS revision FROM ("+sourceSql()+") t";
     }
 
     static String workItemSql() {
@@ -128,7 +138,7 @@ public class RequirementMapper {
     }
 
     private static String sourceSql() {
-        return "SELECT w.id_,w.tenant_id_,w.product_line_id_,w.category_,w.task_type_id_,w.code_,w.title_,w.description_,w.description_html_,w.expected_goal_,w.version_id_,w.status_name_ AS status_,w.assignee_name_ AS owner_name_,COALESCE(w.creator_name_,cu.name_,w.create_by_) AS creator_name_,w.department_,w.customer_id_,w.customer_name_,w.requirement_type_,w.cc_names_,w.media_,w.source_work_order_ids_,w.source_work_order_titles_,w.work_order_type_,w.special_fields_,w.priority_,w.planned_start_date_,w.planned_end_date_ AS due_date_,w.estimated_hours_,w.actual_hours_,w.create_time_,w.version_,w.delete_flag_,p.name_ AS product_line_name_,COALESCE(v.name_,'') AS version_name_ FROM t_product_work_item w JOIN t_product_line p ON p.id_=w.product_line_id_ AND p.tenant_id_=w.tenant_id_ AND p.delete_flag_=0 LEFT JOIN t_product_line_version v ON v.id_=w.version_id_ AND v.tenant_id_=w.tenant_id_ AND v.delete_flag_=0 LEFT JOIN t_sys_user cu ON cu.id_=w.create_by_ AND cu.tenant_id_=w.tenant_id_";
+        return "SELECT w.id_,w.tenant_id_,w.product_line_id_,w.category_,w.task_type_id_,w.code_,w.title_,w.description_,w.description_html_,w.expected_goal_,w.version_id_,w.status_name_ AS status_,w.assistance_status_,w.assistance_initiator_id_,w.assistance_owner_id_,w.assistance_resolution_,w.assignee_name_ AS owner_name_,COALESCE(w.creator_name_,cu.name_,w.create_by_) AS creator_name_,w.department_,w.customer_id_,w.customer_name_,w.requirement_type_,w.cc_names_,w.media_,w.source_work_order_ids_,w.source_work_order_titles_,w.work_order_type_,w.special_fields_,w.priority_,w.planned_start_date_,w.planned_end_date_ AS due_date_,w.estimated_hours_,w.actual_hours_,w.create_time_,w.version_,w.delete_flag_,p.name_ AS product_line_name_,COALESCE(v.name_,'') AS version_name_ FROM t_product_work_item w JOIN t_product_line p ON p.id_=w.product_line_id_ AND p.tenant_id_=w.tenant_id_ AND p.delete_flag_=0 LEFT JOIN t_product_line_version v ON v.id_=w.version_id_ AND v.tenant_id_=w.tenant_id_ AND v.delete_flag_=0 LEFT JOIN t_sys_user cu ON cu.id_=w.create_by_ AND cu.tenant_id_=w.tenant_id_";
     }
 
     private static String qualify(String sql) {

@@ -1,5 +1,5 @@
 import { apiRequest, PageResult } from './apiClient';
-import type { DepartmentOption, EmployeeOption, RequirementTask, RequirementWorkItem, RequirementWorkOrderCandidate } from '../types';
+import type { AttachmentMetadata, DepartmentOption, EmployeeOption, RequirementTask, RequirementWorkItem, RequirementWorkOrderCandidate } from '../types';
 
 function parseJson<T>(value: T | string | null | undefined, fallback: T): T {
   if (typeof value !== 'string') return value ?? fallback;
@@ -46,9 +46,14 @@ export const requirementRepository = {
   departments: () => apiRequest<DepartmentOption[]>('/api/requirements/departments'),
   employees: () => apiRequest<EmployeeOption[]>('/api/auth/dev-accounts'),
   transition: (id: string, action: 'hold' | 'reject', reason: string) => apiRequest<void>(`/api/requirements/${id}/transition`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
-  reassign: (id: string, input: { assigneeId: string; reason: string; revision: number }) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/reassign`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
-  memo: (id: string, input: { content: string; revision: number }) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/memo`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
+  reassign: (id: string, input: { assigneeId: string; reason: string; handoffNote?: string; attachmentIds?: string[]; revision: number }) => apiRequest<{ pendingReassignmentId: string; status: string; owner: string; revision: number }>(`/api/requirements/${id}/reassign`, { method: 'POST', body: JSON.stringify(input) }),
+  acceptReassignment: (reassignmentId: string, revision: number) => apiRequest<{ id: string; status: string }>(`/api/requirements/reassign/${reassignmentId}/accept`, { method: 'POST', body: JSON.stringify({ revision }) }),
+  rejectReassignment: (reassignmentId: string, reason: string) => apiRequest<{ id: string; status: string }>(`/api/requirements/reassign/${reassignmentId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  memo: (id: string, input: { content: string; attachmentIds?: string[]; revision: number }) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/memo`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
+  stageAttachment: (file: { name: string; mimeType: string; size: number; storageKey: string }) => apiRequest<AttachmentMetadata>('/api/attachments/stage', { method: 'POST', body: JSON.stringify(file) }),
+  bindAttachment: (id: string, input: { subjectType: string; subjectId: string; visibility: string }) => apiRequest<AttachmentMetadata>(`/api/attachments/${id}/bind`, { method: 'POST', body: JSON.stringify(input) }),
   createWorkItem: (id: string, input: { title?: string; taskType: string; assigneeName: string; note?: string }) => apiRequest<{ id: string; taskType: string; syncStatus?: string; retryCount?: number; syncError?: string }>(`/api/requirements/${id}/work-items`, { method: 'POST', body: JSON.stringify(input) }),
+  createWorkItemsBatch: (id: string, tasks: Array<{ title?: string; taskType: string; assigneeName: string; note?: string; attachmentIds?: string[]; blocksClosure?: boolean }>) => apiRequest<{ items: RequirementWorkItem[]; count: number }>(`/api/requirements/${id}/work-items/batch`, { method: 'POST', body: JSON.stringify({ tasks }) }),
   workItems: (taskType = '') => apiRequest<RequirementWorkItem[]>(`/api/requirements/work-items?taskType=${encodeURIComponent(taskType)}`),
   syncStatus: (values: Record<string, string | number> = {}) => {
     const query = new URLSearchParams(Object.entries(values).map(([key, value]) => [key, String(value)])).toString();
