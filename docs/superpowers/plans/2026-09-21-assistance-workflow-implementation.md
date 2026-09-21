@@ -4,7 +4,7 @@
 
 **Goal:** 将现有复用需求任务的协助事项升级为可持久化、可并行转任务、可逐条验收、可重开的工单闭环，并让“我的工作”首期真实聚合产研任务与协助事项。
 
-**Architecture:** 保留统一工作项作为产研任务的事实来源，在其上增加协助事项专属责任、转派、任务关联、验收和活动模型；附件通过统一暂存/绑定资源服务管理，不再把文件本体作为 Base64 直接嵌入事项字段。后端负责状态机、权限、版本并发、自动关闭和幂等，React 前端通过 repository API 读取真实状态并在事项详情抽屉中呈现全历程、任务进度和发起人验收操作。
+**Architecture:** 保留统一工作项作为产研任务的事实来源，在其上增加协助事项专属责任、转派、任务关联、验收和活动模型；附件通过统一暂存/绑定资源服务管理，不再把文件本体作为 Base64 直接嵌入事项字段。后端负责状态机、权限、版本并发、负责人确认关闭和幂等，React 前端通过 repository API 读取真实状态并在事项详情抽屉中呈现全历程、任务进度和发起人验收操作。
 
 **Tech Stack:** Java 17, Spring Boot 3.5.x, MyBatis/JdbcTemplate 既有持久化约定, MySQL 9.3/Flyway migrations, React 19, TypeScript, Ant Design 6, Vitest, React Testing Library, existing `apiClient` and design-token CSS.
 
@@ -12,11 +12,11 @@
 
 ## Global Constraints
 
-- 事项主状态只能使用：待受理、处理中、待验收、已关闭、已搁置、已驳回；“等待下游任务”只作为派生进度。
+- 事项主状态使用：待受理、处理中、待验收、验收未通过、待负责人关闭、已关闭、已搁置、已驳回；“等待下游任务”只作为派生进度。
 - 转派只有被转派人接受后才切换当前负责人；接受前原负责人继续负责，拒绝/过期/并发冲突不得改变责任关系。
 - 一个事项允许多条下游任务；每条任务独立记录是否影响关闭，默认影响关闭；仅发起人可逐条或批量验收。
-- 任一任务完成立即回传；单条验收不通过只触发对应返工，其他已验收结果保留。
-- 存在至少一条闭环必要任务且全部验收通过才自动关闭；没有闭环必要任务时必须由当前负责人提交直接解决结果并由发起人验收。
+- 任一任务完成立即回传；单条验收不通过进入验收未通过并重新指派对应任务负责人，其他已验收结果保留。
+- 存在至少一条闭环必要任务且全部验收通过后进入待负责人关闭；必须由当前负责人主动确认关闭。没有闭环必要任务时必须由当前负责人提交直接解决结果并由发起人验收。
 - 个人备忘录默认作者私有，不改变事项状态，不进入其他用户的共享全历程。
 - “我的工作”首期只接入产品需求、设计、研发、测试、缺陷任务与协助事项，不展示未接入模块的演示数据。
 - 新增业务表必须使用版本化迁移、租户隔离、软删除、审计字段、索引和乐观并发校验；Controller 不承载业务逻辑。
@@ -39,7 +39,7 @@
 - Test: `backend/src/test/java/com/shichuang/manage/product/RequirementControllerIntegrationTest.java`
 
 **Interfaces:**
-- Produce `AssistanceStatus.Main` values `PENDING_ACCEPTANCE, PROCESSING, PENDING_REVIEW, CLOSED, ON_HOLD, REJECTED` mapped to the Chinese display labels; expose `isTerminal()` and `canReopen()`.
+- Produce `AssistanceStatus.Main` values `PENDING_ACCEPTANCE, PROCESSING, PENDING_REVIEW, ACCEPTANCE_FAILED, PENDING_OWNER_CLOSE, CLOSED, ON_HOLD, REJECTED` mapped to the Chinese display labels; expose `isTerminal()` and `canReopen()`.
 - Produce service methods `detail(String id)`, `accept(String id,int revision)`, `reopen(String id,int revision)`, `submitDirectResolution(String id, Map<String,Object> input)`, and `recalculate(String id)`.
 - Produce mapper operations for current owner, revision, activity append, direct-resolution record, and status transition guarded by `tenant_id_`, `delete_flag_` and `version_`.
 - Replace the current `RequirementService.memo` behavior so a memo never executes `处理中 -> 已完成`; the current operation only writes a private record.
@@ -174,16 +174,18 @@
 - Produce `POST /api/requirements/{id}/work-items/accept-batch` input `{revision,linkIds:[...],decision:"pass"|"reject",reason?,attachmentIds?}`.
 - Produce `POST /api/requirements/{id}/reopen` input `{revision,reason,attachmentIds?}`.
 - Produce `GET /api/requirements/{id}/timeline` with merged shared events, task feedback, acceptance, rework and status transitions; omit private memos unless requester is author.
-- Rejection creates a linked rework task and preserves all other passed acceptance records; acceptance responses include recalculated `completedCount,pendingAcceptanceCount,acceptedCount,blockingCount`.
+- Rejection changes the assistance to 验收未通过 and reassigns the existing task responsibility to that task owner; no rework task is created. Acceptance responses include recalculated `completedCount,pendingAcceptanceCount,acceptedCount,blockingCount`.
+- All blocking links accepted changes the assistance to 待负责人关闭; only the current owner can confirm close, and a pending reassignment must be accepted before the new owner can continue or close.
 - Only initiator may accept; current owner and collaborators can view/comment/supply materials but never receive acceptance actions.
 
 - [ ] **Step 1: Write failing tests** for initiator-only pass/reject, partial acceptance, reject-to-rework, preserving passed rows, automatic closure, no-necessary-task direct-resolution acceptance, reopen original vs create new scope, and timeline privacy.
 - [ ] **Step 2: Run focused tests to verify failure.**
-- [ ] **Step 3: Implement acceptance/link state and automatic recalculation.** Use row-level revision checks; close only when at least one blocks-closure link exists and every such link is accepted.
-- [ ] **Step 4: Implement rejection rework creation and direct-resolution reopen path.** A rejection never deletes the original completion or acceptance history.
-- [ ] **Step 5: Implement merged timeline query and visibility filtering.**
-- [ ] **Step 6: Update detail drawer with progress counters, per-task feedback cards, initiator-only actions, rejection reason/attachment form, rework link and reopen action.**
-- [ ] **Step 7: Run backend integration and frontend component tests, then commit.**
+- [ ] **Step 3: Implement acceptance/link state and recalculation.** Use row-level revision checks; when all blocking links are accepted, move to 待负责人关闭 instead of closing.
+- [ ] **Step 4: Implement 验收未通过 responsibility return and direct-resolution reopen path.** Preserve the original completion and acceptance history; do not create a rework task automatically.
+- [ ] **Step 5: Implement current-owner close confirmation and transfer-aware close guard.** A pending reassignment blocks close until accepted; only the effective current owner can close.
+- [ ] **Step 6: Implement merged timeline query and visibility filtering.**
+- [ ] **Step 7: Update detail drawer with progress counters, per-task feedback cards, initiator-only actions, 验收未通过 reason/attachment form, close confirmation and reopen action.**
+- [ ] **Step 8: Run backend integration and frontend component tests, then commit.**
   `git add backend/src/main/java/com/shichuang/manage/product/AssistanceAcceptanceService.java backend/src/main/java/com/shichuang/manage/product/AssistanceAcceptanceMapper.java backend/src/main/resources/db/migration/V20260921.7__assistance_acceptance.sql backend/src/main/java/com/shichuang/manage/product/RequirementController.java backend/src/main/java/com/shichuang/manage/product/RequirementService.java backend/src/main/java/com/shichuang/manage/product/RequirementMapper.java src/services/requirementRepository.ts src/types/index.ts src/components/workbench/RequirementPoolView.tsx backend/src/test/java/com/shichuang/manage/product/AssistanceAcceptanceServiceTest.java backend/src/test/java/com/shichuang/manage/product/RequirementControllerIntegrationTest.java src/components/workbench/RequirementPoolView.test.tsx && git commit -m "feat(assistance): add initiator acceptance loop"`
 
 ---

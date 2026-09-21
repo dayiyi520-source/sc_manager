@@ -45,6 +45,8 @@ public class RequirementController {
     @PostMapping("/{id}/reassign") public ApiResponse<Map<String,Object>> reassign(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.reassign(id,b));}
     @Operation(summary = "保存个人备忘")
     @PostMapping("/{id}/memo") public ApiResponse<Map<String,Object>> memo(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.memo(id,b));}
+    @PostMapping("/{id}/acceptance-failed") public ApiResponse<Map<String,Object>> acceptanceFailed(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(assistanceWorkflow.markAcceptanceFailed(id, String.valueOf(b.getOrDefault("taskOwnerId", "")), String.valueOf(b.getOrDefault("reason", ""))));}
+    @PostMapping("/{id}/close") public ApiResponse<Map<String,Object>> close(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(assistanceWorkflow.closeByOwner(id, ((Number)b.getOrDefault("revision",0)).intValue()));}
     @PostMapping("/reassign/{id}/accept") public ApiResponse<Map<String,Object>> acceptReassignment(@PathVariable String id,@RequestBody Map<String,Object> b){return ApiResponse.ok(assistanceWorkflow.accept(id, ((Number)b.getOrDefault("revision",0)).intValue()));}
     @PostMapping("/reassign/{id}/reject") public ApiResponse<Map<String,Object>> rejectReassignment(@PathVariable String id,@RequestBody Map<String,Object> b){return ApiResponse.ok(assistanceWorkflow.reject(id, String.valueOf(b.getOrDefault("reason", ""))));}
     @Operation(summary = "创建下游工作项并同步")

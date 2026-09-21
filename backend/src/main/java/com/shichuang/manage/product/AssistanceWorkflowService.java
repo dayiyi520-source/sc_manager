@@ -28,7 +28,7 @@ public class AssistanceWorkflowService {
     }
 
     AssistanceStatus derive(String status) {
-        if (Set.of("已完成", "已关闭", "已发布").contains(status)) return AssistanceStatus.CLOSED;
+        if (Set.of("已关闭").contains(status)) return AssistanceStatus.CLOSED;
         if ("已搁置".equals(status)) return AssistanceStatus.ON_HOLD;
         if ("已驳回".equals(status)) return AssistanceStatus.REJECTED;
         if ("待处理".equals(status) || status.isBlank()) return AssistanceStatus.PENDING_ACCEPTANCE;
@@ -57,6 +57,23 @@ public class AssistanceWorkflowService {
         if (content == null || content.isBlank()) throw new IllegalArgumentException("个人备忘内容不能为空");
         jdbc.update("INSERT INTO t_product_assistance_memo(id_,tenant_id_,assistance_id_,author_id_,content_,create_time_) VALUES(?,?,?,?,?,NOW(6))", UUID.randomUUID().toString(), RequestContext.tenantId(), assistanceId, RequestContext.userId(), content.trim());
         return Map.of("id", assistanceId, "statusUnchanged", true);
+    }
+
+    @Transactional Map<String,Object> markAcceptanceFailed(String assistanceId, String taskOwnerId, String reason) {
+        AuthorizationService.requireWrite("product");
+        int updated = jdbc.update("UPDATE t_product_work_item SET assistance_status_='验收未通过',assignee_id_=COALESCE(?,assignee_id_),assistance_owner_id_=COALESCE(?,assistance_owner_id_),version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0 AND assistance_status_ IN ('待验收','处理中')", taskOwnerId, taskOwnerId, RequestContext.userId(), RequestContext.tenantId(), assistanceId);
+        if (updated != 1) throw conflict();
+        return Map.of("id", assistanceId, "status", "验收未通过", "reason", reason == null ? "" : reason);
+    }
+
+    @Transactional Map<String,Object> closeByOwner(String assistanceId, int revision) {
+        AuthorizationService.requireWrite("product");
+        Map<String,Object> row = jdbc.queryForMap("SELECT assistance_status_ AS status,assignee_id_ AS ownerId,version_ AS revision FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", RequestContext.tenantId(), assistanceId);
+        if (!"待负责人关闭".equals(row.get("status"))) throw new IllegalArgumentException("当前事项尚未满足负责人关闭条件");
+        if (!RequestContext.userId().equals(Objects.toString(row.get("ownerId"), ""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅当前负责人可以关闭事项");
+        if (((Number) row.get("revision")).intValue() != revision) throw conflict();
+        if (jdbc.update("UPDATE t_product_work_item SET assistance_status_='已关闭',status_name_='已完成',version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=? AND assistance_status_='待负责人关闭'", RequestContext.userId(), RequestContext.tenantId(), assistanceId, revision) != 1) throw conflict();
+        return Map.of("id", assistanceId, "status", "已关闭");
     }
 
     private ResponseStatusException conflict() { return new ResponseStatusException(HttpStatus.CONFLICT, "工单已变化，请刷新后重试"); }
