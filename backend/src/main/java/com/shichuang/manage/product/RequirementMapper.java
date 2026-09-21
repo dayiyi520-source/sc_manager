@@ -117,6 +117,36 @@ public class RequirementMapper {
         jdbc.update("UPDATE t_product_work_item SET assistance_status_=?,version_=version_+1,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", status, tenantId, id);
     }
 
+    void setAssistanceTaskMeta(String tenantId, String id, boolean blocksClosure) {
+        jdbc.update("UPDATE t_product_work_item SET assistance_blocks_closure_=?,assistance_task_status_='PROCESSING',update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND source_type_='WORK_ORDER' AND delete_flag_=0", blocksClosure ? 1 : 0, tenantId, id);
+    }
+
+    void refreshAssistanceTask(String tenantId, String workItemId) {
+        jdbc.update("UPDATE t_product_work_item SET assistance_task_status_=CASE WHEN successful_=1 AND assistance_task_status_='ACCEPTED' THEN 'ACCEPTED' WHEN successful_=1 THEN 'COMPLETED' ELSE 'PROCESSING' END WHERE tenant_id_=? AND id_=? AND source_type_='WORK_ORDER' AND delete_flag_=0", tenantId, workItemId);
+        List<Map<String,Object>> parents = jdbc.queryForList("SELECT DISTINCT requirement_id_ AS id FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND source_type_='WORK_ORDER' AND delete_flag_=0", tenantId, workItemId);
+        if (parents.isEmpty() || parents.get(0).get("id") == null) return;
+        String assistanceId = Objects.toString(parents.get(0).get("id"), "");
+        Map<String,Object> counts = jdbc.queryForMap("SELECT COUNT(*) AS total, SUM(CASE WHEN assistance_task_status_='COMPLETED' THEN 1 ELSE 0 END) AS completed, SUM(CASE WHEN assistance_task_status_='ACCEPTED' THEN 1 ELSE 0 END) AS accepted FROM t_product_work_item WHERE tenant_id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND assistance_blocks_closure_=1 AND delete_flag_=0", tenantId, assistanceId);
+        int total = ((Number) counts.getOrDefault("total", 0)).intValue();
+        int completed = ((Number) counts.getOrDefault("completed", 0)).intValue();
+        int accepted = ((Number) counts.getOrDefault("accepted", 0)).intValue();
+        String status = total == 0 ? "处理中" : accepted == total ? "待负责人关闭" : completed == total ? "待验收" : "处理中";
+        jdbc.update("UPDATE t_product_work_item SET assistance_status_=?,version_=version_+1,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", status, tenantId, assistanceId);
+    }
+
+    Map<String,Object> assistance(String tenantId, String id) {
+        List<Map<String,Object>> rows = jdbc.queryForList("SELECT id_,create_by_,assignee_id_,assistance_owner_id_,assistance_status_,version_ FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", tenantId, id);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    int markAssistanceTaskAccepted(String tenantId, String assistanceId, String workItemId) {
+        return jdbc.update("UPDATE t_product_work_item SET assistance_task_status_='ACCEPTED',update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND assistance_task_status_='COMPLETED' AND delete_flag_=0", tenantId, workItemId, assistanceId);
+    }
+
+    int markAssistanceTaskFailed(String tenantId, String assistanceId, String workItemId, String ownerId) {
+        return jdbc.update("UPDATE t_product_work_item SET assistance_task_status_='PROCESSING',assignee_id_=COALESCE(?,assignee_id_),assignee_name_=COALESCE((SELECT name_ FROM t_sys_user u WHERE u.tenant_id_=t_product_work_item.tenant_id_ AND u.id_=?),assignee_name_),update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND assistance_task_status_='COMPLETED' AND delete_flag_=0", ownerId, ownerId, tenantId, workItemId, assistanceId);
+    }
+
     void markWorkOrder(String tenantId,String id,String taskType,String requirementId,String sourceTitle,String note,String user) {
         jdbc.update("UPDATE t_product_work_item child JOIN t_product_work_item source ON source.id_=? AND source.tenant_id_=child.tenant_id_ AND source.category_='requirement' AND source.delete_flag_=0 SET child.source_type_='WORK_ORDER',child.work_order_type_=?,child.source_work_order_ids_=JSON_ARRAY(?),child.source_work_order_titles_=JSON_ARRAY(?),child.special_fields_=JSON_OBJECT('note',?),child.customer_id_=source.customer_id_,child.customer_name_=source.customer_name_,child.update_by_=?,child.update_time_=NOW(6) WHERE child.tenant_id_=? AND child.id_=? AND child.delete_flag_=0",requirementId,taskType,requirementId,sourceTitle,note,user,tenantId,id);
     }
@@ -134,11 +164,11 @@ public class RequirementMapper {
     }
 
     static String workItemSql() {
-        return "SELECT w.id_ AS id,w.requirement_id_ AS requirementId,r.code_ AS requirementCode,r.title_ AS requirementTitle,w.work_order_type_ AS taskType,w.title_ AS title,w.assignee_name_ AS assigneeName,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(w.special_fields_,'$.note')),'') AS note,w.status_name_ AS status,'SUCCESS' AS syncStatus,0 AS retryCount,NULL AS lastError,NULL AS nextRetryAt,w.update_time_ AS lastSyncAt,w.create_time_ AS createdAt FROM t_product_work_item w JOIN t_product_work_item r ON r.id_=w.requirement_id_ AND r.tenant_id_=w.tenant_id_ AND r.category_='requirement' AND r.delete_flag_=0 WHERE w.tenant_id_=? AND w.delete_flag_=0 AND w.source_type_='WORK_ORDER'";
+        return "SELECT w.id_ AS id,w.requirement_id_ AS requirementId,r.code_ AS requirementCode,r.title_ AS requirementTitle,w.work_order_type_ AS taskType,w.title_ AS title,w.assignee_name_ AS assigneeName,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(w.special_fields_,'$.note')),'') AS note,w.status_name_ AS status,w.assistance_task_status_ AS assistanceTaskStatus,w.assistance_blocks_closure_ AS blocksClosure,'SUCCESS' AS syncStatus,0 AS retryCount,NULL AS lastError,NULL AS nextRetryAt,w.update_time_ AS lastSyncAt,w.create_time_ AS createdAt FROM t_product_work_item w JOIN t_product_work_item r ON r.id_=w.requirement_id_ AND r.tenant_id_=w.tenant_id_ AND r.category_='requirement' AND r.delete_flag_=0 WHERE w.tenant_id_=? AND w.delete_flag_=0 AND w.source_type_='WORK_ORDER'";
     }
 
     private static String sourceSql() {
-        return "SELECT w.id_,w.tenant_id_,w.product_line_id_,w.category_,w.task_type_id_,w.code_,w.title_,w.description_,w.description_html_,w.expected_goal_,w.version_id_,w.status_name_ AS status_,w.assistance_status_,w.assistance_initiator_id_,w.assistance_owner_id_,w.assistance_resolution_,w.assignee_name_ AS owner_name_,COALESCE(w.creator_name_,cu.name_,w.create_by_) AS creator_name_,w.department_,w.customer_id_,w.customer_name_,w.requirement_type_,w.cc_names_,w.media_,w.source_work_order_ids_,w.source_work_order_titles_,w.work_order_type_,w.special_fields_,w.priority_,w.planned_start_date_,w.planned_end_date_ AS due_date_,w.estimated_hours_,w.actual_hours_,w.create_time_,w.version_,w.delete_flag_,p.name_ AS product_line_name_,COALESCE(v.name_,'') AS version_name_ FROM t_product_work_item w JOIN t_product_line p ON p.id_=w.product_line_id_ AND p.tenant_id_=w.tenant_id_ AND p.delete_flag_=0 LEFT JOIN t_product_line_version v ON v.id_=w.version_id_ AND v.tenant_id_=w.tenant_id_ AND v.delete_flag_=0 LEFT JOIN t_sys_user cu ON cu.id_=w.create_by_ AND cu.tenant_id_=w.tenant_id_";
+        return "SELECT w.id_,w.tenant_id_,w.product_line_id_,w.category_,w.task_type_id_,w.code_,w.title_,w.description_,w.description_html_,w.expected_goal_,w.version_id_,COALESCE(w.assistance_status_,w.status_name_) AS status_,w.assistance_status_,w.assistance_initiator_id_,w.assistance_owner_id_,w.assistance_resolution_,w.assignee_name_ AS owner_name_,COALESCE(w.creator_name_,cu.name_,w.create_by_) AS creator_name_,w.department_,w.customer_id_,w.customer_name_,w.requirement_type_,w.cc_names_,w.media_,w.source_work_order_ids_,w.source_work_order_titles_,w.work_order_type_,w.special_fields_,w.priority_,w.planned_start_date_,w.planned_end_date_ AS due_date_,w.estimated_hours_,w.actual_hours_,w.create_time_,w.version_,w.delete_flag_,p.name_ AS product_line_name_,COALESCE(v.name_,'') AS version_name_ FROM t_product_work_item w JOIN t_product_line p ON p.id_=w.product_line_id_ AND p.tenant_id_=w.tenant_id_ AND p.delete_flag_=0 LEFT JOIN t_product_line_version v ON v.id_=w.version_id_ AND v.tenant_id_=w.tenant_id_ AND v.delete_flag_=0 LEFT JOIN t_sys_user cu ON cu.id_=w.create_by_ AND cu.tenant_id_=w.tenant_id_";
     }
 
     private static String qualify(String sql) {

@@ -45,7 +45,7 @@ public class RequirementController {
     @PostMapping("/{id}/reassign") public ApiResponse<Map<String,Object>> reassign(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.reassign(id,b));}
     @Operation(summary = "保存个人备忘")
     @PostMapping("/{id}/memo") public ApiResponse<Map<String,Object>> memo(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.memo(id,b));}
-    @PostMapping("/{id}/acceptance-failed") public ApiResponse<Map<String,Object>> acceptanceFailed(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(assistanceWorkflow.markAcceptanceFailed(id, String.valueOf(b.getOrDefault("taskOwnerId", "")), String.valueOf(b.getOrDefault("reason", ""))));}
+    @PostMapping("/{id}/acceptance-failed") public ApiResponse<Map<String,Object>> acceptanceFailed(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(assistanceWorkflow.markAcceptanceFailed(id, String.valueOf(b.getOrDefault("workItemId", "")), String.valueOf(b.getOrDefault("taskOwnerId", "")), String.valueOf(b.getOrDefault("reason", "")), b.get("attachmentIds")));}
     @PostMapping("/{id}/close") public ApiResponse<Map<String,Object>> close(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(assistanceWorkflow.closeByOwner(id, ((Number)b.getOrDefault("revision",0)).intValue()));}
     @PostMapping("/reassign/{id}/accept") public ApiResponse<Map<String,Object>> acceptReassignment(@PathVariable String id,@RequestBody Map<String,Object> b){return ApiResponse.ok(assistanceWorkflow.accept(id, ((Number)b.getOrDefault("revision",0)).intValue()));}
     @PostMapping("/reassign/{id}/reject") public ApiResponse<Map<String,Object>> rejectReassignment(@PathVariable String id,@RequestBody Map<String,Object> b){return ApiResponse.ok(assistanceWorkflow.reject(id, String.valueOf(b.getOrDefault("reason", ""))));}
@@ -58,6 +58,7 @@ public class RequirementController {
     @Operation(summary = "分页查询下游同步状态")
     @GetMapping("/work-items/sync-status") public ApiResponse<PageResult<Map<String,Object>>> syncStatus(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="50") int pageSize,@RequestParam(defaultValue="") String taskType,@RequestParam(defaultValue="") String syncStatus){return ApiResponse.ok(service.syncStatus(page,pageSize,taskType,syncStatus));}
     @PatchMapping("/work-items/{id}/status") public ApiResponse<Void> updateWorkItemStatus(@PathVariable String id,@RequestBody Map<String,Object>b,HttpServletRequest r){service.updateWorkItemStatus(id,b);return ApiResponse.ok(null);}
+    @PostMapping("/{id}/work-items/{workItemId}/acceptance") public ApiResponse<Map<String,Object>> acceptWorkItem(@PathVariable String id,@PathVariable String workItemId){return ApiResponse.ok(service.acceptAssistanceTask(id, workItemId));}
     @Operation(summary = "幂等重试下游同步")
     @PostMapping("/work-items/{id}/retry") public ApiResponse<Map<String,Object>> retryWorkItem(@PathVariable String id){return ApiResponse.ok(service.retryWorkItem(id));}
 }

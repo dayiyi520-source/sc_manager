@@ -9,7 +9,7 @@ export const RequirementActionButtons: React.FC<{
   onHold: () => void;
   onReject: () => void;
 }> = ({ status, hasWorkItem, onWork, onHold, onReject }) => {
-  const locked = hasWorkItem || ['处理中', '已驳回', '已完成'].includes(status);
+  const locked = hasWorkItem || ['处理中', '待验收', '验收未通过', '待负责人关闭', '已关闭', '已驳回', '已完成'].includes(status);
   if (locked) return null;
   return <div className="flex gap-2">
     <button type="button" onClick={onWork} className="h-9 px-3 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white"><Send className="mr-1 inline w-3.5 h-3.5" />事项流转</button>

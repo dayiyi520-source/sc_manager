@@ -46,13 +46,13 @@ export const requirementRepository = {
   departments: () => apiRequest<DepartmentOption[]>('/api/requirements/departments'),
   employees: () => apiRequest<EmployeeOption[]>('/api/auth/dev-accounts'),
   transition: (id: string, action: 'hold' | 'reject', reason: string) => apiRequest<void>(`/api/requirements/${id}/transition`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
-  reassign: (id: string, input: { assigneeId: string; reason: string; handoffNote?: string; attachmentIds?: string[]; revision: number }) => apiRequest<{ pendingReassignmentId: string; status: string; owner: string; revision: number }>(`/api/requirements/${id}/reassign`, { method: 'POST', body: JSON.stringify(input) }),
+  reassign: (id: string, input: { assigneeId: string; reason: string; handoffNote?: string; attachmentIds?: string[]; revision: number }) => apiRequest<RequirementTask & { pendingReassignmentId: string; owner: string; revision: number; events?: RequirementTask['events'] }>(`/api/requirements/${id}/reassign`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
   acceptReassignment: (reassignmentId: string, revision: number) => apiRequest<{ id: string; status: string }>(`/api/requirements/reassign/${reassignmentId}/accept`, { method: 'POST', body: JSON.stringify({ revision }) }),
   rejectReassignment: (reassignmentId: string, reason: string) => apiRequest<{ id: string; status: string }>(`/api/requirements/reassign/${reassignmentId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
-  acceptanceFailed: (id: string, input: { taskOwnerId?: string; reason: string; attachmentIds?: string[] }) => apiRequest<{ id: string; status: string }>(`/api/requirements/${id}/acceptance-failed`, { method: 'POST', body: JSON.stringify(input) }),
+  acceptanceFailed: (id: string, input: { workItemId?: string; taskOwnerId?: string; reason: string; attachmentIds?: string[] }) => apiRequest<{ id: string; status: string }>(`/api/requirements/${id}/acceptance-failed`, { method: 'POST', body: JSON.stringify(input) }),
   closeByOwner: (id: string, revision: number) => apiRequest<{ id: string; status: string }>(`/api/requirements/${id}/close`, { method: 'POST', body: JSON.stringify({ revision }) }),
   memo: (id: string, input: { content: string; attachmentIds?: string[]; revision: number }) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/memo`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
-  stageAttachment: (file: { name: string; mimeType: string; size: number; storageKey: string }) => apiRequest<AttachmentMetadata>('/api/attachments/stage', { method: 'POST', body: JSON.stringify(file) }),
+  stageAttachment: (file: { name: string; mimeType: string; size: number; dataUrl: string }) => apiRequest<AttachmentMetadata>('/api/attachments/stage', { method: 'POST', body: JSON.stringify(file) }),
   bindAttachment: (id: string, input: { subjectType: string; subjectId: string; visibility: string }) => apiRequest<AttachmentMetadata>(`/api/attachments/${id}/bind`, { method: 'POST', body: JSON.stringify(input) }),
   createWorkItem: (id: string, input: { title?: string; taskType: string; assigneeName: string; note?: string }) => apiRequest<{ id: string; taskType: string; syncStatus?: string; retryCount?: number; syncError?: string }>(`/api/requirements/${id}/work-items`, { method: 'POST', body: JSON.stringify(input) }),
   createWorkItemsBatch: (id: string, tasks: Array<{ title?: string; taskType: string; assigneeName: string; note?: string; attachmentIds?: string[]; blocksClosure?: boolean }>) => apiRequest<{ items: RequirementWorkItem[]; count: number }>(`/api/requirements/${id}/work-items/batch`, { method: 'POST', body: JSON.stringify({ tasks }) }),
@@ -62,5 +62,6 @@ export const requirementRepository = {
     return apiRequest<PageResult<RequirementWorkItem>>(`/api/requirements/work-items/sync-status?${query}`);
   },
   updateWorkItemStatus: (id: string, status: string) => apiRequest<void>(`/api/requirements/work-items/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  acceptWorkItem: (requirementId: string, workItemId: string) => apiRequest<{ id: string; status: string }>(`/api/requirements/${requirementId}/work-items/${workItemId}/acceptance`, { method: 'POST' }),
   retryWorkItem: (id: string) => apiRequest<{ syncStatus: string; retryableFailures: number; syncError?: string }>(`/api/requirements/work-items/${id}/retry`, { method: 'POST' })
 };

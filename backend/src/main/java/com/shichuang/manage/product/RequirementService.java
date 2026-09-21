@@ -30,10 +30,11 @@ public class RequirementService {
     private final WorkOrderService workOrders;
     private final ObjectMapper objectMapper;
     private final AssistanceWorkflowService assistanceWorkflow;
+    private final AttachmentResourceService attachments;
 
     public RequirementService(RequirementMapper mapper,TaskAliasMapper taskMapper,TaskAliasService tasks,WorkItemStorageService storage,
-        WorkItemTransitionService transitions,WorkOrderService workOrders,ObjectMapper objectMapper,AssistanceWorkflowService assistanceWorkflow) {
-        this.mapper=mapper;this.taskMapper=taskMapper;this.tasks=tasks;this.storage=storage;this.transitions=transitions;this.workOrders=workOrders;this.objectMapper=objectMapper;this.assistanceWorkflow=assistanceWorkflow;
+        WorkItemTransitionService transitions,WorkOrderService workOrders,ObjectMapper objectMapper,AssistanceWorkflowService assistanceWorkflow,AttachmentResourceService attachments) {
+        this.mapper=mapper;this.taskMapper=taskMapper;this.tasks=tasks;this.storage=storage;this.transitions=transitions;this.workOrders=workOrders;this.objectMapper=objectMapper;this.assistanceWorkflow=assistanceWorkflow;this.attachments=attachments;
     }
 
     public PageResult<Map<String,Object>> list(int page,int pageSize,String keyword,String productLine,String department,String priority,String status,String ownerName,String workItemKind) {
@@ -117,8 +118,13 @@ public class RequirementService {
         String assigneeName=Objects.toString(employee.get("name"),"");
         String pendingId=UUID.randomUUID().toString();
         mapper.createPendingReassignment(RequestContext.tenantId(), id, pendingId, assigneeId, reason, text(body,"handoffNote"), RequestContext.userId());
+        attachments.bindAll(body.get("attachmentIds"), "ASSISTANCE_REASSIGNMENT", pendingId, "PARTICIPANTS");
         event(id,"转派待受理",from,Objects.toString(current.get("status"),from),reason,Map.of("fromAssigneeName",oldOwner,"assigneeId",assigneeId,"assigneeName",assigneeName,"pendingReassignmentId",pendingId));
-        return Map.of("pendingReassignmentId",pendingId,"status","PENDING","owner",oldOwner,"revision",currentRevision);
+        Map<String,Object> response = new LinkedHashMap<>(detail(id));
+        response.put("pendingReassignmentId", pendingId);
+        response.put("owner", oldOwner);
+        response.put("revision", currentRevision);
+        return response;
     }
 
     @Transactional public Map<String,Object> memo(String id,Map<String,Object> body){
@@ -128,7 +134,7 @@ public class RequirementService {
         rejectTerminal(current);
         String content=text(body,"content");
         if(content.isBlank())throw new IllegalArgumentException("个人备忘内容不能为空");
-        assistanceWorkflow.memo(id, content);
+        assistanceWorkflow.memo(id, content, body.get("attachmentIds"));
         return detail(id);
     }
 
@@ -143,6 +149,8 @@ public class RequirementService {
         WorkItemDefinition.CreateItem input=new WorkItemDefinition.CreateItem("work-order-"+UUID.randomUUID(),line,category,typeId,title,note,"",nullable(current.get("versionId")),id,null,assigneeId,priority(current.get("priority")),null,date(current.get("dueDate")),BigDecimal.ZERO,BigDecimal.ZERO);
         Map<String,Object> created=storage.create(input);
         mapper.markWorkOrder(RequestContext.tenantId(),created.get("id").toString(),taskType,id,String.valueOf(current.get("title")),note,RequestContext.userId());
+        mapper.setAssistanceTaskMeta(RequestContext.tenantId(), created.get("id").toString(), Boolean.parseBoolean(String.valueOf(body.getOrDefault("blocksClosure", true))));
+        attachments.bindAll(body.get("attachmentIds"), "ASSISTANCE_WORK_ITEM", created.get("id").toString(), "PARTICIPANTS");
         jdbcSetAssistanceProcessing(id);
         event(id,"转任务",String.valueOf(current.get("status")),String.valueOf(current.get("status")),note,Map.of("taskType",taskType,"taskId",created.get("id"),"taskTitle",title,"assigneeName",assignee,"targetPage",targetPage(category)));
         return Map.of("id",created.get("id"),"taskType",taskType,"syncStatus","SUCCESS","retryCount",0);
@@ -164,7 +172,17 @@ public class RequirementService {
 
     public PageResult<Map<String,Object>> syncStatus(int page,int pageSize,String taskType,String syncStatus){AuthorizationService.requireRead("product");int current=Math.max(1,page),size=Math.min(100,Math.max(1,pageSize));if(!safe(syncStatus).isBlank()&&!"SUCCESS".equalsIgnoreCase(syncStatus))return new PageResult<>(List.of(),current,size,0);return new PageResult<>(workOrders.syncStatus(RequestContext.tenantId(),safe(taskType),"SUCCESS",size,(current-1)*size),current,size,workOrders.syncStatusCount(RequestContext.tenantId(),safe(taskType),"SUCCESS"));}
 
-    @Transactional public void updateWorkItemStatus(String id,Map<String,Object> body){AuthorizationService.requireWrite("product");workOrders.updateStatus(RequestContext.tenantId(),id,text(body,"status"),RequestContext.userId());}
+    @Transactional public void updateWorkItemStatus(String id,Map<String,Object> body){AuthorizationService.requireWrite("product");workOrders.updateStatus(RequestContext.tenantId(),id,text(body,"status"),RequestContext.userId());mapper.refreshAssistanceTask(RequestContext.tenantId(), id);}
+    @Transactional public Map<String,Object> acceptAssistanceTask(String assistanceId, String workItemId) {
+        AuthorizationService.requireWrite("product");
+        Map<String,Object> assistance = mapper.assistance(RequestContext.tenantId(), assistanceId);
+        if (assistance == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "事项不存在");
+        if (!RequestContext.userId().equals(Objects.toString(assistance.get("create_by_"), ""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅事项发起人可以验收");
+        if (mapper.markAssistanceTaskAccepted(RequestContext.tenantId(), assistanceId, workItemId) != 1) throw conflict();
+        mapper.refreshAssistanceTask(RequestContext.tenantId(), workItemId);
+        event(assistanceId,"任务验收通过",Objects.toString(assistance.get("assistance_status_"),"处理中"),Objects.toString(mapper.assistance(RequestContext.tenantId(), assistanceId).get("assistance_status_"),"处理中"),"发起人确认任务结果",Map.of("taskId",workItemId));
+        return Map.of("id", workItemId, "status", "已验收");
+    }
     public Map<String,Object> retryWorkItem(String id){AuthorizationService.requireWrite("product");workOrders.find(RequestContext.tenantId(),id);return Map.of("syncStatus","SUCCESS","retryableFailures",0);}
 
     private Map<String,Object> requirement(String id){List<Map<String,Object>> rows=mapper.find(RequestContext.tenantId(),id);if(rows.isEmpty())throw notFound("需求不存在");return rows.get(0);}

@@ -513,6 +513,7 @@ export interface RequirementTask {
   customerName?: string;
   descriptionHtml?: string;
   media?: RequirementMedia[];
+  attachments?: AttachmentMetadata[];
   taskType?: RequirementTaskType;
   taskId?: string;
   assignedOwnerName?: string;
@@ -626,6 +627,8 @@ export interface RequirementWorkItem {
   nextRetryAt?: string;
   lastSyncAt?: string;
   createdAt?: string;
+  blocksClosure?: boolean | number;
+  assistanceTaskStatus?: string;
 }
 
 export interface DepartmentOption {
@@ -650,6 +653,7 @@ export interface AttachmentMetadata {
   mimeType?: string;
   size?: number;
   storageKey?: string;
+  dataUrl?: string;
   scanStatus?: 'PENDING' | 'PASSED' | 'REJECTED' | string;
   visibility?: 'SHARED' | 'PRIVATE_AUTHOR' | 'PARTICIPANTS' | string;
   expiresAt?: string;

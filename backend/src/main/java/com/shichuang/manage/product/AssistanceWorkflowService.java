@@ -14,7 +14,8 @@ import java.util.*;
 public class AssistanceWorkflowService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
-    public AssistanceWorkflowService(JdbcTemplate jdbc, ObjectMapper objectMapper) { this.jdbc = jdbc; this.objectMapper = objectMapper; }
+    private final AttachmentResourceService attachments;
+    public AssistanceWorkflowService(JdbcTemplate jdbc, ObjectMapper objectMapper, AttachmentResourceService attachments) { this.jdbc = jdbc; this.objectMapper = objectMapper; this.attachments = attachments; }
 
     Map<String,Object> enrich(Map<String,Object> detail) {
         String id = Objects.toString(detail.get("id"), "");
@@ -22,6 +23,8 @@ public class AssistanceWorkflowService {
         AssistanceStatus status = stored.isBlank() ? derive(Objects.toString(detail.get("status"), "")) : AssistanceStatus.from(stored);
         detail.put("assistanceStatus", status.label());
         detail.put("assistanceStatusKey", status.name());
+        detail.put("status", status.label());
+        detail.put("attachments", jdbc.queryForList("SELECT id_ AS id,name_ AS name,mime_type_ AS mimeType,size_ AS size,storage_key_ AS storageKey,data_url_ AS dataUrl,visibility_,subject_type_ AS subjectType,subject_id_ AS subjectId FROM t_product_attachment_resource WHERE tenant_id_=? AND delete_flag_=0 AND (visibility_<>'PRIVATE_AUTHOR' OR create_by_=?) AND (subject_id_=? OR subject_id_ IN (SELECT id_ FROM t_product_assistance_reassignment WHERE tenant_id_=? AND assistance_id_=? AND delete_flag_=0) OR subject_id_ IN (SELECT id_ FROM t_product_work_item WHERE tenant_id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND delete_flag_=0) OR subject_id_ IN (SELECT id_ FROM t_product_assistance_memo WHERE tenant_id_=? AND assistance_id_=? AND author_id_=? AND delete_flag_=0)) ORDER BY create_time_", RequestContext.tenantId(), RequestContext.userId(), id, RequestContext.tenantId(), id, RequestContext.tenantId(), id, RequestContext.tenantId(), id, RequestContext.userId()));
         detail.put("assistanceInitiatorId", detail.get("assistanceInitiatorId"));
         detail.put("pendingReassignments", jdbc.queryForList("SELECT id_ AS id,to_user_id_ AS toUserId,status_ AS status,reason_ AS reason,create_time_ AS createdAt FROM t_product_assistance_reassignment WHERE tenant_id_=? AND assistance_id_=? AND delete_flag_=0 ORDER BY create_time_ DESC", RequestContext.tenantId(), id));
         return detail;
@@ -52,17 +55,31 @@ public class AssistanceWorkflowService {
         return Map.of("id", id, "status", "REJECTED", "reason", reason == null ? "" : reason);
     }
 
-    @Transactional Map<String,Object> memo(String assistanceId, String content) {
+    @Transactional Map<String,Object> memo(String assistanceId, String content, Object attachmentIds) {
         AuthorizationService.requireWrite("product");
         if (content == null || content.isBlank()) throw new IllegalArgumentException("个人备忘内容不能为空");
-        jdbc.update("INSERT INTO t_product_assistance_memo(id_,tenant_id_,assistance_id_,author_id_,content_,create_time_) VALUES(?,?,?,?,?,NOW(6))", UUID.randomUUID().toString(), RequestContext.tenantId(), assistanceId, RequestContext.userId(), content.trim());
+        String memoId = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO t_product_assistance_memo(id_,tenant_id_,assistance_id_,author_id_,content_,create_time_) VALUES(?,?,?,?,?,NOW(6))", memoId, RequestContext.tenantId(), assistanceId, RequestContext.userId(), content.trim());
+        attachments.bindAll(attachmentIds, "ASSISTANCE_MEMO", memoId, "PRIVATE_AUTHOR");
         return Map.of("id", assistanceId, "statusUnchanged", true);
     }
 
-    @Transactional Map<String,Object> markAcceptanceFailed(String assistanceId, String taskOwnerId, String reason) {
+    @Transactional Map<String,Object> markAcceptanceFailed(String assistanceId, String workItemId, String taskOwnerId, String reason, Object attachmentIds) {
         AuthorizationService.requireWrite("product");
-        int updated = jdbc.update("UPDATE t_product_work_item SET assistance_status_='验收未通过',assignee_id_=COALESCE(?,assignee_id_),assistance_owner_id_=COALESCE(?,assistance_owner_id_),version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0 AND assistance_status_ IN ('待验收','处理中')", taskOwnerId, taskOwnerId, RequestContext.userId(), RequestContext.tenantId(), assistanceId);
+        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("验收未通过原因不能为空");
+        Map<String,Object> assistance = jdbc.queryForMap("SELECT create_by_ AS initiatorId,assistance_status_ AS status FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", RequestContext.tenantId(), assistanceId);
+        if (!RequestContext.userId().equals(Objects.toString(assistance.get("initiatorId"), ""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅事项发起人可以验收");
+        if (workItemId == null || workItemId.isBlank()) throw new IllegalArgumentException("请选择验收未通过的任务");
+        Map<String,Object> task = jdbc.queryForMap("SELECT assignee_id_ AS ownerId,assignee_name_ AS ownerName FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND assistance_task_status_='COMPLETED' AND delete_flag_=0", RequestContext.tenantId(), workItemId, assistanceId);
+        String ownerId = Objects.toString(task.get("ownerId"), "");
+        String ownerName = Objects.toString(task.get("ownerName"), "");
+        if (ownerId.isBlank()) throw new IllegalArgumentException("任务负责人不存在，无法退回");
+        if (jdbc.update("UPDATE t_product_work_item SET assistance_task_status_='PROCESSING',update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND assistance_task_status_='COMPLETED' AND delete_flag_=0", RequestContext.userId(), RequestContext.tenantId(), workItemId, assistanceId) != 1) throw conflict();
+        String from = Objects.toString(assistance.get("status"), "处理中");
+        int updated = jdbc.update("UPDATE t_product_work_item SET assistance_status_='验收未通过',assignee_id_=?,assignee_name_=?,assistance_owner_id_=?,version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0 AND assistance_status_ IN ('待验收','处理中')", ownerId, ownerName, ownerId, RequestContext.userId(), RequestContext.tenantId(), assistanceId);
         if (updated != 1) throw conflict();
+        attachments.bindAll(attachmentIds, "ASSISTANCE_ACCEPTANCE", assistanceId, "PARTICIPANTS");
+        event(assistanceId, "验收未通过", from, "验收未通过", reason);
         return Map.of("id", assistanceId, "status", "验收未通过", "reason", reason == null ? "" : reason);
     }
 
@@ -72,8 +89,15 @@ public class AssistanceWorkflowService {
         if (!"待负责人关闭".equals(row.get("status"))) throw new IllegalArgumentException("当前事项尚未满足负责人关闭条件");
         if (!RequestContext.userId().equals(Objects.toString(row.get("ownerId"), ""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅当前负责人可以关闭事项");
         if (((Number) row.get("revision")).intValue() != revision) throw conflict();
+        Number pending = jdbc.queryForObject("SELECT COUNT(*) FROM t_product_assistance_reassignment WHERE tenant_id_=? AND assistance_id_=? AND status_='PENDING' AND delete_flag_=0", Number.class, RequestContext.tenantId(), assistanceId);
+        if (pending != null && pending.intValue() > 0) throw new IllegalArgumentException("存在待接收转派，请先完成责任交接");
         if (jdbc.update("UPDATE t_product_work_item SET assistance_status_='已关闭',status_name_='已完成',version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=? AND assistance_status_='待负责人关闭'", RequestContext.userId(), RequestContext.tenantId(), assistanceId, revision) != 1) throw conflict();
+        event(assistanceId, "负责人关闭", "待负责人关闭", "已关闭", "当前负责人确认事项闭环");
         return Map.of("id", assistanceId, "status", "已关闭");
+    }
+
+    private void event(String assistanceId, String type, String from, String to, String reason) {
+        jdbc.update("INSERT INTO t_product_work_item_activity(id_,tenant_id_,product_line_id_,subject_id_,event_type_,content_,create_by_,create_time_) SELECT ?,tenant_id_,product_line_id_,id_,?,JSON_OBJECT('fromStatus',?,'toStatus',?,'reason',?),?,NOW(6) FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", UUID.randomUUID().toString(), type, from, to, Objects.toString(reason, ""), RequestContext.userId(), RequestContext.tenantId(), assistanceId);
     }
 
     private ResponseStatusException conflict() { return new ResponseStatusException(HttpStatus.CONFLICT, "工单已变化，请刷新后重试"); }

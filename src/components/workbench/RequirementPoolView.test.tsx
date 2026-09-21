@@ -12,6 +12,7 @@ import type { RequirementTask } from '../../types';
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
 vi.mock('../../services/requirementRepository', () => ({
   requirementRepository: { employees: vi.fn(), detail: vi.fn(), reassign: vi.fn(), memo: vi.fn(), createWorkItem: vi.fn() },
+  normalizeRequirementTask: (task: RequirementTask) => task,
 }));
 vi.mock('../product/LazyRichTextEditor', () => ({
   LazyRichTextEditor: ({ size, onInput }: { size?: string; onInput: (text: string, html: string) => void }) => (
@@ -88,7 +89,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.mouseDown(screen.getByLabelText('所属产品线 *'));
     fireEvent.click(await screen.findByText('协同产品线', { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
-    fireEvent.click(await screen.findByText('陈雅婷', { selector: '.ant-select-item-option-content' }));
+    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
     fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
     fireEvent.click(screen.getByRole('button', { name: '发起协助' }));
 
@@ -170,7 +171,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.mouseDown(screen.getByLabelText('流转类型 *'));
     fireEvent.click(await screen.findByText('转派给他人', { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('转派给负责人 *'));
-    fireEvent.click(await screen.findByText('陈雅婷', { selector: '.ant-select-item-option-content' }));
+    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
     fireEvent.change(screen.getByPlaceholderText('请输入转派原因及交接说明...'), { target: { value: '工作调整' } });
     fireEvent.click(screen.getByRole('button', { name: '确认' }));
 
