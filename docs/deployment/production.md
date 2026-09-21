@@ -32,6 +32,8 @@ scripts/deploy-production.sh
 
 The default command builds and uploads the frontend and backend, verifies the dedicated Nginx route, backs up the current server database and application files, switches only the application files, lets Flyway migrate the existing database, and verifies the internal and public endpoints. It does not import local business data or modify the site root or `/tongren/` routes.
 
+Before upload and again after the public switch, deployment verifies that the generated HTML references `/manage-admin/assets/` and rejects root `/assets/` references. It also verifies direct access to the product defect page so a wrong frontend base path cannot be reported as a successful release.
+
 Complete database replacement is exceptional and must be explicit:
 
 ```bash
@@ -55,7 +57,14 @@ Rules:
 - Load deployment values from `.enterprise-app-factory/secrets/runtime.env` or existing environment variables.
 - After a deployment succeeds, update this runbook with the verified command, required preconditions, rollback notes, and last success date.
 
-Last successful deploy: 2026-09-20
+Last successful deploy: 2026-09-21
+
+Latest verified repair:
+
+- Frontend-only release `20260921092314` repaired production assets that were incorrectly built against root `/assets/` URLs.
+- The public index now references `/manage-admin/assets/`; all six entry JavaScript and CSS resources, the direct product defect page, and the development-account API returned successfully.
+- The backend JAR, backend service, and database were not changed during this repair.
+- Frontend backup: `/opt/manage-admin/backups/20260921092314/frontend.tar.gz`.
 
 Verified deployment:
 

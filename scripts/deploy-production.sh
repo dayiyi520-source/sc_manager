@@ -92,6 +92,18 @@ REMOTE_ROUTE_FILE="/www/server/panel/vhost/nginx/routes/manage-admin.conf"
 RELEASE_ID="$(date +%Y%m%d%H%M%S)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/manage-admin-deploy.XXXXXX")"
 
+verify_frontend_base_path() {
+  local index_file="$1"
+  if grep -Eq '(src|href)="/assets/' "${index_file}"; then
+    echo "Frontend artifact incorrectly references root /assets/ paths" >&2
+    return 1
+  fi
+  if ! grep -Fq "${FRONTEND_PATH}assets/" "${index_file}"; then
+    echo "Frontend artifact does not reference ${FRONTEND_PATH}assets/" >&2
+    return 1
+  fi
+}
+
 cleanup() {
   rm -rf "${WORK_DIR}"
 }
@@ -140,6 +152,7 @@ echo "[2/6] Building frontend and backend"
   cd "${ROOT_DIR}/backend"
   mvn -q -DskipTests package
 )
+verify_frontend_base_path "${ROOT_DIR}/dist/index.html"
 
 FRONTEND_ARCHIVE="${WORK_DIR}/frontend.tar.gz"
 BACKEND_JAR="${WORK_DIR}/app.jar"
@@ -315,6 +328,9 @@ echo "Release ${RELEASE_ID} deployed in ${deploy_mode} mode; backup: ${backup_di
 REMOTE_SCRIPT
 
 echo "[6/6] Verifying the public route"
-curl --fail --silent --show-error --output /dev/null "${PUBLIC_URL}"
+PUBLIC_INDEX="${WORK_DIR}/public-index.html"
+curl --fail --silent --show-error "${PUBLIC_URL}" --output "${PUBLIC_INDEX}"
+verify_frontend_base_path "${PUBLIC_INDEX}"
+curl --fail --silent --show-error --output /dev/null "${PUBLIC_URL%/}/app/prod_bugs"
 curl --fail --silent --show-error --output /dev/null "${PUBLIC_URL%/}/api/auth/dev-accounts"
 echo "Deployment ${RELEASE_ID} completed in ${DEPLOY_MODE} mode: ${PUBLIC_URL}"

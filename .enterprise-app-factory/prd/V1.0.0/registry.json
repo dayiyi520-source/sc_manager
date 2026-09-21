@@ -4,7 +4,7 @@
   "version": "V1.0.0",
   "prdPath": "docs/prd/V1.0.0.md",
   "createdAt": "2026-09-01T02:53:38Z",
-  "updatedAt": "2026-09-20T09:10:00Z",
+  "updatedAt": "2026-09-21T01:20:00Z",
   "modules": [
     {
       "id": "1",
@@ -247,6 +247,13 @@
     "date": "2026-09-20",
     "action": "修改",
     "summary": "分离用例库与执行结果，统一移动目录级联并完善测试报告列表和新建流程",
+    "modules": ["1"],
+    "impactModules": []
+  }, {
+    "id": "20260921-01",
+    "date": "2026-09-21",
+    "action": "修改",
+    "summary": "阻止静态资源脱离项目专属目录的版本被发布为成功版本",
     "modules": ["1"],
     "impactModules": []
   }]
