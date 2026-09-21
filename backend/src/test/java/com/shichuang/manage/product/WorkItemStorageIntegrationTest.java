@@ -62,6 +62,13 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(0,new java.math.BigDecimal("8.50").compareTo((java.math.BigDecimal)created.get("estimatedHours")));
         assertEquals(0,new java.math.BigDecimal("3.25").compareTo((java.math.BigDecimal)created.get("actualHours")));
     }
+    @Test void persistsRichTextDescriptionOnCreateAndUpdate() {
+        var input=new CreateItem("rich-description",line,"test",type,"富文本任务","加粗内容","<p><strong>加粗内容</strong></p>",null,null,null,null,null,"P2",null,null,null,null);
+        var created=storage.create(input);
+        assertEquals("<p><strong>加粗内容</strong></p>",created.get("descriptionHtml"));
+        var changed=storage.update(line,created.get("id").toString(),new UpdateItem(null,"更新内容","<p><em>更新内容</em></p>",null,null,null,null,null,null,null,null,0));
+        assertEquals("<p><em>更新内容</em></p>",changed.get("descriptionHtml"));
+    }
     @Test void updatesUnifiedFieldsWithOptimisticRevision() {
         jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES('assignee-user',?,'assignee-user','测试负责人','测试部','product_manager','测试负责人','enabled','test-user','test-user',NOW(),NOW())",tenant);
         var created=storage.create(input("update-fields","test",type,null,null,null));
@@ -145,6 +152,16 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(version,child.get("versionId"));
         assertEquals(parent.get("id"),child.get("parentWorkItemId"));
         assertThrows(IllegalArgumentException.class,()->storage.create(input("wrong-version","test",childType,parent.get("id").toString(),UUID.randomUUID().toString(),null)));
+    }
+    @Test void childMustUseTheSameCategoryAsItsParent() {
+        var parent=storage.create(input("same-category-parent","test",type,null,null,null));
+        String devType=type("dev","研发子任务");
+        publish("dev");
+
+        var error=assertThrows(IllegalArgumentException.class,()->storage.create(
+            input("cross-category-child","dev",devType,parent.get("id").toString(),null,null)));
+
+        assertEquals("子任务分类必须与父任务一致",error.getMessage());
     }
     @Test void detailReturnsParentAndDeleteUsesRevisionAndProtectsChildren() {
         String childType=type("test","可删除子任务");

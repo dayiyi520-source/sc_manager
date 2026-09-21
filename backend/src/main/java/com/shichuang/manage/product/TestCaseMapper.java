@@ -61,7 +61,10 @@ public class TestCaseMapper {
         return jdbc.queryForList(sql.toString(),a.toArray());
     }
     private static void filters(StringBuilder sql,List<Object>a,TestCaseDefinition.Query q) {
-        if(q.directoryId()!=null&&!q.directoryId().isBlank()){sql.append(" AND c.directory_id_=?");a.add(q.directoryId());}
+        if(q.includeDescendants() && q.directoryIds()!=null && !q.directoryIds().isEmpty()){
+            sql.append(" AND c.directory_id_ IN (").append(String.join(",", Collections.nCopies(q.directoryIds().size(), "?"))).append(")");
+            a.addAll(q.directoryIds());
+        } else if(q.directoryId()!=null&&!q.directoryId().isBlank()){sql.append(" AND c.directory_id_=?");a.add(q.directoryId());}
         if(q.keyword()!=null&&!q.keyword().isBlank()){sql.append(" AND (c.code_ LIKE ? OR c.title_ LIKE ?)");String k="%"+q.keyword().trim()+"%";a.add(k);a.add(k);}
         if(q.priority()!=null&&!q.priority().isBlank()){sql.append(" AND c.priority_=?");a.add(q.priority());}
         if(q.ownerId()!=null&&!q.ownerId().isBlank()){sql.append(" AND c.owner_id_=?");a.add(q.ownerId());}

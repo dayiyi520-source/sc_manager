@@ -40,18 +40,16 @@ const TestTaskDefects: React.FC<{ workItemId: string }> = ({ workItemId }) => {
   ]} />;
 };
 
-const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, editing, onUpdate, employeeNames, employeeOptions, versions, statusControl }) => {
+const truncateTitle = (value: string, maxLength = 30) => value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+
+const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, parent, onOpenParent, editing, onUpdate, employeeNames, employeeOptions, versions, statusControl }) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || '');
   const [descriptionHtml, setDescriptionHtml] = useState(task.descriptionHtml || '');
   const descriptionEditor = useRef<HTMLDivElement | null>(null);
   useEffect(() => { setTitle(task.title); setDescription(task.description || ''); setDescriptionHtml(task.descriptionHtml || ''); }, [task.id, task.title, task.description, task.descriptionHtml]);
-  const types = useQuery({ queryKey: ['test-work-item-types', task.productLineId], queryFn: () => productRepository.workItemTypes(task.productLineId || '', '测试'), enabled: !!task.productLineId, retry: false });
-  const typeName = types.data?.find((item) => item.id === task.workItemTypeId)?.name || task.requirementType || '';
-  if (types.isLoading) return <div className="test-task-loading">正在识别测试子任务类型...</div>;
-  if (typeName === '用例编写') return <div className="test-case-authoring-state"><h3>关联用例</h3><p>在“用例库”中按当前来源需求创建或维护用例，再由可执行测试子任务加入测试计划。</p></div>;
-  const requirementLabel = task.requirementId ? task.sourceWorkOrderTitles?.[0] || task.requirementId : '未关联';
+  const productTaskTitle = task.requirementTitle || task.sourceWorkOrderTitles?.[0] || '未关联';
   const lineVersions = versions.filter((version) => !version.productLineName || version.productLineName === task.productLineName);
   const basicInfo = <div className="test-task-basic-info">
     <div className="test-task-basic-grid">
@@ -66,7 +64,7 @@ const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, editing, onUpda
     </div>
     <section className="test-task-basic-description"><h3>任务描述</h3>{editing ? <RichTextEditor key={`test-detail-${task.id}`} editor={descriptionEditor} value={description} htmlValue={descriptionHtml} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} onBlur={() => onUpdate({ description, descriptionHtml })} placeholder="详细记录测试范围、环境和验收标准..." /> : <CollapsibleDescription value={description} emptyText="未填写任务描述" />}</section>
   </div>;
-  return <div className="test-task-detail-page"><header className="test-task-detail-header">{editing ? <Input className="test-task-detail-title-input" value={title} onChange={(event) => setTitle(event.target.value)} onBlur={() => { const nextTitle = title.trim(); if (nextTitle && nextTitle !== task.title) onUpdate({ title: nextTitle }); else setTitle(task.title); }} /> : <h2 className="test-task-detail-title">{task.title}</h2>}<div className="test-task-detail-meta"><span>所属需求：{requirementLabel}</span><i /> <span>产品线/版本号：{task.productLineName || '未设置'} / {task.versionName || '未设置'}</span><i /> <span>负责人：{task.ownerName || '未设置'}</span></div></header><Tabs className="test-task-detail-tabs" items={[
+  return <div className="test-task-detail-page"><header className="test-task-detail-header">{editing ? <Input className="test-task-detail-title-input" value={title} onChange={(event) => setTitle(event.target.value)} onBlur={() => { const nextTitle = title.trim(); if (nextTitle && nextTitle !== task.title) onUpdate({ title: nextTitle }); else setTitle(task.title); }} /> : <h2 className="test-task-detail-title">{task.title}</h2>}<div className="test-task-detail-meta"><span title={productTaskTitle}>产品任务：{truncateTitle(productTaskTitle)}</span><i /> <span>产品线/版本号：{task.productLineName || '未设置'} / {task.versionName || '未设置'}</span><i /> <span>负责人：{task.ownerName || '未设置'}</span></div>{parent && <div className="test-task-parent-reference"><span>父级任务</span><button type="button" onClick={onOpenParent} title={String(parent.title || '')}><span className="test-task-parent-code font-mono">{String(parent.code || '')}</span><span className="test-task-parent-title">{String(parent.title || '')}</span></button></div>}</header><Tabs className="test-task-detail-tabs" items={[
     { key: 'basic', label: '基本信息', children: basicInfo },
     { key: 'plan', label: '测试计划', children: <TestPlanPanel task={task} workItemId={task.id} productLineId={task.productLineId || ''} sourceRequirementId={task.requirementId} employeeNames={employeeNames} employeeOptions={employeeOptions} onExecutionCreated={() => setRefreshKey((value) => value + 1)} /> },
     { key: 'executions', label: '执行记录', children: <TestExecutionResults workItemId={task.id} productLineId={task.productLineId || ''} refreshKey={refreshKey} /> },

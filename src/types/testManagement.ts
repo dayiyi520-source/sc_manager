@@ -152,6 +152,7 @@ export interface VersionTestReport extends VersionTestReportListItem {
 
 export interface SaveVersionTestReportInput {
   name: string;
+  reportType: '功能测试' | '安全测试' | '回归测试';
   testPlanIds: string[];
   summary?: string;
   revision?: number;

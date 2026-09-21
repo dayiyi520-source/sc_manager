@@ -39,15 +39,35 @@ public class VersionReviewController {
         return ApiResponse.ok(service.create(lineId, versionId, input));
     }
 
+    @PostMapping("/submit")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "新建并提交版本评审")
+    public ApiResponse<Map<String, Object>> createAndSubmit(@PathVariable String lineId, @PathVariable String versionId, @RequestBody SaveReview input) {
+        return ApiResponse.ok(service.createAndSubmit(lineId, versionId, input));
+    }
+
     @PutMapping("/{reviewId}")
     @Operation(summary = "保存版本评审草稿")
     public ApiResponse<Map<String, Object>> update(@PathVariable String lineId, @PathVariable String versionId, @PathVariable String reviewId, @RequestBody SaveReview input) {
         return ApiResponse.ok(service.update(lineId, versionId, reviewId, input));
     }
 
+    @PutMapping("/{reviewId}/submit")
+    @Operation(summary = "保存并提交版本评审")
+    public ApiResponse<Map<String, Object>> updateAndSubmit(@PathVariable String lineId, @PathVariable String versionId, @PathVariable String reviewId, @RequestBody SaveReview input) {
+        return ApiResponse.ok(service.updateAndSubmit(lineId, versionId, reviewId, input));
+    }
+
     @PostMapping("/{reviewId}/submit")
     @Operation(summary = "提交版本评审")
     public ApiResponse<Map<String, Object>> submit(@PathVariable String lineId, @PathVariable String versionId, @PathVariable String reviewId, @RequestBody Revision input) {
         return ApiResponse.ok(service.submit(lineId, versionId, reviewId, input));
+    }
+
+    @DeleteMapping("/{reviewId}")
+    @Operation(summary = "删除版本评审")
+    public ApiResponse<Void> delete(@PathVariable String lineId, @PathVariable String versionId, @PathVariable String reviewId, @RequestBody Revision input) {
+        service.delete(lineId, versionId, reviewId, input);
+        return ApiResponse.ok(null);
     }
 }

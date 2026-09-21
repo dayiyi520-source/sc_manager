@@ -41,12 +41,27 @@ public final class WorkItemDefinition {
     public record Revision(int revision) {}
     public record ChildRule(String parentTypeId, String childTypeId, boolean enabled) {}
     public record CreateItem(String requestId, String productLineId, String category, String taskTypeId,
-        String title, String description, String expectedGoal, String versionId, String requirementId,
+        String title, String description, String descriptionHtml, String expectedGoal, String versionId, String requirementId,
         String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
-        LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours) {}
-    public record UpdateItem(String title, String description, String expectedGoal, String versionId,
+        LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours) {
+        public CreateItem(String requestId, String productLineId, String category, String taskTypeId,
+            String title, String description, String expectedGoal, String versionId, String requirementId,
+            String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
+            LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours) {
+            this(requestId, productLineId, category, taskTypeId, title, description, null, expectedGoal, versionId,
+                requirementId, parentWorkItemId, assigneeId, priority, plannedStartDate, plannedEndDate, estimatedHours, actualHours);
+        }
+    }
+    public record UpdateItem(String title, String description, String descriptionHtml, String expectedGoal, String versionId,
         String assigneeName, String priority, LocalDate plannedStartDate, LocalDate plannedEndDate,
-        BigDecimal estimatedHours, BigDecimal actualHours, Integer revision) {}
+        BigDecimal estimatedHours, BigDecimal actualHours, Integer revision) {
+        public UpdateItem(String title, String description, String expectedGoal, String versionId,
+            String assigneeName, String priority, LocalDate plannedStartDate, LocalDate plannedEndDate,
+            BigDecimal estimatedHours, BigDecimal actualHours, Integer revision) {
+            this(title, description, null, expectedGoal, versionId, assigneeName, priority, plannedStartDate,
+                plannedEndDate, estimatedHours, actualHours, revision);
+        }
+    }
 
     public static String category(String value) {
         if (!CATEGORIES.containsKey(value == null ? "" : value)) throw new IllegalArgumentException("工作项分类无效");

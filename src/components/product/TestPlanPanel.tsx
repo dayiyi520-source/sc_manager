@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, DatePicker, Dropdown, Empty, Form, Input, Modal, Progress, Radio, Select, Space, Table, Tag, Tooltip } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
 import { DownOutlined, PlusOutlined, RightOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
@@ -43,7 +44,7 @@ export const TestPlanPanel: React.FC<TestPlanPanelProps> = ({ task, workItemId, 
   const defectOptions = useQuery({ queryKey: ['test-defect-search', productLineId, defectQuery], queryFn: () => productRepository.workItems(productLineId, 'bug', defectQuery), enabled: referenceOpen, retry: false });
   const currentCases = useMemo(() => new Map((activeExecution.data?.cases || []).map((item) => [item.testCaseId, item])), [activeExecution.data]);
 
-  const openCreatePlan = () => { planForm.setFieldsValue({ name: `${task.title}测试计划`, environment: '' }); setCreateOpen(true); };
+  const openCreatePlan = () => { planForm.resetFields(); planForm.setFieldsValue({ name: `${task.title}测试计划` }); setCreateOpen(true); };
   const createPlan = async () => {
     try {
       const values = await planForm.validateFields(); setSaving(true); setError('');
@@ -112,7 +113,7 @@ export const TestPlanPanel: React.FC<TestPlanPanelProps> = ({ task, workItemId, 
         </div>}
       </section>;
     })}
-    <Modal title="新建测试计划" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={() => void createPlan()} confirmLoading={saving} destroyOnHidden><Form form={planForm} layout="vertical"><Form.Item name="name" label="计划名称" rules={[{ required: true, whitespace: true, message: '请输入计划名称' }]}><Input maxLength={120} /></Form.Item><Form.Item name="environment" label="测试环境"><Input placeholder="例如：测试环境" maxLength={255} /></Form.Item><Form.Item name="dateRange" label="计划起止时间" rules={[{ required: true, message: '请选择计划起止时间' }]}><DatePicker.RangePicker className="w-full" /></Form.Item></Form></Modal>
+    <Modal title="新建测试计划" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={() => void createPlan()} confirmLoading={saving} destroyOnHidden><Form form={planForm} layout="vertical"><Form.Item name="name" label="计划名称" rules={[{ required: true, whitespace: true, message: '请输入计划名称' }]}><Input maxLength={120} /></Form.Item><Form.Item name="environment" label="测试环境" rules={[{ required: true, message: '请选择测试环境' }]}><Select placeholder="请选择测试环境" options={['测试环境', '线上环境'].map((value) => ({ value, label: value }))} /></Form.Item><Form.Item name="dateRange" label="计划起止时间" rules={[{ required: true, message: '请选择计划起止时间' }]}><DatePicker.RangePicker locale={zhCN.DatePicker} placeholder={['开始日期', '结束日期']} className="w-full" /></Form.Item></Form></Modal>
     <Modal title="引用测试用例" open={!!pickerPlan} onCancel={() => setPickerPlan(null)} onOk={async () => { if (pickerPlan) await savePlan(pickerPlan, selectedIds); setPickerPlan(null); }} confirmLoading={saving} width="min(920px, 94vw)">{availableCases.isError ? <Alert type="error" showIcon title="可用用例加载失败" action={<Button onClick={() => availableCases.refetch()}>重试</Button>} /> : <Table<TestCase> size="small" loading={availableCases.isFetching} rowKey="id" dataSource={availableCases.data?.items || []} rowSelection={{ selectedRowKeys: selectedIds, onChange: (keys) => setSelectedIds(keys.map(String)) }} pagination={false} scroll={{ y: 420 }} columns={[{ title: '编号', dataIndex: 'code', width: 120 }, { title: '标题', dataIndex: 'title', ellipsis: true }, { title: '优先级', dataIndex: 'priority', width: 80 }, { title: '负责人', dataIndex: 'ownerName', width: 140, render: (value) => <PersonIdentity name={value} emptyLabel="未设置" variant="list" /> }]} />}</Modal>
     <Modal title="新建人工测试执行" open={roundOpen} onCancel={() => setRoundOpen(false)} onOk={() => void createRound()} confirmLoading={saving}><Form form={roundForm} layout="vertical"><Form.Item name="scopeType" label="执行范围" rules={[{ required: true }]}><Radio.Group optionType="button" buttonStyle="solid" options={[{ label: '全部用例', value: 'ALL' }, { label: '失败用例回归', value: 'FAILED_ONLY' }, { label: '自定义范围', value: 'CUSTOM' }]} /></Form.Item><Form.Item name="name" label="轮次名称" rules={[{ required: true, whitespace: true }]}><Input maxLength={120} /></Form.Item><Form.Item name="environment" label="测试环境"><Input maxLength={255} /></Form.Item><Form.Item name="buildVersion" label="构建版本"><Input maxLength={120} /></Form.Item></Form></Modal>
     <Modal title="记录人工失败结果" open={!!resultCase} onCancel={() => setResultCase(null)} onOk={async () => { if (!resultCase || !failedReason.trim()) { setError('请填写实际结果和失败现象'); return; } await saveCaseResult(resultCase, 'FAILED', failedReason.trim()); setResultCase(null); }} confirmLoading={saving}><Input.TextArea rows={5} value={failedReason} onChange={(event) => setFailedReason(event.target.value)} placeholder="填写实际结果和失败现象" /></Modal>

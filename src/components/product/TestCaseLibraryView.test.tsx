@@ -4,7 +4,8 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TestCaseLibraryView } from './TestCaseLibraryView';
+import { groupTestCasesByDirectory, TestCaseLibraryView } from './TestCaseLibraryView';
+import type { TestCase, TestCaseDirectory } from '../../types/testManagement';
 
 const mocks = vi.hoisted(() => ({
   testCaseDirectories: vi.fn(),
@@ -36,8 +37,20 @@ describe('TestCaseLibraryView', () => {
   it('does not expose execution results in the reusable case library', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><TestCaseLibraryView productLineFilter="all" /></QueryClientProvider>);
-    expect(await screen.findByRole('columnheader', { name: '阶段' })).toBeInTheDocument();
+    expect(await screen.findByText('当前目录暂无测试用例')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '最新执行结果' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /新建用例/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /新建用例/ })).toBeInTheDocument();
+  });
+
+  it('groups cases by directory path and keeps uncategorized cases visible', () => {
+    const directories = [
+      { id: 'root', parentId: null, name: '登录', sort: 1, caseCount: 1, productLineName: '全部用例' },
+      { id: 'child', parentId: 'root', name: '密码', sort: 1, caseCount: 1, productLineName: '全部用例' },
+    ] as TestCaseDirectory[];
+    const cases = [{ id: 'a', directoryId: 'child' }, { id: 'b', directoryId: 'missing' }] as TestCase[];
+    expect(groupTestCasesByDirectory(cases, directories)).toMatchObject([
+      { key: 'child', path: '全部用例 / 登录 / 密码', items: [{ id: 'a' }] },
+      { key: 'missing', path: '未分类', items: [{ id: 'b' }] },
+    ]);
   });
 });

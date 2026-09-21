@@ -531,6 +531,7 @@ export interface RequirementTask {
   sourceWorkOrderIds?: string[];
   sourceWorkOrderTitles?: string[];
   requirementId?: string;
+  requirementTitle?: string;
   requirementType?: string;
   workItemTypeId?: string;
   parentWorkItemId?: string;

@@ -22,7 +22,7 @@ public class VersionTestReportMapper {
 
     public List<Map<String, Object>> reports(String tenant, String lineId, String versionId) {
         return jdbc.queryForList("""
-            SELECT r.id_ AS id,r.name_ AS name,'测试报告' AS reportType,r.summary_ AS summary,r.creator_name_ AS creatorName,
+            SELECT r.id_ AS id,r.name_ AS name,r.report_type_ AS reportType,r.summary_ AS summary,r.creator_name_ AS creatorName,
               r.product_line_id_ AS productLineId,l.name_ AS productLineName,r.version_id_ AS versionId,v.name_ AS versionName,
               r.version_ AS revision,r.create_time_ AS createdAt,r.update_time_ AS updatedAt,
               COUNT(rp.id_) AS planCount,
@@ -44,7 +44,7 @@ public class VersionTestReportMapper {
         args.add(tenant);
         args.addAll(lineIds);
         return jdbc.queryForList("""
-            SELECT r.id_ AS id,r.name_ AS name,'测试报告' AS reportType,r.summary_ AS summary,r.creator_name_ AS creatorName,
+            SELECT r.id_ AS id,r.name_ AS name,r.report_type_ AS reportType,r.summary_ AS summary,r.creator_name_ AS creatorName,
               r.product_line_id_ AS productLineId,l.name_ AS productLineName,r.version_id_ AS versionId,v.name_ AS versionName,
               r.version_ AS revision,r.create_time_ AS createdAt,r.update_time_ AS updatedAt,
               COUNT(rp.id_) AS planCount,
@@ -59,7 +59,7 @@ public class VersionTestReportMapper {
     }
 
     public Map<String, Object> report(String tenant, String lineId, String versionId, String reportId) {
-        return one("SELECT id_ AS id,name_ AS name,summary_ AS summary,creator_name_ AS creatorName,version_ AS revision,create_time_ AS createdAt,update_time_ AS updatedAt FROM t_product_version_test_report WHERE tenant_id_=? AND product_line_id_=? AND version_id_=? AND id_=? AND delete_flag_=0", tenant, lineId, versionId, reportId);
+        return one("SELECT id_ AS id,name_ AS name,report_type_ AS reportType,summary_ AS summary,creator_name_ AS creatorName,version_ AS revision,create_time_ AS createdAt,update_time_ AS updatedAt FROM t_product_version_test_report WHERE tenant_id_=? AND product_line_id_=? AND version_id_=? AND id_=? AND delete_flag_=0", tenant, lineId, versionId, reportId);
     }
 
     public List<Map<String, Object>> availablePlans(String tenant, String lineId, String versionId) {
@@ -105,12 +105,12 @@ public class VersionTestReportMapper {
             """, tenant, reportId);
     }
 
-    public void insert(String tenant, String id, String lineId, String versionId, String name, String summary, String user, String creatorName) {
-        jdbc.update("INSERT INTO t_product_version_test_report(id_,tenant_id_,product_line_id_,version_id_,name_,summary_,creator_name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))", id, tenant, lineId, versionId, name, summary, creatorName, user, user);
+    public void insert(String tenant, String id, String lineId, String versionId, String name, String reportType, String summary, String user, String creatorName) {
+        jdbc.update("INSERT INTO t_product_version_test_report(id_,tenant_id_,product_line_id_,version_id_,name_,report_type_,summary_,creator_name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))", id, tenant, lineId, versionId, name, reportType, summary, creatorName, user, user);
     }
 
-    public int update(String tenant, String id, int revision, String name, String summary, String user) {
-        return jdbc.update("UPDATE t_product_version_test_report SET name_=?,summary_=?,version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=? AND delete_flag_=0", name, summary, user, tenant, id, revision);
+    public int update(String tenant, String id, int revision, String name, String reportType, String summary, String user) {
+        return jdbc.update("UPDATE t_product_version_test_report SET name_=?,report_type_=?,summary_=?,version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=? AND delete_flag_=0", name, reportType, summary, user, tenant, id, revision);
     }
 
     public int delete(String tenant, String id, int revision, String user) {

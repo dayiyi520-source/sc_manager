@@ -61,15 +61,29 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('父级任务');
   });
 
-  it('replaces the detail drawer while creating a child and maps API category labels', () => {
+  it('creates children only from the parent category and uses child-task copy', () => {
     expect(requirementSource).toContain('{selectedTask && !childModalOpen && (');
-    expect(requirementSource).toContain("item.category === workItemCategoryLabel[childCategory]");
-    expect(requirementSource).toContain("selectedTask.category === 'bug'");
-    expect(requirementSource).toContain('工作项类型读取失败');
+    expect(requirementSource).toContain('workItemCategoryLabel[selectedTask.category] === item.category');
+    expect(requirementSource).not.toContain('childCategoryOptions.some');
+    expect(requirementSource).not.toContain('<Form.Item label="子任务分类"');
+    expect(requirementSource).toContain('label="子任务类型"');
+    expect(requirementSource).toContain('子任务类型读取失败');
+    expect(requirementSource).toContain('placeholder="请选择时间"');
     expect(requirementSource).toContain('onClose={cancelChildCreation}');
     expect(requirementSource).toMatch(/const cancelChildCreation = \(\) => \{[\s\S]*setChildModalOpen\(false\);[\s\S]*setSelectedTask\(null\);[\s\S]*\};/);
     expect(requirementSource).toMatch(/addToast\('success', '子任务已创建'\);[\s\S]*setChildModalOpen\(false\);[\s\S]*setSelectedTask\(null\);/);
     expect(requirementSource).toContain('await Promise.allSettled(refreshes)');
+    expect(requirementSource).toContain('const [childDescriptionHtml, setChildDescriptionHtml]');
+    expect(requirementSource).toContain('descriptionHtml: childDescriptionHtml');
+    expect(requirementSource).toContain('editor={childDescriptionEditor}');
+    expect(requirementSource).not.toContain('<Form.Item label="任务描述"><Input.TextArea rows={8} value={childDescription}');
+    expect(requirementSource.match(/placeholder="请输入工时"/g)).toHaveLength(2);
+  });
+
+  it('passes test-task parent context into the custom detail instead of duplicating the generic reference', () => {
+    expect(requirementSource).toContain("taskKind !== 'test' && parentWorkItem");
+    expect(requirementSource).toContain('parent: parentWorkItem');
+    expect(requirementSource).toContain('onOpenParent: parentWorkItem ?');
   });
 
   it('puts product line first and uses Ant Design for both hour fields', () => {

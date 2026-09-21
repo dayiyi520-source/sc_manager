@@ -25,7 +25,8 @@ public class WorkItemStorageService {
         access.check(body.productLineId(),true);
         category(body.category()); required(body.title(),"标题",255); required(body.requestId(),"请求标识",64);
         if (body.priority()==null || !Set.of("P0","P1","P2","P3").contains(body.priority())) throw new IllegalArgumentException("优先级必须为P0至P3");
-        if ((body.description()!=null && body.description().length()>200000) || (body.expectedGoal()!=null && body.expectedGoal().length()>10000))
+        if ((body.description()!=null && body.description().length()>200000) || (body.descriptionHtml()!=null && body.descriptionHtml().length()>500000)
+            || (body.expectedGoal()!=null && body.expectedGoal().length()>10000))
             throw new IllegalArgumentException("描述或验收目标超出长度限制");
         if (body.plannedStartDate()!=null && body.plannedEndDate()!=null && body.plannedEndDate().isBefore(body.plannedStartDate())) throw new IllegalArgumentException("计划完成日期不能早于开始日期");
         if (body.estimatedHours()!=null && (body.estimatedHours().signum()<0 || body.estimatedHours().compareTo(new java.math.BigDecimal("99999999.99"))>0 || body.estimatedHours().scale()>2))
@@ -44,6 +45,7 @@ public class WorkItemStorageService {
         if (parentId!=null) {
             Map<String,Object> parent=requireItem(line,parentId);
             if (Set.of("COMPLETED","CANCELLED").contains(parent.get("statusGroup"))) throw conflict("已结束任务不能新增子任务");
+            if (!Objects.equals(parent.get("category"), body.category())) throw new IllegalArgumentException("子任务分类必须与父任务一致");
             if (!mapper.childAllowed(tenant,line,parent.get("taskTypeId").toString(),body.taskTypeId())) throw new IllegalArgumentException("产品线未允许该父子任务类型组合");
             String inheritedVersion=optional(Objects.toString(parent.get("versionId"),null));
             String inheritedRequirement=optional(Objects.toString(parent.get("requirementId"),null));
@@ -84,6 +86,7 @@ public class WorkItemStorageService {
             throw new IllegalArgumentException("主任务负责人不可修改，请调整子任务负责人");
         if (body.title()!=null) required(body.title(),"标题",255);
         if (body.description()!=null && body.description().length()>200000) throw new IllegalArgumentException("描述超出长度限制");
+        if (body.descriptionHtml()!=null && body.descriptionHtml().length()>500000) throw new IllegalArgumentException("富文本描述超出长度限制");
         if (body.expectedGoal()!=null && body.expectedGoal().length()>10000) throw new IllegalArgumentException("验收目标超出长度限制");
         if (body.priority()!=null && !Set.of("P0","P1","P2","P3").contains(body.priority())) throw new IllegalArgumentException("优先级必须为P0至P3");
         if (body.plannedStartDate()!=null && body.plannedEndDate()!=null && body.plannedEndDate().isBefore(body.plannedStartDate())) throw new IllegalArgumentException("计划完成日期不能早于开始日期");

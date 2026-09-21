@@ -50,11 +50,11 @@ class VersionTestReportIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
     void persistsReportAndAggregatesRealPlanExecutionAndP0Defect() {
-        Map<String, Object> created = reports.create(lineId, versionId, new SaveReport("迭代测试报告", List.of(planId), "初始总结", 0));
+        Map<String, Object> created = reports.create(lineId, versionId, new SaveReport("迭代测试报告", "回归测试", List.of(planId), "初始总结", 0));
         String reportId = String.valueOf(created.get("id"));
         assertEquals(1, reports.list(lineId, versionId).size());
         Map<String, Object> listed = reports.list(lineId, versionId).get(0);
-        assertEquals("测试报告", listed.get("reportType"));
+        assertEquals("回归测试", listed.get("reportType"));
         assertEquals("报告产品线", listed.get("productLineName"));
         assertEquals("验收迭代", listed.get("versionName"));
         assertEquals("核心回归计划", listed.get("firstPlanName"));
@@ -84,15 +84,17 @@ class VersionTestReportIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(1, ((List<?>) detail.get("urgentDefects")).size());
 
         int revision = ((Number) detail.get("revision")).intValue();
-        Map<String, Object> updated = reports.update(lineId, versionId, reportId, new SaveReport("修改后的报告", List.of(planId), "更新总结", revision));
+        Map<String, Object> updated = reports.update(lineId, versionId, reportId, new SaveReport("修改后的报告", "安全测试", List.of(planId), "更新总结", revision));
         assertEquals("修改后的报告", updated.get("name"));
+        assertEquals("安全测试", updated.get("reportType"));
         reports.delete(lineId, versionId, reportId, ((Number) updated.get("revision")).intValue());
         assertTrue(reports.list(lineId, versionId).isEmpty());
     }
 
     @Test
     void rejectsMissingAndCrossVersionPlans() {
-        assertThrows(IllegalArgumentException.class, () -> reports.create(lineId, versionId, new SaveReport("空计划报告", List.of(), "", 0)));
-        assertThrows(IllegalArgumentException.class, () -> reports.create(lineId, versionId, new SaveReport("错误计划报告", List.of(UUID.randomUUID().toString()), "", 0)));
+        assertThrows(IllegalArgumentException.class, () -> reports.create(lineId, versionId, new SaveReport("空计划报告", "功能测试", List.of(), "", 0)));
+        assertThrows(IllegalArgumentException.class, () -> reports.create(lineId, versionId, new SaveReport("错误计划报告", "功能测试", List.of(UUID.randomUUID().toString()), "", 0)));
+        assertThrows(IllegalArgumentException.class, () -> reports.create(lineId, versionId, new SaveReport("错误类型报告", "压力测试", List.of(planId), "", 0)));
     }
 }

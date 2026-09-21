@@ -58,7 +58,7 @@ public class WorkItemStorageMapper {
     public boolean childAllowed(String tenant,String line,String parent,String child) {
         return one("SELECT id_ FROM t_product_work_item_child_rule WHERE tenant_id_=? AND product_line_id_=? AND parent_type_id_=? AND child_type_id_=? AND enabled_=1 AND delete_flag_=0",tenant,line,parent,child) != null;
     }
-    private static final String ITEM = "SELECT w.id_ AS id,w.code_ AS code,w.product_line_id_ AS productLineId,w.category_ AS category,w.task_type_id_ AS taskTypeId,w.title_ AS title,w.description_ AS description,w.expected_goal_ AS expectedGoal,w.version_id_ AS versionId,w.requirement_id_ AS requirementId,w.parent_work_item_id_ AS parentWorkItemId,w.workflow_id_ AS workflowId,w.status_key_ AS statusKey,w.status_name_ AS statusName,w.status_group_ AS statusGroup,w.status_color_ AS statusColor,w.successful_ AS successful,w.assignee_id_ AS assigneeId,w.assignee_name_ AS assigneeName,w.priority_ AS priority,w.planned_start_date_ AS plannedStartDate,w.planned_end_date_ AS plannedEndDate,w.estimated_hours_ AS estimatedHours,w.actual_hours_ AS actualHours,w.version_ AS revision,w.create_time_ AS createdAt,EXISTS(SELECT 1 FROM t_product_work_item child WHERE child.tenant_id_=w.tenant_id_ AND child.product_line_id_=w.product_line_id_ AND child.parent_work_item_id_=w.id_ AND child.delete_flag_=0) AS hasChildren FROM t_product_work_item w WHERE w.tenant_id_=? AND w.product_line_id_=? AND w.delete_flag_=0";
+    private static final String ITEM = "SELECT w.id_ AS id,w.code_ AS code,w.product_line_id_ AS productLineId,w.category_ AS category,w.task_type_id_ AS taskTypeId,w.title_ AS title,w.description_ AS description,w.description_html_ AS descriptionHtml,w.expected_goal_ AS expectedGoal,w.version_id_ AS versionId,w.requirement_id_ AS requirementId,w.parent_work_item_id_ AS parentWorkItemId,w.workflow_id_ AS workflowId,w.status_key_ AS statusKey,w.status_name_ AS statusName,w.status_group_ AS statusGroup,w.status_color_ AS statusColor,w.successful_ AS successful,w.assignee_id_ AS assigneeId,w.assignee_name_ AS assigneeName,w.priority_ AS priority,w.planned_start_date_ AS plannedStartDate,w.planned_end_date_ AS plannedEndDate,w.estimated_hours_ AS estimatedHours,w.actual_hours_ AS actualHours,w.version_ AS revision,w.create_time_ AS createdAt,EXISTS(SELECT 1 FROM t_product_work_item child WHERE child.tenant_id_=w.tenant_id_ AND child.product_line_id_=w.product_line_id_ AND child.parent_work_item_id_=w.id_ AND child.delete_flag_=0) AS hasChildren FROM t_product_work_item w WHERE w.tenant_id_=? AND w.product_line_id_=? AND w.delete_flag_=0";
     public Map<String,Object> item(String tenant,String line,String id) { return one(ITEM+" AND id_=?",tenant,line,id); }
     public Map<String,Object> timedItem(String tenant,String line,String id) {
         Map<String,Object> item = item(tenant,line,id);
@@ -108,25 +108,25 @@ public class WorkItemStorageMapper {
         String assigneeId,String assigneeName,String user) {
         return jdbc.update("""
             UPDATE t_product_work_item SET
-              title_=COALESCE(?,title_),description_=COALESCE(?,description_),expected_goal_=COALESCE(?,expected_goal_),
+              title_=COALESCE(?,title_),description_=COALESCE(?,description_),description_html_=COALESCE(?,description_html_),expected_goal_=COALESCE(?,expected_goal_),
               version_id_=COALESCE(?,version_id_),assignee_id_=CASE WHEN ? THEN ? ELSE assignee_id_ END,
               assignee_name_=CASE WHEN ? THEN ? ELSE assignee_name_ END,priority_=COALESCE(?,priority_),
               planned_start_date_=COALESCE(?,planned_start_date_),planned_end_date_=COALESCE(?,planned_end_date_),
               estimated_hours_=COALESCE(?,estimated_hours_),actual_hours_=COALESCE(?,actual_hours_),
               version_=version_+1,update_by_=?,update_time_=NOW(6)
             WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND delete_flag_=0
-            """,input.title()==null?null:input.title().trim(),input.description(),input.expectedGoal(),versionId,
+            """,input.title()==null?null:input.title().trim(),input.description(),input.descriptionHtml(),input.expectedGoal(),versionId,
             input.assigneeName()!=null,assigneeId,input.assigneeName()!=null,assigneeName,input.priority(),input.plannedStartDate(),
             input.plannedEndDate(),input.estimatedHours(),input.actualHours(),user,tenant,line,id,input.revision());
     }
     public void insertItem(String tenant,String id,String code,WorkItemDefinition.CreateItem input,String versionId,String requirementId,
         String parentId,String assigneeName,String workflowId,WorkItemDefinition.State initial,String hash,String user) {
         jdbc.update("""
-            INSERT INTO t_product_work_item(id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,description_,expected_goal_,
+            INSERT INTO t_product_work_item(id_,tenant_id_,product_line_id_,category_,task_type_id_,code_,title_,description_,description_html_,expected_goal_,
               version_id_,requirement_id_,parent_work_item_id_,workflow_id_,status_key_,status_name_,status_group_,status_color_,successful_,assignee_id_,assignee_name_,
               priority_,planned_start_date_,planned_end_date_,estimated_hours_,actual_hours_,request_id_,request_hash_,create_by_,update_by_,create_time_,update_time_)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))
-            """,id,tenant,input.productLineId(),input.category(),input.taskTypeId(),code,input.title().trim(),input.description(),input.expectedGoal(),
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))
+            """,id,tenant,input.productLineId(),input.category(),input.taskTypeId(),code,input.title().trim(),input.description(),input.descriptionHtml(),input.expectedGoal(),
             versionId,requirementId,parentId,workflowId,initial.key(),initial.name(),initial.group().name(),initial.color(),initial.successful(),
             WorkItemDefinition.optional(input.assigneeId()),assigneeName,input.priority(),input.plannedStartDate(),input.plannedEndDate(),
             input.estimatedHours()==null?java.math.BigDecimal.ZERO:input.estimatedHours(),

@@ -138,6 +138,8 @@ const WorkOrderPicker: React.FC<{
 export type WorkItemDetailContext = {
   task: RequirementTask;
   children: Array<Record<string, unknown>>;
+  parent: Record<string, unknown> | null;
+  onOpenParent?: () => void;
   editing: boolean;
   onUpdate: (updates: Partial<RequirementTask>) => void;
   employeeNames: string[];
@@ -330,6 +332,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         await productRepository.updateWorkItem(current.productLineId, id, {
           title: updates.title,
           description: updates.description,
+          descriptionHtml: updates.descriptionHtml,
           expectedGoal: updates.expectedGoal,
           versionId: updates.versionId,
           assigneeName: updates.ownerName,
@@ -375,13 +378,14 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const [parentWorkItem, setParentWorkItem] = useState<Record<string, unknown> | null>(null);
   const [childModalOpen, setChildModalOpen] = useState(false);
   const [childTitle, setChildTitle] = useState('');
+  const childDescriptionEditor = useRef<HTMLDivElement>(null);
   const [childDescription, setChildDescription] = useState('');
+  const [childDescriptionHtml, setChildDescriptionHtml] = useState('');
   const [childPriority, setChildPriority] = useState<RequirementTask['priority']>('中');
   const [childPlannedStartDate, setChildPlannedStartDate] = useState('');
   const [childDueDate, setChildDueDate] = useState('');
   const [childEstimatedHours, setChildEstimatedHours] = useState<number | ''>('');
   const [childActualHours, setChildActualHours] = useState<number | ''>('');
-  const [childCategory, setChildCategory] = useState<'design' | 'dev' | 'test' | 'bug'>('dev');
   const [childTypeId, setChildTypeId] = useState('');
   const [childTypes, setChildTypes] = useState<Array<{ id: string; name: string; enabled: boolean; category: string }>>([]);
   const [childTypesLoading, setChildTypesLoading] = useState(false);
@@ -422,11 +426,14 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     const detailRequest = productRepository.workItemDetail(selectedTask.productLineId, selectedTask.id);
     const summaryRequest = selectedTask.requirementId
       ? productRepository.requirementSummary(selectedTask.productLineId, selectedTask.requirementId)
-      : Promise.resolve({ linkedItems: [] });
+      : Promise.resolve({ requirement: undefined, linkedItems: [] });
     const relationsRequest = productRepository.workItemRelations(selectedTask.productLineId, selectedTask.id);
     Promise.all([detailRequest, summaryRequest, relationsRequest])
       .then(async ([detail, summary, relationView]) => {
-        setSelectedTask((current) => current?.id === detail.id ? storedTask(detail, current) : current);
+        setSelectedTask((current) => current?.id === detail.id ? {
+          ...storedTask(detail, current),
+          requirementTitle: summary.requirement?.title || current.requirementTitle
+        } : current);
         setChildWorkItems(Array.isArray(detail.children) && detail.children.length ? detail.children : (summary.linkedItems || []).filter((item) => item.id !== selectedTask.id));
         setParentWorkItem(detail.parent && typeof detail.parent === 'object' ? detail.parent : null);
         const relatedIds = (relationView.relations || []).filter((relation) => relation.type === 'RELATES_TO').map((relation) => relation.sourceId === selectedTask.id ? relation.targetId : relation.sourceId);
@@ -436,19 +443,10 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       .catch(() => { setChildWorkItems([]); setParentWorkItem(null); setRelatedWorkItems([]); });
   }, [selectedTask?.id, selectedTask?.productLineId]);
 
-  const childCategoryOptions = useMemo(() => {
-    if (!selectedTask) return [];
-    if (selectedTask.category === 'test') return [{ value: 'test' as const, label: '测试' }, { value: 'bug' as const, label: '缺陷' }];
-    if (selectedTask.category === 'bug') return [{ value: 'bug' as const, label: '缺陷' }];
-    if (selectedTask.category === 'design') return [{ value: 'dev' as const, label: '研发' }, { value: 'test' as const, label: '测试' }];
-    if (selectedTask.category === 'dev') return [{ value: 'dev' as const, label: '研发' }, { value: 'test' as const, label: '测试' }];
-    return [{ value: 'design' as const, label: '设计' }, { value: 'dev' as const, label: '研发' }, { value: 'test' as const, label: '测试' }];
-  }, [selectedTask]);
-
   const childTypeOptions = useMemo(() => childTypes
-    .filter((item) => item.category === workItemCategoryLabel[childCategory])
-    .filter((item) => !createPolicy?.allowedChildTypeNames?.length || childCategory !== 'test' || createPolicy.allowedChildTypeNames.includes(item.name))
-    .map((item) => ({ value: item.id, label: item.name })), [childCategory, childTypes]);
+    .filter((item) => Boolean(selectedTask) && workItemCategoryLabel[selectedTask.category] === item.category)
+    .filter((item) => !createPolicy?.allowedChildTypeNames?.length || createPolicy.allowedChildTypeNames.includes(item.name))
+    .map((item) => ({ value: item.id, label: item.name })), [childTypes, createPolicy?.allowedChildTypeNames, selectedTask]);
 
   useEffect(() => {
     if (!childModalOpen || !selectedTask?.productLineId) return;
@@ -476,10 +474,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const openChildModal = (task: RequirementTask | null = selectedTask) => {
     if (!task?.productLineId) return;
     setSelectedTask(task);
-    const firstCategory = task.category === 'test' ? 'test' : task.category === 'bug' ? 'bug' : task.category === 'design' || task.category === 'dev' ? 'dev' : 'design';
-    setChildCategory(firstCategory);
     setChildTitle('');
     setChildDescription('');
+    setChildDescriptionHtml('');
     setChildPriority('中');
     setChildPlannedStartDate('');
     setChildDueDate('');
@@ -504,10 +501,11 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       await productRepository.createWorkItem({
         requestId: `child-${parentTask.id}-${Date.now()}`,
         productLineId: parentTask.productLineId!,
-        category: childCategory,
+        category: parentTask.category,
         taskTypeId: childTypeId,
         title: childTitle.trim(),
         description: childDescription,
+        descriptionHtml: childDescriptionHtml,
         expectedGoal: '',
         versionId: parentTask.versionId || undefined,
         requirementId: parentTask.requirementId || (parentTask.category === 'requirement' ? parentTask.id : undefined),
@@ -915,6 +913,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     createdAt: item.createdAt ? String(item.createdAt) : undefined,
     revision: item.revision == null ? undefined : Number(item.revision),
     description: String(item.description || ''),
+    descriptionHtml: String(item.descriptionHtml || ''),
     expectedGoal: String(item.expectedGoal || ''),
     hasChildren: Boolean(item.hasChildren)
   });
@@ -1427,14 +1426,14 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
             {taskKind !== 'test' && <div className={detailEditing ? '' : 'pointer-events-none opacity-80'}>
               <DetailTextInput label={`${itemLabel}名称`} value={selectedTask.title} onSave={(title) => title.trim() && saveDetailUpdates({ title })} />
             </div>}
-            {parentWorkItem && <section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2">
+            {taskKind !== 'test' && parentWorkItem && <section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2">
               <span className="block text-[var(--text-muted)]">父级任务</span>
               <button type="button" onClick={() => setSelectedTask(storedTask(parentWorkItem, selectedTask))} className="mt-1 flex max-w-full items-center gap-2 text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]">
                 <span className="shrink-0 font-mono text-[11px]">{String(parentWorkItem.code || '')}</span>
                 <span className="truncate">{String(parentWorkItem.title || '')}</span>
               </button>
             </section>}
-            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems, editing: detailEditing, onUpdate: saveDetailUpdates, employeeNames: employees, employeeOptions: resolvedEmployeeOptions, versions, statusControl: taskStatusControl(selectedTask, true, !detailEditing) })}</section>}
+            {renderDetail && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems, parent: parentWorkItem, onOpenParent: parentWorkItem ? () => setSelectedTask(storedTask(parentWorkItem, selectedTask)) : undefined, editing: detailEditing, onUpdate: saveDetailUpdates, employeeNames: employees, employeeOptions: resolvedEmployeeOptions, versions, statusControl: taskStatusControl(selectedTask, true, !detailEditing) })}</section>}
             {taskKind !== 'test' && <div className={`space-y-5 ${detailEditing ? '' : 'pointer-events-none opacity-80'}`}>
               <label className="block text-[var(--text-muted)]">
                 <span>任务描述</span>
@@ -1515,28 +1514,27 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         showContinueOption={false}
         footer={<><Button disabled={childCreating} onClick={cancelChildCreation}>取消</Button><Button type="primary" loading={childCreating} disabled={childTypesLoading || childTypesError || !childTypeId} onClick={() => void createChildWorkItem()}>创建</Button></>}
         properties={<Form layout="vertical" className="requirement-create-properties">
-          <Form.Item label="子任务分类" required><Select value={childCategory} options={childCategoryOptions} onChange={setChildCategory} /></Form.Item>
           <Form.Item
-            label="工作项类型"
+            label="子任务类型"
             required
             validateStatus={childTypesError ? 'error' : undefined}
             help={childTypesError
-              ? <span>工作项类型读取失败，<Button type="link" size="small" onClick={() => setChildTypesReloadKey((value) => value + 1)}>重新加载</Button></span>
-              : !childTypesLoading && childTypeOptions.length === 0 ? '当前分类未配置可用工作项类型' : undefined}
+              ? <span>子任务类型读取失败，<Button type="link" size="small" onClick={() => setChildTypesReloadKey((value) => value + 1)}>重新加载</Button></span>
+              : !childTypesLoading && childTypeOptions.length === 0 ? '当前分类未配置可用子任务类型' : undefined}
           >
-            <Select showSearch optionFilterProp="label" value={childTypeId || undefined} loading={childTypesLoading} disabled={childTypesLoading || childTypesError || childTypeOptions.length === 0} placeholder={childTypesLoading ? '正在加载工作项类型' : '请选择已配置类型'} options={childTypeOptions} onChange={setChildTypeId} />
+            <Select showSearch optionFilterProp="label" value={childTypeId || undefined} loading={childTypesLoading} disabled={childTypesLoading || childTypesError || childTypeOptions.length === 0} placeholder={childTypesLoading ? '正在加载子任务类型' : '请选择子任务类型'} options={childTypeOptions} onChange={setChildTypeId} />
           </Form.Item>
           <Form.Item label="优先级" required><Select value={childPriority} onChange={setChildPriority} options={['紧急', '高', '中', '低'].map((value) => ({ value, label: value }))} /></Form.Item>
-          <Form.Item label="计划开始时间"><DatePicker value={childPlannedStartDate ? dayjs(childPlannedStartDate) : null} onChange={(date) => setChildPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" /></Form.Item>
-          <Form.Item label="计划完成时间"><DatePicker value={childDueDate ? dayjs(childDueDate) : null} onChange={(date) => setChildDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" /></Form.Item>
-          <Form.Item label="预计工时（小时）"><InputNumber min={0} precision={2} value={childEstimatedHours === '' ? null : childEstimatedHours} onChange={(value) => setChildEstimatedHours(value ?? '')} className="requirement-hours-input w-full" /></Form.Item>
-          <Form.Item label="实际工时（小时）"><InputNumber min={0} precision={2} value={childActualHours === '' ? null : childActualHours} onChange={(value) => setChildActualHours(value ?? '')} className="requirement-hours-input w-full" /></Form.Item>
+          <Form.Item label="计划开始时间"><DatePicker value={childPlannedStartDate ? dayjs(childPlannedStartDate) : null} onChange={(date) => setChildPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} placeholder="请选择时间" className="w-full" /></Form.Item>
+          <Form.Item label="计划完成时间"><DatePicker value={childDueDate ? dayjs(childDueDate) : null} onChange={(date) => setChildDueDate(date ? date.format('YYYY-MM-DD') : '')} placeholder="请选择时间" className="w-full" /></Form.Item>
+          <Form.Item label="预计工时（小时）"><InputNumber min={0} precision={2} value={childEstimatedHours === '' ? null : childEstimatedHours} onChange={(value) => setChildEstimatedHours(value ?? '')} className="requirement-hours-input w-full" placeholder="请输入工时" /></Form.Item>
+          <Form.Item label="实际工时（小时）"><InputNumber min={0} precision={2} value={childActualHours === '' ? null : childActualHours} onChange={(value) => setChildActualHours(value ?? '')} className="requirement-hours-input w-full" placeholder="请输入工时" /></Form.Item>
         </Form>}
       >
         <Form layout="vertical" className="w-full">
           <Form.Item label="子任务名称" required><Input value={childTitle} onChange={(event) => setChildTitle(event.target.value)} placeholder="例如：完成接口联调" /></Form.Item>
           {selectedTask && <section className="mb-6 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2"><span className="block text-xs text-[var(--text-muted)]">父级任务</span><div className="mt-1 flex min-w-0 gap-2 text-xs"><span className="shrink-0 font-mono text-[var(--text-muted)]">{selectedTask.code || selectedTask.id}</span><span className="truncate text-[var(--text-primary)]">{selectedTask.title}</span></div></section>}
-          <Form.Item label="任务描述"><Input.TextArea rows={8} value={childDescription} onChange={(event) => setChildDescription(event.target.value)} placeholder="补充子任务范围、交付物和注意事项" /></Form.Item>
+          <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={childDescriptionEditor} value={childDescription} htmlValue={childDescriptionHtml} onInput={(text, html) => { setChildDescription(text); setChildDescriptionHtml(html); }} placeholder="补充子任务范围、交付物和注意事项" /></Form.Item>
         </Form>
       </WorkItemCreatePanel>
 

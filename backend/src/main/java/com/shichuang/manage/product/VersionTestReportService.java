@@ -77,7 +77,7 @@ public class VersionTestReportService {
         requireVersion(lineId, versionId, true);
         Validated value = validate(lineId, versionId, input);
         String id = UUID.randomUUID().toString();
-        mapper.insert(RequestContext.tenantId(), id, lineId, versionId, value.name(), value.summary(), RequestContext.userId(), RequestContext.operatorName());
+        mapper.insert(RequestContext.tenantId(), id, lineId, versionId, value.name(), value.reportType(), value.summary(), RequestContext.userId(), RequestContext.operatorName());
         mapper.replacePlans(RequestContext.tenantId(), id, value.planIds(), RequestContext.userId());
         return detail(lineId, versionId, id);
     }
@@ -88,7 +88,7 @@ public class VersionTestReportService {
         requireReport(lineId, versionId, reportId);
         if (input == null || input.revision() == null) throw new IllegalArgumentException("缺少报告版本号");
         Validated value = validate(lineId, versionId, input);
-        if (mapper.update(RequestContext.tenantId(), reportId, input.revision(), value.name(), value.summary(), RequestContext.userId()) != 1) {
+        if (mapper.update(RequestContext.tenantId(), reportId, input.revision(), value.name(), value.reportType(), value.summary(), RequestContext.userId()) != 1) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "测试报告已变化，请刷新后重试");
         }
         mapper.replacePlans(RequestContext.tenantId(), reportId, value.planIds(), RequestContext.userId());
@@ -122,13 +122,15 @@ public class VersionTestReportService {
         if (input == null) throw new IllegalArgumentException("报告内容不能为空");
         String name = Objects.toString(input.name(), "").trim();
         if (name.isBlank() || name.length() > 100) throw new IllegalArgumentException("报告名称长度应为1到100个字符");
+        String reportType = Objects.toString(input.reportType(), "").trim();
+        if (!Set.of("功能测试", "安全测试", "回归测试").contains(reportType)) throw new IllegalArgumentException("请选择有效的报告类型");
         List<String> ids = input.testPlanIds() == null ? List.of() : input.testPlanIds().stream().filter(Objects::nonNull).map(String::trim).filter(value -> !value.isBlank()).distinct().toList();
         if (ids.isEmpty() || ids.size() > 15) throw new IllegalArgumentException("关联测试计划数量应为1到15个");
         Set<String> allowed = mapper.availablePlans(RequestContext.tenantId(), lineId, versionId).stream().map(item -> String.valueOf(item.get("id"))).collect(java.util.stream.Collectors.toSet());
         if (!allowed.containsAll(ids)) throw new IllegalArgumentException("关联测试计划不属于当前迭代或已失效");
         String summary = Objects.toString(input.summary(), "").trim();
         if (summary.length() > 10000) throw new IllegalArgumentException("报告总结不能超过10000个字符");
-        return new Validated(name, ids, summary);
+        return new Validated(name, reportType, ids, summary);
     }
 
     private List<Map<String, Object>> distribution(List<Map<String, Object>> defects, boolean bySeverity) {
@@ -150,5 +152,5 @@ public class VersionTestReportService {
     private boolean severe(String value) { return "P1".equals(normalizePriority(value)); }
     private String normalizePriority(String value) { return switch (value) { case "紧急", "最高" -> "P0"; case "高", "高优" -> "P1"; case "中", "中优" -> "P2"; case "低", "低优" -> "P3"; default -> value; }; }
     private String severity(String value) { return switch (normalizePriority(value)) { case "P0" -> "致命"; case "P1" -> "严重"; case "P2" -> "一般"; default -> "轻微"; }; }
-    private record Validated(String name, List<String> planIds, String summary) {}
+    private record Validated(String name, String reportType, List<String> planIds, String summary) {}
 }

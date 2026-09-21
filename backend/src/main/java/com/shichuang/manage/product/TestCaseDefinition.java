@@ -17,7 +17,13 @@ public final class TestCaseDefinition {
         String precondition, String priority, String ownerId, List<String> tags,
         List<StepInput> steps, String workItemTypeId, String statusKey, Integer revision) {}
     public record Query(String directoryId, String keyword, String priority,
-        String ownerId, Boolean enabled, int page, int pageSize) {}
+        String ownerId, Boolean enabled, int page, int pageSize,
+        boolean includeDescendants, List<String> directoryIds) {
+        public Query(String directoryId, String keyword, String priority,
+                     String ownerId, Boolean enabled, int page, int pageSize) {
+            this(directoryId, keyword, priority, ownerId, enabled, page, pageSize, false, List.of());
+        }
+    }
     public record DirectoryView(String id, String parentId, String name, int sort, long caseCount, String productLineId, String productLineName) {
         public DirectoryView(String id,String parentId,String name,int sort,long caseCount){this(id,parentId,name,sort,caseCount,null,null);}
     }

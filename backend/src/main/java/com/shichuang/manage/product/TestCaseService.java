@@ -57,8 +57,27 @@ public class TestCaseService {
     }
     public CasePage list(String line,Query input){
         if (!"all".equals(line)) access.check(line,false);int page=Math.max(1,input.page()),size=Math.min(100,Math.max(1,input.pageSize()));
-        Query q=new Query(blank(input.directoryId()),blank(input.keyword()),blank(input.priority()),blank(input.ownerId()),input.enabled(),page,size);
-        String tenant=RequestContext.tenantId();return new CasePage(mapper.list(tenant,line,q).stream().map(this::view).toList(),page,size,mapper.count(tenant,line,q));
+        String tenant=RequestContext.tenantId();
+        String directory = blank(input.directoryId());
+        List<String> directoryIds = input.includeDescendants() && directory != null
+            ? descendantDirectoryIds(tenant, line, directory)
+            : List.of();
+        Query q=new Query(directory,blank(input.keyword()),blank(input.priority()),blank(input.ownerId()),input.enabled(),page,size,input.includeDescendants(),directoryIds);
+        return new CasePage(mapper.list(tenant,line,q).stream().map(this::view).toList(),page,size,mapper.count(tenant,line,q));
+    }
+    private List<String> descendantDirectoryIds(String tenant, String line, String root) {
+        Map<String, Object> rootDirectory = mapper.directory(tenant, line, root);
+        if (rootDirectory == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "目录不存在");
+        String directoryLine = "all".equals(line) ? text(rootDirectory, "productLineId") : line;
+        List<String> ids = new ArrayList<>();
+        ArrayDeque<String> pending = new ArrayDeque<>();
+        pending.add(root);
+        while (!pending.isEmpty()) {
+            String current = pending.removeFirst();
+            ids.add(current);
+            mapper.childDirectories(tenant, directoryLine, current).forEach(child -> pending.addLast(text(child, "id")));
+        }
+        return ids;
     }
     public CaseView detail(String line,String id){if (!"all".equals(line)) access.check(line,false);return require(line,id);}
     @Transactional public CaseView create(String line,SaveCase input){
