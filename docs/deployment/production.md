@@ -59,6 +59,14 @@ Rules:
 
 Last successful deploy: 2026-09-21
 
+Latest verified application release:
+
+- Release `20260921155025` deployed the test-management, version-review, test-report, and child-task updates in the default application-only mode.
+- Flyway applied the new versioned migrations while preserving the existing database and the historical `V1.0.26` checksum.
+- Backend health, the internal frontend and authentication endpoints, the public frontend and authentication routes, service state, and Nginx configuration all passed.
+- Backup: `/opt/manage-admin/backups/20260921155025/`.
+- Database backup now uses `--no-tablespaces`, avoiding the MySQL `PROCESS` privilege warning for the dedicated application account.
+
 Latest verified repair:
 
 - Frontend-only release `20260921092314` repaired production assets that were incorrectly built against root `/assets/` URLs.

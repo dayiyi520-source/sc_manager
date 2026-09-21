@@ -255,7 +255,7 @@ mysql_client() {
 mysql_dump() {
   MYSQL_PWD="${db_password}" mysqldump \
     --host="${db_host}" --port="${db_port}" --user="${db_user}" \
-    --single-transaction --routines --triggers --events --set-gtid-purged=OFF \
+    --single-transaction --routines --triggers --events --no-tablespaces --set-gtid-purged=OFF \
     --default-character-set=utf8mb4 "${db_name}"
 }
 
