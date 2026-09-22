@@ -105,6 +105,47 @@ const normalizeMedia = (value: unknown): RequirementMedia[] => {
 const samePerson = (value: string | undefined, currentUserName: string) =>
   Boolean(value?.trim()) && value.trim().toLocaleLowerCase() === currentUserName.trim().toLocaleLowerCase();
 
+const isInitiator = (task: RequirementTask, currentUser: { id: string; name: string }) =>
+  Boolean(task.creatorId && currentUser.id && task.creatorId === currentUser.id) || samePerson(task.creatorName, currentUser.name);
+
+const demoCompletedHistory = (task: RequirementTask): { events: RequirementEvent[]; workItems: RequirementWorkItem[] } => {
+  const base = task.createdAt || new Date().toISOString();
+  const times = [0, 1, 2, 3, 4, 5, 6].map((days) => new Date(new Date(base).getTime() + days * 86400000).toISOString());
+  const taskId = `demo-work-item-${task.id}`;
+  const workItem: RequirementWorkItem = {
+    id: taskId,
+    requirementId: task.id,
+    taskType: "研发任务",
+    title: `${task.title}（下游任务示例）`,
+    assigneeName: task.ownerName || "研发负责人",
+    note: "示例历程：用于展示下游任务从创建到完成的完整进度链路",
+    status: "已完成",
+    assistanceTaskStatus: "COMPLETED",
+    progress: 100,
+    createdAt: times[1],
+  };
+  const event = (id: string, eventType: string, reason: string, createdAt: string, metadata: Record<string, unknown> = {}): RequirementEvent => ({
+    id: `demo-${task.id}-${id}`,
+    eventType,
+    reason,
+    operatorName: task.creatorName || task.ownerName || "示例用户",
+    createdAt,
+    metadata: { ...metadata, isDemo: true, taskId, taskTitle: workItem.title, taskType: workItem.taskType, progress: metadata.progress ?? 100 },
+  });
+  return {
+    workItems: [workItem],
+    events: [
+      event("created", "创建协助事项", "示例事项创建", times[0]),
+      event("converted", "创建下游任务", "已创建研发任务并关联到事项", times[1], { progress: 0 }),
+      event("started", "下游任务开始处理", "负责人已开始处理", times[2], { progress: 10 }),
+      event("p30", "下游任务进度更新", "完成核心方案设计", times[3], { fromProgress: 10, toProgress: 30, progress: 30 }),
+      event("p70", "下游任务进度更新", "完成主要功能开发", times[4], { fromProgress: 30, toProgress: 70, progress: 70 }),
+      event("done", "下游任务完成", "功能开发与自测完成，提交发起人验收", times[5], { fromProgress: 70, toProgress: 100, progress: 100 }),
+      event("closed", "发起人关闭事项", "示例事项已完成验收并关闭", times[6], { progress: 100 }),
+    ],
+  };
+};
+
 const eventMetadata = (value: unknown): Record<string, unknown> => {
   if (value && typeof value === "object") return value as Record<string, unknown>;
   if (typeof value !== "string") return {};
@@ -434,8 +475,14 @@ export const RequirementPoolView: React.FC = () => {
     try {
       const detail = await requirementRepository.detail(item.id);
       setSelected((current) => ({ ...(current || item), ...normalizeRequirementTask(detail), media: normalizeMedia(detail.media ?? current?.media ?? item.media) }));
-      setEvents(Array.isArray(detail.events) ? detail.events : []);
-      const nextWorkItems = Array.isArray(detail.workItems) ? detail.workItems : [];
+      let nextEvents = Array.isArray(detail.events) ? detail.events : [];
+      let nextWorkItems = Array.isArray(detail.workItems) ? detail.workItems : [];
+      if (["已关闭", "已完成"].includes(detail.status) && nextWorkItems.length === 0) {
+        const demo = demoCompletedHistory(detail);
+        nextEvents = demo.events;
+        nextWorkItems = demo.workItems;
+      }
+      setEvents(nextEvents);
       setWorkItems(nextWorkItems);
       setProgressDrafts(Object.fromEntries(nextWorkItems.map((workItem) => [workItem.id, workItem.progress ?? 0])));
     } catch {
@@ -653,7 +700,12 @@ export const RequirementPoolView: React.FC = () => {
       setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
       setReopenModalOpen(false);
       setReopenReason("");
-      addToast("success", "事项已重新开启", "事项状态已恢复为处理中");
+      setWorkflowAction("reassign");
+      setReassignAssignee("");
+      setReassignReason(String(reopenReason).trim());
+      setFlowMedia([]);
+      setWorkOpen(true);
+      addToast("success", "事项已重新开启", "请立即选择新的负责人完成责任指派");
     } catch (error) {
       addToast("error", "事项重开失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally {
@@ -1074,7 +1126,7 @@ export const RequirementPoolView: React.FC = () => {
                 onReject={() => setReasonType("reject")}
               />
               <div className="flex items-center gap-2">
-                {(["待验收", "待发起人验收"] as string[]).includes(selected.status) && samePerson(selected.creatorName, currentUser.name) && (
+                {(["待验收", "待发起人验收"] as string[]).includes(selected.status) && isInitiator(selected, currentUser) && (
                   <button
                     type="button"
                     onClick={() => { const first = workItems.find((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"); setAcceptanceWorkItemId(first?.id || ""); setAcceptanceModalOpen(true); }}
@@ -1083,7 +1135,7 @@ export const RequirementPoolView: React.FC = () => {
                     验收未通过
                   </button>
                 )}
-                {selected.status === "待负责人关闭" && samePerson(selected.creatorName, currentUser.name) && (
+                {selected.status === "待负责人关闭" && isInitiator(selected, currentUser) && (
                   <button
                     type="button"
                     onClick={closeAssistance}
@@ -1093,7 +1145,7 @@ export const RequirementPoolView: React.FC = () => {
                     {closeSubmitting ? "结束中…" : "确认结束协助"}
                   </button>
                 )}
-                {["已关闭", "已完成"].includes(selected.status) && samePerson(selected.creatorName, currentUser.name) && (
+                {["已关闭", "已完成"].includes(selected.status) && isInitiator(selected, currentUser) && (
                   <button
                     type="button"
                     onClick={() => { setReopenProgress(0); setReopenReason(""); setReopenModalOpen(true); }}
@@ -1217,9 +1269,10 @@ export const RequirementPoolView: React.FC = () => {
               {events.length ? <div className="space-y-3">{events.map((item) => {
                 const meta = eventMetadata(item.metadata);
                 const targetPage = typeof meta.targetPage === "string" ? meta.targetPage : "";
-                const progress = typeof meta.progress === "number" || typeof meta.progress === "string" ? Number(meta.progress) : null;
+                const progressValue = meta.toProgress ?? meta.progress;
+                const progress = typeof progressValue === "number" || typeof progressValue === "string" ? Number(progressValue) : null;
                 return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3">
-                  <div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{item.createdAt?.slice(0, 16)}</span></div>
+                  <div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}{meta.isDemo === true && <span className="ml-2 rounded bg-[var(--bg-surface-soft)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">示例历程</span>}</b><span className="text-[11px] text-[var(--text-muted)]">{item.createdAt?.slice(0, 16)}</span></div>
                   <div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{item.operatorName || "未知"} · 指派负责人：{String(meta.assigneeName || "未指派")}</div>
                   {item.reason && <p className="mt-2 text-xs">{item.reason}</p>}
                   {progress !== null && <div className="mt-2 text-xs text-[var(--text-muted)]">任务进度：{Math.max(0, Math.min(100, progress))}%{meta.overdueRisk === true && <span className="ml-2 text-[var(--danger)]">已逾期</span>}</div>}
@@ -1233,10 +1286,12 @@ export const RequirementPoolView: React.FC = () => {
                 const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED";
                 const accepted = item.assistanceTaskStatus === "ACCEPTED";
                 const draft = progressDrafts[item.id] ?? item.progress ?? 0;
-                const canEdit = samePerson(item.assigneeName, currentUser.name) || samePerson(selected.creatorName, currentUser.name);
+                const canEdit = samePerson(item.assigneeName, currentUser.name) || isInitiator(selected, currentUser);
+                const taskEvents = Array.isArray(item.events) ? item.events : [];
                 return <div key={item.id} className="space-y-2 border-b border-[var(--border-main)] py-2 text-xs">
-                  <div className="flex items-center justify-between gap-3"><span className="min-w-0 truncate">{item.taskType} · {item.title} · {item.assigneeName}</span><span className="flex shrink-0 items-center gap-2"><StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && samePerson(selected.creatorName, currentUser.name) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>
+                  <div className="flex items-center justify-between gap-3"><span className="min-w-0 truncate">{item.taskType} · {item.title} · {item.assigneeName}</span><span className="flex shrink-0 items-center gap-2"><StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && isInitiator(selected, currentUser) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>
                   <div className="flex items-center gap-2"><span className="text-[var(--text-muted)]">进度 {Math.max(0, Math.min(100, Number(item.progress ?? 0)))}%</span><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bg-main)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${Math.max(0, Math.min(100, Number(item.progress ?? 0)))}%` }} /></div>{canEdit && <><InputNumber min={0} max={100} size="small" value={draft} onChange={(value) => setProgressDrafts((current) => ({ ...current, [item.id]: Number(value ?? 0) }))} /><button type="button" disabled={progressSubmitting === item.id} onClick={() => submitWorkItemProgress(item)} className="text-[var(--active-text)] hover:text-[var(--primary-hover)] disabled:opacity-50">{progressSubmitting === item.id ? "保存中…" : "保存"}</button></>}</div>
+                  {taskEvents.length > 0 && <div className="mt-2 rounded-md bg-[var(--bg-surface-soft)] p-2"><div className="mb-1 text-[11px] font-semibold text-[var(--text-muted)]">任务变化历程</div>{taskEvents.map((taskEvent) => <div key={taskEvent.id} className="flex items-center justify-between gap-2 py-0.5 text-[11px] text-[var(--text-muted)]"><span>{taskEvent.eventType}{taskEvent.toStatus ? ` · ${taskEvent.toStatus}` : ""}</span><span>{taskEvent.createdAt?.slice(0, 16)}</span></div>)}</div>}
                 </div>;
               })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无解决过程记录</p>}
             </section>

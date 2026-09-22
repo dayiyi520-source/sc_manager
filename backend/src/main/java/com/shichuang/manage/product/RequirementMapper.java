@@ -45,7 +45,7 @@ public class RequirementMapper {
         return jdbc.queryForList("""
             SELECT e.id,e.eventType,e.fromStatus,e.toStatus,e.reason,e.operatorName,e.metadata,e.createdAt
             FROM (
-              SELECT a.id_ AS id,CASE a.event_type_ WHEN 'WORK_ITEM_CREATED' THEN '任务创建' WHEN 'WORK_ITEM_UPDATED' THEN '任务更新' WHEN 'WORK_ITEM_TRANSITIONED' THEN '任务状态流转' ELSE a.event_type_ END AS eventType,
+              SELECT a.id_ AS id,CASE a.event_type_ WHEN 'WORK_ITEM_CREATED' THEN '事项创建' WHEN 'WORK_ITEM_UPDATED' THEN '事项更新' WHEN 'WORK_ITEM_TRANSITIONED' THEN '事项状态流转' ELSE a.event_type_ END AS eventType,
                 COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.fromStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.from')),'') AS fromStatus,
                 COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.toStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.to')),'') AS toStatus,
                 COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.reason')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.content')),'') AS reason,
@@ -53,27 +53,26 @@ public class RequirementMapper {
               FROM t_product_work_item_activity a
               LEFT JOIN t_sys_user u ON u.id_=a.create_by_ AND u.tenant_id_=a.tenant_id_
               WHERE a.subject_id_=? AND a.tenant_id_=?
-              UNION ALL
-              SELECT a.id_ AS id,CASE a.event_type_ WHEN 'WORK_ITEM_CREATED' THEN '任务创建' WHEN 'WORK_ITEM_UPDATED' THEN '任务更新' WHEN 'WORK_ITEM_TRANSITIONED' THEN '任务状态流转' ELSE a.event_type_ END AS eventType,
-                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.fromStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.from')),'') AS fromStatus,
-                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.toStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.to')),'') AS toStatus,
-                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.reason')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.content')),'') AS reason,
-                COALESCE(u.name_,a.create_by_) AS operatorName,
-                JSON_MERGE_PATCH(COALESCE(CAST(a.content_ AS JSON),JSON_OBJECT()), JSON_OBJECT(
-                  'taskId',w.id_,'taskTitle',w.title_,'taskType',w.work_order_type_,
-                  'targetPage',CASE w.category_ WHEN 'design' THEN 'prod_design_tasks' WHEN 'dev' THEN 'prod_rd_tasks' WHEN 'bug' THEN 'prod_bugs' ELSE 'prod_req_tasks' END,
-                  'assigneeName',w.assignee_name_,'afterAssigneeName',w.assignee_name_,
-                  'beforeAssigneeName',COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.beforeAssigneeName')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.fromAssigneeName')),''),
-                  'progress',w.progress_,'overdueRisk',w.planned_end_date_ < CURRENT_DATE AND w.successful_=0 AND w.status_group_ NOT IN ('CANCELLED'))) AS metadata,
-                a.create_time_ AS createdAt
-              FROM t_product_work_item_activity a
-              JOIN t_product_work_item w ON w.id_=a.subject_id_ AND w.tenant_id_=a.tenant_id_ AND w.requirement_id_=? AND w.source_type_='WORK_ORDER' AND w.delete_flag_=0
-              LEFT JOIN t_sys_user u ON u.id_=a.create_by_ AND u.tenant_id_=a.tenant_id_
-              WHERE a.tenant_id_=?
             ) e
             WHERE (?='' OR e.eventType=?) AND (?='' OR e.operatorName=?)
             ORDER BY e.createdAt,e.id
-            """,id,tenantId,id,tenantId,eventType,eventType,operatorName,operatorName);
+            """,id,tenantId,eventType,eventType,operatorName,operatorName);
+    }
+
+    List<Map<String,Object>> workItemEvents(String tenantId,String id) {
+        return jdbc.queryForList("""
+            SELECT a.id_ AS id,
+              CASE a.event_type_ WHEN 'WORK_ITEM_CREATED' THEN '下游任务创建' WHEN 'WORK_ITEM_UPDATED' THEN '下游任务更新' WHEN 'WORK_ITEM_TRANSITIONED' THEN '下游任务状态流转' WHEN 'WORK_ITEM_PROGRESS_UPDATED' THEN '下游任务进度更新' ELSE a.event_type_ END AS eventType,
+              COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.fromStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.from')),'') AS fromStatus,
+              COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.toStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.to')),'') AS toStatus,
+              COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.reason')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.content')),'') AS reason,
+              COALESCE(u.name_,a.create_by_) AS operatorName,a.content_ AS metadata,a.create_time_ AS createdAt
+            FROM t_product_work_item_activity a
+            JOIN t_product_work_item w ON w.id_=a.subject_id_ AND w.tenant_id_=a.tenant_id_ AND w.source_type_='WORK_ORDER' AND w.delete_flag_=0
+            LEFT JOIN t_sys_user u ON u.id_=a.create_by_ AND u.tenant_id_=a.tenant_id_
+            WHERE a.tenant_id_=? AND a.subject_id_=?
+            ORDER BY a.create_time_,a.id_
+            """,tenantId,id);
     }
 
     long auditCount(String tenantId,String requirementId,String eventType,String operatorName,LocalDateTime from,LocalDateTime to) {
@@ -110,10 +109,11 @@ public class RequirementMapper {
               w.planned_end_date_ < CURRENT_DATE AND w.successful_=0 AND w.status_group_ NOT IN ('CANCELLED') AS overdueRisk,
               CASE WHEN w.status_group_ IN ('COMPLETED','CANCELLED') OR w.assistance_status_ IN ('已关闭','已完成') THEN 'completed'
                    WHEN w.source_type_='WORK_ORDER' AND COALESCE(w.assignee_id_,'')<>? THEN 'assist' ELSE 'mine' END AS taskGroup,
-              CASE w.category_ WHEN 'design' THEN 'prod_design_tasks' WHEN 'dev' THEN 'prod_rd_tasks' WHEN 'bug' THEN 'prod_bugs' ELSE 'prod_req_tasks' END AS targetPage,
+              CASE w.category_ WHEN 'design' THEN 'prod_design_tasks' WHEN 'dev' THEN 'prod_rd_tasks' WHEN 'test' THEN 'prod_test_tasks' WHEN 'bug' THEN 'prod_bugs' ELSE 'prod_req_tasks' END AS targetPage,
               COALESCE(w.requirement_id_,w.id_) AS sourceId
             FROM t_product_work_item w
             WHERE w.tenant_id_=? AND w.delete_flag_=0
+              AND w.category_ IN ('requirement','design','dev','test','bug')
               AND (w.assignee_id_=? OR w.create_by_=? OR w.assistance_owner_id_=? OR COALESCE(w.assistance_initiator_id_,w.create_by_)=?)
             ORDER BY w.create_time_ DESC LIMIT 200
             """,userId,tenantId,userId,userId,userId,userId);
@@ -200,7 +200,7 @@ public class RequirementMapper {
     }
 
     static String selectSql() {
-        return "SELECT t.id_ AS id,t.code_ AS code,t.title_ AS title,t.description_ AS description,t.description_html_ AS descriptionHtml,t.expected_goal_ AS expectedGoal,t.status_ AS status,t.assistance_status_ AS assistanceStatus,t.assistance_initiator_id_ AS assistanceInitiatorId,t.assistance_owner_id_ AS assistanceOwnerId,t.assistance_resolution_ AS assistanceResolution,t.priority_ AS priority,t.owner_name_ AS ownerName,t.creator_name_ AS creatorName,t.department_ AS department,t.version_id_ AS versionId,t.version_name_ AS versionName,t.product_line_id_ AS productLineId,t.product_line_name_ AS productLineName,t.customer_id_ AS customerId,t.customer_name_ AS customerName,t.estimated_hours_ AS estimatedHours,t.actual_hours_ AS actualHours,t.due_date_ AS dueDate,t.requirement_type_ AS requirementType,t.cc_names_ AS ccNames,t.planned_start_date_ AS plannedStartDate,t.due_date_ AS expectedCompleteDate,t.source_work_order_ids_ AS sourceWorkOrderIds,t.source_work_order_titles_ AS sourceWorkOrderTitles,t.media_ AS media,t.work_order_type_ AS workOrderType,t.special_fields_ AS specialFields,'requirement' AS workItemKind,t.task_type_id_ AS workItemTypeId,t.create_time_ AS createdAt,t.version_ AS version,t.version_ AS revision FROM ("+sourceSql()+") t";
+        return "SELECT t.id_ AS id,t.code_ AS code,t.title_ AS title,t.description_ AS description,t.description_html_ AS descriptionHtml,t.expected_goal_ AS expectedGoal,t.status_ AS status,t.assistance_status_ AS assistanceStatus,t.assistance_initiator_id_ AS assistanceInitiatorId,t.assistance_owner_id_ AS assistanceOwnerId,t.assistance_resolution_ AS assistanceResolution,t.priority_ AS priority,t.owner_name_ AS ownerName,t.creator_name_ AS creatorName,t.create_by_ AS creatorId,t.department_ AS department,t.version_id_ AS versionId,t.version_name_ AS versionName,t.product_line_id_ AS productLineId,t.product_line_name_ AS productLineName,t.customer_id_ AS customerId,t.customer_name_ AS customerName,t.estimated_hours_ AS estimatedHours,t.actual_hours_ AS actualHours,t.due_date_ AS dueDate,t.requirement_type_ AS requirementType,t.cc_names_ AS ccNames,t.planned_start_date_ AS plannedStartDate,t.due_date_ AS expectedCompleteDate,t.source_work_order_ids_ AS sourceWorkOrderIds,t.source_work_order_titles_ AS sourceWorkOrderTitles,t.media_ AS media,t.work_order_type_ AS workOrderType,t.special_fields_ AS specialFields,'requirement' AS workItemKind,t.task_type_id_ AS workItemTypeId,t.create_time_ AS createdAt,t.version_ AS version,t.version_ AS revision FROM ("+sourceSql()+") t";
     }
 
     static String workItemSql() {
@@ -208,7 +208,7 @@ public class RequirementMapper {
     }
 
     private static String sourceSql() {
-        return "SELECT w.id_,w.tenant_id_,w.product_line_id_,w.category_,w.task_type_id_,w.code_,w.title_,w.description_,w.description_html_,w.expected_goal_,w.version_id_,COALESCE(w.assistance_status_,w.status_name_) AS status_,w.assistance_status_,w.assistance_initiator_id_,w.assistance_owner_id_,w.assistance_resolution_,w.assignee_name_ AS owner_name_,COALESCE(w.creator_name_,cu.name_,w.create_by_) AS creator_name_,w.department_,w.customer_id_,w.customer_name_,w.requirement_type_,w.cc_names_,w.media_,w.source_work_order_ids_,w.source_work_order_titles_,w.work_order_type_,w.special_fields_,w.priority_,w.planned_start_date_,w.planned_end_date_ AS due_date_,w.estimated_hours_,w.actual_hours_,w.create_time_,w.version_,w.delete_flag_,p.name_ AS product_line_name_,COALESCE(v.name_,'') AS version_name_ FROM t_product_work_item w JOIN t_product_line p ON p.id_=w.product_line_id_ AND p.tenant_id_=w.tenant_id_ AND p.delete_flag_=0 LEFT JOIN t_product_line_version v ON v.id_=w.version_id_ AND v.tenant_id_=w.tenant_id_ AND v.delete_flag_=0 LEFT JOIN t_sys_user cu ON cu.id_=w.create_by_ AND cu.tenant_id_=w.tenant_id_";
+        return "SELECT w.id_,w.tenant_id_,w.product_line_id_,w.category_,w.task_type_id_,w.code_,w.title_,w.description_,w.description_html_,w.expected_goal_,w.version_id_,COALESCE(w.assistance_status_,w.status_name_) AS status_,w.assistance_status_,w.assistance_initiator_id_,w.assistance_owner_id_,w.assistance_resolution_,w.assignee_name_ AS owner_name_,COALESCE(w.creator_name_,cu.name_,w.create_by_) AS creator_name_,w.create_by_ AS create_by_,w.department_,w.customer_id_,w.customer_name_,w.requirement_type_,w.cc_names_,w.media_,w.source_work_order_ids_,w.source_work_order_titles_,w.work_order_type_,w.special_fields_,w.priority_,w.planned_start_date_,w.planned_end_date_ AS due_date_,w.estimated_hours_,w.actual_hours_,w.create_time_,w.version_,w.delete_flag_,p.name_ AS product_line_name_,COALESCE(v.name_,'') AS version_name_ FROM t_product_work_item w JOIN t_product_line p ON p.id_=w.product_line_id_ AND p.tenant_id_=w.tenant_id_ AND p.delete_flag_=0 LEFT JOIN t_product_line_version v ON v.id_=w.version_id_ AND v.tenant_id_=w.tenant_id_ AND v.delete_flag_=0 LEFT JOIN t_sys_user cu ON cu.id_=w.create_by_ AND cu.tenant_id_=w.tenant_id_";
     }
 
     private static String qualify(String sql) {

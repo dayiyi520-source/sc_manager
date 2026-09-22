@@ -87,6 +87,12 @@ public class WorkItemStorageService {
     }
     public Map<String,Object> detail(String line,String id) { access.check(line,false); requireItem(line,id); return mapper.timedItem(RequestContext.tenantId(),line,id); }
     public List<Map<String,Object>> activities(String line,String id) { access.check(line,false); requireItem(line,id); return mapper.activities(RequestContext.tenantId(),line,id); }
+    @Transactional public int updateProgress(String tenant,String line,String id,int revision,int progress,String user) {
+        return mapper.updateProgress(tenant,line,id,revision,progress,user);
+    }
+    @Transactional public void activity(String tenant,String line,String subject,String event,String json,String user) {
+        mapper.activity(tenant,line,subject,event,json,user);
+    }
     @Transactional public Map<String,Object> update(String line,String id,UpdateItem body) {
         access.check(line,true);
         Map<String,Object> item=requireItem(line,id);

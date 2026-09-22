@@ -85,7 +85,7 @@ public class AssistanceWorkflowService {
 
     @Transactional Map<String,Object> closeByOwner(String assistanceId, int revision) {
         AuthorizationService.requireWrite("product");
-        Map<String,Object> row = jdbc.queryForMap("SELECT assistance_status_ AS status,create_by_ AS initiatorId,version_ AS revision FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", RequestContext.tenantId(), assistanceId);
+        Map<String,Object> row = jdbc.queryForMap("SELECT assistance_status_ AS status,COALESCE(assistance_initiator_id_,create_by_) AS initiatorId,version_ AS revision FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", RequestContext.tenantId(), assistanceId);
         if (!"待负责人关闭".equals(row.get("status"))) throw new IllegalArgumentException("当前事项尚未满足负责人关闭条件");
         if (!RequestContext.userId().equals(Objects.toString(row.get("initiatorId"), ""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅事项发起人可以结束协助");
         if (((Number) row.get("revision")).intValue() != revision) throw conflict();

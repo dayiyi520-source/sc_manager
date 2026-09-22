@@ -503,6 +503,7 @@ export interface RequirementTask {
   priority: '紧急' | '高' | '中' | '低' | 'P0-紧急阻断' | 'P1-高优' | 'P2-普通' | 'P2-标准' | 'P3-低优' | string;
   ownerName: string;
   creatorName?: string;
+  creatorId?: string;
   department?: string;
   departmentId?: string;
   versionId?: string;
@@ -634,6 +635,7 @@ export interface RequirementWorkItem {
   revision?: number;
   overdueRisk?: boolean;
   dueDate?: string;
+  events?: RequirementEvent[];
 }
 
 export interface DepartmentOption {

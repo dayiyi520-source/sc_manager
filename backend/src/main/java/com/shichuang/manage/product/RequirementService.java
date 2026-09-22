@@ -66,7 +66,9 @@ public class RequirementService {
         if(rows.isEmpty())throw notFound("需求不存在");
         Map<String,Object> result=new LinkedHashMap<>(rows.get(0));
         result.put("events",mapper.events(RequestContext.tenantId(),id));
-        result.put("workItems",mapper.workItems(RequestContext.tenantId(),id));
+        List<Map<String,Object>> workItems = mapper.workItems(RequestContext.tenantId(),id);
+        workItems.forEach(item -> item.put("events", mapper.workItemEvents(RequestContext.tenantId(), String.valueOf(item.get("id")))));
+        result.put("workItems",workItems);
         return assistanceWorkflow.enrich(result);
     }
 

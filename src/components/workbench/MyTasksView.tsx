@@ -51,14 +51,14 @@ export const MyTasksView: React.FC = () => {
   const [feedTab, setFeedTab] = useState<FeedTabType>('dynamic');
   const [realTasks, setRealTasks] = useState<MyTaskRecord[]>([]);
   const [taskLoading, setTaskLoading] = useState(true);
-  const [taskError, setTaskError] = useState(false);
+  const [taskError, setTaskError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     setTaskLoading(true);
-    setTaskError(false);
+    setTaskError(null);
     requirementRepository.myTasks()
       .then((items) => { if (active) setRealTasks(Array.isArray(items) ? items : []); })
-      .catch(() => { if (active) { setRealTasks([]); setTaskError(true); } })
+      .catch((error) => { if (active) { setRealTasks([]); setTaskError(error instanceof Error ? error.message : '产品任务和协助事项服务暂不可用'); } })
       .finally(() => { if (active) setTaskLoading(false); });
     return () => { active = false; };
   }, []);
@@ -169,7 +169,7 @@ export const MyTasksView: React.FC = () => {
               {taskLoading ? (
                 <div className="text-center py-8 text-[var(--text-muted)] text-sm">正在加载我的工作...</div>
               ) : taskError ? (
-                <div className="text-center py-8 text-[var(--danger)] text-sm"><AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-70" />我的工作加载失败，请稍后重试</div>
+                <div className="text-center py-8 text-[var(--danger)] text-sm"><AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-70" /><div>我的工作加载失败，请稍后重试</div><div className="mt-1 text-xs text-[var(--text-muted)]">{taskError}</div></div>
               ) : displayTodos.length === 0 ? (
                 <div className="text-center py-8 text-[var(--text-muted)] text-sm">
                   <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
