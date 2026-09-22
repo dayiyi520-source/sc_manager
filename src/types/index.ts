@@ -533,8 +533,10 @@ export interface RequirementTask {
   specialFields?: Record<string, string | number | null> | string;
   sourceWorkOrderIds?: string[];
   sourceWorkOrderTitles?: string[];
+  sourceType?: string;
   requirementId?: string;
   requirementTitle?: string;
+  requirementInitiatorName?: string;
   requirementType?: string;
   workItemTypeId?: string;
   parentWorkItemId?: string;
@@ -636,6 +638,7 @@ export interface RequirementWorkItem {
   overdueRisk?: boolean;
   dueDate?: string;
   events?: RequirementEvent[];
+  sourceType?: string;
 }
 
 export interface DepartmentOption {
@@ -771,7 +774,8 @@ export interface ApprovalFlow {
   type: '合同用印审批' | '商机特批报价' | '招投标立项' | '需求重大变更' | '采购与报销' | '合作伙伴准入';
   applicantName: string;
   applicantDept: string;
-  status: '待审批' | '已通过' | '已驳回' | '已撤销';
+  status: '审批中' | '待审批' | '已通过' | '已驳回' | '已撤销';
+  ccNames?: string[];
   relatedCustomer?: string;
   relatedProduct?: string;
   amount?: number;

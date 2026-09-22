@@ -34,7 +34,10 @@ public class WorkItemRelationService {
         if(input.type()==null || !Set.of("BLOCKS","RELATES_TO","FOUND_DEFECT").contains(input.type())) throw new IllegalArgumentException("关系类型无效");
         String scope="BLOCKS".equals(input.type())?input.scope():"FINISH";
         if(scope==null || !Set.of("START","FINISH").contains(scope)) throw new IllegalArgumentException("请选择限制开始或限制完成");
-        Map<String,Object> from=item(line,id),to=item(line,input.targetId()); editable(line,from); editable(line,to);
+        Map<String,Object> from=item(line,id),to=item(line,input.targetId());
+        if ("WORK_ORDER".equals(Objects.toString(from.get("sourceType"),"")) || "WORK_ORDER".equals(Objects.toString(to.get("sourceType"),"")))
+            throw conflict("协助事项下游任务的来源关联固定，不允许新增工作项关联");
+        editable(line,from); editable(line,to);
         if("BLOCKS".equals(input.type()) && terminal(to)) throw conflict("已结束工作项不能新增阻塞依赖");
         if("FOUND_DEFECT".equals(input.type()) && (!"test".equals(from.get("category")) || !"bug".equals(to.get("category")))) throw new IllegalArgumentException("发现缺陷关系必须从测试指向缺陷");
         String source=id,target=input.targetId();
@@ -60,6 +63,8 @@ public class WorkItemRelationService {
         if(enabled(relation.get("deleted"))) return;
         if("REQUIRES_REGRESSION".equals(relation.get("type"))) throw conflict("回归关系不能直接移除，请完成关联测试任务");
         String from=relation.get("sourceId").toString(),to=relation.get("targetId").toString();
+        if ("WORK_ORDER".equals(Objects.toString(item(line,from).get("sourceType"),"")) || "WORK_ORDER".equals(Objects.toString(item(line,to).get("sourceType"),"")))
+            throw conflict("协助事项下游任务的来源关联固定，不允许删除关联");
         editable(line,item(line,from)); editable(line,item(line,to));
         if(revision!=((Number)relation.get("revision")).intValue()) throw conflict("关系已变化，请刷新后重试");
         var before=snapshot(line);

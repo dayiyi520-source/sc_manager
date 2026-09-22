@@ -1557,6 +1557,7 @@ export const INITIAL_APPROVALS: ApprovalFlow[] = [
     applicantName: '陈雅婷',
     applicantDept: '商务大客户部',
     status: '待审批',
+    ccNames: ['林志豪'],
     relatedCustomer: '国家电网华东分部数智调度中心',
     relatedProduct: '师创智联协同OS',
     amount: 4800000,
@@ -1818,19 +1819,19 @@ export const WORKBENCH_FEEDS = [
   {
     id: 'feed-5',
     time: '今天 09:20',
-    type: 'supervise',
-    title: '跟进国家电网二期合同用印审批',
-    content: '请陈雅婷在今日 18:00 前补充法务确认单，并同步商务运营部。',
-    author: '系统督办',
-    customer: '国家电网华东分部数智调度中心'
+    type: 'competitor',
+    title: '友商云启科技发布新一代低代码协同平台',
+    content: '该产品主打流程配置与智能报表，近期正在重点拓展政务和能源行业客户，建议产品与售前团队关注其差异化能力。',
+    author: '市场情报',
+    customer: '云启科技'
   },
   {
     id: 'feed-6',
     time: '昨天 16:10',
-    type: 'supervise',
-    title: '完成智行新能源现场述标材料复核',
-    content: '技术标与演示环境待王浩然确认，截止 9 月 8 日 12:00。',
-    author: '系统督办',
-    customer: '智行新能源汽车工业互联股份有限公司'
+    type: 'competitor',
+    title: '友商数维软件中标华东某能源集团数据中台项目',
+    content: '项目覆盖主数据治理、实时分析与移动端巡检，预计将强化其在能源行业的标杆案例积累，需要跟踪其交付范围和客户反馈。',
+    author: '市场情报',
+    customer: '数维软件'
   }
 ];

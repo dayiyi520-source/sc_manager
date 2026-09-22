@@ -55,7 +55,7 @@ public class RequirementMapper {
               WHERE a.subject_id_=? AND a.tenant_id_=?
             ) e
             WHERE (?='' OR e.eventType=?) AND (?='' OR e.operatorName=?)
-            ORDER BY e.createdAt,e.id
+            ORDER BY e.createdAt DESC,e.id DESC
             """,id,tenantId,eventType,eventType,operatorName,operatorName);
     }
 
@@ -71,7 +71,7 @@ public class RequirementMapper {
             JOIN t_product_work_item w ON w.id_=a.subject_id_ AND w.tenant_id_=a.tenant_id_ AND w.source_type_='WORK_ORDER' AND w.delete_flag_=0
             LEFT JOIN t_sys_user u ON u.id_=a.create_by_ AND u.tenant_id_=a.tenant_id_
             WHERE a.tenant_id_=? AND a.subject_id_=?
-            ORDER BY a.create_time_,a.id_
+            ORDER BY a.create_time_ DESC,a.id_ DESC
             """,tenantId,id);
     }
 
@@ -107,16 +107,18 @@ public class RequirementMapper {
               w.title_ AS title,w.status_name_ AS status,w.assignee_name_ AS assigneeName,w.create_time_ AS time,
               w.planned_end_date_ AS dueDate,w.progress_ AS progress,
               w.planned_end_date_ < CURRENT_DATE AND w.successful_=0 AND w.status_group_ NOT IN ('CANCELLED') AS overdueRisk,
-              CASE WHEN w.status_group_ IN ('COMPLETED','CANCELLED') OR w.assistance_status_ IN ('已关闭','已完成') THEN 'completed'
-                   WHEN w.source_type_='WORK_ORDER' AND COALESCE(w.assignee_id_,'')<>? THEN 'assist' ELSE 'mine' END AS taskGroup,
+              CASE WHEN w.source_type_='WORK_ORDER' THEN 'assist' ELSE 'mine' END AS taskGroup,
               CASE w.category_ WHEN 'design' THEN 'prod_design_tasks' WHEN 'dev' THEN 'prod_rd_tasks' WHEN 'test' THEN 'prod_test_tasks' WHEN 'bug' THEN 'prod_bugs' ELSE 'prod_req_tasks' END AS targetPage,
               COALESCE(w.requirement_id_,w.id_) AS sourceId
             FROM t_product_work_item w
             WHERE w.tenant_id_=? AND w.delete_flag_=0
               AND w.category_ IN ('requirement','design','dev','test','bug')
-              AND (w.assignee_id_=? OR w.create_by_=? OR w.assistance_owner_id_=? OR COALESCE(w.assistance_initiator_id_,w.create_by_)=?)
+              AND w.assignee_id_=?
+              AND CASE WHEN w.source_type_='WORK_ORDER'
+                       THEN (w.status_group_ IN ('COMPLETED','CANCELLED') OR w.status_name_ IN ('已完成','已发布','已关闭','已取消') OR w.assistance_status_ IN ('已完成','已发布','已关闭','已取消'))
+                       ELSE (w.status_group_ NOT IN ('COMPLETED','CANCELLED') AND w.status_name_ NOT IN ('已完成','已发布','已关闭','已取消')) END
             ORDER BY w.create_time_ DESC LIMIT 200
-            """,userId,tenantId,userId,userId,userId,userId);
+            """,tenantId,userId);
     }
 
     List<Map<String,Object>> workOrderCandidates(String tenantId,String keyword,String type,String requirementId,int limit) {

@@ -225,6 +225,27 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  useEffect(() => {
+    const raw = sessionStorage.getItem('shichuang.task.search');
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(raw) as { targetPage?: string; title?: string };
+      const targetPageByKind: Record<string, string> = {
+        requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks',
+        bug: 'prod_bugs', test: 'prod_test_tasks', presales: 'crm_presales_tasks',
+        delivery: 'proj_delivery_tasks', ops: 'proj_ops_tasks'
+      };
+      if (payload.targetPage !== targetPageByKind[taskKind]) return;
+      const title = String(payload.title || '').trim();
+      setSearchDraft(title);
+      setSearchQuery(title);
+      setSearchOpen(Boolean(title));
+      sessionStorage.removeItem('shichuang.task.search');
+    } catch {
+      sessionStorage.removeItem('shichuang.task.search');
+    }
+  }, [taskKind]);
+
   const remoteEnabled = Boolean(readSession());
   const remoteApiEnabled = (() => {
     const token = sessionStorage.getItem('shichuang.session.token');
@@ -291,8 +312,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       return { items: result.items, total: result.total, groups: result.groups || [] };
     }
   });
+  const productLineKey = productLines.map((line) => line.id).join(',');
   const unifiedQuery = useQuery({
-    queryKey: ['unified-task-page', unifiedCategory, productLineFilter, searchQuery],
+    queryKey: ['unified-task-page', unifiedCategory, productLineFilter, searchQuery, productLineKey],
     enabled: Boolean(unifiedCategory && remoteEnabled),
     queryFn: async () => {
       const lines = productLineFilter === 'all' ? productLines : productLines.filter((line) => line.id === productLineFilter);
@@ -918,6 +940,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     customerId: item.customerId ? String(item.customerId) : fallback?.customerId,
     customerName: item.customerName ? String(item.customerName) : fallback?.customerName,
     requirementId: item.requirementId || undefined,
+    requirementTitle: item.requirementId ? fallback?.requirementTitle : fallback?.requirementTitle,
+    sourceType: (item as UnifiedWorkItem & { sourceType?: string }).sourceType || fallback?.sourceType,
     parentWorkItemId: item.parentWorkItemId || undefined,
     workItemTypeId: item.taskTypeId || undefined,
     dueDate: item.dueDate || '',
@@ -943,6 +967,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     customerId: item.customerId ? String(item.customerId) : fallback?.customerId,
     customerName: item.customerName ? String(item.customerName) : fallback?.customerName,
     requirementId: item.requirementId ? String(item.requirementId) : fallback?.requirementId,
+    requirementTitle: item.requirementTitle ? String(item.requirementTitle) : fallback?.requirementTitle,
+    requirementInitiatorName: item.requirementInitiatorName ? String(item.requirementInitiatorName) : fallback?.requirementInitiatorName,
+    sourceType: item.sourceType ? String(item.sourceType) : fallback?.sourceType,
     parentWorkItemId: item.parentWorkItemId ? String(item.parentWorkItemId) : undefined,
     workItemTypeId: item.taskTypeId ? String(item.taskTypeId) : undefined,
     plannedStartDate: item.plannedStartDate ? String(item.plannedStartDate) : undefined,
@@ -1190,7 +1217,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const effectiveGroupValue = groupBy === 'none' ? '' : groupValueExists ? groupValue : firstGroupValue;
   const rootTasks = unifiedCategory && remoteEnabled ? filteredTasks.filter((task) => !task.parentWorkItemId) : filteredTasks;
   const visibleTasks = (remoteEnabled && !unifiedCategory) || groupBy === 'none' ? rootTasks : rootTasks.filter((task) => getGroupValue(task) === effectiveGroupValue);
-  const pagedTasks = remoteEnabled ? visibleTasks : visibleTasks.slice((page - 1) * pageSize, page * pageSize);
+  const pagedTasks = remoteEnabled && unifiedCategory
+    ? visibleTasks.slice((page - 1) * pageSize, page * pageSize)
+    : remoteEnabled ? visibleTasks : visibleTasks.slice((page - 1) * pageSize, page * pageSize);
   const paginationTotal = unifiedCategory && remoteEnabled ? rootTasks.length : remoteEnabled ? serverPageQuery.data?.total || 0 : visibleTasks.length;
 
   useEffect(() => setPage(1), [activeTab, searchQuery, searchOwnerNames, appliedFilters, groupBy, groupValue, pageSize, productLineFilter]);
@@ -1505,7 +1534,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                   onChange={(value) => setDetailTab(value as 'activity' | 'relations' | 'children')}
                   options={[
                     { label: `动态 · ${selectedTask.events?.length || 0}`, value: 'activity' },
-                    { label: `关联对象 · ${relatedWorkItems.length + (selectedTask.sourceWorkOrderIds?.length || 0)}`, value: 'relations' },
+                    { label: `关联对象 · ${relatedWorkItems.length + (selectedTask.sourceWorkOrderIds?.length || 0) + (selectedTask.sourceType === 'WORK_ORDER' && selectedTask.requirementId ? 1 : 0)}`, value: 'relations' },
                     { label: `子任务 · ${childWorkItems.length}`, value: 'children' },
                   ]}
                 />
@@ -1513,8 +1542,22 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               {detailTab === 'relations' ? (
                 <div className="space-y-4">
                   {relatedWorkItems.length > 0 && <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{relatedWorkItems.map((item) => <button type="button" key={item.id} onClick={() => setSelectedTask(item)} className="grid w-full grid-cols-[100px_minmax(0,1fr)_100px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 text-left last:border-b-0 hover:bg-[var(--bg-surface-soft)]"><span className="font-mono text-[var(--text-muted)]">{item.code || '工作项'}</span><span className="truncate text-[var(--primary)]">{item.title}</span><span className="text-[var(--text-body)]">{item.status}</span></button>)}</div>}
-                  <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={detailEditing ? updateLinkedWorkOrders : () => undefined} placeholder="选择关联事项" />
-                  {!relatedWorkItems.length && !(selectedTask.sourceWorkOrderIds || []).length && <p className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">暂无关联对象</p>}
+                  {selectedTask.sourceType === 'WORK_ORDER' && selectedTask.requirementId ? (
+                    <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-sm">
+                      <div className="mb-1 text-xs text-[var(--text-muted)]">来源协助事项（系统固定关联）</div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-semibold text-white">1</span>
+                        <button type="button" className="truncate text-left text-[var(--primary)] hover:text-[var(--primary-hover)]" onClick={() => {
+                          const title = selectedTask.requirementTitle || selectedTask.sourceWorkOrderTitles?.[0] || '';
+                          if (title) sessionStorage.setItem('shichuang.assistance.search', title);
+                          openPageTab('wb_work_order');
+                        }}>{selectedTask.requirementTitle || selectedTask.sourceWorkOrderTitles?.[0] || selectedTask.requirementId || '关联协助事项'}</button>
+                      </div>
+                      <div className="mt-2 text-xs text-[var(--text-muted)]">发起人：{selectedTask.requirementInitiatorName || '未知'}</div>
+                      <div className="mt-1 text-xs text-[var(--text-muted)]">该关联由协助事项转任务时自动建立，不可修改或新增。</div>
+                    </div>
+                  ) : <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={detailEditing ? updateLinkedWorkOrders : () => undefined} placeholder="选择关联事项" />}
+                  {!relatedWorkItems.length && !(selectedTask.sourceWorkOrderIds || []).length && !(selectedTask.sourceType === 'WORK_ORDER' && selectedTask.requirementId) && <p className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">暂无关联对象</p>}
                 </div>
               ) : detailTab === 'children' ? (
                 <div className="space-y-3">

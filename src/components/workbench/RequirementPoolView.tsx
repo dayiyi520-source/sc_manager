@@ -75,6 +75,13 @@ const taskTypes: RequirementTaskType[] = [
 ];
 const opportunityStagesBeforeWin = new Set(["发现商机", "需求确认", "方案设计", "商务谈判", "招投标"]);
 const taskTargetPages: Record<RequirementTaskType, string> = TASK_PAGE_BY_TYPE;
+const formatDateTime = (value?: string) => {
+  if (!value) return "—";
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(date).replace(/\//g, "-");
+};
 const workOrderCards: Array<{ type: WorkOrderType; description: string; icon: React.ReactNode }> = [
   { type: "客户诉求", description: "收集客户反馈、业务需求与改进建议", icon: <MessageSquareText className="h-6 w-6" /> },
   { type: "线上问题", description: "记录线上故障、异常现象与影响范围", icon: <WifiOff className="h-6 w-6" /> },
@@ -313,9 +320,15 @@ export const RequirementPoolView: React.FC = () => {
   const [reopenProgress, setReopenProgress] = useState(0);
   const [reopenReason, setReopenReason] = useState("");
   const [reopenSubmitting, setReopenSubmitting] = useState(false);
-  const [progressDrafts, setProgressDrafts] = useState<Record<string, number>>({});
-  const [progressSubmitting, setProgressSubmitting] = useState<string | null>(null);
   const editor = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const assistanceSearch = sessionStorage.getItem("shichuang.assistance.search");
+    if (!assistanceSearch) return;
+    setQuery(assistanceSearch);
+    setTab("list");
+    sessionStorage.removeItem("shichuang.assistance.search");
+  }, []);
 
   const currentWorkOrderType = selected?.workOrderType || selected?.taskType || selected?.requirementType || "通用/其他";
   const availableRejectReasons = useMemo(() => getRejectReasonsForType(currentWorkOrderType), [currentWorkOrderType]);
@@ -484,11 +497,9 @@ export const RequirementPoolView: React.FC = () => {
       }
       setEvents(nextEvents);
       setWorkItems(nextWorkItems);
-      setProgressDrafts(Object.fromEntries(nextWorkItems.map((workItem) => [workItem.id, workItem.progress ?? 0])));
     } catch {
       setEvents(Array.isArray(item.events) ? item.events : []);
       setWorkItems([]);
-      setProgressDrafts({});
     }
   };
   const handleWorkflowSubmit = async (event: React.FormEvent) => {
@@ -710,23 +721,6 @@ export const RequirementPoolView: React.FC = () => {
       addToast("error", "事项重开失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally {
       setReopenSubmitting(false);
-    }
-  };
-  const submitWorkItemProgress = async (item: RequirementWorkItem) => {
-    const progress = Math.max(0, Math.min(100, Number(progressDrafts[item.id] ?? item.progress ?? 0)));
-    setProgressSubmitting(item.id);
-    try {
-      await requirementRepository.updateWorkItemProgress(item.id, progress, item.revision);
-      const detail = await requirementRepository.detail(selected?.id || item.requirementId);
-      setSelected((current) => current ? { ...current, ...detail } : current);
-      setEvents(Array.isArray(detail.events) ? detail.events : []);
-      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
-      setRequirementTasks((list) => list.map((entry) => entry.id === detail.id ? { ...entry, ...detail } : entry));
-      addToast("success", "任务进度已更新", `当前进度 ${progress}%`);
-    } catch (error) {
-      addToast("error", "任务进度更新失败", error instanceof Error ? error.message : "请刷新后重试");
-    } finally {
-      setProgressSubmitting(null);
     }
   };
   const submitAcceptanceFailed = async (event: React.FormEvent) => {
@@ -1266,32 +1260,35 @@ export const RequirementPoolView: React.FC = () => {
           <div className={`space-y-5 text-sm ${detailTab === "info" ? "hidden" : ""}`}>
             <section>
               <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项全历程</h3>
-              {events.length ? <div className="space-y-3">{events.map((item) => {
+              {events.length ? <div className="space-y-3">{[...events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))).map((item) => {
                 const meta = eventMetadata(item.metadata);
                 const targetPage = typeof meta.targetPage === "string" ? meta.targetPage : "";
                 const progressValue = meta.toProgress ?? meta.progress;
                 const progress = typeof progressValue === "number" || typeof progressValue === "string" ? Number(progressValue) : null;
+                const taskTitle = String(meta.taskTitle || "").trim();
                 return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3">
-                  <div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}{meta.isDemo === true && <span className="ml-2 rounded bg-[var(--bg-surface-soft)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">示例历程</span>}</b><span className="text-[11px] text-[var(--text-muted)]">{item.createdAt?.slice(0, 16)}</span></div>
+                  <div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}{meta.isDemo === true && <span className="ml-2 rounded bg-[var(--bg-surface-soft)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">示例历程</span>}</b><span className="text-[11px] text-[var(--text-muted)]">{formatDateTime(item.createdAt)}</span></div>
                   <div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{item.operatorName || "未知"} · 指派负责人：{String(meta.assigneeName || "未指派")}</div>
                   {item.reason && <p className="mt-2 text-xs">{item.reason}</p>}
                   {progress !== null && <div className="mt-2 text-xs text-[var(--text-muted)]">任务进度：{Math.max(0, Math.min(100, progress))}%{meta.overdueRisk === true && <span className="ml-2 text-[var(--danger)]">已逾期</span>}</div>}
-                  {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => targetPage && openPageTab(targetPage as Parameters<typeof openPageTab>[0])}>{String(meta.taskType)} · {String(meta.taskTitle || "关联任务")} <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></button></>}
+                  {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => {
+                    if (!targetPage) return;
+                    sessionStorage.setItem('shichuang.task.search', JSON.stringify({ targetPage, title: taskTitle }));
+                    openPageTab(targetPage as Parameters<typeof openPageTab>[0]);
+                  }}>{String(meta.taskType)} · {taskTitle || "关联任务"} <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></button></>}
                 </div>;
               })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无事项流转记录</p>}
             </section>
             <section>
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">下游任务进度</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">下游任务</h3>
               {workItems.length ? <div className="space-y-2">{workItems.map((item) => {
                 const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED";
                 const accepted = item.assistanceTaskStatus === "ACCEPTED";
-                const draft = progressDrafts[item.id] ?? item.progress ?? 0;
-                const canEdit = samePerson(item.assigneeName, currentUser.name) || isInitiator(selected, currentUser);
-                const taskEvents = Array.isArray(item.events) ? item.events : [];
-                return <div key={item.id} className="space-y-2 border-b border-[var(--border-main)] py-2 text-xs">
+                const taskEvents = Array.isArray(item.events) ? [...item.events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))) : [];
+                return <div key={item.id} className="space-y-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-xs">
                   <div className="flex items-center justify-between gap-3"><span className="min-w-0 truncate">{item.taskType} · {item.title} · {item.assigneeName}</span><span className="flex shrink-0 items-center gap-2"><StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && isInitiator(selected, currentUser) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>
-                  <div className="flex items-center gap-2"><span className="text-[var(--text-muted)]">进度 {Math.max(0, Math.min(100, Number(item.progress ?? 0)))}%</span><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bg-main)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${Math.max(0, Math.min(100, Number(item.progress ?? 0)))}%` }} /></div>{canEdit && <><InputNumber min={0} max={100} size="small" value={draft} onChange={(value) => setProgressDrafts((current) => ({ ...current, [item.id]: Number(value ?? 0) }))} /><button type="button" disabled={progressSubmitting === item.id} onClick={() => submitWorkItemProgress(item)} className="text-[var(--active-text)] hover:text-[var(--primary-hover)] disabled:opacity-50">{progressSubmitting === item.id ? "保存中…" : "保存"}</button></>}</div>
-                  {taskEvents.length > 0 && <div className="mt-2 rounded-md bg-[var(--bg-surface-soft)] p-2"><div className="mb-1 text-[11px] font-semibold text-[var(--text-muted)]">任务变化历程</div>{taskEvents.map((taskEvent) => <div key={taskEvent.id} className="flex items-center justify-between gap-2 py-0.5 text-[11px] text-[var(--text-muted)]"><span>{taskEvent.eventType}{taskEvent.toStatus ? ` · ${taskEvent.toStatus}` : ""}</span><span>{taskEvent.createdAt?.slice(0, 16)}</span></div>)}</div>}
+                  <div className="border-t border-[var(--border-main)]" />
+                  {taskEvents.length > 0 && <div className="space-y-2"><div className="text-[11px] font-semibold text-[var(--text-muted)]">任务变化历程</div>{taskEvents.map((taskEvent) => <div key={taskEvent.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-2"><div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{taskEvent.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{formatDateTime(taskEvent.createdAt)}</span></div><div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{taskEvent.operatorName || "未知"}{taskEvent.fromStatus || taskEvent.toStatus ? ` · ${taskEvent.fromStatus || "—"} → ${taskEvent.toStatus || "—"}` : ""}</div>{taskEvent.reason && <p className="mt-1 text-xs text-[var(--text-body)]">{taskEvent.reason}</p>}</div>)}</div>}
                 </div>;
               })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无解决过程记录</p>}
             </section>

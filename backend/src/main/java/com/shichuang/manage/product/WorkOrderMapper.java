@@ -25,7 +25,7 @@ public class WorkOrderMapper {
     }
 
     public Map<String,Object> find(String tenantId,String id){
-        List<Map<String,Object>> rows=jdbc.queryForList("SELECT id_ AS id,product_line_id_ AS productLineId,requirement_id_ AS requirementId,work_order_type_ AS taskType,status_name_ AS status,status_group_ AS statusGroup,successful_ AS successful,progress_ AS progress,assignee_id_ AS assigneeId,assignee_name_ AS assigneeName,create_by_ AS creatorId,creator_name_ AS creatorName,assistance_owner_id_ AS assistanceOwnerId,COALESCE(assistance_initiator_id_,create_by_) AS assistanceInitiatorId,version_ AS revision FROM t_product_work_item WHERE id_=? AND tenant_id_=? AND source_type_='WORK_ORDER' AND delete_flag_=0",id,tenantId);
+        List<Map<String,Object>> rows=jdbc.queryForList("SELECT id_ AS id,product_line_id_ AS productLineId,requirement_id_ AS requirementId,source_type_ AS sourceType,work_order_type_ AS taskType,status_name_ AS status,status_group_ AS statusGroup,successful_ AS successful,progress_ AS progress,assignee_id_ AS assigneeId,assignee_name_ AS assigneeName,create_by_ AS creatorId,creator_name_ AS creatorName,assistance_owner_id_ AS assistanceOwnerId,COALESCE(assistance_initiator_id_,create_by_) AS assistanceInitiatorId,version_ AS revision FROM t_product_work_item WHERE id_=? AND tenant_id_=? AND source_type_='WORK_ORDER' AND delete_flag_=0",id,tenantId);
         if(rows.isEmpty())throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"工作项不存在");
         return rows.get(0);
     }

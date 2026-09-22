@@ -179,6 +179,7 @@ public class RequirementService {
         AuthorizationService.requireWrite("product"); int progress=((Number)body.getOrDefault("progress",-1)).intValue();
         if(progress<0||progress>100) throw new IllegalArgumentException("进度必须为0至100");
         Map<String,Object> item=workOrders.find(RequestContext.tenantId(),id); int revision=((Number)body.getOrDefault("revision",item.get("revision"))).intValue();
+        if ("WORK_ORDER".equals(Objects.toString(item.get("sourceType"),""))) throw new ResponseStatusException(HttpStatus.CONFLICT,"协助事项下游任务进度由任务状态自动计算，不能手动修改");
         if(isTerminal(item)) throw new IllegalArgumentException("已完成或已取消的任务不能更新进度");
         if(!isParticipant(item, RequestContext.userId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅任务参与者可以更新进度");
         int previous=((Number)item.getOrDefault("progress",0)).intValue();

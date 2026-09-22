@@ -22,7 +22,7 @@ export type WorkItemWorkflow = {
 };
 export type UnifiedWorkItem = {
   id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;
-  requirementId?: string | null; customerId?: string | null; customerName?: string | null; assigneeName?: string; status?: { name?: string; group?: string; successful?: boolean };
+  requirementId?: string | null; customerId?: string | null; customerName?: string | null; assigneeName?: string; sourceType?: string; status?: { name?: string; group?: string; successful?: boolean };
   taskTypeId?: string | null; workflowId?: string | null; statusKey?: string | null; statusColor?: string;
   priority?: string; parentWorkItemId?: string | null; versionId?: string | null; dueDate?: string | null;
   estimatedHours?: number; actualHours?: number; createdAt?: string; revision?: number; potentialBlockingDefect?: boolean; hasChildren?: boolean;
@@ -76,7 +76,7 @@ export const productRepository = {
   updateAutomationSetting: (id: string, enabled: boolean) => apiRequest<{ enabled: boolean }>(`/api/product-lines/${id}/automation-rules/setting`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
   automationLogs: (id: string) => apiRequest<AutomationLog[]>(`/api/product-lines/${id}/automation-rules/logs`),
   workItemDetail: (lineId: string, id: string) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(lineId)}`),
-  workItems: (productLineId: string, category = '', keyword = '') => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=1&pageSize=100`),
+  workItems: (productLineId: string, category = '', keyword = '', values: { page?: number; pageSize?: number } = {}) => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number; page?: number; pageSize?: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=${values.page || 1}&pageSize=${values.pageSize || 100}`),
   createWorkItem: (body: { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; requirementId?: string; customerId?: string; customerName?: string; parentWorkItemId?: string; assigneeId?: string; ccNames?: string[]; media?: RequirementMedia[]; priority: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItem: (productLineId: string, id: string, body: { title?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; assigneeName?: string; priority?: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number; actualHours?: number; revision: number }) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}`, { method: 'PUT', body: JSON.stringify(body) }),
   workItemTransitions: (productLineId: string, id: string) => apiRequest<WorkItemTransitionOptions>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`),

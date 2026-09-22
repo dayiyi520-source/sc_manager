@@ -28,14 +28,14 @@ type MyTaskRecord = {
   dueDate?: string;
   progress?: number;
   overdueRisk?: boolean;
-  taskGroup: 'mine' | 'assist' | 'completed';
+  taskGroup: 'mine' | 'assist';
   targetPage: string;
   sourceId: string;
 };
 
-type TabType = 'all' | 'mine' | 'assist' | 'completed';
-type ApprovalTabType = 'pending' | 'my_apply' | 'cc_me' | 'approved';
-type FeedTabType = 'dynamic' | 'feedback' | 'supervise';
+type TabType = 'all' | 'mine' | 'assist';
+type ApprovalTabType = 'pending' | 'my_apply' | 'cc_me';
+type FeedTabType = 'dynamic' | 'feedback' | 'competitor';
 
 export const MyTasksView: React.FC = () => {
   const {
@@ -63,21 +63,18 @@ export const MyTasksView: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  const pendingTodos = useMemo(() => realTasks.filter((task) => task.taskGroup !== 'completed'), [realTasks]);
-  const completedTodos = useMemo(() => realTasks.filter((task) => task.taskGroup === 'completed'), [realTasks]);
+  const pendingTodos = useMemo(() => realTasks.filter((task) => task.taskGroup === 'mine'), [realTasks]);
   const displayTodos = useMemo(() => {
-    if (todoTab === 'completed') return completedTodos;
     if (todoTab === 'mine') return realTasks.filter((task) => task.taskGroup === 'mine');
     if (todoTab === 'assist') return realTasks.filter((task) => task.taskGroup === 'assist');
-    return realTasks;
-  }, [completedTodos, realTasks, todoTab]);
+    return realTasks.filter((task) => task.taskGroup === 'mine');
+  }, [realTasks, todoTab]);
 
   // 审批筛选
   const filteredApprovals = approvals.filter((a) => {
-    if (approvalTab === 'pending') return a.status === '待审批';
-    if (approvalTab === 'my_apply') return a.applicantName === currentUser.name;
-    if (approvalTab === 'cc_me') return true;
-    return a.status === '已通过' || a.status === '已驳回';
+    if (approvalTab === 'pending') return a.status === '待审批' && a.nodes.some((node) => node.approver === currentUser.name && node.status === 'current');
+    if (approvalTab === 'my_apply') return a.applicantName === currentUser.name && ['审批中', '待审批', '已驳回'].includes(a.status);
+    return (a.ccNames || []).includes(currentUser.name) && ['审批中', '待审批'].includes(a.status);
   });
 
   // 获取用户OKR
@@ -116,7 +113,7 @@ export const MyTasksView: React.FC = () => {
         />
         <StatCard
           title="待办审批"
-          value={approvals.filter((a) => a.status === '待审批').length}
+          value={approvals.filter((a) => a.status === '待审批' && a.nodes.some((node) => node.approver === currentUser.name && node.status === 'current')).length}
           unit="单"
           icon={<FileCheck className="w-5 h-5" />}
           iconBgColor="bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400"
@@ -151,15 +148,9 @@ export const MyTasksView: React.FC = () => {
                 待办中心
               </div>
               <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5">
-                <TabButton active={todoTab === 'all'} onClick={() => setTodoTab('all')}>全部 ({realTasks.length})</TabButton>
+                <TabButton active={todoTab === 'all'} onClick={() => setTodoTab('all')}>全部 ({pendingTodos.length})</TabButton>
                 <TabButton active={todoTab === 'mine'} onClick={() => setTodoTab('mine')}>任务 ({realTasks.filter((task) => task.taskGroup === 'mine').length})</TabButton>
                 <TabButton active={todoTab === 'assist'} onClick={() => setTodoTab('assist')}>协助事项 ({realTasks.filter((task) => task.taskGroup === 'assist').length})</TabButton>
-                <TabButton
-                  active={todoTab === 'completed'}
-                  onClick={() => setTodoTab('completed')}
-                >
-                  已完成 ({completedTodos.length})
-                </TabButton>
               </div>
             </div>
           </div>
@@ -173,7 +164,7 @@ export const MyTasksView: React.FC = () => {
               ) : displayTodos.length === 0 ? (
                 <div className="text-center py-8 text-[var(--text-muted)] text-sm">
                   <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  {todoTab === 'completed' ? '暂无已完成事项' : '暂无相关工作'}
+                  暂无相关工作
                 </div>
               ) : (
                 displayTodos.map((task) => (
@@ -182,29 +173,17 @@ export const MyTasksView: React.FC = () => {
                     onClick={() => openPageTab(task.taskGroup === 'assist' ? 'wb_work_order' : task.targetPage)}
                     className="p-4 bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-hover)] border border-[var(--border-main)] rounded-lg cursor-pointer transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-[var(--text-primary)] mb-1 truncate">
-                          {task.title}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                          <span>{task.type === 'assistance' ? '协助事项' : '工作项'} · {task.sourceId}</span>
-                          <span>•</span>
-                          <span>负责人: {task.assigneeName || '未分配'}</span>
-                        </div>
-                      </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      {task.type === 'assistance' ? <Users className="w-4 h-4 shrink-0 text-[var(--primary)]" /> : <CheckSquare className="w-4 h-4 shrink-0 text-[var(--primary)]" />}
+                      <div className="font-medium text-sm text-[var(--text-primary)] truncate">{task.title}</div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 mb-2 text-xs text-[var(--text-muted)]">
+                      <span>负责人：{task.assigneeName || '未分配'}</span>
                       <StatusBadge status={task.status} />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1 text-[var(--text-muted)]">
-                        <Calendar className="w-3 h-3" />
-                        <span>截止: {task.dueDate || '未设置'}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[var(--text-muted)]">
-                        <span>进度 {Math.max(0, Math.min(100, Number(task.progress ?? 0)))}%</span>
-                        {task.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}
-                      <ArrowRight className="w-4 h-4 text-[var(--text-muted)]" />
-                      </div>
+                    <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                      <Calendar className="w-3 h-3" />
+                      <span>截止：{task.dueDate || '未设置'}</span>
                     </div>
                   </div>
                 ))
@@ -235,10 +214,10 @@ export const MyTasksView: React.FC = () => {
                   我申请的
                 </TabButton>
                 <TabButton
-                  active={approvalTab === 'approved'}
-                  onClick={() => setApprovalTab('approved')}
+                  active={approvalTab === 'cc_me'}
+                  onClick={() => setApprovalTab('cc_me')}
                 >
-                  已处理
+                  抄送我的
                 </TabButton>
               </div>
             </div>
@@ -258,21 +237,15 @@ export const MyTasksView: React.FC = () => {
                     onClick={() => openPageTab('approval_center')}
                     className="p-4 bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-hover)] border border-[var(--border-main)] rounded-lg cursor-pointer transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-[var(--text-primary)] mb-1 truncate">
-                          {approval.title}
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)]">
-                          申请人: {approval.applicantName}
-                        </div>
-                      </div>
+                    <div className="font-medium text-sm text-[var(--text-primary)] mb-2 truncate">{approval.title}</div>
+                    <div className="flex items-center justify-between gap-3 mb-2 text-xs text-[var(--text-muted)]">
+                      <span>申请人：{approval.applicantName}</span>
                       <StatusBadge status={approval.status} />
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1 text-[var(--text-muted)]">
                         <Clock className="w-3 h-3" />
-                        <span>{approval.createdAt}</span>
+                        <span>{approval.submittedAt}</span>
                       </div>
                       <ArrowRight className="w-4 h-4 text-[var(--text-muted)]" />
                     </div>
@@ -380,10 +353,10 @@ export const MyTasksView: React.FC = () => {
                   评价吐槽
                 </TabButton>
                 <TabButton
-                  active={feedTab === 'supervise'}
-                  onClick={() => setFeedTab('supervise')}
+                  active={feedTab === 'competitor'}
+                  onClick={() => setFeedTab('competitor')}
                 >
-                  督办事项
+                  友商动态
                 </TabButton>
               </div>
             </div>
