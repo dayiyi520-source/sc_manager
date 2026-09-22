@@ -113,7 +113,8 @@ const WorkOrderPicker: React.FC<{
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   placeholder?: string;
-}> = ({ candidates, selectedIds, onChange, placeholder = '选择关联事项' }) => {
+  onNavigate?: (item: RequirementWorkOrderCandidate) => void;
+}> = ({ candidates, selectedIds, onChange, placeholder = '选择关联事项', onNavigate }) => {
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [type, setType] = useState<RequirementWorkOrderType | 'all'>('all');
@@ -126,7 +127,7 @@ const WorkOrderPicker: React.FC<{
     <button type="button" onClick={() => setOpen((value) => !value)} className="flex h-9 w-full items-center justify-between rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 text-left text-[var(--text-body)] hover:border-[var(--primary)]">
       <span>{selected.length ? `已关联 ${selected.length} 条事项` : placeholder}</span><span className="text-[var(--text-muted)]">{open ? '收起' : '选择'}</span>
     </button>
-    {selected.length > 0 && <div className="flex flex-wrap gap-1.5">{selected.map((item) => <span key={item.id} className="inline-flex max-w-full items-center gap-1 rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]"><span className="max-w-48 truncate">{item.title}</span><button type="button" onClick={() => toggle(item.id)} aria-label={`移除${item.title}`}><X className="h-3 w-3" /></button></span>)}</div>}
+    {selected.length > 0 && <div className="flex flex-wrap gap-1.5">{selected.map((item) => <span key={item.id} className="inline-flex max-w-full items-center gap-1 rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]"><button type="button" className="max-w-48 truncate text-left text-[var(--primary)] hover:text-[var(--primary-hover)]" onClick={() => onNavigate?.(item)}>{item.title}</button><button type="button" onClick={() => toggle(item.id)} aria-label={`移除${item.title}`}><X className="h-3 w-3" /></button></span>)}</div>}
     {open && <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 shadow-sm">
       <div className="flex items-center gap-2"><input autoFocus value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索标题、编号、负责人" className="h-8 min-w-0 flex-1 rounded-md border border-[var(--border-main)] bg-transparent px-2 text-xs outline-none focus:border-[var(--primary)]" /><button type="button" onClick={() => setOpen(false)} className="text-xs text-[var(--text-muted)]">关闭</button></div>
       <div className="mt-3 flex flex-wrap gap-1.5">{[{ key: 'all' as const, label: '全部' }, ...WORK_ORDER_TYPES].map((item) => <button type="button" key={item.key} onClick={() => setType(item.key)} className={`rounded-md px-2 py-1 text-[11px] ${type === item.key ? 'bg-[var(--primary)] text-white' : 'bg-[var(--bg-surface-soft)] text-[var(--text-muted)]'}`}>{item.label} {item.key !== 'all' && <span>({safeCandidates.filter((candidate) => candidate.type === item.key).length})</span>}</button>)}</div>
@@ -598,6 +599,12 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     saveDetailUpdates({ sourceWorkOrderIds: ids, sourceWorkOrderTitles: titles });
   };
 
+  const navigateWorkOrderCandidate = (item: RequirementWorkOrderCandidate) => {
+    if (item.sourceType !== 'WORK_ORDER') return;
+    sessionStorage.setItem('shichuang.assistance.search', item.title);
+    openPageTab('wb_work_order');
+  };
+
   const saveDetailUpdates = (updates: Partial<RequirementTask>) => {
     if (!selectedTask) return;
     void updateTask(selectedTask.id, updates);
@@ -940,7 +947,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     customerId: item.customerId ? String(item.customerId) : fallback?.customerId,
     customerName: item.customerName ? String(item.customerName) : fallback?.customerName,
     requirementId: item.requirementId || undefined,
-    requirementTitle: item.requirementId ? fallback?.requirementTitle : fallback?.requirementTitle,
+    requirementTitle: item.requirementTitle || fallback?.requirementTitle,
+    requirementInitiatorName: item.requirementInitiatorName || fallback?.requirementInitiatorName,
     sourceType: (item as UnifiedWorkItem & { sourceType?: string }).sourceType || fallback?.sourceType,
     parentWorkItemId: item.parentWorkItemId || undefined,
     workItemTypeId: item.taskTypeId || undefined,
@@ -1556,7 +1564,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                       <div className="mt-2 text-xs text-[var(--text-muted)]">发起人：{selectedTask.requirementInitiatorName || '未知'}</div>
                       <div className="mt-1 text-xs text-[var(--text-muted)]">该关联由协助事项转任务时自动建立，不可修改或新增。</div>
                     </div>
-                  ) : <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={detailEditing ? updateLinkedWorkOrders : () => undefined} placeholder="选择关联事项" />}
+                  ) : <WorkOrderPicker candidates={candidateOptions} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={detailEditing ? updateLinkedWorkOrders : () => undefined} onNavigate={navigateWorkOrderCandidate} placeholder="选择关联事项" />}
                   {!relatedWorkItems.length && !(selectedTask.sourceWorkOrderIds || []).length && !(selectedTask.sourceType === 'WORK_ORDER' && selectedTask.requirementId) && <p className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">暂无关联对象</p>}
                 </div>
               ) : detailTab === 'children' ? (
@@ -1663,7 +1671,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         <Form layout="vertical" className="w-full" data-work-item-form>
           <Form.Item label={`${itemLabel}名称`} required><Input value={formTitle} onChange={(event) => setFormTitle(event.target.value)} placeholder="例如：支持达梦DM8数据库读写分离与主备秒级切换" /></Form.Item>
           <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} onBlur={() => { /* auto-save description */ }} placeholder="详细记录需求背景、业务场景和实现说明..." /></Form.Item>
-          <Form.Item label="关联对象"><WorkOrderPicker candidates={candidateOptions.filter((item) => item.id !== editingTask?.id)} selectedIds={[...selectedRequirementTaskIds, ...selectedWorkOrderIds]} onChange={(ids) => { const selectedId = ids.slice(-1)[0] || ''; const selectedItem = candidateOptions.find((item) => item.id === selectedId); setSelectedRequirementTaskIds(selectedItem?.type === 'requirement' ? [selectedId] : []); setSelectedWorkOrderIds(selectedItem && selectedItem.type !== 'requirement' ? [selectedId] : []); }} placeholder="请选择关联事项" /></Form.Item>
+          <Form.Item label="关联对象"><WorkOrderPicker candidates={candidateOptions.filter((item) => item.id !== editingTask?.id)} selectedIds={[...selectedRequirementTaskIds, ...selectedWorkOrderIds]} onChange={(ids) => { const selectedId = ids.slice(-1)[0] || ''; const selectedItem = candidateOptions.find((item) => item.id === selectedId); setSelectedRequirementTaskIds(selectedItem?.type === 'requirement' ? [selectedId] : []); setSelectedWorkOrderIds(selectedItem && selectedItem.type !== 'requirement' ? [selectedId] : []); }} onNavigate={navigateWorkOrderCandidate} placeholder="请选择关联事项" /></Form.Item>
         </Form>
       </WorkItemCreatePanel>
     </div>

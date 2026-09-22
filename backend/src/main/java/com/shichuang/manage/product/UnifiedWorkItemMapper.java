@@ -13,10 +13,10 @@ public class UnifiedWorkItemMapper {
 
     public UnifiedWorkItemMapper(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
-    static final String CORE = "SELECT w.id_ AS id, w.category_ AS category, 'core' AS source, w.code_ AS code, w.title_ AS title, w.product_line_id_ AS productLineId, w.version_id_ AS versionId, w.requirement_id_ AS requirementId, w.assignee_name_ AS assigneeName, w.status_name_ AS status, "
+    static final String CORE = "SELECT w.id_ AS id, w.category_ AS category, 'core' AS source, w.code_ AS code, w.title_ AS title, w.product_line_id_ AS productLineId, w.version_id_ AS versionId, w.requirement_id_ AS requirementId, r.title_ AS requirementTitle, COALESCE(r.creator_name_,ru.name_,r.create_by_) AS requirementInitiatorName, w.source_type_ AS sourceType, w.assignee_name_ AS assigneeName, w.status_name_ AS status, "
         + "w.priority_ AS priority, w.planned_end_date_ AS dueDate, w.estimated_hours_ AS estimatedHours, w.actual_hours_ AS actualHours, w.create_time_ AS createdAt, w.task_type_id_ AS taskTypeId, w.workflow_id_ AS workflowId, w.status_key_ AS statusKey, w.status_group_ AS statusGroup, w.status_color_ AS statusColor, w.successful_ AS successful, w.parent_work_item_id_ AS parentWorkItemId, w.assignee_id_ AS assigneeId, w.version_ AS revision, "
         + "EXISTS(SELECT 1 FROM t_product_work_item child WHERE child.tenant_id_=w.tenant_id_ AND child.product_line_id_=w.product_line_id_ AND child.parent_work_item_id_=w.id_ AND child.delete_flag_=0) AS hasChildren"
-        + " FROM t_product_work_item w WHERE w.tenant_id_=? AND w.product_line_id_=? AND w.delete_flag_=0";
+        + " FROM t_product_work_item w LEFT JOIN t_product_work_item r ON r.tenant_id_=w.tenant_id_ AND r.id_=w.requirement_id_ AND r.category_='requirement' AND r.delete_flag_=0 LEFT JOIN t_sys_user ru ON ru.tenant_id_=r.tenant_id_ AND ru.id_=r.create_by_ AND ru.delete_flag_=0 WHERE w.tenant_id_=? AND w.product_line_id_=? AND w.delete_flag_=0";
 
     public List<Map<String, Object>> byProductLine(String tenant, String lineId) {
         return jdbc.queryForList("SELECT * FROM (" + CORE + ") items ORDER BY createdAt DESC,category,id", tenant, lineId);

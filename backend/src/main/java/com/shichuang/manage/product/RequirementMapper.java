@@ -124,7 +124,7 @@ public class RequirementMapper {
     List<Map<String,Object>> workOrderCandidates(String tenantId,String keyword,String type,String requirementId,int limit) {
         String like="%"+keyword+"%";
         return jdbc.queryForList("""
-            SELECT w.id_ AS id,CASE WHEN w.category_='bug' THEN 'bug' WHEN w.category_='requirement' THEN 'requirement' ELSE 'task' END AS type,
+            SELECT w.id_ AS id,CASE WHEN w.category_='bug' THEN 'bug' WHEN w.category_='requirement' THEN 'requirement' ELSE 'task' END AS type,w.source_type_ AS sourceType,
               CASE w.category_ WHEN 'requirement' THEN '需求' WHEN 'bug' THEN '缺陷' WHEN 'design' THEN '设计任务' WHEN 'dev' THEN '研发任务' ELSE '测试任务' END AS typeLabel,
               w.title_ AS title,w.code_ AS code,w.assignee_name_ AS ownerName,p.name_ AS productLineName,w.status_name_ AS status,w.description_ AS summary
             FROM t_product_work_item w JOIN t_product_line p ON p.id_=w.product_line_id_ AND p.tenant_id_=w.tenant_id_ AND p.delete_flag_=0

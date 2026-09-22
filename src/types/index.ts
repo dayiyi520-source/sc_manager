@@ -559,6 +559,7 @@ export interface RequirementWorkOrderCandidate {
   productLineName?: string;
   status?: string;
   summary?: string;
+  sourceType?: string;
 }
 
 export interface RequirementTaskDraft {

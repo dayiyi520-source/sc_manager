@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 /** Read contract: absent stable type/workflow IDs remain null rather than invented. */
 public record UnifiedWorkItem(
     String key, String id, String category, String source, String code, String title,
-    String productLineId, String versionId, String requirementId, String assigneeName,
+    String productLineId, String versionId, String requirementId, String requirementTitle, String requirementInitiatorName, String sourceType, String assigneeName,
     String taskTypeId, String workflowId, String statusKey, WorkItemStatus status, String statusColor,
     String priority, String originalPriority, LocalDate plannedEndDate,
     BigDecimal estimatedHours, BigDecimal actualHours, LocalDateTime createdAt,
