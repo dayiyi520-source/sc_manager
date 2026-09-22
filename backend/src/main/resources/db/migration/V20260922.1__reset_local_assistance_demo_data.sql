@@ -1,14 +1,14 @@
 -- Local acceptance data only: replace the legacy rows rendered as "历史事项"
 -- with five assistance types and a spread of workflow states.
 CREATE TEMPORARY TABLE local_historical_assistance (
-  tenant_id_ VARCHAR(64) NOT NULL,
-  id_ VARCHAR(64) NOT NULL,
+  tenant_id_ VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  id_ VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   PRIMARY KEY (tenant_id_, id_)
 );
 
 CREATE TEMPORARY TABLE local_historical_assistance_item (
-  tenant_id_ VARCHAR(64) NOT NULL,
-  id_ VARCHAR(64) NOT NULL,
+  tenant_id_ VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  id_ VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   PRIMARY KEY (tenant_id_, id_)
 );
 
@@ -46,7 +46,8 @@ JOIN local_historical_assistance historical
 
 UPDATE t_product_attachment_resource attachment
 JOIN local_historical_assistance_item historical
-  ON historical.tenant_id_ = attachment.tenant_id_ AND historical.id_ = attachment.subject_id_
+  ON historical.tenant_id_ = attachment.tenant_id_ COLLATE utf8mb4_0900_ai_ci
+  AND historical.id_ = attachment.subject_id_ COLLATE utf8mb4_0900_ai_ci
 SET attachment.delete_flag_ = 1;
 
 UPDATE t_product_work_item child
@@ -68,15 +69,15 @@ SET item.delete_flag_ = 1,
     item.version_ = item.version_ + 1;
 
 CREATE TEMPORARY TABLE local_assistance_seed (
-  seed_key_ VARCHAR(64) NOT NULL,
-  type_name_ VARCHAR(64) NOT NULL,
-  title_ VARCHAR(255) NOT NULL,
+  seed_key_ VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  type_name_ VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  title_ VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   description_ TEXT NOT NULL,
-  priority_ VARCHAR(16) NOT NULL,
-  status_key_ VARCHAR(64) NOT NULL,
-  status_name_ VARCHAR(32) NOT NULL,
-  status_group_ VARCHAR(32) NOT NULL,
-  status_color_ VARCHAR(32) NOT NULL,
+  priority_ VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  status_key_ VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  status_name_ VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  status_group_ VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  status_color_ VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   successful_ TINYINT NOT NULL,
   age_days_ INT NOT NULL,
   PRIMARY KEY (seed_key_)
