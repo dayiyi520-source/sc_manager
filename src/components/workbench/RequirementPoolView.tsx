@@ -615,10 +615,13 @@ export const RequirementPoolView: React.FC = () => {
     setCloseSubmitting(true);
     try {
       await requirementRepository.closeByOwner(selected.id, selected.revision ?? selected.version ?? 0);
-      const next = { ...selected, status: "已关闭" as RequirementTask["status"] };
+      const detail = await requirementRepository.detail(selected.id);
+      const next = { ...selected, ...detail, status: "已关闭" as RequirementTask["status"] };
       setSelected(next);
+      setEvents(Array.isArray(detail.events) ? detail.events : []);
+      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
       setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
-      addToast("success", "事项已关闭", "当前负责人确认完成闭环");
+      addToast("success", "协助已结束", "发起人已确认完成闭环");
     } catch (error) {
       addToast("error", "事项关闭失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally { setCloseSubmitting(false); }
@@ -1029,14 +1032,14 @@ export const RequirementPoolView: React.FC = () => {
                     验收未通过
                   </button>
                 )}
-                {selected.status === "待负责人关闭" && samePerson(selected.ownerName, currentUser.name) && (
+                {selected.status === "待负责人关闭" && samePerson(selected.creatorName, currentUser.name) && (
                   <button
                     type="button"
                     onClick={closeAssistance}
                     disabled={closeSubmitting}
                     className="h-9 px-3 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {closeSubmitting ? "关闭中…" : "确认关闭事项"}
+                    {closeSubmitting ? "结束中…" : "确认结束协助"}
                   </button>
                 )}
                 <button

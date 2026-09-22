@@ -43,14 +43,35 @@ public class RequirementMapper {
 
     List<Map<String,Object>> events(String tenantId,String id,String eventType,String operatorName) {
         return jdbc.queryForList("""
-            SELECT a.id_ AS id,a.event_type_ AS eventType,
-              COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.fromStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.from')),'') AS fromStatus,
-              COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.toStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.to')),'') AS toStatus,
-              COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.reason')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.content')),'') AS reason,
-              COALESCE(u.name_,a.create_by_) AS operatorName,a.content_ AS metadata,a.create_time_ AS createdAt
-            FROM t_product_work_item_activity a LEFT JOIN t_sys_user u ON u.id_=a.create_by_ AND u.tenant_id_=a.tenant_id_
-            WHERE a.subject_id_=? AND a.tenant_id_=? AND (?='' OR a.event_type_=?) AND (?='' OR COALESCE(u.name_,a.create_by_)=?) ORDER BY a.create_time_
-            """,id,tenantId,eventType,eventType,operatorName,operatorName);
+            SELECT e.id,e.eventType,e.fromStatus,e.toStatus,e.reason,e.operatorName,e.metadata,e.createdAt
+            FROM (
+              SELECT a.id_ AS id,CASE a.event_type_ WHEN 'WORK_ITEM_CREATED' THEN '任务创建' WHEN 'WORK_ITEM_UPDATED' THEN '任务更新' WHEN 'WORK_ITEM_TRANSITIONED' THEN '任务状态流转' ELSE a.event_type_ END AS eventType,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.fromStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.from')),'') AS fromStatus,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.toStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.to')),'') AS toStatus,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.reason')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.content')),'') AS reason,
+                COALESCE(u.name_,a.create_by_) AS operatorName,a.content_ AS metadata,a.create_time_ AS createdAt
+              FROM t_product_work_item_activity a
+              LEFT JOIN t_sys_user u ON u.id_=a.create_by_ AND u.tenant_id_=a.tenant_id_
+              WHERE a.subject_id_=? AND a.tenant_id_=?
+              UNION ALL
+              SELECT a.id_ AS id,CASE a.event_type_ WHEN 'WORK_ITEM_CREATED' THEN '任务创建' WHEN 'WORK_ITEM_UPDATED' THEN '任务更新' WHEN 'WORK_ITEM_TRANSITIONED' THEN '任务状态流转' ELSE a.event_type_ END AS eventType,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.fromStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.from')),'') AS fromStatus,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.toStatus')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.to')),'') AS toStatus,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.reason')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.content')),'') AS reason,
+                COALESCE(u.name_,a.create_by_) AS operatorName,
+                JSON_MERGE_PATCH(COALESCE(CAST(a.content_ AS JSON),JSON_OBJECT()), JSON_OBJECT(
+                  'taskId',w.id_,'taskTitle',w.title_,'taskType',w.work_order_type_,
+                  'targetPage',CASE w.category_ WHEN 'design' THEN 'prod_design_tasks' WHEN 'dev' THEN 'prod_rd_tasks' WHEN 'bug' THEN 'prod_bugs' ELSE 'prod_req_tasks' END,
+                  'assigneeName',w.assignee_name_)) AS metadata,
+                a.create_time_ AS createdAt
+              FROM t_product_work_item_activity a
+              JOIN t_product_work_item w ON w.id_=a.subject_id_ AND w.tenant_id_=a.tenant_id_ AND w.requirement_id_=? AND w.source_type_='WORK_ORDER' AND w.delete_flag_=0
+              LEFT JOIN t_sys_user u ON u.id_=a.create_by_ AND u.tenant_id_=a.tenant_id_
+              WHERE a.tenant_id_=?
+            ) e
+            WHERE (?='' OR e.eventType=?) AND (?='' OR e.operatorName=?)
+            ORDER BY e.createdAt,e.id
+            """,id,tenantId,id,tenantId,eventType,eventType,operatorName,operatorName);
     }
 
     long auditCount(String tenantId,String requirementId,String eventType,String operatorName,LocalDateTime from,LocalDateTime to) {
