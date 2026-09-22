@@ -58,7 +58,7 @@ public class WorkItemStorageMapper {
     public boolean childAllowed(String tenant,String line,String parent,String child) {
         return one("SELECT id_ FROM t_product_work_item_child_rule WHERE tenant_id_=? AND product_line_id_=? AND parent_type_id_=? AND child_type_id_=? AND enabled_=1 AND delete_flag_=0",tenant,line,parent,child) != null;
     }
-    private static final String ITEM = "SELECT w.id_ AS id,w.code_ AS code,w.product_line_id_ AS productLineId,w.category_ AS category,w.task_type_id_ AS taskTypeId,w.title_ AS title,w.description_ AS description,w.description_html_ AS descriptionHtml,w.expected_goal_ AS expectedGoal,w.version_id_ AS versionId,w.requirement_id_ AS requirementId,w.customer_id_ AS customerId,w.customer_name_ AS customerName,w.cc_names_ AS ccNames,w.media_ AS media,w.parent_work_item_id_ AS parentWorkItemId,w.workflow_id_ AS workflowId,w.status_key_ AS statusKey,w.status_name_ AS statusName,w.status_group_ AS statusGroup,w.status_color_ AS statusColor,w.successful_ AS successful,w.assignee_id_ AS assigneeId,w.assignee_name_ AS assigneeName,w.priority_ AS priority,w.planned_start_date_ AS plannedStartDate,w.planned_end_date_ AS plannedEndDate,w.estimated_hours_ AS estimatedHours,w.actual_hours_ AS actualHours,w.assistance_blocks_closure_ AS blocksClosure,w.assistance_task_status_ AS assistanceTaskStatus,w.source_type_ AS sourceType,w.version_ AS revision,w.create_time_ AS createdAt,EXISTS(SELECT 1 FROM t_product_work_item child WHERE child.tenant_id_=w.tenant_id_ AND child.product_line_id_=w.product_line_id_ AND child.parent_work_item_id_=w.id_ AND child.delete_flag_=0) AS hasChildren FROM t_product_work_item w WHERE w.tenant_id_=? AND w.product_line_id_=? AND w.delete_flag_=0";
+    private static final String ITEM = "SELECT w.id_ AS id,w.code_ AS code,w.product_line_id_ AS productLineId,w.category_ AS category,w.task_type_id_ AS taskTypeId,w.title_ AS title,w.description_ AS description,w.description_html_ AS descriptionHtml,w.expected_goal_ AS expectedGoal,w.version_id_ AS versionId,w.requirement_id_ AS requirementId,w.customer_id_ AS customerId,w.customer_name_ AS customerName,w.cc_names_ AS ccNames,w.media_ AS media,w.parent_work_item_id_ AS parentWorkItemId,w.workflow_id_ AS workflowId,w.status_key_ AS statusKey,w.status_name_ AS statusName,w.status_group_ AS statusGroup,w.status_color_ AS statusColor,w.successful_ AS successful,w.progress_ AS progress,w.assignee_id_ AS assigneeId,w.assignee_name_ AS assigneeName,w.priority_ AS priority,w.planned_start_date_ AS plannedStartDate,w.planned_end_date_ AS plannedEndDate,w.planned_end_date_ < CURRENT_DATE AND w.successful_=0 AND w.status_group_ NOT IN ('CANCELLED') AS overdueRisk,w.estimated_hours_ AS estimatedHours,w.actual_hours_ AS actualHours,w.assistance_blocks_closure_ AS blocksClosure,w.assistance_task_status_ AS assistanceTaskStatus,w.source_type_ AS sourceType,w.version_ AS revision,w.create_time_ AS createdAt,EXISTS(SELECT 1 FROM t_product_work_item child WHERE child.tenant_id_=w.tenant_id_ AND child.product_line_id_=w.product_line_id_ AND child.parent_work_item_id_=w.id_ AND child.delete_flag_=0) AS hasChildren FROM t_product_work_item w WHERE w.tenant_id_=? AND w.product_line_id_=? AND w.delete_flag_=0";
     public Map<String,Object> item(String tenant,String line,String id) { return one(ITEM+" AND id_=?",tenant,line,id); }
     public Map<String,Object> timedItem(String tenant,String line,String id) {
         Map<String,Object> item = item(tenant,line,id);
@@ -84,12 +84,16 @@ public class WorkItemStorageMapper {
     public int transition(String tenant,String line,String id,int revision,String from,WorkItemDefinition.State to,String user) {
         boolean terminal=to.group()==WorkItemStatus.Group.COMPLETED || to.group()==WorkItemStatus.Group.CANCELLED;
         return jdbc.update("""
-            UPDATE t_product_work_item SET status_key_=?,status_name_=?,status_group_=?,status_color_=?,successful_=?,
+            UPDATE t_product_work_item SET status_key_=?,status_name_=?,status_group_=?,status_color_=?,successful_=?,progress_=CASE WHEN ? THEN 100 ELSE progress_ END,
               actual_start_at_=CASE WHEN ?='IN_PROGRESS' THEN COALESCE(actual_start_at_,NOW(6)) ELSE actual_start_at_ END,
               completed_at_=CASE WHEN ? THEN NOW(6) ELSE NULL END,
               version_=version_+1,update_by_=?,update_time_=NOW(6)
             WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND status_key_=? AND delete_flag_=0
-            """,to.key(),to.name(),to.group().name(),to.color(),to.successful(),to.group().name(),terminal,user,tenant,line,id,revision,from);
+            """,to.key(),to.name(),to.group().name(),to.color(),to.successful(),terminal,to.group().name(),terminal,user,tenant,line,id,revision,from);
+    }
+
+    public int updateProgress(String tenant,String line,String id,int revision,int progress,String user) {
+        return jdbc.update("UPDATE t_product_work_item SET progress_=CASE WHEN successful_=1 THEN 100 ELSE ? END,version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND delete_flag_=0",progress,user,tenant,line,id,revision);
     }
     public Map<String,Object> request(String tenant,String line,String requestId) {
         return one("SELECT id_ AS id,request_hash_ AS requestHash,create_by_ AS creatorId FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND request_id_=? AND delete_flag_=0",tenant,line,requestId);

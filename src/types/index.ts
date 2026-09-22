@@ -524,6 +524,7 @@ export interface RequirementTask {
   statusKey?: string;
   statusColor?: string;
   dueDate: string;
+  progress?: number;
   createdAt?: string;
   todoList?: { id: string; text: string; done: boolean }[];
   category?: 'my_responsible' | 'my_dept' | 'assigned_to_me' | 'other_dept' | 'requirement' | 'design' | 'dev' | 'test' | 'bug' | 'case';
@@ -629,6 +630,10 @@ export interface RequirementWorkItem {
   createdAt?: string;
   blocksClosure?: boolean | number;
   assistanceTaskStatus?: string;
+  progress?: number;
+  revision?: number;
+  overdueRisk?: boolean;
+  dueDate?: string;
 }
 
 export interface DepartmentOption {

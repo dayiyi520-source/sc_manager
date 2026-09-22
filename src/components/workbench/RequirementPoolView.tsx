@@ -105,10 +105,10 @@ const normalizeMedia = (value: unknown): RequirementMedia[] => {
 const samePerson = (value: string | undefined, currentUserName: string) =>
   Boolean(value?.trim()) && value.trim().toLocaleLowerCase() === currentUserName.trim().toLocaleLowerCase();
 
-const eventMetadata = (value: unknown): Record<string, string> => {
-  if (value && typeof value === "object") return value as Record<string, string>;
+const eventMetadata = (value: unknown): Record<string, unknown> => {
+  if (value && typeof value === "object") return value as Record<string, unknown>;
   if (typeof value !== "string") return {};
-  try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed : {}; } catch { return {}; }
+  try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {}; } catch { return {}; }
 };
 
 const FlowAttachmentPicker: React.FC<{ media: RequirementMedia[]; onChange: React.Dispatch<React.SetStateAction<RequirementMedia[]>>; onPick: (event: React.ChangeEvent<HTMLInputElement>) => void }> = ({ media, onChange, onPick }) => (
@@ -268,6 +268,12 @@ export const RequirementPoolView: React.FC = () => {
   const [acceptanceReason, setAcceptanceReason] = useState("");
   const [acceptanceSubmitting, setAcceptanceSubmitting] = useState(false);
   const [rejectCategory, setRejectCategory] = useState("");
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const [reopenProgress, setReopenProgress] = useState(0);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenSubmitting, setReopenSubmitting] = useState(false);
+  const [progressDrafts, setProgressDrafts] = useState<Record<string, number>>({});
+  const [progressSubmitting, setProgressSubmitting] = useState<string | null>(null);
   const editor = useRef<HTMLDivElement>(null);
 
   const currentWorkOrderType = selected?.workOrderType || selected?.taskType || selected?.requirementType || "通用/其他";
@@ -429,10 +435,13 @@ export const RequirementPoolView: React.FC = () => {
       const detail = await requirementRepository.detail(item.id);
       setSelected((current) => ({ ...(current || item), ...normalizeRequirementTask(detail), media: normalizeMedia(detail.media ?? current?.media ?? item.media) }));
       setEvents(Array.isArray(detail.events) ? detail.events : []);
-      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+      const nextWorkItems = Array.isArray(detail.workItems) ? detail.workItems : [];
+      setWorkItems(nextWorkItems);
+      setProgressDrafts(Object.fromEntries(nextWorkItems.map((workItem) => [workItem.id, workItem.progress ?? 0])));
     } catch {
       setEvents(Array.isArray(item.events) ? item.events : []);
       setWorkItems([]);
+      setProgressDrafts({});
     }
   };
   const handleWorkflowSubmit = async (event: React.FormEvent) => {
@@ -625,6 +634,48 @@ export const RequirementPoolView: React.FC = () => {
     } catch (error) {
       addToast("error", "事项关闭失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally { setCloseSubmitting(false); }
+  };
+  const submitReopen = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selected) return;
+    setReopenSubmitting(true);
+    try {
+      const result = await requirementRepository.reopen(selected.id, {
+        progress: Math.max(0, Math.min(100, Number(reopenProgress))),
+        reason: reopenReason.trim(),
+        revision: selected.revision ?? selected.version ?? 0,
+      });
+      const detail = await requirementRepository.detail(selected.id);
+      const next = { ...selected, ...detail, status: result.status as RequirementTask["status"], progress: result.progress, revision: result.revision };
+      setSelected(next);
+      setRequirementTasks((list) => list.map((item) => (item.id === next.id ? next : item)));
+      setEvents(Array.isArray(detail.events) ? detail.events : []);
+      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+      setReopenModalOpen(false);
+      setReopenReason("");
+      addToast("success", "事项已重新开启", "事项状态已恢复为处理中");
+    } catch (error) {
+      addToast("error", "事项重开失败", error instanceof Error ? error.message : "请刷新后重试");
+    } finally {
+      setReopenSubmitting(false);
+    }
+  };
+  const submitWorkItemProgress = async (item: RequirementWorkItem) => {
+    const progress = Math.max(0, Math.min(100, Number(progressDrafts[item.id] ?? item.progress ?? 0)));
+    setProgressSubmitting(item.id);
+    try {
+      await requirementRepository.updateWorkItemProgress(item.id, progress, item.revision);
+      const detail = await requirementRepository.detail(selected?.id || item.requirementId);
+      setSelected((current) => current ? { ...current, ...detail } : current);
+      setEvents(Array.isArray(detail.events) ? detail.events : []);
+      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+      setRequirementTasks((list) => list.map((entry) => entry.id === detail.id ? { ...entry, ...detail } : entry));
+      addToast("success", "任务进度已更新", `当前进度 ${progress}%`);
+    } catch (error) {
+      addToast("error", "任务进度更新失败", error instanceof Error ? error.message : "请刷新后重试");
+    } finally {
+      setProgressSubmitting(null);
+    }
   };
   const submitAcceptanceFailed = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -1042,6 +1093,15 @@ export const RequirementPoolView: React.FC = () => {
                     {closeSubmitting ? "结束中…" : "确认结束协助"}
                   </button>
                 )}
+                {["已关闭", "已完成"].includes(selected.status) && samePerson(selected.creatorName, currentUser.name) && (
+                  <button
+                    type="button"
+                    onClick={() => { setReopenProgress(0); setReopenReason(""); setReopenModalOpen(true); }}
+                    className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]"
+                  >
+                    重新开启
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
@@ -1152,8 +1212,34 @@ export const RequirementPoolView: React.FC = () => {
             </div>
           </div>
           <div className={`space-y-5 text-sm ${detailTab === "info" ? "hidden" : ""}`}>
-            <section><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项全历程</h3>{events.length ? <div className="space-y-3">{events.map((item) => { const meta = eventMetadata(item.metadata); const targetPage = meta.targetPage; return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3"><div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{item.createdAt?.slice(0, 16)}</span></div><div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{item.operatorName || "未知"} · 指派负责人：{meta.assigneeName || "未指派"}</div>{item.reason && <p className="mt-2 text-xs">{item.reason}</p>} {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => targetPage && openPageTab(targetPage as Parameters<typeof openPageTab>[0])}>{meta.taskType} · {meta.taskTitle || "关联任务"} <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></button></>}</div>; })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无事项流转记录</p>}</section>
-            <section><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">下游任务进度</h3>{workItems.length ? <div className="space-y-2">{workItems.map((item) => { const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"; const accepted = item.assistanceTaskStatus === "ACCEPTED"; return <div key={item.id} className="flex items-center justify-between gap-3 border-b border-[var(--border-main)] py-2 text-xs"><span className="min-w-0 truncate">{item.taskType} · {item.title} · {item.assigneeName}</span><span className="flex shrink-0 items-center gap-2"><StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{done && !accepted && samePerson(selected.creatorName, currentUser.name) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>; })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无解决过程记录</p>}</section>
+            <section>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项全历程</h3>
+              {events.length ? <div className="space-y-3">{events.map((item) => {
+                const meta = eventMetadata(item.metadata);
+                const targetPage = typeof meta.targetPage === "string" ? meta.targetPage : "";
+                const progress = typeof meta.progress === "number" || typeof meta.progress === "string" ? Number(meta.progress) : null;
+                return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3">
+                  <div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{item.createdAt?.slice(0, 16)}</span></div>
+                  <div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{item.operatorName || "未知"} · 指派负责人：{String(meta.assigneeName || "未指派")}</div>
+                  {item.reason && <p className="mt-2 text-xs">{item.reason}</p>}
+                  {progress !== null && <div className="mt-2 text-xs text-[var(--text-muted)]">任务进度：{Math.max(0, Math.min(100, progress))}%{meta.overdueRisk === true && <span className="ml-2 text-[var(--danger)]">已逾期</span>}</div>}
+                  {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => targetPage && openPageTab(targetPage as Parameters<typeof openPageTab>[0])}>{String(meta.taskType)} · {String(meta.taskTitle || "关联任务")} <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></button></>}
+                </div>;
+              })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无事项流转记录</p>}
+            </section>
+            <section>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">下游任务进度</h3>
+              {workItems.length ? <div className="space-y-2">{workItems.map((item) => {
+                const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED";
+                const accepted = item.assistanceTaskStatus === "ACCEPTED";
+                const draft = progressDrafts[item.id] ?? item.progress ?? 0;
+                const canEdit = samePerson(item.assigneeName, currentUser.name) || samePerson(selected.creatorName, currentUser.name);
+                return <div key={item.id} className="space-y-2 border-b border-[var(--border-main)] py-2 text-xs">
+                  <div className="flex items-center justify-between gap-3"><span className="min-w-0 truncate">{item.taskType} · {item.title} · {item.assigneeName}</span><span className="flex shrink-0 items-center gap-2"><StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && samePerson(selected.creatorName, currentUser.name) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>
+                  <div className="flex items-center gap-2"><span className="text-[var(--text-muted)]">进度 {Math.max(0, Math.min(100, Number(item.progress ?? 0)))}%</span><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bg-main)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${Math.max(0, Math.min(100, Number(item.progress ?? 0)))}%` }} /></div>{canEdit && <><InputNumber min={0} max={100} size="small" value={draft} onChange={(value) => setProgressDrafts((current) => ({ ...current, [item.id]: Number(value ?? 0) }))} /><button type="button" disabled={progressSubmitting === item.id} onClick={() => submitWorkItemProgress(item)} className="text-[var(--active-text)] hover:text-[var(--primary-hover)] disabled:opacity-50">{progressSubmitting === item.id ? "保存中…" : "保存"}</button></>}</div>
+                </div>;
+              })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无解决过程记录</p>}
+            </section>
           </div>
         </Drawer>
       )}
@@ -1350,6 +1436,27 @@ export const RequirementPoolView: React.FC = () => {
           <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3">
             <button type="button" onClick={() => setAcceptanceModalOpen(false)} disabled={acceptanceSubmitting} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]">取消</button>
             <button type="submit" disabled={acceptanceSubmitting} className="h-9 px-4 rounded-lg bg-[var(--danger)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{acceptanceSubmitting ? "提交中…" : "确认退回"}</button>
+          </div>
+        </form>
+      </Modal>
+      <Modal
+        isOpen={reopenModalOpen}
+        onClose={() => { if (!reopenSubmitting) setReopenModalOpen(false); }}
+        title="重新开启事项"
+      >
+        <form onSubmit={submitReopen} className="work-order-dialog space-y-4">
+          <p className="text-xs text-[var(--text-muted)]">历史事项将恢复为处理中，并保留原有历程记录。</p>
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+            当前进度
+            <InputNumber className="w-full" min={0} max={100} value={reopenProgress} onChange={(value) => setReopenProgress(Number(value ?? 0))} addonAfter="%" />
+          </label>
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+            重开原因
+            <Input.TextArea value={reopenReason} onChange={(event) => setReopenReason(event.target.value)} rows={4} placeholder="请输入重新开启原因" />
+          </label>
+          <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3">
+            <button type="button" onClick={() => setReopenModalOpen(false)} disabled={reopenSubmitting} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)] disabled:opacity-50">取消</button>
+            <button type="submit" disabled={reopenSubmitting} className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{reopenSubmitting ? "提交中…" : "确认重开"}</button>
           </div>
         </form>
       </Modal>

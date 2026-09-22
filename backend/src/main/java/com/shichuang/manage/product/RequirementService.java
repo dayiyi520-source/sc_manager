@@ -173,6 +173,25 @@ public class RequirementService {
     public PageResult<Map<String,Object>> syncStatus(int page,int pageSize,String taskType,String syncStatus){AuthorizationService.requireRead("product");int current=Math.max(1,page),size=Math.min(100,Math.max(1,pageSize));if(!safe(syncStatus).isBlank()&&!"SUCCESS".equalsIgnoreCase(syncStatus))return new PageResult<>(List.of(),current,size,0);return new PageResult<>(workOrders.syncStatus(RequestContext.tenantId(),safe(taskType),"SUCCESS",size,(current-1)*size),current,size,workOrders.syncStatusCount(RequestContext.tenantId(),safe(taskType),"SUCCESS"));}
 
     @Transactional public void updateWorkItemStatus(String id,Map<String,Object> body){AuthorizationService.requireWrite("product");workOrders.updateStatus(RequestContext.tenantId(),id,text(body,"status"),RequestContext.userId());mapper.refreshAssistanceTask(RequestContext.tenantId(), id);}
+    @Transactional public Map<String,Object> updateWorkItemProgress(String id,Map<String,Object> body){
+        AuthorizationService.requireWrite("product"); int progress=((Number)body.getOrDefault("progress",-1)).intValue();
+        if(progress<0||progress>100) throw new IllegalArgumentException("进度必须为0至100");
+        Map<String,Object> item=workOrders.find(RequestContext.tenantId(),id); int revision=((Number)body.getOrDefault("revision",item.get("revision"))).intValue();
+        if(isTerminal(item)) throw new IllegalArgumentException("已完成或已取消的任务不能更新进度");
+        if(!isParticipant(item, RequestContext.userId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅任务参与者可以更新进度");
+        int previous=((Number)item.getOrDefault("progress",0)).intValue();
+        if(storage.updateProgress(RequestContext.tenantId(),String.valueOf(item.get("productLineId")),id,revision,progress,RequestContext.userId())!=1) throw conflict();
+        try {
+            storage.activity(RequestContext.tenantId(),String.valueOf(item.get("productLineId")),id,"WORK_ITEM_PROGRESS_UPDATED",objectMapper.writeValueAsString(Map.of("fromProgress",previous,"toProgress",progress,"reason",text(body,"reason"))),RequestContext.userId());
+        } catch (Exception error) {
+            throw new IllegalArgumentException("进度记录格式无效", error);
+        }
+        return Map.of("id",id,"progress",progress,"revision",revision+1);
+    }
+    public List<Map<String,Object>> myTasks(){
+        AuthorizationService.requireRead("product"); String user=RequestContext.userId();
+        return mapper.myTasks(RequestContext.tenantId(),user);
+    }
     @Transactional public Map<String,Object> acceptAssistanceTask(String assistanceId, String workItemId) {
         AuthorizationService.requireWrite("product");
         Map<String,Object> assistance = mapper.assistance(RequestContext.tenantId(), assistanceId);
@@ -189,6 +208,16 @@ public class RequirementService {
     private static void requireRevision(Map<String,Object> current,Map<String,Object> body){Object value=body.get("revision");if(!(value instanceof Number revision))throw new IllegalArgumentException("请提交工单当前版本号");if(revision.intValue()!=((Number)current.get("revision")).intValue())throw conflict();}
     private static void rejectTerminal(Map<String,Object> current){if(Set.of("已完成","已取消","已驳回").contains(Objects.toString(current.get("status"),"")))throw new ResponseStatusException(HttpStatus.CONFLICT,"当前工单已结束，不能继续操作");}
     private static ResponseStatusException conflict(){return new ResponseStatusException(HttpStatus.CONFLICT,"工单已变化，请刷新后重试");}
+    private static boolean isTerminal(Map<String,Object> item){
+        return Boolean.TRUE.equals(item.get("successful")) || Integer.valueOf(1).equals(item.get("successful"))
+            || Set.of("COMPLETED","CANCELLED").contains(Objects.toString(item.get("statusGroup"),""))
+            || Set.of("已完成","已关闭","已取消").contains(Objects.toString(item.get("status"),""));
+    }
+    private static boolean isParticipant(Map<String,Object> item,String userId){
+        return Set.of("assigneeId","creatorId","assistanceOwnerId","assistanceInitiatorId").stream()
+            .map(item::get).map(value -> Objects.toString(value,""))
+            .anyMatch(userId::equals);
+    }
     private void executeStatus(Map<String,Object> current,String target,String reason){if(target.isBlank())throw new IllegalArgumentException("请选择目标状态");WorkItemTransitionService.Actions available=transitions.available(String.valueOf(current.get("productLineId")),String.valueOf(current.get("id")));WorkItemTransitionService.Action action=available.actions().stream().filter(value->value.to().equals(target)||value.name().equals(target)||available.statuses().stream().anyMatch(status->status.key().equals(value.to())&&status.name().equals(target))).findFirst().orElseThrow(()->new IllegalArgumentException("当前流程不允许流转到该状态"));transitions.execute(String.valueOf(current.get("productLineId")),String.valueOf(current.get("id")),new WorkItemDefinition.Transition(action.edgeKey(),available.revision(),reason));}
     private void event(String id,String type,String from,String to,String reason,Map<String,Object> metadata){try{mapper.event(RequestContext.tenantId(),id,type,from,to,reason,RequestContext.operatorName(),RequestContext.userId(),objectMapper.writeValueAsString(metadata));}catch(Exception error){throw new IllegalArgumentException("流转记录格式无效",error);}}
     private static String targetPage(String category){return switch(category){case "design"->"prod_design_tasks";case "dev"->"prod_rd_tasks";case "bug"->"prod_bugs";default->"prod_req_tasks";};}

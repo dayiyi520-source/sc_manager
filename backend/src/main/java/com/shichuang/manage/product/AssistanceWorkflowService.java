@@ -91,9 +91,21 @@ public class AssistanceWorkflowService {
         if (((Number) row.get("revision")).intValue() != revision) throw conflict();
         Number pending = jdbc.queryForObject("SELECT COUNT(*) FROM t_product_assistance_reassignment WHERE tenant_id_=? AND assistance_id_=? AND status_='PENDING' AND delete_flag_=0", Number.class, RequestContext.tenantId(), assistanceId);
         if (pending != null && pending.intValue() > 0) throw new IllegalArgumentException("存在待接收转派，请先完成责任交接");
-        if (jdbc.update("UPDATE t_product_work_item SET assistance_status_='已关闭',status_name_='已完成',version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=? AND assistance_status_='待负责人关闭'", RequestContext.userId(), RequestContext.tenantId(), assistanceId, revision) != 1) throw conflict();
+        if (jdbc.update("UPDATE t_product_work_item SET assistance_status_='已关闭',status_name_='已完成',successful_=1,progress_=100,version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=? AND assistance_status_='待负责人关闭'", RequestContext.userId(), RequestContext.tenantId(), assistanceId, revision) != 1) throw conflict();
         event(assistanceId, "发起人关闭", "待负责人关闭", "已关闭", "发起人确认事项闭环");
         return Map.of("id", assistanceId, "status", "已关闭");
+    }
+
+    @Transactional Map<String,Object> reopen(String assistanceId,int progress,int revision,String reason) {
+        AuthorizationService.requireWrite("product");
+        if(progress<0||progress>100) throw new IllegalArgumentException("当前进度必须为0至100");
+        Map<String,Object> row=jdbc.queryForMap("SELECT COALESCE(assistance_initiator_id_,create_by_) AS initiatorId,assistance_status_ AS status,version_ AS revision FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0",RequestContext.tenantId(),assistanceId);
+        if(!RequestContext.userId().equals(Objects.toString(row.get("initiatorId"),""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅事项发起人可以重新开启");
+        if(!Set.of("已关闭","已完成").contains(Objects.toString(row.get("status"),""))) throw new IllegalArgumentException("仅已完成事项可以重新开启");
+        if(((Number)row.get("revision")).intValue()!=revision) throw conflict();
+        if(jdbc.update("UPDATE t_product_work_item SET assistance_status_='处理中',status_name_='处理中',status_group_='IN_PROGRESS',successful_=0,progress_= ?,completed_at_=NULL,version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=?",progress,RequestContext.userId(),RequestContext.tenantId(),assistanceId,revision)!=1) throw conflict();
+        event(assistanceId,"事项重新开启","已关闭","处理中",reason==null?"":reason);
+        return Map.of("id",assistanceId,"status","处理中","progress",progress,"revision",revision+1);
     }
 
     private void event(String assistanceId, String type, String from, String to, String reason) {

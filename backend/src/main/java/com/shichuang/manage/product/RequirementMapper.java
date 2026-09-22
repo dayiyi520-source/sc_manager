@@ -62,7 +62,9 @@ public class RequirementMapper {
                 JSON_MERGE_PATCH(COALESCE(CAST(a.content_ AS JSON),JSON_OBJECT()), JSON_OBJECT(
                   'taskId',w.id_,'taskTitle',w.title_,'taskType',w.work_order_type_,
                   'targetPage',CASE w.category_ WHEN 'design' THEN 'prod_design_tasks' WHEN 'dev' THEN 'prod_rd_tasks' WHEN 'bug' THEN 'prod_bugs' ELSE 'prod_req_tasks' END,
-                  'assigneeName',w.assignee_name_)) AS metadata,
+                  'assigneeName',w.assignee_name_,'afterAssigneeName',w.assignee_name_,
+                  'beforeAssigneeName',COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.beforeAssigneeName')),JSON_UNQUOTE(JSON_EXTRACT(a.content_,'$.fromAssigneeName')),''),
+                  'progress',w.progress_,'overdueRisk',w.planned_end_date_ < CURRENT_DATE AND w.successful_=0 AND w.status_group_ NOT IN ('CANCELLED'))) AS metadata,
                 a.create_time_ AS createdAt
               FROM t_product_work_item_activity a
               JOIN t_product_work_item w ON w.id_=a.subject_id_ AND w.tenant_id_=a.tenant_id_ AND w.requirement_id_=? AND w.source_type_='WORK_ORDER' AND w.delete_flag_=0
@@ -98,6 +100,23 @@ public class RequirementMapper {
 
     List<Map<String,Object>> workItems(String tenantId,String id) {
         return jdbc.queryForList(workItemSql()+" AND w.requirement_id_=? ORDER BY w.create_time_ DESC",tenantId,id);
+    }
+
+    List<Map<String,Object>> myTasks(String tenantId,String userId) {
+        return jdbc.queryForList("""
+            SELECT w.id_ AS id,CASE WHEN w.source_type_='WORK_ORDER' THEN 'assistance' ELSE w.category_ END AS type,
+              w.title_ AS title,w.status_name_ AS status,w.assignee_name_ AS assigneeName,w.create_time_ AS time,
+              w.planned_end_date_ AS dueDate,w.progress_ AS progress,
+              w.planned_end_date_ < CURRENT_DATE AND w.successful_=0 AND w.status_group_ NOT IN ('CANCELLED') AS overdueRisk,
+              CASE WHEN w.status_group_ IN ('COMPLETED','CANCELLED') OR w.assistance_status_ IN ('已关闭','已完成') THEN 'completed'
+                   WHEN w.source_type_='WORK_ORDER' AND COALESCE(w.assignee_id_,'')<>? THEN 'assist' ELSE 'mine' END AS taskGroup,
+              CASE w.category_ WHEN 'design' THEN 'prod_design_tasks' WHEN 'dev' THEN 'prod_rd_tasks' WHEN 'bug' THEN 'prod_bugs' ELSE 'prod_req_tasks' END AS targetPage,
+              COALESCE(w.requirement_id_,w.id_) AS sourceId
+            FROM t_product_work_item w
+            WHERE w.tenant_id_=? AND w.delete_flag_=0
+              AND (w.assignee_id_=? OR w.create_by_=? OR w.assistance_owner_id_=? OR COALESCE(w.assistance_initiator_id_,w.create_by_)=?)
+            ORDER BY w.create_time_ DESC LIMIT 200
+            """,userId,tenantId,userId,userId,userId,userId);
     }
 
     List<Map<String,Object>> workOrderCandidates(String tenantId,String keyword,String type,String requirementId,int limit) {
@@ -185,7 +204,7 @@ public class RequirementMapper {
     }
 
     static String workItemSql() {
-        return "SELECT w.id_ AS id,w.requirement_id_ AS requirementId,r.code_ AS requirementCode,r.title_ AS requirementTitle,w.work_order_type_ AS taskType,w.title_ AS title,w.assignee_name_ AS assigneeName,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(w.special_fields_,'$.note')),'') AS note,w.status_name_ AS status,w.assistance_task_status_ AS assistanceTaskStatus,w.assistance_blocks_closure_ AS blocksClosure,'SUCCESS' AS syncStatus,0 AS retryCount,NULL AS lastError,NULL AS nextRetryAt,w.update_time_ AS lastSyncAt,w.create_time_ AS createdAt FROM t_product_work_item w JOIN t_product_work_item r ON r.id_=w.requirement_id_ AND r.tenant_id_=w.tenant_id_ AND r.category_='requirement' AND r.delete_flag_=0 WHERE w.tenant_id_=? AND w.delete_flag_=0 AND w.source_type_='WORK_ORDER'";
+        return "SELECT w.id_ AS id,w.requirement_id_ AS requirementId,r.code_ AS requirementCode,r.title_ AS requirementTitle,w.work_order_type_ AS taskType,w.title_ AS title,w.assignee_name_ AS assigneeName,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(w.special_fields_,'$.note')),'') AS note,w.status_name_ AS status,w.status_group_ AS statusGroup,w.progress_ AS progress,w.version_ AS revision,w.planned_end_date_ AS dueDate,w.planned_end_date_ < CURRENT_DATE AND w.successful_=0 AND w.status_group_ NOT IN ('CANCELLED') AS overdueRisk,w.assistance_task_status_ AS assistanceTaskStatus,w.assistance_blocks_closure_ AS blocksClosure,'SUCCESS' AS syncStatus,0 AS retryCount,NULL AS lastError,NULL AS nextRetryAt,w.update_time_ AS lastSyncAt,w.create_time_ AS createdAt FROM t_product_work_item w JOIN t_product_work_item r ON r.id_=w.requirement_id_ AND r.tenant_id_=w.tenant_id_ AND r.category_='requirement' AND r.delete_flag_=0 WHERE w.tenant_id_=? AND w.delete_flag_=0 AND w.source_type_='WORK_ORDER'";
     }
 
     private static String sourceSql() {
