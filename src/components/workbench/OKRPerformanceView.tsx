@@ -173,7 +173,7 @@ const OriginalWorkspace: React.FC = () => {
       {/* Top Main Navigation Tabs */}
       <div className="okr-page-toolbar">
         <div className="okr-primary-tabs primary-line-tabs" role="tablist" aria-label="目标与绩效视图">
-          <Button id="tab-okrs" role="tab" aria-selected={mainTab === 'okrs'} type="text" icon={<Target/>} onClick={()=>setMainTab('okrs')}>目标 OKRs</Button>
+          <Button id="tab-okrs" role="tab" aria-selected={mainTab === 'okrs'} type="text" icon={<Target/>} onClick={()=>setMainTab('okrs')}>我的目标</Button>
           <Button id="tab-reviews" role="tab" aria-selected={mainTab === 'reviews'} type="text" icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
         </div>
 
@@ -207,11 +207,11 @@ const OriginalWorkspace: React.FC = () => {
             activeKey={okrCategoryTab}
             onChange={(value) => setOkrCategoryTab(value as typeof okrCategoryTab)}
             items={[
-              { label: '我的 OKR', key: 'my' },
-              { label: '直属上级 OKR', key: 'supervisor' },
-              { label: '直属下级 OKR', key: 'subordinate' },
-              { label: '我部门的 OKR', key: 'department' },
-              { label: '跨部门协同 OKR', key: 'other_dept' },
+              { label: '我的目标', key: 'my' },
+              { label: '直属上级目标', key: 'supervisor' },
+              { label: '直属下级目标', key: 'subordinate' },
+              { label: '我部门的目标', key: 'department' },
+              { label: '跨部门协同目标', key: 'other_dept' },
             ]}
           />
 
