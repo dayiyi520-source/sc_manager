@@ -416,31 +416,18 @@
 .okr-review-readonly-feedback b { font-size:13px; }
 .okr-review-readonly-feedback p { margin:6px 0 0; color:var(--text-body); font-size:12px; line-height:20px; white-space:pre-wrap; }
 @media (max-width:900px) { .okr-review-readonly-header { flex-direction:column; } .okr-review-readonly-actions { align-self:flex-end; } .okr-review-readonly-metrics,.okr-review-readonly-columns,.okr-review-readonly-kr-grid { grid-template-columns:1fr; } .okr-review-readonly-metrics > div + div { border-top:1px solid var(--border-main); border-left:0; } .okr-review-readonly-kr-head { flex-direction:column; } }
-.okr-action-breakdown-grid {
-  display: grid;
-  grid-template-columns: minmax(17rem, 0.8fr) minmax(0, 2fr);
-  gap: 16px;
-}
-
-.okr-action-parent-panel .ant-card-body {
-  max-height: 38rem;
-  overflow: auto;
-}
-
-.okr-action-parent-item {
-  border-color: var(--border-main);
-  transition: border-color 150ms ease, background-color 150ms ease;
-}
-
-.okr-action-parent-item:hover {
-  border-color: var(--primary);
-  background: var(--bg-surface-soft);
-}
-
-.okr-action-parent-item:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
+.okr-action-breakdown-page { display:grid; gap:16px; }
+.okr-action-breakdown-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 20px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
+.okr-action-breakdown-toolbar h4 { margin:0 0 4px; }
+.okr-action-parent-tree-card { border-color:var(--border-main); }
+.okr-action-parent-tree-head { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.okr-action-parent-tree-head > div { min-width:0; }
+.okr-action-inline-editor { margin-top:16px; border-color:var(--primary); background:var(--bg-surface-soft); }
+.okr-action-child-list { display:grid; gap:8px; margin-top:16px; padding-left:24px; border-left:2px solid var(--border-main); }
+.okr-action-child-item { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); }
+.okr-action-child-index { color:var(--primary); font-weight:700; }
+.okr-action-child-detail { display:flex; flex-basis:100%; flex-wrap:wrap; gap:16px; padding:8px 0 0 28px; color:var(--text-muted); font-size:12px; }
+.okr-action-empty-child { margin:16px 0 0 24px; }
 
 .okr-action-saved-list {
   display: grid;
@@ -477,7 +464,5 @@
 }
 
 @media (max-width: 900px) {
-  .okr-action-breakdown-grid {
-    grid-template-columns: 1fr;
-  }
+  .okr-action-breakdown-toolbar, .okr-action-parent-tree-head { align-items:flex-start; flex-direction:column; }
 }

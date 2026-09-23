@@ -16,19 +16,21 @@ const parents: OkrRecord[] = [{
 
 describe('ActionBreakdownForm', () => {
   it('shows parent actions and product department structured fields', () => {
-    render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => undefined)} />);
+    render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[]} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => undefined)} />);
 
-    expect(screen.getByText('2026年09月 · 拆解动作')).toBeInTheDocument();
+    expect(screen.getByText('2026年09月')).toBeInTheDocument();
     expect(screen.getByText('提升客户满意度')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: '拆解动作'}));
     expect(screen.getByLabelText('输入动作')).toBeInTheDocument();
     expect(screen.getByLabelText('关联产品线')).toBeInTheDocument();
     expect(screen.getByLabelText('关键节点')).toBeInTheDocument();
-    expect(screen.getByLabelText('承接人员（可选）')).toBeInTheDocument();
+    expect(screen.getByText('承接人员（可多选）')).toBeInTheDocument();
   });
 
   it('adds and collapses multiple action cards', () => {
-    render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => undefined)} />);
+    render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[]} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => undefined)} />);
 
+    fireEvent.click(screen.getByRole('button', {name: '拆解动作'}));
     fireEvent.click(screen.getByRole('button', {name: '继续添加'}));
     expect(screen.getByText('关键动作 2')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', {name: '收起'})[0]);

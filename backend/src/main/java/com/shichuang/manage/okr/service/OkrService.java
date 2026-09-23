@@ -30,7 +30,7 @@ import java.util.*;
   for(var record:all){
    if("action".equals(record.get("kind"))&&period.equals(record.get("periodKey"))){
     var p=payload(record.get("payload"));
-    if(me.equals(Objects.toString(p.get("assigneeId"),""))){
+    if(me.equals(Objects.toString(p.get("assigneeId"),"")) || p.get("assigneeIds") instanceof List<?> ids && ids.stream().map(Object::toString).anyMatch(me::equals)){
      var item=new LinkedHashMap<String,Object>(record);item.put("parentObjectiveId",p.get("parentObjectiveId"));item.put("payload",Map.of("title",p.get("title"),"parentObjectiveId",p.get("parentObjectiveId"),"parentActionId",record.get("id")));result.add(item);
     }
     continue;
@@ -57,6 +57,7 @@ import java.util.*;
   integer(input.get("weight"),1,100);if(type.equals("support"))required(input,"acceptanceStandard");else required(input,"milestone");
   if(type.equals("product"))required(input,"productLine");else if(Set.of("presales","delivery").contains(type))required(input,"businessObject");
   String assignee=Objects.toString(input.get("assigneeId"),"");if(!assignee.isBlank())person(assignee);
+  if(input.containsKey("assigneeIds")){if(!(input.get("assigneeIds") instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("承接人员格式无效");for(Object id:ids)person(Objects.toString(id,""));}
   input.put("creatorId",creator);input.put("parentActionId",parentAction);input.put("parentObjectiveId",parentObjective);
   String id=UUID.randomUUID().toString(),data=encode(input);mapper.insert(RequestContext.tenantId(),id,"action",creator,period,"active",data);mapper.event(RequestContext.tenantId(),id,"create_action",creator,data);return Map.of("id",id,"status","active","version",0);
  }
