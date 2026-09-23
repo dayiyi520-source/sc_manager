@@ -226,7 +226,7 @@ const OriginalWorkspace: React.FC = () => {
               onSaveDraft={async payload => { const ok = await saveObjectiveDraft(newOkrCycle, payload); if (ok) setObjectiveForms(forms => forms.filter(id => id !== formId)); return ok; }}
               onAddAnother={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])}/></div>
             ))}
-            <div className="okr-objective-footer"><Button type="text" onClick={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])} disabled={busy || objectiveBatchAction !== null}>+ 添加 O</Button><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy || objectiveBatchAction !== null}>取消</Button><Button onClick={() => void handleObjectiveBatch('draft')} loading={objectiveBatchAction === 'draft'} disabled={busy || loading || !!error || objectiveBatchAction !== null}>存草稿</Button><Button type="primary" onClick={() => void handleObjectiveBatch('submit')} loading={objectiveBatchAction === 'submit'} disabled={loading || !!error || objectiveBatchAction !== null}>{me?.rootFlag ? '提交目标' : '提交主管确认'}</Button></div>
+            <div className="okr-objective-footer"><Button type="text" onClick={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])} disabled={busy || objectiveBatchAction !== null}>+ 添加目标</Button><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy || objectiveBatchAction !== null}>取消</Button><Button onClick={() => void handleObjectiveBatch('draft')} loading={objectiveBatchAction === 'draft'} disabled={busy || loading || !!error || objectiveBatchAction !== null}>存草稿</Button><Button type="primary" onClick={() => void handleObjectiveBatch('submit')} loading={objectiveBatchAction === 'submit'} disabled={loading || !!error || objectiveBatchAction !== null}>{me?.rootFlag ? '提交目标' : '提交主管确认'}</Button></div>
             </div>
           )}
 
@@ -250,14 +250,6 @@ const OriginalWorkspace: React.FC = () => {
                         {okr.objective}
                       </h3>
                     </div>
-                    {okr.alignTo && (
-                      <div className="okr-summary-alignment">
-                        <span>
-                          对齐目标
-                        </span>
-                        <span>{okr.alignTo}</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="okr-summary-meta">
@@ -280,7 +272,7 @@ const OriginalWorkspace: React.FC = () => {
                 {/* Key Results list */}
                 <div className="space-y-2 pt-2">
                   <h4 className="okr-summary-section-title">
-                    支撑关键成果 (Key Results)
+                    A 动作
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {okr.keyResults.map((kr, idx) => (
@@ -290,7 +282,7 @@ const OriginalWorkspace: React.FC = () => {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <span className="okr-summary-kr-title">
-                            KR{idx + 1}: {kr.content}
+                            A{idx + 1}: {kr.content}
                           </span>
                           <span className="okr-summary-kr-progress">
                             {kr.progress}%
