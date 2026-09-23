@@ -59,7 +59,8 @@ import java.util.*;
   String assignee=Objects.toString(input.get("assigneeId"),"");if(!assignee.isBlank())person(assignee);
   if(input.containsKey("assigneeIds")){if(!(input.get("assigneeIds") instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("承接人员格式无效");for(Object id:ids)person(Objects.toString(id,""));}
   input.put("creatorId",creator);input.put("parentActionId",parentAction);input.put("parentObjectiveId",parentObjective);
-  String id=UUID.randomUUID().toString(),data=encode(input);mapper.insert(RequestContext.tenantId(),id,"action",creator,period,"active",data);mapper.event(RequestContext.tenantId(),id,"create_action",creator,data);return Map.of("id",id,"status","active","version",0);
+  boolean submit=Boolean.TRUE.equals(body.get("submit"));String state=submit?"active":"draft";
+  String id=UUID.randomUUID().toString(),data=encode(input);mapper.insert(RequestContext.tenantId(),id,"action",creator,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit_action":"draft_action",creator,data);return Map.of("id",id,"status",state,"version",0);
  }
  private Map<String,Object> record(String id){return records().stream().filter(r->id.equals(r.get("id"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"记录不存在或无权访问"));}
  public List<Map<String,Object>> events(String id){record(id);return mapper.events(RequestContext.tenantId(),id);}

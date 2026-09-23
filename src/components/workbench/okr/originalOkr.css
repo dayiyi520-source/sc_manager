@@ -417,6 +417,7 @@
 .okr-review-readonly-feedback p { margin:6px 0 0; color:var(--text-body); font-size:12px; line-height:20px; white-space:pre-wrap; }
 @media (max-width:900px) { .okr-review-readonly-header { flex-direction:column; } .okr-review-readonly-actions { align-self:flex-end; } .okr-review-readonly-metrics,.okr-review-readonly-columns,.okr-review-readonly-kr-grid { grid-template-columns:1fr; } .okr-review-readonly-metrics > div + div { border-top:1px solid var(--border-main); border-left:0; } .okr-review-readonly-kr-head { flex-direction:column; } }
 .okr-action-breakdown-page { display:grid; gap:16px; }
+.okr-action-breakdown-card { border-color:var(--border-main); }
 .okr-action-breakdown-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 20px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
 .okr-action-breakdown-toolbar h4 { margin:0 0 4px; }
 .okr-action-parent-tree-card { border-color:var(--border-main); }
@@ -429,15 +430,13 @@
 .okr-action-child-detail { display:flex; flex-basis:100%; flex-wrap:wrap; gap:16px; padding:8px 0 0 28px; color:var(--text-muted); font-size:12px; }
 .okr-action-empty-child { margin:16px 0 0 24px; }
 
-.okr-action-saved-list {
-  display: grid;
-  gap: 8px;
-}
+.okr-action-saved-list { display:grid; gap:12px; }
 
 .okr-action-saved-list h3 {
   margin: 0;
   font-size: 16px;
 }
+.okr-action-saved-grid { display:grid; gap:8px; }
 
 .okr-action-saved-card > .ant-card-body {
   display: flex;

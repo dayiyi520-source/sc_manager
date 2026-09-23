@@ -44,7 +44,7 @@ export const okrRepository = {
   },
   work: (ownerId: string) => apiRequest<OkrWork[]>(`${base}/work?ownerId=${encodeURIComponent(ownerId)}`),
   actionParents: (periodKey: string) => apiRequest<OkrRecord[]>(`${base}/actions/parents?periodKey=${encodeURIComponent(periodKey)}`),
-  createAction: (periodKey: string, payload: OkrActionPayload) => apiRequest<{id:string}>(`${base}/actions`, {method:'POST',body:JSON.stringify({periodKey,payload})}),
+  createAction: (periodKey: string, payload: OkrActionPayload, submit = true) => apiRequest<{id:string}>(`${base}/actions`, {method:'POST',body:JSON.stringify({periodKey,payload,submit})}),
   link: (work: OkrWork, objectiveId?:string,keyResultId?:string) => apiRequest(`${base}/work/link`,{method:'PUT',body:JSON.stringify({workId:work.id,objectiveId,keyResultId,version:work.linkVersion})}),
   create: (kind: string, periodKey: string, payload: OkrPayload, submit = false) => apiRequest<{id:string}>(`${base}/records`, {method:'POST',body:JSON.stringify({kind,periodKey,payload,submit})}),
   update: (record: OkrRecord, action: string, data: Record<string, unknown> = {}) => apiRequest(`${base}/records/${record.id}`,{method:'PATCH',body:JSON.stringify({action,version:record.version,...data})}),

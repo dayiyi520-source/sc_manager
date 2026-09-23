@@ -234,13 +234,9 @@ const OriginalWorkspace: React.FC = () => {
             </div>
           )}
 
-          {okrCategoryTab === 'my' && myActions.length > 0 && <div className="okr-action-saved-list">
-            <h3>我的拆解动作</h3>
-            {myActions.map((action, index) => <Card key={action.id} size="small" className="okr-action-saved-card">
-              <div><Tag color="blue">A{index + 1}</Tag><strong>{action.payload.title}</strong></div>
-              <div><span>{action.payload.department}</span><span>{action.payload.deadline}</span><span>权重 {action.payload.weight}%</span><span>{action.payload.assigneeName ? `承接：${action.payload.assigneeName}` : '未指定承接人员'}</span></div>
-            </Card>)}
-          </div>}
+          {okrCategoryTab === 'my' && actionFormOpen && <ActionBreakdownForm open cycle={newOkrCycle} person={me} parents={actionParents} actions={myActions} people={people} busy={busy} onClose={() => setActionFormOpen(false)} onSave={async (parent, values, mode) => { const payloads = values.map(value => ({ title: value.title, department: me?.department || '其他支撑', parentObjectiveId: String(parent.payload.parentObjectiveId || ''), parentActionId: parent.id, assigneeIds: value.assigneeIds || [], assigneeName: (value.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'), structureType: /产研|产品|研发|技术/.test(me?.department || '') ? 'product' : /售前|销售|市场/.test(me?.department || '') ? 'presales' : /交付|项目|实施/.test(me?.department || '') ? 'delivery' : 'support', productLine: value.businessObject, businessObject: value.businessObject, acceptanceStandard: value.businessObject, milestone: value.milestone, deadline: value.deadline?.format('YYYY-MM-DD') || '', weight: Number(value.weight || 0) })); return saveActions(newOkrCycle, payloads, mode === 'submit'); }} />}
+
+          {okrCategoryTab === 'my' && myActions.length > 0 && <Card className="okr-action-saved-list"><h3>{dayjs(newOkrCycle).format('YYYY年MM月')} · 我的拆解动作</h3><div className="okr-action-saved-grid">{myActions.map((action, index) => <div key={action.id} className="okr-action-saved-card"><div><Tag color="blue">A{index + 1}</Tag><strong>{action.payload.title}</strong></div><div><span>{action.payload.department}</span><span>{action.payload.deadline}</span><span>权重 {action.payload.weight}%</span><span>{action.payload.assigneeName ? `承接：${action.payload.assigneeName}` : '未指定承接人员'}</span></div></div>)}</div></Card>}
 
           {/* OKR Cards List */}
           <div className="space-y-4">
@@ -314,8 +310,6 @@ const OriginalWorkspace: React.FC = () => {
           </div>
         </div>
       )}
-      <ActionBreakdownForm open={actionFormOpen} cycle={newOkrCycle} person={me} parents={actionParents} actions={myActions} people={people} busy={busy} onClose={() => setActionFormOpen(false)} onSave={async (parent, values) => { const payloads = values.map(value => ({ title: value.title, department: me?.department || '其他支撑', parentObjectiveId: String(parent.payload.parentObjectiveId || ''), parentActionId: parent.id, assigneeIds: value.assigneeIds || [], assigneeName: (value.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'), structureType: /产研|产品|研发|技术/.test(me?.department || '') ? 'product' : /售前|销售|市场/.test(me?.department || '') ? 'presales' : /交付|项目|实施/.test(me?.department || '') ? 'delivery' : 'support', productLine: value.businessObject, businessObject: value.businessObject, acceptanceStandard: value.businessObject, milestone: value.milestone, deadline: value.deadline?.format('YYYY-MM-DD') || '', weight: Number(value.weight || 0) })); return saveActions(newOkrCycle, payloads); }}/>
-
       {/* Main Tab 2: 目标复盘总结 */}
       {mainTab === 'reviews' && (
         <div className={reviewSubTab === 'write' && isReviewFormOpen ? "space-y-0" : "space-y-6"}>
