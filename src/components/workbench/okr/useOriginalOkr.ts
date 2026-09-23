@@ -42,7 +42,7 @@ export function useOriginalOkr() {
   const refresh = () => client.invalidateQueries({queryKey:['okr',currentUser.id]});
   const saveActions = async (period:string,payloads:import('../../../services/okrRepository').OkrActionPayload[], submit = true) => {
     setBusy(true);
-    try { for(const payload of payloads) await okrRepository.createAction(period,payload,submit); await refresh(); addToast('success',submit?'拆解动作已提交':'拆解动作草稿已保存'); return true; }
+    try { for(const payload of payloads) { if(payload.recordId) await okrRepository.updateAction(payload.recordId, payload.version ?? 0, payload, submit); else await okrRepository.createAction(period,payload,submit); } await refresh(); addToast('success',submit?'拆解动作已提交':'拆解动作草稿已保存'); return true; }
     catch(error){addToast('error',error instanceof Error?error.message:'拆解动作保存失败');return false;}
     finally{setBusy(false);}
   };

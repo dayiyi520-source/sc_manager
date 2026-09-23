@@ -271,6 +271,15 @@ import java.util.*;
   boolean own=owner.equals(RequestContext.userId()),reviewer=!own&&RequestContext.userId().equals(supervisor(owner));
   if("objective".equals(kind)&&"submit".equals(action)&&!java.time.YearMonth.now().toString().equals(s.get("periodKey")))throw new IllegalArgumentException("只能提交进行中的当前月份目标");
   var p=payload(s.get("payload"));String next;
+  if("action".equals(kind)){
+   if(!own||!Set.of("draft","active").contains(state)||!Set.of("save","submit").contains(action))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅可编辑本人未完成的拆解动作");
+   p=payload(b.get("payload"));required(p,"title");required(p,"parentActionId");required(p,"parentObjectiveId");required(p,"department");required(p,"deadline");integer(p.get("weight"),1,100);String type=required(p,"structureType");if(!Set.of("product","presales","delivery","support").contains(type))throw new IllegalArgumentException("部门结构类型无效");if(type.equals("support"))required(p,"acceptanceStandard");else required(p,"milestone");if(type.equals("product"))required(p,"productLine");else if(Set.of("presales","delivery").contains(type))required(p,"businessObject");
+   if(p.containsKey("assigneeIds")){if(!(p.get("assigneeIds") instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("承接人员格式无效");for(Object assigneeId:ids)person(Objects.toString(assigneeId,""));}
+   String parentActionId=p.get("parentActionId").toString(), parentObjectiveId=p.get("parentObjectiveId").toString();boolean parent=actionParents(s.get("periodKey").toString()).stream().anyMatch(r->parentActionId.equals(r.get("id"))&&parentObjectiveId.equals(r.get("parentObjectiveId")));if(!parent)throw new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更");
+   String actionState="submit".equals(action)?"active":"draft";int version=integer(b.get("version"),0,Integer.MAX_VALUE);
+   if(mapper.update(RequestContext.tenantId(),id,version,actionState,encode(p),RequestContext.userId())!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"拆解动作已变更，请刷新后重试");
+   mapper.event(RequestContext.tenantId(),id,action,RequestContext.userId(),encode(Map.of("from",state,"to",actionState,"payload",p)));return;
+  }
   if("save".equals(action)&&own&&Set.of("draft","returned").contains(state)){next=state;p=inputPayload(b.get("payload"),kind);}
   else if("progress".equals(action)&&own&&"active".equals(state)&&"objective".equals(kind)){
    next=state;var values=rows(b.get("keyResults"));var existing=rows(p.get("keyResults"));

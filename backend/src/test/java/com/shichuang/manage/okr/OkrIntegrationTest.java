@@ -40,6 +40,16 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
   mockMvc.perform(patch("/api/okr/records/"+child).header("Authorization","Bearer "+tech).contentType("application/json").content("{\"action\":\"complete\",\"version\":1}")).andExpect(status().isConflict());
   var row=jdbc.queryForMap("SELECT status_,payload_ FROM t_okr_record WHERE id_=?",child);assertEquals("active",row.get("status_"));assertTrue(row.get("payload_").toString().contains(parent));
  }
+ @Test void updatesActionDraftInPlaceAndSubmitsWithoutDuplication()throws Exception{
+  String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
+  var keyResults=List.of(Map.of("id","kr-action-draft","title","完成客户满意度提升动作","weight",100,"progress",0,"assigneeIds",List.of("user-tech")));
+  String objective=create(admin,"objective",Map.of("title","客户满意度提升到9分","keyResults",keyResults));action(admin,objective,"submit",0);
+  var draftPayload=new java.util.LinkedHashMap<String,Object>();draftPayload.put("title","梳理客服问题分类");draftPayload.put("department","软件研发部");draftPayload.put("parentObjectiveId",objective);draftPayload.put("parentActionId","kr-action-draft");draftPayload.put("structureType","product");draftPayload.put("productLine","客户服务平台");draftPayload.put("milestone","完成问题分类方案评审");draftPayload.put("deadline","2026-09-30");draftPayload.put("weight",40);draftPayload.put("assigneeIds",List.of("user-tech"));
+  String response=mockMvc.perform(post("/api/okr/actions").header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("periodKey","2026-09","payload",draftPayload,"submit",false)))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String actionId=objectMapper.readTree(response).path("data").path("id").asText();draftPayload.put("title","完成客服问题分类与看板");
+  mockMvc.perform(patch("/api/okr/records/"+actionId).header("Authorization","Bearer "+tech).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("action","submit","version",0,"payload",draftPayload)))).andExpect(status().isOk());
+  var saved=jdbc.queryForMap("SELECT status_,version_,payload_ FROM t_okr_record WHERE tenant_id_='local-tenant' AND id_=?",actionId);assertEquals("active",saved.get("status_"));assertEquals(1,((Number)saved.get("version_")).intValue());assertEquals("完成客服问题分类与看板",objectMapper.readTree(saved.get("payload_").toString()).path("title").asText());assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM t_okr_record WHERE tenant_id_='local-tenant' AND id_=?",Integer.class,actionId));
+ }
  @Test void rejectsPeerParentAndOrganizationCycles()throws Exception{
   String admin=login("admin"),tech=login("tech"),sales=login("sales");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);reporting(admin,"user-sales","",true);
   var p=Map.of("title","同级目标","keyResults",List.of(Map.of("id","kr","title","结果","weight",100,"progress",0)));String peer=create(sales,"objective",p);action(sales,peer,"submit",0);

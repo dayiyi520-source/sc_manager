@@ -418,6 +418,9 @@
 @media (max-width:900px) { .okr-review-readonly-header { flex-direction:column; } .okr-review-readonly-actions { align-self:flex-end; } .okr-review-readonly-metrics,.okr-review-readonly-columns,.okr-review-readonly-kr-grid { grid-template-columns:1fr; } .okr-review-readonly-metrics > div + div { border-top:1px solid var(--border-main); border-left:0; } .okr-review-readonly-kr-head { flex-direction:column; } }
 .okr-action-breakdown-page { display:grid; gap:16px; }
 .okr-action-breakdown-card { border-color:var(--border-main); }
+.okr-action-period { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.okr-action-period-label { margin-left:0 !important; color:var(--text-primary) !important; font-size:18px !important; font-weight:700 !important; }
+.okr-action-period-label span { margin-left:12px !important; color:var(--text-muted) !important; font-size:14px !important; font-weight:500 !important; }
 .okr-action-breakdown-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 20px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
 .okr-action-breakdown-toolbar h4 { margin:0 0 4px; }
 .okr-action-parent-tree-card { border-color:var(--border-main); }
@@ -463,5 +466,6 @@
 }
 
 @media (max-width: 900px) {
-  .okr-action-breakdown-toolbar, .okr-action-parent-tree-head { align-items:flex-start; flex-direction:column; }
+.okr-action-breakdown-toolbar, .okr-action-parent-tree-head { align-items:flex-start; flex-direction:column; }
+  .okr-action-period { align-items:flex-start; flex-direction:column; }
 }
