@@ -16,6 +16,7 @@ import { runObjectiveBatch } from './okr/objectiveBatch';
 import { filterReviewsByMonth, toggleReviewMonth } from './okr/reviewMonthFilter';
 import { ReviewReadOnlyView } from './okr/ReviewReadOnlyView';
 import { createReviewCopyDraft } from './okr/reviewCopy';
+import { ActionBreakdownForm } from './okr/ActionBreakdownForm';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
 
@@ -47,7 +48,7 @@ const impactLabel = (value?: string) => ({
 
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
-  const { records, okrs, performances, people, work, loading, error, workLoading, workError, refresh, refreshWork, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, busy } = useOriginalOkr();
+  const { records, okrs, performances, people, work, actionParents, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, busy } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -73,6 +74,7 @@ const OriginalWorkspace: React.FC = () => {
 
   // Add OKR Modal State
   const [objectiveForms, setObjectiveForms] = useState<string[]>([]);
+  const [actionFormOpen, setActionFormOpen] = useState(false);
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
   const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const newOkrCycle = dayjs().format('YYYY-MM');
@@ -95,6 +97,7 @@ const OriginalWorkspace: React.FC = () => {
     return o.department !== currentUser.department;
   };
   const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && matchesCategory(o));
+  const myActions = records.filter(record => record.kind === 'action' && record.ownerId === currentUser.id && selectedCycles.includes(record.periodKey));
   const visiblePerformances = performances.filter(performance => (
     reviewSubTab === 'my'
       ? performance.authorId === currentUser.id
@@ -195,6 +198,7 @@ const OriginalWorkspace: React.FC = () => {
               <Plus className="w-3.5 h-3.5" />
               添加目标
             </Button>
+            <Button id="btn-breakdown-action" disabled={busy} onClick={() => setActionFormOpen(true)}>拆解动作</Button>
           </div>
         )}
       </div>
@@ -219,7 +223,7 @@ const OriginalWorkspace: React.FC = () => {
             <div className={`okr-objective-form-stack${objectiveBatchAction ? ' is-batching' : ''}`} aria-busy={objectiveBatchAction !== null}>
             <div className="okr-objective-period">{dayjs(newOkrCycle).format('YYYY年MM月')}<span>进行中</span></div>
             {objectiveForms.map((formId, formIndex) => (
-            <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={newOkrCycle} objectiveIndex={formIndex} ownerName={currentUser.name} parents={parents} busy={busy} unavailable={loading || !!error}
+            <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={newOkrCycle} objectiveIndex={formIndex} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error}
               root={!!me?.rootFlag}
               onCancel={() => setObjectiveForms(forms => forms.filter(id => id !== formId))}
               onSave={async payload => { const ok = await handleSaveOkr(payload); if (ok) setObjectiveForms(forms => forms.filter(id => id !== formId)); return ok; }}
@@ -229,6 +233,14 @@ const OriginalWorkspace: React.FC = () => {
             <div className="okr-objective-footer"><Button type="text" onClick={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])} disabled={busy || objectiveBatchAction !== null}>+ 添加目标</Button><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy || objectiveBatchAction !== null}>取消</Button><Button onClick={() => void handleObjectiveBatch('draft')} loading={objectiveBatchAction === 'draft'} disabled={busy || loading || !!error || objectiveBatchAction !== null}>存草稿</Button><Button type="primary" onClick={() => void handleObjectiveBatch('submit')} loading={objectiveBatchAction === 'submit'} disabled={loading || !!error || objectiveBatchAction !== null}>{me?.rootFlag ? '提交目标' : '提交主管确认'}</Button></div>
             </div>
           )}
+
+          {okrCategoryTab === 'my' && myActions.length > 0 && <div className="okr-action-saved-list">
+            <h3>我的拆解动作</h3>
+            {myActions.map((action, index) => <Card key={action.id} size="small" className="okr-action-saved-card">
+              <div><Tag color="blue">A{index + 1}</Tag><strong>{action.payload.title}</strong></div>
+              <div><span>{action.payload.department}</span><span>{action.payload.deadline}</span><span>权重 {action.payload.weight}%</span><span>{action.payload.assigneeName ? `承接：${action.payload.assigneeName}` : '未指定承接人员'}</span></div>
+            </Card>)}
+          </div>}
 
           {/* OKR Cards List */}
           <div className="space-y-4">
@@ -302,6 +314,7 @@ const OriginalWorkspace: React.FC = () => {
           </div>
         </div>
       )}
+      <ActionBreakdownForm open={actionFormOpen} cycle={newOkrCycle} person={me} parents={actionParents} people={people} busy={busy} onClose={() => setActionFormOpen(false)} onSave={async payloads => { if(await saveActions(newOkrCycle,payloads)) setActionFormOpen(false); }}/>
 
       {/* Main Tab 2: 目标复盘总结 */}
       {mainTab === 'reviews' && (

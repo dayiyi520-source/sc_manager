@@ -1,15 +1,16 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { Alert, Button, DatePicker, Form, Input, InputNumber, Tooltip } from 'antd';
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Tooltip } from 'antd';
 import { GrabberIcon, PlusIcon, TrashIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
 import type { OKRItem } from '../../../types';
-import type { OkrKr, OkrPayload } from '../../../services/okrRepository';
+import type { OkrKr, OkrPayload, OkrPerson } from '../../../services/okrRepository';
 
 interface Props {
   cycle: string;
   objectiveIndex?: number;
   ownerName: string;
   parents: OKRItem[];
+  people?: OkrPerson[];
   busy: boolean;
   unavailable: boolean;
   root: boolean;
@@ -23,7 +24,7 @@ interface Props {
 export interface ObjectiveFormHandle { submit: () => Promise<boolean>; saveDraft: () => Promise<boolean>; }
 export const calculateKrWeightTotal = (items: Pick<OkrKr, 'weight'>[]) => items.reduce((total, item) => total + item.weight, 0);
 
-export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true }, ref) {
+export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, people = [], busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true }, ref) {
   const [title, setTitle] = useState('');
   const [krs, setKrs] = useState<OkrKr[]>(() => [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -83,6 +84,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
           <InputNumber aria-label={`A${index + 1} 权重`} min={1} max={100} precision={0} suffix="%" value={kr.weight} onChange={value => changeKr(kr.id, { weight: value ?? 0 })}/>
           <DatePicker aria-label={`A${index + 1} 截止日期`} placeholder="截止日期" value={kr.deadline ? dayjs(kr.deadline) : null} onChange={value => changeKr(kr.id, { deadline: value?.format('YYYY-MM-DD') })}/>
           <Tooltip title="删除动作"><Button aria-label={`删除 A${index + 1}`} type="text" icon={<TrashIcon/>} disabled={busy || krs.length === 1} onClick={() => setKrs(items => distribute(items.filter(item => item.id !== kr.id)))}/></Tooltip>
+          <Select className="okr-action-assignees" aria-label={`A${index + 1} 承接人员`} mode="multiple" allowClear maxTagCount="responsive" placeholder="指定承接人员（可选）" value={kr.assigneeIds || []} onChange={assigneeIds => changeKr(kr.id, { assigneeIds })} options={people.map(person => ({value: person.id, label: `${person.name} · ${person.department}`}))}/>
         </div>)}
       </div>
       <div className="okr-objective-add"><Button type="text" icon={<PlusIcon/>} disabled={busy || krs.length >= 20} onClick={() => setKrs(items => distribute([...items, { id: crypto.randomUUID(), title: '', weight: 0, progress: 0 }]))}>继续添加</Button><span>A 权重合计 {krWeightTotal}%</span></div>

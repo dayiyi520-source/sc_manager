@@ -20,6 +20,46 @@ import java.util.*;
   var reports=new HashSet<String>();for(var p:reporting)if(me.equals(p.get("supervisorId")))reports.add(p.get("id").toString());
   return mapper.records(RequestContext.tenantId()).stream().filter(r->me.equals(r.get("ownerId"))||reports.contains(r.get("ownerId"))||"objective".equals(r.get("kind"))&&boss.equals(r.get("ownerId"))).toList();
  }
+ public List<Map<String,Object>> actionParents(String period){
+  AuthorizationService.requireRead("okr");
+  String me=RequestContext.userId();
+  var people=people();
+  String boss=people.stream().filter(p->me.equals(p.get("id"))).map(p->Objects.toString(p.get("supervisorId"),"")).findFirst().orElse("");
+  var all=mapper.records(RequestContext.tenantId());
+  var result=new ArrayList<Map<String,Object>>();
+  for(var record:all){
+   if("action".equals(record.get("kind"))&&period.equals(record.get("periodKey"))){
+    var p=payload(record.get("payload"));
+    if(me.equals(Objects.toString(p.get("assigneeId"),""))){
+     var item=new LinkedHashMap<String,Object>(record);item.put("parentObjectiveId",p.get("parentObjectiveId"));item.put("payload",Map.of("title",p.get("title"),"parentObjectiveId",p.get("parentObjectiveId"),"parentActionId",record.get("id")));result.add(item);
+    }
+    continue;
+   }
+   if(!"objective".equals(record.get("kind"))||!period.equals(record.get("periodKey"))||!Set.of("active","submitted","reviewed").contains(record.get("status")))continue;
+   boolean fromSupervisor=boss.equals(Objects.toString(record.get("ownerId"),""));
+   if(!fromSupervisor)continue;
+   var p=payload(record.get("payload"));
+   for(var kr:rows(p.getOrDefault("keyResults",List.of()))){
+    var assignees=kr.get("assigneeIds");
+    if(!(assignees instanceof List<?> ids)||!ids.stream().map(Object::toString).anyMatch(me::equals))continue;
+    var item=new LinkedHashMap<String,Object>();item.put("id",kr.get("id"));item.put("kind","action");item.put("ownerId",record.get("ownerId"));item.put("periodKey",period);item.put("status",record.get("status"));item.put("version",record.get("version"));item.put("parentObjectiveId",record.get("id"));item.put("payload",Map.of("title",kr.get("title"),"parentObjectiveId",record.get("id"),"parentActionId",kr.get("id")));result.add(item);
+   }
+  }
+  return result;
+ }
+ @Transactional public Map<String,Object> createAction(Map<String,Object> body){
+  String period=required(body,"periodKey");var input=payload(body.getOrDefault("payload",Map.of()));String creator=RequestContext.userId();
+  required(input,"title");String parentAction=required(input,"parentActionId");String parentObjective=required(input,"parentObjectiveId");
+  var parents=actionParents(period);var parent=parents.stream().filter(r->parentAction.equals(r.get("id"))&&parentObjective.equals(r.get("parentObjectiveId"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更"));
+  String department=required(input,"department"),type=required(input,"structureType");
+  if(!Set.of("product","presales","delivery","support").contains(type))throw new IllegalArgumentException("部门结构类型无效");
+  required(input,"deadline");try{java.time.LocalDate.parse(input.get("deadline").toString());}catch(Exception e){throw new IllegalArgumentException("完成时间无效");}
+  integer(input.get("weight"),1,100);if(type.equals("support"))required(input,"acceptanceStandard");else required(input,"milestone");
+  if(type.equals("product"))required(input,"productLine");else if(Set.of("presales","delivery").contains(type))required(input,"businessObject");
+  String assignee=Objects.toString(input.get("assigneeId"),"");if(!assignee.isBlank())person(assignee);
+  input.put("creatorId",creator);input.put("parentActionId",parentAction);input.put("parentObjectiveId",parentObjective);
+  String id=UUID.randomUUID().toString(),data=encode(input);mapper.insert(RequestContext.tenantId(),id,"action",creator,period,"active",data);mapper.event(RequestContext.tenantId(),id,"create_action",creator,data);return Map.of("id",id,"status","active","version",0);
+ }
  private Map<String,Object> record(String id){return records().stream().filter(r->id.equals(r.get("id"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"记录不存在或无权访问"));}
  public List<Map<String,Object>> events(String id){record(id);return mapper.events(RequestContext.tenantId(),id);}
  private String encode(Object v){try{return json.writeValueAsString(v);}catch(Exception e){throw new IllegalArgumentException("数据格式无效",e);}}
@@ -91,6 +131,7 @@ import java.util.*;
   var krs=rows(p.get("keyResults"));var ids=new HashSet<String>();
   for(var kr:krs){
    if(!ids.add(required(kr,"id")))throw new IllegalArgumentException("KR 不能重复");required(kr,"title");integer(kr.getOrDefault("progress",0),0,100);
+   if(kr.containsKey("assigneeIds")){if(!(kr.get("assigneeIds") instanceof List<?> assignees)||assignees.size()>100)throw new IllegalArgumentException("动作承接人员格式无效");for(Object assignee:assignees)person(Objects.toString(assignee,""));}
    if(kr.containsKey("deadline"))try{
     var date=java.time.LocalDate.parse(required(kr,"deadline"));
     if(p.containsKey("deadline")&&date.isAfter(java.time.LocalDate.parse(p.get("deadline").toString())))throw new IllegalArgumentException("KR 截止日期不能晚于目标截止日期");

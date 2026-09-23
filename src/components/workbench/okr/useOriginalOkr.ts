@@ -11,6 +11,7 @@ export function useOriginalOkr() {
   const records = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:okrRepository.records,retry:false});
   const peopleQuery = useQuery({queryKey:['okr',currentUser.id,'people'],queryFn:okrRepository.people,retry:false});
   const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>okrRepository.work(currentUser.id),retry:false});
+  const actionParents = useQuery({queryKey:['okr',currentUser.id,'action-parents'],queryFn:()=>okrRepository.actionParents(new Date().toISOString().slice(0,7)),retry:false});
   const people = peopleQuery.data || [];
   const all = records.data || [];
   const me = people.find(p=>p.id===currentUser.id);
@@ -39,6 +40,12 @@ export function useOriginalOkr() {
     };
   });
   const refresh = () => client.invalidateQueries({queryKey:['okr',currentUser.id]});
+  const saveActions = async (period:string,payloads:import('../../../services/okrRepository').OkrActionPayload[]) => {
+    setBusy(true);
+    try { for(const payload of payloads) await okrRepository.createAction(period,payload); await refresh(); addToast('success','拆解动作已保存'); return true; }
+    catch(error){addToast('error',error instanceof Error?error.message:'拆解动作保存失败');return false;}
+    finally{setBusy(false);}
+  };
   const submitReviewDraft = async (id:string) => {
     const record = all.find(item=>item.id===id && item.kind==='review');
     if(!record){addToast('error','复盘记录不存在或已刷新');return false;}
@@ -61,6 +68,7 @@ export function useOriginalOkr() {
   };
   return {records:all,okrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
     error:records.error || peopleQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
+    actionParents:actionParents.data || [],actionParentsLoading:actionParents.isPending,actionParentsError:actionParents.error,saveActions,
     saveObjective:(period:string,payload:OkrPayload)=>save('objective',period,payload),
     saveObjectiveDraft:(period:string,payload:OkrPayload)=>save('objective',period,payload,false),
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),

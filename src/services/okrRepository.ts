@@ -1,7 +1,7 @@
 import { apiRequest } from './apiClient';
 
 export interface OkrPerson { id: string; name: string; department: string; supervisorId: string | null; rootFlag: number; version: number }
-export interface OkrKr { id: string; title: string; weight: number; progress: number; deadline?: string }
+export interface OkrKr { id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[] }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
 export interface OkrReviewItem { workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
 export interface OkrKrReview { objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
@@ -27,7 +27,13 @@ export interface OkrPayload {
   feedback?: string; finalScore?: number; evaluation?: string;
   objectiveSnapshots?: Array<{id:string;period:string;payload:OkrPayload}>;
 }
-export interface OkrRecord { id: string; kind: 'objective' | 'review'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload }
+export interface OkrActionPayload {
+  title: string; department: string; parentObjectiveId: string; parentActionId: string;
+  creatorId?: string; assigneeId?: string; assigneeName?: string; structureType: string;
+  productLine?: string; businessObject?: string; milestone?: string; acceptanceStandard?: string;
+  deadline: string; weight: number;
+}
+export interface OkrRecord { id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload & Partial<OkrActionPayload> }
 export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; creatorName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
 const base = '/api/okr';
 export const okrRepository = {
@@ -37,6 +43,8 @@ export const okrRepository = {
     return rows.map(r => ({...r, payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload}));
   },
   work: (ownerId: string) => apiRequest<OkrWork[]>(`${base}/work?ownerId=${encodeURIComponent(ownerId)}`),
+  actionParents: (periodKey: string) => apiRequest<OkrRecord[]>(`${base}/actions/parents?periodKey=${encodeURIComponent(periodKey)}`),
+  createAction: (periodKey: string, payload: OkrActionPayload) => apiRequest<{id:string}>(`${base}/actions`, {method:'POST',body:JSON.stringify({periodKey,payload})}),
   link: (work: OkrWork, objectiveId?:string,keyResultId?:string) => apiRequest(`${base}/work/link`,{method:'PUT',body:JSON.stringify({workId:work.id,objectiveId,keyResultId,version:work.linkVersion})}),
   create: (kind: string, periodKey: string, payload: OkrPayload, submit = false) => apiRequest<{id:string}>(`${base}/records`, {method:'POST',body:JSON.stringify({kind,periodKey,payload,submit})}),
   update: (record: OkrRecord, action: string, data: Record<string, unknown> = {}) => apiRequest(`${base}/records/${record.id}`,{method:'PATCH',body:JSON.stringify({action,version:record.version,...data})}),
