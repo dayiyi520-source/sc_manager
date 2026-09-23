@@ -19,6 +19,7 @@ Production endpoint:
 Prerequisites:
 
 - Node.js/npm, Java 17/Maven, `ssh`, `scp`, `curl`, and `tar` are available locally.
+- On Windows Git Bash, the script excludes `VITE_BASE_PATH` and `VITE_API_BASE_URL` from MSYS path conversion so the configured Nginx subpath is preserved in the generated HTML.
 - `sshpass` is available when password-based SSH is used.
 - Deployment values are loaded from `.enterprise-app-factory/secrets/runtime.env` or exported environment variables.
 - Docker, `gzip`, and the `SOURCE_DB_*` variables are required only for an explicitly requested complete database replacement.
@@ -32,7 +33,7 @@ scripts/deploy-production.sh
 
 The default command builds and uploads the frontend and backend, verifies the dedicated Nginx route, backs up the current server database and application files, switches only the application files, lets Flyway migrate the existing database, and verifies the internal and public endpoints. It does not import local business data or modify the site root or `/tongren/` routes.
 
-Before upload and again after the public switch, deployment verifies that the generated HTML references `/manage-admin/assets/` and rejects root `/assets/` references. It also verifies direct access to the product defect page so a wrong frontend base path cannot be reported as a successful release.
+Before upload and again after the public switch, deployment verifies that the generated HTML references `/manage-admin/assets/` and rejects root `/assets/` references. The public check uses the release ID as a cache-busting query parameter. It also verifies direct access to the product defect page so a wrong frontend base path cannot be reported as a successful release.
 
 Complete database replacement is exceptional and must be explicit:
 
@@ -57,15 +58,15 @@ Rules:
 - Load deployment values from `.enterprise-app-factory/secrets/runtime.env` or existing environment variables.
 - After a deployment succeeds, update this runbook with the verified command, required preconditions, rollback notes, and last success date.
 
-Last successful deploy: 2026-09-21
+Last successful deploy: 2026-09-23
 
 Latest verified application release:
 
-- Release `20260921155025` deployed the test-management, version-review, test-report, and child-task updates in the default application-only mode.
-- Flyway applied the new versioned migrations while preserving the existing database and the historical `V1.0.26` checksum.
+- Release `20260923120029` deployed commit `0ec3c09`, including the assistance business-parameter adjustments and the goal/performance copy updates, in the default application-only mode.
+- The existing production database was preserved; the deployment created a database and application backup before switching files.
 - Backend health, the internal frontend and authentication endpoints, the public frontend and authentication routes, service state, and Nginx configuration all passed.
-- Backup: `/opt/manage-admin/backups/20260921155025/`.
-- Database backup now uses `--no-tablespaces`, avoiding the MySQL `PROCESS` privilege warning for the dedicated application account.
+- The public index references `/manage-admin/assets/`, and the deployed entry JavaScript returned successfully.
+- Backup: `/opt/manage-admin/backups/20260923120029/`.
 
 Latest verified repair:
 

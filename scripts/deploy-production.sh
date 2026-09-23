@@ -146,7 +146,8 @@ run_ssh \
 echo "[2/6] Building frontend and backend"
 (
   cd "${ROOT_DIR}"
-  VITE_BASE_PATH="${FRONTEND_PATH}" VITE_API_BASE_URL="/manage-admin" npm run build
+  MSYS2_ENV_CONV_EXCL="VITE_BASE_PATH;VITE_API_BASE_URL" \
+    VITE_BASE_PATH="${FRONTEND_PATH}" VITE_API_BASE_URL="/manage-admin" npm run build
 )
 (
   cd "${ROOT_DIR}/backend"
@@ -329,8 +330,12 @@ REMOTE_SCRIPT
 
 echo "[6/6] Verifying the public route"
 PUBLIC_INDEX="${WORK_DIR}/public-index.html"
-curl --fail --silent --show-error "${PUBLIC_URL}" --output "${PUBLIC_INDEX}"
+curl --fail --silent --show-error \
+  -H 'Cache-Control: no-cache' \
+  "${PUBLIC_URL}?deploy=${RELEASE_ID}" \
+  --output "${PUBLIC_INDEX}"
 verify_frontend_base_path "${PUBLIC_INDEX}"
-curl --fail --silent --show-error --output /dev/null "${PUBLIC_URL%/}/app/prod_bugs"
+curl --fail --silent --show-error --output /dev/null \
+  "${PUBLIC_URL%/}/app/prod_bugs?deploy=${RELEASE_ID}"
 curl --fail --silent --show-error --output /dev/null "${PUBLIC_URL%/}/api/auth/dev-accounts"
 echo "Deployment ${RELEASE_ID} completed in ${DEPLOY_MODE} mode: ${PUBLIC_URL}"
