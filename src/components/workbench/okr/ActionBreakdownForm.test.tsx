@@ -27,13 +27,25 @@ describe('ActionBreakdownForm', () => {
     expect(screen.getByText('承接人员（可多选）')).toBeInTheDocument();
   });
 
-  it('adds and collapses multiple action cards', () => {
+  it('adds multiple blank actions without per-action collapse controls', () => {
     render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[]} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => undefined)} />);
 
     fireEvent.click(screen.getByRole('button', {name: '拆解动作'}));
     fireEvent.click(screen.getByRole('button', {name: '继续添加'}));
     expect(screen.getByText('关键动作 2')).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', {name: '收起'})[0]);
-    expect(screen.getByRole('button', {name: '展开'})).toBeInTheDocument();
+    expect(screen.getAllByRole('button', {name: '收起'})).toHaveLength(1);
   }, 15000);
+
+  it('opens a saved draft with its actual parent and does not show a new-action chooser', async () => {
+    const draft: OkrRecord = {
+      id: 'draft-1', kind: 'action', ownerId: 'me', periodKey: '2026-09', status: 'draft', version: 2,
+      payload: {title: '已保存的草稿', department: '产研部门', parentObjectiveId: 'objective-1', parentActionId: 'parent-action', parentKeyResultId: 'kr-1', structureType: 'product', productLine: '平台', milestone: '评审完成', deadline: '2026-09-30', weight: 60},
+    };
+    render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[draft]} people={people} busy={false} initialActionId={draft.id} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
+
+    expect(await screen.findByDisplayValue('已保存的草稿')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '拆解动作'})).not.toBeInTheDocument();
+    expect(screen.getByText('提升客户满意度')).toBeInTheDocument();
+    expect(screen.getByLabelText('关联产品线')).toHaveValue('平台');
+  });
 });

@@ -46,8 +46,43 @@
 .okr-objective-add { display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); font-size: 12px; }
 .okr-objective-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border-main); }
 .okr-objective-footer-spacer { flex: 1; }
+.original-okr .ant-btn-primary,
+.original-okr .ant-btn-primary span { color: var(--text-on-primary) !important; }
 .okr-summary-card { border-color: var(--border-main); background: var(--bg-card); }
 .okr-summary-card:hover { border-color: var(--border-subtle); }
+.okr-summary-month-list { display: grid; gap: 16px; }
+.okr-summary-month-card { border:0; background:transparent; box-shadow:none; }
+.okr-summary-month-card .ant-card-body { padding:0; }
+.okr-summary-month-head { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border: 0; border-bottom: 1px solid var(--border-main); background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; }
+.okr-summary-month-head > span:first-child { display: flex; align-items: baseline; gap: 12px; font-size: 18px; font-weight: 700; }
+.okr-summary-month-head small { color: var(--text-muted); font-size: 12px; font-weight: 500; }
+.okr-summary-month-head > span:last-child { color: var(--primary); font-size: 12px; font-weight: 600; }
+.okr-summary-month-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; padding:16px 0 0; }
+.okr-target-card { min-height: 0; }
+.okr-target-card .ant-card-body { padding:24px; }
+.okr-target-card .okr-my-review-card-head h3 { margin:8px 0 4px; font-size:16px; line-height:24px; }
+.okr-objective-readonly-tree { display:grid; gap:16px; padding:0; color:var(--text-primary); }
+.okr-tree-heading { display:flex; align-items:center; gap:12px; padding:0 4px; }
+.okr-tree-heading h2 { margin:0; font-size:18px; line-height:26px; }
+.okr-tree-heading > span { margin-left:auto; color:var(--text-muted); font-size:12px; }
+.okr-tree-node { display:grid; gap:8px; padding:16px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); }
+.okr-tree-node-head { display:flex; min-width:0; align-items:center; gap:12px; }
+.okr-tree-node-head strong { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
+.okr-tree-node-head > span:last-child { color:var(--text-muted); font-size:12px; }
+.okr-tree-level-two { margin-left:24px; background:var(--bg-surface); }
+.okr-tree-level-three { margin-left:24px; background:var(--bg-surface-soft); }
+.okr-tree-level-four { margin-left:24px; background:var(--bg-elevated); }
+.okr-tree-assignee { color:var(--text-muted); font-size:12px; line-height:20px; }
+.okr-target-card-tags { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.okr-target-card-tags .ant-tag { margin:0; }
+.okr-objective-period { display:flex; align-items:center; justify-content:space-between; }
+.okr-target-index { display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:28px; border:1px solid var(--primary); border-radius:6px; color:var(--primary); font-size:14px; }
+.okr-target-objective-title { display:flex; align-items:center; gap:12px; margin-top:18px; color:var(--text-primary); }
+.okr-target-objective-title strong { font-size:20px; font-weight:600; }
+.okr-target-owner { margin-left:auto; color:var(--text-muted); font-size:12px; }
+.okr-target-remaining { display:flex; align-items:center; gap:6px; margin-top:12px; color:var(--text-muted); font-size:12px; }
+.okr-target-remaining svg { color:var(--primary); }
+.okr-summary-head .okr-summary-index { margin-right: 8px; }
 .okr-summary-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
 .okr-summary-index { display: inline-flex; min-width: 32px; height: 24px; align-items: center; justify-content: center; padding: 0 8px; border: 1px solid color-mix(in srgb,var(--primary) 42%,var(--border-main)); border-radius: 6px; background: color-mix(in srgb,var(--primary) 12%,transparent); color: var(--active-text); font-size: 12px; font-weight: 700; }
 .okr-summary-title { margin: 0; color: var(--text-primary); font-size: 16px; line-height: 24px; }
@@ -220,6 +255,18 @@
 .okr-my-review-summary p { min-height:38px; margin:0; color:var(--text-body); font-size:12px; line-height:18px; }
 .okr-my-review-summary div { display:flex; gap:16px; font-size:11px; }.okr-my-review-summary .is-normal{color:var(--success)}.okr-my-review-summary .is-risk{color:var(--warning)}.okr-my-review-summary .is-blocked{color:var(--danger)}
 .okr-my-review-actions { display:flex; gap:8px; margin-top:16px; }
+.okr-detail-page { display:grid; gap:16px; }
+.okr-detail-toolbar { display:flex; align-items:center; gap:12px; }
+.okr-month-record-list { display:grid; gap:12px; }
+.okr-month-record-item > div { display:flex; align-items:center; gap:10px; }
+.okr-month-record-item strong { min-width:0; flex:1; overflow:hidden; color:var(--text-primary); font-size:14px; font-weight:500; text-overflow:ellipsis; white-space:nowrap; }
+.okr-month-record-item .ant-card-body { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; }
+.okr-action-detail-card { display:grid; gap:18px; }
+.okr-detail-title { display:flex; align-items:center; gap:10px; }
+.okr-detail-title h2 { margin:0; color:var(--text-primary); font-size:18px; }
+.okr-action-detail-grid { display:grid; grid-template-columns:140px minmax(0,1fr); gap:12px 18px; padding:16px; border:1px solid var(--border-main); border-radius:6px; }
+.okr-action-detail-grid span { color:var(--text-muted); font-size:12px; }
+.okr-action-detail-grid b { color:var(--text-body); font-size:13px; font-weight:500; }
 .okr-review-empty { display:flex; min-height:420px; align-items:center; justify-content:center; padding:32px; border:1px dashed var(--border-main); border-radius:8px; background:var(--bg-surface); text-align:center; }
 .okr-received-layout { display:grid; grid-template-columns:360px minmax(0,1fr); min-height:650px; overflow:hidden; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
 .okr-received-list { border-right:1px solid var(--border-main); background:var(--bg-card); }
@@ -232,6 +279,7 @@
 .okr-received-summary-row { display:grid; gap:10px; padding:18px 0; }.okr-received-summary-row > div { display:grid; grid-template-columns:52px minmax(80px,1fr) 42px 40px minmax(80px,1fr) 42px auto; align-items:center; gap:8px; color:var(--text-muted); font-size:11px; }.okr-received-summary-row .ant-progress{margin:0}.okr-received-summary-row b{color:var(--text-primary);font-size:12px}
 .okr-received-section { margin-top:12px; padding:16px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); }.okr-received-section-title{display:flex;align-items:center;gap:8px}.okr-received-section-title svg{color:var(--success)}.okr-received-section-title h3{margin:0;color:var(--text-primary);font-size:14px}.okr-received-section-title strong{margin-left:auto;color:var(--text-muted);font-size:12px}.okr-received-section p{margin:12px 0 0;color:var(--text-body);font-size:12px;line-height:20px}.okr-received-risk{display:flex;gap:8px;margin-top:12px;color:var(--warning);font-size:12px}.okr-received-next{display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-main);color:var(--text-body);font-size:12px}.okr-received-next b{color:var(--text-muted)}.okr-received-two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.okr-received-feedback{display:flex;gap:8px;margin-top:16px}.okr-received-feedback .ant-input{flex:1}
 @media (max-width:900px){.okr-my-review-grid,.okr-received-two-col{grid-template-columns:1fr}.okr-received-layout{grid-template-columns:1fr}.okr-received-list{border-right:0;border-bottom:1px solid var(--border-main)}.okr-review-month-rail{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media (max-width:900px){.okr-summary-month-body{grid-template-columns:1fr}}
 @media (max-width: 900px) { .okr-work-association-filters { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .okr-review-layout { grid-template-columns: 1fr; } .okr-review-aside { position: static; grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 760px) { .okr-review-toolbar { align-items: flex-start; flex-direction: column; } .okr-review-toolbar-actions { justify-content: flex-start; } .okr-review-stats { grid-template-columns: 1fr; } .okr-review-stats > div + div { border-top: 1px solid var(--border-main); border-left: 0; } .okr-review-basics, .okr-review-narratives, .okr-review-assistance, .okr-review-aside { grid-template-columns: 1fr; } .okr-review-progress { grid-template-columns: 40px minmax(80px,1fr); } .okr-review-progress .ant-input-number-group-wrapper { grid-column: 2; } .okr-review-section-head, .okr-review-kr-head { align-items: flex-start; flex-direction: column; } }

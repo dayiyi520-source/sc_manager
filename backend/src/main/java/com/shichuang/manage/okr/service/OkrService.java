@@ -16,9 +16,17 @@ import java.util.*;
  public List<Map<String,Object>> records(){
   AuthorizationService.requireRead("okr");
   String me=RequestContext.userId();var reporting=people();
-  String boss=reporting.stream().filter(p->me.equals(p.get("id"))).map(p->Objects.toString(p.get("supervisorId"),"")).findFirst().orElse("");
+  var meProfile=reporting.stream().filter(p->me.equals(p.get("id"))).findFirst().orElse(Map.of());
+  String boss=Objects.toString(meProfile.get("supervisorId"),"");
   var reports=new HashSet<String>();for(var p:reporting)if(me.equals(p.get("supervisorId")))reports.add(p.get("id").toString());
-  return mapper.records(RequestContext.tenantId()).stream().filter(r->me.equals(r.get("ownerId"))||reports.contains(r.get("ownerId"))||"objective".equals(r.get("kind"))&&boss.equals(r.get("ownerId"))).toList();
+  var all=mapper.records(RequestContext.tenantId());var visibleOwners=new HashSet<String>();visibleOwners.add(me);visibleOwners.addAll(reports);
+  boolean root=((Number)meProfile.getOrDefault("rootFlag",0)).intValue()==1;
+  if(root){
+   for(var record:all)if("objective".equals(record.get("kind"))&&me.equals(record.get("ownerId")))for(var kr:rows(payload(record.get("payload")).getOrDefault("keyResults",List.of()))){Object ids=kr.get("assigneeIds");if(ids instanceof List<?> assignees)for(Object id:assignees)visibleOwners.add(Objects.toString(id,""));}
+   for(var record:all)if("action".equals(record.get("kind"))&&me.equals(record.get("ownerId"))){var action=payload(record.get("payload"));String parentId=Objects.toString(action.get("parentActionId"),"");if(!parentId.isBlank()&&all.stream().anyMatch(candidate->"action".equals(candidate.get("kind"))&&parentId.equals(candidate.get("id"))&&me.equals(candidate.get("ownerId")))){Object ids=action.get("assigneeIds");if(ids instanceof List<?> assignees)for(Object id:assignees)visibleOwners.add(Objects.toString(id,""));}}
+   boolean changed;do{changed=false;for(var record:all)if("action".equals(record.get("kind"))&&visibleOwners.contains(record.get("ownerId"))){Object ids=payload(record.get("payload")).get("assigneeIds");if(ids instanceof List<?> assignees)for(Object id:assignees)changed|=visibleOwners.add(Objects.toString(id,""));}}while(changed);
+  }
+  return all.stream().filter(r->visibleOwners.contains(r.get("ownerId"))||"objective".equals(r.get("kind"))&&boss.equals(r.get("ownerId"))).toList();
  }
  public List<Map<String,Object>> actionParents(String period){
   AuthorizationService.requireRead("okr");
@@ -27,30 +35,30 @@ import java.util.*;
   String boss=people.stream().filter(p->me.equals(p.get("id"))).map(p->Objects.toString(p.get("supervisorId"),"")).findFirst().orElse("");
   var all=mapper.records(RequestContext.tenantId());
   var result=new ArrayList<Map<String,Object>>();
+  var actionsById=new HashMap<String,Map<String,Object>>();for(var record:all)if("action".equals(record.get("kind"))&&period.equals(record.get("periodKey")))actionsById.put(Objects.toString(record.get("id")),record);
+  var seen=new HashSet<String>();
   for(var record:all){
-   if("action".equals(record.get("kind"))&&period.equals(record.get("periodKey"))){
-    var p=payload(record.get("payload"));
-    if(me.equals(Objects.toString(p.get("assigneeId"),"")) || p.get("assigneeIds") instanceof List<?> ids && ids.stream().map(Object::toString).anyMatch(me::equals)){
-     var item=new LinkedHashMap<String,Object>(record);item.put("parentObjectiveId",p.get("parentObjectiveId"));item.put("payload",Map.of("title",p.get("title"),"parentObjectiveId",p.get("parentObjectiveId"),"parentActionId",record.get("id")));result.add(item);
-    }
-    continue;
+   if(!"objective".equals(record.get("kind"))||!period.equals(record.get("periodKey"))||!Set.of("active","submitted","reviewed").contains(record.get("status"))||!boss.equals(Objects.toString(record.get("ownerId"),"")))continue;
+   for(var kr:rows(payload(record.get("payload")).getOrDefault("keyResults",List.of())))if(assignedTo(kr,me)){
+    String id=Objects.toString(kr.get("id"),"");if(seen.add(id)){var item=new LinkedHashMap<String,Object>();item.put("id",id);item.put("kind","action");item.put("ownerId",record.get("ownerId"));item.put("periodKey",period);item.put("status",record.get("status"));item.put("version",record.get("version"));item.put("parentObjectiveId",record.get("id"));item.put("parentKeyResultId",id);item.put("payload",Map.of("title",kr.get("title"),"parentObjectiveId",record.get("id"),"parentActionId",id,"parentKeyResultId",id));result.add(item);}
    }
-   if(!"objective".equals(record.get("kind"))||!period.equals(record.get("periodKey"))||!Set.of("active","submitted","reviewed").contains(record.get("status")))continue;
-   boolean fromSupervisor=boss.equals(Objects.toString(record.get("ownerId"),""));
-   if(!fromSupervisor)continue;
-   var p=payload(record.get("payload"));
-   for(var kr:rows(p.getOrDefault("keyResults",List.of()))){
-    var assignees=kr.get("assigneeIds");
-    if(!(assignees instanceof List<?> ids)||!ids.stream().map(Object::toString).anyMatch(me::equals))continue;
-    var item=new LinkedHashMap<String,Object>();item.put("id",kr.get("id"));item.put("kind","action");item.put("ownerId",record.get("ownerId"));item.put("periodKey",period);item.put("status",record.get("status"));item.put("version",record.get("version"));item.put("parentObjectiveId",record.get("id"));item.put("payload",Map.of("title",kr.get("title"),"parentObjectiveId",record.get("id"),"parentActionId",kr.get("id")));result.add(item);
-   }
+  }
+  var currentProfile=people.stream().filter(p->me.equals(p.get("id"))).findFirst().orElse(Map.of());boolean organizationRoot=((Number)currentProfile.getOrDefault("rootFlag",0)).intValue()==1;
+  for(var child:actionsById.values()){
+   if(organizationRoot||!Set.of("active","submitted","reviewed").contains(child.get("status"))||!me.equals(child.get("ownerId")))continue;
+   var childPayload=payload(child.get("payload"));String parentId=Objects.toString(childPayload.get("parentActionId"),"");var parent=actionsById.get(parentId);
+   if(parent==null||me.equals(parent.get("ownerId")))continue;
+   var parentPayload=payload(parent.get("payload"));String objectiveId=Objects.toString(parentPayload.get("parentObjectiveId"),"");String keyResultId=Objects.toString(parentPayload.getOrDefault("parentKeyResultId",parentId),parentId);String key=parentId+":"+objectiveId+":"+keyResultId;
+   if(!seen.add(key))continue;
+   var item=new LinkedHashMap<String,Object>();item.put("id",parentId);item.put("kind","action");item.put("ownerId",parent.get("ownerId"));item.put("periodKey",period);item.put("status",parent.get("status"));item.put("version",parent.get("version"));item.put("parentObjectiveId",objectiveId);item.put("parentKeyResultId",keyResultId);item.put("payload",Map.of("title",parentPayload.get("title"),"parentObjectiveId",objectiveId,"parentActionId",parentId,"parentKeyResultId",keyResultId));result.add(item);
   }
   return result;
  }
+ private boolean assignedTo(Map<String,Object> payload,String user){Object ids=payload.get("assigneeIds");if(ids instanceof List<?> list&&list.stream().map(Object::toString).anyMatch(user::equals))return true;return user.equals(Objects.toString(payload.get("assigneeId"),""));}
  @Transactional public Map<String,Object> createAction(Map<String,Object> body){
   String period=required(body,"periodKey");var input=payload(body.getOrDefault("payload",Map.of()));String creator=RequestContext.userId();
-  required(input,"title");String parentAction=required(input,"parentActionId");String parentObjective=required(input,"parentObjectiveId");
-  var parents=actionParents(period);var parent=parents.stream().filter(r->parentAction.equals(r.get("id"))&&parentObjective.equals(r.get("parentObjectiveId"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更"));
+  required(input,"title");String parentAction=required(input,"parentActionId");String parentObjective=required(input,"parentObjectiveId");String parentKeyResult=Objects.toString(input.get("parentKeyResultId"),parentAction);
+  var parents=actionParents(period);var parent=parents.stream().filter(r->parentAction.equals(r.get("id"))&&parentObjective.equals(r.get("parentObjectiveId"))&&parentKeyResult.equals(r.get("parentKeyResultId"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更"));
   String department=required(input,"department"),type=required(input,"structureType");
   if(!Set.of("product","presales","delivery","support").contains(type))throw new IllegalArgumentException("部门结构类型无效");
   required(input,"deadline");try{java.time.LocalDate.parse(input.get("deadline").toString());}catch(Exception e){throw new IllegalArgumentException("完成时间无效");}
@@ -58,7 +66,7 @@ import java.util.*;
   if(type.equals("product"))required(input,"productLine");else if(Set.of("presales","delivery").contains(type))required(input,"businessObject");
   String assignee=Objects.toString(input.get("assigneeId"),"");if(!assignee.isBlank())person(assignee);
   if(input.containsKey("assigneeIds")){if(!(input.get("assigneeIds") instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("承接人员格式无效");for(Object id:ids)person(Objects.toString(id,""));}
-  input.put("creatorId",creator);input.put("parentActionId",parentAction);input.put("parentObjectiveId",parentObjective);
+  input.put("creatorId",creator);input.put("parentActionId",parentAction);input.put("parentObjectiveId",parentObjective);input.put("parentKeyResultId",parentKeyResult);
   boolean submit=Boolean.TRUE.equals(body.get("submit"));String state=submit?"active":"draft";
   String id=UUID.randomUUID().toString(),data=encode(input);mapper.insert(RequestContext.tenantId(),id,"action",creator,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit_action":"draft_action",creator,data);return Map.of("id",id,"status",state,"version",0);
  }
@@ -272,10 +280,10 @@ import java.util.*;
   if("objective".equals(kind)&&"submit".equals(action)&&!java.time.YearMonth.now().toString().equals(s.get("periodKey")))throw new IllegalArgumentException("只能提交进行中的当前月份目标");
   var p=payload(s.get("payload"));String next;
   if("action".equals(kind)){
-   if(!own||!Set.of("draft","active").contains(state)||!Set.of("save","submit").contains(action))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅可编辑本人未完成的拆解动作");
+   if(!own||!Set.of("draft").contains(state)||!Set.of("save","submit").contains(action))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅可编辑本人拆解动作草稿");
    p=payload(b.get("payload"));required(p,"title");required(p,"parentActionId");required(p,"parentObjectiveId");required(p,"department");required(p,"deadline");integer(p.get("weight"),1,100);String type=required(p,"structureType");if(!Set.of("product","presales","delivery","support").contains(type))throw new IllegalArgumentException("部门结构类型无效");if(type.equals("support"))required(p,"acceptanceStandard");else required(p,"milestone");if(type.equals("product"))required(p,"productLine");else if(Set.of("presales","delivery").contains(type))required(p,"businessObject");
    if(p.containsKey("assigneeIds")){if(!(p.get("assigneeIds") instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("承接人员格式无效");for(Object assigneeId:ids)person(Objects.toString(assigneeId,""));}
-   String parentActionId=p.get("parentActionId").toString(), parentObjectiveId=p.get("parentObjectiveId").toString();boolean parent=actionParents(s.get("periodKey").toString()).stream().anyMatch(r->parentActionId.equals(r.get("id"))&&parentObjectiveId.equals(r.get("parentObjectiveId")));if(!parent)throw new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更");
+   String parentActionId=p.get("parentActionId").toString(), parentObjectiveId=p.get("parentObjectiveId").toString(),parentKeyResultId=Objects.toString(p.get("parentKeyResultId"),parentActionId);boolean parent=actionParents(s.get("periodKey").toString()).stream().anyMatch(r->parentActionId.equals(r.get("id"))&&parentObjectiveId.equals(r.get("parentObjectiveId"))&&parentKeyResultId.equals(r.get("parentKeyResultId")));if(!parent)throw new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更");p.put("parentKeyResultId",parentKeyResultId);
    String actionState="submit".equals(action)?"active":"draft";int version=integer(b.get("version"),0,Integer.MAX_VALUE);
    if(mapper.update(RequestContext.tenantId(),id,version,actionState,encode(p),RequestContext.userId())!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"拆解动作已变更，请刷新后重试");
    mapper.event(RequestContext.tenantId(),id,action,RequestContext.userId(),encode(Map.of("from",state,"to",actionState,"payload",p)));return;

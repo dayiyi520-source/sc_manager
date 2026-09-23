@@ -58,6 +58,19 @@ export function useOriginalOkr() {
     }catch(error){addToast('error',error instanceof Error?error.message:'提交失败，请重试');return false;}
     finally{setBusy(false);}
   };
+  const submitOkrDraft = async (id: string) => {
+    const record = all.find(item => item.id === id && (item.kind === 'objective' || item.kind === 'action'));
+    if (!record) { addToast('error', '目标记录不存在或已刷新'); return false; }
+    if (record.status !== 'draft') { addToast('error', '只有草稿可以提交'); return false; }
+    setBusy(true);
+    try {
+      await okrRepository.update(record, 'submit', { payload: record.payload });
+      await refresh();
+      addToast('success', record.kind === 'action' ? '拆解动作已提交' : '目标已提交');
+      return true;
+    } catch(error) { addToast('error', error instanceof Error ? error.message : '提交失败，请重试'); return false; }
+    finally { setBusy(false); }
+  };
   const save = async (kind: 'objective' | 'review', period:string, payload:OkrPayload, submit = true) => {
     setBusy(true);
     try {
@@ -66,6 +79,14 @@ export function useOriginalOkr() {
     } catch(error) { addToast('error',error instanceof Error?error.message:'提交失败，请重试'); return false; }
     finally {setBusy(false);}
   };
+  const updateOkr = async (recordId: string, payload: OkrPayload, submit = false) => {
+    const record = all.find(item => item.id === recordId && item.kind === 'objective');
+    if (!record) { addToast('error', '目标记录不存在或已刷新'); return false; }
+    setBusy(true);
+    try { await okrRepository.update(record, submit ? 'submit' : 'save', { payload }); await refresh(); addToast('success', submit ? '目标已提交' : '目标草稿已保存'); return true; }
+    catch(error) { addToast('error', error instanceof Error ? error.message : '目标保存失败'); return false; }
+    finally { setBusy(false); }
+  };
   return {records:all,okrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
     error:records.error || peopleQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
     actionParents:actionParents.data || [],actionParentsLoading:actionParents.isPending,actionParentsError:actionParents.error,saveActions,
@@ -73,6 +94,6 @@ export function useOriginalOkr() {
     saveObjectiveDraft:(period:string,payload:OkrPayload)=>save('objective',period,payload,false),
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
     saveReviewDraft:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload,false),
-    submitReviewDraft,
+    submitReviewDraft,submitOkrDraft,updateOkr,
   };
 }

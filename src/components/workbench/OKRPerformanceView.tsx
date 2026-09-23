@@ -1,10 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Alert, Button, Empty, Input, Modal, Progress, Cascader, Spin, Tag, Tabs } from 'antd';
+import { Alert, Button, Empty, Input, Modal, Progress, Cascader, Spin, Tag, Tabs, Flex, Typography } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
 import { Target, FileSpreadsheet, Plus, Calendar, ChevronDown, ChevronRight, Search, CheckCircle, AlertTriangle, FileText, GitBranch } from '@/components/common/octicons-compat';
-import { useApp } from '../../context/AppContext';
+import { useApp, useAppNavigationContext } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
 import { cycleOptions } from './okr/cycleOptions';
@@ -28,6 +28,8 @@ type StoredExtraWork = {
   impact?: string;
 };
 
+type SummaryKr = { content: string; progress: number; weight: number; deadline: string };
+
 const parseStoredExtraWork = (description?: string): StoredExtraWork[] => {
   if (!description?.startsWith('[')) return [];
   try {
@@ -48,7 +50,8 @@ const impactLabel = (value?: string) => ({
 
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
-  const { records, okrs, performances, people, work, actionParents, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, busy } = useOriginalOkr();
+  const { openPageTab } = useAppNavigationContext();
+  const { records, okrs, performances, people, work, actionParents, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, busy } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -65,6 +68,7 @@ const OriginalWorkspace: React.FC = () => {
   const [copiedReviewId, setCopiedReviewId] = useState<string | null>(null);
   const [expandedReviewIds, setExpandedReviewIds] = useState<Set<string>>(() => new Set());
   const [draftToSubmit, setDraftToSubmit] = useState<string | null>(null);
+  const [okrDraftToSubmit, setOkrDraftToSubmit] = useState<string | null>(null);
   const [receivedSearch, setReceivedSearch] = useState('');
   const [receivedFilter, setReceivedFilter] = useState<'pending'|'reviewed'|'all'>('pending');
   const [selectedReceivedId, setSelectedReceivedId] = useState<string | null>(null);
@@ -75,6 +79,10 @@ const OriginalWorkspace: React.FC = () => {
   // Add OKR Modal State
   const [objectiveForms, setObjectiveForms] = useState<string[]>([]);
   const [actionFormOpen, setActionFormOpen] = useState(false);
+  const [editingActionId, setEditingActionId] = useState<string | undefined>();
+  const [collapsedSummaryMonths, setCollapsedSummaryMonths] = useState<Set<string>>(() => new Set());
+  const [selectedOkrRecordId, setSelectedOkrRecordId] = useState<string | null>(null);
+  const [selectedMonthDetail, setSelectedMonthDetail] = useState<string | null>(null);
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
   const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const newOkrCycle = dayjs().format('YYYY-MM');
@@ -97,7 +105,8 @@ const OriginalWorkspace: React.FC = () => {
     return o.department !== currentUser.department;
   };
   const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && matchesCategory(o));
-  const myActions = records.filter(record => record.kind === 'action' && record.ownerId === currentUser.id && selectedCycles.includes(record.periodKey));
+  const myActions = records.filter(record => record.kind === 'action' && record.ownerId === currentUser.id && selectedCycles.includes(record.periodKey) && record.status !== 'draft');
+  const myActionDrafts = records.filter(record => record.kind === 'action' && record.ownerId === currentUser.id && selectedCycles.includes(record.periodKey) && record.status === 'draft');
   const visiblePerformances = performances.filter(performance => (
     reviewSubTab === 'my'
       ? performance.authorId === currentUser.id
@@ -115,6 +124,45 @@ const OriginalWorkspace: React.FC = () => {
   const detailReview = performances.find(performance => performance.id === reviewDetailId && performance.authorId === currentUser.id);
   const copiedReview = records.find(record => record.id === copiedReviewId && record.kind === 'review');
   const copiedInitialPayload = copiedReview ? createReviewCopyDraft(copiedReview.payload) : undefined;
+  const selectedOkrRecord = records.find(record => record.id === selectedOkrRecordId && (record.kind === 'objective' || record.kind === 'action'));
+  const visibleActionParents = actionParents;
+  const displayActionForm = actionFormOpen;
+
+  const renderObjectiveTree = (record: typeof selectedOkrRecord) => {
+    if (!record) return null;
+    const payload = record.payload;
+    const childActions = records.filter(item => item.kind === 'action' && item.periodKey === record.periodKey && item.payload.parentObjectiveId === record.id && item.status !== 'draft');
+    const personName = (id: string) => people.find(person => person.id === id)?.name || id;
+    const assignees = (ids?: string[]) => ids?.length ? ids.map(personName).join('、') : '未指定承接人';
+    return <div className="okr-objective-readonly-tree">
+      <div className="okr-objective-period"><span>{dayjs(record.periodKey).format('YYYY年MM月')}<span>已提交</span></span><Button type="text" onClick={() => setSelectedOkrRecordId(null)}>取消</Button></div>
+      <div className="okr-tree-heading"><Tag color="processing">目标详情</Tag><h2>{payload.title}</h2><span>提交时间：{record.createdAt ? dayjs(record.createdAt).format('YYYY-MM-DD HH:mm') : '—'}</span></div>
+      <div className="okr-tree-node okr-tree-root"><div className="okr-tree-node-head"><span className="okr-summary-index">O1</span><strong>{payload.title}</strong><span>综合进度 {payload.progress || 0}%</span></div>
+        {(payload.keyResults || []).map((kr, index) => <div className="okr-tree-node okr-tree-level-two" key={kr.id}><div className="okr-tree-node-head"><span className="okr-summary-index">A{index + 1}</span><strong>{kr.title}</strong><span>进度 {kr.progress || 0}% · 权重 {kr.weight}%</span></div><div className="okr-tree-assignee">承接人：{assignees(kr.assigneeIds)}</div>
+          {childActions.filter(action => action.payload.parentKeyResultId === kr.id || action.payload.parentActionId === kr.id).map((action, childIndex) => <div className="okr-tree-node okr-tree-level-three" key={action.id}><div className="okr-tree-node-head"><span className="okr-summary-index">A{index + 1}.{childIndex + 1}</span><strong>{action.payload.title}</strong><Tag color="success">已提交</Tag></div><div className="okr-tree-assignee">{action.payload.department || '—'} · 承接人：{action.payload.assigneeName || assignees(action.payload.assigneeIds)}</div>{records.filter(item => item.kind === 'action' && item.status !== 'draft' && item.payload.parentActionId === action.id).map((employeeAction, employeeIndex) => <div className="okr-tree-node okr-tree-level-four" key={employeeAction.id}><div className="okr-tree-node-head"><span className="okr-summary-index">A{index + 1}.{childIndex + 1}.{employeeIndex + 1}</span><strong>{employeeAction.payload.title}</strong><Tag color="success">已提交</Tag></div><div className="okr-tree-assignee">{employeeAction.payload.department || '—'} · 承接人：{employeeAction.payload.assigneeName || assignees(employeeAction.payload.assigneeIds)}</div></div>)}</div>)}</div>)}
+      </div>
+    </div>;
+  };
+
+  const summaryMonths = Array.from(new Set([...filteredOkrs.map(item => item.cycle), ...myActions.map(item => item.periodKey), ...myActionDrafts.map(item => item.periodKey)])).sort().reverse();
+
+  const renderSummaryCard = (key: string, cycle: string, progress: number, objectiveCount: number, keyResults: SummaryKr[], status: string, submittedAt: string | undefined, onSubmitDraft: () => void, onOpen: () => void, draftCount = 0) => {
+    const statusLabel = status === 'draft' ? '草稿' : status === 'active' ? '已生效' : '已提交';
+    const average = keyResults.length ? Math.round(keyResults.reduce((sum, item) => sum + item.progress, 0) / keyResults.length) : progress;
+    const deadline = keyResults.map(item => item.deadline).filter(Boolean).sort()[0];
+    const remaining = deadline ? Math.ceil(dayjs(deadline).endOf('day').diff(dayjs(), 'day', true)) : null;
+    const remainingLabel = remaining === null ? '未设置截止日' : remaining < 0 ? `已逾期 ${Math.abs(remaining)} 天` : `剩余 ${remaining} 天`;
+    const submittedLabel = submittedAt ? dayjs(submittedAt).format('YYYY-MM-DD') : '暂无提交时间';
+    return (
+    <Card key={key} className="okr-my-review-card okr-target-card">
+      <div className="okr-target-card-tags"><Tag>{remainingLabel}</Tag><Tag color={status === 'draft' ? 'default' : 'processing'}>{statusLabel}</Tag></div>
+      <div className="okr-my-review-card-head"><div><h3>{dayjs(cycle).format('YYYY年MM月')}月度目标</h3><span>提交时间：{submittedLabel}</span></div></div>
+      <div className="okr-my-review-score"><Progress type="circle" percent={average} size={68} /><div><b>目标综合进度</b><strong>{average}%</strong></div></div>
+      <div className="okr-my-review-metrics"><span><Target />{objectiveCount} 个 O</span><span><FileText />{keyResults.length} 个 A</span><span><CheckCircle />{keyResults.filter(item => item.progress >= 100).length} 个完成的 A</span></div>
+      <div className="okr-my-review-actions">{draftCount > 0 && <Button type="primary" onClick={onSubmitDraft}>查看草稿 ({draftCount})</Button>}<Button onClick={onOpen}>查看详情</Button></div>
+    </Card>
+    );
+  };
 
   const handleSaveOkr = async (payload: Parameters<typeof saveObjective>[1]) => {
     if (await saveObjective(newOkrCycle, payload)) {
@@ -198,7 +246,7 @@ const OriginalWorkspace: React.FC = () => {
               <Plus className="w-3.5 h-3.5" />
               添加目标
             </Button>
-            <Button id="btn-breakdown-action" icon={<GitBranch />} disabled={busy} onClick={() => { setOkrCategoryTab('my'); setActionFormOpen(true); }}>
+            <Button id="btn-breakdown-action" icon={<GitBranch />} disabled={busy} onClick={() => { setOkrCategoryTab('my'); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedOkrRecordId(null); setActionFormOpen(true); }}>
               拆解动作
             </Button>
           </div>
@@ -224,7 +272,7 @@ const OriginalWorkspace: React.FC = () => {
           {okrCategoryTab === 'my' && objectiveForms.length > 0 && (
             <div className={`okr-objective-form-stack${objectiveBatchAction ? ' is-batching' : ''}`} aria-busy={objectiveBatchAction !== null}>
             <div className="okr-objective-period">{dayjs(newOkrCycle).format('YYYY年MM月')}<span>进行中</span></div>
-            {objectiveForms.map((formId, formIndex) => (
+              {objectiveForms.map((formId, formIndex) => (
             <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={newOkrCycle} objectiveIndex={formIndex} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error}
               root={!!me?.rootFlag}
               onCancel={() => setObjectiveForms(forms => forms.filter(id => id !== formId))}
@@ -236,79 +284,20 @@ const OriginalWorkspace: React.FC = () => {
             </div>
           )}
 
-          {okrCategoryTab === 'my' && actionFormOpen && <ActionBreakdownForm open cycle={newOkrCycle} person={me} parents={actionParents} actions={myActions} people={people} busy={busy} onClose={() => setActionFormOpen(false)} onSave={async (parent, values, mode) => { const payloads = values.map(value => ({ recordId: value.recordId, version: value.version, title: value.title, department: me?.department || '其他支撑', parentObjectiveId: String(parent.payload.parentObjectiveId || ''), parentActionId: parent.id, assigneeIds: value.assigneeIds || [], assigneeName: (value.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'), structureType: /产研|产品|研发|技术/.test(me?.department || '') ? 'product' : /售前|销售|市场/.test(me?.department || '') ? 'presales' : /交付|项目|实施/.test(me?.department || '') ? 'delivery' : 'support', productLine: value.businessObject, businessObject: value.businessObject, acceptanceStandard: value.businessObject, milestone: value.milestone, deadline: value.deadline?.format('YYYY-MM-DD') || '', weight: Number(value.weight || 0) })); return saveActions(newOkrCycle, payloads, mode === 'submit'); }} />}
+          {okrCategoryTab === 'my' && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key={editingActionId || 'new-action'} open cycle={newOkrCycle} person={me} parents={visibleActionParents} actions={records.filter(record => record.kind === 'action' && record.ownerId === currentUser.id)} people={people} busy={busy} initialActionId={editingActionId} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={async (parent, values, mode) => { const payloads = values.map(value => ({ recordId: value.recordId, version: value.version, title: value.title, department: me?.department || '其他支撑', parentObjectiveId: String(parent.payload.parentObjectiveId || ''), parentActionId: parent.payload.parentActionId || parent.id, parentKeyResultId: String(parent.payload.parentKeyResultId || parent.id), assigneeIds: value.assigneeIds || [], assigneeName: (value.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'), structureType: /产研|产品|研发|技术/.test(me?.department || '') ? 'product' : /售前|销售|市场/.test(me?.department || '') ? 'presales' : /交付|项目|实施/.test(me?.department || '') ? 'delivery' : 'support', productLine: value.businessObject, businessObject: value.businessObject, acceptanceStandard: value.businessObject, milestone: value.milestone, deadline: value.deadline?.format('YYYY-MM-DD') || '', weight: Number(value.weight || 0) })); const saved = await saveActions(newOkrCycle, payloads, mode === 'submit'); if (saved) { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); } return saved; }} />}
 
 
           {/* OKR Cards List */}
-          <div className="space-y-4">
-            {filteredOkrs.length === 0 && objectiveForms.length === 0 && !loading && !error ? (
+          {selectedOkrRecord?.kind === 'action' && selectedOkrRecord.status === 'draft' ? <div className="okr-detail-page"><ActionBreakdownForm key={`action-draft-${selectedOkrRecord.id}`} open cycle={selectedOkrRecord.periodKey} person={me} parents={visibleActionParents} actions={[selectedOkrRecord]} people={people} busy={busy} initialActionId={selectedOkrRecord.id} onClose={() => setSelectedOkrRecordId(null)} onSave={async (parent, values, mode) => { const value = values[0]; if (!value) return false; const updated = await saveActions(selectedOkrRecord.periodKey, [{recordId: value.recordId, version: value.version, title: value.title, department: me?.department || '其他支撑', parentObjectiveId: String(parent.payload.parentObjectiveId || ''), parentActionId: parent.payload.parentActionId || parent.id, parentKeyResultId: String(parent.payload.parentKeyResultId || parent.id), assigneeIds: value.assigneeIds || [], assigneeName: (value.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'), structureType: selectedOkrRecord.payload.structureType || 'support', productLine: value.businessObject, businessObject: value.businessObject, acceptanceStandard: value.businessObject, milestone: value.milestone, deadline: value.deadline?.format('YYYY-MM-DD') || '', weight: Number(value.weight || 0)}], mode === 'submit'); if (updated) setSelectedOkrRecordId(null); return updated; }} /></div> : selectedOkrRecord ? <div className="okr-detail-page">
+            {selectedOkrRecord.kind === 'objective' ? (selectedOkrRecord.status === 'draft' ? <ObjectiveForm key={selectedOkrRecord.id} detailMode compactDetail cycle={selectedOkrRecord.periodKey} objectiveIndex={0} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error} root={!!me?.rootFlag} initialPayload={selectedOkrRecord.payload} onCancel={() => setSelectedOkrRecordId(null)} onSave={payload => updateOkr(selectedOkrRecord.id, payload, true).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })} onSaveDraft={payload => updateOkr(selectedOkrRecord.id, payload, false).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })} /> : renderObjectiveTree(selectedOkrRecord)) : <Card className="okr-action-detail-card"><div className="okr-objective-period okr-action-period"><span>{dayjs(selectedOkrRecord.periodKey).format('YYYY年MM月')}<span>已提交</span></span><Button type="text" onClick={() => setSelectedOkrRecordId(null)}>取消</Button></div><div className="okr-detail-title"><h2>拆解动作详情</h2></div><div className="okr-action-detail-grid"><span>动作名称</span><b>{selectedOkrRecord.payload.title}</b><span>所属目标</span><b>{selectedOkrRecord.payload.parentObjectiveId || '—'}</b><span>关联对象</span><b>{selectedOkrRecord.payload.productLine || selectedOkrRecord.payload.businessObject || selectedOkrRecord.payload.acceptanceStandard || '—'}</b><span>关键节点</span><b>{selectedOkrRecord.payload.milestone || '—'}</b><span>完成时间</span><b>{selectedOkrRecord.payload.deadline || '—'}</b><span>权重</span><b>{selectedOkrRecord.payload.weight || 0}%</b><span>承接人员</span><b>{selectedOkrRecord.payload.assigneeName || '未指定'}</b></div></Card>}
+          </div> : selectedMonthDetail ? <div className="okr-detail-page"><div className="okr-objective-period">{dayjs(selectedMonthDetail).format('YYYY年MM月')}<Button type="text" onClick={() => setSelectedMonthDetail(null)}>取消</Button></div>{okrDraftToSubmit && <Card className="okr-draft-submit-panel"><Typography.Text>提交这条目标或拆解动作草稿？</Typography.Text><Flex gap="small"><Button onClick={() => setOkrDraftToSubmit(null)}>取消</Button><Button type="primary" loading={busy} onClick={async () => { const ok = await submitOkrDraft(okrDraftToSubmit); if (ok) { setOkrDraftToSubmit(null); setSelectedMonthDetail(null); } }}>确认提交</Button></Flex></Card>}<div className="okr-month-record-list">{records.filter(record => record.ownerId === currentUser.id && record.periodKey === selectedMonthDetail && (record.kind === 'objective' || record.kind === 'action')).map((record, index) => <Card key={record.id} className="okr-month-record-item"><div><span className="okr-summary-index">{record.kind === 'objective' ? `O${index + 1}` : `A${index + 1}`}</span><strong>{record.payload.title}</strong><Tag color={record.status === 'draft' ? 'default' : 'processing'}>{record.status === 'draft' ? '草稿' : record.status === 'pending_review' ? '待审核' : record.status === 'active' ? '已生效' : '已提交'}</Tag></div><Flex gap="small">{record.status === 'draft' && <Button type="primary" onClick={() => setOkrDraftToSubmit(record.id)}>提交</Button>}<Button onClick={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedOkrRecordId(record.id); }}>{record.status === 'draft' ? '编辑' : '查看详情'}</Button></Flex></Card>)}</div></div> : (objectiveForms.length > 0 || actionFormOpen ? null : <div className="okr-summary-month-list">
+            {filteredOkrs.length === 0 && myActions.length === 0 && myActionDrafts.length === 0 && objectiveForms.length === 0 && !loading && !error ? (
               <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
                 <Empty description="本月暂无目标"/>
                 <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--text-muted)]">当前月份还没有填写 OKR，点击右上角“添加目标”开始设定。</p>
               </div>
-            ) : filteredOkrs.map((okr, oIdx) => (
-              <Card key={okr.id} className="okr-summary-card">
-                {/* Header of OKR */}
-                <div className="okr-summary-head">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="okr-summary-index">
-                        O{oIdx + 1}
-                      </span>
-                      <h3 className="okr-summary-title">
-                        {okr.objective}
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="okr-summary-meta">
-                    <div className="text-right">
-                      <div className="okr-summary-meta-label">综合进度</div>
-                      <div className="okr-summary-progress-value">{okr.progress}%</div>
-                    </div>
-                    <div className="okr-summary-owner">
-                      <div className="okr-summary-meta-label">责任人 / 周期</div>
-                      <div className="okr-summary-owner-value">
-                        {okr.ownerName} ({okr.cycle})
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress bar */}
-                <Progress percent={okr.progress} showInfo={false}/>
-
-                {/* Key Results list */}
-                <div className="space-y-2 pt-2">
-                  <h4 className="okr-summary-section-title">
-                    A 动作
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {okr.keyResults.map((kr, idx) => (
-                      <div
-                        key={kr.id}
-                        className="okr-summary-kr"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="okr-summary-kr-title">
-                            A{idx + 1}: {kr.content}
-                          </span>
-                          <span className="okr-summary-kr-progress">
-                            {kr.progress}%
-                          </span>
-                        </div>
-                        <Progress percent={kr.progress} size="small" showInfo={false}/>
-                        <div className="okr-summary-kr-meta">
-                          <span>权重: {kr.weight}%</span>
-                          <span>截止: {kr.deadline}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+          ) : <div className="okr-summary-month-body">{summaryMonths.map(month => { const monthOkrs = filteredOkrs.filter(item => item.cycle === month); const monthActions = myActions.filter(item => item.periodKey === month); const monthRecords = records.filter(record => record.periodKey === month && record.ownerId === currentUser.id && (record.kind === 'objective' || record.kind === 'action')); const monthDrafts = monthRecords.filter(record => record.status === 'draft'); const keyResults: SummaryKr[] = [...monthOkrs.flatMap(item => item.keyResults.map(result => ({content: result.content, progress: result.progress, weight: result.weight, deadline: result.deadline}))), ...monthActions.map(action => ({content: action.payload.title, progress: Number(action.payload.progress || 0), weight: Number(action.payload.weight || 0), deadline: action.payload.deadline || ''}))]; const progress = keyResults.length ? Math.round(keyResults.reduce((sum, item) => sum + item.progress, 0) / keyResults.length) : 0; const status = monthDrafts.length ? 'draft' : monthRecords.some(record => record.status === 'active') ? 'active' : 'submitted'; const submittedAt = monthRecords.filter(record => record.status !== 'draft').map(record => record.createdAt).filter((value): value is string => Boolean(value)).sort().at(-1); const draftIds = monthDrafts.map(record => record.id); return renderSummaryCard(month, month, progress, monthOkrs.length, keyResults, status, submittedAt, () => { setDraftToSubmit(draftIds.length === 1 ? draftIds[0] : null); setSelectedMonthDetail(month); }, () => { setSelectedMonthDetail(month); setDraftToSubmit(null); }, monthDrafts.length); })}</div>}
+          </div>)}
         </div>
       )}
       {/* Main Tab 2: 目标复盘总结 */}

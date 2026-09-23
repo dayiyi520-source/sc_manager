@@ -29,7 +29,7 @@ export interface OkrPayload {
 }
 export interface OkrActionPayload {
   recordId?: string; version?: number;
-  title: string; department: string; parentObjectiveId: string; parentActionId: string;
+  title: string; department: string; parentObjectiveId: string; parentActionId: string; parentKeyResultId?: string;
   creatorId?: string; assigneeIds?: string[]; assigneeName?: string; structureType: string;
   productLine?: string; businessObject?: string; milestone?: string; acceptanceStandard?: string;
   deadline: string; weight: number;
