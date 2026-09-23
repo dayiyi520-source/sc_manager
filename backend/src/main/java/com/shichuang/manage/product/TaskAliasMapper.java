@@ -54,6 +54,12 @@ public class TaskAliasMapper {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
+    public String defaultProductLine() {
+        List<String> rows = jdbc.queryForList("SELECT id_ FROM t_product_line WHERE tenant_id_=? AND status_='启用中' AND delete_flag_=0 ORDER BY create_time_ LIMIT 1", String.class, RequestContext.tenantId());
+        if (rows.isEmpty()) rows = jdbc.queryForList("SELECT id_ FROM t_product_line WHERE tenant_id_=? AND delete_flag_=0 ORDER BY create_time_ LIMIT 1", String.class, RequestContext.tenantId());
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
     public Map<String,Object> activeUser(String id) {
         List<Map<String,Object>> rows=jdbc.queryForList("SELECT id_ AS id,name_ AS name FROM t_sys_user WHERE tenant_id_=? AND id_=? AND status_='enabled' AND delete_flag_=0",RequestContext.tenantId(),id);
         return rows.isEmpty()?null:rows.get(0);

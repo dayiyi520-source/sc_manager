@@ -24,6 +24,7 @@ vi.mock('../product/LazyRichTextEditor', () => ({
 
 describe('workbench work-order creation layout', () => {
   const addRequirementTask = vi.fn();
+  const addToast = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,10 +35,11 @@ describe('workbench work-order creation layout', () => {
       setRequirementTasks: vi.fn(),
       productLines: [{ id: 'line-1', name: '协同产品线' }],
       customers: [],
-      biddings: [],
+      leads: [],
+      biddings: [{ id: 'bid-1', projectName: '中标项目甲', customerName: '客户甲', status: '中标', result: '中标' }],
       opportunities: [],
       currentUser: { name: '林志豪', department: '管理部' },
-      addToast: vi.fn(),
+      addToast,
       openPageTab: vi.fn(),
       setRequirementTaskDraft: vi.fn(),
     } as unknown as ReturnType<typeof useApp>);
@@ -53,12 +55,13 @@ describe('workbench work-order creation layout', () => {
     await openCustomerRequest();
 
     expect(screen.getByLabelText('事项标题 *')).toHaveClass('ant-input');
-    expect(screen.getByLabelText('所属产品线 *').closest('.ant-select')).not.toBeNull();
+    expect(screen.getByLabelText('所属产品线').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('负责人 *').closest('.ant-select')).not.toBeNull();
+    expect(screen.getByLabelText('负责人 *').compareDocumentPosition(screen.getByLabelText('所属产品线')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByLabelText('优先级').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('期望完成时间').closest('.ant-picker')).not.toBeNull();
-    expect(screen.getByLabelText('诉求类型').closest('.ant-select')).not.toBeNull();
-    expect(screen.getByLabelText('诉求来源')).toHaveClass('ant-input');
+    expect(screen.getByLabelText('诉求类型 *').closest('.ant-select')).not.toBeNull();
+    expect(screen.getByLabelText('诉求来源 *')).toHaveClass('ant-input');
 
     const submit = screen.getByRole('button', { name: '发起协助' });
     expect(screen.getAllByRole('button', { name: '发起协助' })).toHaveLength(1);
@@ -69,15 +72,15 @@ describe('workbench work-order creation layout', () => {
   });
 
   it.each([
-    ['交付支持', ['推进阶段', '其他说明']],
-    ['其他问题', ['问题来源', '期望结果']],
+    ['交付支持', ['项目阶段 *', '项目类型 *', '交付类型 *']],
+    ['其他问题', ['协助类型 *']],
   ])('uses Ant Design inputs for %s fields', async (type, labels) => {
     render(<RequirementPoolView />);
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: new RegExp(type) }));
 
     expect(screen.getByLabelText('事项标题 *')).toHaveClass('ant-input');
-    labels.forEach((label) => expect(screen.getByLabelText(label)).toHaveClass('ant-input'));
+    labels.forEach((label) => expect(screen.getByLabelText(label).closest('.ant-select')).not.toBeNull());
   });
 
   it('disables header actions while the work order is being submitted', async () => {
@@ -86,10 +89,15 @@ describe('workbench work-order creation layout', () => {
     await openCustomerRequest();
 
     fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '客户反馈事项' } });
-    fireEvent.mouseDown(screen.getByLabelText('所属产品线 *'));
+    fireEvent.mouseDown(screen.getByLabelText('所属产品线'));
     fireEvent.click(await screen.findByText('协同产品线', { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
     fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('所属项目 *'));
+    fireEvent.click(await screen.findByText('中标项目甲', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('诉求类型 *'));
+    fireEvent.click(await screen.findByText('新功能', { selector: '.ant-select-item-option-content' }));
+    fireEvent.change(screen.getByLabelText('诉求来源 *'), { target: { value: '客户反馈' } });
     fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
     fireEvent.click(screen.getByRole('button', { name: '发起协助' }));
 
@@ -149,6 +157,33 @@ describe('workbench work-order creation layout', () => {
     const firstReason = await screen.findByText('事项内容不明确', { selector: '.ant-select-item-option-content' });
     fireEvent.click(firstReason);
     expect(rejectReason.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent(firstReason.textContent || '');
+  });
+
+  it.each([
+    ['线上问题', '缺陷类型 *', '系统缺陷', '安全漏洞'],
+    ['售前支持', '支持类型 *', '建设方案', '招投标标书协同'],
+    ['交付支持', '项目阶段 *', '项目移交', '运维追踪'],
+    ['其他问题', '协助类型 *', '方向研讨', '其他'],
+  ])('provides the configured %s business options', async (type, label, firstOption, lastOption) => {
+    render(<RequirementPoolView />);
+    await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(type) }));
+    fireEvent.mouseDown(screen.getByLabelText(label));
+    expect(await screen.findByText(firstOption, { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
+    expect(await screen.findByText(lastOption, { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
+  });
+
+  it('blocks submission when a visible business parameter is missing', async () => {
+    render(<RequirementPoolView />);
+    await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: /线上问题/ }));
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '线上异常' } });
+    fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
+    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
+    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getByRole('button', { name: '发起协助' }));
+    expect(addToast).toHaveBeenCalledWith('warning', '请完成所有必填业务参数');
+    expect(addRequirementTask).not.toHaveBeenCalled();
   });
 
   it('keeps the reassignment dialog and local data when persistence fails', async () => {

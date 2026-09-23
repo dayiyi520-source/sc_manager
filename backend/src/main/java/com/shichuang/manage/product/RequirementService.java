@@ -83,11 +83,59 @@ public class RequirementService {
         AuthorizationService.requireWrite("product");
         String customerId=text(body,"customerId");
         if(!customerId.isBlank()&&mapper.customerExists(RequestContext.tenantId(),customerId)==0)throw new IllegalArgumentException("关联客户无效");
+        validateAssistance(body);
         Map<String,Object> created=tasks.create("requirement",body);
         String owner=text(body,"ownerName");
         if(!owner.isBlank())mapper.notifyOwner(RequestContext.tenantId(),owner,text(body,"title"),created.get("id").toString());
         return created;
     }
+
+    private void validateAssistance(Map<String,Object> body) {
+        String type=text(body,"workOrderType");
+        if(type.isBlank())return;
+        Map<String,Object> fields=specialFields(body.get("specialFields"));
+        List<String> required=switch(type){
+            case "客户诉求"->List.of("projectName","requestType","requestSource");
+            case "线上问题"->List.of("productName","severity","frequency");
+            case "售前支持"->List.of("opportunityName","supportType","durationDays");
+            case "交付支持"->List.of("projectName","progressStage","other","deliveryType");
+            case "其他问题"->List.of("problemSource","expectedResult","problemType");
+            default->throw new IllegalArgumentException("协助事项类型无效");
+        };
+        if(required.stream().anyMatch(key->Objects.toString(fields.get(key),"").trim().isBlank()))throw new IllegalArgumentException("请完成所有必填业务参数");
+        if("线上问题".equals(type)){
+            requireOption(fields,"productName",Set.of("系统缺陷","样式缺陷","安全漏洞"),"缺陷类型");
+            Map<String,String> priorities=Map.of("阻断主流程","P0","功能逻辑异常","P1","一般缺陷","P2","轻微缺陷","P3");
+            String severity=Objects.toString(fields.get("severity"),"");
+            if(!priorities.containsKey(severity))throw new IllegalArgumentException("严重程度无效");
+            body.put("priority",priorities.get(severity));
+        }
+        if("售前支持".equals(type))requireOption(fields,"supportType",Set.of("建设方案","现场踏勘","方案汇报","报价支持","技术表","投标答疑","产品需求","招投标标书协同"),"支持类型");
+        if("其他问题".equals(type))requireOption(fields,"problemType",Set.of("方向研讨","费用缴纳","开票/邮寄","资料获取","物料支持","意见反馈","其他"),"协助类型");
+        if("交付支持".equals(type)){
+            requireOption(fields,"progressStage",Set.of("项目移交","项目启动","需求确认","系统部署","系统培训","系统试运行","项目初验","项目终验","运维追踪"),"项目阶段");
+            requireOption(fields,"other",Set.of("一般项目","数据项目","试用项目"),"项目类型");
+            requireOption(fields,"deliveryType",Set.of("自有交付","代理商交付","协助代理商交付"),"交付类型");
+        }
+        if(text(body,"productLineId").isBlank()){
+            String line=taskMapper.defaultProductLine();
+            if(line==null)throw new IllegalArgumentException("暂无可用的事项归属范围");
+            body.put("productLineId",line);
+        }
+        body.put("specialFields",fields);
+    }
+
+    private Map<String,Object> specialFields(Object value){
+        if(value instanceof Map<?,?> source){
+            Map<String,Object> result=new LinkedHashMap<>();
+            source.forEach((key,item)->result.put(Objects.toString(key,""),item));
+            return result;
+        }
+        if(value instanceof String json&&!json.isBlank())try{return objectMapper.readValue(json,objectMapper.getTypeFactory().constructMapType(LinkedHashMap.class,String.class,Object.class));}catch(Exception error){throw new IllegalArgumentException("业务参数格式无效");}
+        return new LinkedHashMap<>();
+    }
+
+    private static void requireOption(Map<String,Object> fields,String key,Set<String> options,String label){if(!options.contains(Objects.toString(fields.get(key),"")))throw new IllegalArgumentException(label+"无效");}
 
     @Transactional public void update(String id,Map<String,Object> body){AuthorizationService.requireWrite("product");requirement(id);tasks.update("requirement",id,body);}
 

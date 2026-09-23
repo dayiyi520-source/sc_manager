@@ -579,9 +579,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const selectedProductLine = task.productLineId
       ? productLines.find((item) => item.id === task.productLineId)
-      : productLines.find((item) => item.name === task.productLineName);
+      : productLines.find((item) => item.name === task.productLineName) || productLines[0];
     if (!selectedProductLine) {
-      addToast('warning', '工单创建失败', '请选择所属产品线');
+      addToast('warning', '工单创建失败', '暂无可用的事项归属范围');
       return false;
     }
     const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 16);

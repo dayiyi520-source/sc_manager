@@ -61,6 +61,22 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void validatesAssistanceParametersAndAllowsOmittedProductLine() throws Exception {
+        String token=loginToken();
+        Map<String,Object> invalid=Map.of("title","售前参数缺失","ownerName","张瑞","workOrderType","售前支持","specialFields",Map.of("opportunityName","商机甲"));
+        mockMvc.perform(post("/api/requirements").header("Authorization","Bearer "+token).contentType("application/json").content(objectMapper.writeValueAsString(invalid)))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        Map<String,Object> valid=Map.of("title","线上问题参数校验","description","主流程无法继续","ownerName","张瑞","workOrderType","线上问题",
+            "specialFields",Map.of("productName","系统缺陷","severity","阻断主流程","frequency","必现（100%）"));
+        String response=mockMvc.perform(post("/api/requirements").header("Authorization","Bearer "+token).contentType("application/json").content(objectMapper.writeValueAsString(valid)))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String id=objectMapper.readTree(response).path("data").path("id").asText();
+        assertEquals("P0",jdbc.queryForObject("SELECT priority_ FROM t_product_work_item WHERE id_=?",String.class,id));
+        assertTrue(!jdbc.queryForObject("SELECT product_line_id_ FROM t_product_work_item WHERE id_=?",String.class,id).isBlank());
+    }
+
+    @Test
     void reassignsRequirementWithOptimisticRevisionAndAuditEvent() throws Exception {
         String token=loginToken(),id=createRequirement(token,"转派持久化-"+System.nanoTime());
         String assigneeId=jdbc.queryForObject("SELECT id_ FROM t_sys_user WHERE tenant_id_='local-tenant' AND name_='张瑞' AND status_='enabled' AND delete_flag_=0 LIMIT 1",String.class);
