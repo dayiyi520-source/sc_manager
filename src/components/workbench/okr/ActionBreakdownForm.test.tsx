@@ -47,7 +47,14 @@ describe('ActionBreakdownForm', () => {
   it('opens A1 explicitly and uses different fields for O1, O2, and O3', () => {
     renderForm();
 
+    const expectPeriodActions = () => {
+      expect(screen.getByRole('button', { name: /取\s*消/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '存草稿' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /提\s*交/ })).toBeInTheDocument();
+    };
+
     fireEvent.click(screen.getByRole('button', { name: '拆解 O1' }));
+    expectPeriodActions();
     expect(screen.getByText('A1')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 关联产品线')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 动作描述')).toBeInTheDocument();
@@ -55,10 +62,12 @@ describe('ActionBreakdownForm', () => {
     expect(screen.getByLabelText('A1 指定承接人').closest('.ant-select')).toHaveClass('ant-select-multiple');
 
     fireEvent.click(screen.getByRole('button', { name: '拆解 O2' }));
+    expectPeriodActions();
     expect(screen.getByLabelText('A1 关联项目')).toBeInTheDocument();
     expect(screen.getAllByLabelText('A1 选择节点')).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: '拆解 O3' }));
+    expectPeriodActions();
     expect(screen.getByLabelText('A1 选择分类')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 可衡量结果')).toBeInTheDocument();
     expect(screen.getAllByLabelText('A1 指定承接人')).toHaveLength(3);

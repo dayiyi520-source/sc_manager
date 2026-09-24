@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Tooltip } from 'antd';
 import { GrabberIcon, PlusIcon, TrashIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
@@ -19,18 +19,26 @@ interface Props {
   onSaveDraft?: (payload: OkrPayload) => Promise<boolean>;
   onAddAnother?: () => void;
   chrome?: boolean;
+  initialPayload?: OkrPayload;
+  readOnly?: boolean;
+  detailMode?: boolean;
+  compactDetail?: boolean;
 }
 
 export interface ObjectiveFormHandle { submit: () => Promise<boolean>; saveDraft: () => Promise<boolean>; }
 export const calculateKrWeightTotal = (items: Pick<OkrKr, 'weight'>[]) => items.reduce((total, item) => total + item.weight, 0);
 
-export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, people = [], busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true }, ref) {
-  const [title, setTitle] = useState('');
-  const [krs, setKrs] = useState<OkrKr[]>(() => [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
+export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, people = [], busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false }, ref) {
+  const [title, setTitle] = useState(initialPayload?.title || '');
+  const [krs, setKrs] = useState<OkrKr[]>(() => initialPayload?.keyResults?.length ? initialPayload.keyResults : [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const dragHandleIndex = useRef<number | null>(null);
   const [error, setError] = useState('');
+  useEffect(() => {
+    setTitle(initialPayload?.title || '');
+    setKrs(initialPayload?.keyResults?.length ? initialPayload.keyResults : [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
+  }, [initialPayload]);
   const krWeightTotal = calculateKrWeightTotal(krs);
   const changeKr = (id: string, patch: Partial<OkrKr>) => setKrs(items => items.map(kr => kr.id === id ? { ...kr, ...patch } : kr));
   const distribute = (items: OkrKr[]) => items.map((kr, i) => ({ ...kr, weight: Math.floor(100 / items.length) + (i < 100 % items.length ? 1 : 0) }));
@@ -64,8 +72,8 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     saveDraft: () => saveDraft(true),
   }), [submit, saveDraft]);
   const moveKr = (from: number, to: number) => setKrs(items => { const copy = [...items]; [copy[from], copy[to]] = [copy[to], copy[from]]; return copy; });
-  return <Form className="okr-objective-form" disabled={busy} onFinish={() => void submit()}>
-    {chrome && <div className="okr-objective-period">{dayjs(cycle).format('YYYY年MM月')}<span>进行中</span></div>}
+  return <Form className="okr-objective-form" disabled={busy || readOnly} onFinish={() => void submit()}>
+    {chrome && <div className="okr-objective-period">{dayjs(cycle).format('YYYY年MM月')}{!compactDetail && <span>进行中</span>}{detailMode && <Button type="text" onClick={onCancel} disabled={busy}>取消</Button>}</div>}
     <div className="okr-objective-body">
       <div className="okr-objective-columns okr-objective-head">
         <span>目标与动作</span><span>权重</span><span>截止日期</span><span/>
@@ -87,9 +95,9 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
           <Select className="okr-action-assignees" aria-label={`A${index + 1} 承接人员`} mode="multiple" allowClear maxTagCount="responsive" placeholder="指定承接人员（可选）" value={kr.assigneeIds || []} onChange={assigneeIds => changeKr(kr.id, { assigneeIds })} options={people.map(person => ({value: person.id, label: `${person.name} · ${person.department}`}))}/>
         </div>)}
       </div>
-      <div className="okr-objective-add"><Button type="text" icon={<PlusIcon/>} disabled={busy || krs.length >= 20} onClick={() => setKrs(items => distribute([...items, { id: crypto.randomUUID(), title: '', weight: 0, progress: 0 }]))}>继续添加</Button><span>A 权重合计 {krWeightTotal}%</span></div>
+      <div className="okr-objective-add">{!readOnly && <Button type="text" icon={<PlusIcon/>} disabled={busy || krs.length >= 20} onClick={() => setKrs(items => distribute([...items, { id: crypto.randomUUID(), title: '', weight: 0, progress: 0 }]))}>继续添加</Button>}<span>A 权重合计 {krWeightTotal}%</span></div>
       {error && <Alert type="warning" title={error} showIcon/>}
     </div>
-    {chrome && <div className="okr-objective-footer"><Button type="text" onClick={onAddAnother} disabled={busy}>+ 添加目标</Button><span className="okr-objective-footer-spacer"/><Button onClick={onCancel} disabled={busy}>取消</Button><Button onClick={() => void saveDraft()} disabled={busy || unavailable}>存草稿</Button><Button type="primary" htmlType="submit" loading={busy} disabled={unavailable}>{root ? '提交目标' : '提交主管确认'}</Button></div>}
+    {chrome && <div className="okr-objective-footer">{!detailMode && <Button type="text" onClick={onAddAnother} disabled={busy || readOnly}>+ 添加目标</Button>}<span className="okr-objective-footer-spacer"/>{!detailMode && <Button onClick={onCancel} disabled={busy}>返回列表</Button>}{!readOnly && <><Button onClick={() => void saveDraft()} disabled={busy || unavailable}>存草稿</Button><Button type="primary" htmlType="submit" loading={busy} disabled={unavailable}>{root ? '提交目标' : '提交主管确认'}</Button></>}</div>}
   </Form>;
 });

@@ -34,7 +34,7 @@ describe('OkrScopeSidebar', () => {
     const onSelect = vi.fn();
     const onAddTarget = vi.fn();
     const onOpenSettings = vi.fn();
-    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={onSelect} onAddTarget={onAddTarget} onOpenSettings={onOpenSettings} defaultExpandMembers />);
+    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={onSelect} onAddTarget={onAddTarget} onOpenSettings={onOpenSettings} />);
 
     fireEvent.click(screen.getByRole('button', { name: '直属下级' }));
     expect(onSelect).toHaveBeenCalledWith({ scope: 'subordinate' });
@@ -45,5 +45,43 @@ describe('OkrScopeSidebar', () => {
     fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
     expect(onAddTarget).toHaveBeenCalledTimes(1);
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('provides a side navigation collapse control beside settings', () => {
+    const onToggleCollapse = vi.fn();
+    const { rerender } = render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} onOpenSettings={vi.fn()} onToggleCollapse={onToggleCollapse} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '收起左侧导航' }));
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1);
+    rerender(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} onOpenSettings={vi.fn()} onToggleCollapse={onToggleCollapse} collapsed />);
+    expect(screen.getByRole('button', { name: '展开左侧导航' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: '目标范围导航' })).toHaveClass('is-collapsed');
+  });
+
+  it('opens members when the group label is clicked and toggles them from the row or arrow', () => {
+    const onSelect = vi.fn();
+    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={onSelect} onAddTarget={vi.fn()} onOpenSettings={vi.fn()} />);
+
+    const subordinateGroup = screen.getByLabelText('直属下级分组');
+    expect(within(subordinateGroup).queryByRole('button', { name: '刘员工' })).not.toBeInTheDocument();
+    fireEvent.click(within(subordinateGroup).getByRole('button', { name: '直属下级' }));
+    expect(within(subordinateGroup).getByRole('button', { name: '刘员工' })).toBeInTheDocument();
+    expect(onSelect).toHaveBeenCalledWith({ scope: 'subordinate' });
+    fireEvent.click(within(subordinateGroup).getByRole('button', { name: '直属下级' }));
+    expect(within(subordinateGroup).queryByRole('button', { name: '刘员工' })).not.toBeInTheDocument();
+    fireEvent.click(within(subordinateGroup).getByRole('button', { name: '直属下级' }));
+    expect(within(subordinateGroup).getByRole('button', { name: '刘员工' })).toBeInTheDocument();
+
+    fireEvent.click(within(subordinateGroup).getByRole('button', { name: '收起直属下级成员' }));
+    expect(within(subordinateGroup).queryByRole('button', { name: '刘员工' })).not.toBeInTheDocument();
+    fireEvent.click(within(subordinateGroup).getByRole('button', { name: '直属下级' }).parentElement as HTMLElement);
+    expect(within(subordinateGroup).getByRole('button', { name: '刘员工' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '其他部门' }));
+    fireEvent.click(screen.getByRole('button', { name: '管理层' }));
+    expect(onSelect).toHaveBeenCalledWith({ scope: 'otherDepartments', department: '管理层' });
+    expect(screen.getByRole('button', { name: '陈总' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '陈总' }));
+    expect(onSelect).toHaveBeenCalledWith({ scope: 'otherDepartments', department: '管理层', personId: 'boss' });
   });
 });

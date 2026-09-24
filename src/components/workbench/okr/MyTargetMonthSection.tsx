@@ -1,7 +1,7 @@
 import React from 'react';
-import { Button, Empty, Progress, Tag, Tooltip } from 'antd';
+import { Empty, Progress, Tag } from 'antd';
 import dayjs from 'dayjs';
-import { ChevronDown, ChevronRight, Eye } from '@/components/common/octicons-compat';
+import { ChevronDown, ChevronRight } from '@/components/common/octicons-compat';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
 import type { ActionGroupValues } from './ActionBreakdownForm';
 
@@ -58,6 +58,13 @@ const formatDate = (value?: string) => value ? dayjs(value).format('YYYY-MM-DD')
 const formatDeadline = (value: string) => value ? dayjs(value).format('MM-DD') : '未设置';
 const assigneeLabel = (names: string[]) => names.length ? names.join('、') : '未指定承接人';
 const isSubmitted = (target: MyTargetViewItem) => target.status !== 'draft';
+
+const openOnKeyboard = (event: React.KeyboardEvent<HTMLElement>, onOpen: () => void) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    onOpen();
+  }
+};
 
 const weightedProgress = (actions: MyTargetActionViewItem[]) => {
   const totalWeight = actions.reduce((total, action) => total + action.weight, 0);
@@ -171,7 +178,7 @@ const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submi
 
 const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: () => void }> = ({ target, index, onOpen }) => {
   const submitted = isSubmitted(target);
-  return <article className="okr-target-list-item" aria-label={`目标：${target.title}`}>
+  return <article className="okr-target-list-item" role="button" tabIndex={0} aria-label={`目标：${target.title}`} onClick={onOpen} onKeyDown={event => openOnKeyboard(event, onOpen)}>
     <header>
       <div className="okr-target-list-copy">
         {target.sourceName && <span className="okr-target-source">{target.sourceName}</span>}
@@ -180,7 +187,6 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
       </div>
       <div className="okr-target-list-status">
         {submitted && <><span>目标进度</span><div><Progress type="circle" percent={target.progress} size={32}/></div></>}
-        <Tooltip title="查看月度目标详情"><Button type="text" icon={<Eye/>} aria-label="查看月度详情" onClick={onOpen}/></Tooltip>
       </div>
     </header>
     <div className="okr-target-action-head" aria-hidden="true"><span>行动</span><span>动作描述</span><span>承接人员</span><span>进度</span><span>权重</span><span>截止时间</span></div>
@@ -195,7 +201,7 @@ const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   const submitted = isSubmitted(target);
   const visibleActions = target.actions.slice(0, 4);
   const hiddenCount = target.actions.length - visibleActions.length;
-  return <article className="okr-target-grid-card" aria-label={`目标卡片：${target.title}`}>
+  return <article className="okr-target-grid-card" role="button" tabIndex={0} aria-label={`目标卡片：${target.title}`} onClick={onOpen} onKeyDown={event => openOnKeyboard(event, onOpen)}>
     <header>
       <div className="okr-target-card-title"><span className="okr-summary-index">O{index + 1}</span><h3 title={target.title}>{target.title}</h3>{target.status === 'draft' && <Tag>草稿</Tag>}</div>
       {submitted && <strong className="okr-target-card-progress">{target.progress}%</strong>}
@@ -207,7 +213,7 @@ const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
       ? visibleActions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} compact/>)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>
-    <footer><span>{hiddenCount > 0 ? `另有 ${hiddenCount} 条行动` : `${target.actions.length} 条行动`}</span><Button type="text" icon={<Eye/>} aria-label="查看月度详情" onClick={onOpen}>查看月度详情</Button></footer>
+    <footer><span>{hiddenCount > 0 ? `另有 ${hiddenCount} 条行动` : `${target.actions.length} 条行动`}</span></footer>
   </article>;
 };
 
@@ -219,7 +225,7 @@ export const MyTargetMonthSection: React.FC<Props> = ({ periodKey, targets, view
       <span>{getPeriodCountdown(periodKey)}</span>
       <em>{targets.length} 个目标</em>
     </button>
-    {!collapsed && (targets.length === 0 ? <div className="okr-target-empty"><Empty description="暂无目标" /></div> : <div className={viewMode === 'list' ? 'okr-target-list' : 'okr-target-grid'}>
+    {!collapsed && (targets.length === 0 ? <div className="okr-target-empty"><Empty description={`${dayjs(periodKey).format('YYYY年MM月')}暂无目标`} /></div> : <div className={viewMode === 'list' ? 'okr-target-list' : 'okr-target-grid'}>
       {targets.map((target, index) => viewMode === 'list'
         ? <ListTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)}/>
         : <CardTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)}/>) }

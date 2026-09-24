@@ -32,9 +32,7 @@ type StoredExtraWork = {
   impact?: string;
 };
 
-type SummaryKr = { content: string; progress: number; weight: number; deadline: string };
 export type DemoBreakdown = { id: string; periodKey: string; mode: 'draft' | 'submit'; groups: ActionGroupValues[]; savedAt: string };
-type SavedTargetSummary = { id: string; title: string; status: string; actions: Array<{ id: string; title: string; weight: number; assigneeIds?: string[] }> };
 type OkrCategoryTab = 'my' | 'supervisor' | 'subordinate' | 'department' | 'otherDepartments';
 
 export const appendDemoBreakdown = (current: DemoBreakdown[], next: DemoBreakdown) => [...current, next];
@@ -105,6 +103,7 @@ const OriginalWorkspace: React.FC = () => {
   const [selectedMonthTargetId, setSelectedMonthTargetId] = useState<string | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expandScopeMembers, setExpandScopeMembers] = useState(false);
+  const [scopeSidebarCollapsed, setScopeSidebarCollapsed] = useState(false);
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
   const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const newOkrCycle = dayjs().format('YYYY-MM');
@@ -116,20 +115,26 @@ const OriginalWorkspace: React.FC = () => {
   const directReviewSubmit = Boolean(me?.rootFlag);
   const periods = cycleOptions(records, currentUser.id);
   const cyclePaths = periods.flatMap(group => group.children.filter(child => selectedCycles.includes(child.value)).map(child => [group.value, child.value]));
+  const cycleSummary = selectedCycles.length === 1
+    ? `周期：${dayjs(selectedCycles[0]).format('YYYY年MM月')}`
+    : `周期：${selectedCycles.length}个周期`;
   const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === newOkrCycle && o.status === 'active');
   const selectedScopeGroup = scopeSelection.scope;
   const scopePeople = people.filter(person => {
     if (scopeSelection.personId) return person.id === scopeSelection.personId;
+    if (scopeSelection.department) return person.department === scopeSelection.department;
     if (selectedScopeGroup === 'my') return person.id === currentUser.id;
     if (selectedScopeGroup === 'supervisor') return person.id === me?.supervisorId;
     if (selectedScopeGroup === 'subordinate') return person.supervisorId === currentUser.id;
-    if (selectedScopeGroup === 'department') return person.id !== currentUser.id && person.department === currentUser.department;
+    if (selectedScopeGroup === 'department') return person.department === currentUser.department;
     if (selectedScopeGroup === 'otherDepartments') return person.id !== currentUser.id && person.department !== currentUser.department;
     return false;
   });
   const scopeOwnerIds = new Set(scopePeople.map(person => person.id));
-  const isMyOkrCategory = selectedScopeGroup === 'my' && !scopeSelection.personId;
-  const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && scopeOwnerIds.has(o.ownerId));
+  const isMyOkrCategory = selectedScopeGroup === 'my' && !scopeSelection.personId && !scopeSelection.department;
+  const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && scopeOwnerIds.has(o.ownerId) && (
+    isMyOkrCategory || ['active', 'submitted', 'reviewed'].includes(o.status)
+  ));
   const personalObjectiveRecords = isMyOkrCategory
     ? records.filter(record => record.kind === 'objective' && record.ownerId === currentUser.id && selectedCycles.includes(record.periodKey))
     : [];
@@ -179,7 +184,7 @@ const OriginalWorkspace: React.FC = () => {
   };
   const contextTitle = scopeSelection.personId
     ? people.find(person => person.id === scopeSelection.personId)?.name || scopeLabels[scopeSelection.scope]
-    : scopeLabels[scopeSelection.scope];
+    : scopeSelection.department || scopeLabels[scopeSelection.scope];
 
   const summaryMonths = [...selectedCycles].sort().reverse();
   const selectedMonthRecords = selectedMonthDetail
@@ -194,39 +199,6 @@ const OriginalWorkspace: React.FC = () => {
       currentUser.id,
     )
     : [];
-
-  const renderSummaryCard = (key: string, cycle: string, progress: number, objectiveCount: number, keyResults: SummaryKr[], status: string, submittedAt: string | undefined, onSubmitDraft: () => void, onOpen: () => void, draftCount = 0, demoBreakdowns: DemoBreakdown[] = [], savedTargets: SavedTargetSummary[] = []) => {
-    const statusLabel = status === 'draft' ? '草稿' : status === 'active' ? '已生效' : '已提交';
-    const average = keyResults.length ? Math.round(keyResults.reduce((sum, item) => sum + item.progress, 0) / keyResults.length) : progress;
-    const deadline = keyResults.map(item => item.deadline).filter(Boolean).sort()[0];
-    const remaining = deadline ? Math.ceil(dayjs(deadline).endOf('day').diff(dayjs(), 'day', true)) : null;
-    const remainingLabel = remaining === null ? '未设置截止日' : remaining < 0 ? `已逾期 ${Math.abs(remaining)} 天` : `剩余 ${remaining} 天`;
-    const submittedLabel = submittedAt ? dayjs(submittedAt).format('YYYY-MM-DD') : '暂无提交时间';
-    const demoGroups = demoBreakdowns.flatMap(breakdown => breakdown.groups.map(group => ({ ...group, saveId: breakdown.id })));
-    return (
-    <Card key={key} className="okr-my-review-card okr-target-card">
-      <div className="okr-target-card-tags"><Tag>{remainingLabel}</Tag><Tag color={status === 'draft' ? 'default' : 'processing'}>{statusLabel}</Tag></div>
-      <div className="okr-my-review-card-head"><div><h3>{dayjs(cycle).format('YYYY年MM月')}月度目标</h3><span>提交时间：{submittedLabel}</span></div></div>
-      <div className="okr-my-review-score"><Progress type="circle" percent={average} size={68} /><div><b>目标综合进度</b><strong>{average}%</strong></div></div>
-      <div className="okr-my-review-metrics"><span><Target />{objectiveCount} 个 O</span><span><FileText />{keyResults.length} 个 A</span><span><CheckCircle />{keyResults.filter(item => item.progress >= 100).length} 个完成的 A</span></div>
-      {savedTargets.length > 0 && <div className="okr-demo-breakdown-summary okr-saved-target-summary" aria-label="已保存目标">
-        <div className="okr-demo-breakdown-summary-head"><strong>已保存目标</strong><span>{savedTargets.length} 个 O · {savedTargets.reduce((total, target) => total + target.actions.length, 0)} 个 A</span></div>
-        {savedTargets.map((target, targetIndex) => <section key={target.id}>
-          <div><span className="okr-summary-index">O{targetIndex + 1}</span><b>{target.title}</b><small>{target.status === 'draft' ? '草稿' : '已提交'}</small></div>
-          <ul>{target.actions.map((action, actionIndex) => <li key={action.id}><span>A{actionIndex + 1}</span><strong>{action.title}</strong><small>{action.assigneeIds?.map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、') || '未指定承接人'}</small><em>{action.weight}%</em></li>)}</ul>
-        </section>)}
-      </div>}
-      {demoGroups.length > 0 && <div className="okr-demo-breakdown-summary" aria-label="本次拆解目标">
-        <div className="okr-demo-breakdown-summary-head"><strong>本次拆解目标</strong><span>{demoGroups.length} 个 O · {demoGroups.reduce((total, group) => total + group.actions.length, 0)} 个 A</span></div>
-        {demoGroups.map((group, groupIndex) => <section key={`${group.saveId}-${group.parent.id}`}>
-          <div><span className="okr-summary-index">O{groupIndex + 1}</span><b>{group.parent.payload.title}</b></div>
-          <ul>{group.actions.map((action, actionIndex) => <li key={`${group.saveId}-${group.parent.id}-${actionIndex}`}><span>A{actionIndex + 1}</span><strong>{action.title}</strong><small>{action.assigneeIds?.map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、') || '未指定承接人'}</small><em>{action.weight}%</em></li>)}</ul>
-        </section>)}
-      </div>}
-      <div className="okr-my-review-actions">{draftCount > 0 && <Button type="primary" onClick={onSubmitDraft}>查看草稿 ({draftCount})</Button>}<Button onClick={onOpen}>查看详情</Button></div>
-    </Card>
-    );
-  };
 
   const handleSaveOkr = async (payload: Parameters<typeof saveObjective>[1]) => {
     if (await saveObjective(newOkrCycle, payload)) {
@@ -370,11 +342,11 @@ const OriginalWorkspace: React.FC = () => {
 
   return (
     <div className="original-okr space-y-6 animate-in fade-in duration-150">
-      {loading && <div className="okr-loading-state" role="status" aria-live="polite"><Spin size="small"/> 正在加载目标与绩效…</div>}
-      {error && <Alert type="error" title="目标与绩效加载失败" description="服务暂不可用，请重试。已填写的内容仍保留。" action={<Button onClick={refresh}>重试</Button>}/>}
+      {loading && <div className="okr-loading-state" role="status" aria-live="polite"><Spin size="small"/> 正在加载目标与总结…</div>}
+      {error && <Alert type="error" title="目标与总结加载失败" description="服务暂不可用，请重试。已填写的内容仍保留。" action={<Button onClick={refresh}>重试</Button>}/>}
       {/* Top Main Navigation Tabs */}
       <div className="okr-page-toolbar">
-        <div className="okr-primary-tabs primary-line-tabs" role="tablist" aria-label="目标与绩效视图">
+        <div className="okr-primary-tabs primary-line-tabs" role="tablist" aria-label="目标与总结视图">
           <Button id="tab-okrs" role="tab" aria-selected={mainTab === 'okrs'} type="text" icon={<Target/>} onClick={()=>setMainTab('okrs')}>月度目标</Button>
           <Button id="tab-reviews" role="tab" aria-selected={mainTab === 'reviews'} type="text" icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
         </div>
@@ -399,7 +371,7 @@ const OriginalWorkspace: React.FC = () => {
 
       {/* Main Tab 1: OKRs */}
       {mainTab === 'okrs' && (
-        <div className="okr-workspace-shell">
+        <div className={`okr-workspace-shell${scopeSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}>
           <OkrScopeSidebar
             people={people}
             currentUserId={currentUser.id}
@@ -408,14 +380,16 @@ const OriginalWorkspace: React.FC = () => {
             onSelect={handleScopeChange}
             onAddTarget={() => { setScopeSelection({ scope: 'my' }); setActionFormOpen(false); setSelectedMonthDetail(null); setSelectedOkrRecordId(null); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
             onOpenSettings={() => setSettingsOpen(true)}
+            collapsed={scopeSidebarCollapsed}
+            onToggleCollapse={() => setScopeSidebarCollapsed(collapsed => !collapsed)}
           />
           <section className="okr-workspace-main" aria-label={`${contextTitle}目标展示区`}>
           <div className="okr-context-heading"><h2>{contextTitle}</h2><div className="okr-target-tools">
-            {isMyOkrCategory && <div className="okr-target-view-switch" role="group" aria-label="目标视图">
+            <div className="okr-target-view-switch" role="group" aria-label="目标视图">
               <Tooltip title="列表视图"><Button aria-label="列表视图" aria-pressed={targetViewMode === 'list'} className={targetViewMode === 'list' ? 'is-selected' : ''} icon={<List/>} onClick={() => setTargetViewMode('list')}/></Tooltip>
               <Tooltip title="卡片视图"><Button aria-label="卡片视图" aria-pressed={targetViewMode === 'card'} className={targetViewMode === 'card' ? 'is-selected' : ''} icon={<LayoutGrid/>} onClick={() => setTargetViewMode('card')}/></Tooltip>
-            </div>}
-            <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear maxTagCount={0} maxTagPlaceholder={() => `周期：${selectedCycles.length}个周期`} placeholder="周期：请选择" onChange={paths => setSelectedCycles(paths.map(path => String(path[path.length - 1])))} />
+            </div>
+            <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear maxTagCount={0} maxTagPlaceholder={() => cycleSummary} placeholder="周期：请选择" onChange={paths => setSelectedCycles(paths.map(path => String(path[path.length - 1])))} />
           </div></div>
 
           {isMyOkrCategory && objectiveForms.length > 0 && (
@@ -459,50 +433,27 @@ const OriginalWorkspace: React.FC = () => {
           </div> : (objectiveForms.length > 0 || actionFormOpen ? null : <div className="okr-summary-month-list">
              {selectedCycles.length === 0 ? (
                <div className="okr-empty-period-state"><Empty description="至少选择一个周期" /></div>
-          ) : <div className={`okr-summary-month-body${isMyOkrCategory ? ' is-target-view' : ''}`}>{summaryMonths.map(month => {
+          ) : <div className="okr-summary-month-body is-target-view">{summaryMonths.map(month => {
             const monthOkrs = filteredOkrs.filter(item => item.cycle === month);
-            const monthActions = myActions.filter(item => item.periodKey === month);
             const monthOkrIds = new Set(monthOkrs.map(item => item.id));
             const monthRecords = isMyOkrCategory
               ? [...personalObjectiveRecords, ...myActions, ...myActionDrafts].filter(record => record.periodKey === month)
               : records.filter(record => record.kind === 'objective' && record.periodKey === month && monthOkrIds.has(record.id));
-            const monthDrafts = monthRecords.filter(record => record.status === 'draft');
             const monthDemoBreakdowns = visibleDemoBreakdowns.filter(item => item.periodKey === month);
-            const demoGroups = monthDemoBreakdowns.flatMap(item => item.groups);
-            const demoActions: SummaryKr[] = demoGroups.flatMap(group => group.actions.map(action => ({
-              content: action.title || '',
-              progress: 0,
-              weight: Number(action.weight || 0),
-              deadline: action.deadline?.format('YYYY-MM-DD') || '',
-            })));
-            const keyResults: SummaryKr[] = [
-              ...monthOkrs.flatMap(item => item.keyResults.map(result => ({ content: result.content, progress: result.progress, weight: result.weight, deadline: result.deadline }))),
-              ...monthActions.map(action => ({ content: action.payload.title, progress: Number(action.payload.progress || 0), weight: Number(action.payload.weight || 0), deadline: action.payload.deadline || '' })),
-              ...demoActions,
-            ];
-            const progress = keyResults.length ? Math.round(keyResults.reduce((sum, item) => sum + item.progress, 0) / keyResults.length) : 0;
-            const status = monthDemoBreakdowns.some(item => item.mode === 'draft') || monthDrafts.length ? 'draft' : monthDemoBreakdowns.some(item => item.mode === 'submit') || monthRecords.some(record => record.status === 'active') ? 'active' : 'submitted';
-            const submittedAt = [...monthDemoBreakdowns.map(item => item.savedAt), ...monthRecords.filter(record => record.status !== 'draft').map(record => record.createdAt).filter((value): value is string => Boolean(value))].sort().at(-1);
-            const draftIds = monthDrafts.map(record => record.id);
-            const savedTargets: SavedTargetSummary[] = monthRecords.filter(record => record.kind === 'objective').map(record => ({ id: record.id, title: record.payload.title, status: record.status, actions: (record.payload.keyResults || []).map(action => ({ id: action.id, title: action.title, weight: action.weight, assigneeIds: action.assigneeIds })) }));
-            const objectiveCount = savedTargets.length + demoGroups.length;
-            if (isMyOkrCategory) {
-              const targetItems = buildMyTargetViewItems(monthRecords, monthDemoBreakdowns, visibleActionParents, people, currentUser.id);
-              return <MyTargetMonthSection
-                key={month}
-                periodKey={month}
-                targets={targetItems}
-                viewMode={targetViewMode}
-                collapsed={collapsedSummaryMonths.has(month)}
-                onToggle={() => setCollapsedSummaryMonths(current => {
-                  const next = new Set(current);
-                  next.has(month) ? next.delete(month) : next.add(month);
-                  return next;
-                })}
-                onOpenTarget={targetId => { setSelectedOkrRecordId(null); setSelectedMonthTargetId(targetId); setSelectedMonthDetail(month); }}
-              />;
-            }
-            return renderSummaryCard(month, month, progress, objectiveCount, keyResults, status, submittedAt, () => { setDraftToSubmit(draftIds.length === 1 ? draftIds[0] : null); setSelectedMonthDetail(month); }, () => { setSelectedMonthDetail(month); setDraftToSubmit(null); }, monthDrafts.length, monthDemoBreakdowns, savedTargets);
+            const targetItems = buildMyTargetViewItems(monthRecords, monthDemoBreakdowns, visibleActionParents, people, currentUser.id);
+            return <MyTargetMonthSection
+              key={month}
+              periodKey={month}
+              targets={targetItems}
+              viewMode={targetViewMode}
+              collapsed={collapsedSummaryMonths.has(month)}
+              onToggle={() => setCollapsedSummaryMonths(current => {
+                const next = new Set(current);
+                next.has(month) ? next.delete(month) : next.add(month);
+                return next;
+              })}
+              onOpenTarget={targetId => { setSelectedOkrRecordId(null); setSelectedMonthTargetId(targetId); setSelectedMonthDetail(month); }}
+            />;
           })}</div>}
           </div>)}
           </section>

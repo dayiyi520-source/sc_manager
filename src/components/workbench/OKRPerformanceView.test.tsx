@@ -2,6 +2,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
+import dayjs from 'dayjs';
 import type { OkrRecord } from '../../services/okrRepository';
 import type { OKRItem } from '../../types';
 
@@ -71,14 +72,16 @@ const draftOkrs: OKRItem[] = draftRecords.map((record, index) => ({
   keyResults: [{ id: `draft-a${index + 1}`, content: `草稿行动${index + 1}`, weight: 100, progress: 0, deadline: '' }],
 }));
 
+const defaultPeople = [
+  { id: 'boss', name: '老板', department: '管理层', supervisorId: null, rootFlag: 1, version: 1 },
+  { id: 'manager', name: '主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 },
+];
+
 const okrState = {
   records: [objectiveRecord],
   okrs: [okr],
   performances: [],
-  people: [
-    { id: 'boss', name: '老板', department: '管理层', supervisorId: null, rootFlag: 1, version: 1 },
-    { id: 'manager', name: '主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 },
-  ],
+  people: defaultPeople,
   work: [],
   actionParents: [actionParent],
   loading: false,
@@ -112,6 +115,7 @@ describe('OKRPerformanceView target navigation', () => {
     vi.clearAllMocks();
     okrState.records = [objectiveRecord];
     okrState.okrs = [okr];
+    okrState.people = defaultPeople;
   });
 
   it('uses the scope sidebar and clears detail or breakdown state when switching scopes', async () => {
@@ -122,7 +126,7 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.getByRole('button', { name: '我的目标' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /拆解目标/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '查看月度详情' }));
+    fireEvent.click(screen.getByLabelText('目标：提升年度经营质量'));
     expect(await screen.findByRole('region', { name: '目标逐级承接关系' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: '目标节点详情' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '直属上级' }));
@@ -205,7 +209,7 @@ describe('OKRPerformanceView target navigation', () => {
 
     render(<OKRPerformanceView />);
     const draftTarget = screen.getByLabelText('目标：草稿目标一');
-    fireEvent.click(within(draftTarget).getByRole('button', { name: '查看月度详情' }));
+    fireEvent.click(draftTarget);
 
     const monthlyDetail = await screen.findByRole('region', { name: '目标逐级承接关系' });
     expect(within(monthlyDetail).getAllByText('提升年度经营质量').length).toBeGreaterThan(0);
@@ -214,27 +218,110 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument();
   });
 
-  it('isolates personal active targets and drafts from every non-personal category', async () => {
+  it('isolates personal targets from unrelated scopes and keeps drafts out of department scope', async () => {
     okrState.records = [objectiveRecord, ...draftRecords];
     okrState.okrs = [okr, ...draftOkrs];
 
     render(<OKRPerformanceView />);
     expect(screen.getByLabelText('目标：草稿目标一')).toBeInTheDocument();
 
-    for (const category of ['直属上级', '直属下级', '我部门的', '其他部门']) {
+    for (const category of ['直属上级', '直属下级', '其他部门']) {
       fireEvent.click(screen.getByRole('button', { name: category }));
       await waitFor(() => expect(screen.queryByText('提升年度经营质量')).not.toBeInTheDocument());
       expect(screen.queryByText('草稿目标一')).not.toBeInTheDocument();
       expect(screen.queryByText('草稿目标二')).not.toBeInTheDocument();
     }
+
+    fireEvent.click(screen.getByRole('button', { name: '我部门的' }));
+    expect(screen.getByText('提升年度经营质量')).toBeInTheDocument();
+    expect(screen.queryByText('草稿目标一')).not.toBeInTheDocument();
+    expect(screen.queryByText('草稿目标二')).not.toBeInTheDocument();
+  });
+
+  it('centers empty scopes without hiding another member\'s real target', () => {
+    okrState.records = [{ ...objectiveRecord, ownerId: 'manager', id: 'manager-target', payload: { ...objectiveRecord.payload, title: '部门真实目标' } }];
+    okrState.okrs = [{ ...okr, id: 'manager-target', ownerId: 'manager', objective: '部门真实目标' }];
+    const { container } = render(<OKRPerformanceView />);
+
+    fireEvent.click(screen.getByRole('button', { name: '直属上级' }));
+    const empty = container.querySelector('.okr-target-empty');
+    expect(empty).toBeInTheDocument();
+    expect(empty?.closest('.okr-target-month')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `收起${dayjs().format('YYYY年MM月')}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '卡片视图' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '周期筛选' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '直属下级' }));
+    expect(container.querySelector('.okr-target-empty')).not.toBeInTheDocument();
+    expect(screen.getByText('部门真实目标')).toBeInTheDocument();
+  });
+
+  it('does not show draft targets in department summaries or for selected members', async () => {
+    const draft = { ...objectiveRecord, id: 'consultant-draft', ownerId: 'manager', status: 'draft', payload: { ...objectiveRecord.payload, title: '专家顾问草稿目标' } };
+    okrState.records = [draft];
+    okrState.okrs = [{ ...okr, id: draft.id, ownerId: draft.ownerId, status: 'draft', objective: draft.payload.title }];
+    render(<OKRPerformanceView />);
+
+    fireEvent.click(screen.getByRole('button', { name: '其他部门' }));
+    expect(screen.queryByText('专家顾问草稿目标')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '其他部门' }));
+    expect(screen.queryByText('专家顾问草稿目标')).not.toBeInTheDocument();
+  });
+
+  it('keeps the other-department summary and narrows it for a selected department', () => {
+    const consultantTarget = { ...objectiveRecord, id: 'consultant-target', ownerId: 'consultant', payload: { ...objectiveRecord.payload, title: '专家顾问目标' } };
+    okrState.people = [
+      ...defaultPeople,
+      { id: 'consultant', name: '顾问成员', department: '专家顾问部', supervisorId: 'boss', rootFlag: 0, version: 1 },
+      { id: 'designer', name: '设计成员', department: '交互设计部', supervisorId: 'boss', rootFlag: 0, version: 1 },
+    ];
+    okrState.records = [consultantTarget];
+    okrState.okrs = [{ ...okr, id: consultantTarget.id, ownerId: consultantTarget.ownerId, objective: consultantTarget.payload.title }];
+    const { container } = render(<OKRPerformanceView />);
+
+    fireEvent.click(screen.getByRole('button', { name: '其他部门' }));
+    expect(screen.getByLabelText('目标：专家顾问目标')).toBeInTheDocument();
+    expect(screen.queryByLabelText('目标卡片：专家顾问目标')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '交互设计部' }));
+    expect(screen.getByRole('heading', { name: '交互设计部' })).toBeInTheDocument();
+    expect(screen.queryByText('专家顾问目标')).not.toBeInTheDocument();
+    expect(container.querySelector('.okr-target-empty')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '专家顾问部' }));
+    expect(screen.getByRole('heading', { name: '专家顾问部' })).toBeInTheDocument();
+    expect(screen.getByLabelText('目标：专家顾问目标')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '卡片视图' }));
+    expect(screen.getByLabelText('目标卡片：专家顾问目标')).toBeInTheDocument();
+  });
+
+  it('includes the current user in the current-department scope', () => {
+    render(<OKRPerformanceView />);
+    fireEvent.click(screen.getByRole('button', { name: '我部门的' }));
+
+    expect(screen.getByRole('heading', { name: '我部门的' })).toBeInTheDocument();
+    expect(screen.getByLabelText('目标：提升年度经营质量')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `收起${dayjs().format('YYYY年MM月')}` })).toBeInTheDocument();
   });
 
   it('defaults the period filter to the current cycle and opens the frontend-only settings panel', () => {
     render(<OKRPerformanceView />);
 
     expect(screen.getByRole('combobox', { name: '周期筛选' })).toBeInTheDocument();
+    expect(document.querySelector('.okr-cycle-filter')).toHaveTextContent(`周期：${dayjs().format('YYYY年MM月')}`);
     fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('目标设置');
     expect(screen.getByText('当前为前端演示设置，不保存后台配置。')).toBeInTheDocument();
+  });
+
+  it('shows the selected cycle count after selecting a second month', () => {
+    const { container } = render(<OKRPerformanceView />);
+    fireEvent.mouseDown(container.querySelector('.okr-cycle-filter .ant-select-content') as HTMLElement);
+    fireEvent.click(screen.getByText('已结束'));
+    fireEvent.click(screen.getByText(dayjs().subtract(1, 'month').format('YYYY年MM月')));
+    expect(container.querySelector('.okr-cycle-filter')).toHaveTextContent('周期：2个周期');
+    fireEvent.click(screen.getByRole('button', { name: '其他部门' }));
+    expect(screen.getByText(`${dayjs().format('YYYY年MM月')}暂无目标`)).toBeInTheDocument();
+    expect(screen.getByText(`${dayjs().subtract(1, 'month').format('YYYY年MM月')}暂无目标`)).toBeInTheDocument();
+    expect(container.querySelectorAll('.okr-target-empty')).toHaveLength(2);
   });
 });

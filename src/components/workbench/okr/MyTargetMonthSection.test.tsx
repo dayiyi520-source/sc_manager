@@ -72,9 +72,10 @@ describe('MyTargetMonthSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '收起2026年09月' }));
     expect(onToggle).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getAllByRole('button', { name: '查看月度详情' })[0]);
+    fireEvent.click(screen.getByLabelText('目标：完善客户交付方案'));
     expect(onOpenTarget).toHaveBeenCalledWith('draft-target');
-    expect(screen.getAllByRole('button', { name: '查看月度详情' })).toHaveLength(3);
+    fireEvent.keyDown(screen.getByLabelText('目标：推进平台智能化能力建设'), { key: 'Enter' });
+    expect(onOpenTarget).toHaveBeenCalledWith('active-target');
 
     rerender(<MyTargetMonthSection periodKey="2026-09" targets={targets} viewMode="list" collapsed onToggle={onToggle} onOpenTarget={onOpenTarget} />);
     expect(screen.queryByLabelText('目标：完善客户交付方案')).not.toBeInTheDocument();
