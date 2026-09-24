@@ -1,0 +1,73 @@
+// @vitest-environment jsdom
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { MyTargetMonthSection, type MyTargetViewItem } from './MyTargetMonthSection';
+
+const targets: MyTargetViewItem[] = [
+  {
+    id: 'draft-target',
+    detailId: 'draft-target',
+    title: '完善客户交付方案',
+    status: 'draft',
+    ownerNames: ['林志豪'],
+    progress: 0,
+    savedAt: '2026-09-24T08:00:00',
+    actions: [{ id: 'draft-action', title: '梳理交付清单', assigneeNames: ['刘爱剑'], progress: 0, weight: 100, deadline: '2026-09-30' }],
+  },
+  {
+    id: 'active-target',
+    detailId: 'active-target',
+    title: '推进平台智能化能力建设',
+    status: 'active',
+    sourceName: '直属上级 · 陈宇璋',
+    ownerNames: ['林志豪'],
+    progress: 42,
+    savedAt: '2026-09-20T08:00:00',
+    actions: [{ id: 'active-action', title: '上线智能分析节点', assigneeNames: ['吴清', '刘笑星'], progress: 42, weight: 100, deadline: '2026-09-28' }],
+  },
+];
+
+describe('MyTargetMonthSection', () => {
+  it('renders the list view as complete objective units with source, owners, and action fields', () => {
+    render(<MyTargetMonthSection periodKey="2020-01" targets={targets} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()} />);
+
+    expect(screen.getByText('2020年01月')).toBeInTheDocument();
+    expect(screen.getByText('周期已结束')).toBeInTheDocument();
+    expect(screen.getByText('直属上级 · 陈宇璋')).toBeInTheDocument();
+    const activeTarget = screen.getByLabelText('目标：推进平台智能化能力建设');
+    expect(within(activeTarget).getByText('承接人员：林志豪')).toBeInTheDocument();
+    expect(within(activeTarget).getAllByText('42%')).toHaveLength(2);
+    expect(within(activeTarget).getByText('上线智能分析节点')).toBeInTheDocument();
+    expect(within(activeTarget).getByText('吴清、刘笑星')).toBeInTheDocument();
+    expect(within(activeTarget).getByText('权重 100%')).toBeInTheDocument();
+    expect(within(activeTarget).getByText('09-28')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('目标：完善客户交付方案')).queryByText('0%')).not.toBeInTheDocument();
+  });
+
+  it('shows draft state only for draft cards and uses distinct saved or submitted dates', () => {
+    render(<MyTargetMonthSection periodKey="2026-09" targets={targets} viewMode="card" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()} />);
+
+    const draftCard = screen.getByLabelText('目标卡片：完善客户交付方案');
+    const activeCard = screen.getByLabelText('目标卡片：推进平台智能化能力建设');
+    expect(within(draftCard).getByText('草稿')).toBeInTheDocument();
+    expect(within(draftCard).getByText('保存时间：2026-09-24')).toBeInTheDocument();
+    expect(within(activeCard).queryByText('已提交')).not.toBeInTheDocument();
+    expect(within(activeCard).getByText('提交时间：2026-09-20')).toBeInTheDocument();
+    expect(within(activeCard).getByText('42%')).toBeInTheDocument();
+  });
+
+  it('delegates month collapse and target detail actions', () => {
+    const onToggle = vi.fn();
+    const onOpenTarget = vi.fn();
+    const { rerender } = render(<MyTargetMonthSection periodKey="2026-09" targets={targets} viewMode="list" collapsed={false} onToggle={onToggle} onOpenTarget={onOpenTarget} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '收起2026年09月' }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getAllByRole('button', { name: '查看详情' })[0]);
+    expect(onOpenTarget).toHaveBeenCalledWith('draft-target');
+
+    rerender(<MyTargetMonthSection periodKey="2026-09" targets={targets} viewMode="list" collapsed onToggle={onToggle} onOpenTarget={onOpenTarget} />);
+    expect(screen.queryByLabelText('目标：完善客户交付方案')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '展开2026年09月' })).toBeInTheDocument();
+  });
+});

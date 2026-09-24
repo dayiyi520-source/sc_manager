@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Alert, Button, Empty, Input, Modal, Progress, Cascader, Spin, Tag, Tabs, Flex, Typography } from 'antd';
+import { Alert, Button, Empty, Input, Modal, Progress, Cascader, Spin, Tag, Tabs, Flex, Typography, Tooltip } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
-import { Target, FileSpreadsheet, Plus, Calendar, ChevronDown, ChevronRight, Search, CheckCircle, AlertTriangle, FileText, GitBranch } from '@/components/common/octicons-compat';
+import { Target, FileSpreadsheet, Plus, Calendar, ChevronDown, ChevronRight, Search, CheckCircle, AlertTriangle, FileText, GitBranch, List, LayoutGrid } from '@/components/common/octicons-compat';
 import { useApp, useAppNavigationContext } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
@@ -18,6 +18,7 @@ import { ReviewReadOnlyView } from './okr/ReviewReadOnlyView';
 import { createReviewCopyDraft } from './okr/reviewCopy';
 import { ActionBreakdownForm, type ActionGroupValues } from './okr/ActionBreakdownForm';
 import { GoalHierarchyView } from './okr/GoalHierarchyView';
+import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewMode } from './okr/MyTargetMonthSection';
 import type { OkrRecord } from '../../services/okrRepository';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
@@ -97,6 +98,7 @@ const OriginalWorkspace: React.FC = () => {
   const [editingActionId, setEditingActionId] = useState<string | undefined>();
   const [demoBreakdowns, setDemoBreakdowns] = useState<DemoBreakdown[]>([]);
   const [collapsedSummaryMonths, setCollapsedSummaryMonths] = useState<Set<string>>(() => new Set());
+  const [targetViewMode, setTargetViewMode] = useState<MyTargetViewMode>('list');
   const [selectedOkrRecordId, setSelectedOkrRecordId] = useState<string | null>(null);
   const [selectedMonthDetail, setSelectedMonthDetail] = useState<string | null>(null);
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
@@ -294,6 +296,11 @@ const OriginalWorkspace: React.FC = () => {
               <span className="okr-cycle-label" aria-hidden="true">{cycleLabel}</span>
             </div>
 
+            {okrCategoryTab === 'my' && <div className="okr-target-view-switch" role="group" aria-label="目标视图">
+              <Tooltip title="列表视图"><Button aria-label="列表视图" aria-pressed={targetViewMode === 'list'} type={targetViewMode === 'list' ? 'primary' : 'default'} icon={<List/>} onClick={() => setTargetViewMode('list')}/></Tooltip>
+              <Tooltip title="卡片视图"><Button aria-label="卡片视图" aria-pressed={targetViewMode === 'card'} type={targetViewMode === 'card' ? 'primary' : 'default'} icon={<LayoutGrid/>} onClick={() => setTargetViewMode('card')}/></Tooltip>
+            </div>}
+
             <Button type="primary"
               id="btn-add-okr"
               disabled={busy || objectiveBatchAction !== null}
@@ -380,6 +387,22 @@ const OriginalWorkspace: React.FC = () => {
             const draftIds = monthDrafts.map(record => record.id);
             const savedTargets: SavedTargetSummary[] = monthRecords.filter(record => record.kind === 'objective').map(record => ({ id: record.id, title: record.payload.title, status: record.status, actions: (record.payload.keyResults || []).map(action => ({ id: action.id, title: action.title, weight: action.weight, assigneeIds: action.assigneeIds })) }));
             const objectiveCount = savedTargets.length + demoGroups.length;
+            if (isMyOkrCategory) {
+              const targetItems = buildMyTargetViewItems(monthRecords, monthDemoBreakdowns, visibleActionParents, people, currentUser.id);
+              return <MyTargetMonthSection
+                key={month}
+                periodKey={month}
+                targets={targetItems}
+                viewMode={targetViewMode}
+                collapsed={collapsedSummaryMonths.has(month)}
+                onToggle={() => setCollapsedSummaryMonths(current => {
+                  const next = new Set(current);
+                  next.has(month) ? next.delete(month) : next.add(month);
+                  return next;
+                })}
+                onOpenTarget={targetId => setSelectedOkrRecordId(targetId)}
+              />;
+            }
             return renderSummaryCard(month, month, progress, objectiveCount, keyResults, status, submittedAt, () => { setDraftToSubmit(draftIds.length === 1 ? draftIds[0] : null); setSelectedMonthDetail(month); }, () => { setSelectedMonthDetail(month); setDraftToSubmit(null); }, monthDrafts.length, monthDemoBreakdowns, savedTargets);
           })}</div>}
           </div>)}

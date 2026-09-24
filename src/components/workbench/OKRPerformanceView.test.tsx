@@ -172,11 +172,21 @@ describe('OKRPerformanceView target navigation', () => {
 
     render(<OKRPerformanceView />);
 
-    const savedTargets = screen.getByLabelText('已保存目标');
-    expect(savedTargets).toHaveTextContent('草稿目标一');
-    expect(savedTargets).toHaveTextContent('草稿目标二');
+    expect(screen.getByLabelText('目标：草稿目标一')).toBeInTheDocument();
+    expect(screen.getByLabelText('目标：草稿目标二')).toBeInTheDocument();
     expect(screen.getAllByText('草稿目标一')).toHaveLength(1);
     expect(screen.getAllByText('草稿目标二')).toHaveLength(1);
+  });
+
+  it('defaults to the list view and switches the same targets to cards', () => {
+    render(<OKRPerformanceView />);
+
+    expect(screen.getByRole('button', { name: '列表视图' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('目标：提升年度经营质量')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '卡片视图' }));
+    expect(screen.getByRole('button', { name: '卡片视图' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('目标卡片：提升年度经营质量')).toBeInTheDocument();
   });
 
   it('isolates personal active targets and drafts from every non-personal category', () => {
@@ -184,7 +194,7 @@ describe('OKRPerformanceView target navigation', () => {
     okrState.okrs = [okr, ...draftOkrs];
 
     render(<OKRPerformanceView />);
-    expect(screen.getByLabelText('已保存目标')).toHaveTextContent('草稿目标一');
+    expect(screen.getByLabelText('目标：草稿目标一')).toBeInTheDocument();
 
     for (const category of ['直属上级目标', '直属下级目标', '我部门的目标', '跨部门协同目标']) {
       fireEvent.click(screen.getByRole('tab', { name: category }));
