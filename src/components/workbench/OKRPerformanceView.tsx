@@ -202,6 +202,15 @@ const OriginalWorkspace: React.FC = () => {
     }
   };
 
+  const handleOkrCategoryChange = (value: string) => {
+    setOkrCategoryTab(value as typeof okrCategoryTab);
+    setSelectedOkrRecordId(null);
+    setSelectedMonthDetail(null);
+    setActionFormOpen(false);
+    setEditingActionId(undefined);
+    setOkrDraftToSubmit(null);
+  };
+
   return (
     <div className="original-okr space-y-6 animate-in fade-in duration-150">
       {loading && <div className="okr-loading-state" role="status" aria-live="polite"><Spin size="small"/> 正在加载目标与绩效…</div>}
@@ -209,7 +218,7 @@ const OriginalWorkspace: React.FC = () => {
       {/* Top Main Navigation Tabs */}
       <div className="okr-page-toolbar">
         <div className="okr-primary-tabs primary-line-tabs" role="tablist" aria-label="目标与绩效视图">
-          <Button id="tab-okrs" role="tab" aria-selected={mainTab === 'okrs'} type="text" icon={<Target/>} onClick={()=>setMainTab('okrs')}>我的目标</Button>
+          <Button id="tab-okrs" role="tab" aria-selected={mainTab === 'okrs'} type="text" icon={<Target/>} onClick={()=>setMainTab('okrs')}>月度目标</Button>
           <Button id="tab-reviews" role="tab" aria-selected={mainTab === 'reviews'} type="text" icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
         </div>
 
@@ -232,7 +241,7 @@ const OriginalWorkspace: React.FC = () => {
               添加目标
             </Button>
             <Button id="btn-breakdown-action" icon={<GitBranch />} disabled={busy} onClick={() => { setOkrCategoryTab('my'); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedOkrRecordId(null); setActionFormOpen(true); }}>
-              拆解动作
+              拆解目标
             </Button>
           </div>
         )}
@@ -244,7 +253,7 @@ const OriginalWorkspace: React.FC = () => {
           {/* Sub Navigation */}
           <Tabs
             activeKey={okrCategoryTab}
-            onChange={(value) => setOkrCategoryTab(value as typeof okrCategoryTab)}
+            onChange={handleOkrCategoryChange}
             items={[
               { label: '我的目标', key: 'my' },
               { label: '直属上级目标', key: 'supervisor' },
@@ -274,8 +283,8 @@ const OriginalWorkspace: React.FC = () => {
 
           {/* OKR Cards List */}
           {selectedOkrRecord?.kind === 'action' && selectedOkrRecord.status === 'draft' ? <div className="okr-detail-page"><ActionBreakdownForm key={`action-draft-${selectedOkrRecord.id}`} open cycle={selectedOkrRecord.periodKey} person={me} parents={visibleActionParents} actions={[selectedOkrRecord]} people={people} busy={busy} initialActionId={selectedOkrRecord.id} onClose={() => setSelectedOkrRecordId(null)} onSave={async (parent, values, mode) => { const value = values[0]; if (!value) return false; const updated = await saveActions(selectedOkrRecord.periodKey, [{recordId: value.recordId, version: value.version, title: value.title, department: me?.department || '其他支撑', parentObjectiveId: String(parent.payload.parentObjectiveId || ''), parentActionId: parent.payload.parentActionId || parent.id, parentKeyResultId: String(parent.payload.parentKeyResultId || parent.id), assigneeIds: value.assigneeIds || [], assigneeName: (value.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'), structureType: selectedOkrRecord.payload.structureType || 'support', productLine: value.businessObject, businessObject: value.businessObject, acceptanceStandard: value.businessObject, milestone: value.milestone, deadline: value.deadline?.format('YYYY-MM-DD') || '', weight: Number(value.weight || 0)}], mode === 'submit'); if (updated) setSelectedOkrRecordId(null); return updated; }} /></div> : selectedOkrRecord ? <div className="okr-detail-page">
-            {selectedOkrRecord.kind === 'objective' && selectedOkrRecord.status === 'draft' ? <ObjectiveForm key={selectedOkrRecord.id} detailMode compactDetail cycle={selectedOkrRecord.periodKey} objectiveIndex={0} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error} root={!!me?.rootFlag} initialPayload={selectedOkrRecord.payload} onCancel={() => setSelectedOkrRecordId(null)} onSave={payload => updateOkr(selectedOkrRecord.id, payload, true).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })} onSaveDraft={payload => updateOkr(selectedOkrRecord.id, payload, false).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })} /> : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.kind === 'objective' ? selectedOkrRecord.ownerId : undefined} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} onBack={() => setSelectedOkrRecordId(null)} />}
-          </div> : selectedMonthDetail ? <div className="okr-detail-page">{okrDraftToSubmit && <Card className="okr-draft-submit-panel"><Typography.Text>提交这条目标或拆解动作草稿？</Typography.Text><Flex gap="small"><Button onClick={() => setOkrDraftToSubmit(null)}>取消</Button><Button type="primary" loading={busy} onClick={async () => { const ok = await submitOkrDraft(okrDraftToSubmit); if (ok) { setOkrDraftToSubmit(null); } }}>确认提交</Button></Flex></Card>}<GoalHierarchyView records={records} people={people} periodKey={selectedMonthDetail} ownerId={currentUser.id} loading={loading} error={error} onBack={() => setSelectedMonthDetail(null)} onEditDraft={record => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedOkrRecordId(record.id); }} onSubmitDraft={record => setOkrDraftToSubmit(record.id)} /></div> : (objectiveForms.length > 0 || actionFormOpen ? null : <div className="okr-summary-month-list">
+            {selectedOkrRecord.kind === 'objective' && selectedOkrRecord.status === 'draft' ? <ObjectiveForm key={selectedOkrRecord.id} detailMode compactDetail cycle={selectedOkrRecord.periodKey} objectiveIndex={0} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error} root={!!me?.rootFlag} initialPayload={selectedOkrRecord.payload} onCancel={() => setSelectedOkrRecordId(null)} onSave={payload => updateOkr(selectedOkrRecord.id, payload, true).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })} onSaveDraft={payload => updateOkr(selectedOkrRecord.id, payload, false).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })} /> : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.kind === 'objective' ? selectedOkrRecord.ownerId : undefined} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedOkrRecordId(null)} />}
+          </div> : selectedMonthDetail ? <div className="okr-detail-page">{okrDraftToSubmit && <Card className="okr-draft-submit-panel"><Typography.Text>提交这条目标或拆解目标草稿？</Typography.Text><Flex gap="small"><Button onClick={() => setOkrDraftToSubmit(null)}>取消</Button><Button type="primary" loading={busy} onClick={async () => { const ok = await submitOkrDraft(okrDraftToSubmit); if (ok) { setOkrDraftToSubmit(null); } }}>确认提交</Button></Flex></Card>}<GoalHierarchyView records={records} people={people} periodKey={selectedMonthDetail} ownerId={currentUser.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedMonthDetail(null)} onEditDraft={record => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedOkrRecordId(record.id); }} onSubmitDraft={record => setOkrDraftToSubmit(record.id)} /></div> : (objectiveForms.length > 0 || actionFormOpen ? null : <div className="okr-summary-month-list">
             {filteredOkrs.length === 0 && myActions.length === 0 && myActionDrafts.length === 0 && objectiveForms.length === 0 && !loading && !error ? (
               <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
                 <Empty description="本月暂无目标"/>

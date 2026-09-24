@@ -202,7 +202,22 @@ const sourcePath = (node: GoalHierarchyNode) => {
   return chain;
 };
 
-export function GoalHierarchyView({ records, people, periodKey, ownerId, loading = false, error, initialSelectedId, onBack, onEditDraft, onSubmitDraft }: {
+const GoalHierarchyDemo = () => {
+  const levels = [
+    { code: 'O', title: '公司月度目标', role: '老板制定' },
+    { code: 'A1', title: '老板关键动作', role: '下发主管' },
+    { code: 'A11', title: '主管拆解目标', role: '下发员工' },
+    { code: 'A111', title: '员工执行目标', role: '落地执行' },
+  ];
+  return <section className="goal-hierarchy-demo" aria-label="四级目标关系演示">
+    <header><div><Tag color="processing">关系演示</Tag><strong>四级下钻效果</strong></div><p>仅用于说明老板视角的层级关系，不保存、不提交，也不参与真实目标进度。</p></header>
+    <div className="goal-hierarchy-demo-tree">{levels.map((level, index) => <div key={level.code} className={`goal-hierarchy-demo-node depth-${index}`}>
+      <span>{level.code}</span><b>{level.title}</b><small>{level.role}</small>
+    </div>)}</div>
+  </section>;
+};
+
+export function GoalHierarchyView({ records, people, periodKey, ownerId, loading = false, error, initialSelectedId, showDemoHierarchy = false, onBack, onEditDraft, onSubmitDraft }: {
   records: OkrRecord[];
   people: OkrPerson[];
   periodKey: string;
@@ -210,6 +225,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, loading
   loading?: boolean;
   error?: unknown;
   initialSelectedId?: string;
+  showDemoHierarchy?: boolean;
   onBack?: () => void;
   onEditDraft?: (record: OkrRecord) => void;
   onSubmitDraft?: (record: OkrRecord) => void;
@@ -239,6 +255,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, loading
     {loading ? <div className="goal-hierarchy-loading" role="status"><Skeleton active paragraph={{ rows: 5 }}/></div> : roots.length === 0 ? <div className="goal-hierarchy-empty"><Empty description="当前周期暂无可展示的目标关系"/><p>上级目标提交并指派后，承接动作会显示在这里。</p></div> : <div className="goal-hierarchy-layout">
       <div className="goal-hierarchy-tree">{roots.map((root, index) => <GoalNodeBranch key={root.id} node={root} path={[index + 1]} expandedIds={expandedIds} selectedId={selectedId} people={people} onToggle={toggle} onSelect={node => setSelectedId(node.id)}/>)}</div>
     </div>}
+    {showDemoHierarchy && <GoalHierarchyDemo />}
     <Drawer rootClassName="goal-hierarchy-drawer" open={Boolean(selected)} placement="right" closable={false} maskClosable destroyOnHidden onClose={() => setSelectedId(undefined)} title="目标节点详情">
       {selected && <aside className="goal-node-detail" aria-label="目标节点详情">
         <div className="goal-node-detail-head"><div><Tag color={statusMeta(selected.status).color}>{statusMeta(selected.status).label}</Tag><span>{selected.kind === 'objective' ? '目标 O' : '动作 A'}</span></div><Button type="text" aria-label="关闭详情" icon={<XIcon />} onClick={() => setSelectedId(undefined)}/></div>

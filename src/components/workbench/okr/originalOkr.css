@@ -580,4 +580,19 @@
 .goal-hierarchy-loading { padding:24px; }
 .goal-hierarchy-empty { display:grid; justify-items:center; gap:4px; padding:48px 24px; text-align:center; }
 .goal-hierarchy-empty p { margin:0; color:var(--text-muted); font-size:12px; }
+.goal-hierarchy-demo { display:grid; gap:12px; padding:16px; border:1px dashed var(--border-strong); border-radius:12px; background:var(--bg-surface); }
+.goal-hierarchy-demo header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.goal-hierarchy-demo header > div { display:flex; align-items:center; gap:8px; }
+.goal-hierarchy-demo header strong { font-size:14px; line-height:20px; }
+.goal-hierarchy-demo header p { max-width:560px; margin:0; color:var(--text-muted); font-size:11px; line-height:18px; text-align:right; }
+.goal-hierarchy-demo-tree { display:grid; gap:8px; }
+.goal-hierarchy-demo-node { position:relative; display:grid; min-height:44px; grid-template-columns:52px minmax(0,1fr) auto; align-items:center; gap:12px; padding:8px 12px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); }
+.goal-hierarchy-demo-node.depth-1 { margin-left:32px; }
+.goal-hierarchy-demo-node.depth-2 { margin-left:64px; }
+.goal-hierarchy-demo-node.depth-3 { margin-left:96px; }
+.goal-hierarchy-demo-node:not(.depth-0)::before { position:absolute; top:-9px; left:-17px; width:16px; height:31px; border-bottom:1px solid var(--border-main); border-left:1px solid var(--border-main); content:''; }
+.goal-hierarchy-demo-node > span { display:inline-flex; height:28px; align-items:center; justify-content:center; border:1px solid color-mix(in srgb,var(--primary) 45%,var(--border-main)); border-radius:6px; color:var(--active-text); font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:11px; font-weight:700; }
+.goal-hierarchy-demo-node b { min-width:0; overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.goal-hierarchy-demo-node small { color:var(--text-muted); font-size:11px; }
 @media (max-width:720px) { .goal-hierarchy-toolbar { flex-direction:column; } .goal-hierarchy-actions { width:100%; justify-content:space-between; } .goal-node-main { grid-template-columns:40px minmax(0,1fr) auto; } .goal-node-progress { grid-column:2; grid-template-columns:minmax(48px,1fr) 34px; } .goal-node-main > .ant-tag { grid-column:3; grid-row:1; } .goal-node-children { margin-left:12px; padding-left:12px; } .goal-detail-fields { grid-template-columns:1fr; } }
+@media (max-width:720px) { .goal-hierarchy-demo header { flex-direction:column; } .goal-hierarchy-demo header p { text-align:left; } .goal-hierarchy-demo-node { grid-template-columns:44px minmax(0,1fr); } .goal-hierarchy-demo-node small { grid-column:2; } .goal-hierarchy-demo-node.depth-1 { margin-left:12px; } .goal-hierarchy-demo-node.depth-2 { margin-left:24px; } .goal-hierarchy-demo-node.depth-3 { margin-left:36px; } }

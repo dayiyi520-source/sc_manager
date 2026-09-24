@@ -42,8 +42,8 @@ export function useOriginalOkr() {
   const refresh = () => client.invalidateQueries({queryKey:['okr',currentUser.id]});
   const saveActions = async (period:string,payloads:import('../../../services/okrRepository').OkrActionPayload[], submit = true) => {
     setBusy(true);
-    try { for(const payload of payloads) { if(payload.recordId) await okrRepository.updateAction(payload.recordId, payload.version ?? 0, payload, submit); else await okrRepository.createAction(period,payload,submit); } await refresh(); addToast('success',submit?'拆解动作已提交':'拆解动作草稿已保存'); return true; }
-    catch(error){addToast('error',error instanceof Error?error.message:'拆解动作保存失败');return false;}
+    try { for(const payload of payloads) { if(payload.recordId) await okrRepository.updateAction(payload.recordId, payload.version ?? 0, payload, submit); else await okrRepository.createAction(period,payload,submit); } await refresh(); addToast('success',submit?'拆解目标已提交':'拆解目标草稿已保存'); return true; }
+    catch(error){addToast('error',error instanceof Error?error.message:'拆解目标保存失败');return false;}
     finally{setBusy(false);}
   };
   const submitReviewDraft = async (id:string) => {
@@ -66,7 +66,7 @@ export function useOriginalOkr() {
     try {
       await okrRepository.update(record, 'submit', { payload: record.payload });
       await refresh();
-      addToast('success', record.kind === 'action' ? '拆解动作已提交' : '目标已提交');
+      addToast('success', record.kind === 'action' ? '拆解目标已提交' : '目标已提交');
       return true;
     } catch(error) { addToast('error', error instanceof Error ? error.message : '提交失败，请重试'); return false; }
     finally { setBusy(false); }

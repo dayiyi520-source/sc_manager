@@ -20,7 +20,10 @@ describe('ActionBreakdownForm', () => {
 
     expect(screen.getByText('2026年09月')).toBeInTheDocument();
     expect(screen.getByText('提升客户满意度')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name: '拆解动作'}));
+    fireEvent.click(screen.getByRole('button', {name: '拆解目标'}));
+    expect(screen.queryByLabelText('输入动作')).not.toBeInTheDocument();
+    expect(screen.getByText('尚未添加 A，点击“添加 A”开始拆解')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: '添加 A'}));
     expect(screen.getByLabelText('输入动作')).toBeInTheDocument();
     expect(screen.getByLabelText('关联产品线')).toBeInTheDocument();
     expect(screen.getByLabelText('关键节点')).toBeInTheDocument();
@@ -30,8 +33,9 @@ describe('ActionBreakdownForm', () => {
   it('adds multiple blank actions without per-action collapse controls', () => {
     render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[]} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => undefined)} />);
 
-    fireEvent.click(screen.getByRole('button', {name: '拆解动作'}));
-    fireEvent.click(screen.getByRole('button', {name: '继续添加'}));
+    fireEvent.click(screen.getByRole('button', {name: '拆解目标'}));
+    fireEvent.click(screen.getByRole('button', {name: '添加 A'}));
+    fireEvent.click(screen.getByRole('button', {name: '添加 A'}));
     expect(screen.getByText('关键动作 2')).toBeInTheDocument();
     expect(screen.getAllByRole('button', {name: '收起'})).toHaveLength(1);
   }, 15000);
@@ -44,7 +48,7 @@ describe('ActionBreakdownForm', () => {
     render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[draft]} people={people} busy={false} initialActionId={draft.id} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
 
     expect(await screen.findByDisplayValue('已保存的草稿')).toBeInTheDocument();
-    expect(screen.queryByRole('button', {name: '拆解动作'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '拆解目标'})).not.toBeInTheDocument();
     expect(screen.getByText('提升客户满意度')).toBeInTheDocument();
     expect(screen.getByLabelText('关联产品线')).toHaveValue('平台');
   });
