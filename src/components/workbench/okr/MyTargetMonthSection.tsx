@@ -180,7 +180,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
       </div>
       <div className="okr-target-list-status">
         {submitted && <><span>目标进度</span><div><Progress type="circle" percent={target.progress} size={32}/></div></>}
-        {target.detailId && <Tooltip title={target.status === 'draft' ? '编辑目标草稿' : '查看目标详情'}><Button type="text" icon={<Eye/>} aria-label="查看详情" onClick={onOpen}/></Tooltip>}
+        <Tooltip title="查看月度目标详情"><Button type="text" icon={<Eye/>} aria-label="查看月度详情" onClick={onOpen}/></Tooltip>
       </div>
     </header>
     <div className="okr-target-action-head" aria-hidden="true"><span>行动</span><span>动作描述</span><span>承接人员</span><span>进度</span><span>权重</span><span>截止时间</span></div>
@@ -207,7 +207,7 @@ const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
       ? visibleActions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} compact/>)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>
-    <footer><span>{hiddenCount > 0 ? `另有 ${hiddenCount} 条行动` : `${target.actions.length} 条行动`}</span>{target.detailId && <Button type="text" icon={<Eye/>} onClick={onOpen}>{target.status === 'draft' ? '编辑草稿' : '查看详情'}</Button>}</footer>
+    <footer><span>{hiddenCount > 0 ? `另有 ${hiddenCount} 条行动` : `${target.actions.length} 条行动`}</span><Button type="text" icon={<Eye/>} aria-label="查看月度详情" onClick={onOpen}>查看月度详情</Button></footer>
   </article>;
 };
 

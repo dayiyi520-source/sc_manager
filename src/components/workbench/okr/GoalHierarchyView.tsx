@@ -11,6 +11,7 @@ import {
   XIcon,
 } from '@primer/octicons-react';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
+import type { MyTargetViewItem } from './MyTargetMonthSection';
 
 export type GoalHierarchyNode = {
   id: string;
@@ -22,6 +23,7 @@ export type GoalHierarchyNode = {
   weight: number;
   ownerId: string;
   assigneeIds: string[];
+  assigneeNames?: string[];
   department?: string;
   deadline?: string;
   createdAt?: string;
@@ -157,7 +159,7 @@ const GoalNodeRow = ({ node, code, expanded, selected, people, onToggle, onSelec
   onSelect: () => void;
 }) => {
   const status = statusMeta(node.status);
-  const assigneeNames = node.assigneeIds.map(id => people.find(person => person.id === id)?.name || id);
+  const assigneeNames = node.assigneeNames || node.assigneeIds.map(id => people.find(person => person.id === id)?.name || id);
   return <div className={`goal-node-row${selected ? ' is-selected' : ''}${node.status === 'draft' ? ' is-draft' : ''}`}>
     <button type="button" className="goal-node-toggle" aria-label={node.children.length ? `${expanded ? '收起' : '展开'} ${node.title}` : `${node.title} 无下级动作`} disabled={!node.children.length} onClick={onToggle}>
       {node.children.length ? (expanded ? <ChevronDownIcon /> : <ChevronRightIcon />) : <span />}
@@ -217,11 +219,12 @@ const GoalHierarchyDemo = () => {
   </section>;
 };
 
-export function GoalHierarchyView({ records, people, periodKey, ownerId, loading = false, error, initialSelectedId, showDemoHierarchy = false, onBack, onEditDraft, onSubmitDraft }: {
+export function GoalHierarchyView({ records, people, periodKey, ownerId, supplementalTargets = [], loading = false, error, initialSelectedId, showDemoHierarchy = false, onBack, onEditDraft, onSubmitDraft }: {
   records: OkrRecord[];
   people: OkrPerson[];
   periodKey: string;
   ownerId?: string;
+  supplementalTargets?: MyTargetViewItem[];
   loading?: boolean;
   error?: unknown;
   initialSelectedId?: string;
@@ -230,7 +233,43 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, loading
   onEditDraft?: (record: OkrRecord) => void;
   onSubmitDraft?: (record: OkrRecord) => void;
 }) {
-  const roots = useMemo(() => buildGoalHierarchy(records, periodKey, ownerId), [records, periodKey, ownerId]);
+  const roots = useMemo(() => {
+    const persistedRoots = buildGoalHierarchy(records, periodKey, ownerId);
+    const persistedIds = new Set(persistedRoots.map(root => root.id));
+    const supplementalRoots = supplementalTargets
+      .filter(target => !persistedIds.has(target.id) && (!target.detailId || !persistedIds.has(target.detailId)))
+      .map<GoalHierarchyNode>(target => {
+        const root: GoalHierarchyNode = {
+          id: target.id,
+          referenceId: target.id,
+          kind: 'objective',
+          title: target.title,
+          status: target.status,
+          progress: target.progress,
+          weight: 100,
+          ownerId: ownerId || '',
+          assigneeIds: [],
+          children: [],
+        };
+        root.children = target.actions.map(action => ({
+          id: action.id,
+          referenceId: action.id,
+          kind: 'action',
+          title: action.title,
+          status: target.status,
+          progress: action.progress,
+          weight: action.weight,
+          ownerId: ownerId || '',
+          assigneeIds: [],
+          assigneeNames: action.assigneeNames,
+          deadline: action.deadline,
+          source: root,
+          children: [],
+        }));
+        return root;
+      });
+    return [...persistedRoots, ...supplementalRoots];
+  }, [records, periodKey, ownerId, supplementalTargets]);
   const nodes = useMemo(() => flatten(roots), [roots]);
   const expandableIds = useMemo(() => nodes.filter(node => node.children.length > 0).map(node => node.id), [nodes]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(roots.map(root => root.id)));
@@ -241,7 +280,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, loading
   const allExpanded = expandableIds.length > 0 && expandableIds.every(id => expandedIds.has(id));
   const toggle = (id: string) => setExpandedIds(current => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const ownerName = (id: string) => people.find(person => person.id === id)?.name || '人员已停用';
-  const assignees = selected?.assigneeIds.map(id => people.find(person => person.id === id)?.name || id) || [];
+  const assignees = selected?.assigneeNames || selected?.assigneeIds.map(id => people.find(person => person.id === id)?.name || id) || [];
 
   return <section className="goal-hierarchy" aria-label="目标逐级承接关系">
     <header className="goal-hierarchy-toolbar">
@@ -271,7 +310,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, loading
           <div><dt>所属部门</dt><dd>{selected.department || people.find(person => person.id === selected.ownerId)?.department || '—'}</dd></div>
         </dl>
         <div className="goal-node-detail-actions">
-          {selected.status === 'draft' && selected.record ? <><Button onClick={() => onEditDraft?.(selected.record)} disabled={!onEditDraft}>编辑草稿</Button><Button type="primary" onClick={() => onSubmitDraft?.(selected.record)} disabled={!onSubmitDraft}>提交</Button></> : <Button icon={<GitBranchIcon />} disabled>创建调整</Button>}
+          {selected.status === 'draft' && selected.record ? <><Button onClick={() => { onEditDraft?.(selected.record); setSelectedId(undefined); }} disabled={!onEditDraft}>编辑草稿</Button><Button type="primary" onClick={() => onSubmitDraft?.(selected.record)} disabled={!onSubmitDraft}>提交</Button></> : <Button icon={<GitBranchIcon />} disabled>创建调整</Button>}
           {selected.status !== 'draft' && <span>已提交内容只读，后续将通过“创建调整”进入变更流程。</span>}
         </div>
       </aside>}

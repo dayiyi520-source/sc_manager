@@ -62,10 +62,14 @@ describe('GoalHierarchyView', () => {
     expect(screen.getByText('来源链路')).toBeInTheDocument();
     expect(within(detail).getByText('未指定承接人')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '编辑草稿' }));
-    fireEvent.click(within(detail).getByRole('button', { name: /提\s*交/ }));
     expect(edit).toHaveBeenCalledWith(records[2]);
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: '目标节点详情' })).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 补齐质量复盘机制' }));
+    const reopenedDetail = screen.getByRole('complementary', { name: '目标节点详情' });
+    fireEvent.click(within(reopenedDetail).getByRole('button', { name: /提\s*交/ }));
     expect(submit).toHaveBeenCalledWith(records[2]);
-    fireEvent.click(within(detail).getByRole('button', { name: '关闭详情' }));
+    fireEvent.click(within(reopenedDetail).getByRole('button', { name: '关闭详情' }));
     await waitFor(() => expect(screen.queryByRole('complementary', { name: '目标节点详情' })).not.toBeInTheDocument());
   });
 
@@ -87,5 +91,26 @@ describe('GoalHierarchyView', () => {
     expect(within(demo).getByText('主管拆解目标')).toBeInTheDocument();
     expect(within(demo).getByText('员工执行目标')).toBeInTheDocument();
     expect(within(demo).getByText(/不保存、不提交/)).toBeInTheDocument();
+  });
+
+  it('keeps session targets in the monthly tree and marks the opened objective as selected', () => {
+    render(<GoalHierarchyView
+      records={records}
+      people={people}
+      periodKey="2026-09"
+      ownerId="boss"
+      initialSelectedId="session-o"
+      supplementalTargets={[{
+        id: 'session-o',
+        title: '会话内拆解目标',
+        status: 'draft',
+        ownerNames: ['负责人'],
+        progress: 0,
+        actions: [{ id: 'session-a', title: '会话内行动', assigneeNames: ['部门主管'], progress: 0, weight: 100, deadline: '' }],
+      }]}
+    />);
+
+    expect(screen.getByRole('button', { name: '查看 会话内拆解目标' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('会话内行动')).toBeInTheDocument();
   });
 });

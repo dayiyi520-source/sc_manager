@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import type { OkrRecord } from '../../services/okrRepository';
@@ -121,7 +121,7 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.getByRole('tab', { name: '我的目标' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /拆解目标/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
+    fireEvent.click(screen.getByRole('button', { name: '查看月度详情' }));
     expect(await screen.findByRole('region', { name: '目标逐级承接关系' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '直属上级目标' }));
     await waitFor(() => expect(screen.queryByRole('region', { name: '目标逐级承接关系' })).not.toBeInTheDocument());
@@ -179,14 +179,36 @@ describe('OKRPerformanceView target navigation', () => {
   });
 
   it('defaults to the list view and switches the same targets to cards', () => {
-    render(<OKRPerformanceView />);
+    const { container } = render(<OKRPerformanceView />);
 
-    expect(screen.getByRole('button', { name: '列表视图' })).toHaveAttribute('aria-pressed', 'true');
+    const listButton = screen.getByRole('button', { name: '列表视图' });
+    expect(listButton).toHaveAttribute('aria-pressed', 'true');
+    expect(listButton).toHaveClass('is-selected');
+    expect(listButton).not.toHaveClass('ant-btn-primary');
+    expect(container.querySelector('.okr-summary-month-body')).toHaveClass('is-target-view');
     expect(screen.getByLabelText('目标：提升年度经营质量')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '卡片视图' }));
-    expect(screen.getByRole('button', { name: '卡片视图' })).toHaveAttribute('aria-pressed', 'true');
+    const cardButton = screen.getByRole('button', { name: '卡片视图' });
+    expect(cardButton).toHaveAttribute('aria-pressed', 'true');
+    expect(cardButton).toHaveClass('is-selected');
+    expect(cardButton).not.toHaveClass('ant-btn-primary');
     expect(screen.getByLabelText('目标卡片：提升年度经营质量')).toBeInTheDocument();
+  });
+
+  it('opens every objective in the shared monthly detail context instead of a standalone draft form', async () => {
+    okrState.records = [objectiveRecord, ...draftRecords];
+    okrState.okrs = [okr, ...draftOkrs];
+
+    render(<OKRPerformanceView />);
+    const draftTarget = screen.getByLabelText('目标：草稿目标一');
+    fireEvent.click(within(draftTarget).getByRole('button', { name: '查看月度详情' }));
+
+    const monthlyDetail = await screen.findByRole('region', { name: '目标逐级承接关系' });
+    expect(within(monthlyDetail).getAllByText('提升年度经营质量').length).toBeGreaterThan(0);
+    expect(within(monthlyDetail).getAllByText('草稿目标一').length).toBeGreaterThan(0);
+    expect(within(monthlyDetail).getAllByText('草稿目标二').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument();
   });
 
   it('isolates personal active targets and drafts from every non-personal category', () => {

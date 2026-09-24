@@ -25,6 +25,15 @@ const targets: MyTargetViewItem[] = [
     savedAt: '2026-09-20T08:00:00',
     actions: [{ id: 'active-action', title: '上线智能分析节点', assigneeNames: ['吴清', '刘笑星'], progress: 42, weight: 100, deadline: '2026-09-28' }],
   },
+  {
+    id: 'session-target',
+    title: '会话内拆解目标',
+    status: 'draft',
+    ownerNames: ['林志豪'],
+    progress: 0,
+    savedAt: '2026-09-24T09:00:00',
+    actions: [],
+  },
 ];
 
 describe('MyTargetMonthSection', () => {
@@ -63,8 +72,9 @@ describe('MyTargetMonthSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '收起2026年09月' }));
     expect(onToggle).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getAllByRole('button', { name: '查看详情' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '查看月度详情' })[0]);
     expect(onOpenTarget).toHaveBeenCalledWith('draft-target');
+    expect(screen.getAllByRole('button', { name: '查看月度详情' })).toHaveLength(3);
 
     rerender(<MyTargetMonthSection periodKey="2026-09" targets={targets} viewMode="list" collapsed onToggle={onToggle} onOpenTarget={onOpenTarget} />);
     expect(screen.queryByLabelText('目标：完善客户交付方案')).not.toBeInTheDocument();

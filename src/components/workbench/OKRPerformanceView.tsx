@@ -101,6 +101,7 @@ const OriginalWorkspace: React.FC = () => {
   const [targetViewMode, setTargetViewMode] = useState<MyTargetViewMode>('list');
   const [selectedOkrRecordId, setSelectedOkrRecordId] = useState<string | null>(null);
   const [selectedMonthDetail, setSelectedMonthDetail] = useState<string | null>(null);
+  const [selectedMonthTargetId, setSelectedMonthTargetId] = useState<string | undefined>();
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
   const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const newOkrCycle = dayjs().format('YYYY-MM');
@@ -166,6 +167,18 @@ const OriginalWorkspace: React.FC = () => {
   const visibleDemoBreakdowns = filterVisibleDemoBreakdowns(demoBreakdowns, selectedCycles, okrCategoryTab);
 
   const summaryMonths = Array.from(new Set([...filteredOkrs.map(item => item.cycle), ...personalObjectiveRecords.map(item => item.periodKey), ...myActions.map(item => item.periodKey), ...myActionDrafts.map(item => item.periodKey), ...visibleDemoBreakdowns.map(item => item.periodKey)])).sort().reverse();
+  const selectedMonthRecords = selectedMonthDetail
+    ? [...personalObjectiveRecords, ...myActions, ...myActionDrafts].filter(record => record.periodKey === selectedMonthDetail)
+    : [];
+  const selectedMonthTargets = selectedMonthDetail && isMyOkrCategory
+    ? buildMyTargetViewItems(
+      selectedMonthRecords,
+      visibleDemoBreakdowns.filter(item => item.periodKey === selectedMonthDetail),
+      visibleActionParents,
+      people,
+      currentUser.id,
+    )
+    : [];
 
   const renderSummaryCard = (key: string, cycle: string, progress: number, objectiveCount: number, keyResults: SummaryKr[], status: string, submittedAt: string | undefined, onSubmitDraft: () => void, onOpen: () => void, draftCount = 0, demoBreakdowns: DemoBreakdown[] = [], savedTargets: SavedTargetSummary[] = []) => {
     const statusLabel = status === 'draft' ? '草稿' : status === 'active' ? '已生效' : '已提交';
@@ -242,6 +255,7 @@ const OriginalWorkspace: React.FC = () => {
         setActionFormOpen(false);
         setSelectedOkrRecordId(null);
         setSelectedMonthDetail(null);
+        setSelectedMonthTargetId(undefined);
         return;
       }
       if (result.completedIds.length > 0) {
@@ -261,6 +275,7 @@ const OriginalWorkspace: React.FC = () => {
     setOkrCategoryTab(value as typeof okrCategoryTab);
     setSelectedOkrRecordId(null);
     setSelectedMonthDetail(null);
+    setSelectedMonthTargetId(undefined);
     setActionFormOpen(false);
     setEditingActionId(undefined);
     setOkrDraftToSubmit(null);
@@ -272,8 +287,70 @@ const OriginalWorkspace: React.FC = () => {
     setActionFormOpen(false);
     setEditingActionId(undefined);
     setSelectedMonthDetail(null);
+    setSelectedMonthTargetId(undefined);
     addToast('success', mode === 'draft' ? '拆解目标草稿已保存（界面演示）' : '拆解目标已提交（界面演示）');
     return true;
+  };
+
+  const renderDraftEditor = (record: OkrRecord) => {
+    if (record.status !== 'draft') return null;
+    if (record.kind === 'objective') {
+      return <ObjectiveForm
+        key={record.id}
+        detailMode
+        compactDetail
+        cycle={record.periodKey}
+        objectiveIndex={0}
+        ownerName={currentUser.name}
+        parents={parents}
+        people={people}
+        busy={busy}
+        unavailable={loading || !!error}
+        root={!!me?.rootFlag}
+        initialPayload={record.payload}
+        onCancel={() => setSelectedOkrRecordId(null)}
+        onSave={payload => updateOkr(record.id, payload, true).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })}
+        onSaveDraft={payload => updateOkr(record.id, payload, false).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })}
+      />;
+    }
+    return <ActionBreakdownForm
+      key={`action-draft-${record.id}`}
+      open
+      cycle={record.periodKey}
+      person={me}
+      parents={visibleActionParents}
+      actions={[record]}
+      people={people}
+      busy={busy}
+      initialActionId={record.id}
+      onClose={() => setSelectedOkrRecordId(null)}
+      onSave={async (periodKey, groups, mode) => {
+        const group = groups[0];
+        const value = group?.actions[0];
+        if (!group || !value) return false;
+        const assigneeIds = value.assigneeIds || [];
+        const updated = await saveActions(periodKey, [{
+          recordId: value.recordId,
+          version: value.version,
+          title: value.title || '',
+          department: me?.department || '其他支撑',
+          parentObjectiveId: String(group.parent.payload.parentObjectiveId || ''),
+          parentActionId: group.parent.payload.parentActionId || group.parent.id,
+          parentKeyResultId: String(group.parent.payload.parentKeyResultId || group.parent.id),
+          assigneeIds,
+          assigneeName: assigneeIds.map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'),
+          structureType: record.payload.structureType || 'support',
+          productLine: value.businessObject,
+          businessObject: value.businessObject,
+          acceptanceStandard: value.measurableResult || value.businessObject,
+          milestone: value.milestone,
+          deadline: value.deadline?.format('YYYY-MM-DD') || '',
+          weight: Number(value.weight || 0),
+        }], mode === 'submit');
+        if (updated) setSelectedOkrRecordId(null);
+        return updated;
+      }}
+    />;
   };
 
   return (
@@ -297,20 +374,20 @@ const OriginalWorkspace: React.FC = () => {
             </div>
 
             {okrCategoryTab === 'my' && <div className="okr-target-view-switch" role="group" aria-label="目标视图">
-              <Tooltip title="列表视图"><Button aria-label="列表视图" aria-pressed={targetViewMode === 'list'} type={targetViewMode === 'list' ? 'primary' : 'default'} icon={<List/>} onClick={() => setTargetViewMode('list')}/></Tooltip>
-              <Tooltip title="卡片视图"><Button aria-label="卡片视图" aria-pressed={targetViewMode === 'card'} type={targetViewMode === 'card' ? 'primary' : 'default'} icon={<LayoutGrid/>} onClick={() => setTargetViewMode('card')}/></Tooltip>
+              <Tooltip title="列表视图"><Button aria-label="列表视图" aria-pressed={targetViewMode === 'list'} className={targetViewMode === 'list' ? 'is-selected' : ''} icon={<List/>} onClick={() => setTargetViewMode('list')}/></Tooltip>
+              <Tooltip title="卡片视图"><Button aria-label="卡片视图" aria-pressed={targetViewMode === 'card'} className={targetViewMode === 'card' ? 'is-selected' : ''} icon={<LayoutGrid/>} onClick={() => setTargetViewMode('card')}/></Tooltip>
             </div>}
 
             <Button type="primary"
               id="btn-add-okr"
               disabled={busy || objectiveBatchAction !== null}
-              onClick={() => { setOkrCategoryTab('my'); setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedOkrRecordId(null); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
+              onClick={() => { setOkrCategoryTab('my'); setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); setSelectedOkrRecordId(null); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
 
             >
               <Plus className="w-3.5 h-3.5" />
               添加目标
             </Button>
-            <Button id="btn-breakdown-action" icon={<GitBranch />} disabled={busy} onClick={() => { setOkrCategoryTab('my'); setObjectiveForms([]); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedOkrRecordId(null); setActionFormOpen(true); }}>
+            <Button id="btn-breakdown-action" icon={<GitBranch />} disabled={busy} onClick={() => { setOkrCategoryTab('my'); setObjectiveForms([]); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); setSelectedOkrRecordId(null); setActionFormOpen(true); }}>
               拆解目标
             </Button>
           </div>
@@ -352,15 +429,32 @@ const OriginalWorkspace: React.FC = () => {
 
 
           {/* OKR Cards List */}
-          {selectedOkrRecord?.kind === 'action' && selectedOkrRecord.status === 'draft' ? <div className="okr-detail-page"><ActionBreakdownForm key={`action-draft-${selectedOkrRecord.id}`} open cycle={selectedOkrRecord.periodKey} person={me} parents={visibleActionParents} actions={[selectedOkrRecord]} people={people} busy={busy} initialActionId={selectedOkrRecord.id} onClose={() => setSelectedOkrRecordId(null)} onSave={async (periodKey, groups, mode) => { const group = groups[0]; const value = group?.actions[0]; if (!group || !value) return false; const assigneeIds = value.assigneeIds || []; const updated = await saveActions(periodKey, [{recordId: value.recordId, version: value.version, title: value.title || '', department: me?.department || '其他支撑', parentObjectiveId: String(group.parent.payload.parentObjectiveId || ''), parentActionId: group.parent.payload.parentActionId || group.parent.id, parentKeyResultId: String(group.parent.payload.parentKeyResultId || group.parent.id), assigneeIds, assigneeName: assigneeIds.map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'), structureType: selectedOkrRecord.payload.structureType || 'support', productLine: value.businessObject, businessObject: value.businessObject, acceptanceStandard: value.measurableResult || value.businessObject, milestone: value.milestone, deadline: value.deadline?.format('YYYY-MM-DD') || '', weight: Number(value.weight || 0)}], mode === 'submit'); if (updated) setSelectedOkrRecordId(null); return updated; }} /></div> : selectedOkrRecord ? <div className="okr-detail-page">
-            {selectedOkrRecord.kind === 'objective' && selectedOkrRecord.status === 'draft' ? <ObjectiveForm key={selectedOkrRecord.id} detailMode compactDetail cycle={selectedOkrRecord.periodKey} objectiveIndex={0} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error} root={!!me?.rootFlag} initialPayload={selectedOkrRecord.payload} onCancel={() => setSelectedOkrRecordId(null)} onSave={payload => updateOkr(selectedOkrRecord.id, payload, true).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })} onSaveDraft={payload => updateOkr(selectedOkrRecord.id, payload, false).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })} /> : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.kind === 'objective' ? selectedOkrRecord.ownerId : undefined} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedOkrRecordId(null)} />}
-          </div> : selectedMonthDetail ? <div className="okr-detail-page">{okrDraftToSubmit && <Card className="okr-draft-submit-panel"><Typography.Text>提交这条目标或拆解目标草稿？</Typography.Text><Flex gap="small"><Button onClick={() => setOkrDraftToSubmit(null)}>取消</Button><Button type="primary" loading={busy} onClick={async () => { const ok = await submitOkrDraft(okrDraftToSubmit); if (ok) { setOkrDraftToSubmit(null); } }}>确认提交</Button></Flex></Card>}<GoalHierarchyView records={records} people={people} periodKey={selectedMonthDetail} ownerId={currentUser.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedMonthDetail(null)} onEditDraft={record => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedOkrRecordId(record.id); }} onSubmitDraft={record => setOkrDraftToSubmit(record.id)} /></div> : (objectiveForms.length > 0 || actionFormOpen ? null : <div className="okr-summary-month-list">
+          {selectedMonthDetail ? <div className="okr-detail-page">
+            {selectedOkrRecord && renderDraftEditor(selectedOkrRecord)}
+            {okrDraftToSubmit && <Card className="okr-draft-submit-panel"><Typography.Text>提交这条目标或拆解目标草稿？</Typography.Text><Flex gap="small"><Button onClick={() => setOkrDraftToSubmit(null)}>取消</Button><Button type="primary" loading={busy} onClick={async () => { const ok = await submitOkrDraft(okrDraftToSubmit); if (ok) setOkrDraftToSubmit(null); }}>确认提交</Button></Flex></Card>}
+            <GoalHierarchyView
+              records={records}
+              people={people}
+              periodKey={selectedMonthDetail}
+              ownerId={currentUser.id}
+              supplementalTargets={selectedMonthTargets}
+              initialSelectedId={selectedMonthTargetId}
+              loading={loading}
+              error={error}
+              showDemoHierarchy={Boolean(me?.rootFlag)}
+              onBack={() => { setSelectedOkrRecordId(null); setSelectedMonthTargetId(undefined); setSelectedMonthDetail(null); }}
+              onEditDraft={record => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedOkrRecordId(record.id); }}
+              onSubmitDraft={record => setOkrDraftToSubmit(record.id)}
+            />
+          </div> : selectedOkrRecord ? <div className="okr-detail-page">
+            {selectedOkrRecord.status === 'draft' ? renderDraftEditor(selectedOkrRecord) : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.kind === 'objective' ? selectedOkrRecord.ownerId : undefined} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedOkrRecordId(null)} />}
+          </div> : (objectiveForms.length > 0 || actionFormOpen ? null : <div className="okr-summary-month-list">
             {filteredOkrs.length === 0 && personalObjectiveRecords.length === 0 && myActions.length === 0 && myActionDrafts.length === 0 && visibleDemoBreakdowns.length === 0 && objectiveForms.length === 0 && !loading && !error ? (
               <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
                 <Empty description="本月暂无目标"/>
                 <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--text-muted)]">当前月份还没有填写 OKR，点击右上角“添加目标”开始设定。</p>
               </div>
-          ) : <div className="okr-summary-month-body">{summaryMonths.map(month => {
+          ) : <div className={`okr-summary-month-body${isMyOkrCategory ? ' is-target-view' : ''}`}>{summaryMonths.map(month => {
             const monthOkrs = filteredOkrs.filter(item => item.cycle === month);
             const monthActions = myActions.filter(item => item.periodKey === month);
             const monthOkrIds = new Set(monthOkrs.map(item => item.id));
@@ -400,7 +494,7 @@ const OriginalWorkspace: React.FC = () => {
                   next.has(month) ? next.delete(month) : next.add(month);
                   return next;
                 })}
-                onOpenTarget={targetId => setSelectedOkrRecordId(targetId)}
+                onOpenTarget={targetId => { setSelectedOkrRecordId(null); setSelectedMonthTargetId(targetId); setSelectedMonthDetail(month); }}
               />;
             }
             return renderSummaryCard(month, month, progress, objectiveCount, keyResults, status, submittedAt, () => { setDraftToSubmit(draftIds.length === 1 ? draftIds[0] : null); setSelectedMonthDetail(month); }, () => { setSelectedMonthDetail(month); setDraftToSubmit(null); }, monthDrafts.length, monthDemoBreakdowns, savedTargets);
