@@ -1,55 +1,76 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/react';
+import dayjs from 'dayjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ActionBreakdownForm } from './ActionBreakdownForm';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
 
 const people: OkrPerson[] = [
-  {id: 'me', name: '产品主管', department: '产研部门', supervisorId: 'boss', rootFlag: 0, version: 0},
-  {id: 'member', name: '产品成员', department: '产研部门', supervisorId: 'me', rootFlag: 0, version: 0},
+  { id: 'boss', name: '张总', department: '管理层', supervisorId: null, rootFlag: 1, version: 0 },
+  { id: 'me', name: '产品主管', department: '产研部门', supervisorId: 'boss', rootFlag: 0, version: 0 },
 ];
 
-const parents: OkrRecord[] = [{
-  id: 'parent-action', kind: 'action', ownerId: 'boss', periodKey: '2026-09', status: 'active', version: 0,
-  payload: {title: '提升客户满意度', parentObjectiveId: 'objective-1', parentActionId: 'parent-action'},
-}];
+const titles = ['推进平台智能化能力建设', '保障重点项目稳定交付', '提升客户满意度'];
+const parents: OkrRecord[] = titles.map((title, index) => ({
+  id: `parent-${index + 1}`,
+  kind: 'action',
+  ownerId: 'boss',
+  periodKey: dayjs().format('YYYY-MM'),
+  status: 'active',
+  version: 0,
+  payload: { title, parentObjectiveId: `objective-${index + 1}`, parentActionId: `parent-${index + 1}` },
+}));
+
+const renderForm = () => render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[]} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
 
 describe('ActionBreakdownForm', () => {
-  it('shows parent actions and product department structured fields', () => {
-    render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[]} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => undefined)} />);
+  it('shows dynamic month choices, three untouched parent targets, and source names', () => {
+    renderForm();
 
-    expect(screen.getByText('2026年09月')).toBeInTheDocument();
-    expect(screen.getByText('提升客户满意度')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name: '拆解目标'}));
-    expect(screen.queryByLabelText('输入动作')).not.toBeInTheDocument();
-    expect(screen.getByText('尚未添加 A，点击“添加 A”开始拆解')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name: '添加 A'}));
-    expect(screen.getByLabelText('输入动作')).toBeInTheDocument();
-    expect(screen.getByLabelText('关联产品线')).toBeInTheDocument();
-    expect(screen.getByLabelText('关键节点')).toBeInTheDocument();
-    expect(screen.getByText('承接人员（可多选）')).toBeInTheDocument();
+    expect(screen.getByTitle(dayjs().format('YYYY年MM月'))).toBeInTheDocument();
+    expect(screen.queryByText('进行中')).not.toBeInTheDocument();
+    titles.forEach(title => expect(screen.getByText(title)).toBeInTheDocument());
+    expect(screen.getAllByText('来源自上级 · 张总')).toHaveLength(3);
+    expect(screen.getAllByText('暂无行动，点击右侧图标开始拆解')).toHaveLength(3);
+    expect(screen.queryByText('A1')).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByLabelText('目标归属周期'));
+    const options = Array.from(document.querySelectorAll('.ant-select-item-option-content')).map(item => item.textContent);
+    expect(options).toEqual([
+      dayjs().add(1, 'month').format('YYYY年MM月'),
+      dayjs().format('YYYY年MM月'),
+      dayjs().subtract(1, 'month').format('YYYY年MM月'),
+    ]);
   });
 
-  it('adds multiple blank actions without per-action collapse controls', () => {
-    render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[]} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => undefined)} />);
+  it('opens A1 explicitly and uses different fields for O1, O2, and O3', () => {
+    renderForm();
 
-    fireEvent.click(screen.getByRole('button', {name: '拆解目标'}));
-    fireEvent.click(screen.getByRole('button', {name: '添加 A'}));
-    fireEvent.click(screen.getByRole('button', {name: '添加 A'}));
-    expect(screen.getByText('关键动作 2')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', {name: '收起'})).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '拆解 O1' }));
+    expect(screen.getByText('A1')).toBeInTheDocument();
+    expect(screen.getByLabelText('A1 关联产品线')).toBeInTheDocument();
+    expect(screen.getByLabelText('A1 动作描述')).toBeInTheDocument();
+    expect(screen.getByLabelText('A1 选择节点')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '拆解 O2' }));
+    expect(screen.getByLabelText('A1 关联项目')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('A1 选择节点')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: '拆解 O3' }));
+    expect(screen.getByLabelText('A1 选择分类')).toBeInTheDocument();
+    expect(screen.getByLabelText('A1 可衡量结果')).toBeInTheDocument();
+    expect(screen.queryByText('承接人员（可多选）')).not.toBeInTheDocument();
+  });
+
+  it('numbers actions A1 through A8 and disables further additions per O', () => {
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: '拆解 O1' }));
+    const addButton = screen.getByRole('button', { name: /添加行动/ });
+    for (let index = 0; index < 7; index += 1) fireEvent.click(addButton);
+
+    expect(screen.getByText('A8')).toBeInTheDocument();
+    expect(screen.getByText('8/8')).toBeInTheDocument();
+    expect(addButton).toBeDisabled();
   }, 15000);
-
-  it('opens a saved draft with its actual parent and does not show a new-action chooser', async () => {
-    const draft: OkrRecord = {
-      id: 'draft-1', kind: 'action', ownerId: 'me', periodKey: '2026-09', status: 'draft', version: 2,
-      payload: {title: '已保存的草稿', department: '产研部门', parentObjectiveId: 'objective-1', parentActionId: 'parent-action', parentKeyResultId: 'kr-1', structureType: 'product', productLine: '平台', milestone: '评审完成', deadline: '2026-09-30', weight: 60},
-    };
-    render(<ActionBreakdownForm open cycle="2026-09" person={people[0]} parents={parents} actions={[draft]} people={people} busy={false} initialActionId={draft.id} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
-
-    expect(await screen.findByDisplayValue('已保存的草稿')).toBeInTheDocument();
-    expect(screen.queryByRole('button', {name: '拆解目标'})).not.toBeInTheDocument();
-    expect(screen.getByText('提升客户满意度')).toBeInTheDocument();
-    expect(screen.getByLabelText('关联产品线')).toHaveValue('平台');
-  });
 });
