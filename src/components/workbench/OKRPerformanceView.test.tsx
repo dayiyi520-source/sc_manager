@@ -114,21 +114,24 @@ describe('OKRPerformanceView target navigation', () => {
     okrState.okrs = [okr];
   });
 
-  it('uses the new labels and clears detail or breakdown state when switching categories', async () => {
+  it('uses the scope sidebar and clears detail or breakdown state when switching scopes', async () => {
     const { container } = render(<OKRPerformanceView />);
 
     expect(screen.getByRole('tab', { name: /月度目标/ })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '我的目标' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: '目标范围导航' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '我的目标' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /拆解目标/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '查看月度详情' }));
     expect(await screen.findByRole('region', { name: '目标逐级承接关系' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: '直属上级目标' }));
+    expect(screen.queryByRole('complementary', { name: '目标节点详情' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '直属上级' }));
     await waitFor(() => expect(screen.queryByRole('region', { name: '目标逐级承接关系' })).not.toBeInTheDocument());
 
+    fireEvent.click(screen.getByRole('button', { name: '我的目标' }));
     fireEvent.click(screen.getByRole('button', { name: /拆解目标/ }));
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('tab', { name: '直属下级目标' }));
+    fireEvent.click(screen.getByRole('button', { name: '直属下级' }));
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).not.toBeInTheDocument());
   });
 
@@ -138,7 +141,7 @@ describe('OKRPerformanceView target navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /拆解目标/ }));
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /添加目标/ }));
+    fireEvent.click(container.querySelector('#btn-add-okr') as HTMLElement);
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page')).not.toBeInTheDocument());
     expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
 
@@ -161,7 +164,7 @@ describe('OKRPerformanceView target navigation', () => {
     const breakdown = { id: 'demo-save', periodKey: '2026-09', mode: 'draft' as const, groups: [], savedAt: '2026-09-30T10:00:00Z' };
 
     expect(filterVisibleDemoBreakdowns([breakdown], ['2026-09'], 'my')).toEqual([breakdown]);
-    for (const category of ['supervisor', 'subordinate', 'department', 'other_dept'] as const) {
+    for (const category of ['supervisor', 'subordinate', 'department', 'otherDepartments'] as const) {
       expect(filterVisibleDemoBreakdowns([breakdown], ['2026-09'], category)).toEqual([]);
     }
   });
@@ -211,18 +214,27 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument();
   });
 
-  it('isolates personal active targets and drafts from every non-personal category', () => {
+  it('isolates personal active targets and drafts from every non-personal category', async () => {
     okrState.records = [objectiveRecord, ...draftRecords];
     okrState.okrs = [okr, ...draftOkrs];
 
     render(<OKRPerformanceView />);
     expect(screen.getByLabelText('目标：草稿目标一')).toBeInTheDocument();
 
-    for (const category of ['直属上级目标', '直属下级目标', '我部门的目标', '跨部门协同目标']) {
-      fireEvent.click(screen.getByRole('tab', { name: category }));
-      expect(screen.queryByText('提升年度经营质量')).not.toBeInTheDocument();
+    for (const category of ['直属上级', '直属下级', '我部门的', '其他部门']) {
+      fireEvent.click(screen.getByRole('button', { name: category }));
+      await waitFor(() => expect(screen.queryByText('提升年度经营质量')).not.toBeInTheDocument());
       expect(screen.queryByText('草稿目标一')).not.toBeInTheDocument();
       expect(screen.queryByText('草稿目标二')).not.toBeInTheDocument();
     }
+  });
+
+  it('defaults the period filter to the current cycle and opens the frontend-only settings panel', () => {
+    render(<OKRPerformanceView />);
+
+    expect(screen.getByRole('combobox', { name: '周期筛选' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('目标设置');
+    expect(screen.getByText('当前为前端演示设置，不保存后台配置。')).toBeInTheDocument();
   });
 });

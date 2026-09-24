@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Alert, Button, Empty, Input, Modal, Progress, Cascader, Spin, Tag, Tabs, Flex, Typography, Tooltip } from 'antd';
+import { Alert, Button, Empty, Input, Modal, Progress, Cascader, Spin, Tag, Tabs, Flex, Typography, Tooltip, Switch } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
@@ -8,6 +8,7 @@ import { useApp, useAppNavigationContext } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
 import { cycleOptions } from './okr/cycleOptions';
+import { OkrScopeSidebar, type OkrScopeSelection } from './okr/OkrScopeSidebar';
 import { OKRItem } from '../../types';
 import { ObjectiveForm, type ObjectiveFormHandle } from './okr/ObjectiveForm';
 import { WeeklyReviewEditor } from './okr/WeeklyReviewEditor';
@@ -34,7 +35,7 @@ type StoredExtraWork = {
 type SummaryKr = { content: string; progress: number; weight: number; deadline: string };
 export type DemoBreakdown = { id: string; periodKey: string; mode: 'draft' | 'submit'; groups: ActionGroupValues[]; savedAt: string };
 type SavedTargetSummary = { id: string; title: string; status: string; actions: Array<{ id: string; title: string; weight: number; assigneeIds?: string[] }> };
-type OkrCategoryTab = 'my' | 'supervisor' | 'subordinate' | 'department' | 'other_dept';
+type OkrCategoryTab = 'my' | 'supervisor' | 'subordinate' | 'department' | 'otherDepartments';
 
 export const appendDemoBreakdown = (current: DemoBreakdown[], next: DemoBreakdown) => [...current, next];
 export const includeSelectedCycle = (current: string[], periodKey: string) => current.includes(periodKey) ? current : [...current, periodKey];
@@ -74,7 +75,7 @@ const OriginalWorkspace: React.FC = () => {
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
   // OKR Sub Tabs: 我的OKR、直属上级、直属下级、我部门的、其他部门
-  const [okrCategoryTab, setOkrCategoryTab] = useState<OkrCategoryTab>('my');
+  const [scopeSelection, setScopeSelection] = useState<OkrScopeSelection>({ scope: 'my' });
   const [selectedCycles, setSelectedCycles] = useState<string[]>([dayjs().format('YYYY-MM')]);
 
   // Review Sub Tabs: 写总结、我的总结、我收到的
@@ -102,6 +103,8 @@ const OriginalWorkspace: React.FC = () => {
   const [selectedOkrRecordId, setSelectedOkrRecordId] = useState<string | null>(null);
   const [selectedMonthDetail, setSelectedMonthDetail] = useState<string | null>(null);
   const [selectedMonthTargetId, setSelectedMonthTargetId] = useState<string | undefined>();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [expandScopeMembers, setExpandScopeMembers] = useState(false);
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
   const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const newOkrCycle = dayjs().format('YYYY-MM');
@@ -111,20 +114,22 @@ const OriginalWorkspace: React.FC = () => {
   const me = people.find(p => p.id === currentUser.id);
   const reviewerName = me?.supervisorId ? people.find(person => person.id === me.supervisorId)?.name : undefined;
   const directReviewSubmit = Boolean(me?.rootFlag);
-  const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === newOkrCycle && o.status === 'active');
   const periods = cycleOptions(records, currentUser.id);
-  const cyclePaths = periods.flatMap(group=>group.children.filter(c=>selectedCycles.includes(c.value)).map(c=>[group.value,c.value]));
-  const cycleLabel = selectedCycles.length === 1 ? `周期：${dayjs(selectedCycles[0]).format('YYYY年MM月')}` : `周期：${selectedCycles.length}个周期`;
-
-  const matchesCategory = (o: OKRItem) => {
-    if (okrCategoryTab === 'my') return o.category === 'my';
-    if (okrCategoryTab === 'supervisor') return o.category === 'supervisor';
-    if (okrCategoryTab === 'subordinate') return o.category === 'subordinate';
-    if (okrCategoryTab === 'department') return o.category === 'department' || o.department === currentUser.department;
-    return o.department !== currentUser.department;
-  };
-  const isMyOkrCategory = okrCategoryTab === 'my';
-  const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && matchesCategory(o) && (isMyOkrCategory || o.ownerId !== currentUser.id));
+  const cyclePaths = periods.flatMap(group => group.children.filter(child => selectedCycles.includes(child.value)).map(child => [group.value, child.value]));
+  const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === newOkrCycle && o.status === 'active');
+  const selectedScopeGroup = scopeSelection.scope;
+  const scopePeople = people.filter(person => {
+    if (scopeSelection.personId) return person.id === scopeSelection.personId;
+    if (selectedScopeGroup === 'my') return person.id === currentUser.id;
+    if (selectedScopeGroup === 'supervisor') return person.id === me?.supervisorId;
+    if (selectedScopeGroup === 'subordinate') return person.supervisorId === currentUser.id;
+    if (selectedScopeGroup === 'department') return person.id !== currentUser.id && person.department === currentUser.department;
+    if (selectedScopeGroup === 'otherDepartments') return person.id !== currentUser.id && person.department !== currentUser.department;
+    return false;
+  });
+  const scopeOwnerIds = new Set(scopePeople.map(person => person.id));
+  const isMyOkrCategory = selectedScopeGroup === 'my' && !scopeSelection.personId;
+  const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && scopeOwnerIds.has(o.ownerId));
   const personalObjectiveRecords = isMyOkrCategory
     ? records.filter(record => record.kind === 'objective' && record.ownerId === currentUser.id && selectedCycles.includes(record.periodKey))
     : [];
@@ -164,9 +169,19 @@ const OriginalWorkspace: React.FC = () => {
     payload: { title, parentObjectiveId: `demo-objective-${index + 1}`, parentActionId: `demo-action-parent-${index + 1}` },
   }));
   const displayActionForm = actionFormOpen;
-  const visibleDemoBreakdowns = filterVisibleDemoBreakdowns(demoBreakdowns, selectedCycles, okrCategoryTab);
+  const visibleDemoBreakdowns = filterVisibleDemoBreakdowns(demoBreakdowns, selectedCycles, isMyOkrCategory ? 'my' : 'supervisor');
+  const scopeLabels: Record<OkrScopeSelection['scope'], string> = {
+    my: '我的目标',
+    supervisor: '直属上级',
+    subordinate: '直属下级',
+    department: '我部门的',
+    otherDepartments: '其他部门',
+  };
+  const contextTitle = scopeSelection.personId
+    ? people.find(person => person.id === scopeSelection.personId)?.name || scopeLabels[scopeSelection.scope]
+    : scopeLabels[scopeSelection.scope];
 
-  const summaryMonths = Array.from(new Set([...filteredOkrs.map(item => item.cycle), ...personalObjectiveRecords.map(item => item.periodKey), ...myActions.map(item => item.periodKey), ...myActionDrafts.map(item => item.periodKey), ...visibleDemoBreakdowns.map(item => item.periodKey)])).sort().reverse();
+  const summaryMonths = [...selectedCycles].sort().reverse();
   const selectedMonthRecords = selectedMonthDetail
     ? [...personalObjectiveRecords, ...myActions, ...myActionDrafts].filter(record => record.periodKey === selectedMonthDetail)
     : [];
@@ -271,8 +286,8 @@ const OriginalWorkspace: React.FC = () => {
     }
   };
 
-  const handleOkrCategoryChange = (value: string) => {
-    setOkrCategoryTab(value as typeof okrCategoryTab);
+  const handleScopeChange = (selection: OkrScopeSelection) => {
+    setScopeSelection(selection);
     setSelectedOkrRecordId(null);
     setSelectedMonthDetail(null);
     setSelectedMonthTargetId(undefined);
@@ -366,28 +381,16 @@ const OriginalWorkspace: React.FC = () => {
 
         {mainTab === 'okrs' && (
           <div className="okr-page-actions">
-            <div className="okr-cycle-control">
-              <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear={false}
-                onChange={paths=>setSelectedCycles(paths.map(path=>String(path[path.length-1])))}
-                maxTagCount={0} maxTagPlaceholder={()=>cycleLabel} placeholder="周期：请选择" />
-              <span className="okr-cycle-label" aria-hidden="true">{cycleLabel}</span>
-            </div>
-
-            {okrCategoryTab === 'my' && <div className="okr-target-view-switch" role="group" aria-label="目标视图">
-              <Tooltip title="列表视图"><Button aria-label="列表视图" aria-pressed={targetViewMode === 'list'} className={targetViewMode === 'list' ? 'is-selected' : ''} icon={<List/>} onClick={() => setTargetViewMode('list')}/></Tooltip>
-              <Tooltip title="卡片视图"><Button aria-label="卡片视图" aria-pressed={targetViewMode === 'card'} className={targetViewMode === 'card' ? 'is-selected' : ''} icon={<LayoutGrid/>} onClick={() => setTargetViewMode('card')}/></Tooltip>
-            </div>}
-
             <Button type="primary"
               id="btn-add-okr"
               disabled={busy || objectiveBatchAction !== null}
-              onClick={() => { setOkrCategoryTab('my'); setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); setSelectedOkrRecordId(null); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
+              onClick={() => { setScopeSelection({ scope: 'my' }); setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); setSelectedOkrRecordId(null); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
 
             >
               <Plus className="w-3.5 h-3.5" />
               添加目标
             </Button>
-            <Button id="btn-breakdown-action" icon={<GitBranch />} disabled={busy} onClick={() => { setOkrCategoryTab('my'); setObjectiveForms([]); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); setSelectedOkrRecordId(null); setActionFormOpen(true); }}>
+            <Button id="btn-breakdown-action" icon={<GitBranch />} disabled={busy} onClick={() => { setScopeSelection({ scope: 'my' }); setObjectiveForms([]); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); setSelectedOkrRecordId(null); setActionFormOpen(true); }}>
               拆解目标
             </Button>
           </div>
@@ -396,21 +399,26 @@ const OriginalWorkspace: React.FC = () => {
 
       {/* Main Tab 1: OKRs */}
       {mainTab === 'okrs' && (
-        <div className="space-y-6">
-          {/* Sub Navigation */}
-          <Tabs
-            activeKey={okrCategoryTab}
-            onChange={handleOkrCategoryChange}
-            items={[
-              { label: '我的目标', key: 'my' },
-              { label: '直属上级目标', key: 'supervisor' },
-              { label: '直属下级目标', key: 'subordinate' },
-              { label: '我部门的目标', key: 'department' },
-              { label: '跨部门协同目标', key: 'other_dept' },
-            ]}
+        <div className="okr-workspace-shell">
+          <OkrScopeSidebar
+            people={people}
+            currentUserId={currentUser.id}
+            selection={scopeSelection}
+            defaultExpandMembers={expandScopeMembers}
+            onSelect={handleScopeChange}
+            onAddTarget={() => { setScopeSelection({ scope: 'my' }); setActionFormOpen(false); setSelectedMonthDetail(null); setSelectedOkrRecordId(null); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
+          <section className="okr-workspace-main" aria-label={`${contextTitle}目标展示区`}>
+          <div className="okr-context-heading"><h2>{contextTitle}</h2><div className="okr-target-tools">
+            {isMyOkrCategory && <div className="okr-target-view-switch" role="group" aria-label="目标视图">
+              <Tooltip title="列表视图"><Button aria-label="列表视图" aria-pressed={targetViewMode === 'list'} className={targetViewMode === 'list' ? 'is-selected' : ''} icon={<List/>} onClick={() => setTargetViewMode('list')}/></Tooltip>
+              <Tooltip title="卡片视图"><Button aria-label="卡片视图" aria-pressed={targetViewMode === 'card'} className={targetViewMode === 'card' ? 'is-selected' : ''} icon={<LayoutGrid/>} onClick={() => setTargetViewMode('card')}/></Tooltip>
+            </div>}
+            <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear maxTagCount={0} maxTagPlaceholder={() => `周期：${selectedCycles.length}个周期`} placeholder="周期：请选择" onChange={paths => setSelectedCycles(paths.map(path => String(path[path.length - 1])))} />
+          </div></div>
 
-          {okrCategoryTab === 'my' && objectiveForms.length > 0 && (
+          {isMyOkrCategory && objectiveForms.length > 0 && (
             <div className={`okr-objective-form-stack${objectiveBatchAction ? ' is-batching' : ''}`} aria-busy={objectiveBatchAction !== null}>
             <div className="okr-objective-period">{dayjs(newOkrCycle).format('YYYY年MM月')}<span>进行中</span></div>
               {objectiveForms.map((formId, formIndex) => (
@@ -425,7 +433,7 @@ const OriginalWorkspace: React.FC = () => {
             </div>
           )}
 
-          {okrCategoryTab === 'my' && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key="new-action" open cycle={newOkrCycle} person={me} parents={demoActionParents} actions={[]} people={people} busy={false} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={saveDemoBreakdown} />}
+          {isMyOkrCategory && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key="new-action" open cycle={newOkrCycle} person={me} parents={demoActionParents} actions={[]} people={people} busy={false} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={saveDemoBreakdown} />}
 
 
           {/* OKR Cards List */}
@@ -449,11 +457,8 @@ const OriginalWorkspace: React.FC = () => {
           </div> : selectedOkrRecord ? <div className="okr-detail-page">
             {selectedOkrRecord.status === 'draft' ? renderDraftEditor(selectedOkrRecord) : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.kind === 'objective' ? selectedOkrRecord.ownerId : undefined} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedOkrRecordId(null)} />}
           </div> : (objectiveForms.length > 0 || actionFormOpen ? null : <div className="okr-summary-month-list">
-            {filteredOkrs.length === 0 && personalObjectiveRecords.length === 0 && myActions.length === 0 && myActionDrafts.length === 0 && visibleDemoBreakdowns.length === 0 && objectiveForms.length === 0 && !loading && !error ? (
-              <div className="review-empty-state flex flex-col items-center justify-center rounded-xl border border-dashed p-10 sm:p-14 text-center">
-                <Empty description="本月暂无目标"/>
-                <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[var(--text-muted)]">当前月份还没有填写 OKR，点击右上角“添加目标”开始设定。</p>
-              </div>
+             {selectedCycles.length === 0 ? (
+               <div className="okr-empty-period-state"><Empty description="至少选择一个周期" /></div>
           ) : <div className={`okr-summary-month-body${isMyOkrCategory ? ' is-target-view' : ''}`}>{summaryMonths.map(month => {
             const monthOkrs = filteredOkrs.filter(item => item.cycle === month);
             const monthActions = myActions.filter(item => item.periodKey === month);
@@ -500,6 +505,7 @@ const OriginalWorkspace: React.FC = () => {
             return renderSummaryCard(month, month, progress, objectiveCount, keyResults, status, submittedAt, () => { setDraftToSubmit(draftIds.length === 1 ? draftIds[0] : null); setSelectedMonthDetail(month); }, () => { setSelectedMonthDetail(month); setDraftToSubmit(null); }, monthDrafts.length, monthDemoBreakdowns, savedTargets);
           })}</div>}
           </div>)}
+          </section>
         </div>
       )}
       {/* Main Tab 2: 目标复盘总结 */}
@@ -542,8 +548,8 @@ const OriginalWorkspace: React.FC = () => {
           )}
 
           {reviewSubTab === 'write' && isReviewFormOpen && (
-            reviewType === 'week' ? (
-              <WeeklyReviewEditor key={`weekly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={okrs.filter(o=>o.ownerId===currentUser.id)} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setOkrCategoryTab('my');setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
+ reviewType === 'week' ? (
+              <WeeklyReviewEditor key={`weekly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={okrs.filter(o=>o.ownerId===currentUser.id)} work={work} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setScopeSelection({scope:'my'});setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
             ) : (
               <MonthlyReviewEditor key={`monthly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={okrs.filter(o=>o.ownerId===currentUser.id)} records={records} currentUserId={currentUser.id} busy={busy} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}}/>
             )
@@ -819,6 +825,19 @@ const OriginalWorkspace: React.FC = () => {
           )}
         </div>
       )}
+
+      <Modal
+        title="目标设置"
+        open={settingsOpen}
+        onCancel={() => setSettingsOpen(false)}
+        footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>}
+      >
+        <div className="okr-settings-panel">
+          <div><span>默认视图</span><div className="okr-settings-view-buttons"><Button type={targetViewMode === 'list' ? 'primary' : 'default'} onClick={() => setTargetViewMode('list')}>列表</Button><Button type={targetViewMode === 'card' ? 'primary' : 'default'} onClick={() => setTargetViewMode('card')}>卡片</Button></div></div>
+          <div><span>分组成员默认展开</span><Switch checked={expandScopeMembers} onChange={setExpandScopeMembers} /></div>
+          <p>当前为前端演示设置，不保存后台配置。</p>
+        </div>
+      </Modal>
 
       <Modal
         title="确认提交复盘"

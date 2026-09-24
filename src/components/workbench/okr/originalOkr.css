@@ -58,6 +58,41 @@
 .okr-summary-card { border-color: var(--border-main); background: var(--bg-card); }
 .okr-summary-card:hover { border-color: var(--border-subtle); }
 .okr-summary-month-list { display: grid; gap: 16px; }
+.okr-workspace-shell { display: grid; grid-template-columns: 240px minmax(0,1fr); min-height: 620px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-card); overflow: hidden; }
+.okr-scope-sidebar { display: flex; min-width: 0; flex-direction: column; border-right: 1px solid var(--border-main); background: var(--bg-surface); }
+.okr-scope-search { display: grid; grid-template-columns: minmax(0,1fr) 32px; gap: 8px; padding: 16px; border-bottom: 1px solid var(--border-main); }
+.okr-scope-search .ant-btn { width: 32px; padding-inline: 0; }
+.okr-scope-groups { min-height: 0; flex: 1; overflow-y: auto; padding: 8px; }
+.okr-scope-group { display: grid; gap: 4px; }
+.okr-scope-group + .okr-scope-group { margin-top: 4px; }
+.okr-scope-group-row { display: flex; min-height: 40px; align-items: center; overflow: hidden; border: 1px solid transparent; border-radius: 6px; color: var(--text-secondary); transition: border-color .15s ease, background-color .15s ease, color .15s ease; }
+.okr-scope-group-row:hover { border-color: var(--border-subtle); background: var(--bg-elevated); color: var(--text-primary); }
+.okr-scope-group-row:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb,var(--primary) 18%,transparent); }
+.okr-scope-group-row.is-selected { border-color: var(--primary); background: color-mix(in srgb,var(--primary) 10%,transparent); color: var(--primary); }
+.okr-scope-main, .okr-scope-expand, .okr-scope-members button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.okr-scope-main { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; padding: 8px 12px; text-align: left; }
+.okr-scope-main span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.okr-scope-expand { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; border-radius: 4px; }
+.okr-scope-expand:hover { background: color-mix(in srgb,var(--primary) 10%,transparent); color: var(--primary); }
+.okr-scope-members { display: grid; gap: 4px; padding: 0 0 4px 20px; }
+.okr-scope-members button { display: flex; min-width: 0; min-height: 36px; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; color: var(--text-secondary); text-align: left; }
+.okr-scope-members button:hover { border-color: var(--border-subtle); background: var(--bg-elevated); color: var(--text-primary); }
+.okr-scope-members button:focus-visible, .okr-scope-members button.is-selected { outline: none; border-color: var(--primary); background: color-mix(in srgb,var(--primary) 10%,transparent); color: var(--primary); }
+.okr-scope-members button span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.okr-scope-members p { margin: 4px 10px 8px; color: var(--text-muted); font-size: 12px; }
+.okr-scope-settings { padding: 8px; border-top: 1px solid var(--border-main); }
+.okr-scope-settings .ant-btn { justify-content: flex-start; color: var(--text-secondary); }
+.okr-workspace-main { display: grid; min-width: 0; align-content: start; gap: 16px; padding: 24px; }
+.okr-context-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
+.okr-context-heading h2 { min-width: 0; margin: 0; color: var(--text-primary); font-size: 18px; line-height: 26px; }
+.okr-target-tools { display: flex; flex-shrink: 0; align-items: center; gap: 8px; }
+.okr-target-tools .okr-cycle-filter { width: 224px; }
+.okr-target-empty { display: grid; min-height: 160px; place-items: center; padding: 24px; border: 1px dashed var(--border-main); border-radius: 8px; background: var(--bg-surface); }
+.okr-empty-period-state { display: grid; min-height: 240px; place-items: center; padding: 32px; }
+.okr-settings-panel { display: grid; gap: 16px; }
+.okr-settings-panel > div { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 16px; }
+.okr-settings-view-buttons { display: flex; gap: 8px; }
+.okr-settings-panel p { margin: 0; padding: 12px; border: 1px solid var(--border-main); border-radius: 6px; background: var(--bg-surface-soft); color: var(--text-muted); font-size: 12px; }
 .okr-summary-month-card { border:0; background:transparent; box-shadow:none; }
 .okr-summary-month-card .ant-card-body { padding:0; }
 .okr-summary-month-head { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border: 0; border-bottom: 1px solid var(--border-main); background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; }
@@ -112,6 +147,7 @@
 .okr-document-section-index { display: inline-flex; width: 20px; height: 20px; flex: none; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb,var(--primary) 42%,var(--border-main)); border-radius: 6px; background: color-mix(in srgb,var(--primary) 12%,transparent); color: var(--active-text); font-size: 11px; font-weight: 700; }
 @media (max-width: 900px) { .okr-objective-columns { grid-template-columns: minmax(0,1fr) 100px; } .okr-objective-head span:nth-child(3), .okr-objective-columns > .okr-objective-deadline, .okr-objective-kr > :nth-child(3) { display: none; } }
 @media (max-width: 760px) { .okr-page-toolbar, .okr-summary-head { align-items: stretch; flex-direction: column; } .okr-page-actions, .okr-primary-tabs { width: 100%; } .okr-primary-tabs .ant-btn { flex: 1; } .okr-cycle-control { min-width: 0; flex: 1; } .okr-summary-meta { justify-content: space-between; } .okr-overview-stats { grid-template-columns: 1fr; } .okr-overview-stats > div + div { border-top: 1px solid var(--border-main); border-left: 0; } }
+@media (max-width: 900px) { .okr-workspace-shell { grid-template-columns: 1fr; } .okr-scope-sidebar { border-right: 0; border-bottom: 1px solid var(--border-main); } .okr-scope-groups { display: flex; overflow-x: auto; padding: 8px; } .okr-scope-group { min-width: max-content; } .okr-scope-group + .okr-scope-group { margin: 0 0 0 4px; } .okr-scope-members { display: none; } .okr-scope-settings { border-top: 0; border-bottom: 1px solid var(--border-main); } .okr-workspace-main { padding: 16px; } }
 
 .okr-review-editor { display: grid; gap: 16px; color: var(--text-primary); }
 .okr-review-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }

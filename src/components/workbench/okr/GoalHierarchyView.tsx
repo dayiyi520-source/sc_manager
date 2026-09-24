@@ -274,6 +274,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
   const expandableIds = useMemo(() => nodes.filter(node => node.children.length > 0).map(node => node.id), [nodes]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(roots.map(root => root.id)));
   const [selectedId, setSelectedId] = useState<string | undefined>(initialSelectedId);
+  const [detailId, setDetailId] = useState<string | undefined>();
   useEffect(() => { setExpandedIds(new Set(roots.map(root => root.id))); }, [periodKey, roots.length]);
   useEffect(() => { if (initialSelectedId) setSelectedId(initialSelectedId); }, [initialSelectedId]);
   const selected = nodes.find(node => node.id === selectedId);
@@ -292,12 +293,12 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
     </header>
     {error && <Alert type="error" showIcon title="目标关系加载失败" description="服务暂不可用，请重试后查看。"/>}
     {loading ? <div className="goal-hierarchy-loading" role="status"><Skeleton active paragraph={{ rows: 5 }}/></div> : roots.length === 0 ? <div className="goal-hierarchy-empty"><Empty description="当前周期暂无可展示的目标关系"/><p>上级目标提交并指派后，承接动作会显示在这里。</p></div> : <div className="goal-hierarchy-layout">
-      <div className="goal-hierarchy-tree">{roots.map((root, index) => <GoalNodeBranch key={root.id} node={root} path={[index + 1]} expandedIds={expandedIds} selectedId={selectedId} people={people} onToggle={toggle} onSelect={node => setSelectedId(node.id)}/>)}</div>
+      <div className="goal-hierarchy-tree">{roots.map((root, index) => <GoalNodeBranch key={root.id} node={root} path={[index + 1]} expandedIds={expandedIds} selectedId={selectedId} people={people} onToggle={toggle} onSelect={node => { setSelectedId(node.id); setDetailId(node.id); }}/>)}</div>
     </div>}
     {showDemoHierarchy && <GoalHierarchyDemo />}
-    <Drawer rootClassName="goal-hierarchy-drawer" open={Boolean(selected)} placement="right" closable={false} maskClosable destroyOnHidden onClose={() => setSelectedId(undefined)} title="目标节点详情">
-      {selected && <aside className="goal-node-detail" aria-label="目标节点详情">
-        <div className="goal-node-detail-head"><div><Tag color={statusMeta(selected.status).color}>{statusMeta(selected.status).label}</Tag><span>{selected.kind === 'objective' ? '目标 O' : '动作 A'}</span></div><Button type="text" aria-label="关闭详情" icon={<XIcon />} onClick={() => setSelectedId(undefined)}/></div>
+    <Drawer rootClassName="goal-hierarchy-drawer" open={Boolean(detailId)} placement="right" closable={false} maskClosable destroyOnHidden onClose={() => setDetailId(undefined)} title="目标节点详情">
+      {selected && detailId && <aside className="goal-node-detail" aria-label="目标节点详情">
+        <div className="goal-node-detail-head"><div><Tag color={statusMeta(selected.status).color}>{statusMeta(selected.status).label}</Tag><span>{selected.kind === 'objective' ? '目标 O' : '动作 A'}</span></div><Button type="text" aria-label="关闭详情" icon={<XIcon />} onClick={() => setDetailId(undefined)}/></div>
         <h3>{selected.title}</h3>
         <div className="goal-source-path"><b><LinkIcon />来源链路</b><div>{sourcePath(selected).map((item, index) => <span key={item.id}>{index > 0 && <ChevronRightIcon/>}<em>{item.title}</em></span>)}</div></div>
         <div className="goal-detail-progress"><span>递归汇总进度</span><strong>{selected.progress}%</strong><Progress percent={selected.progress} showInfo={false}/><small>{selected.children.length ? `由 ${selected.children.length} 个直属下级动作按权重汇总` : '当前为叶子动作，展示自身进度'}</small></div>

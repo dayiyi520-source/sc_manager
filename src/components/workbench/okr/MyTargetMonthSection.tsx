@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Progress, Tag, Tooltip } from 'antd';
+import { Button, Empty, Progress, Tag, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import { ChevronDown, ChevronRight, Eye } from '@/components/common/octicons-compat';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
@@ -219,10 +219,10 @@ export const MyTargetMonthSection: React.FC<Props> = ({ periodKey, targets, view
       <span>{getPeriodCountdown(periodKey)}</span>
       <em>{targets.length} 个目标</em>
     </button>
-    {!collapsed && <div className={viewMode === 'list' ? 'okr-target-list' : 'okr-target-grid'}>
+    {!collapsed && (targets.length === 0 ? <div className="okr-target-empty"><Empty description="暂无目标" /></div> : <div className={viewMode === 'list' ? 'okr-target-list' : 'okr-target-grid'}>
       {targets.map((target, index) => viewMode === 'list'
         ? <ListTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)}/>
         : <CardTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)}/>) }
-    </div>}
+    </div>)}
   </section>
 );
