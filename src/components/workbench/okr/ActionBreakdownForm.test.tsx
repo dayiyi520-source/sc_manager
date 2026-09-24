@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import dayjs from 'dayjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ActionBreakdownForm } from './ActionBreakdownForm';
@@ -8,6 +8,7 @@ import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
 const people: OkrPerson[] = [
   { id: 'boss', name: '张总', department: '管理层', supervisorId: null, rootFlag: 1, version: 0 },
   { id: 'me', name: '产品主管', department: '产研部门', supervisorId: 'boss', rootFlag: 0, version: 0 },
+  { id: 'staff', name: '李工', department: '软件研发部', supervisorId: 'me', rootFlag: 0, version: 0 },
 ];
 
 const titles = ['推进平台智能化能力建设', '保障重点项目稳定交付', '提升客户满意度'];
@@ -51,6 +52,7 @@ describe('ActionBreakdownForm', () => {
     expect(screen.getByLabelText('A1 关联产品线')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 动作描述')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 选择节点')).toBeInTheDocument();
+    expect(screen.getByLabelText('A1 指定承接人').closest('.ant-select')).toHaveClass('ant-select-multiple');
 
     fireEvent.click(screen.getByRole('button', { name: '拆解 O2' }));
     expect(screen.getByLabelText('A1 关联项目')).toBeInTheDocument();
@@ -59,7 +61,27 @@ describe('ActionBreakdownForm', () => {
     fireEvent.click(screen.getByRole('button', { name: '拆解 O3' }));
     expect(screen.getByLabelText('A1 选择分类')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 可衡量结果')).toBeInTheDocument();
-    expect(screen.queryByText('承接人员（可多选）')).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText('A1 指定承接人')).toHaveLength(3);
+  });
+
+  it('balances weights after add and delete, while invalid manual totals block saving', async () => {
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: '拆解 O1' }));
+    expect(screen.getByLabelText('A1 权重')).toHaveValue('100');
+
+    fireEvent.click(screen.getByRole('button', { name: /添加行动/ }));
+    expect(screen.getByLabelText('A1 权重')).toHaveValue('50');
+    expect(screen.getByLabelText('A2 权重')).toHaveValue('50');
+
+    fireEvent.change(screen.getByLabelText('A1 权重'), { target: { value: '60' } });
+    await waitFor(() => expect(screen.getByText('权重合计 110%，需为 100%')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '存草稿' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /提\s*交/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '删除 A2' }));
+    await waitFor(() => expect(screen.getByLabelText('A1 权重')).toHaveValue('100'));
+    expect(screen.getByText('权重合计 100%')).toBeInTheDocument();
   });
 
   it('numbers actions A1 through A8 and disables further additions per O', () => {

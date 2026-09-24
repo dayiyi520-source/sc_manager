@@ -14,6 +14,7 @@ export type ActionValues = {
   measurableResult?: string;
   deadline?: dayjs.Dayjs;
   weight?: number;
+  assigneeIds?: string[];
 };
 
 export type ActionGroupValues = { parent: OkrRecord; actions: ActionValues[] };
@@ -48,7 +49,13 @@ const monthOptions = () => {
   return [current.add(1, 'month'), current, current.subtract(1, 'month')].map(month => ({ value: month.format('YYYY-MM'), label: month.format('YYYY年MM月') }));
 };
 
-const emptyAction = (): ActionValues => ({ weight: undefined });
+const emptyAction = (): ActionValues => ({});
+const balanceWeights = (actions: ActionValues[]) => {
+  if (actions.length === 0) return actions;
+  const base = Math.floor(100 / actions.length);
+  const remainder = 100 - base * actions.length;
+  return actions.map((action, index) => ({ ...action, weight: base + (index < remainder ? 1 : 0) }));
+};
 
 export function ActionBreakdownForm({ open, cycle, parents, actions, people, busy, onClose, onSave, initialActionId }: {
   key?: Key;
@@ -75,6 +82,11 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, bus
   const draftParent = draftAction ? parents.find(item => item.id === draftAction.payload.parentActionId && item.payload.parentObjectiveId === draftAction.payload.parentObjectiveId) : undefined;
   const visibleParents = draftParent ? [draftParent] : parents.slice(0, 3);
   const actionCount = visibleParents.reduce((total, parent) => total + (groupsValue?.[parent.id]?.actions?.length || 0), 0);
+  const invalidWeightParentIds = new Set(visibleParents.filter(parent => {
+    const parentActions = groupsValue?.[parent.id]?.actions || [];
+    return parentActions.length > 0 && parentActions.reduce((sum, action) => sum + Number(action.weight || 0), 0) !== 100;
+  }).map(parent => parent.id));
+  const weightsValid = Boolean(initialActionId) || invalidWeightParentIds.size === 0;
 
   useEffect(() => {
     if (!open) return;
@@ -89,6 +101,7 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, bus
         measurableResult: draftAction.payload.acceptanceStandard,
         deadline: draftAction.payload.deadline ? dayjs(draftAction.payload.deadline) : undefined,
         weight: draftAction.payload.weight,
+        assigneeIds: draftAction.payload.assigneeIds || [],
       }] } } });
       setEditingParentIds(new Set([draftParent.id]));
       return;
@@ -96,10 +109,11 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, bus
     form.resetFields();
     setEditingParentIds(new Set());
     setCollapsedParents(new Set());
-  }, [open, initialActionId]);
+  }, [open, cycle, initialActionId, draftAction, draftParent, form]);
 
   if (!open) return null;
 
+  const getParentActions = (parentId: string): ActionValues[] => form.getFieldValue(['groups', parentId, 'actions']) || [];
   const setParentActions = (parentId: string, values: ActionValues[]) => form.setFieldValue(['groups', parentId, 'actions'], values);
   const openEditor = (parentId: string) => {
     setEditingParentIds(current => {
@@ -107,8 +121,8 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, bus
       if (next.has(parentId)) next.delete(parentId);
       else {
         next.add(parentId);
-        const currentActions = form.getFieldValue(['groups', parentId, 'actions']) || [];
-        if (currentActions.length === 0) setParentActions(parentId, [emptyAction()]);
+        const currentActions = getParentActions(parentId);
+        if (currentActions.length === 0) setParentActions(parentId, balanceWeights([emptyAction()]));
       }
       return next;
     });
@@ -133,16 +147,40 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, bus
   return <Card className="okr-action-breakdown-card"><div className="okr-action-breakdown-page" aria-label={initialActionId ? '拆解目标草稿编辑' : '拆解目标'}>
     <div className="okr-action-period">
       <div className="okr-action-period-control"><Typography.Text>目标归属周期</Typography.Text><Select aria-label="目标归属周期" value={periodKey} options={periods} onChange={changePeriod} disabled={busy || Boolean(initialActionId)} /></div>
-      <Flex className="okr-action-period-actions" gap="small" align="center"><Button onClick={onClose} disabled={busy}>取消</Button><Button onClick={() => void submit('draft')} loading={busy && savingMode === 'draft'} disabled={busy || actionCount === 0}>存草稿</Button><Button type="primary" onClick={() => void submit('submit')} loading={busy && savingMode === 'submit'} disabled={busy || actionCount === 0}>提交</Button></Flex>
+      <Flex className="okr-action-period-actions" gap="small" align="center"><Button onClick={onClose} disabled={busy}>取消</Button><Button onClick={() => void submit('draft')} loading={busy && savingMode === 'draft'} disabled={busy || actionCount === 0 || !weightsValid}>存草稿</Button><Button type="primary" onClick={() => void submit('submit')} loading={busy && savingMode === 'submit'} disabled={busy || actionCount === 0 || !weightsValid}>提交</Button></Flex>
     </div>
     {visibleParents.length === 0 ? <Card><Empty description="暂无指定给你的承接目标" /></Card> : <Form form={form} component={false} disabled={busy}><Flex vertical gap="middle">{visibleParents.map((parent, parentIndex) => {
       const config = fieldConfig(parentIndex);
       const isEditing = editingParentIds.has(parent.id);
       const isCollapsed = collapsedParents.has(parent.id);
       const parentActions = groupsValue?.[parent.id]?.actions || [];
+      const parentWeight = parentActions.reduce((sum, action) => sum + Number(action.weight || 0), 0);
+      const invalidWeight = !initialActionId && invalidWeightParentIds.has(parent.id);
       const sourceName = people.find(person => person.id === parent.ownerId)?.name || '直属上级';
       return <Card key={parent.id} className="okr-action-parent-tree-card"><div className="okr-action-parent-tree-head"><div className="okr-action-o-title"><span className="okr-summary-index">O{parentIndex + 1}</span><Typography.Text strong>{parent.payload.title}</Typography.Text><Typography.Text className="okr-action-source">来源自上级 · {sourceName}</Typography.Text></div><Flex gap="small" align="center"><Button type="text" onClick={() => setCollapsedParents(current => { const next = new Set(current); next.has(parent.id) ? next.delete(parent.id) : next.add(parent.id); return next; })}>{isCollapsed ? '展开' : '收起'}</Button><Button type="text" aria-label={isEditing ? `收起 O${parentIndex + 1} 拆解` : `拆解 O${parentIndex + 1}`} title={isEditing ? '收起拆解' : '拆解目标'} icon={<GitBranchIcon size={16} />} onClick={() => openEditor(parent.id)} /></Flex></div>
-        {!isCollapsed && <>{!isEditing && parentActions.length === 0 && <Typography.Paragraph type="secondary" className="okr-action-empty-child">暂无行动，点击右侧图标开始拆解</Typography.Paragraph>}{isEditing && <div className="okr-action-table-wrap"><Form.List name={['groups', parent.id, 'actions']}>{(fields, { add, remove }) => <><div className="okr-action-table-toolbar"><div><strong>行动拆解</strong><span>{fields.length}/{MAX_ACTIONS_PER_OBJECTIVE}</span></div><Button type="text" icon={<PlusIcon />} disabled={fields.length >= MAX_ACTIONS_PER_OBJECTIVE} onClick={() => add(emptyAction())}>添加行动</Button></div><div className="okr-action-table" role="table" aria-label={`O${parentIndex + 1} 行动列表`}><div className="okr-action-table-head" role="row"><span>序号</span><span>{config.relationLabel}</span><span>动作描述</span><span>{config.resultLabel}</span><span>完成时间</span><span>权重</span><span>操作</span></div>{fields.map((field, actionIndex) => <div key={field.key} className="okr-action-table-row" role="row"><strong className="okr-action-code">A{actionIndex + 1}</strong><Form.Item name={[field.name, 'businessObject']} rules={[{ required: true, message: `请选择${config.relationLabel.replace('选择', '')}` }]}><Select aria-label={`A${actionIndex + 1} ${config.relationLabel}`} placeholder={config.relationPlaceholder} options={config.relationOptions.map(value => ({ value, label: value }))} /></Form.Item><Form.Item name={[field.name, 'title']} rules={[{ required: true, whitespace: true, message: '请输入动作描述' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 动作描述`} placeholder="输入具体行动" autoSize={{ minRows: 2, maxRows: 4 }} maxLength={2000} /></Form.Item>{config.resultOptions ? <Form.Item name={[field.name, 'milestone']} rules={[{ required: true, message: '请选择节点' }]}><Select aria-label={`A${actionIndex + 1} ${config.resultLabel}`} placeholder={config.resultPlaceholder} options={config.resultOptions.map(value => ({ value, label: value }))} /></Form.Item> : <Form.Item name={[field.name, 'measurableResult']} rules={[{ required: true, whitespace: true, message: '请输入可衡量结果' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 可衡量结果`} placeholder={config.resultPlaceholder} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={1000} /></Form.Item>}<Form.Item name={[field.name, 'deadline']} rules={[{ required: true, message: '请选择完成时间' }]}><DatePicker aria-label={`A${actionIndex + 1} 完成时间`} className="w-full" /></Form.Item><Form.Item name={[field.name, 'weight']} rules={[{ required: true, type: 'number', min: 1, max: 100, message: '请输入 1-100 的权重' }]}><InputNumber aria-label={`A${actionIndex + 1} 权重`} min={1} max={100} precision={0} suffix="%" /></Form.Item><Button danger type="text" aria-label={`删除 A${actionIndex + 1}`} title="删除行动" icon={<TrashIcon />} onClick={() => remove(field.name)} /></div>)}{fields.length === 0 && <div className="okr-action-table-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未添加行动" /></div>}</div></>}</Form.List></div>}</>}
+        {!isCollapsed && <>
+          {!isEditing && parentActions.length === 0 && <Typography.Paragraph type="secondary" className="okr-action-empty-child">暂无行动，点击右侧图标开始拆解</Typography.Paragraph>}
+          {isEditing && <div className="okr-action-table-wrap"><Form.List name={['groups', parent.id, 'actions']}>{fields => <>
+            <div className="okr-action-table-toolbar">
+              <div><strong>行动拆解</strong><span>{fields.length}/{MAX_ACTIONS_PER_OBJECTIVE}</span><span className={invalidWeight ? 'is-error' : 'is-valid'}>{invalidWeight ? `权重合计 ${parentWeight}%，需为 100%` : '权重合计 100%'}</span></div>
+              <Button type="text" icon={<PlusIcon />} disabled={fields.length >= MAX_ACTIONS_PER_OBJECTIVE} onClick={() => setParentActions(parent.id, balanceWeights([...getParentActions(parent.id), emptyAction()]))}>添加行动</Button>
+            </div>
+            <div className="okr-action-table" role="table" aria-label={`O${parentIndex + 1} 行动列表`}>
+              <div className="okr-action-table-head" role="row"><span>序号</span><span>{config.relationLabel}</span><span>动作描述</span><span>{config.resultLabel}</span><span>指定承接人</span><span>完成时间</span><span>权重</span><span>操作</span></div>
+              {fields.map((field, actionIndex) => <div key={field.key} className="okr-action-table-row" role="row">
+                <strong className="okr-action-code">A{actionIndex + 1}</strong>
+                <Form.Item name={[field.name, 'businessObject']} rules={[{ required: true, message: `请选择${config.relationLabel.replace('选择', '')}` }]}><Select aria-label={`A${actionIndex + 1} ${config.relationLabel}`} placeholder={config.relationPlaceholder} options={config.relationOptions.map(value => ({ value, label: value }))} /></Form.Item>
+                <Form.Item name={[field.name, 'title']} rules={[{ required: true, whitespace: true, message: '请输入动作描述' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 动作描述`} placeholder="输入具体行动" autoSize={{ minRows: 2, maxRows: 4 }} maxLength={2000} /></Form.Item>
+                {config.resultOptions ? <Form.Item name={[field.name, 'milestone']} rules={[{ required: true, message: '请选择节点' }]}><Select aria-label={`A${actionIndex + 1} ${config.resultLabel}`} placeholder={config.resultPlaceholder} options={config.resultOptions.map(value => ({ value, label: value }))} /></Form.Item> : <Form.Item name={[field.name, 'measurableResult']} rules={[{ required: true, whitespace: true, message: '请输入可衡量结果' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 可衡量结果`} placeholder={config.resultPlaceholder} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={1000} /></Form.Item>}
+                <Form.Item name={[field.name, 'assigneeIds']}><Select aria-label={`A${actionIndex + 1} 指定承接人`} mode="multiple" allowClear showSearch optionFilterProp="label" placeholder="选择承接人" maxTagCount="responsive" options={people.map(person => ({ value: person.id, label: `${person.name} · ${person.department}` }))} /></Form.Item>
+                <Form.Item name={[field.name, 'deadline']} rules={[{ required: true, message: '请选择完成时间' }]}><DatePicker aria-label={`A${actionIndex + 1} 完成时间`} className="w-full" /></Form.Item>
+                <Form.Item name={[field.name, 'weight']} rules={[{ required: true, type: 'number', min: 1, max: 100, message: '请输入 1-100 的权重' }]}><InputNumber aria-label={`A${actionIndex + 1} 权重`} min={1} max={100} precision={0} suffix="%" /></Form.Item>
+                <Button danger type="text" aria-label={`删除 A${actionIndex + 1}`} title="删除行动" icon={<TrashIcon />} onClick={() => setParentActions(parent.id, balanceWeights(getParentActions(parent.id).filter((_, index) => index !== actionIndex)))} />
+              </div>)}
+              {fields.length === 0 && <div className="okr-action-table-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未添加行动" /></div>}
+            </div>
+          </>}</Form.List></div>}
+        </>}
       </Card>;
     })}</Flex></Form>}
   </div></Card>;
