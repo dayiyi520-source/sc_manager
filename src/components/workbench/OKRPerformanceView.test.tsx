@@ -45,6 +45,32 @@ const okr: OKRItem = {
   keyResults: [{ id: 'a1', content: '改善重点客户交付', weight: 100, progress: 30, deadline: '2026-09-30' }],
 };
 
+const draftRecords: OkrRecord[] = [
+  {
+    id: 'draft-objective-1', kind: 'objective', ownerId: 'boss', periodKey: '2026-09', status: 'draft', version: 1,
+    payload: { title: '草稿目标一', keyResults: [{ id: 'draft-a1', title: '草稿行动一', weight: 100, progress: 0 }] },
+  },
+  {
+    id: 'draft-objective-2', kind: 'objective', ownerId: 'boss', periodKey: '2026-09', status: 'draft', version: 1,
+    payload: { title: '草稿目标二', keyResults: [{ id: 'draft-a2', title: '草稿行动二', weight: 100, progress: 0 }] },
+  },
+];
+
+const draftOkrs: OKRItem[] = draftRecords.map((record, index) => ({
+  id: record.id,
+  cycle: record.periodKey,
+  ownerId: record.ownerId,
+  ownerName: '老板',
+  department: '管理层',
+  category: 'my',
+  objective: record.payload.title,
+  weight: 100,
+  progress: 0,
+  deadline: '',
+  status: 'draft',
+  keyResults: [{ id: `draft-a${index + 1}`, content: `草稿行动${index + 1}`, weight: 100, progress: 0, deadline: '' }],
+}));
+
 const okrState = {
   records: [objectiveRecord],
   okrs: [okr],
@@ -79,10 +105,14 @@ vi.mock('../../context/AppContext', () => ({
   useAppNavigationContext: () => ({ openPageTab: vi.fn() }),
 }));
 
-import { appendDemoBreakdown, includeSelectedCycle, OKRPerformanceView } from './OKRPerformanceView';
+import { appendDemoBreakdown, filterVisibleDemoBreakdowns, includeSelectedCycle, OKRPerformanceView } from './OKRPerformanceView';
 
 describe('OKRPerformanceView target navigation', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    okrState.records = [objectiveRecord];
+    okrState.okrs = [okr];
+  });
 
   it('uses the new labels and clears detail or breakdown state when switching categories', async () => {
     const { container } = render(<OKRPerformanceView />);
@@ -125,5 +155,42 @@ describe('OKRPerformanceView target navigation', () => {
     const saved = appendDemoBreakdown(appendDemoBreakdown(appendDemoBreakdown([], august), september), secondSeptember);
     expect(saved.map(item => item.id)).toEqual(['august-save', 'september-save', 'september-save-2']);
     expect(includeSelectedCycle(includeSelectedCycle(['2026-09'], '2026-08'), '2026-09')).toEqual(['2026-09', '2026-08']);
+  });
+
+  it('shows demo breakdowns only in my targets for a selected month', () => {
+    const breakdown = { id: 'demo-save', periodKey: '2026-09', mode: 'draft' as const, groups: [], savedAt: '2026-09-30T10:00:00Z' };
+
+    expect(filterVisibleDemoBreakdowns([breakdown], ['2026-09'], 'my')).toEqual([breakdown]);
+    for (const category of ['supervisor', 'subordinate', 'department', 'other_dept'] as const) {
+      expect(filterVisibleDemoBreakdowns([breakdown], ['2026-09'], category)).toEqual([]);
+    }
+  });
+
+  it('lists every same-month objective draft by its unique record id', () => {
+    okrState.records = [objectiveRecord, ...draftRecords];
+    okrState.okrs = [okr, ...draftOkrs];
+
+    render(<OKRPerformanceView />);
+
+    const savedTargets = screen.getByLabelText('已保存目标');
+    expect(savedTargets).toHaveTextContent('草稿目标一');
+    expect(savedTargets).toHaveTextContent('草稿目标二');
+    expect(screen.getAllByText('草稿目标一')).toHaveLength(1);
+    expect(screen.getAllByText('草稿目标二')).toHaveLength(1);
+  });
+
+  it('isolates personal active targets and drafts from every non-personal category', () => {
+    okrState.records = [objectiveRecord, ...draftRecords];
+    okrState.okrs = [okr, ...draftOkrs];
+
+    render(<OKRPerformanceView />);
+    expect(screen.getByLabelText('已保存目标')).toHaveTextContent('草稿目标一');
+
+    for (const category of ['直属上级目标', '直属下级目标', '我部门的目标', '跨部门协同目标']) {
+      fireEvent.click(screen.getByRole('tab', { name: category }));
+      expect(screen.queryByText('提升年度经营质量')).not.toBeInTheDocument();
+      expect(screen.queryByText('草稿目标一')).not.toBeInTheDocument();
+      expect(screen.queryByText('草稿目标二')).not.toBeInTheDocument();
+    }
   });
 });
