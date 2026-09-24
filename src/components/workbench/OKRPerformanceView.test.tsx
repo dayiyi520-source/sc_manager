@@ -79,7 +79,7 @@ vi.mock('../../context/AppContext', () => ({
   useAppNavigationContext: () => ({ openPageTab: vi.fn() }),
 }));
 
-import { OKRPerformanceView } from './OKRPerformanceView';
+import { appendDemoBreakdown, includeSelectedCycle, OKRPerformanceView } from './OKRPerformanceView';
 
 describe('OKRPerformanceView target navigation', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -100,5 +100,30 @@ describe('OKRPerformanceView target navigation', () => {
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('tab', { name: '直属下级目标' }));
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).not.toBeInTheDocument());
+  });
+
+  it('keeps target creation and action breakdown editors mutually exclusive', async () => {
+    const { container } = render(<OKRPerformanceView />);
+
+    fireEvent.click(screen.getByRole('button', { name: /拆解目标/ }));
+    await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /添加目标/ }));
+    await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /拆解目标/ }));
+    await waitFor(() => expect(container.querySelector('.okr-objective-form-stack')).not.toBeInTheDocument());
+    expect(container.querySelector('.okr-action-breakdown-page')).toBeInTheDocument();
+  });
+
+  it('appends breakdown saves and keeps every saved month selected', () => {
+    const august = { id: 'august-save', periodKey: '2026-08', mode: 'draft' as const, groups: [], savedAt: '2026-08-31T10:00:00Z' };
+    const september = { id: 'september-save', periodKey: '2026-09', mode: 'draft' as const, groups: [], savedAt: '2026-09-30T10:00:00Z' };
+    const secondSeptember = { ...september, id: 'september-save-2' };
+
+    const saved = appendDemoBreakdown(appendDemoBreakdown(appendDemoBreakdown([], august), september), secondSeptember);
+    expect(saved.map(item => item.id)).toEqual(['august-save', 'september-save', 'september-save-2']);
+    expect(includeSelectedCycle(includeSelectedCycle(['2026-09'], '2026-08'), '2026-09')).toEqual(['2026-09', '2026-08']);
   });
 });
