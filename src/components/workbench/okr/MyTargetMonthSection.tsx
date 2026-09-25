@@ -162,12 +162,12 @@ export const buildMyTargetViewItems = (
   return [...objectiveTargets, ...actionTargets, ...demoTargets];
 };
 
-const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submitted: boolean; compact?: boolean }> = ({ action, index, submitted, compact }) => {
+const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submitted: boolean; compact?: boolean; inlineAssignees?: boolean }> = ({ action, index, submitted, compact, inlineAssignees = false }) => {
   const overdue = Boolean(action.deadline) && dayjs(action.deadline).endOf('day').isBefore(dayjs()) && action.progress < 100;
   return <div className={`okr-target-action-row${compact ? ' is-compact' : ''}`}>
     <span className="okr-target-action-index">A{index + 1}</span>
-    <strong title={action.title}>{action.title || '未填写行动描述'}</strong>
-    <span title={assigneeLabel(action.assigneeNames)}>{assigneeLabel(action.assigneeNames)}</span>
+    <strong title={action.title}>{action.title || '未填写行动描述'}{inlineAssignees && action.assigneeNames.length > 0 && <span className="okr-target-action-assignees-inline"> {action.assigneeNames.map(name => `@${name}`).join(' ')}</span>}</strong>
+    {!inlineAssignees && <span title={assigneeLabel(action.assigneeNames)}>{assigneeLabel(action.assigneeNames)}</span>}
     {!compact && <>
       <span className="okr-target-action-progress">{submitted ? <><Progress type="circle" percent={action.progress} size={24} showInfo={false}/><b>{action.progress}%</b></> : '--'}</span>
       <span>权重 {action.weight}%</span>
@@ -181,17 +181,18 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   return <article className="okr-target-list-item" role="button" tabIndex={0} aria-label={`目标：${target.title}`} onClick={onOpen} onKeyDown={event => openOnKeyboard(event, onOpen)}>
     <header>
       <div className="okr-target-list-copy">
-        {target.sourceName && <span className="okr-target-source">{target.sourceName}</span>}
-        <div className="okr-target-title-line"><span className="okr-summary-index">O{index + 1}</span><h3>{target.title}</h3>{target.status === 'draft' && <Tag>草稿</Tag>}</div>
-        <span className="okr-target-owner">承接人员：{assigneeLabel(target.ownerNames)}</span>
+        <div className={`okr-target-hierarchy${target.sourceName || target.ownerNames.length ? ' has-links' : ''}`}>
+          {target.sourceName && <span className="okr-target-hierarchy-source"><span className="okr-target-hierarchy-label">{target.sourceName}</span></span>}
+          <div className="okr-target-title-line"><span className="okr-summary-index">O{index + 1}</span><h3>{target.title}</h3>{target.status === 'draft' && <Tag>草稿</Tag>}</div>
+          <span className="okr-target-hierarchy-owner"><span className="okr-target-hierarchy-label">承接人员：{assigneeLabel(target.ownerNames)}</span></span>
+        </div>
       </div>
       <div className="okr-target-list-status">
         {submitted && <><span>目标进度</span><div><Progress type="circle" percent={target.progress} size={32}/></div></>}
       </div>
     </header>
-    <div className="okr-target-action-head" aria-hidden="true"><span>行动</span><span>动作描述</span><span>承接人员</span><span>进度</span><span>权重</span><span>截止时间</span></div>
     <div className="okr-target-actions">{target.actions.length
-      ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted}/>)
+      ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees/>)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>
   </article>;
