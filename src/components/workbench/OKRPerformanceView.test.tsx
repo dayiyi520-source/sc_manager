@@ -103,6 +103,8 @@ const okrState = {
   submitReviewDraft: vi.fn(async () => true),
   submitOkrDraft: vi.fn(async () => true),
   updateOkr: vi.fn(async () => true),
+  settings: { defaultView: 'list', timeRules: [], validation: { actionWeightTotal: 100, maxActions: 8, assigneeMultiple: true, keyNodeMultiple: false, resultRequired: true }, dictionaries: { productNodes: [], deliveryNodes: [], presalesNodes: [], supportTypes: [] }, templates: [] },
+  saveSettings: vi.fn(async () => true),
 };
 
 vi.mock('./okr/useOriginalOkr', () => ({ useOriginalOkr: () => okrState }));
@@ -238,7 +240,7 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.getByLabelText('目标卡片：提升年度经营质量')).toBeInTheDocument();
   });
 
-  it('opens every objective in the shared monthly detail context instead of a standalone draft form', async () => {
+  it('opens objective drafts in the editable form with their original content', async () => {
     okrState.records = [objectiveRecord, ...draftRecords];
     okrState.okrs = [okr, ...draftOkrs];
 
@@ -246,11 +248,8 @@ describe('OKRPerformanceView target navigation', () => {
     const draftTarget = screen.getByLabelText('目标：草稿目标一');
     fireEvent.click(draftTarget);
 
-    const monthlyDetail = await screen.findByRole('region', { name: '目标逐级承接关系' });
-    expect(within(monthlyDetail).getAllByText('提升年度经营质量').length).toBeGreaterThan(0);
-    expect(within(monthlyDetail).getAllByText('草稿目标一').length).toBeGreaterThan(0);
-    expect(within(monthlyDetail).getAllByText('草稿目标二').length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument();
+    expect(await screen.findByLabelText('目标名称')).toHaveValue('草稿目标一');
+    expect(screen.queryByRole('region', { name: '目标逐级承接关系' })).not.toBeInTheDocument();
   });
 
   it('isolates personal targets from unrelated scopes and keeps drafts out of department scope', async () => {
@@ -338,14 +337,14 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.getByRole('button', { name: `收起${dayjs().format('YYYY年MM月')}` })).toBeInTheDocument();
   });
 
-  it('defaults the period filter to the current cycle and opens the frontend-only settings panel', () => {
+  it('defaults the period filter to the current cycle and opens the settings workspace', () => {
     render(<OKRPerformanceView />);
 
     expect(screen.getByRole('combobox', { name: '周期筛选' })).toBeInTheDocument();
     expect(document.querySelector('.okr-cycle-filter')).toHaveTextContent(`周期：${dayjs().format('YYYY年MM月')}`);
     fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent('目标设置');
-    expect(screen.getByText('当前为前端演示设置，不保存后台配置。')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'OKR 设置' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'OKR 设置' })).toBeInTheDocument();
   });
 
   it('shows the selected cycle count after selecting a second month', () => {

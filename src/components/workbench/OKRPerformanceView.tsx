@@ -19,6 +19,7 @@ import { ReviewReadOnlyView } from './okr/ReviewReadOnlyView';
 import { createReviewCopyDraft } from './okr/reviewCopy';
 import { ActionBreakdownForm, type ActionGroupValues } from './okr/ActionBreakdownForm';
 import { GoalHierarchyView } from './okr/GoalHierarchyView';
+import { OkrSettingsView } from './okr/OkrSettingsView';
 import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewMode } from './okr/MyTargetMonthSection';
 import type { OkrRecord } from '../../services/okrRepository';
 
@@ -62,7 +63,7 @@ const impactLabel = (value?: string) => ({
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
   const { openPageTab } = useAppNavigationContext();
-  const { records, okrs, performances, people, work, actionParents, productLineOptions, projectOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, busy } = useOriginalOkr();
+  const { records, okrs, performances, people, work, actionParents, productLineOptions, projectOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, busy, settings, saveSettings } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -111,6 +112,7 @@ const OriginalWorkspace: React.FC = () => {
     setSelectedMonthTargetId(undefined);
     setOkrDraftToSubmit(null);
   }, [currentUser.id]);
+  useEffect(() => { if (settings?.defaultView) setTargetViewMode(settings.defaultView); }, [settings?.defaultView]);
 
   // Write Review Form State
   const [reviewType, setReviewType] = useState<'week' | 'month'>('month');
@@ -260,6 +262,13 @@ const OriginalWorkspace: React.FC = () => {
     setOkrDraftToSubmit(null);
   };
 
+  const structureTypeForDepartment = (department?: string) => {
+    if (department?.includes('产研') || department?.includes('研发')) return 'product';
+    if (department?.includes('交付') || department?.includes('项目')) return 'delivery';
+    if (department?.includes('售前')) return 'presales';
+    return 'support';
+  };
+
   const saveDemoBreakdown = async (periodKey: string, groups: ActionGroupValues[], mode: 'draft' | 'submit') => {
     const payloads = groups.flatMap(group => {
       const parentObjectiveId = String(group.parent.payload.parentObjectiveId || '');
@@ -276,7 +285,7 @@ const OriginalWorkspace: React.FC = () => {
         parentKeyResultId,
         assigneeIds: action.assigneeIds || [],
         assigneeName: (action.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'),
-        structureType: 'support',
+        structureType: structureTypeForDepartment(me?.department),
         businessObject: action.businessObject,
         acceptanceStandard: action.measurableResult || action.businessObject,
         productLine: action.businessObject,
@@ -335,6 +344,7 @@ const OriginalWorkspace: React.FC = () => {
       projectOptions={projectOptions}
       businessOptionsLoading={businessOptionsLoading}
       businessOptionsError={businessOptionsError}
+      settings={settings}
       busy={busy}
       initialActionId={record.id}
       onClose={() => setSelectedOkrRecordId(null)}
@@ -351,7 +361,7 @@ const OriginalWorkspace: React.FC = () => {
             parentKeyResultId: String(group.parent.payload.parentKeyResultId || group.parent.id),
             assigneeIds,
             assigneeName: assigneeIds.map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'),
-            structureType: record.payload.structureType || 'support',
+            structureType: record.payload.structureType || structureTypeForDepartment(me?.department),
             productLine: value.businessObject,
             businessObject: value.businessObject,
             acceptanceStandard: value.measurableResult || value.businessObject,
@@ -369,6 +379,8 @@ const OriginalWorkspace: React.FC = () => {
       }}
     />;
   };
+
+  if (settingsOpen && settings) return <div className="original-okr space-y-6 animate-in fade-in duration-150"><OkrSettingsView settings={settings} busy={busy} onSave={saveSettings} onClose={() => setSettingsOpen(false)} /></div>;
 
   return (
     <div className="original-okr space-y-6 animate-in fade-in duration-150">
@@ -447,7 +459,7 @@ const OriginalWorkspace: React.FC = () => {
             </div>
           )}
 
-          {isMyOkrCategory && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key={`new-action-${targetFormCycle}`} open cycle={targetFormCycle} person={me} parents={visibleActionParents} actions={[]} people={people} productLineOptions={productLineOptions} projectOptions={projectOptions} businessOptionsLoading={businessOptionsLoading} businessOptionsError={businessOptionsError} busy={busy} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={saveDemoBreakdown} />}
+          {isMyOkrCategory && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key={`new-action-${targetFormCycle}`} open cycle={targetFormCycle} person={me} parents={visibleActionParents} actions={[]} people={people} productLineOptions={productLineOptions} projectOptions={projectOptions} businessOptionsLoading={businessOptionsLoading} businessOptionsError={businessOptionsError} settings={settings} busy={busy} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={saveDemoBreakdown} />}
 
 
           {/* OKR Cards List */}

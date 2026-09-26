@@ -65,7 +65,7 @@ describe('ActionBreakdownForm', () => {
     expect(screen.getAllByText('真实产品线').length).toBeGreaterThan(0);
     expect(screen.queryByText('师创智联协同OS')).not.toBeInTheDocument();
     expect(screen.getByLabelText('A1 动作描述')).toBeInTheDocument();
-    expect(screen.getByLabelText('A1 选择节点')).toBeInTheDocument();
+    expect(screen.getByLabelText('A1 需要达成的关键节点')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 指定承接人').closest('.ant-select')).toHaveClass('ant-select-multiple');
 
     fireEvent.click(screen.getByRole('button', { name: '拆解 O2' }));
@@ -73,11 +73,11 @@ describe('ActionBreakdownForm', () => {
     expect(screen.getByLabelText('A1 关联项目')).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText('A1 关联项目'));
     expect(screen.getAllByText('真实交付项目').length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText('A1 选择节点')).toHaveLength(2);
+    expect(screen.getAllByLabelText('A1 需要达成的关键节点')).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: '拆解 O3' }));
     expectPeriodActions();
-    expect(screen.getByLabelText('A1 选择分类')).toBeInTheDocument();
+    expect(screen.getByLabelText('A1 类型')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 可衡量结果')).toBeInTheDocument();
     expect(screen.getAllByLabelText('A1 指定承接人')).toHaveLength(3);
   });

@@ -102,6 +102,22 @@
 .okr-settings-panel > div { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 16px; }
 .okr-settings-view-buttons { display: flex; gap: 8px; }
 .okr-settings-panel p { margin: 0; padding: 12px; border: 1px solid var(--border-main); border-radius: 6px; background: var(--bg-surface-soft); color: var(--text-muted); font-size: 12px; }
+.okr-settings-page { display:grid; gap:24px; min-height:calc(100vh - 160px); }
+.okr-settings-page-head { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.okr-settings-page-head h2 { margin:0; color:var(--text-primary); font-size:20px; }
+.okr-settings-page-head p { margin:6px 0 0; color:var(--text-muted); font-size:12px; }
+.okr-settings-layout { display:grid; min-width:0; grid-template-columns:220px minmax(0,1fr); gap:16px; }
+.okr-settings-nav { display:grid; align-content:start; gap:4px; padding:8px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
+.okr-settings-nav button { padding:10px 12px; border:0; border-radius:6px; background:transparent; color:var(--text-secondary); cursor:pointer; text-align:left; }
+.okr-settings-nav button:hover,.okr-settings-nav button.is-active { background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary); }
+.okr-settings-content { min-width:0; }
+.okr-settings-template { display:grid; gap:8px; padding-bottom:16px; border-bottom:1px solid var(--border-main); }
+.okr-settings-template:last-child { padding-bottom:0; border-bottom:0; }
+.okr-settings-template > div,.okr-settings-time-rule { display:flex; align-items:center; gap:8px; }
+.okr-settings-template small { color:var(--text-muted); font-size:11px; }
+.okr-settings-content label { display:grid; gap:6px; color:var(--text-secondary); font-size:12px; }
+.okr-settings-time-rule { flex-wrap:wrap; }
+@media (max-width:720px) { .okr-settings-page-head { align-items:flex-start; flex-direction:column; } .okr-settings-layout { grid-template-columns:1fr; } .okr-settings-nav { display:flex; overflow-x:auto; } .okr-settings-nav button { white-space:nowrap; } }
 .okr-summary-month-card { border:0; background:transparent; box-shadow:none; }
 .okr-summary-month-card .ant-card-body { padding:0; }
 .okr-summary-month-head { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border: 0; border-bottom: 1px solid var(--border-main); background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; }

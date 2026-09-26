@@ -14,6 +14,16 @@ public class OkrMapper {
     public List<Map<String,Object>> records(String tenant) {
         return jdbc.queryForList("SELECT id_ AS id,kind_ AS kind,owner_id_ AS ownerId,period_key_ AS periodKey,status_ AS status,payload_ AS payload,version_ AS version,create_time_ AS createdAt FROM t_okr_record WHERE tenant_id_=? AND delete_flag_=0 ORDER BY create_time_ DESC",tenant);
     }
+    public Map<String,Object> setting(String tenant) {
+        var rows = jdbc.queryForList("SELECT id_ AS id,version_ AS version,payload_ AS payload FROM t_okr_setting WHERE tenant_id_=? AND delete_flag_=0", tenant);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+    public void insertSetting(String tenant, String id, int version, String payload, String operator) {
+        jdbc.update("INSERT INTO t_okr_setting (id_,tenant_id_,version_,payload_,create_by_,update_by_,create_time_,update_time_) VALUES (?,?,?,?,?,?,NOW(6),NOW(6))", id, tenant, version, payload, operator, operator);
+    }
+    public int updateSetting(String tenant, int version, String payload, String operator) {
+        return jdbc.update("UPDATE t_okr_setting SET payload_=?,version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND version_=? AND delete_flag_=0", payload, operator, tenant, version);
+    }
     public void insert(String tenant,String id,String kind,String owner,String period,String status,String payload) {
         jdbc.update("INSERT INTO t_okr_record (id_,tenant_id_,kind_,owner_id_,period_key_,status_,payload_,create_by_,update_by_,create_time_,update_time_) VALUES (?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))",id,tenant,kind,owner,period,status,payload,owner,owner);
     }

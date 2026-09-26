@@ -41,9 +41,12 @@ export interface OkrActionPayload {
 }
 export interface OkrRecord { id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload & Partial<OkrActionPayload> }
 export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; creatorName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
+export interface OkrSettings { version?: number; defaultView: 'list'|'card'; timeRules: Array<{key:string;label:string;startDay:number;endDay:number}>; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: Array<{department:string;type:string;fields:string[]}> }
 const base = '/api/okr';
 export const okrRepository = {
   people: () => apiRequest<OkrPerson[]>(`${base}/people`),
+  settings: () => apiRequest<OkrSettings>(`${base}/settings`),
+  saveSettings: (settings: OkrSettings) => apiRequest<OkrSettings>(`${base}/settings`, {method:'PUT', body: JSON.stringify(settings)}),
   records: async (): Promise<OkrRecord[]> => {
     const rows = await apiRequest<Array<Omit<OkrRecord,'payload'> & {payload: string | OkrPayload}>>(`${base}/records`);
     return rows.map(r => ({...r, payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload}));

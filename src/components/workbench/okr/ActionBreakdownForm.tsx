@@ -3,7 +3,7 @@ import Card from 'antd/es/card/Card';
 import { GitBranchIcon, GrabberIcon, PlusIcon, TrashIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState, type Key } from 'react';
-import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
+import type { OkrPerson, OkrRecord, OkrSettings } from '../../../services/okrRepository';
 
 export type ActionValues = {
   recordId?: string;
@@ -37,10 +37,13 @@ const MAX_ACTIONS_PER_OBJECTIVE = 8;
 const MILESTONES = ['方案确认', '阶段评审', '上线验收'];
 const CUSTOMER_CATEGORIES = ['客户成功', '服务响应', '体验优化'];
 
-const fieldConfig = (index: number, productLineOptions: string[], projectOptions: string[]): ParentFieldConfig => {
-  if (index === 0) return { relationLabel: '关联产品线', relationPlaceholder: '选择产品线', relationOptions: productLineOptions, resultLabel: '选择节点', resultPlaceholder: '选择节点', resultOptions: MILESTONES };
-  if (index === 1) return { relationLabel: '关联项目', relationPlaceholder: '选择项目', relationOptions: projectOptions, resultLabel: '选择节点', resultPlaceholder: '选择节点', resultOptions: MILESTONES };
-  return { relationLabel: '选择分类', relationPlaceholder: '选择分类', relationOptions: CUSTOMER_CATEGORIES, resultLabel: '可衡量结果', resultPlaceholder: '填写可验证的结果' };
+const fieldConfig = (index: number, productLineOptions: string[], projectOptions: string[], settings?: OkrSettings, department?: string): ParentFieldConfig => {
+  const configuredType = settings?.templates.find(template => template.department === department)?.type;
+  const type = configuredType || (index === 0 ? 'product' : index === 1 ? 'delivery' : 'support');
+  if (type === 'product') return { relationLabel: '关联产品线', relationPlaceholder: '选择产品线', relationOptions: productLineOptions, resultLabel: '需要达成的关键节点', resultPlaceholder: '选择关键节点', resultOptions: settings?.dictionaries.productNodes || MILESTONES };
+  if (type === 'delivery') return { relationLabel: '关联项目', relationPlaceholder: '选择项目', relationOptions: projectOptions, resultLabel: '需要达成的关键节点', resultPlaceholder: '选择关键节点', resultOptions: settings?.dictionaries.deliveryNodes || MILESTONES };
+  if (type === 'presales') return { relationLabel: '关联线索/商机/投标', relationPlaceholder: '选择线索/商机/投标', relationOptions: settings?.dictionaries.supportTypes || CUSTOMER_CATEGORIES, resultLabel: '需要达成的关键节点', resultPlaceholder: '选择关键节点', resultOptions: settings?.dictionaries.presalesNodes || MILESTONES };
+  return { relationLabel: '类型', relationPlaceholder: '选择类型', relationOptions: settings?.dictionaries.supportTypes || CUSTOMER_CATEGORIES, resultLabel: '预期结果', resultPlaceholder: '填写预期结果' };
 };
 
 const monthOptions = () => {
@@ -67,7 +70,7 @@ const defaultCommitmentWeight = (parents: OkrRecord[], index: number) => {
   return base + (index < remainder ? 1 : 0);
 };
 
-export function ActionBreakdownForm({ open, cycle, parents, actions, people, productLineOptions, projectOptions, businessOptionsLoading = false, businessOptionsError, busy, onClose, onSave, initialActionId }: {
+export function ActionBreakdownForm({ open, cycle, person, parents, actions, people, productLineOptions, projectOptions, businessOptionsLoading = false, businessOptionsError, busy, onClose, onSave, initialActionId, settings }: {
   key?: Key;
   open: boolean;
   cycle: string;
@@ -83,6 +86,7 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, pro
   onClose: () => void;
   onSave: (periodKey: string, groups: ActionGroupValues[], mode: 'draft' | 'submit') => Promise<boolean>;
   initialActionId?: string;
+  settings?: OkrSettings;
 }) {
   const [form] = Form.useForm<BreakdownFormValues>();
   const [periodKey, setPeriodKey] = useState(cycle);
@@ -200,7 +204,7 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, pro
     {visibleParents.length > 1 && <div className={`okr-action-commitment-summary ${commitmentWeightsValid ? 'is-valid' : 'is-error'}`}>来源承接权重合计 {commitmentWeightTotal}%{commitmentWeightsValid ? '' : '，需为 100%'}</div>}
     {businessOptionsError && <Typography.Text type="danger">{businessOptionsError}</Typography.Text>}
     {visibleParents.length === 0 ? <Card><Empty description="暂无指定给你的承接目标" /></Card> : <Form form={form} component={false} disabled={busy}><Flex vertical gap="middle">{visibleParents.map((parent, parentIndex) => {
-      const config = fieldConfig(parentIndex, productLineOptions, projectOptions);
+      const config = fieldConfig(parentIndex, productLineOptions, projectOptions, settings, person?.department);
       const isEditing = editingParentIds.has(parent.id);
       const isCollapsed = collapsedParents.has(parent.id);
       const parentActions = groupsValue?.[parent.id]?.actions || [];
@@ -213,7 +217,7 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, pro
           {isEditing && <div className="okr-action-table-wrap"><Form.List name={['groups', parent.id, 'actions']}>{fields => <>
             <div className="okr-action-table-toolbar">
               <div><strong>行动拆解</strong><span>{fields.length}/{MAX_ACTIONS_PER_OBJECTIVE}</span><span className={invalidWeight ? 'is-error' : 'is-valid'}>{invalidWeight ? `权重合计 ${parentWeight}%，需为 100%` : '权重合计 100%'}</span></div>
-              <Button type="text" icon={<PlusIcon />} disabled={fields.length >= MAX_ACTIONS_PER_OBJECTIVE} onClick={() => setParentActions(parent.id, balanceWeights([...getParentActions(parent.id), emptyAction()]))}>添加行动</Button>
+              <Button type="text" icon={<PlusIcon />} disabled={fields.length >= (settings?.validation.maxActions || MAX_ACTIONS_PER_OBJECTIVE)} onClick={() => setParentActions(parent.id, balanceWeights([...getParentActions(parent.id), { ...emptyAction(), deadline: parent.payload.deadline ? dayjs(parent.payload.deadline) : undefined }]))}>添加行动</Button>
             </div>
             <div className="okr-action-table" role="table" aria-label={`O${parentIndex + 1} 行动列表`}>
               <div className="okr-action-table-head" role="row"><span>序号</span><span>{config.relationLabel}</span><span>动作描述</span><span>{config.resultLabel}</span><span>指定承接人</span><span>完成时间</span><span>权重</span><span>操作</span></div>
@@ -233,7 +237,7 @@ export function ActionBreakdownForm({ open, cycle, parents, actions, people, pro
                 <Form.Item name={[field.name, 'title']} rules={[{ required: true, whitespace: true, message: '请输入动作描述' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 动作描述`} placeholder="输入具体行动" autoSize={{ minRows: 2, maxRows: 4 }} maxLength={2000} /></Form.Item>
                 {config.resultOptions ? <Form.Item name={[field.name, 'milestone']} rules={[{ required: true, message: '请选择节点' }]}><Select aria-label={`A${actionIndex + 1} ${config.resultLabel}`} placeholder={config.resultPlaceholder} options={config.resultOptions.map(value => ({ value, label: value }))} /></Form.Item> : <Form.Item name={[field.name, 'measurableResult']} rules={[{ required: true, whitespace: true, message: '请输入可衡量结果' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 可衡量结果`} placeholder={config.resultPlaceholder} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={1000} /></Form.Item>}
                 <Form.Item name={[field.name, 'assigneeIds']}><Select aria-label={`A${actionIndex + 1} 指定承接人`} mode="multiple" allowClear showSearch optionFilterProp="label" placeholder="选择承接人" maxTagCount="responsive" options={people.map(person => ({ value: person.id, label: `${person.name} · ${person.department}` }))} /></Form.Item>
-                <Form.Item name={[field.name, 'deadline']} rules={[{ required: true, message: '请选择完成时间' }]}><DatePicker aria-label={`A${actionIndex + 1} 完成时间`} className="w-full" /></Form.Item>
+                <Form.Item name={[field.name, 'deadline']} rules={[{ required: true, message: '请选择完成时间' }]}><DatePicker aria-label={`A${actionIndex + 1} 完成时间`} className="w-full" defaultValue={parent.payload.deadline ? dayjs(parent.payload.deadline) : undefined} maxDate={parent.payload.deadline ? dayjs(parent.payload.deadline) : undefined} disabledDate={date => Boolean(parent.payload.deadline && date.isAfter(dayjs(parent.payload.deadline), 'day'))} /></Form.Item>
                 <Form.Item name={[field.name, 'weight']} rules={[{ required: true, type: 'number', min: 1, max: 100, message: '请输入 1-100 的权重' }]}><InputNumber aria-label={`A${actionIndex + 1} 权重`} min={1} max={100} precision={0} suffix="%" /></Form.Item>
                 <Button danger type="text" aria-label={`删除 A${actionIndex + 1}`} title="删除行动" icon={<TrashIcon />} onClick={() => setParentActions(parent.id, balanceWeights(getParentActions(parent.id).filter((_, index) => index !== actionIndex)))} />
               </div>;

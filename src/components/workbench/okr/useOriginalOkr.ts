@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useApp } from '../../../context/AppContext';
 import { crmRepository } from '../../../services/crmRepository';
-import { okrRepository, type OkrPayload, type OkrRecord } from '../../../services/okrRepository';
+import { okrRepository, type OkrPayload, type OkrRecord, type OkrSettings } from '../../../services/okrRepository';
 import { productRepository } from '../../../services/productRepository';
 import type { OKRItem, PerformanceReview } from '../../../types';
 
@@ -12,6 +12,7 @@ export function useOriginalOkr() {
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const records = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:okrRepository.records,retry:false});
+  const settingsQuery = useQuery({queryKey:['okr','settings'],queryFn:okrRepository.settings,retry:false});
   const peopleQuery = useQuery({queryKey:['okr',currentUser.id,'people'],queryFn:okrRepository.people,retry:false});
   const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>okrRepository.work(currentUser.id),retry:false});
   const productLinesQuery = useQuery({queryKey:['okr',currentUser.id,'product-lines'],queryFn:()=>productRepository.productLines(),retry:false});
@@ -134,6 +135,7 @@ export function useOriginalOkr() {
     catch(error) { addToast('error', error instanceof Error ? error.message : '目标保存失败'); return false; }
     finally { setBusy(false); }
   };
+  const saveSettings = async (settings: OkrSettings) => { setBusy(true); try { await okrRepository.saveSettings(settings); await client.invalidateQueries({queryKey:['okr','settings']}); addToast('success','OKR 配置已保存'); return true; } catch(error) { addToast('error',error instanceof Error ? error.message : '配置保存失败'); return false; } finally { setBusy(false); } };
   return {records:all,okrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
     error:records.error || peopleQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
     productLineOptions,projectOptions,businessOptionsLoading:productLinesQuery.isPending || projectsQuery.isPending,
@@ -144,5 +146,6 @@ export function useOriginalOkr() {
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
     saveReviewDraft:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload,false),
     submitReviewDraft,submitOkrDraft,updateOkr,
+    settings: settingsQuery.data, settingsLoading: settingsQuery.isPending, saveSettings,
   };
 }

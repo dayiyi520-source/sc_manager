@@ -10,6 +10,8 @@ import java.util.*;
 public class OkrController {
  private final OkrService service; public OkrController(OkrService service){this.service=service;}
  @GetMapping("/people") @Operation(summary="查询目标承接关系") public ApiResponse<List<Map<String,Object>>> people(){return ApiResponse.ok(service.people());}
+ @GetMapping("/settings") @Operation(summary="查询 OKR 配置") public ApiResponse<Map<String,Object>> settings(){return ApiResponse.ok(service.settings());}
+ @PutMapping("/settings") @Operation(summary="保存 OKR 配置") public ApiResponse<Map<String,Object>> saveSettings(@RequestBody Map<String,Object> body){return ApiResponse.ok(service.saveSettings(body));}
  @GetMapping("/records") @Operation(summary="查询权限范围内目标与复盘") public ApiResponse<List<Map<String,Object>>> records(){return ApiResponse.ok(service.records());}
  @GetMapping("/{id}/events") @Operation(summary="查询目标与复盘操作记录") public ApiResponse<List<Map<String,Object>>> events(@PathVariable String id){return ApiResponse.ok(service.events(id));}
  @PostMapping("/records") @Operation(summary="创建目标或复盘草稿") public ApiResponse<Map<String,Object>> create(@RequestBody Map<String,Object> body){return ApiResponse.ok(service.create(body));}
