@@ -1,6 +1,7 @@
 import { Button, Input, InputNumber, Select, Space, Tag } from 'antd';
 import Card from 'antd/es/card/Card';
 import { useState } from 'react';
+import { ArrowLeft } from '@/components/common/octicons-compat';
 import type { OkrSettings } from '../../../services/okrRepository';
 
 type Props = { settings: OkrSettings; busy?: boolean; onSave: (settings: OkrSettings) => Promise<boolean>; onClose: () => void };
@@ -14,13 +15,18 @@ export function OkrSettingsView({ settings, busy = false, onSave, onClose }: Pro
   const updateDictionary = (key: keyof OkrSettings['dictionaries'], value: string) => setDraft(current => ({ ...current, dictionaries: { ...current.dictionaries, [key]: listParse(value) } }));
   const save = async () => { if (await onSave(draft)) onClose(); };
   return <section className="okr-settings-page" aria-label="OKR 设置">
-    <header className="okr-settings-page-head"><div><h2>OKR 设置</h2><p>配置拆解模板、业务字段、开放时间与校验规则。</p></div><Space><Button onClick={onClose}>返回目标</Button><Button type="primary" loading={busy} onClick={() => void save()}>保存配置</Button></Space></header>
-    <div className="okr-settings-layout"><nav className="okr-settings-nav" aria-label="设置导航">{(Object.keys(labels) as Array<keyof typeof labels>).map(key => <button type="button" className={active === key ? 'is-active' : ''} key={key} onClick={() => setActive(key)}>{labels[key]}</button>)}</nav><main className="okr-settings-content">
+    <aside className="okr-settings-sidebar">
+      <div className="okr-settings-sidebar-title"><h2>设置</h2><span>OKR</span></div>
+      <nav className="okr-settings-nav" aria-label="设置导航">{(Object.keys(labels) as Array<keyof typeof labels>).map(key => <button type="button" className={active === key ? 'is-active' : ''} key={key} onClick={() => setActive(key)}>{labels[key]}</button>)}</nav>
+      <div className="okr-settings-sidebar-footer"><Button type="text" block icon={<ArrowLeft />} onClick={onClose}>返回目标页</Button></div>
+    </aside>
+    <main className="okr-settings-content">
+      <header className="okr-settings-page-head"><div><h2>{labels[active]}</h2><p>配置拆解模板、业务字段、开放时间与校验规则。</p></div><Space><Button type="primary" loading={busy} onClick={() => void save()}>保存配置</Button></Space></header>
       {active === 'templates' && <Card title="拆解模板"><Space orientation="vertical" size="middle" style={{width:'100%'}}>{draft.templates.map((template, index) => <div className="okr-settings-template" key={template.type}><div><strong>{template.department}</strong><Tag color="blue">{template.type}</Tag></div><Input value={template.fields.join('、')} onChange={event => setDraft(current => ({ ...current, templates: current.templates.map((item, itemIndex) => itemIndex === index ? { ...item, fields: listParse(event.target.value) } : item) }))} addonBefore="字段顺序"/><small>模板发布后，新建或重新编辑的拆解使用最新字段；历史记录保留原结构。</small></div>)}</Space></Card>}
       {active === 'dictionaries' && <Card title="业务字段"><Space orientation="vertical" size="middle" style={{width:'100%'}}><label>产研关键节点<Input value={listValue(draft.dictionaries.productNodes)} onChange={event => updateDictionary('productNodes', event.target.value)}/></label><label>交付关键节点<Input value={listValue(draft.dictionaries.deliveryNodes)} onChange={event => updateDictionary('deliveryNodes', event.target.value)}/></label><label>售前关键节点<Input value={listValue(draft.dictionaries.presalesNodes)} onChange={event => updateDictionary('presalesNodes', event.target.value)}/></label><label>其他部门类型<Input value={listValue(draft.dictionaries.supportTypes)} onChange={event => updateDictionary('supportTypes', event.target.value)}/></label></Space></Card>}
       {active === 'timeRules' && <Card title="开放时间"><Space orientation="vertical" size="middle" style={{width:'100%'}}>{draft.timeRules.map((rule, index) => <div className="okr-settings-time-rule" key={rule.key}><strong>{rule.label}</strong><InputNumber min={1} max={31} value={rule.startDay} addonBefore="开始日" onChange={value => setDraft(current => ({ ...current, timeRules: current.timeRules.map((item, itemIndex) => itemIndex === index ? { ...item, startDay: value || 1 } : item) }))}/><InputNumber min={1} max={31} value={rule.endDay} addonBefore="结束日" onChange={value => setDraft(current => ({ ...current, timeRules: current.timeRules.map((item, itemIndex) => itemIndex === index ? { ...item, endDay: value || 1 } : item) }))}/></div>)}</Space></Card>}
       {active === 'validation' && <Card title="权重与必填校验"><Space direction="vertical" size="middle"><label>A 权重合计<InputNumber min={1} max={100} value={draft.validation.actionWeightTotal} onChange={value => setDraft(current => ({ ...current, validation: { ...current.validation, actionWeightTotal: value || 100 } }))} addonAfter="%"/></label><label>单个 O 最多动作<InputNumber min={1} max={20} value={draft.validation.maxActions} onChange={value => setDraft(current => ({ ...current, validation: { ...current.validation, maxActions: value || 8 } }))}/></label><label>承接人员<Select value={draft.validation.assigneeMultiple ? 'multiple' : 'single'} options={[{value:'multiple',label:'允许多人'},{value:'single',label:'仅允许一人'}]} onChange={value => setDraft(current => ({ ...current, validation: { ...current.validation, assigneeMultiple: value === 'multiple' } }))}/></label><label>关键节点<Select value={draft.validation.keyNodeMultiple ? 'multiple' : 'single'} options={[{value:'single',label:'单选'},{value:'multiple',label:'多选'}]} onChange={value => setDraft(current => ({ ...current, validation: { ...current.validation, keyNodeMultiple: value === 'multiple' } }))}/></label></Space></Card>}
       {active === 'defaultView' && <Card title="默认视图"><Select value={draft.defaultView} options={[{value:'list',label:'列表视图'},{value:'card',label:'卡片视图'}]} onChange={value => setDraft(current => ({ ...current, defaultView: value }))}/></Card>}
-    </main></div>
+    </main>
   </section>;
 }

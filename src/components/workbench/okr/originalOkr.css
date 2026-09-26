@@ -102,22 +102,27 @@
 .okr-settings-panel > div { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 16px; }
 .okr-settings-view-buttons { display: flex; gap: 8px; }
 .okr-settings-panel p { margin: 0; padding: 12px; border: 1px solid var(--border-main); border-radius: 6px; background: var(--bg-surface-soft); color: var(--text-muted); font-size: 12px; }
-.okr-settings-page { display:grid; gap:24px; min-height:calc(100vh - 160px); }
-.okr-settings-page-head { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.okr-settings-page { display:grid; height:clamp(420px, calc(100vh - 220px), 760px); min-height:420px; min-width:0; grid-template-columns:240px minmax(0,1fr); overflow:hidden; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); }
+.okr-settings-sidebar { display:flex; min-width:0; min-height:0; flex-direction:column; border-right:1px solid var(--border-main); background:var(--bg-surface); }
+.okr-settings-sidebar-title { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:20px 16px 16px; border-bottom:1px solid var(--border-main); }
+.okr-settings-sidebar-title h2 { margin:0; color:var(--text-primary); font-size:18px; line-height:26px; }
+.okr-settings-sidebar-title span { color:var(--text-muted); font-size:11px; letter-spacing:.08em; }
+.okr-settings-page-head { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--border-main); }
 .okr-settings-page-head h2 { margin:0; color:var(--text-primary); font-size:20px; }
 .okr-settings-page-head p { margin:6px 0 0; color:var(--text-muted); font-size:12px; }
-.okr-settings-layout { display:grid; min-width:0; grid-template-columns:220px minmax(0,1fr); gap:16px; }
-.okr-settings-nav { display:grid; align-content:start; gap:4px; padding:8px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
+.okr-settings-nav { display:grid; align-content:start; gap:4px; min-height:0; padding:12px 8px; overflow-y:auto; }
 .okr-settings-nav button { padding:10px 12px; border:0; border-radius:6px; background:transparent; color:var(--text-secondary); cursor:pointer; text-align:left; }
 .okr-settings-nav button:hover,.okr-settings-nav button.is-active { background:color-mix(in srgb,var(--primary) 12%,transparent); color:var(--primary); }
-.okr-settings-content { min-width:0; }
+.okr-settings-sidebar-footer { margin-top:auto; padding:8px; border-top:1px solid var(--border-main); }
+.okr-settings-sidebar-footer .ant-btn { justify-content:flex-start; color:var(--text-secondary); }
+.okr-settings-content { display:grid; min-width:0; min-height:0; align-content:start; gap:16px; padding:24px; overflow-y:auto; overscroll-behavior:contain; }
 .okr-settings-template { display:grid; gap:8px; padding-bottom:16px; border-bottom:1px solid var(--border-main); }
 .okr-settings-template:last-child { padding-bottom:0; border-bottom:0; }
 .okr-settings-template > div,.okr-settings-time-rule { display:flex; align-items:center; gap:8px; }
 .okr-settings-template small { color:var(--text-muted); font-size:11px; }
 .okr-settings-content label { display:grid; gap:6px; color:var(--text-secondary); font-size:12px; }
 .okr-settings-time-rule { flex-wrap:wrap; }
-@media (max-width:720px) { .okr-settings-page-head { align-items:flex-start; flex-direction:column; } .okr-settings-layout { grid-template-columns:1fr; } .okr-settings-nav { display:flex; overflow-x:auto; } .okr-settings-nav button { white-space:nowrap; } }
+@media (max-width:720px) { .okr-settings-page { height:auto; min-height:0; grid-template-columns:1fr; overflow:visible; } .okr-settings-sidebar { border-right:0; border-bottom:1px solid var(--border-main); } .okr-settings-nav { display:flex; overflow-x:auto; } .okr-settings-nav button { white-space:nowrap; } .okr-settings-content { overflow:visible; padding:16px; } .okr-settings-page-head { align-items:flex-start; flex-direction:column; } }
 .okr-summary-month-card { border:0; background:transparent; box-shadow:none; }
 .okr-summary-month-card .ant-card-body { padding:0; }
 .okr-summary-month-head { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border: 0; border-bottom: 1px solid var(--border-main); background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; }

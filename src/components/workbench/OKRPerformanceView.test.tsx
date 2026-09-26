@@ -344,7 +344,8 @@ describe('OKRPerformanceView target navigation', () => {
     expect(document.querySelector('.okr-cycle-filter')).toHaveTextContent(`周期：${dayjs().format('YYYY年MM月')}`);
     fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
     expect(screen.getByRole('region', { name: 'OKR 设置' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'OKR 设置' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '设置' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '返回目标页' })).toBeInTheDocument();
   });
 
   it('shows the selected cycle count after selecting a second month', () => {
