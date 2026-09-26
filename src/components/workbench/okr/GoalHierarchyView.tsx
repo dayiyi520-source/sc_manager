@@ -48,10 +48,14 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
   const actions = periodRecords.filter(record => record.kind === 'action');
 
   const addManagerLayers = (parent: GoalHierarchyNode): void => {
-    if (parent.assigneeIds.length === 0 || parent.children.length === 0) return;
+    if (parent.assigneeIds.length <= 1 || parent.children.length === 0) return;
     const managerNodes = parent.assigneeIds.map(managerId => {
       const manager = people.find(person => person.id === managerId);
-      const managerChildren = parent.children.filter(child => people.find(person => person.id === child.ownerId)?.supervisorId === managerId);
+      const managerChildren = parent.children.filter(child => {
+        const childOwner = people.find(person => person.id === child.ownerId);
+        const childAssignees = child.assigneeIds.flatMap(id => people.find(person => person.id === id)?.supervisorId === managerId ? [id] : []);
+        return childOwner?.supervisorId === managerId || childAssignees.length > 0;
+      });
       const managerNode: GoalHierarchyNode = {
         id: `manager:${parent.id}:${managerId}`,
         referenceId: `manager:${parent.id}:${managerId}`,
