@@ -48,12 +48,25 @@ describe('GoalHierarchyView', () => {
     render(<GoalHierarchyView records={records} people={people} periodKey="2026-09" />);
     expect(screen.getByText('提升客户交付质量')).toBeInTheDocument();
     expect(screen.getByText('建立交付质量门禁')).toBeInTheDocument();
+    expect(screen.getByText('公司级')).toBeInTheDocument();
+    expect(screen.getByText('负责人')).toBeInTheDocument();
+    expect(screen.getAllByText('100%')).toHaveLength(2);
+    expect(screen.getByText('@部门主管')).toBeInTheDocument();
+    expect(screen.getByText('2 个下级动作')).toBeInTheDocument();
+    expect(screen.getAllByText('进度').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('权重').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('截止日期').length).toBeGreaterThan(0);
     expect(screen.queryByText('完成重点项目验收清单')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '展开 建立交付质量门禁' }));
     expect(screen.getByText('完成重点项目验收清单')).toBeInTheDocument();
+    expect(screen.getByText('70%')).toBeInTheDocument();
     expect(screen.getByText('补齐质量复盘机制')).toBeInTheDocument();
-    expect(screen.queryByText('核验交付验收证据')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开 完成重点项目验收清单' }));
+    expect(screen.getByText('核验交付验收证据')).toBeInTheDocument();
+    const leafRow = screen.getByRole('button', { name: '查看 核验交付验收证据' }).closest('.goal-node-row');
+    expect(leafRow).not.toHaveTextContent('承接人员');
+    expect(leafRow).not.toHaveTextContent('下级动作');
   });
 
   it('opens and closes the detail drawer with source chain and draft-only actions', async () => {

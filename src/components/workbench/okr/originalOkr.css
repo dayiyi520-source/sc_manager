@@ -711,6 +711,26 @@
 @media (max-width:720px) { .goal-hierarchy-toolbar { flex-direction:column; } .goal-hierarchy-actions { width:100%; justify-content:space-between; } .goal-node-main { grid-template-columns:40px minmax(0,1fr) auto; } .goal-node-progress { grid-column:2; grid-template-columns:minmax(48px,1fr) 34px; } .goal-node-main > .ant-tag { grid-column:3; grid-row:1; } .goal-node-children { margin-left:12px; padding-left:12px; } .goal-detail-fields { grid-template-columns:1fr; } }
 @media (max-width:720px) { .goal-hierarchy-demo header { flex-direction:column; } .goal-hierarchy-demo header p { text-align:left; } .goal-hierarchy-demo-node { grid-template-columns:44px minmax(0,1fr); } .goal-hierarchy-demo-node small { grid-column:2; } .goal-hierarchy-demo-node.depth-1 { margin-left:12px; } .goal-hierarchy-demo-node.depth-2 { margin-left:24px; } .goal-hierarchy-demo-node.depth-3 { margin-left:36px; } }
 
+/* Detail tree uses the same O/A field grid as the monthly list. */
+.goal-node-main { grid-template-columns:minmax(0,1fr) 304px; gap:24px; padding:12px 0 12px 20px; }
+.goal-node-list-copy { display:grid; min-width:0; gap:6px; }
+.goal-node-title-line { display:flex; min-width:0; align-items:flex-start; gap:8px; }
+.goal-node-title-line .goal-node-code { flex:none; }
+.goal-node-title { min-width:0; overflow-wrap:anywhere; white-space:normal; }
+.goal-node-title-line .ant-tag { flex:none; margin:0; }
+.goal-node-meta { display:flex; min-width:0; flex-wrap:wrap; align-items:center; gap:6px 12px; color:var(--text-muted); font-size:11px; line-height:18px; }
+.goal-node-meta-line { display:flex; min-width:0; align-items:center; gap:10px; margin-left:40px; color:var(--text-primary); font-size:13px; line-height:24px; }
+.goal-node-meta-line .ant-tag { margin:0; font-size:12px; }
+.goal-node-meta-line .goal-node-creator, .goal-node-meta-line .goal-node-weight { padding:3px 10px; border:1px solid var(--border-main); border-radius:6px; background:var(--bg-surface); color:var(--text-body); }
+.goal-node-owner { min-width:0; margin-left:40px; overflow-wrap:anywhere; color:var(--text-muted); font-size:12px; line-height:18px; }
+.goal-node-action-assignees-inline { color:var(--primary); font-weight:500; }
+.goal-node-metrics { display:grid; grid-template-columns:repeat(3,96px); align-items:center; gap:8px; width:304px; min-width:304px; }
+.goal-node-metrics > span { display:grid; min-width:0; gap:4px; justify-items:center; }
+.goal-node-metrics small { color:var(--text-muted); font-size:11px; line-height:18px; white-space:nowrap; }
+.goal-node-metrics strong { color:var(--text-body); font-size:14px; font-weight:500; line-height:20px; white-space:nowrap; }
+.goal-node-metrics .goal-node-progress-value { color:var(--active-text); }
+@media (max-width:900px) { .goal-node-main { grid-template-columns:minmax(0,1fr); gap:8px; padding:12px 16px; } .goal-node-metrics { width:100%; min-width:0; grid-template-columns:repeat(3,minmax(72px,1fr)); } }
+
 /* My targets: monthly list and card views */
 .okr-summary-month-body.is-target-view { grid-template-columns:minmax(0,1fr); width:100%; }
 .okr-target-view-switch { display:inline-flex; gap:4px; padding:2px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); }

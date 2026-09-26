@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Drawer, Empty, Progress, Skeleton, Tag } from 'antd';
+import dayjs from 'dayjs';
 import {
   ChevronDownIcon,
   ChevronRightIcon,
   GitBranchIcon,
   LinkIcon,
-  PersonIcon,
   ScreenFullIcon,
   ScreenNormalIcon,
   XIcon,
@@ -165,8 +165,9 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
         addManagerLayers(node);
         node.progress = aggregateProgress(node);
         return node;
-      });
+    });
     root.children = [...keyResultNodes, ...topLevelActions];
+    root.assigneeIds = [...new Set(root.children.flatMap(child => child.assigneeIds))];
     root.progress = aggregateProgress(root);
     return root;
   });
@@ -182,6 +183,8 @@ const statusMeta = (status: string) => status === 'draft'
       ? { label: '待确认', color: 'processing' as const }
       : { label: '已提交', color: 'processing' as const };
 
+const formatDeadline = (value?: string) => value ? dayjs(value).format('MM-DD') : '未设置';
+
 const GoalNodeRow = ({ node, code, expanded, selected, people, onToggle, onSelect }: {
   node: GoalHierarchyNode;
   code: string;
@@ -193,21 +196,26 @@ const GoalNodeRow = ({ node, code, expanded, selected, people, onToggle, onSelec
 }) => {
   const status = statusMeta(node.status);
   const assigneeNames = node.assigneeNames || node.assigneeIds.map(id => people.find(person => person.id === id)?.name || id);
+  const isObjective = node.kind === 'objective';
+  const isLeafAction = !isObjective && node.children.length === 0;
+  const visibleAssignees = isLeafAction ? [] : assigneeNames;
+  const ownerName = people.find(person => person.id === node.ownerId)?.name || '人员已停用';
   return <div className={`goal-node-row${selected ? ' is-selected' : ''}${node.status === 'draft' ? ' is-draft' : ''}`}>
     <button type="button" className="goal-node-toggle" aria-label={node.children.length ? `${expanded ? '收起' : '展开'} ${node.title}` : `${node.title} 无下级动作`} disabled={!node.children.length} onClick={onToggle}>
       {node.children.length ? (expanded ? <ChevronDownIcon /> : <ChevronRightIcon />) : <span />}
     </button>
     <button type="button" className="goal-node-main" aria-label={`查看 ${node.title}`} aria-pressed={selected} onClick={onSelect}>
-      <span className={`goal-node-code is-${node.kind}`}>{code}</span>
-      <span className="goal-node-content">
-        <span className="goal-node-title">{node.title}</span>
-        <span className="goal-node-meta">
-          {node.kind === 'action' && <><PersonIcon />{assigneeNames.length ? assigneeNames.join('、') : '未指定承接人'}</>}
-          {node.children.length > 0 && <span>{node.children.length} 个下级动作</span>}
-        </span>
+      <span className="goal-node-list-copy">
+        <span className="goal-node-title-line"><span className={`goal-node-code is-${node.kind}`}>{code}</span><span className="goal-node-title">{node.title}{!isObjective && visibleAssignees.length > 0 && <span className="goal-node-action-assignees-inline"> {visibleAssignees.map(name => `@${name}`).join(' ')}</span>}</span><Tag color={status.color}>{status.label}</Tag></span>
+        {isObjective
+          ? <><span className="goal-node-meta-line"><Tag color="blue">公司级</Tag><span className="goal-node-creator">{ownerName}</span><span className="goal-node-weight">{node.weight}%</span></span><span className="goal-node-owner">承接人员：{assigneeNames.length ? assigneeNames.join('、') : '未指定承接人'}</span></>
+          : node.children.length > 0 && <span className="goal-node-meta"><span>{node.children.length} 个下级动作</span></span>}
       </span>
-      <span className="goal-node-progress"><Progress percent={node.progress} size="small" showInfo={false}/><b>{node.progress}%</b></span>
-      <Tag color={status.color}>{status.label}</Tag>
+      <span className="goal-node-metrics">
+        <span><small>进度</small><strong className="goal-node-progress-value">{node.progress}%</strong></span>
+        <span><small>权重</small><strong>{node.weight}%</strong></span>
+        <span><small>截止日期</small><strong>{formatDeadline(node.deadline)}</strong></span>
+      </span>
     </button>
   </div>;
 };
