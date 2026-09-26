@@ -36,7 +36,7 @@ export function useOriginalOkr() {
   const {currentUser, addToast} = useApp();
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const records = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:okrRepository.records,retry:false});
+  const records = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:()=>okrRepository.records(currentUser.id),retry:false});
   const settingsQuery = useQuery({queryKey:['okr','settings'],queryFn:okrRepository.settings,retry:false});
   const peopleQuery = useQuery({queryKey:['okr',currentUser.id,'people'],queryFn:okrRepository.people,retry:false});
   const teamMembersQuery = useQuery<EmployeeOption[]>({queryKey:['team-member-options'],queryFn:teamRepository.options,retry:false});
@@ -126,7 +126,7 @@ export function useOriginalOkr() {
     if(!record){addToast('error','复盘记录不存在或已刷新');return false;}
     setBusy(true);
     try{
-      await okrRepository.update(record,'submit');
+      await okrRepository.update(record,'submit',{},currentUser.id);
       await refresh();
       addToast('success','复盘已提交');
       return true;
@@ -139,7 +139,7 @@ export function useOriginalOkr() {
     if (record.status !== 'draft') { addToast('error', '只有草稿可以提交'); return false; }
     setBusy(true);
     try {
-      await okrRepository.update(record, 'submit', { payload: record.payload });
+      await okrRepository.update(record, 'submit', { payload: record.payload }, currentUser.id);
       await refresh();
       addToast('success', record.kind === 'action' ? '拆解目标已提交' : '目标已提交');
       return true;
@@ -156,12 +156,12 @@ export function useOriginalOkr() {
             addToast('warning', '本周期已有复盘，不能重复新建');
             return false;
           }
-          await okrRepository.update(existing, submit ? 'submit' : 'save', { payload });
+          await okrRepository.update(existing, submit ? 'submit' : 'save', { payload }, currentUser.id);
         } else {
-          await okrRepository.create(kind,period,payload,submit);
+          await okrRepository.create(kind,period,payload,submit,currentUser.id);
         }
       } else {
-        await okrRepository.create(kind,period,payload,submit);
+        await okrRepository.create(kind,period,payload,submit,currentUser.id);
       }
       await refresh(); addToast('success',kind==='objective'?(submit?'目标已提交':'目标草稿已保存'):(submit?'复盘已提交':'复盘草稿已保存')); return true;
     } catch(error) { addToast('error',error instanceof Error?error.message:'提交失败，请重试'); return false; }
@@ -171,7 +171,7 @@ export function useOriginalOkr() {
     const record = all.find(item => item.id === recordId && item.kind === 'objective');
     if (!record) { addToast('error', '目标记录不存在或已刷新'); return false; }
     setBusy(true);
-    try { await okrRepository.update(record, submit ? 'submit' : 'save', { payload }); await refresh(); addToast('success', submit ? '目标已提交' : '目标草稿已保存'); return true; }
+    try { await okrRepository.update(record, submit ? 'submit' : 'save', { payload }, currentUser.id); await refresh(); addToast('success', submit ? '目标已提交' : '目标草稿已保存'); return true; }
     catch(error) { addToast('error', error instanceof Error ? error.message : '目标保存失败'); return false; }
     finally { setBusy(false); }
   };

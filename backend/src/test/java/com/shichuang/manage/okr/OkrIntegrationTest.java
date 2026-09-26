@@ -30,6 +30,14 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
  private void action(String token,String id,String action,int version)throws Exception{
   mockMvc.perform(patch("/api/okr/records/"+id).header("Authorization","Bearer "+token).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("action",action,"version",version)))).andExpect(status().isOk());
  }
+ @Test void adminViewerScopeOwnsDraftAndNonAdminCannotForgeIt()throws Exception{
+  String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
+  var payload=Map.<String,Object>of("title","陈宇璋视角周报","startDate","2026-09-21","endDate","2026-09-27","reviewMode","completed","reviewType","week","selfScore",80,"sendTo",List.of(),"items",List.of());
+  String response=mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+admin).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("kind","review","periodKey","2026-09-21/2026-09-27","payload",payload,"submit",false,"viewerId","user-tech")))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String id=objectMapper.readTree(response).path("data").path("id").asText();
+  assertEquals("user-tech",jdbc.queryForObject("SELECT owner_id_ FROM t_okr_record WHERE id_=?",String.class,id));
+  mockMvc.perform(get("/api/okr/records?viewerId=user-admin").header("Authorization","Bearer "+tech)).andExpect(status().isForbidden());
+ }
  @Test void allowsRootObjectivesForEndedAndUpcomingPeriods()throws Exception{
   String admin=login("admin");reporting(admin,"user-admin","",true);
   var payload=Map.<String,Object>of("title","跨周期目标","keyResults",List.of(Map.of("id","kr-cross-period","title","完成跨周期计划","weight",100,"progress",0)));

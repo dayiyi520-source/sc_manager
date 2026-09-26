@@ -47,8 +47,9 @@ export const okrRepository = {
   people: () => apiRequest<OkrPerson[]>(`${base}/people`),
   settings: () => apiRequest<OkrSettings>(`${base}/settings`),
   saveSettings: (settings: OkrSettings) => apiRequest<OkrSettings>(`${base}/settings`, {method:'PUT', body: JSON.stringify(settings)}),
-  records: async (): Promise<OkrRecord[]> => {
-    const rows = await apiRequest<Array<Omit<OkrRecord,'payload'> & {payload: string | OkrPayload}>>(`${base}/records`);
+  records: async (viewerId?: string): Promise<OkrRecord[]> => {
+    const query = viewerId ? `?viewerId=${encodeURIComponent(viewerId)}` : '';
+    const rows = await apiRequest<Array<Omit<OkrRecord,'payload'> & {payload: string | OkrPayload}>>(`${base}/records${query}`);
     return rows.map(r => ({...r, payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload}));
   },
   work: (ownerId: string) => apiRequest<OkrWork[]>(`${base}/work?ownerId=${encodeURIComponent(ownerId)}`),
@@ -59,8 +60,8 @@ export const okrRepository = {
     return apiRequest<void>(`${base}/records/${recordId}`, {method:'PATCH',body:JSON.stringify({action: submit ? 'submit' : 'save', version, payload: actionPayload, viewerId})});
   },
   link: (work: OkrWork, objectiveId?:string,keyResultId?:string) => apiRequest(`${base}/work/link`,{method:'PUT',body:JSON.stringify({workId:work.id,objectiveId,keyResultId,version:work.linkVersion})}),
-  create: (kind: string, periodKey: string, payload: OkrPayload, submit = false) => apiRequest<{id:string}>(`${base}/records`, {method:'POST',body:JSON.stringify({kind,periodKey,payload,submit})}),
-  update: (record: OkrRecord, action: string, data: Record<string, unknown> = {}) => apiRequest(`${base}/records/${record.id}`,{method:'PATCH',body:JSON.stringify({action,version:record.version,...data})}),
+  create: (kind: string, periodKey: string, payload: OkrPayload, submit = false, viewerId?: string) => apiRequest<{id:string}>(`${base}/records`, {method:'POST',body:JSON.stringify({kind,periodKey,payload,submit,viewerId})}),
+  update: (record: OkrRecord, action: string, data: Record<string, unknown> = {}, viewerId?: string) => apiRequest(`${base}/records/${record.id}`,{method:'PATCH',body:JSON.stringify({action,version:record.version,...data,viewerId})}),
   reporting: (person: OkrPerson, supervisorId: string | null, root: boolean) => apiRequest(`${base}/people/${person.id}`, {method:'PUT',body:JSON.stringify({supervisorId,root,version:person.version})}),
   events: (id: string) => apiRequest<Array<{action:string;operator:string;createdAt:string}>>(`${base}/${id}/events`),
 };

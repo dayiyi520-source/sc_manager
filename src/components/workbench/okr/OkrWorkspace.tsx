@@ -23,7 +23,7 @@ function WorkspaceContent(){
  const [editing,setEditing]=useState<OkrRecord|'new'>();const [busy,setBusy]=useState(false);const [evaluation,setEvaluation]=useState<OkrRecord>();
  const [evalForm]=Form.useForm();const [orgPerson,setOrgPerson]=useState<OkrPerson>();const [supervisor,setSupervisor]=useState<string>();
  const people=useQuery({queryKey:['okr',currentUser.id,'people'],queryFn:okrRepository.people});
- const records=useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:okrRepository.records});
+ const records=useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:()=>okrRepository.records(currentUser.id)});
  const work=useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>okrRepository.work(currentUser.id)});
  const events=useQuery({queryKey:['okr',currentUser.id,'events',detailId],queryFn:()=>okrRepository.events(detailId!),enabled:!!detailId});
  const all=records.data||[],me=people.data?.find(p=>p.id===currentUser.id),detail=all.find(r=>r.id===detailId);
@@ -32,8 +32,8 @@ function WorkspaceContent(){
  const visible=all.filter(r=>r.kind===tab&&(r.kind==='review'||r.periodKey===cycle)&&(scope==='my'?r.ownerId===currentUser.id:scope==='supervisor'?r.ownerId===me?.supervisorId:r.ownerId!==currentUser.id&&r.ownerId!==me?.supervisorId));
  const refresh=()=>client.invalidateQueries({queryKey:['okr',currentUser.id]});
  const run=async(action:()=>Promise<unknown>)=>{setBusy(true);try{await action();await refresh();message.success('保存成功');return true;}catch(e){message.error(e instanceof Error?e.message:'保存失败');return false;}finally{setBusy(false);}};
- const save=async(p:OkrPayload)=>{if(await run(()=>editing==='new'?okrRepository.create(tab,tab==='objective'?cycle:`${p.startDate}/${p.endDate}`,p):okrRepository.update(editing!,'save',{payload:p})))setEditing(undefined);};
- const transition=(r:OkrRecord,action:string)=>run(()=>okrRepository.update(r,action));
+ const save=async(p:OkrPayload)=>{if(await run(()=>editing==='new'?okrRepository.create(tab,tab==='objective'?cycle:`${p.startDate}/${p.endDate}`,p,false,currentUser.id):okrRepository.update(editing!,'save',{payload:p},currentUser.id)))setEditing(undefined);};
+ const transition=(r:OkrRecord,action:string)=>run(()=>okrRepository.update(r,action,{},currentUser.id));
  const isOwner=(r:OkrRecord)=>r.ownerId===currentUser.id;
  const isReviewer=(r:OkrRecord)=>!isOwner(r)&&people.data?.find(p=>p.id===r.ownerId)?.supervisorId===currentUser.id;
  const actions=(r:OkrRecord)=><Space wrap>
@@ -64,7 +64,7 @@ function WorkspaceContent(){
   {editing&&tab==='review'&&(work.isError?<Alert type="error" title="工作项加载失败" description={work.error.message} action={<Button onClick={()=>work.refetch()}>重试</Button>}/>:work.isPending?<Spin/>:<ReviewEditor record={editing==='new'?undefined:editing} objectives={objectives} work={work.data||[]} busy={busy} onSave={save} onClose={()=>setEditing(undefined)}/>)}
   <Drawer open={!!detail} width="80%" title={detail?.payload.title} onClose={()=>setDetailId(undefined)} extra={detail&&actions(detail)}>
    {detail&&<div className="space-y-4"><Descriptions items={[{key:'state',label:'状态',children:statusNames[detail.status]},{key:'period',label:'周期',children:detail.periodKey},{key:'parent',label:'承接目标',children:all.find(r=>r.id===detail.payload.parentObjectiveId)?.payload.title||'组织根目标 / 无关联'}]}/>
-    {detail.kind==='objective'?<><Table rowKey="id" pagination={false} dataSource={detail.payload.keyResults} columns={[{title:'关键结果',dataIndex:'title'},{title:'权重',dataIndex:'weight',render:v=>`${v}%`},{title:'进度',render:(_,kr)=><InputNumber key={`${kr.id}-${detail.version}`} aria-label={`${kr.title}进度`} min={0} max={100} precision={0} defaultValue={kr.progress} disabled={!isOwner(detail)||detail.status!=='active'||busy} onBlur={e=>{const v=Number(e.target.value);if(e.target.value!==''&&Number.isInteger(v)&&v>=0&&v<=100&&v!==kr.progress)run(()=>okrRepository.update(detail,'progress',{keyResults:detail.payload.keyResults?.map(k=>k.id===kr.id?{...k,progress:v}:k)}));}}/>}]}/>
+    {detail.kind==='objective'?<><Table rowKey="id" pagination={false} dataSource={detail.payload.keyResults} columns={[{title:'关键结果',dataIndex:'title'},{title:'权重',dataIndex:'weight',render:v=>`${v}%`},{title:'进度',render:(_,kr)=><InputNumber key={`${kr.id}-${detail.version}`} aria-label={`${kr.title}进度`} min={0} max={100} precision={0} defaultValue={kr.progress} disabled={!isOwner(detail)||detail.status!=='active'||busy} onBlur={e=>{const v=Number(e.target.value);if(e.target.value!==''&&Number.isInteger(v)&&v>=0&&v<=100&&v!==kr.progress)run(()=>okrRepository.update(detail,'progress',{keyResults:detail.payload.keyResults?.map(k=>k.id===kr.id?{...k,progress:v}:k)},currentUser.id));}}/>}]}/>
      {isOwner(detail)&&<Button onClick={()=>{setDetailId(undefined);setTab('work');setCycle(detail.periodKey);}}>关联任务 / 事项</Button>}
      <Typography.Title level={5}>下级承接</Typography.Title>{all.filter(r=>r.payload.parentObjectiveId===detail.id).map(r=><Typography.Paragraph key={r.id}>{r.payload.title}</Typography.Paragraph>)}</>:<>
      <ReviewDetails record={detail} objectives={all.filter(o=>o.kind==='objective'&&o.ownerId===detail.ownerId)}/>
@@ -73,9 +73,9 @@ function WorkspaceContent(){
    </div>}
   </Drawer>
   <Modal open={!!evaluation} title={evaluation?.kind==='review'?'主管评价':'目标确认'} footer={null} onCancel={()=>setEvaluation(undefined)}>
-   <Form form={evalForm} layout="vertical" onFinish={async v=>{if(await run(()=>okrRepository.update(evaluation!,'approve',v)))setEvaluation(undefined);}}>
+   <Form form={evalForm} layout="vertical" onFinish={async v=>{if(await run(()=>okrRepository.update(evaluation!,'approve',v,currentUser.id)))setEvaluation(undefined);}}>
     {evaluation?.kind==='review'&&<><Form.Item label="最终分数" name="finalScore" rules={[{required:true}]}><InputNumber min={0} max={100} precision={0}/></Form.Item><Form.Item label="计入评价的计划外贡献" name="includedWorkIds"><Select mode="multiple" options={evaluation.payload.items?.filter(i=>!i.objectiveId).map(i=>({value:i.workId,label:i.title}))}/></Form.Item><Form.Item label="OKR 结果、交付质量与计划外贡献评价" name="evaluation" rules={[{required:true,whitespace:true}]}><Input.TextArea maxLength={2000}/></Form.Item></>}
-    <Form.Item label="评价 / 退回原因" name="feedback" rules={[{required:true,whitespace:true}]}><Input.TextArea maxLength={2000}/></Form.Item><Space><Button danger disabled={busy} onClick={async()=>{try{const v=await evalForm.validateFields(['feedback']);if(await run(()=>okrRepository.update(evaluation!,'return',v)))setEvaluation(undefined);}catch{}}}>退回修改</Button><Button type="primary" htmlType="submit" loading={busy}>确认</Button></Space>
+   <Form.Item label="评价 / 退回原因" name="feedback" rules={[{required:true,whitespace:true}]}><Input.TextArea maxLength={2000}/></Form.Item><Space><Button danger disabled={busy} onClick={async()=>{try{const v=await evalForm.validateFields(['feedback']);if(await run(()=>okrRepository.update(evaluation!,'return',v,currentUser.id)))setEvaluation(undefined);}catch{}}}>退回修改</Button><Button type="primary" htmlType="submit" loading={busy}>确认</Button></Space>
    </Form>
   </Modal>
   <Modal open={!!orgPerson} title={`${orgPerson?.name||''} · 组织关系`} onCancel={()=>setOrgPerson(undefined)} confirmLoading={busy} onOk={async()=>{if(supervisor&&await run(()=>okrRepository.reporting(orgPerson!,supervisor==='root'?null:supervisor,supervisor==='root')))setOrgPerson(undefined);}}>

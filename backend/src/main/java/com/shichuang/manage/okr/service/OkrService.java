@@ -23,9 +23,10 @@ import java.util.*;
   person(requested);
   return requested;
  }
- public List<Map<String,Object>> records(){
+ public List<Map<String,Object>> records(){return records(null);}
+ public List<Map<String,Object>> records(String requestedViewer){
   AuthorizationService.requireRead("okr");
-  String me=RequestContext.userId();var reporting=people();
+  String me=viewerId(requestedViewer);var reporting=people();
   var meProfile=reporting.stream().filter(p->me.equals(p.get("id"))).findFirst().orElse(Map.of());
   String boss=Objects.toString(meProfile.get("supervisorId"),"");
   var reports=new HashSet<String>();for(var p:reporting)if(me.equals(p.get("supervisorId")))reports.add(p.get("id").toString());
@@ -88,7 +89,8 @@ import java.util.*;
   boolean submit=Boolean.TRUE.equals(body.get("submit"));String state=submit?"active":"draft";
   String id=UUID.randomUUID().toString(),data=encode(input);mapper.insert(RequestContext.tenantId(),id,"action",creator,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit_action":"draft_action",creator,data);return Map.of("id",id,"status",state,"version",0);
  }
- private Map<String,Object> record(String id){return records().stream().filter(r->id.equals(r.get("id"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"记录不存在或无权访问"));}
+ private Map<String,Object> record(String id,String requestedViewer){return records(requestedViewer).stream().filter(r->id.equals(r.get("id"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"记录不存在或无权访问"));}
+ private Map<String,Object> record(String id){return record(id,null);}
  public List<Map<String,Object>> events(String id){record(id);return mapper.events(RequestContext.tenantId(),id);}
  private String encode(Object v){try{return json.writeValueAsString(v);}catch(Exception e){throw new IllegalArgumentException("数据格式无效",e);}}
  private String required(Map<String,Object>b,String k){String v=Objects.toString(b.get(k),"").trim();if(v.isBlank()||v.length()>2000)throw new IllegalArgumentException("请检查字段："+k);return v;}
@@ -285,11 +287,11 @@ import java.util.*;
  }
  @Transactional public Map<String,Object> create(Map<String,Object>b){
   String kind=required(b,"kind"),period=required(b,"periodKey");if(!Set.of("objective","review").contains(kind))throw new IllegalArgumentException("记录类型无效");
-  var p=inputPayload(b.getOrDefault("payload",Map.of()),kind);String owner=RequestContext.userId();
+  var p=inputPayload(b.getOrDefault("payload",Map.of()),kind);String owner=viewerId(Objects.toString(b.get("viewerId"),""));
   boolean submit=Boolean.TRUE.equals(b.get("submit"));
   if("objective".equals(kind))validateObjective(owner,period,p);else {
    validateReview(owner,p,submit);
-   boolean duplicate=records().stream().anyMatch(record -> "review".equals(record.get("kind"))
+   boolean duplicate=records(owner).stream().anyMatch(record -> "review".equals(record.get("kind"))
     && owner.equals(record.get("ownerId"))
     && period.equals(record.get("periodKey"))
     && Objects.equals(Objects.toString(payload(record.get("payload")).get("reviewType"),""), Objects.toString(p.get("reviewType"),""))
@@ -302,7 +304,7 @@ import java.util.*;
   String id=UUID.randomUUID().toString(),data=encode(p);mapper.insert(RequestContext.tenantId(),id,kind,owner,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit":"create",owner,data);return Map.of("id",id,"status",state,"version",0);
  }
  @Transactional public void update(String id,Map<String,Object>b){
-  Map<String,Object>s=record(id);String owner=s.get("ownerId").toString(),state=s.get("status").toString(),action=required(b,"action"),kind=s.get("kind").toString();String viewer=viewerId(Objects.toString(b.get("viewerId"),""));
+  String viewer=viewerId(Objects.toString(b.get("viewerId"),""));Map<String,Object>s=record(id,viewer);String owner=s.get("ownerId").toString(),state=s.get("status").toString(),action=required(b,"action"),kind=s.get("kind").toString();
   boolean own=owner.equals(viewer),reviewer=!own&&viewer.equals(supervisor(owner));
   var p=payload(s.get("payload"));String next;
   if("action".equals(kind)){
@@ -329,7 +331,7 @@ import java.util.*;
   }else if(Set.of("save","submit").contains(action))validateReview(owner,p,"submit".equals(action));
   if("return".equals(action))p.put("feedback",required(b,"feedback"));
   if("submit".equals(action)&&"review".equals(kind)){
-   p.put("objectiveSnapshots",records().stream().filter(r->owner.equals(r.get("ownerId"))&&"objective".equals(r.get("kind"))).map(r->Map.of("id",r.get("id"),"period",r.get("periodKey"),"payload",payload(r.get("payload")))).toList());
+   p.put("objectiveSnapshots",records(viewer).stream().filter(r->owner.equals(r.get("ownerId"))&&"objective".equals(r.get("kind"))).map(r->Map.of("id",r.get("id"),"period",r.get("periodKey"),"payload",payload(r.get("payload")))).toList());
   }
   if("approve".equals(action)&&"review".equals(kind)){
    p.put("feedback",required(b,"feedback"));p.put("finalScore",integer(b.get("finalScore"),0,100));p.put("evaluation",required(b,"evaluation"));
