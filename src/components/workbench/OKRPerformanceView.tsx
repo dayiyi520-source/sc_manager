@@ -7,7 +7,7 @@ import { Target, FileSpreadsheet, Plus, Calendar, ChevronDown, ChevronRight, Sea
 import { useApp, useAppNavigationContext } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
-import { cycleOptions } from './okr/cycleOptions';
+import { cycleOptions, periodStatusLabel } from './okr/cycleOptions';
 import { OkrScopeSidebar, type OkrScopeSelection } from './okr/OkrScopeSidebar';
 import { OKRItem } from '../../types';
 import { ObjectiveForm, type ObjectiveFormHandle } from './okr/ObjectiveForm';
@@ -105,6 +105,7 @@ const OriginalWorkspace: React.FC = () => {
   const [expandScopeMembers, setExpandScopeMembers] = useState(false);
   const [scopeSidebarCollapsed, setScopeSidebarCollapsed] = useState(false);
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
+  const [targetFormCycle, setTargetFormCycle] = useState(dayjs().format('YYYY-MM'));
   const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const newOkrCycle = dayjs().format('YYYY-MM');
 
@@ -201,8 +202,8 @@ const OriginalWorkspace: React.FC = () => {
     : [];
 
   const handleSaveOkr = async (payload: Parameters<typeof saveObjective>[1]) => {
-    if (await saveObjective(newOkrCycle, payload)) {
-      setSelectedCycles(current => includeSelectedCycle(current, newOkrCycle));
+    if (await saveObjective(targetFormCycle, payload)) {
+      setSelectedCycles(current => includeSelectedCycle(current, targetFormCycle));
       return true;
     }
     return false;
@@ -378,7 +379,27 @@ const OriginalWorkspace: React.FC = () => {
             selection={scopeSelection}
             defaultExpandMembers={expandScopeMembers}
             onSelect={handleScopeChange}
-            onAddTarget={() => { setScopeSelection({ scope: 'my' }); setActionFormOpen(false); setSelectedMonthDetail(null); setSelectedOkrRecordId(null); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
+            onAddTarget={() => {
+              if (selectedCycles.length !== 1) {
+                addToast('warning', '请先选择一个目标周期');
+                return;
+              }
+              const cycle = selectedCycles[0];
+              setScopeSelection({ scope: 'my' });
+              setActionFormOpen(false);
+              setSelectedMonthDetail(null);
+              setSelectedMonthTargetId(undefined);
+              setSelectedOkrRecordId(null);
+              setTargetFormCycle(cycle);
+              const existingObjective = records.find(record => record.kind === 'objective' && record.ownerId === currentUser.id && record.periodKey === cycle);
+              if (existingObjective) {
+                setObjectiveForms([]);
+                setSelectedMonthDetail(cycle);
+                setSelectedMonthTargetId(existingObjective.id);
+                return;
+              }
+              setObjectiveForms(forms => [...forms, crypto.randomUUID()]);
+            }}
             onOpenSettings={() => setSettingsOpen(true)}
             collapsed={scopeSidebarCollapsed}
             onToggleCollapse={() => setScopeSidebarCollapsed(collapsed => !collapsed)}
@@ -394,13 +415,13 @@ const OriginalWorkspace: React.FC = () => {
 
           {isMyOkrCategory && objectiveForms.length > 0 && (
             <div className={`okr-objective-form-stack${objectiveBatchAction ? ' is-batching' : ''}`} aria-busy={objectiveBatchAction !== null}>
-            <div className="okr-objective-period">{dayjs(newOkrCycle).format('YYYY年MM月')}<span>进行中</span></div>
+            <div className="okr-objective-period">{dayjs(targetFormCycle).format('YYYY年MM月')}<span>{periodStatusLabel(targetFormCycle)}</span></div>
               {objectiveForms.map((formId, formIndex) => (
-            <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={newOkrCycle} objectiveIndex={formIndex} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error}
+            <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={targetFormCycle} objectiveIndex={formIndex} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error}
               root={!!me?.rootFlag}
               onCancel={() => setObjectiveForms(forms => forms.filter(id => id !== formId))}
               onSave={handleSaveOkr}
-              onSaveDraft={async payload => { const ok = await saveObjectiveDraft(newOkrCycle, payload); if (ok) setSelectedCycles(current => includeSelectedCycle(current, newOkrCycle)); return ok; }}
+              onSaveDraft={async payload => { const ok = await saveObjectiveDraft(targetFormCycle, payload); if (ok) setSelectedCycles(current => includeSelectedCycle(current, targetFormCycle)); return ok; }}
               onAddAnother={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])}/></div>
             ))}
             <div className="okr-objective-footer"><Button type="text" onClick={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])} disabled={busy || objectiveBatchAction !== null}>+ 添加目标</Button><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy || objectiveBatchAction !== null}>取消</Button><Button onClick={() => void handleObjectiveBatch('draft')} loading={objectiveBatchAction === 'draft'} disabled={busy || loading || !!error || objectiveBatchAction !== null}>存草稿</Button><Button type="primary" onClick={() => void handleObjectiveBatch('submit')} loading={objectiveBatchAction === 'submit'} disabled={loading || !!error || objectiveBatchAction !== null}>{me?.rootFlag ? '提交目标' : '提交主管确认'}</Button></div>

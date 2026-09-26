@@ -154,6 +154,15 @@ describe('OKRPerformanceView target navigation', () => {
     expect(container.querySelector('.okr-action-breakdown-page')).toBeInTheDocument();
   });
 
+  it('offers next month under the not-started period group', () => {
+    const { container } = render(<OKRPerformanceView />);
+    fireEvent.mouseDown(container.querySelector('.okr-cycle-filter .ant-select-content') as HTMLElement);
+    fireEvent.click(screen.getByText('未开始'));
+
+    expect(screen.getByText(dayjs().add(1, 'month').format('YYYY年MM月'))).toBeInTheDocument();
+    expect(screen.queryByText('已归档')).not.toBeInTheDocument();
+  });
+
   it('appends breakdown saves and keeps every saved month selected', () => {
     const august = { id: 'august-save', periodKey: '2026-08', mode: 'draft' as const, groups: [], savedAt: '2026-08-31T10:00:00Z' };
     const september = { id: 'september-save', periodKey: '2026-09', mode: 'draft' as const, groups: [], savedAt: '2026-09-30T10:00:00Z' };

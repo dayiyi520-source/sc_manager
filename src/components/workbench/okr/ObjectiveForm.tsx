@@ -4,6 +4,7 @@ import { GrabberIcon, PlusIcon, TrashIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
 import type { OKRItem } from '../../../types';
 import type { OkrKr, OkrPayload, OkrPerson } from '../../../services/okrRepository';
+import { periodStatusLabel } from './cycleOptions';
 
 interface Props {
   cycle: string;
@@ -73,7 +74,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   }), [submit, saveDraft]);
   const moveKr = (from: number, to: number) => setKrs(items => { const copy = [...items]; [copy[from], copy[to]] = [copy[to], copy[from]]; return copy; });
   return <Form className="okr-objective-form" disabled={busy || readOnly} onFinish={() => void submit()}>
-    {chrome && <div className="okr-objective-period">{dayjs(cycle).format('YYYY年MM月')}{!compactDetail && <span>进行中</span>}{detailMode && <Button type="text" onClick={onCancel} disabled={busy}>取消</Button>}</div>}
+    {chrome && <div className="okr-objective-period">{dayjs(cycle).format('YYYY年MM月')}{!compactDetail && <span>{periodStatusLabel(cycle)}</span>}{detailMode && <Button type="text" onClick={onCancel} disabled={busy}>取消</Button>}</div>}
     <div className="okr-objective-body">
       <div className="okr-objective-columns okr-objective-head">
         <span>目标与动作</span><span>权重</span><span>截止日期</span><span/>

@@ -30,6 +30,19 @@ class OkrIntegrationTest extends AbstractApiIntegrationTest {
  private void action(String token,String id,String action,int version)throws Exception{
   mockMvc.perform(patch("/api/okr/records/"+id).header("Authorization","Bearer "+token).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("action",action,"version",version)))).andExpect(status().isOk());
  }
+ @Test void allowsRootObjectivesForEndedAndUpcomingPeriods()throws Exception{
+  String admin=login("admin");reporting(admin,"user-admin","",true);
+  var payload=Map.<String,Object>of("title","跨周期目标","keyResults",List.of(Map.of("id","kr-cross-period","title","完成跨周期计划","weight",100,"progress",0)));
+  String ended=java.time.YearMonth.now().minusMonths(1).toString();
+  String upcoming=java.time.YearMonth.now().plusMonths(1).toString();
+  String endedResponse=mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+admin).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("kind","objective","periodKey",ended,"payload",payload,"submit",false)))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String endedId=objectMapper.readTree(endedResponse).path("data").path("id").asText();
+  action(admin,endedId,"submit",0);
+  String upcomingResponse=mockMvc.perform(post("/api/okr/records").header("Authorization","Bearer "+admin).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("kind","objective","periodKey",upcoming,"payload",payload,"submit",false)))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  String upcomingId=objectMapper.readTree(upcomingResponse).path("data").path("id").asText();
+  assertEquals("active",jdbc.queryForObject("SELECT status_ FROM t_okr_record WHERE id_=?",String.class,endedId));
+  assertEquals("draft",jdbc.queryForObject("SELECT status_ FROM t_okr_record WHERE id_=?",String.class,upcomingId));
+ }
  @Test void persistsAlignmentRejectsSelfApprovalAndStaleVersion()throws Exception{
   String admin=login("admin"),tech=login("tech");reporting(admin,"user-admin","",true);reporting(admin,"user-tech","user-admin",false);
   var kr=List.of(Map.of("id","kr-root","title","验收结果","weight",100,"progress",0));

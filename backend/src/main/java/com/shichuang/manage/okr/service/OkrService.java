@@ -269,7 +269,6 @@ import java.util.*;
   String kind=required(b,"kind"),period=required(b,"periodKey");if(!Set.of("objective","review").contains(kind))throw new IllegalArgumentException("记录类型无效");
   var p=inputPayload(b.getOrDefault("payload",Map.of()),kind);String owner=RequestContext.userId();
   boolean submit=Boolean.TRUE.equals(b.get("submit"));
-  if("objective".equals(kind)&&!java.time.YearMonth.now().toString().equals(period))throw new IllegalArgumentException("只能添加进行中的当前月份目标");
   if("objective".equals(kind))validateObjective(owner,period,p);else {validateReview(owner,p,submit);if(submit)syncReviewProgress(owner,p);}
   String state=submit?("objective".equals(kind)?(root(owner)?"active":"pending_review"):"submitted"):"draft";
   String id=UUID.randomUUID().toString(),data=encode(p);mapper.insert(RequestContext.tenantId(),id,kind,owner,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit":"create",owner,data);return Map.of("id",id,"status",state,"version",0);
@@ -277,7 +276,6 @@ import java.util.*;
  @Transactional public void update(String id,Map<String,Object>b){
   Map<String,Object>s=record(id);String owner=s.get("ownerId").toString(),state=s.get("status").toString(),action=required(b,"action"),kind=s.get("kind").toString();
   boolean own=owner.equals(RequestContext.userId()),reviewer=!own&&RequestContext.userId().equals(supervisor(owner));
-  if("objective".equals(kind)&&"submit".equals(action)&&!java.time.YearMonth.now().toString().equals(s.get("periodKey")))throw new IllegalArgumentException("只能提交进行中的当前月份目标");
   var p=payload(s.get("payload"));String next;
   if("action".equals(kind)){
    if(!own||!Set.of("draft").contains(state)||!Set.of("save","submit").contains(action))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅可编辑本人拆解动作草稿");

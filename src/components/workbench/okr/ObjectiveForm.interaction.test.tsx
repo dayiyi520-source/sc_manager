@@ -29,6 +29,12 @@ describe('ObjectiveForm A dragging', () => {
 });
 
 describe('ObjectiveForm objective numbering', () => {
+  it('shows the selected period calendar state instead of always showing active', () => {
+    render(<ObjectiveForm cycle="2026-08" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn(async () => true)}/>);
+
+    expect(screen.getByText('2026年08月').parentElement).toHaveTextContent('已结束');
+  });
+
   it('shows the simplified target-and-action fields without alignment metadata', () => {
     render(<ObjectiveForm cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn(async () => true)}/>);
 
