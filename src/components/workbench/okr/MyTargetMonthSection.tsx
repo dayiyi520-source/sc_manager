@@ -130,7 +130,10 @@ export const buildMyTargetViewItems = (
       title: source?.payload.title || group[0]?.payload.title || '来源目标已不可用',
       status: group.some(item => item.status === 'draft') ? 'draft' : 'active',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
-      ownerNames: ownerName ? [ownerName] : [],
+      ownerNames: (() => {
+        const assigneeNames = namesOf(group.flatMap(item => item.payload.assigneeIds || []));
+        return assigneeNames.length ? assigneeNames : (ownerName ? [ownerName] : []);
+      })(),
       progress: weightedProgress(actions),
       savedAt: group.map(item => item.createdAt).filter((value): value is string => Boolean(value)).sort().at(-1),
       actions,
