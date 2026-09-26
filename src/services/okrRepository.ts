@@ -5,7 +5,7 @@ export interface OkrKr { id: string; title: string; weight: number; progress: nu
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
 export interface OkrReviewItem { workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
 export interface OkrKrReview { objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
-export interface OkrReviewAssistance { subject:string; result:string }
+export interface OkrReviewAssistance { subject:string; result:string; assistanceType?:string; expectedAssignee?:string; content?:string; expectedDueDate?:string }
 export interface OkrExtraWork { workIds:string[]; description:string; impact:string; notes?:Record<string,string> }
 export interface OkrMonthlyTask { id:string; content:string; result:string; status:string; sourceReviewId?:string; workId?:string }
 export interface OkrMonthlyPlan { id:string; content:string; objectiveId?:string; keyResultId?:string; plannedDate?:string }

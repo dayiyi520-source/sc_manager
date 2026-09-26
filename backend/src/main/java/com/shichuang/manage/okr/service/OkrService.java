@@ -103,7 +103,7 @@ import java.util.*;
    if(Set.of("structured","monthly").contains(Objects.toString(result.get("reviewMode"),""))){
     var reviews=new ArrayList<Map<String,Object>>();
     for(var entry:rows(result.getOrDefault("krReviews",List.of()))){var clean=new LinkedHashMap<String,Object>();for(String key:List.of("objectiveId","objectiveTitle","keyResultId","keyResultTitle","previousProgress","currentProgress","health","achievement","blocker","nextPlan","evidenceNote","workIds"))if(entry.containsKey(key))clean.put(key,entry.get(key));reviews.add(clean);}result.put("krReviews",reviews);
-    var assistance=new ArrayList<Map<String,Object>>();for(var entry:rows(result.getOrDefault("assistance",List.of()))){var clean=new LinkedHashMap<String,Object>();for(String key:List.of("subject","result"))if(entry.containsKey(key))clean.put(key,entry.get(key));assistance.add(clean);}result.put("assistance",assistance);
+    var assistance=new ArrayList<Map<String,Object>>();for(var entry:rows(result.getOrDefault("assistance",List.of()))){var clean=new LinkedHashMap<String,Object>();for(String key:List.of("subject","result","assistanceType","expectedAssignee","content","expectedDueDate"))if(entry.containsKey(key))clean.put(key,entry.get(key));assistance.add(clean);}result.put("assistance",assistance);
     if(result.containsKey("extraWork")){var source=payload(result.get("extraWork"));var clean=new LinkedHashMap<String,Object>();for(String key:List.of("workIds","description","impact","notes"))if(source.containsKey(key))clean.put(key,source.get(key));result.put("extraWork",clean);}
     if("monthly".equals(result.get("reviewMode"))){
      var tasks=new ArrayList<Map<String,Object>>();for(var entry:rows(result.getOrDefault("monthlyOtherTasks",List.of()))){var clean=new LinkedHashMap<String,Object>();for(String key:List.of("id","content","result","status","sourceReviewId","workId"))if(entry.containsKey(key))clean.put(key,entry.get(key));tasks.add(clean);}result.put("monthlyOtherTasks",tasks);
@@ -194,7 +194,7 @@ import java.util.*;
     if(submitting&&!"normal".equals(entry.get("health"))&&Objects.toString(entry.get("blocker"),"").isBlank())throw new IllegalArgumentException("风险或阻塞 KR 必须填写风险原因及所需支持");
     if(!(entry.getOrDefault("workIds",List.of()) instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("KR 工作证据格式无效");
    }
-   for(var entry:rows(p.getOrDefault("assistance",List.of())))for(String key:List.of("subject","result"))if(Objects.toString(entry.get(key),"").length()>500)throw new IllegalArgumentException("协助事项不能超过500字");
+   for(var entry:rows(p.getOrDefault("assistance",List.of())))for(String key:List.of("subject","result","assistanceType","expectedAssignee","content","expectedDueDate"))if(Objects.toString(entry.get(key),"").length()>500)throw new IllegalArgumentException("协助事项不能超过500字");
    var extra=payload(p.getOrDefault("extraWork",Map.of()));String impact=normalizeImpact(extra.get("impact"));extra.put("impact",impact);p.put("extraWork",extra);for(String key:List.of("description","impact"))if(Objects.toString(extra.get(key),"").length()>2000)throw new IllegalArgumentException("额外工作说明不能超过2000字");if(!Set.of("","none","support","block").contains(impact))throw new IllegalArgumentException("额外工作影响类型无效");if(!(extra.getOrDefault("workIds",List.of()) instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("额外工作关联格式无效");if(extra.containsKey("notes")){var notes=payload(extra.get("notes"));if(notes.size()>100||notes.values().stream().anyMatch(value->Objects.toString(value,"").length()>500)||notes.keySet().stream().anyMatch(key->!ids.contains(key)))throw new IllegalArgumentException("额外工作说明格式无效");}
    if(!(p.getOrDefault("syncKrProgress",false) instanceof Boolean))throw new IllegalArgumentException("同步进度选项无效");
    if(monthly)validateMonthlyReview(owner,start,end,p,submitting);
@@ -282,7 +282,17 @@ import java.util.*;
   String kind=required(b,"kind"),period=required(b,"periodKey");if(!Set.of("objective","review").contains(kind))throw new IllegalArgumentException("记录类型无效");
   var p=inputPayload(b.getOrDefault("payload",Map.of()),kind);String owner=RequestContext.userId();
   boolean submit=Boolean.TRUE.equals(b.get("submit"));
-  if("objective".equals(kind))validateObjective(owner,period,p);else {validateReview(owner,p,submit);if(submit)syncReviewProgress(owner,p);}
+  if("objective".equals(kind))validateObjective(owner,period,p);else {
+   validateReview(owner,p,submit);
+   boolean duplicate=records().stream().anyMatch(record -> "review".equals(record.get("kind"))
+    && owner.equals(record.get("ownerId"))
+    && period.equals(record.get("periodKey"))
+    && Objects.equals(Objects.toString(payload(record.get("payload")).get("reviewType"),""), Objects.toString(p.get("reviewType"),""))
+    && Objects.equals(Objects.toString(payload(record.get("payload")).get("startDate"),""), Objects.toString(p.get("startDate"),""))
+    && Objects.equals(Objects.toString(payload(record.get("payload")).get("endDate"),""), Objects.toString(p.get("endDate"),"")));
+   if(duplicate)throw new IllegalArgumentException("本周期已有复盘，不能重复新建");
+   if(submit)syncReviewProgress(owner,p);
+  }
   String state=submit?("objective".equals(kind)?(root(owner)?"active":"pending_review"):"submitted"):"draft";
   String id=UUID.randomUUID().toString(),data=encode(p);mapper.insert(RequestContext.tenantId(),id,kind,owner,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit":"create",owner,data);return Map.of("id",id,"status",state,"version",0);
  }

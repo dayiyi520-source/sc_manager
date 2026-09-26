@@ -5,7 +5,18 @@ import { useApp } from '../../../context/AppContext';
 import { crmRepository } from '../../../services/crmRepository';
 import { okrRepository, type OkrPayload, type OkrRecord, type OkrSettings } from '../../../services/okrRepository';
 import { productRepository } from '../../../services/productRepository';
-import type { OKRItem, PerformanceReview } from '../../../types';
+import { teamRepository } from '../../../services/teamRepository';
+import type { EmployeeOption, OKRItem, PerformanceReview } from '../../../types';
+
+export const findReviewForPayload = (records: OkrRecord[], ownerId: string, periodKey: string, payload: OkrPayload) =>
+  records.find(record => (
+    record.kind === 'review'
+    && record.ownerId === ownerId
+    && record.periodKey === periodKey
+    && record.payload.reviewType === payload.reviewType
+    && record.payload.startDate === payload.startDate
+    && record.payload.endDate === payload.endDate
+  ));
 
 export function useOriginalOkr() {
   const {currentUser, addToast} = useApp();
@@ -14,6 +25,7 @@ export function useOriginalOkr() {
   const records = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:okrRepository.records,retry:false});
   const settingsQuery = useQuery({queryKey:['okr','settings'],queryFn:okrRepository.settings,retry:false});
   const peopleQuery = useQuery({queryKey:['okr',currentUser.id,'people'],queryFn:okrRepository.people,retry:false});
+  const teamMembersQuery = useQuery<EmployeeOption[]>({queryKey:['team-member-options'],queryFn:teamRepository.options,retry:false});
   const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>okrRepository.work(currentUser.id),retry:false});
   const productLinesQuery = useQuery({queryKey:['okr',currentUser.id,'product-lines'],queryFn:()=>productRepository.productLines(),retry:false});
   const projectsQuery = useQuery({queryKey:['okr',currentUser.id,'projects'],queryFn:()=>crmRepository.projects({page:1,pageSize:100}),retry:false});
@@ -122,7 +134,20 @@ export function useOriginalOkr() {
   const save = async (kind: 'objective' | 'review', period:string, payload:OkrPayload, submit = true) => {
     setBusy(true);
     try {
-      await okrRepository.create(kind,period,payload,submit);
+      if (kind === 'review') {
+        const existing = findReviewForPayload(all, currentUser.id, period, payload);
+        if (existing) {
+          if (!['draft', 'returned'].includes(existing.status)) {
+            addToast('warning', '本周期已有复盘，不能重复新建');
+            return false;
+          }
+          await okrRepository.update(existing, submit ? 'submit' : 'save', { payload });
+        } else {
+          await okrRepository.create(kind,period,payload,submit);
+        }
+      } else {
+        await okrRepository.create(kind,period,payload,submit);
+      }
       await refresh(); addToast('success',kind==='objective'?(submit?'目标已提交':'目标草稿已保存'):(submit?'复盘已提交':'复盘草稿已保存')); return true;
     } catch(error) { addToast('error',error instanceof Error?error.message:'提交失败，请重试'); return false; }
     finally {setBusy(false);}
@@ -146,6 +171,6 @@ export function useOriginalOkr() {
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
     saveReviewDraft:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload,false),
     submitReviewDraft,submitOkrDraft,updateOkr,
-    settings: settingsQuery.data, settingsLoading: settingsQuery.isPending, saveSettings,
+    settings: settingsQuery.data, settingsLoading: settingsQuery.isPending, saveSettings, teamMembers: teamMembersQuery.data || [],
   };
 }

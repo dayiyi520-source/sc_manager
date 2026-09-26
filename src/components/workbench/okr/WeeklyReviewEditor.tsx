@@ -4,6 +4,7 @@ import {
   Button,
   Checkbox,
   Collapse,
+  DatePicker,
   Empty,
   Input,
   InputNumber,
@@ -17,7 +18,7 @@ import {
   Tag
 } from 'antd';
 import dayjs from 'dayjs';
-import type { OKRItem } from '../../../types';
+import type { EmployeeOption, OKRItem, WorkOrderType } from '../../../types';
 import type { OkrPayload, OkrWork } from '../../../services/okrRepository';
 import { AlertTriangle, Plus, Save, Search, Send, Trash2 } from '@/components/common/octicons-compat';
 import { periodWork, workSource } from './workAggregation';
@@ -47,7 +48,13 @@ export interface KrReviewDraft {
 export interface AssistanceDraft {
   subject: string;
   result: string;
+  assistanceType: string;
+  expectedAssignee: string;
+  content: string;
+  expectedDueDate: string;
 }
+
+const assistanceTypes: WorkOrderType[] = ['客户诉求', '线上问题', '售前支持', '交付支持', '其他问题'];
 
 const terminalStatuses = new Set(['已完成', '已发布', '已验收', '已关闭']);
 const statusColor = (status: string) =>
@@ -59,8 +66,8 @@ const statusColor = (status: string) =>
 
 const impactOptions = [
   { value: 'none', label: '无明显影响' },
-  { value: 'block', label: '挤占 KR 投入' },
-  { value: 'support', label: '支持 KR' }
+  { value: 'block', label: '挤占 A 投入' },
+  { value: 'support', label: '支持 A' }
 ];
 
 interface WeeklyReviewEditorProps {
@@ -76,6 +83,7 @@ interface WeeklyReviewEditorProps {
   onCancel: () => void;
   onAddObjective?: () => void;
   reviewerName?: string;
+  teamMembers?: EmployeeOption[];
   directSubmit?: boolean;
   initialPayload?: OkrPayload;
 }
@@ -92,6 +100,7 @@ export function WeeklyReviewEditor({
   onCancel,
   onAddObjective,
   reviewerName,
+  teamMembers = [],
   directSubmit = false,
   initialPayload
 }: WeeklyReviewEditorProps) {
@@ -181,9 +190,18 @@ export function WeeklyReviewEditor({
     }
   });
 
-  const [helpNeeded, setHelpNeeded] = useState<string>(
-    initialPayload?.helpNeeded || initialPayload?.assistance?.[0]?.result || ''
-  );
+  const [assistance, setAssistance] = useState<AssistanceDraft[]>(() => {
+    const rows = initialPayload?.assistance || [];
+    if (!rows.length && initialPayload?.helpNeeded) return [{ subject: '需要协助事项', result: initialPayload.helpNeeded, assistanceType: '', expectedAssignee: '', content: initialPayload.helpNeeded, expectedDueDate: '' }];
+    return rows.map(row => ({
+      subject: row.subject || '需要协助事项',
+      result: row.result || row.content || '',
+      assistanceType: row.assistanceType || '',
+      expectedAssignee: row.expectedAssignee || '',
+      content: row.content || row.result || '',
+      expectedDueDate: row.expectedDueDate || ''
+    }));
+  });
 
   const candidates = useMemo(
     () => periodWork(work, period.startDate, period.endDate),
@@ -230,13 +248,13 @@ export function WeeklyReviewEditor({
       errors.push('尚未配置直属上级，无法确定审批人');
     }
     if (selectedKrs.some(kr => !kr.achievement.trim())) {
-      errors.push('请补充所有已选 KR 的本期成果');
+      errors.push('请补充所有已选 A 的本期成果');
     }
     if (selectedKrs.some(kr => !kr.nextPlan.trim())) {
-      errors.push('请补充所有已选 KR 的下一步计划');
+      errors.push('请补充所有已选 A 的下一步计划');
     }
     if (selectedKrs.some(kr => kr.health !== 'normal' && !kr.blocker.trim())) {
-      errors.push('风险或阻塞状态的 KR 必须填写原因');
+      errors.push('风险或阻塞状态的 A 必须填写原因');
     }
     setValidationErrors(errors);
     if (errors.length === 0) setSubmitModalOpen(true);
@@ -248,7 +266,7 @@ export function WeeklyReviewEditor({
       .map((kr, idx) => ({ ...kr, krIndex: idx + 1 }))
       .filter(kr => kr.currentProgress !== kr.previousProgress);
     if (changes.length === 0) return '暂无进度变动';
-    return changes.map(c => `KR${c.krIndex} ${c.previousProgress}% -> ${c.currentProgress}%`).join('，');
+    return changes.map(c => `A${c.krIndex} ${c.previousProgress}% -> ${c.currentProgress}%`).join('，');
   }, [krs]);
 
   const payload = (): OkrPayload => ({
@@ -259,7 +277,6 @@ export function WeeklyReviewEditor({
     reviewMode: 'structured',
     selfScore,
     summary: '',
-    helpNeeded,
     syncKrProgress: sync,
     krReviews: selectedKrs.map(kr => ({
       ...kr,
@@ -268,7 +285,8 @@ export function WeeklyReviewEditor({
         .map(([_, note]) => note)
         .join('；') || kr.evidenceNote
     })),
-    assistance: helpNeeded.trim() ? [{ subject: '需要协助与反馈', result: helpNeeded.trim() }] : [],
+    helpNeeded: assistance.map(row => row.content.trim()).filter(Boolean).join('；'),
+    assistance: assistance.filter(row => row.content.trim()).map(row => ({ ...row, subject: '需要协助事项', result: row.content.trim() })),
     extraWork: {
       ...extra,
       description: manualWorks.length ? JSON.stringify(manualWorks) : extra.description
@@ -429,12 +447,12 @@ export function WeeklyReviewEditor({
         />
       )}
 
-      {/* ▌ 1. OKR 目标复盘 */}
+      {/* ▌ 1. 本月目标复盘 */}
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]">
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-            <span>1. OKR 目标复盘</span>
+            <span>1. 本月目标复盘</span>
           </div>
           {onAddObjective && (
             <Button size="small" icon={<Plus className="h-3.5 w-3.5" />} onClick={onAddObjective}>
@@ -445,7 +463,7 @@ export function WeeklyReviewEditor({
 
         {objectiveGroups.length === 0 ? (
           <div className="bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-8 text-center shadow-sm">
-            <Empty description="暂无可复盘的 OKR 目标" />
+            <Empty description="暂无可复盘的本月目标" />
           </div>
         ) : (
           objectiveGroups.map(({ objective, krs: objectiveKrs }, oIdx) => (
@@ -482,8 +500,8 @@ export function WeeklyReviewEditor({
                     >
                       {/* KR Header */}
                       <div className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 border-b border-[var(--border-main)] pb-3">
-                        <span className="text-[var(--primary)] font-bold">KR{krIdx + 1}</span>
-                        <span>关键结果 (KR{krIdx + 1})：{kr.keyResultTitle}</span>
+                        <span className="text-[var(--primary)] font-bold">A{krIdx + 1}</span>
+                    <span>关键结果 (A{krIdx + 1})：{kr.keyResultTitle}</span>
                       </div>
 
                       {/* Progress & Health */}
@@ -692,12 +710,12 @@ export function WeeklyReviewEditor({
         )}
       </section>
 
-      {/* ▌ 2. 非 OKR 额外工作 */}
+      {/* ▌ 2. 非本月目标任务 */}
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]">
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-            <span>2. 非 OKR 额外工作</span>
+            <span>2. 非本月目标任务</span>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -706,26 +724,6 @@ export function WeeklyReviewEditor({
               onClick={() => openPicker('extra', 'task')}
             >
               关联任务或工单
-            </Button>
-            <Button
-              size="small"
-              icon={<Plus className="h-3.5 w-3.5" />}
-              onClick={() =>
-                setManualWorks(prev => [
-                  ...prev,
-                  {
-                    id: `manual-${Date.now()}`,
-                    content: '',
-                    source: '手工记录',
-                    status: '处理中',
-                    hours: '',
-                    impact: 'none',
-                    note: ''
-                  }
-                ])
-              }
-            >
-              临时任务
             </Button>
           </div>
         </div>
@@ -807,7 +805,7 @@ export function WeeklyReviewEditor({
                     )
                   },
                   {
-                    title: '对 OKR 的影响',
+                    title: '对本月目标的影响',
                     width: 170,
                     render: (_, row) => (
                       <Select
@@ -853,7 +851,7 @@ export function WeeklyReviewEditor({
             </div>
           ) : (
             <div className="p-4 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-main)] rounded bg-[var(--bg-surface-soft)]">
-              (暂无非 OKR 额外工作)
+              暂无非本月目标工作
             </div>
           )}
         </div>
@@ -867,12 +865,18 @@ export function WeeklyReviewEditor({
         </div>
 
         <div className="bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-4 shadow-sm">
-          <Input.TextArea
-            autoSize={{ minRows: 3 }}
-            value={helpNeeded}
-            onChange={e => setHelpNeeded(e.target.value)}
-            placeholder="如需其他部门或主管协助，请在此说明协助事项、所需资源及期望交付节点..."
-          />
+          <div className="space-y-3">
+            {assistance.map((row, index) => (
+              <div key={`assistance-${index}`} className="grid grid-cols-1 gap-2 rounded border border-[var(--border-main)] p-3 md:grid-cols-[160px_180px_160px_1fr_auto]">
+                <Select value={row.assistanceType || undefined} placeholder="请选择协助类型" options={assistanceTypes.map(value => ({ value, label: value }))} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, assistanceType: value } : item))} />
+                <Select showSearch allowClear optionFilterProp="label" value={row.expectedAssignee || undefined} placeholder="请选择期望协助人" options={teamMembers.map(member => ({ value: member.name, label: `${member.name} · ${member.jobTitle || member.roleTitle || '未设置职位'}` }))} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, expectedAssignee: value || '' } : item))} />
+                <DatePicker value={row.expectedDueDate ? dayjs(row.expectedDueDate) : null} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, expectedDueDate: value?.format('YYYY-MM-DD') || '' } : item))} placeholder="期望完成日期" />
+                <Input value={row.content} onChange={event => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, content: event.target.value, result: event.target.value } : item))} placeholder="说明需要的协助、资源和反馈" />
+                <Button type="text" danger aria-label="移除协助事项" onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>移除</Button>
+              </div>
+            ))}
+            <Button icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setAssistance(rows => [...rows, { subject: '需要协助事项', result: '', assistanceType: '', expectedAssignee: '', content: '', expectedDueDate: '' }])}>添加协助事项</Button>
+          </div>
         </div>
       </section>
 
@@ -895,9 +899,9 @@ export function WeeklyReviewEditor({
           <div className="okr-work-association-body">
             <p className="okr-work-association-context">
               {picker.target === 'extra' ? (
-                <>为 <strong>非 OKR 工作</strong> 选择任务或工单</>
+                <>为 <strong>非本月目标任务</strong> 选择任务或工单</>
               ) : (
-                <>为 <strong>{pickerKr ? `KR${pickerKrIndex}：${pickerKr.keyResultTitle}` : '当前 KR'}</strong> 选择工作证据</>
+                <>为 <strong>{pickerKr ? `A${pickerKrIndex}：${pickerKr.keyResultTitle}` : '当前 A'}</strong> 选择工作证据</>
               )}
             </p>
             <Tabs
@@ -1048,12 +1052,12 @@ export function WeeklyReviewEditor({
                 <h4>目标{objectiveIndex + 1}：{objective.objective}</h4>
                 {objectiveKrs.map((kr, krIndex) => (
                   <div key={kr.keyResultId} className="okr-review-submit-kr">
-                    <span>KR{krIndex + 1}：{kr.keyResultTitle}</span>
+                    <span>A{krIndex + 1}：{kr.keyResultTitle}</span>
                     <span className="font-mono">{kr.previousProgress}% → <strong>{kr.currentProgress}%</strong></span>
                   </div>
                 ))}
               </section>
-            )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有需要提交的未完成 KR" />}
+            )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有需要提交的未完成 A" />}
           </div>
           <div className="pt-2 border-t border-[var(--border-main)]">
             <Checkbox checked={sync} onChange={e => setSync(e.target.checked)}>
