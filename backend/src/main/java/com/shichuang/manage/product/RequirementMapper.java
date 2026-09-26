@@ -114,11 +114,15 @@ public class RequirementMapper {
             WHERE w.tenant_id_=? AND w.delete_flag_=0
               AND w.category_ IN ('requirement','design','dev','test','bug')
               AND w.assignee_id_=?
-              AND CASE WHEN w.source_type_='WORK_ORDER'
-                       THEN (w.status_group_ IN ('COMPLETED','CANCELLED') OR w.status_name_ IN ('已完成','已发布','已关闭','已取消') OR w.assistance_status_ IN ('已完成','已发布','已关闭','已取消'))
-                       ELSE (w.status_group_ NOT IN ('COMPLETED','CANCELLED') AND w.status_name_ NOT IN ('已完成','已发布','已关闭','已取消')) END
+              AND w.status_group_ NOT IN ('COMPLETED','CANCELLED')
+              AND w.status_name_ NOT IN ('已完成','已发布','已关闭','已取消')
+              AND COALESCE(w.assistance_status_,'') NOT IN ('已完成','已发布','已关闭','已取消')
             ORDER BY w.create_time_ DESC LIMIT 200
             """,tenantId,userId);
+    }
+
+    boolean activeUser(String tenantId,String userId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM t_sys_user WHERE tenant_id_=? AND id_=? AND status_='enabled' AND delete_flag_=0)", Boolean.class, tenantId, userId));
     }
 
     List<Map<String,Object>> workOrderCandidates(String tenantId,String keyword,String type,String requirementId,int limit) {

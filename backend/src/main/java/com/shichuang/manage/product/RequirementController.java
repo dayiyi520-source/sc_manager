@@ -60,7 +60,7 @@ public class RequirementController {
     @GetMapping("/work-items/sync-status") public ApiResponse<PageResult<Map<String,Object>>> syncStatus(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="50") int pageSize,@RequestParam(defaultValue="") String taskType,@RequestParam(defaultValue="") String syncStatus){return ApiResponse.ok(service.syncStatus(page,pageSize,taskType,syncStatus));}
     @PatchMapping("/work-items/{id}/status") public ApiResponse<Void> updateWorkItemStatus(@PathVariable String id,@RequestBody Map<String,Object>b,HttpServletRequest r){service.updateWorkItemStatus(id,b);return ApiResponse.ok(null);}
     @PatchMapping("/work-items/{id}/progress") public ApiResponse<Map<String,Object>> updateWorkItemProgress(@PathVariable String id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.updateWorkItemProgress(id,b));}
-    @GetMapping("/my-tasks") public ApiResponse<List<Map<String,Object>>> myTasks(){return ApiResponse.ok(service.myTasks());}
+    @GetMapping("/my-tasks") public ApiResponse<List<Map<String,Object>>> myTasks(@RequestParam(required=false) String viewerId){return ApiResponse.ok(service.myTasks(viewerId));}
     @PostMapping("/{id}/work-items/{workItemId}/acceptance") public ApiResponse<Map<String,Object>> acceptWorkItem(@PathVariable String id,@PathVariable String workItemId){return ApiResponse.ok(service.acceptAssistanceTask(id, workItemId));}
     @Operation(summary = "幂等重试下游同步")
     @PostMapping("/work-items/{id}/retry") public ApiResponse<Map<String,Object>> retryWorkItem(@PathVariable String id){return ApiResponse.ok(service.retryWorkItem(id));}

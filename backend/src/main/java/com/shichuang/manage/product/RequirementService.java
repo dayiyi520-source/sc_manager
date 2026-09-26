@@ -239,8 +239,13 @@ public class RequirementService {
         }
         return Map.of("id",id,"progress",progress,"revision",revision+1);
     }
-    public List<Map<String,Object>> myTasks(){
+    public List<Map<String,Object>> myTasks(String requestedViewer){
         AuthorizationService.requireRead("product"); String user=RequestContext.userId();
+        if(requestedViewer!=null&&!requestedViewer.isBlank()&&!requestedViewer.equals(user)) {
+            if(!"admin".equals(RequestContext.role())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前角色不允许切换体验视角");
+            if(!mapper.activeUser(RequestContext.tenantId(),requestedViewer)) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"人员不存在或已停用");
+            user=requestedViewer;
+        }
         return mapper.myTasks(RequestContext.tenantId(),user);
     }
     @Transactional public Map<String,Object> acceptAssistanceTask(String assistanceId, String workItemId) {

@@ -56,18 +56,18 @@ export const MyTasksView: React.FC = () => {
     let active = true;
     setTaskLoading(true);
     setTaskError(null);
-    requirementRepository.myTasks()
+    requirementRepository.myTasks(currentUser.id)
       .then((items) => { if (active) setRealTasks(Array.isArray(items) ? items : []); })
       .catch((error) => { if (active) { setRealTasks([]); setTaskError(error instanceof Error ? error.message : '产品任务和协助事项服务暂不可用'); } })
       .finally(() => { if (active) setTaskLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [currentUser.id]);
 
-  const pendingTodos = useMemo(() => realTasks.filter((task) => task.taskGroup === 'mine'), [realTasks]);
+  const pendingTodos = useMemo(() => realTasks, [realTasks]);
   const displayTodos = useMemo(() => {
     if (todoTab === 'mine') return realTasks.filter((task) => task.taskGroup === 'mine');
     if (todoTab === 'assist') return realTasks.filter((task) => task.taskGroup === 'assist');
-    return realTasks.filter((task) => task.taskGroup === 'mine');
+    return realTasks;
   }, [realTasks, todoTab]);
 
   // 审批筛选

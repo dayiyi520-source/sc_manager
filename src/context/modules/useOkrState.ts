@@ -6,7 +6,7 @@ import type { CurrentUser, OKRItem, PerformanceReview } from '../../types';
 export function useOkrState(currentUser: CurrentUser, enabled: boolean) {
   const [okrs, setOkrs] = useState<OKRItem[]>([]);
   const [performances, setPerformances] = useState<PerformanceReview[]>([]);
-  const okrQuery = useQuery({ queryKey: ['okr', currentUser.id, 'records'], queryFn: okrRepository.records, enabled });
+  const okrQuery = useQuery({ queryKey: ['okr', currentUser.id, 'records'], queryFn: () => okrRepository.records(currentUser.id), enabled });
 
   useEffect(() => {
     setOkrs((okrQuery.data || []).filter((record) => record.kind === 'objective' && record.ownerId === currentUser.id).map((record) => ({
