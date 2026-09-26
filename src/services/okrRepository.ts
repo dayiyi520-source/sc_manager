@@ -33,6 +33,11 @@ export interface OkrActionPayload {
   creatorId?: string; assigneeIds?: string[]; assigneeName?: string; structureType: string;
   productLine?: string; businessObject?: string; milestone?: string; acceptanceStandard?: string;
   deadline: string; weight: number;
+  objectiveType?: 'target' | 'challenge';
+  /** Weight assigned by the lower-level owner across all accepted parent actions. */
+  commitmentWeight?: number;
+  /** Sum of the sibling actions in this lower-level breakdown. */
+  breakdownWeightTotal?: number;
 }
 export interface OkrRecord { id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload & Partial<OkrActionPayload> }
 export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; creatorName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
@@ -44,11 +49,11 @@ export const okrRepository = {
     return rows.map(r => ({...r, payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload}));
   },
   work: (ownerId: string) => apiRequest<OkrWork[]>(`${base}/work?ownerId=${encodeURIComponent(ownerId)}`),
-  actionParents: (periodKey: string) => apiRequest<OkrRecord[]>(`${base}/actions/parents?periodKey=${encodeURIComponent(periodKey)}`),
-  createAction: (periodKey: string, payload: OkrActionPayload, submit = true) => apiRequest<{id:string}>(`${base}/actions`, {method:'POST',body:JSON.stringify({periodKey,payload,submit})}),
-  updateAction: (recordId: string, version: number, payload: OkrActionPayload, submit = false) => {
+  actionParents: (periodKey: string, viewerId?: string) => apiRequest<OkrRecord[]>(`${base}/actions/parents?periodKey=${encodeURIComponent(periodKey)}${viewerId ? `&viewerId=${encodeURIComponent(viewerId)}` : ''}`),
+  createAction: (periodKey: string, payload: OkrActionPayload, submit = true, viewerId?: string) => apiRequest<{id:string}>(`${base}/actions`, {method:'POST',body:JSON.stringify({periodKey,payload,submit,viewerId})}),
+  updateAction: (recordId: string, version: number, payload: OkrActionPayload, submit = false, viewerId?: string) => {
     const {recordId: _recordId, version: _version, ...actionPayload} = payload;
-    return apiRequest<void>(`${base}/records/${recordId}`, {method:'PATCH',body:JSON.stringify({action: submit ? 'submit' : 'save', version, payload: actionPayload})});
+    return apiRequest<void>(`${base}/records/${recordId}`, {method:'PATCH',body:JSON.stringify({action: submit ? 'submit' : 'save', version, payload: actionPayload, viewerId})});
   },
   link: (work: OkrWork, objectiveId?:string,keyResultId?:string) => apiRequest(`${base}/work/link`,{method:'PUT',body:JSON.stringify({workId:work.id,objectiveId,keyResultId,version:work.linkVersion})}),
   create: (kind: string, periodKey: string, payload: OkrPayload, submit = false) => apiRequest<{id:string}>(`${base}/records`, {method:'POST',body:JSON.stringify({kind,periodKey,payload,submit})}),

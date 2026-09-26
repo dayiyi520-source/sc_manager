@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import dayjs from 'dayjs';
 import { useApp } from '../../../context/AppContext';
-import { okrRepository, type OkrPayload } from '../../../services/okrRepository';
+import { crmRepository } from '../../../services/crmRepository';
+import { okrRepository, type OkrPayload, type OkrRecord } from '../../../services/okrRepository';
+import { productRepository } from '../../../services/productRepository';
 import type { OKRItem, PerformanceReview } from '../../../types';
 
 export function useOriginalOkr() {
@@ -11,10 +14,54 @@ export function useOriginalOkr() {
   const records = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:okrRepository.records,retry:false});
   const peopleQuery = useQuery({queryKey:['okr',currentUser.id,'people'],queryFn:okrRepository.people,retry:false});
   const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>okrRepository.work(currentUser.id),retry:false});
-  const actionParents = useQuery({queryKey:['okr',currentUser.id,'action-parents'],queryFn:()=>okrRepository.actionParents(new Date().toISOString().slice(0,7)),retry:false});
+  const productLinesQuery = useQuery({queryKey:['okr',currentUser.id,'product-lines'],queryFn:()=>productRepository.productLines(),retry:false});
+  const projectsQuery = useQuery({queryKey:['okr',currentUser.id,'projects'],queryFn:()=>crmRepository.projects({page:1,pageSize:100}),retry:false});
+  const actionParents = useQuery({
+    queryKey:['okr',currentUser.id,'action-parents'],
+    queryFn:async()=>{
+      const current = dayjs().startOf('month');
+      const periods = [current.add(1,'month'), current, current.subtract(1,'month')].map(month => month.format('YYYY-MM'));
+      const results = await Promise.all(periods.map(period => okrRepository.actionParents(period, currentUser.id)));
+      return results.flat();
+    },
+    retry:false,
+  });
   const people = peopleQuery.data || [];
+  const productLineOptions = (productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => line.name);
+  const projectOptions = (projectsQuery.data?.items || []).map(project => String(project.name || '')).filter(Boolean);
+  const businessOptionsError = productLinesQuery.error || projectsQuery.error;
   const all = records.data || [];
   const me = people.find(p=>p.id===currentUser.id);
+  const derivedActionParents = useMemo(() => {
+    if (!me) return [];
+    const activeStatuses = new Set(['active', 'submitted', 'reviewed']);
+    const result: OkrRecord[] = [];
+    const seen = new Set<string>();
+    const actionById = new Map(all.filter(record => record.kind === 'action').map(record => [record.id, record]));
+    const addParent = (record: OkrRecord, parentObjectiveId: string, parentActionId: string, parentKeyResultId: string, title: string) => {
+      const key = `${record.periodKey}:${parentObjectiveId}:${parentActionId}:${parentKeyResultId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ ...record, id: parentActionId, kind: 'action', ownerId: record.ownerId, payload: { title, parentObjectiveId, parentActionId, parentKeyResultId } });
+      }
+    };
+    for (const record of all) {
+      if (record.kind === 'objective' && activeStatuses.has(record.status) && record.ownerId === me.supervisorId) {
+        for (const kr of record.payload.keyResults || []) {
+          if ((kr.assigneeIds || []).includes(currentUser.id)) addParent({ ...record, kind: 'action' }, record.id, kr.id, kr.id, kr.title);
+        }
+      }
+      if (record.kind === 'action' && activeStatuses.has(record.status) && (record.payload.assigneeIds || []).includes(currentUser.id)) {
+        const parentId = String(record.payload.parentActionId || '');
+        const parent = actionById.get(parentId);
+        if (parent && parent.ownerId !== currentUser.id) {
+          const parentPayload = parent.payload;
+          addParent(parent, String(parentPayload.parentObjectiveId || record.payload.parentObjectiveId || ''), parent.id, String(parentPayload.parentKeyResultId || parent.id), String(parentPayload.title || '上级行动'));
+        }
+      }
+    }
+    return result;
+  }, [all, currentUser.id, me]);
   const okrs: OKRItem[] = all.filter(r=>r.kind==='objective').map(r=>{
     const owner = people.find(p=>p.id===r.ownerId);
     return {
@@ -42,7 +89,7 @@ export function useOriginalOkr() {
   const refresh = () => client.invalidateQueries({queryKey:['okr',currentUser.id]});
   const saveActions = async (period:string,payloads:import('../../../services/okrRepository').OkrActionPayload[], submit = true) => {
     setBusy(true);
-    try { for(const payload of payloads) { if(payload.recordId) await okrRepository.updateAction(payload.recordId, payload.version ?? 0, payload, submit); else await okrRepository.createAction(period,payload,submit); } await refresh(); addToast('success',submit?'拆解目标已提交':'拆解目标草稿已保存'); return true; }
+    try { for(const payload of payloads) { if(payload.recordId) await okrRepository.updateAction(payload.recordId, payload.version ?? 0, payload, submit, currentUser.id); else await okrRepository.createAction(period,payload,submit,currentUser.id); } await refresh(); addToast('success',submit?'拆解目标已提交':'拆解目标草稿已保存'); return true; }
     catch(error){addToast('error',error instanceof Error?error.message:'拆解目标保存失败');return false;}
     finally{setBusy(false);}
   };
@@ -89,7 +136,9 @@ export function useOriginalOkr() {
   };
   return {records:all,okrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
     error:records.error || peopleQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
-    actionParents:actionParents.data || [],actionParentsLoading:actionParents.isPending,actionParentsError:actionParents.error,saveActions,
+    productLineOptions,projectOptions,businessOptionsLoading:productLinesQuery.isPending || projectsQuery.isPending,
+    businessOptionsError:businessOptionsError instanceof Error ? businessOptionsError.message : businessOptionsError ? '业务数据加载失败' : undefined,
+    actionParents:derivedActionParents.length ? derivedActionParents : actionParents.data || [],actionParentsLoading:actionParents.isPending,actionParentsError:actionParents.error,saveActions,
     saveObjective:(period:string,payload:OkrPayload)=>save('objective',period,payload),
     saveObjectiveDraft:(period:string,payload:OkrPayload)=>save('objective',period,payload,false),
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),

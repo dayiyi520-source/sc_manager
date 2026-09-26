@@ -32,7 +32,8 @@ public class TeamMemberMapper {
 
     List<Map<String, Object>> activeOptions(String tenant) {
         return jdbc.queryForList("""
-            SELECT id_ AS id,name_ AS name,department_ AS department,role_title_ AS jobTitle
+            SELECT id_ AS id,username_ AS username,name_ AS name,avatar_ AS avatar,
+                   department_ AS department,role_ AS role,role_title_ AS roleTitle,role_title_ AS jobTitle
             FROM t_sys_user
             WHERE tenant_id_=? AND status_='enabled' AND delete_flag_=0
             ORDER BY department_,name_,create_time_

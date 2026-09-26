@@ -89,3 +89,27 @@ describe('ObjectiveForm objective numbering', () => {
     expect(onSave).toHaveBeenCalledOnce();
   });
 });
+
+describe('ObjectiveForm assignee search', () => {
+  it('filters assignees by the displayed member name', async () => {
+    render(
+      <ObjectiveForm
+        cycle="2026-09"
+        ownerName="林志豪"
+        parents={[]}
+        people={[{ id: 'user-product', name: '陈宇璋', department: '产品规划部' }]}
+        busy={false}
+        unavailable={false}
+        root
+        onCancel={vi.fn()}
+        onSave={vi.fn(async () => true)}
+      />,
+    );
+
+    const assigneeSelect = screen.getByLabelText('A1 承接人员');
+    fireEvent.mouseDown(assigneeSelect);
+    fireEvent.change(assigneeSelect, { target: { value: '陈' } });
+
+    expect(await screen.findByText('陈宇璋 · 产品规划部')).toBeInTheDocument();
+  });
+});

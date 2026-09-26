@@ -44,7 +44,8 @@ export const requirementRepository = {
     return apiRequest<RequirementWorkOrderCandidate[]>(`/api/requirements/work-order-candidates?${query}`);
   },
   departments: () => apiRequest<DepartmentOption[]>('/api/requirements/departments'),
-  employees: () => apiRequest<EmployeeOption[]>('/api/auth/dev-accounts'),
+  // 协助事项与产研负责人统一使用团队组织的有效成员目录。
+  employees: () => apiRequest<EmployeeOption[]>('/api/team-members/options'),
   transition: (id: string, action: 'hold' | 'reject', reason: string) => apiRequest<void>(`/api/requirements/${id}/transition`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
   reassign: (id: string, input: { assigneeId: string; reason: string; handoffNote?: string; attachmentIds?: string[]; revision: number }) => apiRequest<RequirementTask & { pendingReassignmentId: string; owner: string; revision: number; events?: RequirementTask['events'] }>(`/api/requirements/${id}/reassign`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
   acceptReassignment: (reassignmentId: string, revision: number) => apiRequest<{ id: string; status: string }>(`/api/requirements/reassign/${reassignmentId}/accept`, { method: 'POST', body: JSON.stringify({ revision }) }),

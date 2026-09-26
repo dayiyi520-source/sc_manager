@@ -183,7 +183,7 @@ const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submi
     {!inlineAssignees && <span title={assigneeLabel(action.assigneeNames)}>{assigneeLabel(action.assigneeNames)}</span>}
     {!compact && <>
       <span className="okr-target-action-progress">{submitted ? <><Progress type="circle" percent={action.progress} size={24} showInfo={false}/><b>{action.progress}%</b></> : '--'}</span>
-      <span>权重 {action.weight}%</span>
+      <span>{action.weight}%</span>
       <time className={overdue ? 'is-overdue' : ''}>{formatDeadline(action.deadline)}</time>
     </>}
   </div>;

@@ -17,5 +17,14 @@ public final class TeamMemberContract {
         boolean loginEnabled,
         int version
     ) {}
-    public record EmployeeOption(String id, String name, String department, String jobTitle) {}
+    public record EmployeeOption(
+        String id,
+        String username,
+        String name,
+        String avatar,
+        String department,
+        String role,
+        String roleTitle,
+        String jobTitle
+    ) {}
 }

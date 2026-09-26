@@ -84,6 +84,10 @@ const okrState = {
   people: defaultPeople,
   work: [],
   actionParents: [actionParent],
+  productLineOptions: ['真实产品线'],
+  projectOptions: ['真实交付项目'],
+  businessOptionsLoading: false,
+  businessOptionsError: undefined,
   loading: false,
   error: undefined,
   workLoading: false,
@@ -124,7 +128,8 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.getByRole('tab', { name: /月度目标/ })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: '目标范围导航' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '我的目标' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /拆解目标/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /拆解目标/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '添加目标' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('目标：提升年度经营质量'));
     expect(await screen.findByRole('region', { name: '目标逐级承接关系' })).toBeInTheDocument();
@@ -133,25 +138,46 @@ describe('OKRPerformanceView target navigation', () => {
     await waitFor(() => expect(screen.queryByRole('region', { name: '目标逐级承接关系' })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: '我的目标' }));
-    fireEvent.click(screen.getByRole('button', { name: /拆解目标/ }));
-    await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    await waitFor(() => expect(screen.getByRole('region', { name: '目标逐级承接关系' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: '直属下级' }));
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).not.toBeInTheDocument());
   });
 
-  it('keeps target creation and action breakdown editors mutually exclusive', async () => {
+  it('opens target creation from the sidebar primary action for the root user', async () => {
+    okrState.records = [];
+    okrState.okrs = [];
     const { container } = render(<OKRPerformanceView />);
 
-    fireEvent.click(screen.getByRole('button', { name: /拆解目标/ }));
-    await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page')).toBeInTheDocument());
-
-    fireEvent.click(container.querySelector('#btn-add-okr') as HTMLElement);
-    await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
     expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
+    expect(container.querySelector('.okr-action-breakdown-page')).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /拆解目标/ }));
-    await waitFor(() => expect(container.querySelector('.okr-objective-form-stack')).not.toBeInTheDocument());
-    expect(container.querySelector('.okr-action-breakdown-page')).toBeInTheDocument();
+  it('opens the existing cycle target instead of a blank creation form', async () => {
+    render(<OKRPerformanceView />);
+
+    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+
+    expect(await screen.findByRole('region', { name: '目标逐级承接关系' })).toBeInTheDocument();
+    expect(screen.getByText('提升年度经营质量')).toBeInTheDocument();
+    expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument();
+  });
+
+  it('creates a target in the single period selected by the user', async () => {
+    okrState.records = [];
+    okrState.okrs = [];
+    const { container } = render(<OKRPerformanceView />);
+    fireEvent.click(container.querySelector('.okr-cycle-filter .ant-select-clear') as HTMLElement);
+    fireEvent.mouseDown(container.querySelector('.okr-cycle-filter .ant-select-content') as HTMLElement);
+    fireEvent.click(screen.getByText('已结束'));
+    fireEvent.click(screen.getByText(dayjs().subtract(1, 'month').format('YYYY年MM月')));
+
+    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+
+    expect(container.querySelector('.okr-objective-period')).toHaveTextContent(dayjs().subtract(1, 'month').format('YYYY年MM月'));
+    expect(container.querySelector('.okr-objective-period')).toHaveTextContent('已结束');
+    expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
   });
 
   it('offers next month under the not-started period group', () => {

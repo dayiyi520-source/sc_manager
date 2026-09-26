@@ -13,6 +13,13 @@ import java.util.*;
  public OkrService(OkrMapper mapper,ObjectMapper json){this.mapper=mapper;this.json=json;}
  public List<Map<String,Object>> people(){AuthorizationService.requireRead("okr"); return mapper.people(RequestContext.tenantId());}
  private String supervisor(String owner){return people().stream().filter(p->owner.equals(p.get("id"))).map(p->Objects.toString(p.get("supervisorId"),"")).findFirst().orElse("");}
+ private String viewerId(String requested){
+  String session=RequestContext.userId();
+  if(requested==null||requested.isBlank()||requested.equals(session)) return session;
+  if(!"admin".equals(RequestContext.role())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前角色不允许切换体验视角");
+  person(requested);
+  return requested;
+ }
  public List<Map<String,Object>> records(){
   AuthorizationService.requireRead("okr");
   String me=RequestContext.userId();var reporting=people();
@@ -29,8 +36,11 @@ import java.util.*;
   return all.stream().filter(r->visibleOwners.contains(r.get("ownerId"))||"objective".equals(r.get("kind"))&&boss.equals(r.get("ownerId"))).toList();
  }
  public List<Map<String,Object>> actionParents(String period){
+  return actionParents(period,null);
+ }
+ public List<Map<String,Object>> actionParents(String period,String requestedViewer){
   AuthorizationService.requireRead("okr");
-  String me=RequestContext.userId();
+  String me=viewerId(requestedViewer);
   var people=people();
   String boss=people.stream().filter(p->me.equals(p.get("id"))).map(p->Objects.toString(p.get("supervisorId"),"")).findFirst().orElse("");
   var all=mapper.records(RequestContext.tenantId());
@@ -56,13 +66,13 @@ import java.util.*;
  }
  private boolean assignedTo(Map<String,Object> payload,String user){Object ids=payload.get("assigneeIds");if(ids instanceof List<?> list&&list.stream().map(Object::toString).anyMatch(user::equals))return true;return user.equals(Objects.toString(payload.get("assigneeId"),""));}
  @Transactional public Map<String,Object> createAction(Map<String,Object> body){
-  String period=required(body,"periodKey");var input=payload(body.getOrDefault("payload",Map.of()));String creator=RequestContext.userId();
+  String period=required(body,"periodKey");var input=payload(body.getOrDefault("payload",Map.of()));String creator=viewerId(Objects.toString(body.get("viewerId"),""));
   required(input,"title");String parentAction=required(input,"parentActionId");String parentObjective=required(input,"parentObjectiveId");String parentKeyResult=Objects.toString(input.get("parentKeyResultId"),parentAction);
-  var parents=actionParents(period);var parent=parents.stream().filter(r->parentAction.equals(r.get("id"))&&parentObjective.equals(r.get("parentObjectiveId"))&&parentKeyResult.equals(r.get("parentKeyResultId"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更"));
+  var parents=actionParents(period,creator);var parent=parents.stream().filter(r->parentAction.equals(r.get("id"))&&parentObjective.equals(r.get("parentObjectiveId"))&&parentKeyResult.equals(r.get("parentKeyResultId"))).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更"));
   String department=required(input,"department"),type=required(input,"structureType");
   if(!Set.of("product","presales","delivery","support").contains(type))throw new IllegalArgumentException("部门结构类型无效");
   required(input,"deadline");try{java.time.LocalDate.parse(input.get("deadline").toString());}catch(Exception e){throw new IllegalArgumentException("完成时间无效");}
-  integer(input.get("weight"),1,100);if(type.equals("support"))required(input,"acceptanceStandard");else required(input,"milestone");
+  integer(input.get("weight"),1,100);input.putIfAbsent("commitmentWeight",100);integer(input.get("commitmentWeight"),1,100);validateBreakdownWeight(input);if(type.equals("support"))required(input,"acceptanceStandard");else required(input,"milestone");
   if(type.equals("product"))required(input,"productLine");else if(Set.of("presales","delivery").contains(type))required(input,"businessObject");
   String assignee=Objects.toString(input.get("assigneeId"),"");if(!assignee.isBlank())person(assignee);
   if(input.containsKey("assigneeIds")){if(!(input.get("assigneeIds") instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("承接人员格式无效");for(Object id:ids)person(Objects.toString(id,""));}
@@ -274,14 +284,15 @@ import java.util.*;
   String id=UUID.randomUUID().toString(),data=encode(p);mapper.insert(RequestContext.tenantId(),id,kind,owner,period,state,data);mapper.event(RequestContext.tenantId(),id,submit?"submit":"create",owner,data);return Map.of("id",id,"status",state,"version",0);
  }
  @Transactional public void update(String id,Map<String,Object>b){
-  Map<String,Object>s=record(id);String owner=s.get("ownerId").toString(),state=s.get("status").toString(),action=required(b,"action"),kind=s.get("kind").toString();
-  boolean own=owner.equals(RequestContext.userId()),reviewer=!own&&RequestContext.userId().equals(supervisor(owner));
+  Map<String,Object>s=record(id);String owner=s.get("ownerId").toString(),state=s.get("status").toString(),action=required(b,"action"),kind=s.get("kind").toString();String viewer=viewerId(Objects.toString(b.get("viewerId"),""));
+  boolean own=owner.equals(viewer),reviewer=!own&&viewer.equals(supervisor(owner));
   var p=payload(s.get("payload"));String next;
   if("action".equals(kind)){
    if(!own||!Set.of("draft").contains(state)||!Set.of("save","submit").contains(action))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅可编辑本人拆解动作草稿");
-   p=payload(b.get("payload"));required(p,"title");required(p,"parentActionId");required(p,"parentObjectiveId");required(p,"department");required(p,"deadline");integer(p.get("weight"),1,100);String type=required(p,"structureType");if(!Set.of("product","presales","delivery","support").contains(type))throw new IllegalArgumentException("部门结构类型无效");if(type.equals("support"))required(p,"acceptanceStandard");else required(p,"milestone");if(type.equals("product"))required(p,"productLine");else if(Set.of("presales","delivery").contains(type))required(p,"businessObject");
+   p=payload(b.get("payload"));required(p,"title");required(p,"parentActionId");required(p,"parentObjectiveId");required(p,"department");required(p,"deadline");integer(p.get("weight"),1,100);p.putIfAbsent("commitmentWeight",100);integer(p.get("commitmentWeight"),1,100);String type=required(p,"structureType");if(!Set.of("product","presales","delivery","support").contains(type))throw new IllegalArgumentException("部门结构类型无效");if(type.equals("support"))required(p,"acceptanceStandard");else required(p,"milestone");if(type.equals("product"))required(p,"productLine");else if(Set.of("presales","delivery").contains(type))required(p,"businessObject");
    if(p.containsKey("assigneeIds")){if(!(p.get("assigneeIds") instanceof List<?> ids)||ids.size()>100)throw new IllegalArgumentException("承接人员格式无效");for(Object assigneeId:ids)person(Objects.toString(assigneeId,""));}
-   String parentActionId=p.get("parentActionId").toString(), parentObjectiveId=p.get("parentObjectiveId").toString(),parentKeyResultId=Objects.toString(p.get("parentKeyResultId"),parentActionId);boolean parent=actionParents(s.get("periodKey").toString()).stream().anyMatch(r->parentActionId.equals(r.get("id"))&&parentObjectiveId.equals(r.get("parentObjectiveId"))&&parentKeyResultId.equals(r.get("parentKeyResultId")));if(!parent)throw new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更");p.put("parentKeyResultId",parentKeyResultId);
+   validateBreakdownWeight(p);
+   String parentActionId=p.get("parentActionId").toString(), parentObjectiveId=p.get("parentObjectiveId").toString(),parentKeyResultId=Objects.toString(p.get("parentKeyResultId"),parentActionId);boolean parent=actionParents(s.get("periodKey").toString(),viewer).stream().anyMatch(r->parentActionId.equals(r.get("id"))&&parentObjectiveId.equals(r.get("parentObjectiveId"))&&parentKeyResultId.equals(r.get("parentKeyResultId")));if(!parent)throw new ResponseStatusException(HttpStatus.FORBIDDEN,"上级动作未指定给当前用户或已变更");p.put("parentKeyResultId",parentKeyResultId);
    String actionState="submit".equals(action)?"active":"draft";int version=integer(b.get("version"),0,Integer.MAX_VALUE);
    if(mapper.update(RequestContext.tenantId(),id,version,actionState,encode(p),RequestContext.userId())!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"拆解动作已变更，请刷新后重试");
    mapper.event(RequestContext.tenantId(),id,action,RequestContext.userId(),encode(Map.of("from",state,"to",actionState,"payload",p)));return;
@@ -312,6 +323,9 @@ import java.util.*;
   int version=integer(b.get("version"),0,Integer.MAX_VALUE);
   if(mapper.update(RequestContext.tenantId(),id,version,next,encode(p),RequestContext.userId())!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"记录已变更，请刷新后重试");
   mapper.event(RequestContext.tenantId(),id,action,RequestContext.userId(),encode(Map.of("from",state,"to",next,"payload",p)));
+ }
+ private void validateBreakdownWeight(Map<String,Object> payload){
+  if(payload.containsKey("breakdownWeightTotal") && integer(payload.get("breakdownWeightTotal"),0,100)!=100)throw new IllegalArgumentException("承接目标权重合计必须为 100%");
  }
  @Transactional public void reporting(String employee,Map<String,Object> b){
   if(!"admin".equals(RequestContext.role()))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"仅管理员可配置组织关系");

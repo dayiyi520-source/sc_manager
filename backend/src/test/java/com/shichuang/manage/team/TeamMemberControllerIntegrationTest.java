@@ -80,6 +80,8 @@ class TeamMemberControllerIntegrationTest extends AbstractApiIntegrationTest {
         mockMvc.perform(get("/api/team-members/options").header("Authorization", authorization))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[?(@.name == '林志豪')]").exists())
+            .andExpect(jsonPath("$.data[?(@.name == '林志豪')].id").value(org.hamcrest.Matchers.hasItem("user-admin")))
+            .andExpect(jsonPath("$.data[?(@.name == '林志豪')].role").value(org.hamcrest.Matchers.hasItem("admin")))
             .andExpect(jsonPath("$.data[?(@.name == '停用员工-" + suffix + "')]").doesNotExist());
 
         String accounts = mockMvc.perform(get("/api/auth/dev-accounts"))

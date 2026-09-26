@@ -652,6 +652,7 @@ export interface EmployeeOption {
   id: string;
   username?: string;
   name: string;
+  avatar?: string;
   department?: string;
   role?: string;
   roleTitle?: string;

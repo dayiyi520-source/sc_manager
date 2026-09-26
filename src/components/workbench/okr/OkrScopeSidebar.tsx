@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Avatar, Button, Input, Tooltip } from 'antd';
+import { Button, Input, Tooltip } from 'antd';
 import {
   Building,
   ChevronDown,
@@ -71,14 +71,19 @@ type Props = {
 
 export function OkrScopeSidebar({ people, currentUserId, selection, defaultExpandMembers = false, onSelect, onAddTarget, onOpenSettings, collapsed = false, onToggleCollapse }: Props) {
   const groups = useMemo(() => buildOkrScopeGroups(people, currentUserId), [people, currentUserId]);
+  const currentUser = people.find(person => person.id === currentUserId);
+  const primaryActionLabel = currentUser?.rootFlag === 1 ? '添加目标' : '拆解目标';
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(defaultExpandMembers ? groups.filter(group => group.members.length).map(group => group.key) : []));
+  useEffect(() => {
+    setExpanded(new Set(defaultExpandMembers ? groups.filter(group => group.members.length).map(group => group.key) : []));
+  }, [currentUserId, defaultExpandMembers, groups]);
   const normalizedQuery = query.trim().toLowerCase();
 
   return <aside className={`okr-scope-sidebar${collapsed ? ' is-collapsed' : ''}`} aria-label="目标范围导航">
     <div className="okr-scope-search">
       <Input value={query} onChange={event => setQuery(event.target.value)} prefix={<Search />} allowClear placeholder="搜索人名" aria-label="搜索人名" />
-      <Tooltip title="添加目标"><Button type="primary" icon={<Plus />} aria-label="添加目标" onClick={onAddTarget} /></Tooltip>
+      <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} onClick={onAddTarget} /></Tooltip>
     </div>
     <nav className="okr-scope-groups">
       {groups.map(group => {
@@ -119,7 +124,7 @@ export function OkrScopeSidebar({ people, currentUserId, selection, defaultExpan
                 </div>
                 {departmentExpanded && <div className="okr-scope-members">{matches.map(person => {
                   const selected = selection.scope === group.key && selection.personId === person.id;
-                  return <button key={person.id} type="button" className={selected ? 'is-selected' : ''} aria-label={person.name} aria-pressed={selected} onClick={() => onSelect({ scope: group.key, department, personId: person.id })}><Avatar size={24}>{person.name.slice(0, 1)}</Avatar><span title={`${person.name} · ${person.department}`}>{person.name}</span></button>;
+                  return <button key={person.id} type="button" className={selected ? 'is-selected' : ''} aria-label={person.name} aria-pressed={selected} onClick={() => onSelect({ scope: group.key, department, personId: person.id })}><span className="okr-scope-member-icon" aria-hidden="true"><User /></span><span title={`${person.name} · ${person.department}`}>{person.name}</span></button>;
                 })}</div>}
               </section>;
             })}
@@ -129,7 +134,7 @@ export function OkrScopeSidebar({ people, currentUserId, selection, defaultExpan
             {filteredMembers.length > 0 ? filteredMembers.map(person => {
               const selected = selection.scope === group.key && selection.personId === person.id;
               return <button key={person.id} type="button" className={selected ? 'is-selected' : ''} aria-label={person.name} aria-pressed={selected} onClick={() => onSelect({ scope: group.key, personId: person.id })}>
-                <Avatar size={24}>{person.name.slice(0, 1)}</Avatar><span title={`${person.name} · ${person.department}`}>{person.name}</span>
+                <span className="okr-scope-member-icon" aria-hidden="true"><User /></span><span title={`${person.name} · ${person.department}`}>{person.name}</span>
               </button>;
             }) : <p>未找到匹配人员</p>}
           </div>}

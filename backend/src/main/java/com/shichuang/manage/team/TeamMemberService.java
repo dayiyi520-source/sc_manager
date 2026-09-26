@@ -44,7 +44,9 @@ public class TeamMemberService {
     public List<TeamMemberContract.EmployeeOption> activeOptions() {
         AuthorizationService.requireRead("product");
         return mapper.activeOptions(RequestContext.tenantId()).stream().map(row -> new TeamMemberContract.EmployeeOption(
-            row.get("id").toString(), row.get("name").toString(), row.get("department").toString(), row.get("jobTitle").toString()
+            row.get("id").toString(), Objects.toString(row.get("username"), ""), row.get("name").toString(),
+            Objects.toString(row.get("avatar"), ""), row.get("department").toString(), Objects.toString(row.get("role"), ""),
+            Objects.toString(row.get("roleTitle"), ""), Objects.toString(row.get("jobTitle"), "")
         )).toList();
     }
 

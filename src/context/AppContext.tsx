@@ -208,7 +208,7 @@ export interface AppContextType {
   closePageTab: (id: SubMenuId) => void;
   toggleSidebar: () => void;
   toggleMobileSidebar: () => void;
-  setCurrentUserRole: (role: CurrentUser['role']) => void;
+  setCurrentUserRole: (user: CurrentUser) => void;
   setGlobalSearchOpen: (open: boolean) => void;
   toggleTheme: () => void;
   addToast: (type: ToastItem['type'], title: string, message?: string) => void;
@@ -462,8 +462,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const crmLoading = customerQuery.isFetching || leadQuery.isFetching || opportunityQuery.isFetching || biddingQuery.isFetching || followUpQuery.isFetching || contractQuery.isFetching;
   const crmError = [customerQuery.error, leadQuery.error, opportunityQuery.error, followUpQuery.error, contractQuery.error].find(Boolean);
 
-  const setCurrentUserRole = (role: CurrentUser['role']) => {
-    const target = CURRENT_USERS.find((u) => u.role === role) || CURRENT_USERS[0];
+  const setCurrentUserRole = (target: CurrentUser) => {
     setCurrentUser(target);
     addToast('info', `已切换身份视角：${target.name}`, `角色权限：${target.roleTitle}`);
   };

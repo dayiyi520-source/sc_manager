@@ -41,7 +41,7 @@ describe('OkrScopeSidebar', () => {
     const subordinateGroup = screen.getByLabelText('直属下级分组');
     fireEvent.click(within(subordinateGroup).getByRole('button', { name: '刘员工' }));
     expect(onSelect).toHaveBeenCalledWith({ scope: 'subordinate', personId: 'staff' });
-    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.click(screen.getByRole('button', { name: '拆解目标' }));
     fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
     expect(onAddTarget).toHaveBeenCalledTimes(1);
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
@@ -83,5 +83,24 @@ describe('OkrScopeSidebar', () => {
     expect(screen.getByRole('button', { name: '陈总' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '陈总' }));
     expect(onSelect).toHaveBeenCalledWith({ scope: 'otherDepartments', department: '管理层', personId: 'boss' });
+  });
+
+  it('clears the previous role expansion when the current user changes', () => {
+    const props = {
+      people,
+      selection: { scope: 'supervisor' as const },
+      onSelect: vi.fn(),
+      onAddTarget: vi.fn(),
+      onOpenSettings: vi.fn(),
+    };
+    const view = render(<OkrScopeSidebar {...props} currentUserId="manager" />);
+    fireEvent.click(screen.getByRole('button', { name: '直属上级' }));
+    expect(screen.getByRole('button', { name: '收起直属上级成员' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '陈总' })).toBeInTheDocument();
+
+    view.rerender(<OkrScopeSidebar {...props} currentUserId="boss" />);
+
+    expect(screen.queryByRole('button', { name: /直属上级成员/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '陈总' })).not.toBeInTheDocument();
   });
 });

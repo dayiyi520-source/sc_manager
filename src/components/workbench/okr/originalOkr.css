@@ -833,3 +833,13 @@
 .okr-target-list-status { grid-template-columns:repeat(3,96px); gap:8px; width:304px; min-width:304px; }
 .okr-target-action-row:not(.is-compact) { grid-template-columns:40px minmax(240px,1fr) 96px 96px 96px; padding-right:20px; }
 .okr-target-list-status > div { width:96px; }
+
+/* Keep O content flexible and give every A field an explicit desktop column. */
+.okr-target-list-item > header { display:grid; grid-template-columns:minmax(0,1fr) 304px; gap:24px; }
+.okr-target-list-copy { width:100%; min-width:0; }
+.okr-target-hierarchy, .okr-target-hierarchy > * { min-width:0; max-width:100%; }
+.okr-target-title-line h3 { overflow-wrap:anywhere; }
+.okr-target-hierarchy-owner .okr-target-hierarchy-label { white-space:normal; overflow-wrap:anywhere; }
+.okr-target-action-row:not(.is-compact) { grid-template-columns:40px minmax(0,1fr) 96px 96px 96px; padding:12px 20px 12px 82px; }
+.okr-target-action-row:not(.is-compact) > strong { white-space:normal; overflow-wrap:anywhere; }
+@media (max-width:900px) { .okr-target-list-item > header { display:flex; } .okr-target-list-copy { max-width:100%; } .okr-target-action-row:not(.is-compact) { grid-template-columns:32px minmax(0,1fr); padding:12px 16px; } .okr-target-action-row:not(.is-compact) > .okr-target-action-progress, .okr-target-action-row:not(.is-compact) > strong, .okr-target-action-row:not(.is-compact) > span:nth-last-child(2), .okr-target-action-row:not(.is-compact) > time { grid-column:auto; grid-row:auto; justify-self:start; width:auto; text-align:left; } }

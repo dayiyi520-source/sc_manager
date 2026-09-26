@@ -22,7 +22,7 @@ const parents: OkrRecord[] = titles.map((title, index) => ({
   payload: { title, parentObjectiveId: `objective-${index + 1}`, parentActionId: `parent-${index + 1}` },
 }));
 
-const renderForm = () => render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[]} people={people} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
+const renderForm = () => render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[]} people={people} productLineOptions={['真实产品线']} projectOptions={['真实交付项目']} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
 
 describe('ActionBreakdownForm', () => {
   it('shows dynamic month choices, three untouched parent targets, and source names', () => {
@@ -32,6 +32,10 @@ describe('ActionBreakdownForm', () => {
     expect(screen.queryByText('进行中')).not.toBeInTheDocument();
     titles.forEach(title => expect(screen.getByText(title)).toBeInTheDocument());
     expect(screen.getAllByText('来源自上级 · 张总')).toHaveLength(3);
+    expect(screen.getByLabelText('O1 来源承接权重')).toHaveValue('34');
+    expect(screen.getByLabelText('O2 来源承接权重')).toHaveValue('33');
+    expect(screen.getByLabelText('O3 来源承接权重')).toHaveValue('33');
+    expect(screen.getByText('来源承接权重合计 100%')).toBeInTheDocument();
     expect(screen.getAllByText('暂无行动，点击右侧图标开始拆解')).toHaveLength(3);
     expect(screen.queryByText('A1')).not.toBeInTheDocument();
 
@@ -57,6 +61,9 @@ describe('ActionBreakdownForm', () => {
     expectPeriodActions();
     expect(screen.getByText('A1')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 关联产品线')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('A1 关联产品线'));
+    expect(screen.getAllByText('真实产品线').length).toBeGreaterThan(0);
+    expect(screen.queryByText('师创智联协同OS')).not.toBeInTheDocument();
     expect(screen.getByLabelText('A1 动作描述')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 选择节点')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 指定承接人').closest('.ant-select')).toHaveClass('ant-select-multiple');
@@ -64,6 +71,8 @@ describe('ActionBreakdownForm', () => {
     fireEvent.click(screen.getByRole('button', { name: '拆解 O2' }));
     expectPeriodActions();
     expect(screen.getByLabelText('A1 关联项目')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('A1 关联项目'));
+    expect(screen.getAllByText('真实交付项目').length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText('A1 选择节点')).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: '拆解 O3' }));
@@ -78,6 +87,12 @@ describe('ActionBreakdownForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '拆解 O1' }));
     expect(screen.getByLabelText('A1 权重')).toHaveValue('100');
+
+    fireEvent.change(screen.getByLabelText('O1 来源承接权重'), { target: { value: '50' } });
+    await waitFor(() => expect(screen.getByText('来源承接权重合计 116%，需为 100%')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '存草稿' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('O1 来源承接权重'), { target: { value: '34' } });
+    await waitFor(() => expect(screen.getByText('来源承接权重合计 100%')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /添加行动/ }));
     expect(screen.getByLabelText('A1 权重')).toHaveValue('50');
@@ -104,4 +119,15 @@ describe('ActionBreakdownForm', () => {
     expect(screen.getByText('8/8')).toBeInTheDocument();
     expect(addButton).toBeDisabled();
   }, 15000);
+
+  it('toggles each action between target and challenge types from its A label', () => {
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: '拆解 O1' }));
+    const actionToggle = screen.getByRole('button', { name: 'A1目标动作' });
+    expect(actionToggle).toHaveClass('okr-action-type-target');
+
+    fireEvent.click(actionToggle);
+    expect(screen.getByRole('button', { name: 'A1挑战动作' })).toHaveClass('okr-action-type-challenge');
+  });
 });

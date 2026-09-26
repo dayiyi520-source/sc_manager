@@ -1,9 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Empty, Input, Modal, Progress, Cascader, Spin, Tag, Tabs, Flex, Typography, Tooltip, Switch } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
-import { Target, FileSpreadsheet, Plus, Calendar, ChevronDown, ChevronRight, Search, CheckCircle, AlertTriangle, FileText, GitBranch, List, LayoutGrid } from '@/components/common/octicons-compat';
+import { Target, FileSpreadsheet, Calendar, ChevronDown, ChevronRight, Search, CheckCircle, AlertTriangle, FileText, List, LayoutGrid } from '@/components/common/octicons-compat';
 import { useApp, useAppNavigationContext } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
@@ -41,12 +41,6 @@ export const filterVisibleDemoBreakdowns = (items: DemoBreakdown[], selectedCycl
   category === 'my' ? items.filter(item => selectedCycles.includes(item.periodKey)) : []
 );
 
-const DEMO_ACTION_PARENT_TITLES = [
-  '推进平台智能化能力建设',
-  '保障重点项目稳定交付',
-  '提升客户满意度',
-];
-
 const parseStoredExtraWork = (description?: string): StoredExtraWork[] => {
   if (!description?.startsWith('[')) return [];
   try {
@@ -68,7 +62,7 @@ const impactLabel = (value?: string) => ({
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
   const { openPageTab } = useAppNavigationContext();
-  const { records, okrs, performances, people, work, actionParents, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, busy } = useOriginalOkr();
+  const { records, okrs, performances, people, work, actionParents, productLineOptions, projectOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, busy } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -95,7 +89,6 @@ const OriginalWorkspace: React.FC = () => {
   const [objectiveForms, setObjectiveForms] = useState<string[]>([]);
   const [actionFormOpen, setActionFormOpen] = useState(false);
   const [editingActionId, setEditingActionId] = useState<string | undefined>();
-  const [demoBreakdowns, setDemoBreakdowns] = useState<DemoBreakdown[]>([]);
   const [collapsedSummaryMonths, setCollapsedSummaryMonths] = useState<Set<string>>(() => new Set());
   const [targetViewMode, setTargetViewMode] = useState<MyTargetViewMode>('list');
   const [selectedOkrRecordId, setSelectedOkrRecordId] = useState<string | null>(null);
@@ -107,7 +100,17 @@ const OriginalWorkspace: React.FC = () => {
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
   const [targetFormCycle, setTargetFormCycle] = useState(dayjs().format('YYYY-MM'));
   const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
-  const newOkrCycle = dayjs().format('YYYY-MM');
+
+  useEffect(() => {
+    setScopeSelection({ scope: 'my' });
+    setObjectiveForms([]);
+    setActionFormOpen(false);
+    setEditingActionId(undefined);
+    setSelectedOkrRecordId(null);
+    setSelectedMonthDetail(null);
+    setSelectedMonthTargetId(undefined);
+    setOkrDraftToSubmit(null);
+  }, [currentUser.id]);
 
   // Write Review Form State
   const [reviewType, setReviewType] = useState<'week' | 'month'>('month');
@@ -119,7 +122,7 @@ const OriginalWorkspace: React.FC = () => {
   const cycleSummary = selectedCycles.length === 1
     ? `周期：${dayjs(selectedCycles[0]).format('YYYY年MM月')}`
     : `周期：${selectedCycles.length}个周期`;
-  const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === newOkrCycle && o.status === 'active');
+  const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === targetFormCycle && o.status === 'active');
   const selectedScopeGroup = scopeSelection.scope;
   const scopePeople = people.filter(person => {
     if (scopeSelection.personId) return person.id === scopeSelection.personId;
@@ -164,18 +167,6 @@ const OriginalWorkspace: React.FC = () => {
   const copiedInitialPayload = copiedReview ? createReviewCopyDraft(copiedReview.payload) : undefined;
   const selectedOkrRecord = records.find(record => record.id === selectedOkrRecordId && (record.kind === 'objective' || record.kind === 'action'));
   const visibleActionParents = actionParents;
-  const demoSource = people.find(person => person.id === me?.supervisorId) || people.find(person => person.id !== currentUser.id);
-  const demoActionParents: OkrRecord[] = DEMO_ACTION_PARENT_TITLES.map((title, index) => visibleActionParents.find(parent => parent.payload.title === title) || ({
-    id: `demo-action-parent-${index + 1}`,
-    kind: 'action',
-    ownerId: demoSource?.id || currentUser.id,
-    periodKey: newOkrCycle,
-    status: 'active',
-    version: 0,
-    payload: { title, parentObjectiveId: `demo-objective-${index + 1}`, parentActionId: `demo-action-parent-${index + 1}` },
-  }));
-  const displayActionForm = actionFormOpen;
-  const visibleDemoBreakdowns = filterVisibleDemoBreakdowns(demoBreakdowns, selectedCycles, isMyOkrCategory ? 'my' : 'supervisor');
   const scopeLabels: Record<OkrScopeSelection['scope'], string> = {
     my: '我的目标',
     supervisor: '直属上级',
@@ -194,7 +185,7 @@ const OriginalWorkspace: React.FC = () => {
   const selectedMonthTargets = selectedMonthDetail && isMyOkrCategory
     ? buildMyTargetViewItems(
       selectedMonthRecords,
-      visibleDemoBreakdowns.filter(item => item.periodKey === selectedMonthDetail),
+      [],
       visibleActionParents,
       people,
       currentUser.id,
@@ -270,14 +261,43 @@ const OriginalWorkspace: React.FC = () => {
   };
 
   const saveDemoBreakdown = async (periodKey: string, groups: ActionGroupValues[], mode: 'draft' | 'submit') => {
-    setDemoBreakdowns(current => appendDemoBreakdown(current, { id: crypto.randomUUID(), periodKey, groups, mode, savedAt: new Date().toISOString() }));
-    setSelectedCycles(current => includeSelectedCycle(current, periodKey));
-    setActionFormOpen(false);
-    setEditingActionId(undefined);
-    setSelectedMonthDetail(null);
-    setSelectedMonthTargetId(undefined);
-    addToast('success', mode === 'draft' ? '拆解目标草稿已保存（界面演示）' : '拆解目标已提交（界面演示）');
-    return true;
+    const payloads = groups.flatMap(group => {
+      const parentObjectiveId = String(group.parent.payload.parentObjectiveId || '');
+      const parentActionId = String(group.parent.payload.parentActionId || group.parent.id);
+      const parentKeyResultId = String(group.parent.payload.parentKeyResultId || group.parent.id);
+      const breakdownWeightTotal = group.actions.reduce((sum, action) => sum + Number(action.weight || 0), 0);
+      return group.actions.map(action => ({
+        recordId: action.recordId,
+        version: action.version,
+        title: action.title || '',
+        department: me?.department || '其他支撑',
+        parentObjectiveId,
+        parentActionId,
+        parentKeyResultId,
+        assigneeIds: action.assigneeIds || [],
+        assigneeName: (action.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'),
+        structureType: 'support',
+        businessObject: action.businessObject,
+        acceptanceStandard: action.measurableResult || action.businessObject,
+        productLine: action.businessObject,
+        milestone: action.milestone,
+        deadline: action.deadline?.format('YYYY-MM-DD') || '',
+        weight: Number(action.weight || 0),
+        objectiveType: action.objectiveType || 'target',
+        breakdownWeightTotal,
+        commitmentWeight: group.commitmentWeight,
+      }));
+    });
+    if (!payloads.length) return false;
+    const ok = await saveActions(periodKey, payloads, mode === 'submit');
+    if (ok) {
+      setSelectedCycles(current => includeSelectedCycle(current, periodKey));
+      setActionFormOpen(false);
+      setEditingActionId(undefined);
+      setSelectedMonthDetail(null);
+      setSelectedMonthTargetId(undefined);
+    }
+    return ok;
   };
 
   const renderDraftEditor = (record: OkrRecord) => {
@@ -309,6 +329,10 @@ const OriginalWorkspace: React.FC = () => {
       parents={visibleActionParents}
       actions={[record]}
       people={people}
+      productLineOptions={productLineOptions}
+      projectOptions={projectOptions}
+      businessOptionsLoading={businessOptionsLoading}
+      businessOptionsError={businessOptionsError}
       busy={busy}
       initialActionId={record.id}
       onClose={() => setSelectedOkrRecordId(null)}
@@ -334,6 +358,8 @@ const OriginalWorkspace: React.FC = () => {
           milestone: value.milestone,
           deadline: value.deadline?.format('YYYY-MM-DD') || '',
           weight: Number(value.weight || 0),
+          objectiveType: value.objectiveType || 'target',
+          commitmentWeight: group.commitmentWeight,
         }], mode === 'submit');
         if (updated) setSelectedOkrRecordId(null);
         return updated;
@@ -352,22 +378,6 @@ const OriginalWorkspace: React.FC = () => {
           <Button id="tab-reviews" role="tab" aria-selected={mainTab === 'reviews'} type="text" icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
         </div>
 
-        {mainTab === 'okrs' && (
-          <div className="okr-page-actions">
-            <Button type="primary"
-              id="btn-add-okr"
-              disabled={busy || objectiveBatchAction !== null}
-              onClick={() => { setScopeSelection({ scope: 'my' }); setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); setSelectedOkrRecordId(null); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
-
-            >
-              <Plus className="w-3.5 h-3.5" />
-              添加目标
-            </Button>
-            <Button id="btn-breakdown-action" icon={<GitBranch />} disabled={busy} onClick={() => { setScopeSelection({ scope: 'my' }); setObjectiveForms([]); setEditingActionId(undefined); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); setSelectedOkrRecordId(null); setActionFormOpen(true); }}>
-              拆解目标
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Main Tab 1: OKRs */}
@@ -386,19 +396,25 @@ const OriginalWorkspace: React.FC = () => {
               }
               const cycle = selectedCycles[0];
               setScopeSelection({ scope: 'my' });
-              setActionFormOpen(false);
               setSelectedMonthDetail(null);
               setSelectedMonthTargetId(undefined);
               setSelectedOkrRecordId(null);
+              setEditingActionId(undefined);
               setTargetFormCycle(cycle);
-              const existingObjective = records.find(record => record.kind === 'objective' && record.ownerId === currentUser.id && record.periodKey === cycle);
-              if (existingObjective) {
+              if (me?.rootFlag === 1) {
+                setActionFormOpen(false);
+                const existingObjective = records.find(record => record.kind === 'objective' && record.ownerId === currentUser.id && record.periodKey === cycle);
+                if (existingObjective) {
+                  setObjectiveForms([]);
+                  setSelectedMonthDetail(cycle);
+                  setSelectedMonthTargetId(existingObjective.id);
+                  return;
+                }
+                setObjectiveForms(forms => [...forms, crypto.randomUUID()]);
+              } else {
                 setObjectiveForms([]);
-                setSelectedMonthDetail(cycle);
-                setSelectedMonthTargetId(existingObjective.id);
-                return;
+                setActionFormOpen(true);
               }
-              setObjectiveForms(forms => [...forms, crypto.randomUUID()]);
             }}
             onOpenSettings={() => setSettingsOpen(true)}
             collapsed={scopeSidebarCollapsed}
@@ -428,7 +444,7 @@ const OriginalWorkspace: React.FC = () => {
             </div>
           )}
 
-          {isMyOkrCategory && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key="new-action" open cycle={newOkrCycle} person={me} parents={demoActionParents} actions={[]} people={people} busy={false} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={saveDemoBreakdown} />}
+          {isMyOkrCategory && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key={`new-action-${targetFormCycle}`} open cycle={targetFormCycle} person={me} parents={visibleActionParents} actions={[]} people={people} productLineOptions={productLineOptions} projectOptions={projectOptions} businessOptionsLoading={businessOptionsLoading} businessOptionsError={businessOptionsError} busy={busy} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={saveDemoBreakdown} />}
 
 
           {/* OKR Cards List */}
@@ -460,8 +476,7 @@ const OriginalWorkspace: React.FC = () => {
             const monthRecords = isMyOkrCategory
               ? [...personalObjectiveRecords, ...myActions, ...myActionDrafts].filter(record => record.periodKey === month)
               : records.filter(record => record.kind === 'objective' && record.periodKey === month && monthOkrIds.has(record.id));
-            const monthDemoBreakdowns = visibleDemoBreakdowns.filter(item => item.periodKey === month);
-            const targetItems = buildMyTargetViewItems(monthRecords, monthDemoBreakdowns, visibleActionParents, people, currentUser.id);
+            const targetItems = buildMyTargetViewItems(monthRecords, [], visibleActionParents, people, currentUser.id);
             return <MyTargetMonthSection
               key={month}
               periodKey={month}
