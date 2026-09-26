@@ -139,7 +139,13 @@ export function useOriginalOkr() {
     if (record.status !== 'draft') { addToast('error', '只有草稿可以提交'); return false; }
     setBusy(true);
     try {
-      await okrRepository.update(record, 'submit', { payload: record.payload }, currentUser.id);
+      if (record.kind === 'action') {
+        const parentActionId = record.payload.parentActionId;
+        const drafts = all.filter(item => item.kind === 'action' && item.ownerId === currentUser.id && item.periodKey === record.periodKey && item.status === 'draft' && item.payload.parentActionId === parentActionId);
+        for (const draft of drafts) await okrRepository.update(draft, 'submit', { payload: draft.payload }, currentUser.id);
+      } else {
+        await okrRepository.update(record, 'submit', { payload: record.payload }, currentUser.id);
+      }
       await refresh();
       addToast('success', record.kind === 'action' ? '拆解目标已提交' : '目标已提交');
       return true;

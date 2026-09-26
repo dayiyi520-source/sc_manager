@@ -79,7 +79,7 @@ export const MyTasksView: React.FC = () => {
 
   // 获取用户OKR
   const currentCycle = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
-  const myOkr = okrs.find((o) => o.ownerId === currentUser.id && o.cycle === currentCycle);
+  const myOkr = okrs.find((o) => o.cycle === currentCycle && (o.ownerId === currentUser.id || o.keyResults.some((keyResult) => keyResult.assigneeIds?.includes(currentUser.id))));
 
   // Tab组件
   const TabButton: React.FC<{

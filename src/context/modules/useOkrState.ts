@@ -9,7 +9,7 @@ export function useOkrState(currentUser: CurrentUser, enabled: boolean) {
   const okrQuery = useQuery({ queryKey: ['okr', currentUser.id, 'records'], queryFn: () => okrRepository.records(currentUser.id), enabled });
 
   useEffect(() => {
-    setOkrs((okrQuery.data || []).filter((record) => record.kind === 'objective' && record.ownerId === currentUser.id).map((record) => ({
+    setOkrs((okrQuery.data || []).filter((record) => record.kind === 'objective' && (record.ownerId === currentUser.id || (record.payload.keyResults || []).some(keyResult => keyResult.assigneeIds?.includes(currentUser.id)))).map((record) => ({
       id: record.id,
       cycle: record.periodKey,
       ownerId: record.ownerId,
@@ -22,7 +22,7 @@ export function useOkrState(currentUser: CurrentUser, enabled: boolean) {
       deadline: record.periodKey,
       parentObjectiveId: record.payload.parentObjectiveId,
       parentKeyResultId: record.payload.parentKeyResultId,
-      keyResults: (record.payload.keyResults || []).map((keyResult) => ({ id: keyResult.id, content: keyResult.title, weight: keyResult.weight, progress: keyResult.progress, deadline: record.periodKey })),
+      keyResults: (record.payload.keyResults || []).map((keyResult) => ({ id: keyResult.id, content: keyResult.title, weight: keyResult.weight, progress: keyResult.progress, deadline: record.periodKey, assigneeIds: keyResult.assigneeIds })),
     })));
   }, [okrQuery.data, currentUser.id, currentUser.name, currentUser.department]);
 
