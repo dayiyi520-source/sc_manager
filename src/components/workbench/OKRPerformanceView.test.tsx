@@ -80,6 +80,7 @@ const defaultPeople = [
 const okrState = {
   records: [objectiveRecord],
   okrs: [okr],
+  reviewableOkrs: [okr],
   performances: [],
   people: defaultPeople,
   work: [],
@@ -121,6 +122,7 @@ describe('OKRPerformanceView target navigation', () => {
     vi.clearAllMocks();
     okrState.records = [objectiveRecord];
     okrState.okrs = [okr];
+    okrState.reviewableOkrs = [okr];
     okrState.people = defaultPeople;
   });
 

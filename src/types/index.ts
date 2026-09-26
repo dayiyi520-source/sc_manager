@@ -111,6 +111,7 @@ export interface OKRItem {
     progress: number;
     weight: number;
     deadline: string;
+    assigneeIds?: string[];
   }[];
 }
 

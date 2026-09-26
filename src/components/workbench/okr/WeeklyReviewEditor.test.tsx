@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { WeeklyReviewEditor } from './WeeklyReviewEditor';
-import { findReviewForPayload } from './useOriginalOkr';
+import { findReviewForPayload, isReviewableObjective } from './useOriginalOkr';
 import type { OkrPayload, OkrRecord } from '../../../services/okrRepository';
 
 class IntersectionObserverMock {
@@ -55,6 +55,16 @@ describe('review period identity', () => {
     expect(findReviewForPayload(records, 'me', '2026-09-21/2026-09-27', payload)?.id).toBe('review-1');
     expect(findReviewForPayload(records, 'other', '2026-09-21/2026-09-27', payload)).toBeUndefined();
     expect(findReviewForPayload(records, 'me', '2026-09-14/2026-09-20', payload)).toBeUndefined();
+  });
+
+  it('includes an assigned key result from the organization root in weekly and monthly review targets', () => {
+    const objective = {
+      id: 'root-objective', cycle: '2026-09', ownerId: 'root', ownerName: '林志豪', department: '管理部', category: 'supervisor' as const,
+      objective: '本月经营目标', weight: 100, progress: 20, deadline: '2026-09-30', status: 'active' as const,
+      keyResults: [{ id: 'a-1', content: '负责交付动作', progress: 20, weight: 100, deadline: '2026-09-30', assigneeIds: ['chen'] }]
+    };
+    expect(isReviewableObjective(objective, 'chen')).toBe(true);
+    expect(isReviewableObjective(objective, 'other')).toBe(false);
   });
 
   it('uses business assistance types and team member search without temporary task creation', () => {

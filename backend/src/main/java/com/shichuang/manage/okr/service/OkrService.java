@@ -30,13 +30,17 @@ import java.util.*;
   String boss=Objects.toString(meProfile.get("supervisorId"),"");
   var reports=new HashSet<String>();for(var p:reporting)if(me.equals(p.get("supervisorId")))reports.add(p.get("id").toString());
   var all=mapper.records(RequestContext.tenantId());var visibleOwners=new HashSet<String>();visibleOwners.add(me);visibleOwners.addAll(reports);
+  var reviewVisibleOwners=new HashSet<String>();reviewVisibleOwners.add(me);reviewVisibleOwners.addAll(reports);
   boolean root=((Number)meProfile.getOrDefault("rootFlag",0)).intValue()==1;
   if(root){
    for(var record:all)if("objective".equals(record.get("kind"))&&me.equals(record.get("ownerId")))for(var kr:rows(payload(record.get("payload")).getOrDefault("keyResults",List.of()))){Object ids=kr.get("assigneeIds");if(ids instanceof List<?> assignees)for(Object id:assignees)visibleOwners.add(Objects.toString(id,""));}
    for(var record:all)if("action".equals(record.get("kind"))&&me.equals(record.get("ownerId"))){var action=payload(record.get("payload"));String parentId=Objects.toString(action.get("parentActionId"),"");if(!parentId.isBlank()&&all.stream().anyMatch(candidate->"action".equals(candidate.get("kind"))&&parentId.equals(candidate.get("id"))&&me.equals(candidate.get("ownerId")))){Object ids=action.get("assigneeIds");if(ids instanceof List<?> assignees)for(Object id:assignees)visibleOwners.add(Objects.toString(id,""));}}
    boolean changed;do{changed=false;for(var record:all)if("action".equals(record.get("kind"))&&visibleOwners.contains(record.get("ownerId"))){Object ids=payload(record.get("payload")).get("assigneeIds");if(ids instanceof List<?> assignees)for(Object id:assignees)changed|=visibleOwners.add(Objects.toString(id,""));}}while(changed);
   }
-  return all.stream().filter(r->visibleOwners.contains(r.get("ownerId"))||"objective".equals(r.get("kind"))&&boss.equals(r.get("ownerId"))).toList();
+  return all.stream().filter(r -> {
+   if("review".equals(r.get("kind"))) return reviewVisibleOwners.contains(r.get("ownerId"));
+   return visibleOwners.contains(r.get("ownerId"))||"objective".equals(r.get("kind"))&&(boss.equals(r.get("ownerId"))||objectiveAssignedTo(r,me));
+  }).toList();
  }
  public List<Map<String,Object>> actionParents(String period){
   return actionParents(period,null);
@@ -51,7 +55,7 @@ import java.util.*;
   var actionsById=new HashMap<String,Map<String,Object>>();for(var record:all)if("action".equals(record.get("kind"))&&period.equals(record.get("periodKey")))actionsById.put(Objects.toString(record.get("id")),record);
   var seen=new HashSet<String>();
   for(var record:all){
-   if(!"objective".equals(record.get("kind"))||!period.equals(record.get("periodKey"))||!Set.of("active","submitted","reviewed").contains(record.get("status"))||!boss.equals(Objects.toString(record.get("ownerId"),"")))continue;
+   if(!"objective".equals(record.get("kind"))||!period.equals(record.get("periodKey"))||!Set.of("active","submitted","reviewed").contains(record.get("status"))||!(boss.equals(Objects.toString(record.get("ownerId"),""))||objectiveAssignedTo(record,me)))continue;
     for(var kr:rows(payload(record.get("payload")).getOrDefault("keyResults",List.of())))if(assignedTo(kr,me)){
     String id=Objects.toString(kr.get("id"),"");if(seen.add(id)){var item=new LinkedHashMap<String,Object>();item.put("id",id);item.put("kind","action");item.put("ownerId",record.get("ownerId"));item.put("periodKey",period);item.put("status",record.get("status"));item.put("version",record.get("version"));item.put("parentObjectiveId",record.get("id"));item.put("parentKeyResultId",id);var parentPayload=new LinkedHashMap<String,Object>();parentPayload.put("title",kr.get("title"));parentPayload.put("parentObjectiveId",record.get("id"));parentPayload.put("parentActionId",id);parentPayload.put("parentKeyResultId",id);if(kr.get("deadline")!=null)parentPayload.put("deadline",kr.get("deadline"));item.put("payload",parentPayload);result.add(item);}
    }
@@ -68,6 +72,7 @@ import java.util.*;
   return result;
  }
  private boolean assignedTo(Map<String,Object> payload,String user){Object ids=payload.get("assigneeIds");if(ids instanceof List<?> list&&list.stream().map(Object::toString).anyMatch(user::equals))return true;return user.equals(Objects.toString(payload.get("assigneeId"),""));}
+ private boolean objectiveAssignedTo(Map<String,Object> record,String user){if(!"objective".equals(record.get("kind")))return false;for(var kr:rows(payload(record.get("payload")).getOrDefault("keyResults",List.of())))if(assignedTo(kr,user))return true;return false;}
  @Transactional public Map<String,Object> createAction(Map<String,Object> body){
   String period=required(body,"periodKey");var input=payload(body.getOrDefault("payload",Map.of()));String creator=viewerId(Objects.toString(body.get("viewerId"),""));
   required(input,"title");String parentAction=required(input,"parentActionId");String parentObjective=required(input,"parentObjectiveId");String parentKeyResult=Objects.toString(input.get("parentKeyResultId"),parentAction);
@@ -185,7 +190,7 @@ import java.util.*;
    integer(p.get("selfScore"),0,100);var reviewIds=new HashSet<String>();
    for(var entry:rows(p.getOrDefault("krReviews",List.of()))){
     String objectiveId=required(entry,"objectiveId"),krId=required(entry,"keyResultId");if(!reviewIds.add(krId))throw new IllegalArgumentException("同一 KR 不能重复复盘");
-    var objective=record(objectiveId);if(!owner.equals(objective.get("ownerId"))||!"objective".equals(objective.get("kind")))throw new IllegalArgumentException("只能复盘本人的目标");
+    var objective=record(objectiveId);if(!(owner.equals(objective.get("ownerId"))||objectiveAssignedTo(objective,owner))||!"objective".equals(objective.get("kind")))throw new IllegalArgumentException("只能复盘本人负责或被指派的目标");
     var kr=rows(payload(objective.get("payload")).get("keyResults")).stream().filter(k->krId.equals(k.get("id"))).findFirst().orElseThrow(()->new IllegalArgumentException("KR 不存在或已变更"));
     entry.put("objectiveTitle",payload(objective.get("payload")).get("title"));entry.put("keyResultTitle",kr.get("title"));integer(entry.get("previousProgress"),0,100);integer(entry.get("currentProgress"),0,100);
     if(!Set.of("normal","risk","blocked").contains(Objects.toString(entry.get("health"),"")))throw new IllegalArgumentException("KR 健康状态无效");
@@ -222,7 +227,7 @@ import java.util.*;
    String affected=Objects.toString(entry.get("affectedObjectiveId"),"");
    if(!affected.isBlank()){
     var target=record(affected);
-    if(!owner.equals(target.get("ownerId"))||!"objective".equals(target.get("kind")))throw new IllegalArgumentException("受影响目标必须属于本人");
+    if(!(owner.equals(target.get("ownerId"))||objectiveAssignedTo(target,owner))||!"objective".equals(target.get("kind")))throw new IllegalArgumentException("受影响目标必须属于本人负责或被指派的目标");
     var month=java.time.YearMonth.parse(target.get("periodKey").toString());
     if(month.atEndOfMonth().isBefore(start)||month.atDay(1).isAfter(end))throw new IllegalArgumentException("受影响目标不属于复盘周期");
     String affectedKr=required(entry,"affectedKeyResultId");
@@ -231,7 +236,7 @@ import java.util.*;
    }else entry.remove("affectedKeyResultId");
    String objective=Objects.toString(entry.get("objectiveId"),"");
    if(!objective.isBlank()){
-    var o=record(objective);if(!owner.equals(o.get("ownerId"))||!"objective".equals(o.get("kind")))throw new IllegalArgumentException("工作项只能归入本人目标");
+    var o=record(objective);if(!(owner.equals(o.get("ownerId"))||objectiveAssignedTo(o,owner))||!"objective".equals(o.get("kind")))throw new IllegalArgumentException("工作项只能归入本人负责或被指派的目标");
     var month=java.time.YearMonth.parse(o.get("periodKey").toString());if(month.atEndOfMonth().isBefore(start)||month.atDay(1).isAfter(end))throw new IllegalArgumentException("关联目标不属于复盘周期");
     String kr=required(entry,"keyResultId");if(rows(payload(o.get("payload")).get("keyResults")).stream().noneMatch(k->kr.equals(k.get("id"))))throw new IllegalArgumentException("关联 KR 不存在");
    }
@@ -266,13 +271,13 @@ import java.util.*;
   var tasks=rows(p.getOrDefault("monthlyOtherTasks",List.of()));var taskIds=new HashSet<String>();
   for(var task:tasks){if(!taskIds.add(required(task,"id")))throw new IllegalArgumentException("其他任务不能重复");required(task,"content");if(Objects.toString(task.get("result"),"").length()>1000)throw new IllegalArgumentException("其他任务结果不能超过 1000 字");if(!Set.of("待处理","处理中","已完成","已阻塞").contains(Objects.toString(task.get("status"),"")))throw new IllegalArgumentException("其他任务状态无效");}
   var plans=rows(p.getOrDefault("nextMonthPlans",List.of()));var planIds=new HashSet<String>();
-  for(var plan:plans){if(!planIds.add(required(plan,"id")))throw new IllegalArgumentException("下月安排不能重复");required(plan,"content");String date=Objects.toString(plan.get("plannedDate"),"");if(!date.isBlank())try{java.time.LocalDate.parse(date);}catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("下月安排日期无效");}String objectiveId=Objects.toString(plan.get("objectiveId"),""),krId=Objects.toString(plan.get("keyResultId"),"");if(!krId.isBlank()&&objectiveId.isBlank())throw new IllegalArgumentException("下月安排关联目标无效");if(!objectiveId.isBlank()){var objective=record(objectiveId);if(!owner.equals(objective.get("ownerId"))||!"objective".equals(objective.get("kind")))throw new IllegalArgumentException("下月安排只能关联本人的目标");if(!krId.isBlank()&&rows(payload(objective.get("payload")).get("keyResults")).stream().noneMatch(kr->krId.equals(kr.get("id"))))throw new IllegalArgumentException("下月安排关联 KR 已变更");}}
+  for(var plan:plans){if(!planIds.add(required(plan,"id")))throw new IllegalArgumentException("下月安排不能重复");required(plan,"content");String date=Objects.toString(plan.get("plannedDate"),"");if(!date.isBlank())try{java.time.LocalDate.parse(date);}catch(java.time.format.DateTimeParseException e){throw new IllegalArgumentException("下月安排日期无效");}String objectiveId=Objects.toString(plan.get("objectiveId"),""),krId=Objects.toString(plan.get("keyResultId"),"");if(!krId.isBlank()&&objectiveId.isBlank())throw new IllegalArgumentException("下月安排关联目标无效");if(!objectiveId.isBlank()){var objective=record(objectiveId);if(!(owner.equals(objective.get("ownerId"))||objectiveAssignedTo(objective,owner))||!"objective".equals(objective.get("kind")))throw new IllegalArgumentException("下月安排只能关联本人负责或被指派的目标");if(!krId.isBlank()&&rows(payload(objective.get("payload")).get("keyResults")).stream().noneMatch(kr->krId.equals(kr.get("id"))))throw new IllegalArgumentException("下月安排关联 KR 已变更");}}
  }
  private void syncReviewProgress(String owner,Map<String,Object> p){
   if(!Boolean.TRUE.equals(p.get("syncKrProgress")))return;
   var reviews=rows(p.getOrDefault("krReviews",List.of()));
   for(String objectiveId:reviews.stream().map(r->r.get("objectiveId").toString()).distinct().toList()){
-   var record=record(objectiveId);if(!owner.equals(record.get("ownerId")))throw new IllegalArgumentException("只能同步本人的 KR");var payload=payload(record.get("payload"));var krs=rows(payload.get("keyResults"));
+   var record=record(objectiveId);if(!(owner.equals(record.get("ownerId"))||objectiveAssignedTo(record,owner)))throw new IllegalArgumentException("只能同步本人负责或被指派的 A");var payload=payload(record.get("payload"));var krs=rows(payload.get("keyResults"));
    for(var kr:krs)reviews.stream().filter(r->objectiveId.equals(r.get("objectiveId"))&&kr.get("id").equals(r.get("keyResultId"))).findFirst().ifPresent(r->kr.put("progress",r.get("currentProgress")));
    payload.put("keyResults",krs);payload.put("progress",OkrPolicy.progress(krs.stream().map(k->integer(k.get("weight"),1,100)).toList(),krs.stream().map(k->integer(k.get("progress"),0,100)).toList()));
    int version=((Number)record.get("version")).intValue();if(mapper.update(RequestContext.tenantId(),objectiveId,version,record.get("status").toString(),encode(payload),owner)!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"目标进度已变更，请刷新后重试");

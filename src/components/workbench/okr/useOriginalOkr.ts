@@ -18,6 +18,13 @@ export const findReviewForPayload = (records: OkrRecord[], ownerId: string, peri
     && record.payload.endDate === payload.endDate
   ));
 
+export const isReviewableObjective = (objective: OKRItem, userId: string) => (
+  ['active', 'submitted', 'reviewed'].includes(objective.status || '')
+  && (objective.ownerId === userId
+  || objective.keyResults.some(keyResult => keyResult.assigneeIds?.includes(userId))
+  )
+);
+
 export function useOriginalOkr() {
   const {currentUser, addToast} = useApp();
   const client = useQueryClient();
@@ -84,9 +91,10 @@ export function useOriginalOkr() {
       parentObjectiveId:r.payload.parentObjectiveId,alignTo:all.find(p=>p.id===r.payload.parentObjectiveId)?.payload.title,
       parentKeyResultId:r.payload.parentKeyResultId,alignments:r.payload.alignments, objectiveType:r.payload.objectiveType || 'target',
       status:r.status as OKRItem['status'],
-      keyResults:(r.payload.keyResults || []).map(k=>({id:k.id,content:k.title,progress:k.progress,weight:k.weight,deadline:k.deadline || ''})),
+      keyResults:(r.payload.keyResults || []).map(k=>({id:k.id,content:k.title,progress:k.progress,weight:k.weight,deadline:k.deadline || '',assigneeIds:k.assigneeIds})),
     };
   });
+  const reviewableOkrs = okrs.filter(objective => isReviewableObjective(objective, currentUser.id));
   const performances: (PerformanceReview & {authorId:string})[] = all.filter(r=>r.kind==='review').map(r=>{
     const owner = people.find(p=>p.id===r.ownerId), p=r.payload;
     return {id:r.id,version:r.version,authorId:r.ownerId,author:owner?.name || '人员已停用',authorDept:owner?.department || '',
@@ -161,7 +169,7 @@ export function useOriginalOkr() {
     finally { setBusy(false); }
   };
   const saveSettings = async (settings: OkrSettings) => { setBusy(true); try { await okrRepository.saveSettings(settings); await client.invalidateQueries({queryKey:['okr','settings']}); addToast('success','OKR 配置已保存'); return true; } catch(error) { addToast('error',error instanceof Error ? error.message : '配置保存失败'); return false; } finally { setBusy(false); } };
-  return {records:all,okrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
+  return {records:all,okrs,reviewableOkrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
     error:records.error || peopleQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
     productLineOptions,projectOptions,businessOptionsLoading:productLinesQuery.isPending || projectsQuery.isPending,
     businessOptionsError:businessOptionsError instanceof Error ? businessOptionsError.message : businessOptionsError ? '业务数据加载失败' : undefined,

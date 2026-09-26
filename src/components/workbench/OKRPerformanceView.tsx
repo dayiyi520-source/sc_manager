@@ -63,7 +63,7 @@ const impactLabel = (value?: string) => ({
 const OriginalWorkspace: React.FC = () => {
   const { currentUser, addToast } = useApp();
   const { openPageTab } = useAppNavigationContext();
-  const { records, okrs, performances, people, work, teamMembers, actionParents, productLineOptions, projectOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, busy, settings, saveSettings } = useOriginalOkr();
+  const { records, okrs, reviewableOkrs, performances, people, work, teamMembers, actionParents, productLineOptions, projectOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, busy, settings, saveSettings } = useOriginalOkr();
 
   const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
 
@@ -155,7 +155,8 @@ const OriginalWorkspace: React.FC = () => {
       ? performance.authorId === currentUser.id
       : performance.authorId !== currentUser.id
   ));
-  const receivedPerformances = performances.filter(performance => performance.authorId !== currentUser.id);
+  const subordinateIds = new Set(people.filter(person => person.supervisorId === currentUser.id).map(person => person.id));
+  const receivedPerformances = performances.filter(performance => subordinateIds.has(performance.authorId) && performance.status !== 'draft');
   const receivedFiltered = receivedPerformances.filter(performance => {
     const matchesSearch = !receivedSearch || `${performance.author}${performance.cycleName}${performance.summary}`.toLowerCase().includes(receivedSearch.toLowerCase());
     const matchesStatus = receivedFilter === 'all' || (receivedFilter === 'pending' ? performance.status === 'submitted' : performance.status === 'reviewed');
@@ -531,7 +532,7 @@ const OriginalWorkspace: React.FC = () => {
             items={[
               {key:'write',label:'写复盘总结'},
               {key:'my',label:`我的复盘列表 (${performances.filter(p=>p.authorId===currentUser.id).length})`},
-              {key:'received',label:`我收到的复盘 (${performances.filter(p=>p.authorId!==currentUser.id).length})`},
+              {key:'received',label:`我收到的复盘 (${receivedPerformances.length})`},
             ]}
           />
 
@@ -562,9 +563,9 @@ const OriginalWorkspace: React.FC = () => {
 
           {reviewSubTab === 'write' && isReviewFormOpen && (
  reviewType === 'week' ? (
-              <WeeklyReviewEditor key={`weekly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={okrs.filter(o=>o.ownerId===currentUser.id)} work={work} teamMembers={teamMembers} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setScopeSelection({scope:'my'});setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
+              <WeeklyReviewEditor key={`weekly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={reviewableOkrs} work={work} teamMembers={teamMembers} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setScopeSelection({scope:'my'});setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
             ) : (
-              <MonthlyReviewEditor key={`monthly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={okrs.filter(o=>o.ownerId===currentUser.id)} records={records} currentUserId={currentUser.id} busy={busy} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}}/>
+              <MonthlyReviewEditor key={`monthly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={reviewableOkrs} records={records} currentUserId={currentUser.id} busy={busy} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}}/>
             )
           )}
 
@@ -616,11 +617,10 @@ const OriginalWorkspace: React.FC = () => {
                 </aside>
                 <section className="okr-received-detail">
                   {!selectedReceived ? <div className="okr-received-detail-empty"><Empty description="请选择一份复盘" /></div> : <>
-                    <div className="okr-received-detail-head"><div><Tag color={selectedReceived.type === 'week' ? 'blue' : 'purple'}>{selectedReceived.type === 'week' ? '周报复盘' : '月报复盘'}</Tag><h2>{selectedReceived.cycleName}</h2><p>提交时间：{selectedReceived.createdAt}　|　复盘人：{selectedReceived.author}　|　{selectedReceived.authorDept}</p></div><Button type="link">打开完整复盘 ↗</Button></div>
+                    <div className="okr-received-detail-head"><div><Tag color={selectedReceived.type === 'week' ? 'blue' : 'purple'}>{selectedReceived.type === 'week' ? '周报复盘' : '月报复盘'}</Tag><h2>{selectedReceived.cycleName}</h2><p>提交时间：{selectedReceived.createdAt}　|　复盘人：{selectedReceived.author}　|　{selectedReceived.authorDept}</p></div></div>
                     <div className="okr-received-summary-row">{(selectedReceived.krReviews || []).slice(0, 3).map(kr => <div key={kr.keyResultId}><span>复盘前</span><Progress percent={kr.previousProgress} showInfo={false} /><b>{kr.previousProgress}%</b><span>本期</span><Progress percent={kr.currentProgress} showInfo={false} status={kr.health === 'blocked' ? 'exception' : undefined} /><b>{kr.currentProgress}%</b><Tag color={kr.health === 'normal' ? 'success' : kr.health === 'risk' ? 'warning' : 'error'}>{kr.health === 'normal' ? '正常' : kr.health === 'risk' ? '有风险' : '已阻塞'}</Tag></div>)}</div>
                     {(selectedReceived.krReviews || []).map((kr, index) => <div className="okr-received-section" key={kr.keyResultId}><div className="okr-received-section-title"><CheckCircle /><h3>本期成果</h3><strong>KR{index + 1} {kr.keyResultTitle}</strong></div><p>{kr.achievement || '暂无成果说明'}</p>{kr.blocker && <div className="okr-received-risk"><AlertTriangle /><span>{kr.blocker}</span></div>}<div className="okr-received-next"><b>下一步计划</b><span>{kr.nextPlan || '暂无计划'}</span></div></div>)}
                     <div className="okr-received-two-col"><div className="okr-received-section"><div className="okr-received-section-title"><FileText /><h3>非 OKR 额外工作</h3></div><p>{selectedReceived.extraWork?.description || '暂无额外工作记录'}</p></div><div className="okr-received-section"><div className="okr-received-section-title"><Target /><h3>协助与协同事项</h3></div>{selectedReceived.assistance?.length ? selectedReceived.assistance.map(item => <p key={item.subject}>{item.subject}：{item.result}</p>) : <p>暂无协同事项</p>}</div></div>
-                    <div className="okr-received-feedback"><Input placeholder="写下反馈或建议（可选）" /><Button>保存备注</Button><Button type="primary">标记已查看</Button></div>
                   </>}
                 </section>
               </div>
