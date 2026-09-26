@@ -59,7 +59,6 @@ export const getPeriodCountdown = (periodKey: string) => {
   return `剩余 ${remaining} 天`;
 };
 
-const formatDate = (value?: string) => value ? dayjs(value).format('YYYY-MM-DD') : '暂无时间';
 const formatDeadline = (value: string) => value ? dayjs(value).format('MM-DD') : '未设置';
 const assigneeLabel = (names: string[]) => names.length ? names.join('、') : '未指定承接人';
 const isSubmitted = (target: MyTargetViewItem) => target.status !== 'draft';
@@ -223,20 +222,18 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
 const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: () => void }> = ({ target, index, onOpen }) => {
   const submitted = isSubmitted(target);
   const visibleActions = target.actions.slice(0, 4);
-  const hiddenCount = target.actions.length - visibleActions.length;
   return <article className="okr-target-grid-card" role="button" tabIndex={0} aria-label={`目标卡片：${target.title}`} onClick={onOpen} onKeyDown={event => openOnKeyboard(event, onOpen)}>
     <header>
       <div className="okr-target-card-title"><span className="okr-summary-index">O{index + 1}</span><h3 title={target.title}>{target.title}</h3>{target.status === 'draft' && <Tag>草稿</Tag>}</div>
-      {submitted && <strong className="okr-target-card-progress">{target.progress}%</strong>}
+      <strong className="okr-target-card-progress">{target.progress}%</strong>
     </header>
     {target.sourceName && <span className="okr-target-source">{target.sourceName}</span>}
-    <span className="okr-target-owner">承接人员：{assigneeLabel(target.ownerNames)}</span>
-    <div className="okr-target-card-meta"><span>{submitted ? '提交时间' : '保存时间'}：{formatDate(target.savedAt)}</span>{submitted && <Progress percent={target.progress} size="small" showInfo={false}/>}</div>
+    <div className="okr-target-meta-line"><Tag color="blue">{target.levelLabel || '公司级'}</Tag><span className="okr-target-creator">{target.creatorName || '未指定'}</span><span className="okr-target-weight">{target.totalWeight ?? 0}%</span></div>
+    <div className="okr-target-card-meta"><span>当前进度：{target.progress}%</span><time>截止日期：{formatDeadline(target.maxDeadline || '')}</time><Progress percent={target.progress} size="small" showInfo={false}/></div>
     <div className="okr-target-card-actions">{visibleActions.length
       ? visibleActions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} compact/>)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>
-    <footer><span>{hiddenCount > 0 ? `另有 ${hiddenCount} 条行动` : `${target.actions.length} 条行动`}</span></footer>
   </article>;
 };
 

@@ -91,7 +91,10 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
       weight: Number(record.payload.weight) || 100,
       ownerId: record.ownerId,
       assigneeIds: [],
-      deadline: record.payload.deadline,
+      deadline: record.payload.deadline || latestDeadline([
+        ...(record.payload.keyResults || []).map(keyResult => keyResult.deadline),
+        ...actions.filter(action => action.payload.parentObjectiveId === record.id).map(action => action.payload.deadline),
+      ]),
       createdAt: record.createdAt,
       children: [],
       record,
@@ -160,6 +163,7 @@ const statusMeta = (status: string) => status === 'draft'
       : { label: '已提交', color: 'processing' as const };
 
 const formatDeadline = (value?: string) => value ? dayjs(value).format('MM-DD') : '未设置';
+const latestDeadline = (values: Array<string | undefined>) => values.filter(Boolean).sort().at(-1);
 
 const GoalNodeRow = ({ node, code, expanded, selected, people, onToggle, onSelect }: {
   node: GoalHierarchyNode;
@@ -268,6 +272,8 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
           assigneeNames: [...new Set(target.actions.flatMap(action => action.assigneeNames))],
           objectiveLevel: target.levelLabel || (people.find(person => person.id === ownerId)?.rootFlag === 1 ? '公司级' : people.find(person => person.id === ownerId)?.supervisorId ? '主管级' : '个人级'),
           objectiveMetaOwnerId: target.metaOwnerId || ownerId,
+          deadline: target.maxDeadline,
+          record: records.find(record => record.kind === 'action' && record.status === 'draft' && target.actions.some(action => action.id === record.id)),
           children: [],
         };
         root.children = target.actions.map(action => ({
@@ -284,6 +290,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
           deadline: action.deadline,
           source: root,
           children: [],
+          record: records.find(record => record.id === action.id),
         }));
         return root;
       });

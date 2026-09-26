@@ -11,6 +11,7 @@ const targets: MyTargetViewItem[] = [
     title: '完善客户交付方案',
     status: 'draft',
     ownerNames: ['林志豪'],
+    maxDeadline: '2026-09-30',
     progress: 0,
     savedAt: '2026-09-24T08:00:00',
     actions: [{ id: 'draft-action', title: '梳理交付清单', assigneeNames: ['刘爱剑'], progress: 0, weight: 100, deadline: '2026-09-30' }],
@@ -22,6 +23,7 @@ const targets: MyTargetViewItem[] = [
     status: 'active',
     sourceName: '直属上级 · 陈宇璋',
     ownerNames: ['林志豪'],
+    maxDeadline: '2026-09-28',
     progress: 42,
     savedAt: '2026-09-20T08:00:00',
     actions: [{ id: 'active-action', title: '上线智能分析节点', assigneeNames: ['吴清', '刘笑星'], progress: 42, weight: 100, deadline: '2026-09-28' }],
@@ -66,7 +68,7 @@ describe('MyTargetMonthSection', () => {
     expect(within(activeTarget).getByText('上线智能分析节点')).toBeInTheDocument();
     expect(within(activeTarget).getByText('@吴清 @刘笑星')).toBeInTheDocument();
     expect(within(activeTarget).getAllByText('100%').length).toBeGreaterThan(0);
-    expect(within(activeTarget).getByText('09-28')).toBeInTheDocument();
+    expect(within(activeTarget).getAllByText('09-28').length).toBeGreaterThan(0);
     expect(within(screen.getByLabelText('目标：完善客户交付方案')).getByText('0%')).toBeInTheDocument();
   });
 
@@ -76,10 +78,13 @@ describe('MyTargetMonthSection', () => {
     const draftCard = screen.getByLabelText('目标卡片：完善客户交付方案');
     const activeCard = screen.getByLabelText('目标卡片：推进平台智能化能力建设');
     expect(within(draftCard).getByText('草稿')).toBeInTheDocument();
-    expect(within(draftCard).getByText('保存时间：2026-09-24')).toBeInTheDocument();
+    expect(within(draftCard).getByText('当前进度：0%')).toBeInTheDocument();
+    expect(within(draftCard).getByText('截止日期：09-30')).toBeInTheDocument();
     expect(within(activeCard).queryByText('已提交')).not.toBeInTheDocument();
-    expect(within(activeCard).getByText('提交时间：2026-09-20')).toBeInTheDocument();
+    expect(within(activeCard).getByText('当前进度：42%')).toBeInTheDocument();
+    expect(within(activeCard).getByText('截止日期：09-28')).toBeInTheDocument();
     expect(within(activeCard).getByText('42%')).toBeInTheDocument();
+    expect(within(activeCard).queryByText('另有')).not.toBeInTheDocument();
   });
 
   it('delegates month collapse and target detail actions', () => {

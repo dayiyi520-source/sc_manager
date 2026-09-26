@@ -81,6 +81,30 @@ describe('GoalHierarchyView', () => {
     expect(screen.getByText('承接人员：执行员工')).toBeInTheDocument();
   });
 
+  it('keeps a draft action group editable from the detail root', () => {
+    const submit = vi.fn();
+    render(<GoalHierarchyView
+      records={records}
+      people={people}
+      periodKey="2026-09"
+      ownerId="boss"
+      supplementalTargets={[{
+        id: 'draft-group',
+        title: '主管拆解目标',
+        status: 'draft',
+        ownerNames: ['部门主管'],
+        progress: 0,
+        actions: [{ id: 'a12', title: '补齐质量复盘机制', assigneeNames: [], progress: 0, weight: 100, deadline: '2026-09-30' }],
+      }]}
+      onSubmitDraft={submit}
+    />);
+    fireEvent.click(screen.getByRole('button', { name: '查看 主管拆解目标' }));
+    const detail = screen.getByRole('complementary', { name: '目标节点详情' });
+    expect(within(detail).getByText('草稿')).toBeInTheDocument();
+    fireEvent.click(within(detail).getByRole('button', { name: /提\s*交/ }));
+    expect(submit).toHaveBeenCalledWith(records[2]);
+  });
+
   it('shows two levels initially and expands deeper branches on demand', () => {
     render(<GoalHierarchyView records={records} people={people} periodKey="2026-09" />);
     expect(screen.getByText('提升客户交付质量')).toBeInTheDocument();
