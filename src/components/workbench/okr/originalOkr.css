@@ -791,7 +791,7 @@
 .okr-target-no-actions { margin:0; padding:24px; color:var(--text-muted); font-size:12px; text-align:center; }
 
 .okr-target-grid { display:grid; grid-template-columns:repeat(3,minmax(280px,1fr)); gap:12px; }
-.okr-target-grid-card { display:grid; min-width:0; min-height:288px; cursor:pointer; grid-template-rows:auto auto auto auto 1fr auto; gap:8px; padding:16px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); transition:border-color 150ms ease,background-color 150ms ease,transform 150ms ease; }
+.okr-target-grid-card { display:grid; min-width:0; cursor:pointer; grid-template-rows:auto; align-content:start; gap:8px; padding:16px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); transition:border-color 150ms ease,background-color 150ms ease,transform 150ms ease; }
 .okr-target-grid-card:hover { border-color:var(--border-strong); background:color-mix(in srgb,var(--primary) 3%,var(--bg-card)); transform:translateY(-1px); }
 .okr-target-grid-card:focus-within { border-color:var(--primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 16%,transparent); }
 .okr-target-grid-card:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
@@ -804,9 +804,12 @@
 .okr-target-card-progress { flex-shrink:0; color:var(--active-text); font-size:12px; font-variant-numeric:tabular-nums; }
 .okr-target-card-meta { display:grid; grid-template-columns:auto auto; align-items:center; justify-content:start; gap:6px 16px; padding:8px 0; border-top:1px solid var(--border-main); border-bottom:1px solid var(--border-main); color:var(--text-muted); font-size:11px; }
 .okr-target-card-meta .ant-progress { grid-column:1 / -1; width:100%; }
+.okr-target-card-meta > span,.okr-target-card-meta > time { min-width:0; white-space:nowrap; }
 .okr-target-card-actions { display:grid; align-content:start; }
 .okr-target-action-row.is-compact { min-height:40px; grid-template-columns:32px minmax(0,1fr) minmax(88px,128px); padding:0; border-top:1px solid var(--border-main); }
 .okr-target-action-row.is-compact:first-child { border-top:0; }
+.okr-target-action-row.is-compact.has-inline-assignees { grid-template-columns:32px minmax(0,1fr); }
+.okr-target-action-row.is-compact.has-inline-assignees > strong { overflow:visible; white-space:normal; overflow-wrap:anywhere; }
 .okr-target-grid-card > footer { display:flex; min-height:32px; align-items:center; justify-content:space-between; gap:8px; padding-top:8px; border-top:1px solid var(--border-main); }
 .okr-target-grid-card > footer > span { color:var(--text-muted); font-size:11px; }
 
