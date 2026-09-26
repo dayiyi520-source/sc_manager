@@ -52,7 +52,7 @@ describe('MyTargetMonthSection', () => {
     ];
     const target = buildMyTargetViewItems(records, [], [], people, 'manager').find(item => item.actions.some(action => action.title === '测试1'))!;
     expect(target.levelLabel).toBe('主管级');
-    expect(target.creatorName).toBe('林志豪');
+    expect(target.creatorName).toBe('陈宇璋');
     expect(target.ownerNames).toEqual(['毛景强']);
   });
 
@@ -91,7 +91,7 @@ describe('MyTargetMonthSection', () => {
     expect(within(activeTarget).getByText('@吴清 @刘笑星')).toBeInTheDocument();
     expect(within(activeTarget).getAllByText('100%').length).toBeGreaterThan(0);
     expect(within(activeTarget).getAllByText('09-28').length).toBeGreaterThan(0);
-    expect(within(screen.getByLabelText('目标：完善客户交付方案')).getByText('0%')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('目标：完善客户交付方案')).getAllByText('0%').length).toBeGreaterThan(0);
   });
 
   it('shows draft state only for draft cards and uses distinct saved or submitted dates', () => {
@@ -105,6 +105,8 @@ describe('MyTargetMonthSection', () => {
     expect(within(activeCard).queryByText('已提交')).not.toBeInTheDocument();
     expect(within(activeCard).getByText('当前进度：42%')).toBeInTheDocument();
     expect(within(activeCard).getByText('截止日期：09-28')).toBeInTheDocument();
+    expect(within(activeCard).getByText('@吴清 @刘笑星')).toBeInTheDocument();
+    expect(within(activeCard).queryByText('来源自上级 · 陈宇璋')).not.toBeInTheDocument();
     expect(within(activeCard).getByText('42%')).toBeInTheDocument();
     expect(within(activeCard).queryByText('另有')).not.toBeInTheDocument();
   });

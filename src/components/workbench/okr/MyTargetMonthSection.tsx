@@ -144,7 +144,7 @@ export const buildMyTargetViewItems = (
       title: source?.payload.title || group[0]?.payload.title || '来源目标已不可用',
       status: group.some(item => item.status === 'draft') ? 'draft' : 'active',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
-      creatorName: source ? ownerNameOf(source.ownerId) : ownerNameOf(group[0]?.ownerId),
+      creatorName: ownerNameOf(group[0]?.ownerId),
       levelLabel: groupOwner?.rootFlag === 1 ? '公司级' : groupOwner?.supervisorId ? '主管级' : '个人级',
       metaOwnerId: source?.ownerId || groupOwner?.supervisorId || group[0]?.ownerId,
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
@@ -210,9 +210,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
           <span className="okr-target-hierarchy-owner"><span className="okr-target-hierarchy-label">承接人员：{assigneeLabel(target.ownerNames)}</span></span>
         </div>
       </div>
-      <div className="okr-target-list-status">
-        {submitted && <><div><span>进度</span><strong>{target.progress}%</strong></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></>}
-      </div>
+      <div className="okr-target-list-status"><div><span>进度</span><strong>{target.progress}%</strong></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></div>
     </header>
     <div className="okr-target-actions">{target.actions.length
       ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees/>)
@@ -226,14 +224,13 @@ const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   const visibleActions = target.actions.slice(0, 4);
   return <article className="okr-target-grid-card" role="button" tabIndex={0} aria-label={`目标卡片：${target.title}`} onClick={onOpen} onKeyDown={event => openOnKeyboard(event, onOpen)}>
     <header>
-      <div className="okr-target-card-title"><span className="okr-summary-index">O{index + 1}</span><h3 title={target.title}>{target.title}</h3>{target.status === 'draft' && <Tag>草稿</Tag>}</div>
-      <strong className="okr-target-card-progress">{target.progress}%</strong>
+      <div className="okr-target-card-title"><span className="okr-summary-index">O{index + 1}</span><h3 title={target.title}>{target.title}</h3></div>
+      <div className="okr-target-card-head-right">{target.status === 'draft' && <Tag>草稿</Tag>}<strong className="okr-target-card-progress">{target.progress}%</strong></div>
     </header>
-    {target.sourceName && <span className="okr-target-source">{target.sourceName}</span>}
     <div className="okr-target-meta-line"><Tag color="blue">{target.levelLabel || '公司级'}</Tag><span className="okr-target-creator">{target.creatorName || '未指定'}</span><span className="okr-target-weight">{target.totalWeight ?? 0}%</span></div>
     <div className="okr-target-card-meta"><span>当前进度：{target.progress}%</span><time>截止日期：{formatDeadline(target.maxDeadline || '')}</time><Progress percent={target.progress} size="small" showInfo={false}/></div>
     <div className="okr-target-card-actions">{visibleActions.length
-      ? visibleActions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} compact/>)
+      ? visibleActions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} compact inlineAssignees/>)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>
   </article>;
