@@ -812,3 +812,11 @@
   .okr-target-action-row.is-compact { grid-template-columns:28px minmax(0,1fr); }
   .okr-target-action-row.is-compact > span:nth-child(3) { grid-column:2; }
 }
+
+.okr-target-meta-line { display:flex; align-items:center; gap:12px; margin-left:40px; color:var(--text-primary); font-size:13px; line-height:24px; }
+.okr-target-meta-line .ant-tag { margin:0; font-size:12px; }
+.okr-target-list-status { display:grid; grid-template-columns:repeat(3,minmax(72px,auto)); align-items:center; gap:20px; min-width:360px; }
+.okr-target-list-status > div { display:grid; gap:4px; justify-items:center; min-width:0; }
+.okr-target-list-status > div > span { color:var(--text-muted); font-size:12px; white-space:nowrap; }
+.okr-target-list-status > div > strong { color:var(--text-body); font-size:16px; font-weight:500; white-space:nowrap; }
+@media (max-width:900px) { .okr-target-list-item > header { flex-direction:column; align-items:stretch; } .okr-target-list-status { grid-template-columns:repeat(3,1fr); min-width:0; width:100%; } }

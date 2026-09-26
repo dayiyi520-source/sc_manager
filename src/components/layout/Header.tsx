@@ -252,7 +252,7 @@ export const Header: React.FC = () => {
               {currentUser.avatar ? <img src={currentUser.avatar} alt={currentUser.name} className="block w-6 h-6 rounded-full object-cover" /> : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--primary)] text-[11px] font-semibold text-white">{currentUser.name.slice(0, 1)}</span>}
             </span>
             <div className="hidden lg:block text-xs leading-tight">
-              <div className="font-medium text-white flex items-center gap-1">
+              <div className="tech-current-user-name font-medium flex items-center gap-1">
                 {currentUser.name}
                 <span className="text-[9px] px-1.5 py-0.2 bg-[color-mix(in_srgb,var(--warning)_15%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_30%,var(--border-main))] rounded font-mono">
                   {currentUser.role === 'admin'
