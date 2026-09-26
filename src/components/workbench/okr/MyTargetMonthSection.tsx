@@ -202,6 +202,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   const submitted = isSubmitted(target);
   return <article className="okr-target-list-item" role="button" tabIndex={0} aria-label={`目标：${target.title}`} onClick={onOpen} onKeyDown={event => openOnKeyboard(event, onOpen)}>
     <header>
+      {target.status === 'draft' && <Tag className="okr-target-list-draft">草稿</Tag>}
       <div className="okr-target-list-copy">
         <div className={`okr-target-hierarchy${target.sourceName || target.ownerNames.length ? ' has-links' : ''}`}>
           {target.sourceName && <span className="okr-target-hierarchy-source"><span className="okr-target-hierarchy-label">{target.sourceName}</span></span>}
@@ -210,7 +211,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
           <span className="okr-target-hierarchy-owner"><span className="okr-target-hierarchy-label">承接人员：{assigneeLabel(target.ownerNames)}</span></span>
         </div>
       </div>
-      <div className="okr-target-list-status">{target.status === 'draft' && <Tag className="okr-target-list-status-tag">草稿</Tag>}<div><span>进度</span><strong>{target.progress}%</strong></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></div>
+      <div className="okr-target-list-status"><div><span>进度</span><strong>{target.progress}%</strong></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></div>
     </header>
     <div className="okr-target-actions">{target.actions.length
       ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees/>)

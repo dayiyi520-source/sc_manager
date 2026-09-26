@@ -767,6 +767,7 @@
 .okr-target-hierarchy-owner { color:var(--text-muted); }
 .okr-target-list-item:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
 .okr-target-list-item > header { display:flex; min-height:96px; align-items:center; justify-content:space-between; gap:24px; padding:16px 20px; border-bottom:1px solid var(--border-main); }
+.okr-target-list-item > header { position:relative; }
 .okr-target-list-copy { display:grid; min-width:0; gap:6px; }
 .okr-target-source,.okr-target-owner { color:var(--text-muted); font-size:11px; line-height:16px; }
 .okr-target-title-line { display:flex; min-width:0; align-items:flex-start; gap:8px; }
@@ -842,7 +843,7 @@
 .okr-target-meta-line { display:flex; align-items:center; gap:12px; margin-left:40px; color:var(--text-primary); font-size:13px; line-height:24px; }
 .okr-target-meta-line .ant-tag { margin:0; font-size:12px; }
 .okr-target-list-status { display:grid; grid-template-columns:repeat(3,minmax(72px,auto)); align-items:center; gap:20px; min-width:360px; }
-.okr-target-list-status-tag { grid-column:1 / -1; justify-self:end; margin:0; }
+.okr-target-list-draft { position:absolute; top:16px; right:20px; z-index:1; margin:0; }
 .okr-target-list-status > div { display:grid; gap:4px; justify-items:center; min-width:0; }
 .okr-target-list-status > div > span { color:var(--text-muted); font-size:12px; white-space:nowrap; }
 .okr-target-list-status > div > strong { color:var(--text-body); font-size:16px; font-weight:500; white-space:nowrap; }
