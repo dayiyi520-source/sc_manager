@@ -842,6 +842,7 @@
 .okr-target-meta-line { display:flex; align-items:center; gap:12px; margin-left:40px; color:var(--text-primary); font-size:13px; line-height:24px; }
 .okr-target-meta-line .ant-tag { margin:0; font-size:12px; }
 .okr-target-list-status { display:grid; grid-template-columns:repeat(3,minmax(72px,auto)); align-items:center; gap:20px; min-width:360px; }
+.okr-target-list-status-tag { grid-column:1 / -1; justify-self:end; margin:0; }
 .okr-target-list-status > div { display:grid; gap:4px; justify-items:center; min-width:0; }
 .okr-target-list-status > div > span { color:var(--text-muted); font-size:12px; white-space:nowrap; }
 .okr-target-list-status > div > strong { color:var(--text-body); font-size:16px; font-weight:500; white-space:nowrap; }
