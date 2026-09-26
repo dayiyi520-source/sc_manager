@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MyTargetMonthSection, type MyTargetViewItem } from './MyTargetMonthSection';
+import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewItem } from './MyTargetMonthSection';
+import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
 
 const targets: MyTargetViewItem[] = [
   {
@@ -37,6 +38,22 @@ const targets: MyTargetViewItem[] = [
 ];
 
 describe('MyTargetMonthSection', () => {
+  it('uses the breakdown owner for level and the upstream owner for creator', () => {
+    const people: OkrPerson[] = [
+      { id: 'boss', name: '林志豪', department: '管理部', supervisorId: null, rootFlag: 1, version: 1 },
+      { id: 'manager', name: '陈宇璋', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 },
+      { id: 'staff', name: '毛景强', department: '产品部', supervisorId: 'manager', rootFlag: 0, version: 1 },
+    ];
+    const records: OkrRecord[] = [
+      { id: 'parent', kind: 'action', ownerId: 'boss', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '产研动作', parentObjectiveId: 'o1', parentActionId: '' } },
+      { id: 'child', kind: 'action', ownerId: 'manager', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '测试1', parentObjectiveId: 'o1', parentActionId: 'parent', assigneeIds: ['staff'], weight: 100 } },
+    ];
+    const target = buildMyTargetViewItems(records, [], [], people, 'manager').find(item => item.actions.some(action => action.title === '测试1'))!;
+    expect(target.levelLabel).toBe('主管级');
+    expect(target.creatorName).toBe('林志豪');
+    expect(target.ownerNames).toEqual(['毛景强']);
+  });
+
   it('renders the list view as complete objective units with source, owners, and action fields', () => {
     render(<MyTargetMonthSection periodKey="2020-01" targets={targets} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()} />);
 

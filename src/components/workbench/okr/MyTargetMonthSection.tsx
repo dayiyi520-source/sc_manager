@@ -25,6 +25,7 @@ export type MyTargetViewItem = {
   ownerNames: string[];
   creatorName?: string;
   levelLabel?: string;
+  metaOwnerId?: string;
   totalWeight?: number;
   maxDeadline?: string;
   progress: number;
@@ -117,6 +118,7 @@ export const buildMyTargetViewItems = (
       ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
       creatorName: sourceOwner || ownerNameOf(record.ownerId),
       levelLabel: recordOwner?.rootFlag === 1 ? '公司级' : recordOwner?.supervisorId ? '主管级' : '个人级',
+      metaOwnerId: source?.ownerId || recordOwner?.supervisorId || record.ownerId,
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
       maxDeadline: actions.map(action => action.deadline).filter(Boolean).sort().at(-1) || '',
       progress: weightedProgress(actions),
@@ -134,7 +136,7 @@ export const buildMyTargetViewItems = (
     const source = [...sourceActions, ...records].find(item => item.id === parentId);
     const actions = group.map(actionView);
     const sourceOwner = source ? nameOf(source.ownerId) : undefined;
-    const sourceOwnerPerson = source ? people.find(person => person.id === source.ownerId) : undefined;
+    const groupOwner = people.find(person => person.id === group[0]?.ownerId);
     return {
       id: `action-group-${parentId}`,
       detailId: group[0]?.id,
@@ -142,7 +144,8 @@ export const buildMyTargetViewItems = (
       status: group.some(item => item.status === 'draft') ? 'draft' : 'active',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       creatorName: source ? ownerNameOf(source.ownerId) : ownerNameOf(group[0]?.ownerId),
-      levelLabel: sourceOwnerPerson?.rootFlag === 1 ? '公司级' : sourceOwnerPerson?.supervisorId ? '主管级' : '个人级',
+      levelLabel: groupOwner?.rootFlag === 1 ? '公司级' : groupOwner?.supervisorId ? '主管级' : '个人级',
+      metaOwnerId: source?.ownerId || groupOwner?.supervisorId || group[0]?.ownerId,
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
       maxDeadline: actions.map(action => action.deadline).filter(Boolean).sort().at(-1) || '',
       ownerNames: (() => {

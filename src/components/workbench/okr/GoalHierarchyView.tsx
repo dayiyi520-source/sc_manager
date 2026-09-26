@@ -264,9 +264,10 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
           progress: target.progress,
           weight: 100,
           ownerId: ownerId || '',
-          assigneeIds: [],
-          objectiveLevel: people.find(person => person.id === ownerId)?.rootFlag === 1 ? '公司级' : people.find(person => person.id === ownerId)?.supervisorId ? '主管级' : '个人级',
-          objectiveMetaOwnerId: ownerId,
+          assigneeIds: [...new Set(target.actions.flatMap(action => action.assigneeNames.map(name => people.find(person => person.name === name)?.id).filter((id): id is string => Boolean(id))))],
+          assigneeNames: [...new Set(target.actions.flatMap(action => action.assigneeNames))],
+          objectiveLevel: target.levelLabel || (people.find(person => person.id === ownerId)?.rootFlag === 1 ? '公司级' : people.find(person => person.id === ownerId)?.supervisorId ? '主管级' : '个人级'),
+          objectiveMetaOwnerId: target.metaOwnerId || ownerId,
           children: [],
         };
         root.children = target.actions.map(action => ({
