@@ -14,14 +14,38 @@ import {
   List,
 } from '@/components/common/octicons-compat';
 import { useApp, MENU_GROUPS } from '../../context/AppContext';
-import { CURRENT_USERS } from '../../data/mockData';
 import { useAppAuth } from '../../hooks/useAppAuth';
 import { clearSession } from '../../services/session';
+import { teamRepository } from '../../services/teamRepository';
+import type { CurrentUser, EmployeeOption } from '../../types';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
 export const Header: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, setCurrentUserRole } = useAppAuth();
+  const switchableRoles: CurrentUser['role'][] = ['admin', 'sales_director', 'product_manager', 'tech_lead'];
+  const roleMembersQuery = useQuery({
+    queryKey: ['team-member-role-options'],
+    queryFn: teamRepository.options,
+    retry: false,
+  });
+  const organizationRoleMembers = (roleMembersQuery.data || [])
+    .filter((member) => switchableRoles.includes(member.role as CurrentUser['role']))
+    .sort((a, b) => switchableRoles.indexOf(a.role as CurrentUser['role']) - switchableRoles.indexOf(b.role as CurrentUser['role']));
+  const productManagerMember = (roleMembersQuery.data || [])
+    .filter((member) => member.role === 'employee' && member.department === '产品规划部' && member.jobTitle === '产品经理')
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))[0];
+  const roleMembers = productManagerMember ? [...organizationRoleMembers, productManagerMember] : organizationRoleMembers;
+  const roleMemberToUser = (member: EmployeeOption): CurrentUser => ({
+    id: member.id,
+    name: member.name,
+    avatar: member.avatar || '',
+    role: member.role === 'employee' ? 'product_manager' : member.role as CurrentUser['role'],
+    roleTitle: member.roleTitle || member.jobTitle || '团队成员',
+    department: member.department || '',
+  });
+  const switchableUsers = roleMembers.map(roleMemberToUser);
   const {
     theme,
     toggleTheme,
@@ -225,11 +249,7 @@ export const Header: React.FC = () => {
             className="flex items-center gap-2 p-1 pl-1.5 rounded-md hover:bg-[var(--bg-surface)] border border-transparent hover:border-[var(--border-main)] transition-colors text-left"
           >
             <span className="tech-avatar-frame shrink-0">
-              <img
-                src={currentUser.avatar || undefined}
-                alt={currentUser.name}
-                className="block w-6 h-6 rounded-full object-cover"
-              />
+              {currentUser.avatar ? <img src={currentUser.avatar} alt={currentUser.name} className="block w-6 h-6 rounded-full object-cover" /> : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--primary)] text-[11px] font-semibold text-white">{currentUser.name.slice(0, 1)}</span>}
             </span>
             <div className="hidden lg:block text-xs leading-tight">
               <div className="font-medium text-white flex items-center gap-1">
@@ -264,27 +284,29 @@ export const Header: React.FC = () => {
               </div>
 
               <div className="space-y-1 mt-1">
-                {CURRENT_USERS.map((u) => (
+                {roleMembersQuery.isLoading && <div className="px-3 py-2 text-[var(--text-muted)]">正在加载团队成员...</div>}
+                {!roleMembersQuery.isLoading && !switchableUsers.length && <div className="px-3 py-2 text-[var(--text-muted)]">暂无可切换的团队角色</div>}
+                {switchableUsers.map((u) => (
                   <button
                     key={u.id}
                     onClick={() => {
-                      setCurrentUserRole(u.role);
+                      setCurrentUserRole(u);
                       setUserMenuOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-left transition-colors ${
-                      currentUser.role === u.role
+                      currentUser.id === u.id
                         ? 'bg-[color-mix(in_srgb,var(--warning)_15%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_30%,var(--border-main))] font-medium'
                         : 'hover:bg-[var(--bg-elevated)] text-[var(--text-body)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <img src={u.avatar || undefined} alt={u.name} className="w-5 h-5 rounded-full object-cover" />
+                      {u.avatar ? <img src={u.avatar} alt={u.name} className="w-5 h-5 rounded-full object-cover" /> : <span className="role-switch-avatar flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-semibold text-white">{u.name.slice(0, 1)}</span>}
                       <div>
                         <div>{u.name}</div>
                         <div className="text-[10px] text-[var(--text-muted)]">{u.roleTitle.split(' ')[0]}</div>
                       </div>
                     </div>
-                    {currentUser.role === u.role && <UserCheck className="w-4 h-4 text-[var(--warning)]" />}
+                    {currentUser.id === u.id && <UserCheck className="w-4 h-4 text-[var(--warning)]" />}
                   </button>
                 ))}
               </div>

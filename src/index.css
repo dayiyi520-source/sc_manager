@@ -2117,3 +2117,5 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
   .test-task-metrics > div:nth-child(2) { border-right: 0; }
   .test-task-metrics > div:nth-child(-n+2) { border-bottom: 1px solid var(--border-main); }
 }
+
+.role-switch-avatar { color: #fff !important; }
