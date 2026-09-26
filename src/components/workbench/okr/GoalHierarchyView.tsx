@@ -42,7 +42,7 @@ const aggregateProgress = (node: GoalHierarchyNode): number => {
   return Math.round(weighted.reduce((sum, child) => sum + aggregateProgress(child) * child.weight, 0) / totalWeight);
 };
 
-export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, ownerId?: string): GoalHierarchyNode[] {
+export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, ownerId?: string, people: OkrPerson[] = []): GoalHierarchyNode[] {
   const periodRecords = records.filter(record => record.periodKey === periodKey);
   const objectives = periodRecords.filter(record => record.kind === 'objective' && (!ownerId || record.ownerId === ownerId));
   const actions = periodRecords.filter(record => record.kind === 'action');
@@ -105,6 +105,17 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
         children: [],
       };
       actionNode.children = buildActionChildren(actionNode, keyResult.id, new Set());
+      if (actionNode.assigneeIds.length > 1 && actionNode.children.length > 0 && !actionNode.children.some(child => actionNode.assigneeIds.includes(child.ownerId))) {
+        const managerNodes = actionNode.assigneeIds.map(managerId => {
+          const manager = people.find(person => person.id === managerId);
+          const managerChildren = actionNode.children.filter(child => people.find(person => person.id === child.ownerId)?.supervisorId === managerId);
+          const managerNode: GoalHierarchyNode = { id: `manager:${actionNode.id}:${managerId}`, referenceId: `manager:${actionNode.id}:${managerId}`, kind: 'action', title: manager?.name || actionNode.title, status: actionNode.status, progress: 0, weight: Number((100 / actionNode.assigneeIds.length).toFixed(2)), ownerId: managerId, assigneeIds: [managerId], assigneeNames: manager?.name ? [manager.name] : undefined, source: actionNode, children: managerChildren };
+          managerChildren.forEach(child => { child.source = managerNode; });
+          managerNode.progress = aggregateProgress(managerNode);
+          return managerNode;
+        }).filter(node => node.children.length > 0);
+        if (managerNodes.length > 0) actionNode.children = managerNodes;
+      }
       actionNode.progress = aggregateProgress(actionNode);
       return actionNode;
     });
@@ -234,7 +245,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
   onSubmitDraft?: (record: OkrRecord) => void;
 }) {
   const roots = useMemo(() => {
-    const persistedRoots = buildGoalHierarchy(records, periodKey, ownerId);
+    const persistedRoots = buildGoalHierarchy(records, periodKey, ownerId, people);
     const persistedIds = new Set(persistedRoots.map(root => root.id));
     const supplementalRoots = supplementalTargets
       .filter(target => !persistedIds.has(target.id) && (!target.detailId || !persistedIds.has(target.detailId)))
@@ -269,7 +280,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
         return root;
       });
     return [...persistedRoots, ...supplementalRoots];
-  }, [records, periodKey, ownerId, supplementalTargets]);
+  }, [records, periodKey, ownerId, people, supplementalTargets]);
   const nodes = useMemo(() => flatten(roots), [roots]);
   const expandableIds = useMemo(() => nodes.filter(node => node.children.length > 0).map(node => node.id), [nodes]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(roots.map(root => root.id)));

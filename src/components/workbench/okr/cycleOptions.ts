@@ -5,8 +5,8 @@ export type OkrPeriodStatus = 'active' | 'upcoming' | 'ended';
 
 export const periodStatusOptions = (): { label: string; value: OkrPeriodStatus }[] => [
   { label: '进行中', value: 'active' },
-  { label: '已结束', value: 'ended' },
   { label: '未开始', value: 'upcoming' },
+  { label: '已结束', value: 'ended' },
 ];
 
 export function periodStatus(month: string, current = dayjs().format('YYYY-MM')): OkrPeriodStatus {
