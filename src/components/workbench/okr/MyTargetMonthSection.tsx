@@ -24,6 +24,7 @@ export type MyTargetViewItem = {
   sourceName?: string;
   ownerNames: string[];
   creatorName?: string;
+  levelLabel?: string;
   totalWeight?: number;
   maxDeadline?: string;
   progress: number;
@@ -104,8 +105,9 @@ export const buildMyTargetViewItems = (
       deadline: action.deadline || '',
     }));
     const sourceId = record.payload.parentObjectiveId || record.payload.alignments?.[0]?.parentObjectiveId;
+    const recordOwner = people.find(person => person.id === record.ownerId);
     const source = sourceId ? [...sourceActions, ...records].find(item => item.id === sourceId) : undefined;
-    const sourceOwner = source ? nameOf(source.ownerId) : undefined;
+    const sourceOwner = nameOf(source?.ownerId || recordOwner?.supervisorId);
     return {
       id: record.id,
       detailId: record.id,
@@ -113,7 +115,8 @@ export const buildMyTargetViewItems = (
       status: record.status,
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
-      creatorName: ownerNameOf(record.ownerId),
+      creatorName: sourceOwner || ownerNameOf(record.ownerId),
+      levelLabel: recordOwner?.rootFlag === 1 ? '公司级' : recordOwner?.supervisorId ? '主管级' : '个人级',
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
       maxDeadline: actions.map(action => action.deadline).filter(Boolean).sort().at(-1) || '',
       progress: weightedProgress(actions),
@@ -131,6 +134,7 @@ export const buildMyTargetViewItems = (
     const source = [...sourceActions, ...records].find(item => item.id === parentId);
     const actions = group.map(actionView);
     const sourceOwner = source ? nameOf(source.ownerId) : undefined;
+    const sourceOwnerPerson = source ? people.find(person => person.id === source.ownerId) : undefined;
     return {
       id: `action-group-${parentId}`,
       detailId: group[0]?.id,
@@ -138,6 +142,7 @@ export const buildMyTargetViewItems = (
       status: group.some(item => item.status === 'draft') ? 'draft' : 'active',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       creatorName: source ? ownerNameOf(source.ownerId) : ownerNameOf(group[0]?.ownerId),
+      levelLabel: sourceOwnerPerson?.rootFlag === 1 ? '公司级' : sourceOwnerPerson?.supervisorId ? '主管级' : '个人级',
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
       maxDeadline: actions.map(action => action.deadline).filter(Boolean).sort().at(-1) || '',
       ownerNames: (() => {
@@ -197,7 +202,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
         <div className={`okr-target-hierarchy${target.sourceName || target.ownerNames.length ? ' has-links' : ''}`}>
           {target.sourceName && <span className="okr-target-hierarchy-source"><span className="okr-target-hierarchy-label">{target.sourceName}</span></span>}
           <div className="okr-target-title-line"><span className="okr-summary-index">O{index + 1}</span><h3>{target.title}</h3>{target.status === 'draft' && <Tag>草稿</Tag>}</div>
-          <div className="okr-target-meta-line"><Tag color="blue">公司级</Tag><span className="okr-target-creator">{target.creatorName || '未指定'}</span><span className="okr-target-weight">{target.totalWeight ?? 0}%</span></div>
+          <div className="okr-target-meta-line"><Tag color="blue">{target.levelLabel || '公司级'}</Tag><span className="okr-target-creator">{target.creatorName || '未指定'}</span><span className="okr-target-weight">{target.totalWeight ?? 0}%</span></div>
           <span className="okr-target-hierarchy-owner"><span className="okr-target-hierarchy-label">承接人员：{assigneeLabel(target.ownerNames)}</span></span>
         </div>
       </div>

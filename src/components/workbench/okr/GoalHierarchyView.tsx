@@ -30,6 +30,8 @@ export type GoalHierarchyNode = {
   source?: GoalHierarchyNode;
   children: GoalHierarchyNode[];
   record?: OkrRecord;
+  objectiveLevel?: string;
+  objectiveMetaOwnerId?: string;
 };
 
 const clampProgress = (value: unknown) => Math.max(0, Math.min(100, Number(value) || 0));
@@ -47,34 +49,9 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
   const objectives = periodRecords.filter(record => record.kind === 'objective' && (!ownerId || record.ownerId === ownerId));
   const actions = periodRecords.filter(record => record.kind === 'action');
 
-  const addManagerLayers = (parent: GoalHierarchyNode): void => {
-    if (parent.assigneeIds.length <= 1 || parent.children.length === 0) return;
-    const managerNodes = parent.assigneeIds.map(managerId => {
-      const manager = people.find(person => person.id === managerId);
-      const managerChildren = parent.children.filter(child => {
-        const childOwner = people.find(person => person.id === child.ownerId);
-        const childAssignees = child.assigneeIds.flatMap(id => people.find(person => person.id === id)?.supervisorId === managerId ? [id] : []);
-        return childOwner?.supervisorId === managerId || childAssignees.length > 0;
-      });
-      const managerNode: GoalHierarchyNode = {
-        id: `manager:${parent.id}:${managerId}`,
-        referenceId: `manager:${parent.id}:${managerId}`,
-        kind: 'action',
-        title: manager?.name ? `${parent.title}（${manager.name}）` : parent.title,
-        status: parent.status,
-        progress: 0,
-        weight: Number((100 / parent.assigneeIds.length).toFixed(2)),
-        ownerId: managerId,
-        assigneeIds: [managerId],
-        assigneeNames: manager?.name ? [manager.name] : undefined,
-        source: parent,
-        children: managerChildren,
-      };
-      managerChildren.forEach(child => { child.source = managerNode; });
-      managerNode.progress = aggregateProgress(managerNode);
-      return managerNode;
-    }).filter(node => node.children.length > 0);
-    if (managerNodes.length > 0) parent.children = managerNodes;
+  const levelLabel = (id: string) => {
+    const person = people.find(item => item.id === id);
+    return person?.rootFlag === 1 ? '公司级' : person?.supervisorId ? '主管级' : '个人级';
   };
 
   const buildActionChildren = (parent: GoalHierarchyNode, parentReferenceId: string, seen: Set<string>): GoalHierarchyNode[] => actions
@@ -99,7 +76,6 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
         record,
       };
       node.children = buildActionChildren(node, record.id, nextSeen);
-      addManagerLayers(node);
       node.progress = aggregateProgress(node);
       return node;
     });
@@ -119,6 +95,8 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
       createdAt: record.createdAt,
       children: [],
       record,
+      objectiveLevel: levelLabel(record.ownerId),
+      objectiveMetaOwnerId: periodRecords.find(item => item.id === (record.payload.parentObjectiveId || record.payload.alignments?.[0]?.parentObjectiveId))?.ownerId || people.find(person => person.id === record.ownerId)?.supervisorId || record.ownerId,
     };
     const keyResultNodes: GoalHierarchyNode[] = (record.payload.keyResults || []).map(keyResult => {
       const actionNode: GoalHierarchyNode = {
@@ -136,7 +114,6 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
         children: [],
       };
       actionNode.children = buildActionChildren(actionNode, keyResult.id, new Set());
-      addManagerLayers(actionNode);
       actionNode.progress = aggregateProgress(actionNode);
       return actionNode;
     });
@@ -162,7 +139,6 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
           record: action,
         };
         node.children = buildActionChildren(node, action.id, new Set([action.id]));
-        addManagerLayers(node);
         node.progress = aggregateProgress(node);
         return node;
     });
@@ -197,18 +173,17 @@ const GoalNodeRow = ({ node, code, expanded, selected, people, onToggle, onSelec
   const status = statusMeta(node.status);
   const assigneeNames = node.assigneeNames || node.assigneeIds.map(id => people.find(person => person.id === id)?.name || id);
   const isObjective = node.kind === 'objective';
-  const isLeafAction = !isObjective && node.children.length === 0;
-  const visibleAssignees = isLeafAction ? [] : assigneeNames;
-  const ownerName = people.find(person => person.id === node.ownerId)?.name || '人员已停用';
+  const visibleAssignees = assigneeNames;
+  const ownerName = people.find(person => person.id === (node.objectiveMetaOwnerId || node.ownerId))?.name || '人员已停用';
   return <div className={`goal-node-row${selected ? ' is-selected' : ''}${node.status === 'draft' ? ' is-draft' : ''}`}>
     <button type="button" className="goal-node-toggle" aria-label={node.children.length ? `${expanded ? '收起' : '展开'} ${node.title}` : `${node.title} 无下级动作`} disabled={!node.children.length} onClick={onToggle}>
       {node.children.length ? (expanded ? <ChevronDownIcon /> : <ChevronRightIcon />) : <span />}
     </button>
     <button type="button" className="goal-node-main" aria-label={`查看 ${node.title}`} aria-pressed={selected} onClick={onSelect}>
       <span className="goal-node-list-copy">
-        <span className="goal-node-title-line"><span className={`goal-node-code is-${node.kind}`}>{code}</span><span className="goal-node-title">{node.title}{!isObjective && visibleAssignees.length > 0 && <span className="goal-node-action-assignees-inline"> {visibleAssignees.map(name => `@${name}`).join(' ')}</span>}</span><Tag color={status.color}>{status.label}</Tag></span>
+        <span className="goal-node-title-line"><span className={`goal-node-code is-${node.kind}`}>{code}</span><span className="goal-node-title">{node.title}{!isObjective && visibleAssignees.length > 0 && <span className="goal-node-action-assignees-inline"> {visibleAssignees.map(name => `@${name}`).join(' ')}</span>}</span>{node.status !== 'active' && <Tag color={status.color}>{status.label}</Tag>}</span>
         {isObjective
-          ? <><span className="goal-node-meta-line"><Tag color="blue">公司级</Tag><span className="goal-node-creator">{ownerName}</span><span className="goal-node-weight">{node.weight}%</span></span><span className="goal-node-owner">承接人员：{assigneeNames.length ? assigneeNames.join('、') : '未指定承接人'}</span></>
+          ? <><span className="goal-node-meta-line"><Tag color="blue">{node.objectiveLevel || '公司级'}</Tag><span className="goal-node-creator">{ownerName}</span><span className="goal-node-weight">{node.weight}%</span></span><span className="goal-node-owner">承接人员：{assigneeNames.length ? assigneeNames.join('、') : '未指定承接人'}</span></>
           : node.children.length > 0 && <span className="goal-node-meta"><span>{node.children.length} 个下级动作</span></span>}
       </span>
       <span className="goal-node-metrics">
@@ -290,6 +265,8 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
           weight: 100,
           ownerId: ownerId || '',
           assigneeIds: [],
+          objectiveLevel: people.find(person => person.id === ownerId)?.rootFlag === 1 ? '公司级' : people.find(person => person.id === ownerId)?.supervisorId ? '主管级' : '个人级',
+          objectiveMetaOwnerId: ownerId,
           children: [],
         };
         root.children = target.actions.map(action => ({

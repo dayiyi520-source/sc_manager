@@ -44,6 +44,25 @@ describe('GoalHierarchyView', () => {
     expect(root.children[0].id).toBe('kr:o1:a1');
   });
 
+  it('keeps real child actions under the parent without creating manager wrapper nodes', () => {
+    const multiAssigneeRecords = records.map(record => record.id === 'o1'
+      ? { ...record, payload: { ...record.payload, keyResults: [{ ...record.payload.keyResults![0], assigneeIds: ['manager', 'staff'] }] } }
+      : record);
+    const [root] = buildGoalHierarchy(multiAssigneeRecords, '2026-09', undefined, people);
+    expect(root.children[0].children.map(node => node.id)).toEqual(['a11', 'a12']);
+    expect(root.children[0].children.some(node => node.id.startsWith('manager:'))).toBe(false);
+  });
+
+  it('marks a manager objective with the upstream owner in its metadata', () => {
+    const managerObjective: OkrRecord = {
+      id: 'manager-objective', kind: 'objective', ownerId: 'manager', periodKey: '2026-09', status: 'active', version: 1,
+      payload: { title: '主管目标', parentObjectiveId: 'o1', keyResults: [] },
+    };
+    const [root] = buildGoalHierarchy([...records, managerObjective], '2026-09', 'manager', people);
+    expect(root.objectiveLevel).toBe('主管级');
+    expect(root.objectiveMetaOwnerId).toBe('boss');
+  });
+
   it('shows two levels initially and expands deeper branches on demand', () => {
     render(<GoalHierarchyView records={records} people={people} periodKey="2026-09" />);
     expect(screen.getByText('提升客户交付质量')).toBeInTheDocument();
@@ -64,6 +83,7 @@ describe('GoalHierarchyView', () => {
     expect(screen.getByText('补齐质量复盘机制')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '展开 完成重点项目验收清单' }));
     expect(screen.getByText('核验交付验收证据')).toBeInTheDocument();
+    expect(screen.getByText('@执行员工')).toBeInTheDocument();
     const leafRow = screen.getByRole('button', { name: '查看 核验交付验收证据' }).closest('.goal-node-row');
     expect(leafRow).not.toHaveTextContent('承接人员');
     expect(leafRow).not.toHaveTextContent('下级动作');
