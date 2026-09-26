@@ -249,7 +249,7 @@ export const Header: React.FC = () => {
             className="flex items-center gap-2 p-1 pl-1.5 rounded-md hover:bg-[var(--bg-surface)] border border-transparent hover:border-[var(--border-main)] transition-colors text-left"
           >
             <span className="tech-avatar-frame shrink-0">
-              {currentUser.avatar ? <img src={currentUser.avatar} alt={currentUser.name} className="block w-6 h-6 rounded-full object-cover" /> : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--primary)] text-[11px] font-semibold text-white">{currentUser.name.slice(0, 1)}</span>}
+              {currentUser.avatar ? <img src={currentUser.avatar} alt={currentUser.name} className="block w-6 h-6 rounded-full object-cover" /> : <span className="tech-current-avatar flex h-6 w-6 items-center justify-center rounded-full bg-[var(--primary)] text-[11px] font-semibold text-white">{currentUser.name.slice(0, 1)}</span>}
             </span>
             <div className="hidden lg:block text-xs leading-tight">
               <div className="tech-current-user-name font-medium flex items-center gap-1">

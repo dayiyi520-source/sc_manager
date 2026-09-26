@@ -820,3 +820,11 @@
 .okr-target-list-status > div > span { color:var(--text-muted); font-size:12px; white-space:nowrap; }
 .okr-target-list-status > div > strong { color:var(--text-body); font-size:16px; font-weight:500; white-space:nowrap; }
 @media (max-width:900px) { .okr-target-list-item > header { flex-direction:column; align-items:stretch; } .okr-target-list-status { grid-template-columns:repeat(3,1fr); min-width:0; width:100%; } }
+
+.okr-target-list-item > header { align-items:stretch; }
+.okr-target-list-copy { flex:1; }
+.okr-target-hierarchy { height:100%; grid-template-rows:auto auto auto; align-content:center; gap:6px; }
+.okr-target-meta-line { margin-left:40px; gap:10px; }
+.okr-target-meta-line .okr-target-creator, .okr-target-meta-line .okr-target-weight { padding:3px 10px; border:1px solid var(--border-main); border-radius:6px; background:var(--bg-surface); color:var(--text-body); }
+.okr-target-list-status { align-self:center; }
+.okr-target-actions { margin-left:0; }
