@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Drawer, Empty, Progress, Skeleton, Tag } from 'antd';
+import { Alert, Button, Drawer, Empty, Progress, Skeleton, Tag, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import {
   ChevronDownIcon,
@@ -47,7 +47,7 @@ const aggregateProgress = (node: GoalHierarchyNode): number => {
 export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, ownerId?: string, people: OkrPerson[] = []): GoalHierarchyNode[] {
   const periodRecords = records.filter(record => record.periodKey === periodKey);
   const objectives = periodRecords.filter(record => record.kind === 'objective' && (!ownerId || record.ownerId === ownerId));
-  const actions = periodRecords.filter(record => record.kind === 'action');
+  const actions = periodRecords.filter(record => record.kind === 'action' && record.status !== 'draft');
 
   const levelLabel = (id: string) => {
     const person = people.find(item => item.id === id);
@@ -257,7 +257,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
     const persistedRoots = buildGoalHierarchy(records, periodKey, ownerId, people);
     const persistedIds = new Set(persistedRoots.map(root => root.id));
     const supplementalRoots = supplementalTargets
-      .filter(target => !persistedIds.has(target.id) && (!target.detailId || !persistedIds.has(target.detailId)))
+      .filter(target => target.status !== 'draft' && !persistedIds.has(target.id) && (!target.detailId || !persistedIds.has(target.detailId)))
       .map<GoalHierarchyNode>(target => {
         const root: GoalHierarchyNode = {
           id: target.id,
@@ -313,8 +313,8 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
     <header className="goal-hierarchy-toolbar">
       <div><h2>{periodKey.replace('-', '年')}月目标树</h2><p>默认展示 O 与直属 A，继续展开可查看逐级承接动作。</p></div>
       <div className="goal-hierarchy-actions">
-        <Button icon={allExpanded ? <ScreenNormalIcon /> : <ScreenFullIcon />} disabled={!expandableIds.length || loading} onClick={() => setExpandedIds(allExpanded ? new Set(roots.map(root => root.id)) : new Set(expandableIds))}>{allExpanded ? '收起深层' : '全部展开'}</Button>
-        {onBack && <Button type="text" icon={<XIcon />} onClick={onBack}>返回列表</Button>}
+        <Tooltip title={allExpanded ? '收起' : '展开'}><Button type="text" aria-label={allExpanded ? '收起' : '展开'} icon={allExpanded ? <ScreenNormalIcon /> : <ScreenFullIcon />} disabled={!expandableIds.length || loading} onClick={() => setExpandedIds(allExpanded ? new Set(roots.map(root => root.id)) : new Set(expandableIds))}/></Tooltip>
+        {onBack && <Tooltip title="关闭"><Button type="text" aria-label="关闭" icon={<XIcon />} onClick={onBack}/></Tooltip>}
       </div>
     </header>
     {error && <Alert type="error" showIcon title="目标关系加载失败" description="服务暂不可用，请重试后查看。"/>}

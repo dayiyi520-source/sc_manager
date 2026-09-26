@@ -316,6 +316,8 @@ const OriginalWorkspace: React.FC = () => {
         unavailable={loading || !!error}
         root={!!me?.rootFlag}
         initialPayload={record.payload}
+        allowAddAnotherInDetail
+        onAddAnother={() => { setSelectedOkrRecordId(null); setTargetFormCycle(record.periodKey); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
         onCancel={() => setSelectedOkrRecordId(null)}
         onSave={payload => updateOkr(record.id, payload, true).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })}
         onSaveDraft={payload => updateOkr(record.id, payload, false).then(ok => { if (ok) setSelectedOkrRecordId(null); return ok; })}
@@ -337,30 +339,31 @@ const OriginalWorkspace: React.FC = () => {
       initialActionId={record.id}
       onClose={() => setSelectedOkrRecordId(null)}
       onSave={async (periodKey, groups, mode) => {
-        const group = groups[0];
-        const value = group?.actions[0];
-        if (!group || !value) return false;
-        const assigneeIds = value.assigneeIds || [];
-        const updated = await saveActions(periodKey, [{
-          recordId: value.recordId,
-          version: value.version,
-          title: value.title || '',
-          department: me?.department || '其他支撑',
-          parentObjectiveId: String(group.parent.payload.parentObjectiveId || ''),
-          parentActionId: group.parent.payload.parentActionId || group.parent.id,
-          parentKeyResultId: String(group.parent.payload.parentKeyResultId || group.parent.id),
-          assigneeIds,
-          assigneeName: assigneeIds.map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'),
-          structureType: record.payload.structureType || 'support',
-          productLine: value.businessObject,
-          businessObject: value.businessObject,
-          acceptanceStandard: value.measurableResult || value.businessObject,
-          milestone: value.milestone,
-          deadline: value.deadline?.format('YYYY-MM-DD') || '',
-          weight: Number(value.weight || 0),
-          objectiveType: value.objectiveType || 'target',
-          commitmentWeight: group.commitmentWeight,
-        }], mode === 'submit');
+        const payloads = groups.flatMap(group => group.actions.map(value => {
+          const assigneeIds = value.assigneeIds || [];
+          return {
+            recordId: value.recordId,
+            version: value.version,
+            title: value.title || '',
+            department: me?.department || '其他支撑',
+            parentObjectiveId: String(group.parent.payload.parentObjectiveId || ''),
+            parentActionId: group.parent.payload.parentActionId || group.parent.id,
+            parentKeyResultId: String(group.parent.payload.parentKeyResultId || group.parent.id),
+            assigneeIds,
+            assigneeName: assigneeIds.map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'),
+            structureType: record.payload.structureType || 'support',
+            productLine: value.businessObject,
+            businessObject: value.businessObject,
+            acceptanceStandard: value.measurableResult || value.businessObject,
+            milestone: value.milestone,
+            deadline: value.deadline?.format('YYYY-MM-DD') || '',
+            weight: Number(value.weight || 0),
+            objectiveType: value.objectiveType || 'target',
+            commitmentWeight: group.commitmentWeight,
+          };
+        }));
+        if (!payloads.length) return false;
+        const updated = await saveActions(periodKey, payloads, mode === 'submit');
         if (updated) setSelectedOkrRecordId(null);
         return updated;
       }}
@@ -488,7 +491,18 @@ const OriginalWorkspace: React.FC = () => {
                 next.has(month) ? next.delete(month) : next.add(month);
                 return next;
               })}
-              onOpenTarget={targetId => { setSelectedOkrRecordId(null); setSelectedMonthTargetId(targetId); setSelectedMonthDetail(month); }}
+              onOpenTarget={targetId => {
+                const target = targetItems.find(item => item.id === targetId);
+                if (target?.status === 'draft' && target.detailId) {
+                  setSelectedMonthDetail(null);
+                  setSelectedMonthTargetId(undefined);
+                  setSelectedOkrRecordId(target.detailId);
+                  return;
+                }
+                setSelectedOkrRecordId(null);
+                setSelectedMonthTargetId(targetId);
+                setSelectedMonthDetail(month);
+              }}
             />;
           })}</div>}
           </div>)}

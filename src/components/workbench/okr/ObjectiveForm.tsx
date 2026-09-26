@@ -24,12 +24,13 @@ interface Props {
   readOnly?: boolean;
   detailMode?: boolean;
   compactDetail?: boolean;
+  allowAddAnotherInDetail?: boolean;
 }
 
 export interface ObjectiveFormHandle { submit: () => Promise<boolean>; saveDraft: () => Promise<boolean>; }
 export const calculateKrWeightTotal = (items: Pick<OkrKr, 'weight'>[]) => items.reduce((total, item) => total + item.weight, 0);
 
-export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, people = [], busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false }, ref) {
+export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, people = [], busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false }, ref) {
   const [title, setTitle] = useState(initialPayload?.title || '');
   const [krs, setKrs] = useState<OkrKr[]>(() => initialPayload?.keyResults?.length ? initialPayload.keyResults : [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -99,6 +100,6 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
       <div className="okr-objective-add">{!readOnly && <Button type="text" icon={<PlusIcon/>} disabled={busy || krs.length >= 20} onClick={() => setKrs(items => distribute([...items, { id: crypto.randomUUID(), title: '', weight: 0, progress: 0 }]))}>继续添加</Button>}<span>A 权重合计 {krWeightTotal}%</span></div>
       {error && <Alert type="warning" title={error} showIcon/>}
     </div>
-    {chrome && <div className="okr-objective-footer">{!detailMode && <Button type="text" onClick={onAddAnother} disabled={busy || readOnly}>+ 添加目标</Button>}<span className="okr-objective-footer-spacer"/>{!detailMode && <Button onClick={onCancel} disabled={busy}>返回列表</Button>}{!readOnly && <><Button onClick={() => void saveDraft()} disabled={busy || unavailable}>存草稿</Button><Button type="primary" htmlType="submit" loading={busy} disabled={unavailable}>{root ? '提交目标' : '提交主管确认'}</Button></>}</div>}
+    {chrome && <div className="okr-objective-footer">{(!detailMode || allowAddAnotherInDetail) && <Button type="text" onClick={onAddAnother} disabled={busy || readOnly}>+ 添加目标</Button>}<span className="okr-objective-footer-spacer"/>{!detailMode && <Button onClick={onCancel} disabled={busy}>返回列表</Button>}{!readOnly && <><Button onClick={() => void saveDraft()} disabled={busy || unavailable}>存草稿</Button><Button type="primary" htmlType="submit" loading={busy} disabled={unavailable}>{root ? '提交目标' : '提交主管确认'}</Button></>}</div>}
   </Form>;
 });

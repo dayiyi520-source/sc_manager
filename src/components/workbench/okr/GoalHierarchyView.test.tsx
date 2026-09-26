@@ -32,10 +32,10 @@ const records: OkrRecord[] = [
 describe('GoalHierarchyView', () => {
   it('builds recursive O/A relations and aggregates direct children by weight', () => {
     const [root] = buildGoalHierarchy(records, '2026-09');
-    expect(root.children[0].children.map(node => node.id)).toEqual(['a11', 'a12']);
+    expect(root.children[0].children.map(node => node.id)).toEqual(['a11']);
     expect(root.children[0].children[0].children[0].id).toBe('a111');
     expect(root.children[0].children[0].progress).toBe(80);
-    expect(root.progress).toBe(68);
+    expect(root.progress).toBe(80);
   });
 
   it('uses O1 for objectives and A1 for root actions', () => {
@@ -49,7 +49,7 @@ describe('GoalHierarchyView', () => {
       ? { ...record, payload: { ...record.payload, keyResults: [{ ...record.payload.keyResults![0], assigneeIds: ['manager', 'staff'] }] } }
       : record);
     const [root] = buildGoalHierarchy(multiAssigneeRecords, '2026-09', undefined, people);
-    expect(root.children[0].children.map(node => node.id)).toEqual(['a11', 'a12']);
+    expect(root.children[0].children.map(node => node.id)).toEqual(['a11']);
     expect(root.children[0].children.some(node => node.id.startsWith('manager:'))).toBe(false);
   });
 
@@ -81,8 +81,7 @@ describe('GoalHierarchyView', () => {
     expect(screen.getByText('承接人员：执行员工')).toBeInTheDocument();
   });
 
-  it('keeps a draft action group editable from the detail root', () => {
-    const submit = vi.fn();
+  it('does not include draft supplemental actions in the submitted hierarchy', () => {
     render(<GoalHierarchyView
       records={records}
       people={people}
@@ -94,15 +93,11 @@ describe('GoalHierarchyView', () => {
         status: 'draft',
         ownerNames: ['部门主管'],
         progress: 0,
-        actions: [{ id: 'a12', title: '补齐质量复盘机制', assigneeNames: [], progress: 0, weight: 100, deadline: '2026-09-30' }],
+          actions: [{ id: 'a12', title: '补齐质量复盘机制', assigneeNames: [], progress: 0, weight: 100, deadline: '2026-09-30' }],
       }]}
-      onSubmitDraft={submit}
     />);
-    fireEvent.click(screen.getByRole('button', { name: '查看 主管拆解目标' }));
-    const detail = screen.getByRole('complementary', { name: '目标节点详情' });
-    expect(within(detail).getByText('草稿')).toBeInTheDocument();
-    fireEvent.click(within(detail).getByRole('button', { name: /提\s*交/ }));
-    expect(submit).toHaveBeenCalledWith(records[2]);
+    expect(screen.queryByText('主管拆解目标')).not.toBeInTheDocument();
+    expect(screen.queryByText('补齐质量复盘机制')).not.toBeInTheDocument();
   });
 
   it('shows two levels initially and expands deeper branches on demand', () => {
@@ -113,7 +108,7 @@ describe('GoalHierarchyView', () => {
     expect(screen.getByText('负责人')).toBeInTheDocument();
     expect(screen.getAllByText('100%')).toHaveLength(2);
     expect(screen.getByText('@部门主管')).toBeInTheDocument();
-    expect(screen.getByText('2 个下级动作')).toBeInTheDocument();
+    expect(screen.getByText('1 个下级动作')).toBeInTheDocument();
     expect(screen.getAllByText('进度').length).toBeGreaterThan(0);
     expect(screen.getAllByText('权重').length).toBeGreaterThan(0);
     expect(screen.getAllByText('截止日期').length).toBeGreaterThan(0);
@@ -122,7 +117,6 @@ describe('GoalHierarchyView', () => {
     fireEvent.click(screen.getByRole('button', { name: '展开 建立交付质量门禁' }));
     expect(screen.getByText('完成重点项目验收清单')).toBeInTheDocument();
     expect(screen.getByText('70%')).toBeInTheDocument();
-    expect(screen.getByText('补齐质量复盘机制')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '展开 完成重点项目验收清单' }));
     expect(screen.getByText('核验交付验收证据')).toBeInTheDocument();
     expect(screen.getByText('@执行员工')).toBeInTheDocument();
@@ -131,27 +125,22 @@ describe('GoalHierarchyView', () => {
     expect(leafRow).not.toHaveTextContent('下级动作');
   });
 
-  it('opens and closes the detail drawer with source chain and draft-only actions', async () => {
+  it('opens and closes the detail drawer for submitted actions', async () => {
     const edit = vi.fn();
     const submit = vi.fn();
     render(<GoalHierarchyView records={records} people={people} periodKey="2026-09" onEditDraft={edit} onSubmitDraft={submit} />);
     fireEvent.click(screen.getByRole('button', { name: '展开 建立交付质量门禁' }));
-    fireEvent.click(screen.getByRole('button', { name: '查看 补齐质量复盘机制' }));
+    fireEvent.click(screen.getByRole('button', { name: '查看 完成重点项目验收清单' }));
 
     const detail = screen.getByRole('complementary', { name: '目标节点详情' });
     expect(detail).toBeInTheDocument();
     expect(screen.getByText('来源链路')).toBeInTheDocument();
-    expect(within(detail).getByText('未指定承接人')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '编辑草稿' }));
-    expect(edit).toHaveBeenCalledWith(records[2]);
+    expect(within(detail).getByText('执行员工')).toBeInTheDocument();
+    expect(within(detail).queryByRole('button', { name: '编辑草稿' })).not.toBeInTheDocument();
+    fireEvent.click(within(detail).getByRole('button', { name: '关闭详情' }));
     await waitFor(() => expect(screen.queryByRole('complementary', { name: '目标节点详情' })).not.toBeInTheDocument());
-
-    fireEvent.click(screen.getByRole('button', { name: '查看 补齐质量复盘机制' }));
-    const reopenedDetail = screen.getByRole('complementary', { name: '目标节点详情' });
-    fireEvent.click(within(reopenedDetail).getByRole('button', { name: /提\s*交/ }));
-    expect(submit).toHaveBeenCalledWith(records[2]);
-    fireEvent.click(within(reopenedDetail).getByRole('button', { name: '关闭详情' }));
-    await waitFor(() => expect(screen.queryByRole('complementary', { name: '目标节点详情' })).not.toBeInTheDocument());
+    expect(edit).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
   });
 
   it('renders loading, error, and empty states', () => {
@@ -172,7 +161,7 @@ describe('GoalHierarchyView', () => {
       supplementalTargets={[{
         id: 'session-o',
         title: '会话内拆解目标',
-        status: 'draft',
+        status: 'active',
         ownerNames: ['负责人'],
         progress: 0,
         actions: [{ id: 'session-a', title: '会话内行动', assigneeNames: ['部门主管'], progress: 0, weight: 100, deadline: '' }],

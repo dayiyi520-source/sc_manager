@@ -66,6 +66,18 @@ describe('MyTargetMonthSection', () => {
     expect(buildMyTargetViewItems(records, [], [], people, 'boss')[0].maxDeadline).toBe('2026-09-30');
   });
 
+  it('binds mixed action groups to the draft record for editing', () => {
+    const people: OkrPerson[] = [{ id: 'manager', name: '陈宇璋', department: '产品部', supervisorId: null, rootFlag: 0, version: 1 }];
+    const records: OkrRecord[] = [
+      { id: 'submitted', kind: 'action', ownerId: 'manager', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '已提交动作', parentObjectiveId: 'o1', parentActionId: 'parent' } },
+      { id: 'draft', kind: 'action', ownerId: 'manager', periodKey: '2026-09', status: 'draft', version: 1, payload: { title: '草稿动作', parentObjectiveId: 'o1', parentActionId: 'parent' } },
+    ];
+
+    const target = buildMyTargetViewItems(records, [], [], people, 'manager').find(item => item.id === 'action-group-parent');
+    expect(target?.status).toBe('draft');
+    expect(target?.detailId).toBe('draft');
+  });
+
   it('renders the list view as complete objective units with source, owners, and action fields', () => {
     render(<MyTargetMonthSection periodKey="2020-01" targets={targets} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()} />);
 

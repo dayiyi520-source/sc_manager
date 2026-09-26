@@ -140,7 +140,7 @@ export const buildMyTargetViewItems = (
     const groupOwner = people.find(person => person.id === group[0]?.ownerId);
     return {
       id: `action-group-${parentId}`,
-      detailId: group[0]?.id,
+      detailId: group.find(item => item.status === 'draft')?.id || group[0]?.id,
       title: source?.payload.title || group[0]?.payload.title || '来源目标已不可用',
       status: group.some(item => item.status === 'draft') ? 'draft' : 'active',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
