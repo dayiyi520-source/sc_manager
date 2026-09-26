@@ -2119,3 +2119,5 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 }
 
 .role-switch-avatar { color: #fff !important; }
+
+.role-switch-avatar, .role-switch-avatar * { color: #fff !important; -webkit-text-fill-color: #fff !important; }

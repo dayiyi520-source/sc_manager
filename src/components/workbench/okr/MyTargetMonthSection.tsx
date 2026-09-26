@@ -23,6 +23,9 @@ export type MyTargetViewItem = {
   status: string;
   sourceName?: string;
   ownerNames: string[];
+  creatorName?: string;
+  totalWeight?: number;
+  maxDeadline?: string;
   progress: number;
   savedAt?: string;
   actions: MyTargetActionViewItem[];
@@ -82,6 +85,7 @@ export const buildMyTargetViewItems = (
   const nameOf = (id?: string) => people.find(person => person.id === id)?.name;
   const namesOf = (ids?: string[]) => (ids || []).map(nameOf).filter((name): name is string => Boolean(name));
   const ownerName = nameOf(currentUserId);
+  const ownerNameOf = (id?: string) => nameOf(id) || '未指定';
   const actionView = (record: OkrRecord): MyTargetActionViewItem => ({
     id: record.id,
     title: record.payload.title,
@@ -109,6 +113,9 @@ export const buildMyTargetViewItems = (
       status: record.status,
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
+      creatorName: ownerNameOf(record.ownerId),
+      totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
+      maxDeadline: actions.map(action => action.deadline).filter(Boolean).sort().at(-1) || '',
       progress: weightedProgress(actions),
       savedAt: record.createdAt,
       actions,
@@ -130,6 +137,9 @@ export const buildMyTargetViewItems = (
       title: source?.payload.title || group[0]?.payload.title || '来源目标已不可用',
       status: group.some(item => item.status === 'draft') ? 'draft' : 'active',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
+      creatorName: source ? ownerNameOf(source.ownerId) : ownerNameOf(group[0]?.ownerId),
+      totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
+      maxDeadline: actions.map(action => action.deadline).filter(Boolean).sort().at(-1) || '',
       ownerNames: (() => {
         const assigneeNames = namesOf(group.flatMap(item => item.payload.assigneeIds || []));
         return assigneeNames.length ? assigneeNames : (ownerName ? [ownerName] : []);
@@ -185,13 +195,14 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
     <header>
       <div className="okr-target-list-copy">
         <div className={`okr-target-hierarchy${target.sourceName || target.ownerNames.length ? ' has-links' : ''}`}>
+          <div className="okr-target-meta-line"><Tag color="blue">公司级</Tag><span>制定者：{target.creatorName || '未指定'}</span><span>目标权重：{target.totalWeight ?? 0}%</span></div>
           {target.sourceName && <span className="okr-target-hierarchy-source"><span className="okr-target-hierarchy-label">{target.sourceName}</span></span>}
           <div className="okr-target-title-line"><span className="okr-summary-index">O{index + 1}</span><h3>{target.title}</h3>{target.status === 'draft' && <Tag>草稿</Tag>}</div>
           <span className="okr-target-hierarchy-owner"><span className="okr-target-hierarchy-label">承接人员：{assigneeLabel(target.ownerNames)}</span></span>
         </div>
       </div>
       <div className="okr-target-list-status">
-        {submitted && <><span>目标进度</span><div><Progress type="circle" percent={target.progress} size={32}/></div></>}
+        {submitted && <><div><span>进度</span><strong>{target.progress}%</strong></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></>}
       </div>
     </header>
     <div className="okr-target-actions">{target.actions.length
