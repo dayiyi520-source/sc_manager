@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { WeeklyReviewEditor } from './WeeklyReviewEditor';
-import { findReviewForPayload, isReviewableObjective } from './useOriginalOkr';
+import { findReviewForPayload, isReviewableObjective, reviewableObjectivesFor } from './useOriginalOkr';
 import type { OkrPayload, OkrRecord } from '../../../services/okrRepository';
 
 class IntersectionObserverMock {
@@ -65,6 +65,13 @@ describe('review period identity', () => {
     };
     expect(isReviewableObjective(objective, 'chen')).toBe(true);
     expect(isReviewableObjective(objective, 'other')).toBe(false);
+    expect(reviewableObjectivesFor([{
+      ...objective,
+      keyResults: [
+        ...objective.keyResults,
+        { id: 'a-2', content: '售前动作', progress: 0, weight: 100, deadline: '2026-09-30', assigneeIds: ['sales'] }
+      ]
+    }], 'chen')[0].keyResults.map(keyResult => keyResult.content)).toEqual(['负责交付动作']);
   });
 
   it('uses business assistance types and team member search without temporary task creation', () => {

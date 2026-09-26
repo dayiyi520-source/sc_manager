@@ -25,6 +25,13 @@ export const isReviewableObjective = (objective: OKRItem, userId: string) => (
   )
 );
 
+export const reviewableObjectivesFor = (okrs: OKRItem[], userId: string) => okrs.flatMap(objective => {
+  if (!isReviewableObjective(objective, userId)) return [];
+  if (objective.ownerId === userId) return [objective];
+  const assignedKeyResults = objective.keyResults.filter(keyResult => keyResult.assigneeIds?.includes(userId));
+  return assignedKeyResults.length ? [{ ...objective, keyResults: assignedKeyResults }] : [];
+});
+
 export function useOriginalOkr() {
   const {currentUser, addToast} = useApp();
   const client = useQueryClient();
@@ -94,7 +101,7 @@ export function useOriginalOkr() {
       keyResults:(r.payload.keyResults || []).map(k=>({id:k.id,content:k.title,progress:k.progress,weight:k.weight,deadline:k.deadline || '',assigneeIds:k.assigneeIds})),
     };
   });
-  const reviewableOkrs = okrs.filter(objective => isReviewableObjective(objective, currentUser.id));
+  const reviewableOkrs = reviewableObjectivesFor(okrs, currentUser.id);
   const performances: (PerformanceReview & {authorId:string})[] = all.filter(r=>r.kind==='review').map(r=>{
     const owner = people.find(p=>p.id===r.ownerId), p=r.payload;
     return {id:r.id,version:r.version,authorId:r.ownerId,author:owner?.name || '人员已停用',authorDept:owner?.department || '',
