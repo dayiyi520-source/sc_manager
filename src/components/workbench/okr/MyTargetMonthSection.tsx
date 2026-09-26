@@ -76,6 +76,8 @@ const weightedProgress = (actions: MyTargetActionViewItem[]) => {
   return Math.round(actions.reduce((total, action) => total + action.progress * action.weight, 0) / totalWeight);
 };
 
+const latestDeadline = (values: string[]) => values.filter(Boolean).sort().at(-1) || '';
+
 export const buildMyTargetViewItems = (
   records: OkrRecord[],
   demoBreakdowns: DemoTargetBreakdown[],
@@ -119,7 +121,7 @@ export const buildMyTargetViewItems = (
       levelLabel: recordOwner?.rootFlag === 1 ? '公司级' : recordOwner?.supervisorId ? '主管级' : '个人级',
       metaOwnerId: source?.ownerId || recordOwner?.supervisorId || record.ownerId,
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
-      maxDeadline: actions.map(action => action.deadline).filter(Boolean).sort().at(-1) || '',
+      maxDeadline: record.payload.deadline || latestDeadline(actions.map(action => action.deadline)),
       progress: weightedProgress(actions),
       savedAt: record.createdAt,
       actions,
@@ -146,7 +148,7 @@ export const buildMyTargetViewItems = (
       levelLabel: groupOwner?.rootFlag === 1 ? '公司级' : groupOwner?.supervisorId ? '主管级' : '个人级',
       metaOwnerId: source?.ownerId || groupOwner?.supervisorId || group[0]?.ownerId,
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
-      maxDeadline: actions.map(action => action.deadline).filter(Boolean).sort().at(-1) || '',
+      maxDeadline: source?.payload.deadline || latestDeadline(actions.map(action => action.deadline)),
       ownerNames: (() => {
         const assigneeNames = namesOf(group.flatMap(item => item.payload.assigneeIds || []));
         return assigneeNames.length ? assigneeNames : (ownerName ? [ownerName] : []);

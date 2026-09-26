@@ -56,6 +56,16 @@ describe('MyTargetMonthSection', () => {
     expect(target.ownerNames).toEqual(['毛景强']);
   });
 
+  it('keeps the objective deadline when its actions have no deadline', () => {
+    const people: OkrPerson[] = [{ id: 'boss', name: '林志豪', department: '管理部', supervisorId: null, rootFlag: 1, version: 1 }];
+    const records: OkrRecord[] = [{
+      id: 'objective-with-deadline', kind: 'objective', ownerId: 'boss', periodKey: '2026-09', status: 'active', version: 1,
+      payload: { title: '带截止时间的目标', deadline: '2026-09-30', keyResults: [] },
+    }];
+
+    expect(buildMyTargetViewItems(records, [], [], people, 'boss')[0].maxDeadline).toBe('2026-09-30');
+  });
+
   it('renders the list view as complete objective units with source, owners, and action fields', () => {
     render(<MyTargetMonthSection periodKey="2020-01" targets={targets} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()} />);
 
