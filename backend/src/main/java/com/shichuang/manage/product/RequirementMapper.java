@@ -113,12 +113,12 @@ public class RequirementMapper {
             FROM t_product_work_item w
             WHERE w.tenant_id_=? AND w.delete_flag_=0
               AND w.category_ IN ('requirement','design','dev','test','bug')
-              AND w.assignee_id_=?
+              AND (w.assignee_id_=? OR (w.source_type_='WORK_ORDER' AND w.assistance_owner_id_=?))
               AND w.status_group_ NOT IN ('COMPLETED','CANCELLED')
               AND w.status_name_ NOT IN ('已完成','已发布','已关闭','已取消')
               AND COALESCE(w.assistance_status_,'') NOT IN ('已完成','已发布','已关闭','已取消')
             ORDER BY w.create_time_ DESC LIMIT 200
-            """,tenantId,userId);
+            """,tenantId,userId,userId);
     }
 
     boolean activeUser(String tenantId,String userId) {
