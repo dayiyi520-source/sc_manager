@@ -828,3 +828,8 @@
 .okr-target-meta-line .okr-target-creator, .okr-target-meta-line .okr-target-weight { padding:3px 10px; border:1px solid var(--border-main); border-radius:6px; background:var(--bg-surface); color:var(--text-body); }
 .okr-target-list-status { align-self:center; }
 .okr-target-actions { margin-left:0; }
+
+/* Keep O and A metric columns on the same vertical grid. */
+.okr-target-list-status { grid-template-columns:repeat(3,96px); gap:8px; width:304px; min-width:304px; }
+.okr-target-action-row:not(.is-compact) { grid-template-columns:40px minmax(240px,1fr) 96px 96px 96px; padding-right:20px; }
+.okr-target-list-status > div { width:96px; }

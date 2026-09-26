@@ -50,7 +50,7 @@ describe('MyTargetMonthSection', () => {
     expect(within(activeTarget).getByText('@吴清 @刘笑星')).toBeInTheDocument();
     expect(within(activeTarget).getByText('权重 100%')).toBeInTheDocument();
     expect(within(activeTarget).getByText('09-28')).toBeInTheDocument();
-    expect(within(screen.getByLabelText('目标：完善客户交付方案')).queryByText('0%')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('目标：完善客户交付方案')).getByText('0%')).toBeInTheDocument();
   });
 
   it('shows draft state only for draft cards and uses distinct saved or submitted dates', () => {

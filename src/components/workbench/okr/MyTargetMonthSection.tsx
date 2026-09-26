@@ -197,7 +197,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
         <div className={`okr-target-hierarchy${target.sourceName || target.ownerNames.length ? ' has-links' : ''}`}>
           {target.sourceName && <span className="okr-target-hierarchy-source"><span className="okr-target-hierarchy-label">{target.sourceName}</span></span>}
           <div className="okr-target-title-line"><span className="okr-summary-index">O{index + 1}</span><h3>{target.title}</h3>{target.status === 'draft' && <Tag>草稿</Tag>}</div>
-          <div className="okr-target-meta-line"><Tag color="blue">公司级</Tag><span className="okr-target-creator">制定者：{target.creatorName || '未指定'}</span><span className="okr-target-weight">目标权重：{target.totalWeight ?? 0}%</span></div>
+          <div className="okr-target-meta-line"><Tag color="blue">公司级</Tag><span className="okr-target-creator">{target.creatorName || '未指定'}</span><span className="okr-target-weight">{target.totalWeight ?? 0}%</span></div>
           <span className="okr-target-hierarchy-owner"><span className="okr-target-hierarchy-label">承接人员：{assigneeLabel(target.ownerNames)}</span></span>
         </div>
       </div>
