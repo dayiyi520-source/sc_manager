@@ -108,7 +108,7 @@ export const buildMyTargetViewItems = (
       title: record.payload.title,
       status: record.status,
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
-      ownerNames: namesOf([record.ownerId]),
+      ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
       progress: weightedProgress(actions),
       savedAt: record.createdAt,
       actions,

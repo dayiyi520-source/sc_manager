@@ -87,18 +87,6 @@ describe('GoalHierarchyView', () => {
     expect(screen.getByText('当前周期暂无可展示的目标关系')).toBeInTheDocument();
   });
 
-  it('shows an isolated four-level relationship demo for the boss view', () => {
-    render(<GoalHierarchyView records={records} people={people} periodKey="2026-09" showDemoHierarchy />);
-
-    const demo = screen.getByRole('region', { name: '四级目标关系演示' });
-    expect(within(demo).getByText('关系演示')).toBeInTheDocument();
-    expect(within(demo).getByText('公司月度目标')).toBeInTheDocument();
-    expect(within(demo).getByText('老板关键动作')).toBeInTheDocument();
-    expect(within(demo).getByText('主管拆解目标')).toBeInTheDocument();
-    expect(within(demo).getByText('员工执行目标')).toBeInTheDocument();
-    expect(within(demo).getByText(/不保存、不提交/)).toBeInTheDocument();
-  });
-
   it('keeps session targets in the monthly tree and marks the opened objective as selected', () => {
     render(<GoalHierarchyView
       records={records}

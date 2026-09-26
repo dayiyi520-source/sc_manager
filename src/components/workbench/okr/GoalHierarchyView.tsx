@@ -318,7 +318,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
 
   return <section className="goal-hierarchy" aria-label="目标逐级承接关系">
     <header className="goal-hierarchy-toolbar">
-      <div><span>目标关系</span><h2>{periodKey.replace('-', '年')}月目标树</h2><p>默认展示 O 与直属 A，继续展开可查看逐级承接动作。</p></div>
+      <div><h2>{periodKey.replace('-', '年')}月目标树</h2><p>默认展示 O 与直属 A，继续展开可查看逐级承接动作。</p></div>
       <div className="goal-hierarchy-actions">
         <Button icon={allExpanded ? <ScreenNormalIcon /> : <ScreenFullIcon />} disabled={!expandableIds.length || loading} onClick={() => setExpandedIds(allExpanded ? new Set(roots.map(root => root.id)) : new Set(expandableIds))}>{allExpanded ? '收起深层' : '全部展开'}</Button>
         {onBack && <Button type="text" icon={<XIcon />} onClick={onBack}>返回列表</Button>}
@@ -328,7 +328,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
     {loading ? <div className="goal-hierarchy-loading" role="status"><Skeleton active paragraph={{ rows: 5 }}/></div> : roots.length === 0 ? <div className="goal-hierarchy-empty"><Empty description="当前周期暂无可展示的目标关系"/><p>上级目标提交并指派后，承接动作会显示在这里。</p></div> : <div className="goal-hierarchy-layout">
       <div className="goal-hierarchy-tree">{roots.map((root, index) => <GoalNodeBranch key={root.id} node={root} path={[index + 1]} expandedIds={expandedIds} selectedId={selectedId} people={people} onToggle={toggle} onSelect={node => { setSelectedId(node.id); setDetailId(node.id); }}/>)}</div>
     </div>}
-    {showDemoHierarchy && <GoalHierarchyDemo />}
+
     <Drawer rootClassName="goal-hierarchy-drawer" open={Boolean(detailId)} placement="right" closable={false} maskClosable destroyOnHidden onClose={() => setDetailId(undefined)} title="目标节点详情">
       {selected && detailId && <aside className="goal-node-detail" aria-label="目标节点详情">
         <div className="goal-node-detail-head"><div><Tag color={statusMeta(selected.status).color}>{statusMeta(selected.status).label}</Tag><span>{selected.kind === 'objective' ? '目标 O' : '动作 A'}</span></div><Button type="text" aria-label="关闭详情" icon={<XIcon />} onClick={() => setDetailId(undefined)}/></div>
