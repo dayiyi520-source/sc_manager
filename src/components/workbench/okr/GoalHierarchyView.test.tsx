@@ -38,6 +38,12 @@ describe('GoalHierarchyView', () => {
     expect(root.progress).toBe(68);
   });
 
+  it('uses O1 for objectives and A1 for root actions', () => {
+    const [root] = buildGoalHierarchy(records, '2026-09', undefined, people);
+    expect(root.id).toBe('o1');
+    expect(root.children[0].id).toBe('kr:o1:a1');
+  });
+
   it('shows two levels initially and expands deeper branches on demand', () => {
     render(<GoalHierarchyView records={records} people={people} periodKey="2026-09" />);
     expect(screen.getByText('提升客户交付质量')).toBeInTheDocument();

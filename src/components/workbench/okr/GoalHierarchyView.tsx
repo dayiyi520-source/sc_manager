@@ -47,6 +47,32 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
   const objectives = periodRecords.filter(record => record.kind === 'objective' && (!ownerId || record.ownerId === ownerId));
   const actions = periodRecords.filter(record => record.kind === 'action');
 
+  const addManagerLayers = (parent: GoalHierarchyNode): void => {
+    if (parent.assigneeIds.length === 0 || parent.children.length === 0) return;
+    const managerNodes = parent.assigneeIds.map(managerId => {
+      const manager = people.find(person => person.id === managerId);
+      const managerChildren = parent.children.filter(child => people.find(person => person.id === child.ownerId)?.supervisorId === managerId);
+      const managerNode: GoalHierarchyNode = {
+        id: `manager:${parent.id}:${managerId}`,
+        referenceId: `manager:${parent.id}:${managerId}`,
+        kind: 'action',
+        title: manager?.name ? `${parent.title}（${manager.name}）` : parent.title,
+        status: parent.status,
+        progress: 0,
+        weight: Number((100 / parent.assigneeIds.length).toFixed(2)),
+        ownerId: managerId,
+        assigneeIds: [managerId],
+        assigneeNames: manager?.name ? [manager.name] : undefined,
+        source: parent,
+        children: managerChildren,
+      };
+      managerChildren.forEach(child => { child.source = managerNode; });
+      managerNode.progress = aggregateProgress(managerNode);
+      return managerNode;
+    }).filter(node => node.children.length > 0);
+    if (managerNodes.length > 0) parent.children = managerNodes;
+  };
+
   const buildActionChildren = (parent: GoalHierarchyNode, parentReferenceId: string, seen: Set<string>): GoalHierarchyNode[] => actions
     .filter(record => record.payload.parentActionId === parentReferenceId && !seen.has(record.id))
     .map(record => {
@@ -69,6 +95,7 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
         record,
       };
       node.children = buildActionChildren(node, record.id, nextSeen);
+      addManagerLayers(node);
       node.progress = aggregateProgress(node);
       return node;
     });
@@ -105,17 +132,7 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
         children: [],
       };
       actionNode.children = buildActionChildren(actionNode, keyResult.id, new Set());
-      if (actionNode.assigneeIds.length > 1 && actionNode.children.length > 0 && !actionNode.children.some(child => actionNode.assigneeIds.includes(child.ownerId))) {
-        const managerNodes = actionNode.assigneeIds.map(managerId => {
-          const manager = people.find(person => person.id === managerId);
-          const managerChildren = actionNode.children.filter(child => people.find(person => person.id === child.ownerId)?.supervisorId === managerId);
-          const managerNode: GoalHierarchyNode = { id: `manager:${actionNode.id}:${managerId}`, referenceId: `manager:${actionNode.id}:${managerId}`, kind: 'action', title: manager?.name || actionNode.title, status: actionNode.status, progress: 0, weight: Number((100 / actionNode.assigneeIds.length).toFixed(2)), ownerId: managerId, assigneeIds: [managerId], assigneeNames: manager?.name ? [manager.name] : undefined, source: actionNode, children: managerChildren };
-          managerChildren.forEach(child => { child.source = managerNode; });
-          managerNode.progress = aggregateProgress(managerNode);
-          return managerNode;
-        }).filter(node => node.children.length > 0);
-        if (managerNodes.length > 0) actionNode.children = managerNodes;
-      }
+      addManagerLayers(actionNode);
       actionNode.progress = aggregateProgress(actionNode);
       return actionNode;
     });
@@ -141,6 +158,7 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
           record: action,
         };
         node.children = buildActionChildren(node, action.id, new Set([action.id]));
+        addManagerLayers(node);
         node.progress = aggregateProgress(node);
         return node;
       });
@@ -200,7 +218,7 @@ const GoalNodeBranch = ({ node, path, expandedIds, selectedId, people, onToggle,
   onToggle: (id: string) => void;
   onSelect: (node: GoalHierarchyNode) => void;
 }) => {
-  const code = node.kind === 'objective' ? `O${path[0]}` : `A${path.join('')}`;
+  const code = node.kind === 'objective' ? `O${path[0]}` : `A${path.slice(1).join('')}`;
   const expanded = expandedIds.has(node.id);
   return <div className={`goal-node-branch depth-${path.length}`}>
     <GoalNodeRow node={node} code={code} expanded={expanded} selected={selectedId === node.id} people={people} onToggle={() => onToggle(node.id)} onSelect={() => onSelect(node)}/>
