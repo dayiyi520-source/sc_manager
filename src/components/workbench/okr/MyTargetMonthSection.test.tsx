@@ -46,7 +46,7 @@ describe('MyTargetMonthSection', () => {
     ];
     const records: OkrRecord[] = [
       { id: 'parent', kind: 'action', ownerId: 'boss', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '产研动作', parentObjectiveId: 'o1', parentActionId: '' } },
-      { id: 'child', kind: 'action', ownerId: 'manager', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '测试1', parentObjectiveId: 'o1', parentActionId: 'parent', assigneeIds: ['staff'], weight: 100 } },
+      { id: 'child', kind: 'action', ownerId: 'manager', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '测试1', parentObjectiveId: 'o1', parentActionId: 'parent', assigneeIds: ['staff', 'staff'], weight: 100 } },
     ];
     const target = buildMyTargetViewItems(records, [], [], people, 'manager').find(item => item.actions.some(action => action.title === '测试1'))!;
     expect(target.levelLabel).toBe('主管级');

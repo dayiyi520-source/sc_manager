@@ -85,7 +85,7 @@ export const buildMyTargetViewItems = (
   currentUserId: string,
 ): MyTargetViewItem[] => {
   const nameOf = (id?: string) => people.find(person => person.id === id)?.name;
-  const namesOf = (ids?: string[]) => (ids || []).map(nameOf).filter((name): name is string => Boolean(name));
+  const namesOf = (ids?: string[]) => [...new Set((ids || []).map(nameOf).filter((name): name is string => Boolean(name)))];
   const ownerName = nameOf(currentUserId);
   const ownerNameOf = (id?: string) => nameOf(id) || '未指定';
   const actionView = (record: OkrRecord): MyTargetActionViewItem => ({

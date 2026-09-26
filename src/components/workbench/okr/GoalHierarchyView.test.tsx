@@ -63,6 +63,24 @@ describe('GoalHierarchyView', () => {
     expect(root.objectiveMetaOwnerId).toBe('boss');
   });
 
+  it('deduplicates assignees on supplemental objective nodes', () => {
+    render(<GoalHierarchyView
+      records={records}
+      people={people}
+      periodKey="2026-09"
+      ownerId="manager"
+      supplementalTargets={[{
+        id: 'session-dedup',
+        title: '主管拆解目标',
+        status: 'active',
+        ownerNames: ['部门主管'],
+        progress: 0,
+        actions: [{ id: 'session-a', title: '测试动作', assigneeNames: ['执行员工', '执行员工'], progress: 0, weight: 100, deadline: '' }],
+      }]}
+    />);
+    expect(screen.getByText('承接人员：执行员工')).toBeInTheDocument();
+  });
+
   it('shows two levels initially and expands deeper branches on demand', () => {
     render(<GoalHierarchyView records={records} people={people} periodKey="2026-09" />);
     expect(screen.getByText('提升客户交付质量')).toBeInTheDocument();

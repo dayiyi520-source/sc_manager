@@ -171,7 +171,7 @@ const GoalNodeRow = ({ node, code, expanded, selected, people, onToggle, onSelec
   onSelect: () => void;
 }) => {
   const status = statusMeta(node.status);
-  const assigneeNames = node.assigneeNames || node.assigneeIds.map(id => people.find(person => person.id === id)?.name || id);
+  const assigneeNames = [...new Set(node.assigneeNames || node.assigneeIds.map(id => people.find(person => person.id === id)?.name || id))];
   const isObjective = node.kind === 'objective';
   const visibleAssignees = assigneeNames;
   const ownerName = people.find(person => person.id === (node.objectiveMetaOwnerId || node.ownerId))?.name || '人员已停用';
