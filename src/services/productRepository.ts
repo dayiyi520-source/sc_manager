@@ -29,7 +29,7 @@ export type UnifiedWorkItem = {
   requirementId?: string | null; requirementTitle?: string | null; requirementInitiatorName?: string | null; customerId?: string | null; customerName?: string | null; assigneeName?: string; sourceType?: string; status?: { name?: string; group?: string; successful?: boolean };
   taskTypeId?: string | null; workflowId?: string | null; statusKey?: string | null; statusColor?: string;
   priority?: string; parentWorkItemId?: string | null; versionId?: string | null; dueDate?: string | null;
-  estimatedHours?: number; actualHours?: number; createdAt?: string; revision?: number; potentialBlockingDefect?: boolean; hasChildren?: boolean;
+  estimatedHours?: number; actualHours?: number; createdAt?: string; creatorName?: string; revision?: number; potentialBlockingDefect?: boolean; hasChildren?: boolean;
 };
 export type WorkItemTransitionAction = {
   edgeKey: string; name: string; to: string; requiredFields: string[]; allowed: boolean; reasons: string[];

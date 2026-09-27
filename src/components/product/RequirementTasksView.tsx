@@ -28,6 +28,7 @@ import { readSession } from '../../services/session';
 import { preferredWorkItemTypeName } from './workItemTypeDefaults';
 import { CollapsibleDescription } from './CollapsibleDescription';
 import { employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity';
+import { WorkItemGroupMenu } from './UnifiedWorkItemControls';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
 
 type RequirementFilterState = {
@@ -65,6 +66,7 @@ const normalizePriority = (priority: string) => ({
 }[priority] || priority);
 const apiPriority = (priority: string) => ({ 紧急: 'P0', 高: 'P1', 中: 'P2', 低: 'P3' }[normalizePriority(priority)] || 'P2');
 const workItemCategoryLabel: Record<string, string> = { requirement: '需求', design: '设计', dev: '研发', test: '测试', bug: '缺陷' };
+
 const SearchableSelect: React.FC<{ label: string; value: string; options: string[]; onChange: (value: string) => void; placeholder?: string; clearable?: boolean }> = ({ label, value, options, onChange, placeholder = '请选择', clearable }) => (
   <label className="block text-[var(--text-muted)]"><span>{label}</span><Select showSearch optionFilterProp="label" allowClear={clearable} value={value || undefined} onChange={(next) => onChange(next || '')} options={options.map((option) => ({ label: option, value: option }))} placeholder={placeholder} className="mt-1 w-full" /></label>
 );
@@ -142,15 +144,23 @@ export type WorkItemDetailContext = {
   statusControl: React.ReactNode;
 };
 export type WorkItemCreatePolicy = { requireRequirement?: boolean; allowedChildTypeNames?: string[] };
+export type WorkItemCreationContext = {
+  productLineId: string;
+  versionId?: string;
+  parent?: RequirementTask;
+  onClose?: () => void;
+  onCreated?: () => void;
+};
 type RequirementTasksViewProps = {
   productLineFilter?: string;
   itemLabel?: string;
   taskKind?: 'requirement' | 'design' | 'test' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops';
   renderDetail?: (context: WorkItemDetailContext) => React.ReactNode;
   createPolicy?: WorkItemCreatePolicy;
+  creationContext?: WorkItemCreationContext;
 };
 
-export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', renderDetail, createPolicy }) => {
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', renderDetail, createPolicy, creationContext }) => {
   const {
     requirementTasks,
     designTasks,
@@ -557,6 +567,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       addToast('success', '子任务已创建');
       setChildModalOpen(false);
       setSelectedTask(null);
+      creationContext?.onCreated?.();
+      creationContext?.onClose?.();
       const refreshes: Promise<unknown>[] = [
         productRepository.workItemDetail(parentTask.productLineId!, parentTask.id).then((detail) => {
           const children = Array.isArray(detail.children) ? detail.children : [];
@@ -747,6 +759,40 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     setIsModalOpen(true);
   };
 
+  const creationIntentKey = `${taskKind}:${creationContext?.productLineId || ''}:${creationContext?.versionId || ''}:${creationContext?.parent?.id || ''}`;
+  const consumedCreationIntent = useRef('');
+  useEffect(() => {
+    if (!creationContext || !creationContext.productLineId || consumedCreationIntent.current === creationIntentKey) return;
+    const line = productLines.find((item) => item.id === creationContext.productLineId);
+    if (!line) return;
+    consumedCreationIntent.current = creationIntentKey;
+    if (creationContext.parent) {
+      openChildModal(creationContext.parent);
+      return;
+    }
+    openAddModal();
+    setFormProductLineName(line.name);
+    const version = versions.find((item) => item.id === creationContext.versionId);
+    setFormVersionName(version?.name || '');
+  }, [creationContext, creationIntentKey, productLines, versions]);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem('shichuang.iterationTaskCreate');
+    if (!raw) return;
+    let intent: { kind?: string; productLineId?: string; versionId?: string };
+    try { intent = JSON.parse(raw); } catch { sessionStorage.removeItem('shichuang.iterationTaskCreate'); return; }
+    if (intent.kind !== taskKind) return;
+    const line = productLines.find((item) => item.id === intent.productLineId);
+    const version = versions.find((item) => item.id === intent.versionId && (
+      item.productLineId === line?.id || item.productLineName === line?.name
+    ));
+    if (!line || !version) return;
+    sessionStorage.removeItem('shichuang.iterationTaskCreate');
+    openAddModal();
+    setFormProductLineName(line.name);
+    setFormVersionName(version.name);
+  }, [taskKind, productLines, versions]);
+
   useEffect(() => {
     if (!requirementTaskDraft) return;
     setEditingTask(null);
@@ -916,7 +962,11 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       saveSucceeded = saved !== false;
       if (saveSucceeded) addToast('success', taskKind === 'design' ? '设计任务已写入' : isBusinessTask ? `${itemLabel}已写入` : '需求任务已写入', taskKind === 'design' ? '已保存到设计任务数据表' : isBusinessTask ? `已保存到${itemLabel}数据表` : '已自动同步录入云效需求池与版本规划');
     }
-    if (saveSucceeded) setIsModalOpen(false);
+      if (saveSucceeded) {
+        setIsModalOpen(false);
+        creationContext?.onCreated?.();
+        creationContext?.onClose?.();
+      }
   };
 
   const handleSaveAndContinue = () => {
@@ -1263,7 +1313,6 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     appliedFilters.cc.values.length > 0 && { key: 'cc', text: `参与人 ${operatorText(appliedFilters.cc.operator)} ${appliedFilters.cc.values.join('、')}` }
   ].filter(Boolean) as Array<{ key: keyof RequirementFilterState; text: string }>;
   const groupLabel = groupOptions.find(([key]) => key === groupBy)?.[1];
-  const visibleGroupOptions = groupOptions.filter(([, label]) => label.includes(groupQuery.trim()));
   const hasSearch = Boolean(searchQuery || searchOwnerNames.length);
   const setFilterDate = (field: 'createdAt' | 'plannedStartDate', part: 'from' | 'to', value: string) => {
     setFilterDraft((current) => ({ ...current, [field]: { ...current[field], [part]: value } }));
@@ -1355,6 +1404,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
   return (
     <div className="task-page space-y-6 animate-in fade-in duration-150">
+      <div className={creationContext ? 'hidden' : ''}>
       {/* Tabs + Search + Filter + Group */}
       <div ref={controlsRef} className="task-page-toolbar bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3 text-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -1379,7 +1429,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                 open={groupOpen}
                 onOpenChange={(open) => { setGroupOpen(open); if (open) { setFilterOpen(false); setSearchOpen(false); setSearchOwnerPickerOpen(false); } }}
                 placement="bottomRight"
-                content={<div className="w-48 space-y-2"><Input allowClear prefix={<Search className="h-4 w-4" />} value={groupQuery} onChange={(event) => setGroupQuery(event.target.value)} placeholder="搜索分组字段" />{visibleGroupOptions.map(([key, label]) => <Button block style={{ justifyContent: 'flex-start', textAlign: 'left' }} type="text" key={key} onClick={() => { setGroupBy(key); setGroupValue(''); setGroupOpen(false); }}>{`按${label}分组`}{groupBy === key && <Check className="ml-auto h-4 w-4" />}</Button>)}<Button block style={{ justifyContent: 'flex-start', textAlign: 'left' }} type="text" onClick={() => { setGroupBy('none'); setGroupValue(''); setGroupOpen(false); }}>取消分组{groupBy === 'none' && <Check className="ml-auto h-4 w-4" />}</Button></div>}
+                content={<WorkItemGroupMenu query={groupQuery} groupBy={groupBy} options={groupOptions} onQueryChange={setGroupQuery} onSelect={(key) => { setGroupBy(key as RequirementGroupKey); setGroupValue(''); setGroupOpen(false); }} />}
               >
                 <Button type="text" aria-label="分组" aria-pressed={groupOpen} icon={<List className="h-4 w-4" />} />
               </Popover>
@@ -1592,6 +1642,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           </div>
         </WorkItemCreatePanel>
       )}
+      </div>
       <WorkItemCreatePanel
         isOpen={childModalOpen}
         onClose={cancelChildCreation}
