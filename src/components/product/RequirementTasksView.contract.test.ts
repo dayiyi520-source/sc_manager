@@ -48,6 +48,13 @@ describe('requirement task Ant Design contract', () => {
     expect(productLineSource).toContain("width: `max(100%, ${timelineWidth}px)`");
   });
 
+  it('consumes the version task creation context on the target task page', () => {
+    expect(requirementSource).toContain("sessionStorage.getItem('shichuang.iterationTaskCreate')");
+    expect(requirementSource).toContain('setFormProductLineName(line.name)');
+    expect(requirementSource).toContain('setFormVersionName(version.name)');
+    expect(requirementSource).toContain('item.productLineName === line?.name');
+  });
+
   it('uses category icons instead of text tags before task titles', () => {
     expect(requirementSource).toContain('workItemCategoryIcon');
     expect(requirementSource).toContain('work-item-category-icon');

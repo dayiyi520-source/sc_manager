@@ -5,12 +5,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VersionIterationView } from './VersionIterationView';
 
 const appMocks = vi.hoisted(() => ({
+  workItemTypes: vi.fn().mockResolvedValue([{ id: 'type-test', category: '测试', name: '功能测试', enabled: true, isDefault: true }]),
+  createWorkItem: vi.fn().mockResolvedValue({ id: 'created-1' }),
+  workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }),
   assignRequirementToVersion: vi.fn().mockResolvedValue(true),
   addToast: vi.fn(),
   deleteVersion: vi.fn(),
   updateVersion: vi.fn().mockResolvedValue(true),
   showDeleteConfirm: vi.fn(),
+  openPageTab: vi.fn(),
 }));
+
+vi.mock('../../services/productRepository', () => ({ productRepository: { workItemTypes: appMocks.workItemTypes, createWorkItem: appMocks.createWorkItem, workItems: appMocks.workItems } }));
+vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.fn().mockResolvedValue([{ id: 'member-1', name: '王丽' }, { id: 'member-2', name: '李明' }]) } }));
 
 vi.mock('../../context/AppContext', () => ({
   useApp: () => ({
@@ -47,6 +54,9 @@ vi.mock('../../context/AppContext', () => ({
       status: '已完成',
       priority: '中',
       ownerName: '王丽',
+      creatorName: '张瑞',
+      sourceWorkOrderTitles: '关联的历史协助事项',
+      createdAt: '2026-09-02T09:30:00',
       versionId: 'version-1',
       versionName: '秋季迭代',
       productLineId: 'line-1',
@@ -61,11 +71,12 @@ vi.mock('../../context/AppContext', () => ({
     addToast: appMocks.addToast,
     addVersion: vi.fn().mockResolvedValue(true),
     updateVersion: appMocks.updateVersion,
+    openPageTab: appMocks.openPageTab,
   }),
 }));
 
 vi.mock('./CreateVersionModal', () => ({ CreateVersionModal: ({ isOpen, productLine }: { isOpen: boolean; productLine?: { id: string } }) => isOpen ? <div role="dialog" aria-label="创建迭代版本">产品线：{productLine?.id || '未选择'}</div> : null }));
-vi.mock('./WorkItemCreatePanel', () => ({ WorkItemCreatePanel: ({ isOpen, title }: { isOpen: boolean; title: string }) => isOpen ? <div role="dialog" aria-label={title}>{title}</div> : null }));
+vi.mock('./WorkItemCreatePanel', () => ({ WorkItemCreatePanel: ({ isOpen, title, children, footer, properties }: { isOpen: boolean; title: string; children: React.ReactNode; footer: React.ReactNode; properties?: React.ReactNode }) => isOpen ? <div role="dialog" aria-label={title}>{children}{properties}{footer}</div> : null }));
 vi.mock('./VersionTestReportPanel', () => ({ VersionTestReportPanel: () => <div>暂无测试报告</div> }));
 vi.mock('../common/Feedback', () => ({ showDeleteConfirm: appMocks.showDeleteConfirm }));
 
@@ -76,6 +87,9 @@ describe('VersionIterationView', () => {
     appMocks.deleteVersion.mockClear();
     appMocks.updateVersion.mockClear();
     appMocks.showDeleteConfirm.mockClear();
+    appMocks.openPageTab.mockClear();
+    appMocks.createWorkItem.mockClear();
+    appMocks.workItemTypes.mockClear();
     sessionStorage.clear();
   });
 
@@ -91,10 +105,30 @@ describe('VersionIterationView', () => {
     expect(headers.indexOf('所属产品线')).toBe(headers.indexOf('起止时间') + 1);
 
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
-    expect(screen.queryByRole('button', { name: '返回迭代列表' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '返回迭代列表' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '迭代规划' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '产品线筛选' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '迭代信息' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tab', { name: '迭代任务' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('checkbox', { name: '全选迭代任务' })).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(expect.arrayContaining(['创建人', '创建时间']));
+    fireEvent.click(screen.getByRole('checkbox', { name: '全选迭代任务' }));
+    expect(screen.getByRole('checkbox', { name: '选择迭代任务：已纳入迭代的工作项' })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: '收起迭代目录' }));
+    expect(screen.getByRole('button', { name: '展开迭代目录' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开迭代目录' }));
+    expect(screen.getByRole('button', { name: '搜索' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '过滤器' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '分组' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }));
+    expect(screen.getByRole('textbox', { name: '搜索迭代任务' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '过滤器' }));
+    expect(screen.getByTestId('iteration-filter-panel')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '迭代信息' }));
+    expect(screen.getByRole('tab', { name: '迭代信息' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '迭代任务' })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByText('张瑞')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '迭代工时' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /迭代任务/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '测试报告' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '版本评审' })).toBeInTheDocument();
     expect(screen.getByText('工作项分布')).toBeInTheDocument();
@@ -102,10 +136,18 @@ describe('VersionIterationView', () => {
     expect(screen.getByText('工时排名')).toBeInTheDocument();
     expect(screen.getAllByText('王丽')).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole('button', { name: /迭代任务/ }));
+    fireEvent.click(screen.getByRole('tab', { name: '迭代任务' }));
+    expect(screen.queryByText('迭代工时')).not.toBeInTheDocument();
     expect(screen.getByText('已纳入迭代的工作项')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '搜索迭代任务' }), { target: { value: '不存在' } });
+    expect(screen.getByText('已纳入迭代的工作项')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '搜索迭代任务' }), { key: 'Enter', code: 'Enter' });
+    expect(screen.getByText('暂无匹配工作项')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: '搜索迭代任务' }), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: '已纳入迭代的工作项' }));
     expect(screen.getByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '迭代信息' }));
     fireEvent.click(screen.getByRole('button', { name: '测试报告' }));
     expect(screen.getByText('暂无测试报告')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '版本评审' }));
@@ -121,7 +163,7 @@ describe('VersionIterationView', () => {
 
     render(<VersionIterationView />);
 
-    expect(screen.getByRole('button', { name: /迭代任务/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '迭代任务' })).toBeInTheDocument();
     expect(sessionStorage.getItem('shichuang.productLineTargetVersionId')).toBeNull();
   });
 
@@ -152,12 +194,58 @@ describe('VersionIterationView', () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
 
-    expect(screen.getByRole('combobox', { name: '产品线筛选' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '产品线筛选' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '迭代信息' }));
     expect(screen.getAllByRole('button', { name: '进入规划' })).toHaveLength(1);
     const createButton = screen.getByLabelText('新建迭代');
     expect(createButton.className).toContain('text-[var(--primary)]');
     fireEvent.click(createButton);
     expect(screen.getByRole('dialog', { name: '创建迭代版本' })).toHaveTextContent('产品线：line-1');
+  });
+
+  it('creates inside the iteration without navigating away', async () => {
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    fireEvent.click(screen.getByRole('button', { name: '新建' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '测试' }));
+    expect(screen.getByRole('dialog', { name: '新建测试任务' })).toBeInTheDocument();
+    await waitFor(() => expect(appMocks.workItemTypes).toHaveBeenCalledWith('line-1', '测试'));
+    fireEvent.change(screen.getByRole('textbox', { name: '任务标题' }), { target: { value: '版本测试' } });
+    fireEvent.click(screen.getByRole('button', { name: /创\s*建/ }));
+    await waitFor(() => expect(appMocks.createWorkItem).toHaveBeenCalledWith(expect.objectContaining({ category: 'test', productLineId: 'line-1', versionId: 'version-1', taskTypeId: 'type-test', title: '版本测试' })));
+    expect(appMocks.openPageTab).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '返回迭代列表' }));
+    expect(screen.getByRole('button', { name: '迭代规划' })).toBeInTheDocument();
+  });
+
+  it('uses the task grouping choices and offers work-item owners after @', async () => {
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    fireEvent.click(screen.getByRole('button', { name: '分组' }));
+    expect(screen.getByRole('button', { name: '按优先级分组' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '按需求类型分组' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '按负责人分组' }));
+    expect(screen.getByText('王丽 · 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '搜索迭代任务' }), { target: { value: '@' } });
+    await waitFor(() => expect(screen.getByRole('combobox', { name: '搜索负责人' })).toBeInTheDocument());
+    expect(await screen.findByText('王丽', { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
+  });
+
+  it('shows child-task properties', async () => {
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    fireEvent.click(screen.getByRole('button', { name: '操作已纳入迭代的工作项' }));
+    fireEvent.click(await screen.findByText('添加子任务'));
+    expect(screen.getByRole('dialog', { name: '新建子任务产品任务' })).toHaveTextContent('基础字段');
+    expect(screen.getByRole('dialog', { name: '新建子任务产品任务' })).toHaveTextContent('已纳入迭代的工作项');
+  });
+
+  it('tolerates a legacy association title string in task detail', () => {
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    fireEvent.click(screen.getByRole('button', { name: '已纳入迭代的工作项' }));
+    expect(screen.getByRole('dialog', { name: '需求详情' })).toHaveTextContent('关联的历史协助事项');
   });
 
   it('uses the themed Ant Design confirmation instead of a native browser dialog', () => {

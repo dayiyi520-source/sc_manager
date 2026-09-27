@@ -22,30 +22,41 @@ import {
   Undo2,
   UserRound
 } from '@/components/common/octicons-compat';
-import { Alert, Input, Select } from 'antd';
+import { Alert, Button, Dropdown, Input, Modal, Select } from 'antd';
+import { ApartmentOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
 import { showDeleteConfirm } from '../common/Feedback';
-import { DefectBug, DevTask, RequirementTask, VersionIteration } from '../../types';
+import { DefectBug, DevTask, ProductLineWorkItemType, RequirementTask, VersionIteration } from '../../types';
+import { RequirementTasksView } from './RequirementTasksView';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { CreateVersionModal } from './CreateVersionModal';
 import { VersionTestReportPanel } from './VersionTestReportPanel';
 import { PersonIdentity } from '../common/PersonIdentity';
+import { productRepository, type UnifiedWorkItem } from '../../services/productRepository';
+import { teamRepository } from '../../services/teamRepository';
+import { Pagination } from '../common/Pagination';
+import { UnifiedWorkItemControls, type UnifiedFilterState } from './UnifiedWorkItemControls';
 
 type ViewMode = 'list' | 'planning';
-type DetailTab = 'hours' | 'workItems' | 'testReports' | 'review';
+type DetailTab = 'hours' | 'testReports' | 'review';
+type DetailSection = 'info' | 'workItems';
 type SelectedWorkItem =
   | { kind: 'requirement'; item: RequirementTask }
   | { kind: 'design'; item: RequirementTask }
+  | { kind: 'test'; item: RequirementTask }
   | { kind: 'task'; item: DevTask }
   | { kind: 'bug'; item: DefectBug };
 
-type PlanningKind = 'requirement' | 'design' | 'bug' | 'dev';
+type PlanningKind = 'requirement' | 'design' | 'bug' | 'dev' | 'test';
+type TaskGroupBy = 'none' | 'priority' | 'status' | 'owner' | 'creator' | 'version' | 'customer' | 'requirementType';
 type PlanningItem = {
   id: string;
   kind: PlanningKind;
   title: string;
   ownerName: string;
+  creatorName?: string;
+  createdAt?: string;
   estimatedHours: number;
   actualHours: number;
   priority: string;
@@ -56,15 +67,34 @@ type PlanningItem = {
   source: RequirementTask | DefectBug | DevTask;
 };
 
-const planningKindLabel: Record<PlanningKind, string> = { requirement: '需求', design: '设计', bug: '缺陷', dev: '研发' };
+const planningKindLabel: Record<PlanningKind, string> = { requirement: '需求', design: '设计', bug: '缺陷', dev: '研发', test: '测试' };
 const planningKindIcon: Record<PlanningKind, React.ReactNode> = {
   requirement: <ListTodo className="h-4 w-4 text-[var(--primary)]" />,
   design: <Layers className="h-4 w-4 text-[var(--accent-purple)]" />,
   bug: <Bug className="h-4 w-4 text-[var(--danger)]" />,
-  dev: <GitBranch className="h-4 w-4 text-[var(--success)]" />
+  dev: <GitBranch className="h-4 w-4 text-[var(--success)]" />,
+  test: <Beaker className="h-4 w-4 text-[var(--warning)]" />
 };
 
 const normalize = (value?: string) => (value || '').trim().toLowerCase();
+const textList = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : typeof value === 'string' && value.trim() ? [value] : [];
+const taskGroupValue = (item: PlanningItem, groupBy: TaskGroupBy): string => {
+  const source = item.source as unknown as Record<string, unknown>;
+  switch (groupBy) {
+    case 'priority': return item.priority || '未设置';
+    case 'status': return item.status || '未设置';
+    case 'owner': return item.ownerName || '未设置';
+    case 'creator': return item.creatorName || '未设置';
+    case 'version': return item.versionName || '未关联';
+    case 'customer': return String(source.customerName || '未关联');
+    case 'requirementType': return String(source.requirementType || source.workItemTypeName || '未设置');
+    default: return '';
+  }
+};
+const normalizedTaskGroupValue = (item: PlanningItem, groupBy: TaskGroupBy): string => {
+  const value = taskGroupValue(item, groupBy);
+  return value && value !== '0' ? value : '未设置';
+};
 
 const versionMatches = (version: VersionIteration, value?: string) => {
   const source = normalize(value);
@@ -111,9 +141,9 @@ const EmptyState: React.FC<{ icon: React.ReactNode; title: string; description: 
 );
 
 const Metric: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="min-w-24">
-    <div className="text-[11px] text-[var(--text-muted)]">{label}</div>
-    <div className="mt-1 font-semibold text-[var(--text-primary)]">{value}</div>
+  <div className="flex min-h-16 min-w-24 flex-col justify-between py-2">
+    <div className="text-[11px] font-normal text-[var(--text-muted)]">{label}</div>
+    <div className="font-bold text-[var(--text-primary)]">{value}</div>
   </div>
 );
 
@@ -237,36 +267,45 @@ const BugRows: React.FC<{ items: DefectBug[]; onOpen: (item: DefectBug) => void 
   </div>
 );
 
-const WorkItemRows: React.FC<{ items: PlanningItem[]; onOpen: (item: PlanningItem) => void }> = ({ items, onOpen }) => (
+const WorkItemRows: React.FC<{ items: PlanningItem[]; groupBy: TaskGroupBy; selectedIds: string[]; onSelectionChange: (ids: string[]) => void; onOpen: (item: PlanningItem) => void; onOperation: (key: string, item: PlanningItem) => void }> = ({ items, groupBy, selectedIds, onSelectionChange, onOpen, onOperation }) => (
   <div className="overflow-x-auto">
-    <table className="w-full min-w-[860px] text-left">
+    <table className="w-full min-w-[1040px] text-left">
       <thead className="bg-[var(--bg-surface-soft)] text-[11px] text-[var(--text-muted)]">
         <tr>
-          <th className="px-4 py-2.5 font-medium">类型</th>
+          <th className="px-4 py-2.5 font-medium"><input type="checkbox" aria-label="全选迭代任务" checked={items.length > 0 && items.every((item) => selectedIds.includes(`${item.kind}:${item.id}`))} onChange={(event) => onSelectionChange(event.target.checked ? items.map((item) => `${item.kind}:${item.id}`) : [])} className="h-4 w-4 accent-[var(--primary)]" /></th>
           <th className="px-3 py-2.5 font-medium">标题</th>
           <th className="px-3 py-2.5 font-medium">状态</th>
           <th className="px-3 py-2.5 font-medium">负责人</th>
+          <th className="px-3 py-2.5 font-medium">创建人</th>
+          <th className="px-3 py-2.5 font-medium">创建时间</th>
           <th className="px-3 py-2.5 font-medium">优先级</th>
           <th className="px-3 py-2.5 font-medium">预计工时</th>
           <th className="px-4 py-2.5 font-medium">实际工时</th>
+          <th className="sticky right-0 z-10 min-w-16 border-l border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-2.5 text-right font-medium">操作</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--border-main)]">
-        {items.map((item) => (
-          <tr key={`${item.kind}-${item.id}`} className="hover:bg-[var(--bg-surface-soft)]">
-            <td className="px-4 py-3">
-              <span className="inline-flex items-center gap-1.5 text-[var(--text-body)]">{planningKindIcon[item.kind]}{planningKindLabel[item.kind]}</span>
-            </td>
+        {items.map((item, index) => {
+          const group = normalizedTaskGroupValue(item, groupBy);
+          const previous = items[index - 1];
+          const previousGroup = previous && normalizedTaskGroupValue(previous, groupBy);
+          const operationMenu = { items: [{ key: 'child', icon: <PlusOutlined />, label: '添加子任务' }, { key: 'copy', icon: <CopyOutlined />, label: '复制任务' }, { key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' }, { type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true }], onClick: ({ key }: { key: string }) => onOperation(key, item) };
+          return <React.Fragment key={`${item.kind}-${item.id}`}>{groupBy !== 'none' && (index === 0 || group !== previousGroup) && <tr className="bg-[var(--bg-surface-soft)]"><td colSpan={10} className="px-4 py-2 font-semibold text-[var(--text-body)]">{group} · {items.filter((entry) => normalizedTaskGroupValue(entry, groupBy) === group).length}</td></tr>}
+          <tr className="hover:bg-[var(--bg-surface-soft)]">
+            <td className="px-4 py-3"><input type="checkbox" aria-label={`选择迭代任务：${item.title}`} checked={selectedIds.includes(`${item.kind}:${item.id}`)} onChange={(event) => onSelectionChange(event.target.checked ? [...selectedIds, `${item.kind}:${item.id}`] : selectedIds.filter((id) => id !== `${item.kind}:${item.id}`))} className="h-4 w-4 accent-[var(--primary)]" /></td>
             <td className="max-w-[360px] px-3 py-3">
-              <button type="button" onClick={() => onOpen(item)} className="block max-w-full truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">{item.title}</button>
+              <div className="flex items-center gap-2"><span aria-label={planningKindLabel[item.kind]} title={planningKindLabel[item.kind]}>{planningKindIcon[item.kind]}</span><button type="button" onClick={() => onOpen(item)} className="block max-w-full truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">{item.title}</button></div>
             </td>
             <td className="px-3 py-3"><StatusTag status={item.status} /></td>
             <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" /></td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.creatorName} emptyLabel="未设置" variant="list" /></td>
+            <td className="px-3 py-3 font-mono text-[var(--text-muted)]">{item.createdAt?.slice(0, 10) || '—'}</td>
             <td className="px-3 py-3"><StatusTag status={item.priority} /></td>
             <td className="px-3 py-3 text-[var(--text-muted)]">{item.estimatedHours} 小时</td>
             <td className="px-4 py-3 text-[var(--text-muted)]">{item.actualHours} 小时</td>
-          </tr>
-        ))}
+            <td className="sticky right-0 z-10 min-w-16 border-l border-[var(--border-main)] bg-[var(--bg-surface)] px-4 py-3 text-right"><Dropdown menu={operationMenu} trigger={['click']}><Button type="text" icon={<MoreOutlined />} aria-label={`操作${item.title}`} /></Dropdown></td>
+          </tr></React.Fragment>;
+        })}
       </tbody>
     </table>
   </div>
@@ -290,6 +329,45 @@ export const VersionIterationView: React.FC = () => {
   const [mode, setMode] = useState<ViewMode>('list');
   const [showDetail, setShowDetail] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>('hours');
+  const [detailSection, setDetailSection] = useState<DetailSection>('workItems');
+  const [taskQuery, setTaskQuery] = useState('');
+  const [taskSearchDraft, setTaskSearchDraft] = useState('');
+  const [taskSearchOpen, setTaskSearchOpen] = useState(false);
+  const [taskFilterOpen, setTaskFilterOpen] = useState(false);
+  const [taskFilterTarget, setTaskFilterTarget] = useState<HTMLDivElement | null>(null);
+  const [taskGroupOpen, setTaskGroupOpen] = useState(false);
+  const [taskGroupBy, setTaskGroupBy] = useState<TaskGroupBy>('none');
+  const [taskGroupSelection, setTaskGroupSelection] = useState('');
+  const [taskGroupQuery, setTaskGroupQuery] = useState('');
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [removedTaskIds, setRemovedTaskIds] = useState<string[]>([]);
+  const [directoryCollapsed, setDirectoryCollapsed] = useState(false);
+  const [createTaskKind, setCreateTaskKind] = useState<'requirement' | 'dev' | 'test' | 'bug' | null>(null);
+  const [childParentItem, setChildParentItem] = useState<PlanningItem | null>(null);
+  const [createTitle, setCreateTitle] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createTypeId, setCreateTypeId] = useState('');
+  const [createPriority, setCreatePriority] = useState('P2');
+  const [createTypes, setCreateTypes] = useState<ProductLineWorkItemType[]>([]);
+  const [createTypesLoading, setCreateTypesLoading] = useState(false);
+  const [createTypesError, setCreateTypesError] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [recentItems, setRecentItems] = useState<UnifiedWorkItem[]>([]);
+  const [taskKinds, setTaskKinds] = useState<PlanningKind[]>(['requirement', 'design', 'dev', 'test', 'bug']);
+  const [testItems, setTestItems] = useState<UnifiedWorkItem[]>([]);
+  const [testItemsError, setTestItemsError] = useState(false);
+  const [taskStatus, setTaskStatus] = useState('all');
+  const [taskOwner, setTaskOwner] = useState('all');
+  const [taskTitleFilter, setTaskTitleFilter] = useState('');
+  const [taskCreatorFilter, setTaskCreatorFilter] = useState('all');
+  const [taskVersionFilter, setTaskVersionFilter] = useState('all');
+  const [taskOwnerPickerOpen, setTaskOwnerPickerOpen] = useState(false);
+  const [taskOwnerNames, setTaskOwnerNames] = useState<string[]>([]);
+  const [directoryOwnerNames, setDirectoryOwnerNames] = useState<string[]>([]);
+  const [taskFilters, setTaskFilters] = useState<UnifiedFilterState>({ title: '', status: [], owner: [], creator: [], customer: [], version: [], cc: [], createdAt: ['', ''], plannedStartDate: ['', ''] });
+  const [taskFilterDraft, setTaskFilterDraft] = useState<UnifiedFilterState>({ title: '', status: [], owner: [], creator: [], customer: [], version: [], cc: [], createdAt: ['', ''], plannedStartDate: ['', ''] });
+  const [taskPage, setTaskPage] = useState(1);
+  const [taskPageSize, setTaskPageSize] = useState(10);
   const [selectedWorkItem, setSelectedWorkItem] = useState<SelectedWorkItem | null>(null);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
@@ -310,6 +388,14 @@ export const VersionIterationView: React.FC = () => {
   const [expandedVersionIds, setExpandedVersionIds] = useState<string[]>([]);
   const [draggedWorkItem, setDraggedWorkItem] = useState<PlanningItem | null>(null);
   const [selectedPlanningItemIds, setSelectedPlanningItemIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    teamRepository.options().then((members) => {
+      if (active) setDirectoryOwnerNames(members.map((member) => member.name).filter(Boolean));
+    }).catch(() => { /* Keep work-item assignees available when the directory is unavailable. */ });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!selectedId && versions[0]?.id) setSelectedId(versions[0].id);
@@ -378,6 +464,57 @@ export const VersionIterationView: React.FC = () => {
     || productLines.find((line) => line.name === selectedVersion?.productLineName)?.id
     || (productLineFilter !== 'all' ? productLineFilter : '');
 
+  useEffect(() => {
+    setTestItems([]);
+    setTestItemsError(false);
+    if (!showDetail || !selectedVersionProductLineId || !sessionStorage.getItem('shichuang.session.token')) return;
+    let active = true;
+    const loadTestItems = async () => {
+      const pageSize = 100;
+      const items: UnifiedWorkItem[] = [];
+      let page = 1;
+      let total = 0;
+      do {
+        const result = await productRepository.workItems(selectedVersionProductLineId, 'test', '', { page, pageSize });
+        items.push(...result.page.items);
+        total = result.page.total;
+        page += 1;
+        if (!result.page.items.length) break;
+      } while (items.length < total && page <= 100);
+      if (active) setTestItems(items);
+    };
+    loadTestItems().catch(() => { if (active) setTestItemsError(true); });
+    return () => { active = false; };
+  }, [selectedVersionProductLineId, showDetail]);
+
+  useEffect(() => {
+    if (!showDetail || !selectedVersionProductLineId || !sessionStorage.getItem('shichuang.session.token')) return;
+    let active = true;
+    const load = async () => {
+      const items: UnifiedWorkItem[] = [];
+      for (let page = 1; page <= 100; page += 1) {
+        const result = await productRepository.workItems(selectedVersionProductLineId, '', '', { page, pageSize: 100 });
+        items.push(...result.page.items);
+        if (!result.page.items.length || items.length >= result.page.total) break;
+      }
+      if (active) setRecentItems(items);
+    };
+    load().catch(() => { if (active) addToast('error', '工作项列表刷新失败'); });
+    return () => { active = false; };
+  }, [showDetail, selectedVersionProductLineId]);
+
+  useEffect(() => {
+    if (!createTaskKind || !selectedVersionProductLineId) return;
+    let active = true;
+    setCreateTypesLoading(true);
+    setCreateTypesError(false);
+    productRepository.workItemTypes(selectedVersionProductLineId, ({ requirement: '需求', dev: '研发', test: '测试', bug: '缺陷' } as const)[createTaskKind])
+      .then((items) => { if (active) { const enabled = items.filter((item) => item.enabled); setCreateTypes(enabled); setCreateTypeId(enabled.find((item) => item.isDefault)?.id || ''); } })
+      .catch(() => { if (active) setCreateTypesError(true); })
+      .finally(() => { if (active) setCreateTypesLoading(false); });
+    return () => { active = false; };
+  }, [createTaskKind, selectedVersionProductLineId]);
+
   const selectedRequirements = useMemo(
     () =>
       selectedVersion
@@ -399,11 +536,15 @@ export const VersionIterationView: React.FC = () => {
     [bugs, selectedVersion]
   );
   const planningItems = useMemo<PlanningItem[]>(() => [
-    ...requirementTasks.map((item) => ({ id: item.id, kind: 'requirement' as const, title: item.title, ownerName: item.ownerName || '', estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: item.versionId, versionName: item.versionName, source: item })),
-    ...designTasks.map((item) => ({ id: item.id, kind: 'design' as const, title: item.title, ownerName: item.ownerName || '', estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: item.versionId, versionName: item.versionName, source: item })),
-    ...bugs.map((item) => ({ id: item.id, kind: 'bug' as const, title: item.title, ownerName: item.ownerName || item.assignee || '', estimatedHours: (item as DefectBug & { estimatedHours?: number }).estimatedHours || 0, actualHours: (item as DefectBug & { actualHours?: number }).actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: (item as DefectBug & { versionId?: string }).versionId, versionName: item.versionName, source: item })),
-    ...devTasks.map((item) => ({ id: item.id, kind: 'dev' as const, title: item.title, ownerName: item.developer || '', estimatedHours: item.estimatedHours || 0, actualHours: item.spentHours || 0, priority: item.priority || '中', status: item.status, productLineId: (item as DevTask & { productLineId?: string }).productLineId, versionId: (item as DevTask & { versionId?: string }).versionId, versionName: item.versionName, source: item }))
-  ], [bugs, designTasks, devTasks, requirementTasks]);
+    ...requirementTasks.map((item) => ({ id: item.id, kind: 'requirement' as const, title: item.title, ownerName: item.ownerName || '', creatorName: item.creatorName, createdAt: item.createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: item.versionId, versionName: item.versionName, source: item })),
+    ...designTasks.map((item) => ({ id: item.id, kind: 'design' as const, title: item.title, ownerName: item.ownerName || '', creatorName: item.creatorName, createdAt: item.createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: item.versionId, versionName: item.versionName, source: item })),
+    ...bugs.map((item) => ({ id: item.id, kind: 'bug' as const, title: item.title, ownerName: item.ownerName || item.assignee || '', creatorName: item.creatorName || item.creator, createdAt: item.createdAt, estimatedHours: (item as DefectBug & { estimatedHours?: number }).estimatedHours || 0, actualHours: (item as DefectBug & { actualHours?: number }).actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: (item as DefectBug & { versionId?: string }).versionId, versionName: item.versionName, source: item })),
+    ...devTasks.map((item) => ({ id: item.id, kind: 'dev' as const, title: item.title, ownerName: item.developer || '', creatorName: (item as DevTask & { creatorName?: string }).creatorName, createdAt: (item as DevTask & { createdAt?: string }).createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.spentHours || 0, priority: item.priority || '中', status: item.status, productLineId: (item as DevTask & { productLineId?: string }).productLineId, versionId: (item as DevTask & { versionId?: string }).versionId, versionName: item.versionName, source: item })),
+    ...[...testItems, ...recentItems].map((item) => {
+      const source = { ...item, workItemTypeId: item.taskTypeId || undefined, status: item.status?.name || '未设置', ownerName: item.assigneeName || '', versionId: item.versionId || '', versionName: selectedVersion?.id === item.versionId ? selectedVersion.name : '', productLineName: selectedVersion?.productLineName || '', description: '', dueDate: item.dueDate || '', estimatedHours: item.estimatedHours || 0 } as RequirementTask;
+      return { id: item.id, kind: item.category as PlanningKind, title: item.title, ownerName: source.ownerName, creatorName: item.creatorName, createdAt: item.createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: source.status, productLineId: item.productLineId, versionId: item.versionId || undefined, versionName: source.versionName, source };
+    })
+  ], [bugs, designTasks, devTasks, recentItems, requirementTasks, selectedVersion, testItems]);
 
   const unplannedWorkItems = useMemo(() => planningItems.filter((item) => {
     const matchesLine = productLineFilter === 'all' || item.productLineId === productLineFilter;
@@ -443,6 +584,8 @@ export const VersionIterationView: React.FC = () => {
     setProductLineFilter(version.productLineId || 'all');
     setMode('list');
     setShowDetail(true);
+    setDetailSection('workItems');
+    setSelectedTaskIds([]);
   };
 
   const openCreateVersion = () => {
@@ -475,6 +618,7 @@ export const VersionIterationView: React.FC = () => {
   };
 
   const openRequirement = (item: RequirementTask) => setSelectedWorkItem({ kind: 'requirement', item });
+  const openTestTask = (item: RequirementTask) => setSelectedWorkItem({ kind: 'test', item });
   const openDesignTask = (item: RequirementTask) => setSelectedWorkItem({ kind: 'design', item });
   const openDevTask = (item: DevTask) => setSelectedWorkItem({ kind: 'task', item });
   const openBug = (item: DefectBug) => setSelectedWorkItem({ kind: 'bug', item });
@@ -515,6 +659,128 @@ export const VersionIterationView: React.FC = () => {
       {icon}{label}
     </button>
   );
+
+  const createIterationTask = (kind: 'requirement' | 'dev' | 'test' | 'bug', parent?: PlanningItem) => {
+    if (!selectedVersion || !selectedVersionProductLineId) return;
+    setCreateTitle('');
+    setCreateDescription('');
+    setCreateTypeId('');
+    setCreateTypes([]);
+    setCreatePriority('P2');
+    setChildParentItem(parent || null);
+    setCreateTaskKind(kind);
+  };
+
+  const saveIterationTask = async () => {
+    if (!createTaskKind || !selectedVersion || !selectedVersionProductLineId || createSaving) return;
+    if (!createTitle.trim() || !createTypeId) {
+      addToast('error', '请填写任务标题并选择已启用的任务类型');
+      return;
+    }
+    setCreateSaving(true);
+    try {
+      await productRepository.createWorkItem({
+        requestId: `iteration-${createTaskKind}-${crypto.randomUUID()}`,
+        productLineId: selectedVersionProductLineId,
+        versionId: selectedVersion.id,
+        category: createTaskKind,
+        taskTypeId: createTypeId,
+        title: createTitle.trim(),
+        description: createDescription,
+        priority: createPriority
+        ,parentWorkItemId: childParentItem?.id
+      });
+      setCreateTaskKind(null);
+      setChildParentItem(null);
+      addToast('success', '迭代任务已创建');
+    } catch (error) {
+      addToast('error', '迭代任务保存失败', error instanceof Error ? error.message : '请稍后重试');
+      setCreateSaving(false);
+      return;
+    }
+    try {
+      const result = await productRepository.workItems(selectedVersionProductLineId, createTaskKind, '', { page: 1, pageSize: 100 });
+      const items = [...result.page.items];
+      let page = 2;
+      while (items.length < result.page.total && page <= 100) {
+        const next = await productRepository.workItems(selectedVersionProductLineId, createTaskKind, '', { page, pageSize: 100 });
+        if (!next.page.items.length) break;
+        items.push(...next.page.items);
+        page += 1;
+      }
+      setRecentItems((current) => [...current.filter((item) => item.category !== createTaskKind || item.productLineId !== selectedVersionProductLineId), ...items.filter((item) => item.versionId === selectedVersion.id)]);
+    } catch (error) {
+      addToast('error', '任务已创建，但列表刷新失败', error instanceof Error ? error.message : '请稍后重试');
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
+  const operatePlanningItem = async (key: string, item: PlanningItem) => {
+    const persisted = recentItems.find((candidate) => candidate.id === item.id && candidate.category === item.kind);
+    const source = { ...(item.source as PlanningItem['source'] & Record<string, unknown>), ...(persisted || {}) } as PlanningItem['source'] & Record<string, unknown>;
+    const productLineId = item.productLineId || selectedVersionProductLineId;
+    if (key === 'child') {
+      if (item.kind === 'requirement' || item.kind === 'dev' || item.kind === 'test' || item.kind === 'bug') createIterationTask(item.kind, item);
+      else addToast('warning', '该工作项类型暂不支持直接添加子任务');
+      return;
+    }
+    if (!productLineId) {
+      addToast('warning', '工作项缺少产品线，无法操作');
+      return;
+    }
+    if (key === 'copy' || key === 'copy-link') {
+      const category = item.kind === 'requirement' || item.kind === 'design' || item.kind === 'dev' || item.kind === 'test' || item.kind === 'bug' ? item.kind : undefined;
+      const taskTypeId = String(source.workItemTypeId || source.taskTypeId || '');
+      if (!category || !taskTypeId) {
+        addToast('warning', '该任务尚未绑定工作项类型，无法复制');
+        return;
+      }
+      try {
+        const created = await productRepository.createWorkItem({
+          requestId: `copy-${item.id}-${Date.now()}`,
+          productLineId,
+          category,
+          taskTypeId,
+          title: `${item.title} - 副本`,
+          description: String(source.description || ''),
+          versionId: item.versionId || selectedVersion?.id || undefined,
+          priority: String(source.priority || 'P2')
+        });
+        if (key === 'copy-link') await productRepository.createWorkItemRelation(productLineId, item.id, String(created.id));
+        const createdItem = { ...created, category, productLineId, taskTypeId, versionId: item.versionId || selectedVersion?.id, title: `${item.title} - 副本`, status: created.status || { name: item.status }, priority: item.priority, assigneeName: item.ownerName, creatorName: item.creatorName, estimatedHours: 0, actualHours: 0 } as UnifiedWorkItem;
+        setRecentItems((current) => [createdItem, ...current]);
+        addToast('success', key === 'copy-link' ? '任务已复制并建立关联' : '任务已复制');
+      } catch (error) {
+        addToast('error', key === 'copy-link' ? '复制并关联失败' : '复制任务失败', error instanceof Error ? error.message : '请稍后重试');
+      }
+      return;
+    }
+    if (key === 'delete') {
+      const revision = Number(source.revision);
+      if (!Number.isFinite(revision)) {
+        addToast('warning', '该任务缺少版本信息，无法删除');
+        return;
+      }
+      Modal.confirm({
+        title: `删除任务“${item.title}”？`,
+        content: '任务将被软删除；存在子任务时系统会阻止删除。',
+        okText: '删除',
+        cancelText: '取消',
+        okButtonProps: { danger: true },
+        onOk: async () => {
+          try {
+            await productRepository.deleteWorkItem(productLineId, item.id, revision);
+            setRemovedTaskIds((current) => [...current, `${item.kind}:${item.id}`]);
+            setSelectedTaskIds((current) => current.filter((id) => id !== `${item.kind}:${item.id}`));
+            addToast('success', '任务已删除');
+          } catch (error) {
+            addToast('error', '任务删除失败', error instanceof Error ? error.message : '请稍后重试');
+          }
+        }
+      });
+    }
+  };
 
   const renderList = () => (
     <div className="space-y-3">
@@ -582,7 +848,7 @@ export const VersionIterationView: React.FC = () => {
   );
 
   const renderDetail = () => {
-    const selectedItems = selectedVersion ? plannedWorkItems.get(selectedVersion.id) || [] : [];
+    const selectedItems: PlanningItem[] = selectedVersion ? [...new Map<string, PlanningItem>((plannedWorkItems.get(selectedVersion.id) || []).map((item): [string, PlanningItem] => [`${item.kind}:${item.id}`, item])).values()].filter((item) => !removedTaskIds.includes(`${item.kind}:${item.id}`)) : [];
     const selectedStats = workItemStats(selectedItems);
     const estimatedHours = selectedItems.reduce((total, item) => total + item.estimatedHours, 0);
     const actualHours = selectedItems.reduce((total, item) => total + item.actualHours, 0);
@@ -599,7 +865,7 @@ export const VersionIterationView: React.FC = () => {
     }, new Map<string, MemberStat>());
     const memberStats = [...memberStatsMap.values()] as MemberStat[];
     memberStats.sort((a, b) => b.total - a.total || b.estimated - a.estimated);
-    const typeStats = (['requirement', 'design', 'dev', 'bug'] as PlanningKind[]).map((kind) => {
+    const typeStats = (['requirement', 'design', 'dev', 'test', 'bug'] as PlanningKind[]).map((kind) => {
       const items = selectedItems.filter((item) => item.kind === kind);
       return { kind, ...workItemStats(items) };
     });
@@ -607,6 +873,7 @@ export const VersionIterationView: React.FC = () => {
       requirement: 'bg-[var(--primary)]',
       design: 'bg-[var(--accent-purple)]',
       dev: 'bg-[var(--success)]',
+      test: 'bg-[var(--warning)]',
       bug: 'bg-[var(--danger)]'
     };
     const isCompleted = selectedVersion?.status === '已完成' || selectedVersion?.status === '已发布';
@@ -616,15 +883,71 @@ export const VersionIterationView: React.FC = () => {
       : isRunning
         ? { label: '完成迭代', nextStatus: '已完成', icon: <CheckCircle className="h-4 w-4" /> }
         : { label: '开启迭代', nextStatus: '迭代中', icon: <Play className="h-4 w-4" /> };
-    const detailTabs: Array<{ key: DetailTab; label: string; count?: number; icon: React.ReactNode }> = [
+    const detailTabs: Array<{ key: DetailTab; label: string; icon: React.ReactNode }> = [
       { key: 'hours', label: '迭代工时', icon: <Calendar className="h-4 w-4" /> },
-      { key: 'workItems', label: '迭代任务', count: selectedStats.total, icon: <ListTodo className="h-4 w-4" /> },
       { key: 'testReports', label: '测试报告', icon: <Beaker className="h-4 w-4" /> },
       { key: 'review', label: '版本评审', icon: <CheckCircle className="h-4 w-4" /> }
     ];
+    const filteredItems = selectedItems.filter((item) =>
+      taskKinds.includes(item.kind)
+      && (taskStatus === 'all' || item.status === taskStatus)
+      && (taskOwner === 'all' || item.ownerName === taskOwner)
+      && (!taskFilters.title.trim() || item.title.toLowerCase().includes(taskFilters.title.trim().toLowerCase()))
+      && (!taskFilters.status.length || ((taskFilters.operators?.status || 'include') === 'exclude' ? !taskFilters.status.includes(item.status) : taskFilters.status.includes(item.status)))
+      && (!taskFilters.owner.length || ((taskFilters.operators?.owner || 'include') === 'exclude' ? !taskFilters.owner.includes(item.ownerName) : taskFilters.owner.includes(item.ownerName)))
+      && (!taskFilters.creator.length || ((taskFilters.operators?.creator || 'include') === 'exclude' ? !taskFilters.creator.includes(item.creatorName || '') : taskFilters.creator.includes(item.creatorName || '')))
+      && (!taskFilters.version.length || ((taskFilters.operators?.version || 'include') === 'exclude' ? !taskFilters.version.includes(item.versionName || '') : taskFilters.version.includes(item.versionName || '')))
+      && (!taskFilters.customer.length || ((taskFilters.operators?.customer || 'include') === 'exclude' ? !taskFilters.customer.includes(String((item.source as unknown as Record<string, unknown>).customerName || '')) : taskFilters.customer.includes(String((item.source as unknown as Record<string, unknown>).customerName || ''))))
+      && (!taskFilters.cc.length || ((taskFilters.operators?.cc || 'include') === 'exclude' ? !(taskFilters.cc as string[]).some((value) => ((item.source as unknown as Record<string, unknown>).ccNames as string[] || []).includes(value)) : (taskFilters.cc as string[]).some((value) => ((item.source as unknown as Record<string, unknown>).ccNames as string[] || []).includes(value))))
+      && (!taskFilters.createdAt[0] || String(item.createdAt || '').slice(0, 10) >= taskFilters.createdAt[0])
+      && (!taskFilters.createdAt[1] || String(item.createdAt || '').slice(0, 10) <= taskFilters.createdAt[1])
+      && (!taskFilters.plannedStartDate[0] || String((item.source as unknown as Record<string, unknown>).plannedStartDate || '').slice(0, 10) >= taskFilters.plannedStartDate[0])
+      && (!taskFilters.plannedStartDate[1] || String((item.source as unknown as Record<string, unknown>).plannedStartDate || '').slice(0, 10) <= taskFilters.plannedStartDate[1])
+      && (!taskOwnerNames.length || taskOwnerNames.includes(item.ownerName))
+      && `${item.title} ${item.ownerName} ${item.creatorName || ''} ${item.status}`.toLowerCase().includes(taskQuery.trim().toLowerCase())
+    ).sort((a, b) => taskGroupBy === 'none' ? 0 : normalizedTaskGroupValue(a, taskGroupBy).localeCompare(normalizedTaskGroupValue(b, taskGroupBy), 'zh-CN'));
+    const taskStatuses = [...new Set(selectedItems.map((item) => item.status).filter(Boolean))];
+    const taskOwners = [...new Set([...directoryOwnerNames, ...planningItems.flatMap((item) => [item.ownerName, String((item.source as unknown as Record<string, unknown>).assigneeName || ''), String((item.source as unknown as Record<string, unknown>).assignee || ''), String((item.source as unknown as Record<string, unknown>).developer || '')])])].filter(Boolean);
+    const taskCreators = [...new Set(selectedItems.map((item) => item.creatorName).filter(Boolean))];
+    const taskVersions = [...new Set(selectedItems.map((item) => item.versionName).filter(Boolean))];
+    const taskGroupOptions: Array<[TaskGroupBy, string]> = [['priority', '优先级'], ['status', '状态'], ['owner', '负责人'], ['creator', '创建者'], ['version', '迭代版本'], ['customer', '关联客户'], ['requirementType', '需求类型']];
+    const taskGroupEntries = taskGroupBy === 'none'
+      ? []
+      : [...new Set(filteredItems.map((item) => normalizedTaskGroupValue(item, taskGroupBy)))].map((value) => ({ value, count: filteredItems.filter((item) => normalizedTaskGroupValue(item, taskGroupBy) === value).length }));
+    const effectiveTaskGroupValue = taskGroupBy === 'none' ? '' : taskGroupEntries.some((entry) => entry.value === taskGroupSelection) ? taskGroupSelection : taskGroupEntries[0]?.value || '';
+    const visibleTaskItems = taskGroupBy === 'none' || !effectiveTaskGroupValue ? filteredItems : filteredItems.filter((item) => normalizedTaskGroupValue(item, taskGroupBy) === effectiveTaskGroupValue);
+    const pagedItems = visibleTaskItems.slice((taskPage - 1) * taskPageSize, taskPage * taskPageSize);
+    const emptyTaskFilters = (): UnifiedFilterState => ({ title: '', status: [], owner: [], creator: [], customer: [], version: [], cc: [], createdAt: ['', ''], plannedStartDate: ['', ''], operators: {}, dateOperators: {} });
+    const appliedTaskFilterLabels = [
+      taskFilters.title.trim() ? { key: 'title', text: `标题：${taskFilters.title.trim()}` } : null,
+      ...(['status', 'owner', 'creator', 'customer', 'cc'] as const).flatMap((key) => taskFilters[key].map((value) => ({ key: `${key}:${value}`, text: `${({ status: '状态', owner: '负责人', creator: '创建人', customer: '关联客户', cc: '参与人' } as const)[key]}：${value}` }))),
+      taskFilters.createdAt.some(Boolean) ? { key: 'createdAt', text: `创建时间：${taskFilters.createdAt.filter(Boolean).join(' ~ ')}` } : null,
+      taskFilters.plannedStartDate.some(Boolean) ? { key: 'plannedStartDate', text: `计划开始时间：${taskFilters.plannedStartDate.filter(Boolean).join(' ~ ')}` } : null
+    ].filter(Boolean) as Array<{ key: string; text: string }>;
+    const clearTaskFilter = (key: string) => {
+      if (key === 'title') {
+        const next = { ...taskFilters, title: '' };
+        setTaskFilters(next);
+        setTaskFilterDraft(next);
+      }
+      else if (key === 'createdAt' || key === 'plannedStartDate') {
+        const next = { ...taskFilters, [key]: ['', ''] as [string, string] };
+        setTaskFilters(next);
+        setTaskFilterDraft(next);
+      }
+      else {
+        const [field, value] = key.split(':') as ['status' | 'owner' | 'creator' | 'customer' | 'cc', string];
+        const next = { ...taskFilters, [field]: taskFilters[field].filter((item) => item !== value) };
+        setTaskFilters(next);
+        setTaskFilterDraft(next);
+      }
+      setTaskPage(1);
+    };
     return (
-      <div className="version-detail-layout grid min-h-[620px] grid-cols-[250px_minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]">
+      <div className={`version-detail-layout grid min-h-[620px] ${directoryCollapsed ? 'grid-cols-[48px_minmax(0,1fr)]' : 'grid-cols-[240px_minmax(0,1fr)]'} overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]`}>
         <aside className="flex min-h-0 flex-col border-r border-[var(--border-main)] bg-[var(--bg-surface-soft)]">
+          {!directoryCollapsed && <>
+          <button type="button" onClick={() => setShowDetail(false)} className="flex h-10 items-center gap-2 border-b border-[var(--border-main)] px-4 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-surface-soft)] hover:text-[var(--active-text)]"><ChevronLeft className="h-4 w-4" />返回迭代列表</button>
           <div className="flex h-12 items-center border-b border-[var(--border-main)] px-4">
             <span className="font-semibold text-[var(--text-primary)]">迭代目录</span>
             <span className="ml-3 text-[11px] text-[var(--text-muted)]">{visibleVersions.length} 个</span>
@@ -639,7 +962,7 @@ export const VersionIterationView: React.FC = () => {
                 <button
                   type="button"
                   key={version.id}
-                  onClick={() => setSelectedId(version.id)}
+                  onClick={() => { setSelectedId(version.id); setDetailSection('workItems'); setTaskQuery(''); setTaskStatus('all'); setTaskOwner('all'); setSelectedTaskIds([]); }}
                   className={`mb-1 w-full rounded-md border p-3 text-left transition ${active ? 'border-[var(--primary)] bg-[var(--bg-surface)] shadow-sm' : 'border-transparent hover:border-[var(--border-main)] hover:bg-[var(--bg-surface)]'}`}
                 >
                   <div className="truncate font-medium text-[var(--text-primary)]">{version.name}</div>
@@ -653,19 +976,21 @@ export const VersionIterationView: React.FC = () => {
               );
             })}
           </div>
+          </>}
+          <button type="button" aria-label={directoryCollapsed ? '展开迭代目录' : '收起迭代目录'} onClick={() => setDirectoryCollapsed((value) => !value)} className="mt-auto flex h-10 shrink-0 items-center justify-center gap-2 border-t border-[var(--border-main)] text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--active-text)]">{directoryCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}{!directoryCollapsed && '收起目录'}</button>
         </aside>
         <section className="min-w-0 bg-[var(--bg-surface)]">
           {selectedVersion ? (
             <>
               <div className="border-b border-[var(--border-main)] px-5 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex min-w-0 items-center gap-2"><h2 className="truncate text-lg font-bold text-[var(--text-primary)]">{selectedVersion.name}</h2><StatusTag status={selectedVersion.status} /></div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-3"><h2 className="max-w-80 truncate text-lg font-bold text-[var(--text-primary)]" title={selectedVersion.name}>{selectedVersion.name}</h2><span className="text-[var(--text-muted)]">|</span><div role="tablist" aria-label="迭代详情分类" className="inline-flex rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">{([['info', '迭代信息'], ['workItems', '迭代任务']] as const).map(([key, label]) => <button type="button" role="tab" aria-selected={detailSection === key} key={key} onClick={() => setDetailSection(key)} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${detailSection === key ? 'bg-[var(--bg-surface)] text-[var(--active-text)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{label}</button>)}</div><StatusTag status={selectedVersion.status} /></div>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => void changeVersionStatus(statusAction.nextStatus)} className={secondaryButton}>{statusAction.icon}{statusAction.label}</button>
                   </div>
                 </div>
               </div>
-              <div className="grid gap-3 border-b border-[var(--border-main)] p-5 lg:grid-cols-2">
+              {detailSection === 'info' && <><div className="grid gap-3 border-b border-[var(--border-main)] p-5 lg:grid-cols-2">
                 <section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4">
                   <h3 className="text-sm font-semibold text-[var(--text-primary)]">基本信息</h3>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -689,18 +1014,36 @@ export const VersionIterationView: React.FC = () => {
               <div className="flex items-center gap-1 border-b border-[var(--border-main)] px-5">
                 {detailTabs.map((tab) => (
                   <button type="button" key={tab.key} onClick={() => setDetailTab(tab.key)} className={`inline-flex h-11 items-center gap-1.5 border-b-2 px-3 text-xs font-semibold ${detailTab === tab.key ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-                    {tab.icon}{tab.label}{tab.count !== undefined && <span className="text-[10px]">· {tab.count}</span>}
+                    {tab.icon}{tab.label}
                   </button>
                 ))}
               </div>
               <div className="p-5">
                 {detailTab === 'hours' && <div className="space-y-3"><div className="grid gap-3 lg:grid-cols-2"><section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><h3 className="text-sm font-semibold text-[var(--text-primary)]">工作项分布</h3><div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3"><Metric label="工作项总数" value={`${selectedStats.total} 个`} /><Metric label="工作项完成数" value={`${selectedStats.completed} 个`} /><Metric label="工作项未完成数" value={`${selectedStats.total - selectedStats.completed} 个`} /></div></section><section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><h3 className="text-sm font-semibold text-[var(--text-primary)]">迭代工时概览</h3><div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3"><Metric label="预计工时" value={`${estimatedHours} 小时`} /><Metric label="实际工时" value={`${actualHours} 小时`} /><Metric label="预计偏差" value={`${actualHours - estimatedHours} 小时`} /></div></section></div><div className="grid gap-3 lg:grid-cols-2"><section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-[var(--text-primary)]">工作项排名</h3><div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[var(--primary)]" />完成</span><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[var(--active-text)]/40" />总量</span></div></div><div className="mt-5 space-y-4">{memberStats.length ? memberStats.map((member) => <div key={`work-${member.name}`} className="grid grid-cols-[72px_minmax(0,1fr)_52px] items-center gap-2 text-xs"><span className="truncate text-[var(--text-muted)]" title={member.name}>{member.name}</span><div className="space-y-1"><div className="h-2 overflow-hidden rounded-full bg-[var(--active-text)]/20"><div className="h-full rounded-full bg-[var(--active-text)]/45" style={{ width: `${selectedStats.total ? (member.total / selectedStats.total) * 100 : 0}%` }}><div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${member.total ? (member.completed / member.total) * 100 : 0}%` }} /></div></div></div><span className="text-right text-[var(--text-muted)]">{member.completed}/{member.total}</span></div>) : <p className="py-6 text-center text-xs text-[var(--text-muted)]">暂无成员工作项</p>}</div></section><section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-[var(--text-primary)]">工时排名</h3><div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[var(--primary)]" />实际工时(小时)</span><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[var(--active-text)]/40" />预计工时(小时)</span></div></div><div className="mt-5 space-y-4">{memberStats.length ? memberStats.map((member) => <div key={`hours-${member.name}`} className="grid grid-cols-[72px_minmax(0,1fr)_52px] items-center gap-2 text-xs"><span className="truncate text-[var(--text-muted)]" title={member.name}>{member.name}</span><div className="space-y-1"><div className="h-2 overflow-hidden rounded-full bg-[var(--active-text)]/20"><div className="h-full rounded-full bg-[var(--active-text)]/45" style={{ width: `${estimatedHours ? (member.estimated / estimatedHours) * 100 : 0}%` }}><div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${estimatedHours ? (member.actual / estimatedHours) * 100 : 0}%` }} /></div></div></div><span className="text-right text-[var(--text-muted)]">{member.actual}/{member.estimated}</span></div>) : <p className="py-6 text-center text-xs text-[var(--text-muted)]">暂无成员工时</p>}</div></section></div></div>}
-                {detailTab === 'workItems' && (selectedItems.length ? <WorkItemRows items={selectedItems} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无工作项" description="当前迭代还没有关联工作项。" />)}
                 {detailTab === 'testReports' && (selectedVersionProductLineId
                   ? <VersionTestReportPanel productLineId={selectedVersionProductLineId} versionId={selectedVersion.id} versionName={selectedVersion.name} />
                   : <Alert type="error" showIcon title="测试报告加载失败" description="当前迭代未关联有效产品线，请先修正迭代归属。" />)}
                 {detailTab === 'review' && <EmptyState icon={<CheckCircle className="h-5 w-5" />} title="暂无版本评审" description="当前迭代还没有版本评审记录。" />}
               </div>
+              </>}
+              {detailSection === 'workItems' && <div className="space-y-3 p-5">
+                <div className="flex min-w-0 items-center justify-between gap-3"><span className="min-w-0 truncate font-semibold text-[var(--text-primary)]">全部工作项 · {filteredItems.length}</span><div className="flex min-w-0 items-center gap-2"><span className="flex items-center gap-2 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-2 py-1.5">{([['requirement', '产品'], ['dev', '研发'], ['test', '测试'], ['bug', '缺陷']] as const).map(([kind, label]) => <label key={kind} className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] text-[var(--text-body)]"><input type="checkbox" checked={taskKinds.includes(kind)} onChange={() => setTaskKinds((current) => current.includes(kind) ? current.filter((value) => value !== kind) : [...current, kind])} className="h-3.5 w-3.5 accent-[var(--primary)]" />{label}</label>)}</span><UnifiedWorkItemControls searchOpen={taskSearchOpen} searchDraft={taskSearchDraft} ownerPickerOpen={taskOwnerPickerOpen} ownerNames={taskOwnerNames} ownerOptions={taskOwners} filterOpen={taskFilterOpen} filters={taskFilterDraft} groupOpen={taskGroupOpen} groupQuery={taskGroupQuery} groupBy={taskGroupBy} groupOptions={taskGroupOptions} hideVersionFilter filterPanelTarget={taskFilterTarget} filterOptions={{ status: taskStatuses, owner: taskOwners, creator: taskCreators, customer: [...new Set(selectedItems.map((item) => String((item.source as unknown as Record<string, unknown>).customerName || '')).filter(Boolean))], version: taskVersions, cc: [...new Set(selectedItems.flatMap((item) => ((item.source as unknown as Record<string, unknown>).ccNames as string[] || [])))] }} onSearchOpenChange={setTaskSearchOpen} onSearchDraftChange={(value) => { const normalized = value.includes('@') ? value.replaceAll('@', '') : value; setTaskSearchDraft(normalized); setTaskOwnerPickerOpen(value.includes('@')); }} onSearchApply={() => { setTaskQuery(taskSearchDraft.trim()); setTaskSearchOpen(false); setTaskPage(1); }} onOwnerPickerOpenChange={setTaskOwnerPickerOpen} onOwnerNamesChange={(values) => { setTaskOwnerNames(values); setTaskPage(1); }} onFilterOpenChange={(open) => { if (open) setTaskFilterDraft(taskFilters); setTaskFilterOpen(open); }} onFiltersChange={(value) => { setTaskFilterDraft(value); setTaskPage(1); }} onClearFilters={() => { const empty = emptyTaskFilters(); setTaskFilters(empty); setTaskFilterDraft(empty); setTaskOwnerNames([]); setTaskPage(1); }} onApplyFilters={() => { setTaskFilters(taskFilterDraft); setTaskFilterOpen(false); setTaskPage(1); }} onGroupOpenChange={setTaskGroupOpen} onGroupQueryChange={setTaskGroupQuery} onGroupByChange={(value) => { setTaskGroupBy(value as typeof taskGroupBy); setTaskGroupSelection(''); setTaskGroupOpen(false); }} extra={<Dropdown trigger={['click']} menu={{ items: ([['requirement', '产品'], ['dev', '研发'], ['test', '测试'], ['bug', '缺陷']] as const).map(([key, label]) => ({ key, label, onClick: () => createIterationTask(key) })) }} disabled={!selectedVersionProductLineId}><button type="button" className={`${primaryButton} shrink-0 whitespace-nowrap`}><Plus className="h-4 w-4" />新建<ChevronDown className="h-3.5 w-3.5" /></button></Dropdown>} /></div></div>
+                {Boolean(taskQuery || taskOwnerNames.length || appliedTaskFilterLabels.length) && <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-main)] py-2 text-[11px]">
+                  {taskQuery && <span className="group/tag inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">搜索：{taskQuery}<button type="button" aria-label="清除搜索" onClick={() => { setTaskQuery(''); setTaskSearchDraft(''); setTaskOwnerNames([]); }} className="opacity-0 transition-opacity group-hover/tag:opacity-100"><span aria-hidden="true">×</span></button></span>}
+                  {taskOwnerNames.map((name) => <span key={`owner:${name}`} className="group/tag inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">负责人：{name}<button type="button" aria-label={`删除负责人${name}`} onClick={() => setTaskOwnerNames((current) => current.filter((item) => item !== name))} className="opacity-0 transition-opacity group-hover/tag:opacity-100"><span aria-hidden="true">×</span></button></span>)}
+                  {appliedTaskFilterLabels.map(({ key, text }) => <span key={key} className="group/tag inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">{text}<button type="button" aria-label={`删除${text}`} onClick={() => clearTaskFilter(key)} className="opacity-0 transition-opacity group-hover/tag:opacity-100"><span aria-hidden="true">×</span></button></span>)}
+                  <button type="button" onClick={() => { const empty = emptyTaskFilters(); setTaskFilters(empty); setTaskFilterDraft(empty); setTaskQuery(''); setTaskSearchDraft(''); setTaskOwnerNames([]); setTaskPage(1); }} className="text-blue-600 hover:text-blue-700">清空过滤条件</button>
+                </div>}
+                {taskGroupBy !== 'none' && <div className="flex flex-wrap items-center gap-6 border-b border-[var(--border-main)] py-3 text-[11px]">
+                  <span className="font-semibold text-[var(--text-body)]">按{taskGroupOptions.find(([key]) => key === taskGroupBy)?.[1]}分组：</span>
+                  {taskGroupEntries.map(({ value, count }) => <button key={value} type="button" onClick={() => { setTaskGroupSelection(value); setTaskPage(1); }} className={`border-b-2 px-1 py-1 transition-colors ${effectiveTaskGroupValue === value ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{value}<span className="ml-1 text-[var(--active-text)]">{count}</span></button>)}
+                  <button type="button" aria-label="取消分组" onClick={() => { setTaskGroupBy('none'); setTaskGroupSelection(''); setTaskGroupQuery(''); }} className="text-[var(--primary)]">取消分组</button>
+                </div>}
+                <div ref={setTaskFilterTarget} className="empty:hidden" />
+                {testItemsError && <Alert type="warning" showIcon title="测试任务加载失败" description="其他任务仍可查看，请稍后重试。" />}
+                <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{filteredItems.length ? <WorkItemRows items={pagedItems} groupBy={taskGroupBy} selectedIds={selectedTaskIds} onSelectionChange={setSelectedTaskIds} onOperation={(key, item) => void operatePlanningItem(key, item)} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'test' ? openTestTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无匹配工作项" description="当前迭代无对应任务，请调整筛选条件或新建任务。" />}</div>
+                <Pagination total={filteredItems.length} page={taskPage} pageSize={taskPageSize} onPageChange={setTaskPage} onPageSizeChange={(size) => { setTaskPageSize(size); setTaskPage(1); }} />
+              </div>}
             </>
           ) : <EmptyState icon={<GitBranch className="h-5 w-5" />} title="暂无迭代" description="创建一个迭代后即可查看详情。" />}
         </section>
@@ -767,7 +1110,7 @@ export const VersionIterationView: React.FC = () => {
 
   return (
     <div className="space-y-3 text-xs">
-      <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-main)] pb-3">
+      {!showDetail && <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-main)] pb-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="primary-line-tabs flex items-center gap-3" role="tablist" aria-label="版本迭代视图">{tabButton('list', '迭代列表', <ListTodo className="h-4 w-4" />)}{tabButton('planning', '迭代规划', <GitBranch className="h-4 w-4" />)}</div>
         </div>
@@ -786,7 +1129,7 @@ export const VersionIterationView: React.FC = () => {
             />
           </div>
         </div>
-      </div>
+      </div>}
       {mode === 'list' && !showDetail && <div className="version-toolbar flex w-full flex-nowrap items-center justify-between gap-3 pt-3">
           <div className="flex min-w-0 items-center gap-2">
               <Input
@@ -819,16 +1162,30 @@ export const VersionIterationView: React.FC = () => {
       </div>}
       {mode === 'list' && (showDetail ? renderDetail() : renderList())}
       {mode === 'planning' && <div className="pt-3">{renderPlanning()}</div>}
+      {createTaskKind && selectedVersionProductLineId && (
+        <RequirementTasksView
+          productLineFilter={selectedVersionProductLineId}
+          itemLabel={({ requirement: '产品任务', dev: '研发任务', test: '测试任务', bug: '缺陷' } as const)[createTaskKind]}
+          taskKind={createTaskKind}
+          creationContext={{
+            productLineId: selectedVersionProductLineId,
+            versionId: selectedVersion?.id,
+            parent: childParentItem?.source as RequirementTask | undefined,
+            onClose: () => { setCreateTaskKind(null); setChildParentItem(null); setCreateSaving(false); },
+            onCreated: () => { setTaskPage(1); }
+          }}
+        />
+      )}
       {selectedWorkItem && (
         <WorkItemCreatePanel
           isOpen
           onClose={() => setSelectedWorkItem(null)}
-          title={selectedWorkItem.kind === 'requirement' ? '需求详情' : selectedWorkItem.kind === 'design' ? '设计任务详情' : selectedWorkItem.kind === 'task' ? '研发任务详情' : '缺陷详情'}
+          title={selectedWorkItem.kind === 'requirement' ? '需求详情' : selectedWorkItem.kind === 'design' ? '设计任务详情' : selectedWorkItem.kind === 'test' ? '测试任务详情' : selectedWorkItem.kind === 'task' ? '研发任务详情' : '缺陷详情'}
           presentation="drawer"
           showContinueOption={false}
           footer={<button type="button" onClick={() => setSelectedWorkItem(null)} className="tech-button-primary h-10 rounded-lg px-4 text-xs font-semibold">关闭</button>}
           properties={
-            selectedWorkItem.kind === 'requirement' || selectedWorkItem.kind === 'design' ? (
+            selectedWorkItem.kind === 'requirement' || selectedWorkItem.kind === 'design' || selectedWorkItem.kind === 'test' ? (
               <div className="space-y-3 text-xs">
                 <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
                 <DetailField label="当前状态"><StatusTag status={selectedWorkItem.item.status} /></DetailField>
@@ -872,7 +1229,7 @@ export const VersionIterationView: React.FC = () => {
             )
           }
         >
-          {selectedWorkItem.kind === 'requirement' || selectedWorkItem.kind === 'design' ? (
+          {selectedWorkItem.kind === 'requirement' || selectedWorkItem.kind === 'design' || selectedWorkItem.kind === 'test' ? (
             <div className="w-full space-y-5 text-xs">
               <DetailField label={selectedWorkItem.kind === 'design' ? '设计任务名称' : '需求名称'}><span className="font-medium">{selectedWorkItem.item.title}</span></DetailField>
               <DetailField label="验收标准"><p className="min-h-20 whitespace-pre-wrap break-words leading-6">{selectedWorkItem.item.expectedGoal || '未填写验收标准'}</p></DetailField>
@@ -882,7 +1239,7 @@ export const VersionIterationView: React.FC = () => {
                   <span className="border-b-2 border-[var(--primary)] pb-2 text-sm text-[var(--active-text)]">关联事项</span>
                   <span className="text-sm text-[var(--text-muted)]">动态 <span className="ml-1 text-[11px]">{selectedWorkItem.item.events?.length || 0}</span></span>
                 </div>
-                {selectedWorkItem.item.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedWorkItem.item.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : <p className="text-[var(--text-muted)]">未关联事项</p>}
+                {textList(selectedWorkItem.item.sourceWorkOrderTitles).length ? <div className="flex flex-wrap gap-2">{textList(selectedWorkItem.item.sourceWorkOrderTitles).map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : <p className="text-[var(--text-muted)]">未关联事项</p>}
               </section>
             </div>
           ) : selectedWorkItem.kind === 'task' ? (
@@ -895,7 +1252,7 @@ export const VersionIterationView: React.FC = () => {
               <DetailField label="缺陷编号"><span className="font-mono">{selectedWorkItem.item.code || '未设置'}</span></DetailField>
               <DetailField label="缺陷名称"><span className="font-medium">{selectedWorkItem.item.title}</span></DetailField>
               <DetailField label="复现步骤 / 缺陷描述"><p className="min-h-28 whitespace-pre-wrap break-words leading-6">{selectedWorkItem.item.description || '未填写缺陷描述'}</p></DetailField>
-              <DetailField label="关联事项">{selectedWorkItem.item.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedWorkItem.item.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : '未关联事项'}</DetailField>
+              <DetailField label="关联事项">{textList(selectedWorkItem.item.sourceWorkOrderTitles).length ? <div className="flex flex-wrap gap-2">{textList(selectedWorkItem.item.sourceWorkOrderTitles).map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : '未关联事项'}</DetailField>
             </div>
           )}
         </WorkItemCreatePanel>

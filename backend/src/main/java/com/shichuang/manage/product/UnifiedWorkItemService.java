@@ -138,7 +138,7 @@ public class UnifiedWorkItemService {
             text(row, "code"), text(row, "title"), text(row, "productLineId"), nullable(row, "versionId"),
             nullable(row, "requirementId"), nullable(row, "requirementTitle"), nullable(row, "requirementInitiatorName"), nullable(row, "sourceType"), text(row, "assigneeName"), nullable(row,"taskTypeId"), nullable(row,"workflowId"), nullable(row,"statusKey"), status,
             statusColor == null ? "neutral" : statusColor, priority, originalPriority,
-            due, decimal(row.get("estimatedHours")), decimal(row.get("actualHours")), created,
+            due, decimal(row.get("estimatedHours")), decimal(row.get("actualHours")), created, nullable(row,"creatorName"),
             due != null && due.isBefore(today) && !status.terminal(),
             "bug".equals(category) && ("P0".equals(priority) || "P1".equals(priority)) && !status.terminal(), nullable(row,"parentWorkItemId"), nullable(row,"assigneeId"),
             WorkItemConfigurationService.enabled(row.get("hasChildren")), ((Number)row.getOrDefault("revision",0)).intValue());
