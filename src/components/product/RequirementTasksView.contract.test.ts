@@ -32,8 +32,8 @@ describe('requirement task Ant Design contract', () => {
       productLineSource.indexOf("section === 'basic'"),
       productLineSource.indexOf("section === 'members'")
     );
-    expect(basicInfo).toContain('<span>产品线网址</span>');
-    expect(basicInfo.indexOf('<span>产品线网址</span>')).toBeLessThan(basicInfo.indexOf('<span>可见范围</span>'));
+    expect(basicInfo).toContain('<span>产品网址</span>');
+    expect(basicInfo.indexOf('<span>产品网址</span>')).toBeLessThan(basicInfo.indexOf('<span>可见范围'));
     expect(productLineSource).toContain("website: normalizedWebsite || ''");
     expect(productLineSource).toContain('loading={isSavingBasic}');
   });

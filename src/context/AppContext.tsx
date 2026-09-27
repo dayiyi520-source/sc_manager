@@ -126,7 +126,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     title: '产研管理',
     icon: 'Layers',
     subMenus: [
-      { id: 'prod_lines', title: '产品线', mainMenuId: 'product', icon: 'Box' },
+      { id: 'prod_lines', title: '产品管理', mainMenuId: 'product', icon: 'Box' },
       { id: 'prod_versions', title: '版本迭代', mainMenuId: 'product', icon: 'GitBranch' },
       { id: 'prod_req_tasks', title: '产品任务', mainMenuId: 'product', icon: 'ListTodo', badge: '云效流', badgeType: 'default' },
       { id: 'prod_design_tasks', title: '设计任务', mainMenuId: 'product', icon: 'Edit' },
@@ -1171,15 +1171,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addProductLine = async (line: Partial<ProductLine>) => {
     if (!requirementBackendEnabled) {
-      addToast('error', '产品线保存失败', '当前未连接后端服务，数据未保存');
+      addToast('error', '产品保存失败', '当前未连接后端服务，数据未保存');
       return false;
     }
     const ownerName = line.ownerName || line.owner || currentUser.name;
     const newLine: ProductLine = {
       id: `pl-${Date.now()}`,
-      name: line.name || '新建产品线',
+      name: line.name || '新建产品',
       code: line.code || 'PL-NEW',
-      description: line.description || '该产品线还没有任何简介内容。',
+      description: line.description || '该产品还没有任何简介内容。',
       ownerName,
       owner: ownerName,
       ownerUserId: line.ownerUserId,
@@ -1189,11 +1189,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       technicalOwner: line.technicalOwner || '',
       requirementOwner: line.requirementOwner || '',
       requirementOwnerUserId: line.requirementOwnerUserId,
+      requirementOwnerSecondary: line.requirementOwnerSecondary || '',
+      requirementOwnerSecondaryUserId: line.requirementOwnerSecondaryUserId,
       techOwner: line.techOwner || '',
       techOwnerUserId: line.techOwnerUserId,
+      techOwnerSecondary: line.techOwnerSecondary || '',
+      techOwnerSecondaryUserId: line.techOwnerSecondaryUserId,
       testOwner: line.testOwner || '',
       testOwnerUserId: line.testOwnerUserId,
-      visibility: '公开',
+      testOwnerSecondary: line.testOwnerSecondary || '',
+      testOwnerSecondaryUserId: line.testOwnerSecondaryUserId,
+      visibility: line.visibility || '公开',
+      sort: line.sort ?? 0,
       coverColor: 'from-blue-600 to-indigo-700',
       coverUrl: line.coverUrl,
       members: line.members?.length ? line.members : line.ownerUserId ? [{ id: `mem-${Date.now()}`, userId: line.ownerUserId, name: ownerName, role: '管理员' }] : [],
@@ -1212,10 +1219,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await productRepository.createProductLine(newLine);
       await productLineQuery.refetch();
-      addToast('success', '产品线创建成功', newLine.name);
+      addToast('success', '产品创建成功', newLine.name);
       return true;
     } catch (error) {
-      addToast('error', '产品线保存失败', error instanceof Error ? error.message : '请稍后重试');
+      addToast('error', '产品保存失败', error instanceof Error ? error.message : '请稍后重试');
       return false;
     }
   };
@@ -1226,7 +1233,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     await productRepository.updateProductLine(id, updates);
     await productLineQuery.refetch();
-    addToast('success', '产品线配置已保存');
+    addToast('success', '产品配置已保存');
   };
 
   const addProductLineMembers = async (id: string, members: ProductLineMember[]) => {

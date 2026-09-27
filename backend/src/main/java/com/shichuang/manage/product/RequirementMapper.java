@@ -176,7 +176,7 @@ public class RequirementMapper {
         int total = ((Number) counts.getOrDefault("total", 0)).intValue();
         int completed = ((Number) counts.getOrDefault("completed", 0)).intValue();
         int accepted = ((Number) counts.getOrDefault("accepted", 0)).intValue();
-        String status = total == 0 ? "处理中" : accepted == total ? "待负责人关闭" : completed == total ? "待验收" : "处理中";
+        String status = total == 0 ? "处理中" : accepted == total ? "待关闭" : completed == total ? "待验收" : "处理中";
         jdbc.update("UPDATE t_product_work_item SET assistance_status_=?,version_=version_+1,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", status, tenantId, assistanceId);
     }
 

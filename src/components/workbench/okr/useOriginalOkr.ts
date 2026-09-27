@@ -73,7 +73,8 @@ export function useOriginalOkr() {
       }
     };
     for (const record of all) {
-      if (record.kind === 'objective' && activeStatuses.has(record.status) && record.ownerId === me.supervisorId) {
+      // 承接关系由 KR 的 assigneeIds 决定，组织根负责人指派给成员时也要可拆解。
+      if (record.kind === 'objective' && activeStatuses.has(record.status)) {
         for (const kr of record.payload.keyResults || []) {
           if ((kr.assigneeIds || []).includes(currentUser.id)) addParent({ ...record, kind: 'action' }, record.id, kr.id, kr.id, kr.title);
         }

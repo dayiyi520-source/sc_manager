@@ -3,7 +3,8 @@ import { Alert, Button, Empty, Input, Modal, Progress, Cascader, Spin, Tag, Tabs
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
-import { Target, FileSpreadsheet, Calendar, ChevronDown, ChevronRight, Search, CheckCircle, AlertTriangle, FileText, List, LayoutGrid } from '@/components/common/octicons-compat';
+import { Target, FileSpreadsheet, Calendar, ChevronDown, ChevronRight, Search, CheckCircle, AlertTriangle, FileText } from '@/components/common/octicons-compat';
+import { ViewModeSwitch } from '../common/ViewModeSwitch';
 import { useApp, useAppNavigationContext } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
@@ -438,10 +439,7 @@ const OriginalWorkspace: React.FC = () => {
           />
           <section className="okr-workspace-main" aria-label={`${contextTitle}目标展示区`}>
           <div className="okr-context-heading"><h2>{contextTitle}</h2><div className="okr-target-tools">
-            <div className="okr-target-view-switch" role="group" aria-label="目标视图">
-              <Tooltip title="列表视图"><Button aria-label="列表视图" aria-pressed={targetViewMode === 'list'} className={targetViewMode === 'list' ? 'is-selected' : ''} icon={<List/>} onClick={() => setTargetViewMode('list')}/></Tooltip>
-              <Tooltip title="卡片视图"><Button aria-label="卡片视图" aria-pressed={targetViewMode === 'card'} className={targetViewMode === 'card' ? 'is-selected' : ''} icon={<LayoutGrid/>} onClick={() => setTargetViewMode('card')}/></Tooltip>
-            </div>
+            <ViewModeSwitch value={targetViewMode} onChange={setTargetViewMode} ariaLabel="目标视图" />
             <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear maxTagCount={0} maxTagPlaceholder={() => cycleSummary} placeholder="周期：请选择" onChange={paths => setSelectedCycles(paths.map(path => String(path[path.length - 1])))} />
           </div></div>
 

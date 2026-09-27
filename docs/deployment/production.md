@@ -58,7 +58,18 @@ Rules:
 - Load deployment values from `.enterprise-app-factory/secrets/runtime.env` or existing environment variables.
 - After a deployment succeeds, update this runbook with the verified command, required preconditions, rollback notes, and last success date.
 
-Last successful deploy: 2026-09-23
+Last successful deploy: 2026-09-27
+
+Latest verified demo release:
+
+- Release `20260927134948` deployed the current working tree in application-only mode to the existing `/manage-admin/` route on `103.236.98.125`; the server database was preserved. The remote release step was run from the canonical script's extracted remote block after the local password adapter failed to forward standard input. It completed with an application and database backup at `/opt/manage-admin/backups/20260927134948/`.
+- The backend is active and healthy, Nginx configuration passed, Flyway applied `20260927.1`, and the public entry, direct business route, and authentication endpoint returned successfully. A read-only Chen Yuzhang perspective check found no actionable item in the current demo data: the root objective is still `pending_review` and its KR has no assignee ID. This release alone does not close that specific business acceptance scenario.
+- Release `20260927131638` deployed local commit `363ff03` to the existing `/manage-admin/` route on `103.236.98.125` in application-only mode. The server database was not replaced.
+- The canonical script built and uploaded the application, but its remote backup step exceeded the SSH wrapper's timeout. The uploaded artifacts were switched manually only after a separate compressed database backup and frontend/JAR backups succeeded. The script itself did not report completion for this release.
+- The backend service is active, Nginx configuration is valid, the public entry page and JavaScript asset return 200, direct defect-page navigation returns 200, and the public development-account API returns 200.
+- Flyway completed through `20260926.2`; 53 tables and no failed Flyway records were observed after deployment. This confirms schema migration, not business-level browser acceptance.
+- Backup: `/opt/manage-admin/backups/20260927131638/` (database, frontend, and JAR). The uploaded package remains in `/opt/manage-admin/incoming/20260927131638/`.
+- Before the next release, fix or accommodate the canonical script's remote backup timeout. The local full test suites failed before this demo deployment; do not treat this release as a clean automated-test pass.
 
 Latest verified application release:
 

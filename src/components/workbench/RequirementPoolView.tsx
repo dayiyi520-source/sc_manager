@@ -56,12 +56,10 @@ import { DateField } from "../common";
 import { employeeSelectOptions } from "../common/PersonIdentity";
 
 const statuses: RequirementTask["status"][] = [
-  "待受理",
   "待处理",
   "处理中",
   "待验收",
-  "验收未通过",
-  "待负责人关闭",
+  "待关闭",
   "已关闭",
   "已搁置",
   "已驳回",
@@ -746,14 +744,14 @@ export const RequirementPoolView: React.FC = () => {
     setAcceptanceSubmitting(true);
     try {
       await requirementRepository.acceptanceFailed(selected.id, { workItemId: target?.id, taskOwnerId: owner?.id, reason: acceptanceReason.trim(), attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
-      const next = { ...selected, status: "验收未通过" as RequirementTask["status"], ownerName: owner?.name || selected.ownerName };
+      const next = { ...selected, status: "处理中" as RequirementTask["status"], ownerName: owner?.name || selected.ownerName };
       setSelected(next);
       setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
       setAcceptanceModalOpen(false);
       setAcceptanceWorkItemId("");
       setAcceptanceReason("");
       setFlowMedia([]);
-      addToast("success", "已退回任务负责人", "事项状态已变更为验收未通过，请负责人重新处理");
+      addToast("success", "已退回任务负责人", "事项状态已变更为处理中，请负责人重新处理");
     } catch (error) {
       addToast("error", "验收操作失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally {
@@ -834,7 +832,7 @@ export const RequirementPoolView: React.FC = () => {
     selected &&
     (selected.taskId ||
       workItems.length > 0 ||
-      ["处理中", "待验收", "验收未通过", "待负责人关闭", "已关闭", "已驳回", "已完成"].includes(selected.status)),
+      ["处理中", "待验收", "待关闭", "已关闭", "已驳回"].includes(selected.status)),
   );
   const selectedMedia = normalizeMedia(selected?.media);
   const cardSubText = (count: number) => `今日新增 +${count}`;
@@ -1141,7 +1139,7 @@ export const RequirementPoolView: React.FC = () => {
                     验收未通过
                   </button>
                 )}
-                {selected.status === "待负责人关闭" && isInitiator(selected, currentUser) && (
+                {selected.status === "待关闭" && isInitiator(selected, currentUser) && (
                   <button
                     type="button"
                     onClick={closeAssistance}
@@ -1486,7 +1484,7 @@ export const RequirementPoolView: React.FC = () => {
         title="验收未通过"
       >
         <form onSubmit={submitAcceptanceFailed} className="work-order-dialog space-y-4">
-          <p className="text-xs text-[var(--text-muted)]">事项将退回当前任务负责人，状态变更为“验收未通过”，负责人重新处理后再次提交验收。</p>
+          <p className="text-xs text-[var(--text-muted)]">事项将退回当前任务负责人，状态变更为“处理中”，负责人重新处理后再次提交验收。</p>
           {workItems.filter((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED").length > 0 && (
             <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
               验收任务 *

@@ -67,6 +67,8 @@ const ProductLineSettingsPanel: React.FC<{
   const [name, setName] = useState(productLine.name);
   const [code, setCode] = useState(productLine.code);
   const [website, setWebsite] = useState(productLine.website || '');
+  const [ownerUserId, setOwnerUserId] = useState(productLine.ownerUserId || '');
+  const [sort, setSort] = useState(productLine.sort ?? 0);
   const [websiteError, setWebsiteError] = useState('');
   const [isSavingBasic, setIsSavingBasic] = useState(false);
   const [description, setDescription] = useState(productLine.description);
@@ -81,6 +83,8 @@ const ProductLineSettingsPanel: React.FC<{
     setName(productLine.name);
     setCode(productLine.code);
     setWebsite(productLine.website || '');
+    setOwnerUserId(productLine.ownerUserId || '');
+    setSort(productLine.sort ?? 0);
     setWebsiteError('');
     setDescription(productLine.description);
     setVisibility(productLine.visibility === '部门可见' ? '私密' : productLine.visibility === '保密' ? '仅创建者可见' : productLine.visibility || '公开');
@@ -93,14 +97,18 @@ const ProductLineSettingsPanel: React.FC<{
 
   const saveBasicInfo = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!name.trim() || !productLine.code.trim()) {
-      addToast('warning', '请填写产品线名称');
+    if (!name.trim() || !productLine.code.trim() || !ownerUserId) {
+      addToast('warning', '请填写产品名称并选择负责人');
+      return;
+    }
+    if (!Number.isInteger(sort) || sort < 0 || sort > 999) {
+      addToast('warning', '排序必须是 0-999 的整数');
       return;
     }
     const normalizedWebsite = normalizeProductWebsiteUrl(website);
     if (website.trim() && !normalizedWebsite) {
       setWebsiteError('请输入以 http:// 或 https:// 开头的有效网址');
-      addToast('warning', '请输入有效的产品线网址');
+      addToast('warning', '请输入有效的产品网址');
       return;
     }
     setWebsiteError('');
@@ -108,13 +116,15 @@ const ProductLineSettingsPanel: React.FC<{
     try {
       await updateProductLine(productLine.id, {
         name: name.trim(),
-        description: description.trim() || '该产品线还没有任何简介内容。',
+        description: description.trim() || '该产品还没有任何简介内容。',
         website: normalizedWebsite || '',
+        ownerUserId,
+        sort,
         visibility,
         status
       });
     } catch (error) {
-      addToast('error', '产品线设置保存失败', error instanceof Error ? error.message : '请稍后重试');
+      addToast('error', '产品设置保存失败', error instanceof Error ? error.message : '请稍后重试');
     } finally {
       setIsSavingBasic(false);
     }
@@ -131,13 +141,13 @@ const ProductLineSettingsPanel: React.FC<{
   return (
     <div className="product-line-settings space-y-5 animate-in fade-in duration-200">
       <div className="flex items-center gap-3 border-b border-[var(--border-main)] pb-3">
-        <Button onClick={onBack} icon={<ArrowLeft className="w-3.5 h-3.5" />}>返回产品线详情</Button>
+        <Button onClick={onBack} icon={<ArrowLeft className="w-3.5 h-3.5" />}>返回产品详情</Button>
       </div>
 
       <div className="grid min-h-[520px] grid-cols-1 border border-[var(--border-main)] bg-[var(--bg-surface)] md:grid-cols-[190px_minmax(0,1fr)]">
-        <nav className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:border-b-0 md:border-r" aria-label="产品线设置菜单">
+        <nav className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:border-b-0 md:border-r" aria-label="产品设置菜单">
           <div className="mb-4 border-b border-[var(--border-main)] px-3 pb-4 select-none">
-            <h2 className="text-base font-bold text-[var(--text-primary)]">产品线设置</h2>
+            <h2 className="text-base font-bold text-[var(--text-primary)]">产品设置</h2>
             <p className="mt-2 truncate text-xs font-medium text-[var(--active-text)]" title={productLine.name}>{productLine.name}</p>
             <p className="mt-1 truncate font-mono text-[11px] text-[var(--text-muted)]" title={productLine.code}>{productLine.code}</p>
           </div>
@@ -155,24 +165,26 @@ const ProductLineSettingsPanel: React.FC<{
         <section className="min-w-0 p-6">
           {section === 'basic' && (
             <form onSubmit={saveBasicInfo} className="mx-auto w-full max-w-2xl space-y-5 text-xs">
-              <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">维护产品线的名称、编码、网址、可见范围和简介。</p></div>
+              <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">维护产品的名称、编码、网址、可见范围和简介。</p></div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线名称 *</span><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入产品线名称" /></label>
-                <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线编码</span><Input value={code} disabled readOnly /></label>
+                <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品名称 *</span><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入产品名称" /></label>
+                <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品编码</span><Input value={code} disabled readOnly /></label>
               </div>
-              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线网址</span><Input value={website} status={websiteError ? 'error' : undefined} aria-invalid={Boolean(websiteError)} onChange={(event) => { setWebsite(event.target.value); if (websiteError) setWebsiteError(''); }} placeholder="https://example.com" />{websiteError && <span className="text-[11px] font-normal text-[var(--danger)]">{websiteError}</span>}</label>
-              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>可见范围</span><Select className="w-full" value={visibility} onChange={setVisibility} options={[{ value: '公开', label: '公开（组织全员可访问）' }, { value: '私密', label: '私密（仅成员可见）' }, { value: '仅创建者可见', label: '仅创建者可见' }]} /></label>
+              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品负责人 *</span><Select showSearch allowClear className="w-full" value={ownerUserId || undefined} onChange={(value) => setOwnerUserId(value || '')} options={(employeesQuery.data || []).map((employee) => ({ value: employee.id, label: `${employee.name} · ${employeeJobTitle(employee) || '未设置职位'}` }))} optionFilterProp="label" placeholder="请选择产品负责人" /></label>
+              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品网址</span><Input value={website} status={websiteError ? 'error' : undefined} aria-invalid={Boolean(websiteError)} onChange={(event) => { setWebsite(event.target.value); if (websiteError) setWebsiteError(''); }} placeholder="https://example.com" />{websiteError && <span className="text-[11px] font-normal text-[var(--danger)]">{websiteError}</span>}</label>
+              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>可见范围 *</span><Select className="w-full" value={visibility} onChange={setVisibility} options={[{ value: '公开', label: '公开（组织全员可访问）' }, { value: '私密', label: '私密（仅成员可见）' }, { value: '仅创建者可见', label: '仅创建者可见' }]} /></label>
               <div className="flex items-center justify-between gap-4">
-                <div><div className="font-medium text-[var(--text-body)]">项目状态</div><p className="mt-[5px] text-[11px] text-[var(--text-muted)]">关闭后，产品线仅保留查看和历史记录能力。</p></div>
+                <div><div className="font-medium text-[var(--text-body)]">产品状态</div><p className="mt-[5px] text-[11px] text-[var(--text-muted)]">关闭后，产品仅保留查看和历史记录能力。</p></div>
                 <Switch className="product-line-switch" checked={status === '启用中'} onChange={(checked) => setStatus(checked ? '启用中' : '已停用')} checkedChildren="启用中" unCheckedChildren="已停用" />
               </div>
-              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品线简介</span><Input.TextArea rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="请输入产品线简介" /></label>
+              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>排序</span><Input type="number" min={0} max={999} step={1} value={sort} onChange={(event) => setSort(Number(event.target.value))} /></label>
+              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品描述</span><Input.TextArea rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="请输入产品描述" /></label>
               <div className="flex justify-end"><Button type="primary" htmlType="submit" loading={isSavingBasic}>保存基本信息</Button></div>
             </form>
           )}
           {section === 'members' && (
             <div className="mx-auto w-full max-w-2xl space-y-5 text-xs">
-              <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">项目成员</h3><p className="mt-1 text-[var(--text-muted)]">配置产品线成员及其角色。</p></div><Button type="primary" onClick={onOpenMembers} icon={<UserAddOutlined />}>添加成员</Button></div>
+              <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">项目成员</h3><p className="mt-1 text-[var(--text-muted)]">配置产品成员及其角色。</p></div><Button type="primary" onClick={onOpenMembers} icon={<UserAddOutlined />}>添加成员</Button></div>
               {(() => {
                 const members: ProductLineMember[] = (productLine.members || []).map((member, index) => typeof member === 'string' ? { id: `legacy-${index}-${member}`, userId: '', name: member, role: '参与人' } : member);
                 const memberTabs = ['全部', '管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'];
@@ -185,7 +197,7 @@ const ProductLineSettingsPanel: React.FC<{
                   </div>
                 </>;
               })()}
-              <Modal isOpen={Boolean(memberToRemove)} onClose={() => setMemberToRemove(null)} title="移除项目成员" footer={<><Button onClick={() => setMemberToRemove(null)}>取消</Button><Button type="primary" danger onClick={async () => { if (!memberToRemove) return; try { await removeProductLineMember(productLine.id, memberToRemove.id); addToast('success', '成员已移除'); setMemberToRemove(null); } catch (error) { addToast('error', '成员移除失败', error instanceof Error ? error.message : '请稍后重试'); } }}>确认移除</Button></>}><p className="text-sm text-[var(--text-body)]">确定将“{memberToRemove?.name}”移除产品线吗？</p></Modal>
+              <Modal isOpen={Boolean(memberToRemove)} onClose={() => setMemberToRemove(null)} title="移除产品成员" footer={<><Button onClick={() => setMemberToRemove(null)}>取消</Button><Button type="primary" danger onClick={async () => { if (!memberToRemove) return; try { await removeProductLineMember(productLine.id, memberToRemove.id); addToast('success', '成员已移除'); setMemberToRemove(null); } catch (error) { addToast('error', '成员移除失败', error instanceof Error ? error.message : '请稍后重试'); } }}>确认移除</Button></>}><p className="text-sm text-[var(--text-body)]">确定将“{memberToRemove?.name}”移除产品吗？</p></Modal>
             </div>
           )}
           {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
@@ -450,15 +462,18 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   // Edit Leads Form state
   const [leadReqOwnerUserId, setLeadReqOwnerUserId] = useState(productLine?.requirementOwnerUserId || '');
+  const [leadReqOwnerSecondaryUserId, setLeadReqOwnerSecondaryUserId] = useState(productLine?.requirementOwnerSecondaryUserId || '');
   const [leadTechOwnerUserId, setLeadTechOwnerUserId] = useState(productLine?.techOwnerUserId || '');
+  const [leadTechOwnerSecondaryUserId, setLeadTechOwnerSecondaryUserId] = useState(productLine?.techOwnerSecondaryUserId || '');
   const [leadTestOwnerUserId, setLeadTestOwnerUserId] = useState(productLine?.testOwnerUserId || '');
+  const [leadTestOwnerSecondaryUserId, setLeadTestOwnerSecondaryUserId] = useState(productLine?.testOwnerSecondaryUserId || '');
 
   if (!productLine) {
     return (
       <div className="p-8 text-center space-y-4">
-        <p className="text-sm text-[var(--text-body)]">未找到指定产品线信息</p>
+        <p className="text-sm text-[var(--text-body)]">未找到指定产品信息</p>
         <Button type="primary" onClick={onBack}>
-          返回产品线列表
+          返回产品列表
         </Button>
       </div>
     );
@@ -548,18 +563,30 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   const resetLeadForm = () => {
     setLeadReqOwnerUserId(productLine.requirementOwnerUserId || '');
+    setLeadReqOwnerSecondaryUserId(productLine.requirementOwnerSecondaryUserId || '');
     setLeadTechOwnerUserId(productLine.techOwnerUserId || '');
+    setLeadTechOwnerSecondaryUserId(productLine.techOwnerSecondaryUserId || '');
     setLeadTestOwnerUserId(productLine.testOwnerUserId || '');
+    setLeadTestOwnerSecondaryUserId(productLine.testOwnerSecondaryUserId || '');
   };
 
   // Handle Save Leads
   const handleSaveLeads = async (e: React.FormEvent) => {
     e.preventDefault();
+    if ((leadReqOwnerUserId && leadReqOwnerUserId === leadReqOwnerSecondaryUserId)
+      || (leadTechOwnerUserId && leadTechOwnerUserId === leadTechOwnerSecondaryUserId)
+      || (leadTestOwnerUserId && leadTestOwnerUserId === leadTestOwnerSecondaryUserId)) {
+      addToast('warning', '责任人配置无效', '同一职责的主责任人与次责任人不能选择同一人');
+      return;
+    }
     try {
       await updateProductLine(productLine.id, {
         requirementOwnerUserId: leadReqOwnerUserId,
+        requirementOwnerSecondaryUserId: leadReqOwnerSecondaryUserId,
         techOwnerUserId: leadTechOwnerUserId,
-        testOwnerUserId: leadTestOwnerUserId
+        techOwnerSecondaryUserId: leadTechOwnerSecondaryUserId,
+        testOwnerUserId: leadTestOwnerUserId,
+        testOwnerSecondaryUserId: leadTestOwnerSecondaryUserId
       });
       setIsEditLeadsOpen(false);
     } catch (error) {
@@ -583,13 +610,13 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             onClick={onBack}
             icon={<ArrowLeft className="w-3.5 h-3.5" />}
           >
-            返回产品线矩阵
+            返回产品矩阵
           </Button>
         </div>
 
         {/* Header Action Buttons */}
         <div className="flex items-center gap-2">
-          <Button onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品线设置</Button>
+          <Button onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品设置</Button>
         </div>
       </div>
 
@@ -673,7 +700,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }}
                 icon={<Edit3 className="w-3 h-3" />}
               >
-                负责人配置
+                责任人配置
               </Button>
             </div>
 
@@ -684,9 +711,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                   PO
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[11px] text-[var(--text-muted)]">需求负责人 (Product Owner)</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">产品责任人 (Product Owner)</div>
                   <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
-                    {productLine.requirementOwner || '暂无'}
+                    主：{productLine.requirementOwner || '暂无'}{productLine.requirementOwnerSecondary ? ` · 次：${productLine.requirementOwnerSecondary}` : ''}
                   </div>
                   <div className="text-[10px] text-purple-400/90 font-medium mt-0.5">
                     负责产品矩阵定位、需求全生命周期规划
@@ -700,9 +727,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                   TL
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[11px] text-[var(--text-muted)]">技术负责人 (Tech Lead)</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">研发责任人 (Tech Lead)</div>
                   <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
-                    {productLine.techOwner || '暂无'}
+                    主：{productLine.techOwner || '暂无'}{productLine.techOwnerSecondary ? ` · 次：${productLine.techOwnerSecondary}` : ''}
                   </div>
                   <div className="text-[10px] text-[var(--active-text)]/90 font-medium mt-0.5">
                     把控系统架构演进、技术选型与高可用交付
@@ -716,9 +743,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                   QA
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[11px] text-[var(--text-muted)]">测试负责人 (QA Lead)</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">测试责任人 (QA Lead)</div>
                   <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
-                    {productLine.testOwner || '暂无'}
+                    主：{productLine.testOwner || '暂无'}{productLine.testOwnerSecondary ? ` · 次：${productLine.testOwnerSecondary}` : ''}
                   </div>
                   <div className="text-[10px] text-emerald-400/90 font-medium mt-0.5">
                     负责封版验收、自动化回归与质量基线
@@ -803,7 +830,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             <div>
               <h3 className="font-bold text-sm text-[var(--text-primary)]">版本迭代演进路线</h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                记录该产品线已发布及规划中的各版本周期、关键更新与关联需求
+                记录该产品已发布及规划中的各版本周期、关键更新与关联需求
               </p>
             </div>
             <div className="flex items-center gap-1">
@@ -866,7 +893,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             <div>
               <h3 className="font-bold text-sm text-[var(--text-primary)]">成员管理</h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                支持配置产品线需求、架构、研发、测试与运维人员权限与职责
+                支持配置产品需求、架构、研发、测试与运维人员权限与职责
               </p>
             </div>
             <div className="flex items-center gap-1">
@@ -911,9 +938,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       <Modal
         isOpen={isEditLeadsOpen}
         onClose={() => { resetLeadForm(); setIsEditLeadsOpen(false); }}
-        title="负责人配置"
+        title="责任人配置"
         headerIcon={<UserCheck className="w-5 h-5" />}
-        subtitle={<span>产品线：<span className="font-medium text-[var(--active-text)]">{productLine.name}</span> ({productLine.code})</span>}
+        subtitle={<span>产品：<span className="font-medium text-[var(--active-text)]">{productLine.name}</span> ({productLine.code})</span>}
         footer={
           <>
             <Button
@@ -935,7 +962,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <div>
             <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-purple-400" />
-              需求负责人 (Product Owner / PO) *
+              产品责任人 - 主责任人 (Product Owner / PO) *
             </label>
             <Select
               showSearch
@@ -947,13 +974,14 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               placeholder="搜索并选择负责人"
               optionFilterProp="label"
             />
+            <Select showSearch allowClear className="w-full mt-2" value={leadReqOwnerSecondaryUserId || undefined} onChange={(value) => setLeadReqOwnerSecondaryUserId(value || '')} options={leadOptions} placeholder="选择次责任人" optionFilterProp="label" />
             <p className="text-[11px] text-[var(--text-muted)] mt-1">负责业务调研、PRD规划评审与需求优先级排序</p>
           </div>
 
           <div>
             <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[var(--primary)]" />
-              技术负责人 (Tech Lead / 架构师) *
+              研发责任人 - 主责任人 (Tech Lead / 架构师) *
             </label>
             <Select
               showSearch
@@ -965,13 +993,14 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               placeholder="搜索并选择负责人"
               optionFilterProp="label"
             />
+            <Select showSearch allowClear className="w-full mt-2" value={leadTechOwnerSecondaryUserId || undefined} onChange={(value) => setLeadTechOwnerSecondaryUserId(value || '')} options={leadOptions} placeholder="选择次责任人" optionFilterProp="label" />
             <p className="text-[11px] text-[var(--text-muted)] mt-1">负责技术选型、架构高可用审查与研发任务攻坚</p>
           </div>
 
           <div>
             <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              测试负责人 (QA Lead / 质量主管) *
+              测试责任人 - 主责任人 (QA Lead / 质量主管) *
             </label>
             <Select
               showSearch
@@ -983,6 +1012,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               placeholder="搜索并选择负责人"
               optionFilterProp="label"
             />
+            <Select showSearch allowClear className="w-full mt-2" value={leadTestOwnerSecondaryUserId || undefined} onChange={(value) => setLeadTestOwnerSecondaryUserId(value || '')} options={leadOptions} placeholder="选择次责任人" optionFilterProp="label" />
             <p className="text-[11px] text-[var(--text-muted)] mt-1">负责版本封版验收、自动化测试回归与缺陷归零把控</p>
           </div>
         </form>
