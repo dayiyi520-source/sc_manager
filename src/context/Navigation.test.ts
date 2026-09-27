@@ -28,4 +28,16 @@ describe('design task navigation', () => {
       expect.objectContaining({ id: 'prod_version_reviews', title: '版本评审' })
     ]));
   });
+
+  it('hides retired entry points while keeping system work item module visible', () => {
+    expect(MENU_GROUPS.find((group) => group.id === 'crm')).toBeUndefined();
+    expect(MENU_GROUPS.find((group) => group.id === 'approval')).toBeUndefined();
+    expect(MENU_GROUPS.find((group) => group.id === 'project')).toBeUndefined();
+    expect(MENU_GROUPS.find((group) => group.id === 'workbench')?.subMenus.some((menu) => menu.id === 'wb_knowledge')).toBe(false);
+    const product = MENU_GROUPS.find((group) => group.id === 'product')!.subMenus;
+    expect(product.some((menu) => menu.id === 'prod_reviews' || menu.id === 'prod_planning')).toBe(false);
+    expect(MENU_GROUPS.find((group) => group.id === 'system')?.subMenus).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'sys_work_items', title: '工作项模版' })
+    ]));
+  });
 });

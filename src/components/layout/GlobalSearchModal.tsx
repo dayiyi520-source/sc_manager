@@ -36,9 +36,8 @@ export const GlobalSearchModal: React.FC = () => {
       // Default quick suggestions
       return [
         { type: 'menu', id: 'wb_my_tasks', title: '工作台 · 我的任务', desc: '查看待办事项、审批与个人OKR', icon: Layers },
-        { type: 'menu', id: 'crm_dashboard', title: '客户与商机 · 数据看板', desc: '商机漏斗、转化率与贡献榜单', icon: Briefcase },
         { type: 'menu', id: 'prod_req_tasks', title: '产研管理 · 产品任务', desc: '产品任务列表与看板', icon: Layers },
-        { type: 'menu', id: 'approval_center', title: '审批中心', desc: '合同用印、特批、招投标流程审批', icon: FileCheck }
+        { type: 'menu', id: 'sys_work_items', title: '系统与组织 · 工作项模版', desc: '配置新建产品默认工作项子类型与状态', icon: FileCheck }
       ];
     }
 

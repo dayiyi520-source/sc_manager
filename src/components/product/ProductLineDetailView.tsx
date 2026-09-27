@@ -638,7 +638,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             onClick={onBack}
             icon={<ArrowLeft className="w-3.5 h-3.5" />}
           >
-            返回产品矩阵
+            返回产品管理
           </Button>
         </div>
 

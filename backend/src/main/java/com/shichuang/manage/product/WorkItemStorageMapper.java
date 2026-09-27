@@ -64,7 +64,7 @@ public class WorkItemStorageMapper {
         Map<String,Object> item = item(tenant,line,id);
         if (item != null) {
             item.putAll(one("SELECT source_type_ AS sourceType,actual_start_at_ AS actualStartAt,completed_at_ AS completedAt FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND delete_flag_=0",tenant,line,id));
-            item.put("children", jdbc.queryForList(ITEM + " AND parent_work_item_id_=? ORDER BY create_time_,id_", tenant, line, id));
+            item.put("children", jdbc.queryForList(ITEM + " AND w.parent_work_item_id_=? ORDER BY w.create_time_,w.id_", tenant, line, id));
             if(item.get("parentWorkItemId")!=null) item.put("parent",item(tenant,line,item.get("parentWorkItemId").toString()));
         }
         return item;

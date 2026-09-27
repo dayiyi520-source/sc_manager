@@ -1,4 +1,6 @@
 package com.shichuang.manage.product;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shichuang.manage.auth.RequestContext;
 import com.shichuang.manage.auth.AuthorizationService;
 import org.springframework.stereotype.Service;
@@ -13,7 +15,9 @@ public class ProductLineService {
  private final RequirementService requirementService;
  private final WorkItemAccess workItemAccess;
  private final WorkItemConfigurationService workItemConfigurations;
- public ProductLineService(ProductLineMapper mapper,RequirementService requirementService,WorkItemAccess workItemAccess,WorkItemConfigurationService workItemConfigurations){this.mapper=mapper;this.requirementService=requirementService;this.workItemAccess=workItemAccess;this.workItemConfigurations=workItemConfigurations;}
+ private final WorkItemTemplateMapper templateMapper;
+ private final ObjectMapper json;
+ public ProductLineService(ProductLineMapper mapper,RequirementService requirementService,WorkItemAccess workItemAccess,WorkItemConfigurationService workItemConfigurations,WorkItemTemplateMapper templateMapper,ObjectMapper json){this.mapper=mapper;this.requirementService=requirementService;this.workItemAccess=workItemAccess;this.workItemConfigurations=workItemConfigurations;this.templateMapper=templateMapper;this.json=json;}
  public List<Map<String,Object>> list(String keyword){
   AuthorizationService.requireRead("product");
   String tenant=RequestContext.tenantId();
@@ -71,16 +75,33 @@ public class ProductLineService {
  }
   @Transactional public void updateWorkItemType(String id,String typeId,Map<String,Object>b){workItemAccess.check(id,true);requireLine(id); String tenant=RequestContext.tenantId(),user=RequestContext.userId(); mapper.lockLine(tenant,id); Map<String,Object> current=mapper.workItemType(tenant,id,typeId); if(current==null) throw new NoSuchElementException("工作项类型不存在"); boolean categoryChanged=b.containsKey("category")&&!Objects.equals(b.get("category"),current.get("category")); if(categoryChanged&&mapper.workItemTypeReferenced(tenant,typeId)) throw new IllegalArgumentException("已使用的任务类型不能更换分类"); if(b.containsKey("category")&&!Set.of("需求","设计","研发","测试","缺陷","用例").contains(String.valueOf(b.get("category")))) throw new IllegalArgumentException("工作项类型分类无效"); if(b.containsKey("name")&&String.valueOf(b.get("name")).trim().isBlank()) throw new IllegalArgumentException("工作项类型名称不能为空"); boolean enabled=b.containsKey("enabled")?Boolean.TRUE.equals(b.get("enabled")):WorkItemConfigurationService.enabled(current.get("enabled")); boolean defaultRequested=b.containsKey("isDefault")?Boolean.TRUE.equals(b.get("isDefault")):WorkItemConfigurationService.enabled(current.get("isDefault")); if(!enabled)b.put("isDefault",false); else if(categoryChanged&&defaultRequested)b.put("isDefault",true); boolean setDefault=enabled&&Boolean.TRUE.equals(b.get("isDefault")); if(setDefault)mapper.clearDefaultWorkItemType(tenant,id,Objects.toString(b.getOrDefault("category",current.get("category"))),user); if(mapper.updateWorkItemType(tenant,id,typeId,b,user)==0) throw new NoSuchElementException("工作项类型不存在"); mapper.addActivity(tenant,id,"修改工作项类型",String.valueOf(b.getOrDefault("name",current.get("name"))),RequestContext.operatorName()); }
   @Transactional public void deleteWorkItemType(String id,String typeId){workItemAccess.check(id,true);requireLine(id); if(mapper.workItemTypeReferenced(RequestContext.tenantId(),typeId)) throw new IllegalArgumentException("已使用的任务类型不能删除，请停用"); Map<String,Object> current=mapper.workItemType(RequestContext.tenantId(),id,typeId); if(current==null || mapper.deleteWorkItemType(RequestContext.tenantId(),id,typeId,RequestContext.userId())==0) throw new NoSuchElementException("工作项类型不存在"); mapper.addActivity(RequestContext.tenantId(),id,"删除工作项类型",String.valueOf(current.get("name")),RequestContext.operatorName()); }
-  private void initializeWorkItemTemplate(String id){
+ private void initializeWorkItemTemplate(String id){
    Map<String,String> typeIds=new HashMap<>();
-   for(WorkItemTemplate.Type type:WorkItemTemplate.types()) {
-    Map<String,Object> created=addWorkItemTypeWithWorkflow(id,new WorkItemDefinition.CreateWorkItemType(type.category(),type.name(),"",true,type.isDefault(),WorkItemTemplate.workflow(type)));
-    typeIds.put(type.name(),created.get("id").toString());
+   List<Map<String,Object>> configured=templateMapper.types(RequestContext.tenantId());
+   if(configured.isEmpty()) {
+    for(WorkItemTemplate.Type type:WorkItemTemplate.types()) configured.add(new HashMap<>(Map.of("id",type.name(),"category",type.category(),"name",type.name(),"description","","enabled",true,"isDefault",type.isDefault(),"workflow",WorkItemTemplate.workflow(type))));
+   }
+   Map<String,Map<String,Object>> workflows=new HashMap<>();
+   templateMapper.workflows(RequestContext.tenantId()).forEach(row->workflows.put(String.valueOf(row.get("templateTypeId")),row));
+   for(Map<String,Object> type:configured) {
+    String category=String.valueOf(type.get("category")); String apiCategory=WorkItemDefinition.CATEGORIES.entrySet().stream().filter(e->e.getValue().equals(category)).map(Map.Entry::getKey).findFirst().orElse(category);
+    WorkItemDefinition.SaveWorkflow workflow;
+    Object definition=type.get("workflow");
+    if(definition instanceof WorkItemDefinition.SaveWorkflow save) workflow=save;
+    else {
+     Map<String,Object> row=workflows.get(String.valueOf(type.get("id")));
+     WorkItemDefinition.Workflow parsed=null;
+     if(row!=null) try { parsed=json.readValue(String.valueOf(row.get("definition")),WorkItemDefinition.Workflow.class); } catch(JsonProcessingException e){ throw new IllegalStateException("工作项模版状态无法读取",e); }
+     if(parsed==null) { WorkItemTemplate.Type fallback=new WorkItemTemplate.Type(category,apiCategory,String.valueOf(type.get("name")),Boolean.TRUE.equals(type.get("isDefault"))); workflow=WorkItemTemplate.workflow(fallback); }
+     else workflow=new WorkItemDefinition.SaveWorkflow(apiCategory,String.valueOf(type.get("name"))+"状态配置",parsed,null);
+    }
+    Map<String,Object> created=addWorkItemTypeWithWorkflow(id,new WorkItemDefinition.CreateWorkItemType(category,String.valueOf(type.get("name")),String.valueOf(type.getOrDefault("description","")),WorkItemTemplateService.asBoolean(type.get("enabled")),WorkItemTemplateService.asBoolean(type.get("isDefault")),workflow));
+    typeIds.put(String.valueOf(type.get("name")),created.get("id").toString());
    }
    String parentTypeId=typeIds.get("测试任务");
-   for(String childName:List.of("用例编写","测试任务","测试验收","安全测试","回归测试"))
+   if(parentTypeId!=null) for(String childName:List.of("用例编写","测试任务","测试验收","安全测试","回归测试")) if(typeIds.containsKey(childName))
     workItemConfigurations.childRule(id,new WorkItemDefinition.ChildRule(parentTypeId,typeIds.get(childName),true));
-  }
+ }
  public List<Map<String,Object>> versions(String id){requireReadLine(id); return mapper.versions(RequestContext.tenantId(),id);}
  @Transactional public void addVersion(String id,Map<String,Object> input){
   requireWriteLine(id);

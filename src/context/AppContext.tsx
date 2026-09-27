@@ -97,28 +97,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     subMenus: [
       { id: 'wb_my_tasks', title: '我的任务', mainMenuId: 'workbench', icon: 'CheckSquare', badge: 4, badgeType: 'danger' },
       { id: 'wb_okr_perf', title: '目标与总结', mainMenuId: 'workbench', icon: 'Target' },
-      { id: 'wb_knowledge', title: '知识库', mainMenuId: 'workbench', icon: 'BookOpen' },
       { id: 'wb_work_order', title: '协助事项', mainMenuId: 'workbench', icon: 'Database' }
-    ]
-  },
-  {
-    id: 'crm',
-    title: '客户与商机',
-    icon: 'Briefcase',
-    subMenus: [
-      { id: 'crm_dashboard', title: '数据看板', mainMenuId: 'crm', icon: 'BarChart3' },
-      { id: 'crm_customers', title: '客户档案', mainMenuId: 'crm', icon: 'Users' },
-      { id: 'crm_leads', title: '线索管理', mainMenuId: 'crm', icon: 'Filter' },
-      { id: 'crm_opportunities', title: '商机管理', mainMenuId: 'crm', icon: 'TrendingUp', badge: '¥1400w', badgeType: 'success' },
-      { id: 'crm_visits', title: '拜访计划', mainMenuId: 'crm', icon: 'Calendar' },
-      { id: 'crm_followups', title: '跟进记录', mainMenuId: 'crm', icon: 'Clock' },
-      { id: 'crm_partners', title: '合作伙伴', mainMenuId: 'crm', icon: 'Handshake' },
-      { id: 'crm_tender', title: '标讯', mainMenuId: 'crm', icon: 'Radio', badge: 'NEW', badgeType: 'danger' },
-      { id: 'crm_bidding', title: '招投标管理', mainMenuId: 'crm', icon: 'FileSpreadsheet', badge: 2, badgeType: 'warning' },
-      { id: 'crm_winning_engagement', title: '中标接洽', mainMenuId: 'crm', icon: 'Award', badge: 3, badgeType: 'success' },
-      { id: 'crm_bidding_review', title: '招标复盘', mainMenuId: 'crm', icon: 'RefreshCw' },
-      { id: 'crm_contracts', title: '合同管理', mainMenuId: 'crm', icon: 'FileText' },
-      { id: 'crm_presales_tasks', title: '售前任务', mainMenuId: 'crm', icon: 'Ticket' }
     ]
   },
   {
@@ -133,33 +112,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'prod_rd_tasks', title: '研发任务', mainMenuId: 'product', icon: 'Code' },
       { id: 'prod_test_tasks', title: '测试任务', mainMenuId: 'product', icon: 'Beaker' },
       { id: 'prod_bugs', title: '缺陷管理', mainMenuId: 'product', icon: 'Bug', badge: 3, badgeType: 'danger' },
-      { id: 'prod_version_reviews', title: '版本评审', mainMenuId: 'product', icon: 'FileCheck' },
-      { id: 'prod_reviews', title: '复盘管理', mainMenuId: 'product', icon: 'Archive' },
-      { id: 'prod_planning', title: '产品规划', mainMenuId: 'product', icon: 'Compass' }
-    ]
-  },
-  {
-    id: 'approval',
-    title: '综合中心',
-    icon: 'Boxes',
-    subMenus: [
-      { id: 'comp_approval', title: '审批管理', mainMenuId: 'approval', icon: 'Stamp', badge: 1, badgeType: 'danger' },
-      { id: 'comp_attendance', title: '考勤管理', mainMenuId: 'approval', icon: 'CalendarCheck' },
-      { id: 'comp_procurement', title: '采购管理', mainMenuId: 'approval', icon: 'ShoppingBag' },
-      { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval', icon: 'Box' },
-      { id: 'comp_invoice', title: '发票管理', mainMenuId: 'approval', icon: 'Receipt' },
-      { id: 'comp_payment', title: '回款管理', mainMenuId: 'approval', icon: 'CreditCard' }
-    ]
-  },
-  {
-    id: 'project',
-    title: '项目管理',
-    icon: 'FolderKanban',
-    subMenus: [
-      { id: 'proj_list', title: '项目列表', mainMenuId: 'project', icon: 'FolderGit2' },
-      { id: 'proj_config', title: '里程碑计划', mainMenuId: 'project', icon: 'Settings2' },
-      { id: 'proj_delivery_tasks', title: '交付任务', mainMenuId: 'project', icon: 'ClipboardCheck' },
-      { id: 'proj_ops_tasks', title: '运维任务', mainMenuId: 'project', icon: 'Server' }
+      { id: 'prod_version_reviews', title: '版本评审', mainMenuId: 'product', icon: 'FileCheck' }
     ]
   },
   {
@@ -168,6 +121,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     icon: 'Settings',
     subMenus: [
       { id: 'team_org', title: '团队组织', mainMenuId: 'system', icon: 'Users' },
+      { id: 'sys_work_items', title: '工作项模版', mainMenuId: 'system', icon: 'Appstore' },
       { id: 'sys_settings', title: '系统设置', mainMenuId: 'system', icon: 'Sliders' }
     ]
   }

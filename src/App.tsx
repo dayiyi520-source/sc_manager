@@ -63,6 +63,7 @@ const MilestoneScheduleView = lazyNamed(() => import('./components/project/Miles
 // Knowledge, Team & System Views
 const TeamOrgView = lazyNamed(() => import('./components/team/TeamOrgView'), 'TeamOrgView');
 const SystemSettingsView = lazyNamed(() => import('./components/system/SystemSettingsView'), 'SystemSettingsView');
+const WorkItemModuleView = lazyNamed(() => import('./components/system/WorkItemModuleView'), 'WorkItemModuleView');
 const AntDesignTestView = lazyNamed(() => import('./components/test/AntDesignTestView'), 'AntDesignTestView');
 const RequirementWorkItemsView = lazyNamed(() => import('./components/common/RequirementWorkItemsView'), 'RequirementWorkItemsView');
 
@@ -183,6 +184,8 @@ const MainContent: React.FC = () => {
       // Team & System
       case 'team_org':
         return <TeamOrgView />;
+      case 'sys_work_items':
+        return <WorkItemModuleView />;
       case 'sys_settings':
         return <SystemSettingsView />;
       case 'test_antd':

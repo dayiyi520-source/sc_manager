@@ -70,6 +70,7 @@ export type SubMenuId =
   // 知识与组织
   | 'know_base'
   | 'team_org'
+  | 'sys_work_items'
   | 'sys_settings'
   // 项目管理
   | 'proj_list'

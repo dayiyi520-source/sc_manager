@@ -20,6 +20,10 @@ export type WorkItemWorkflow = {
     transitions: Array<{ key: string; from: string; to: string; name: string }>;
   };
 };
+export type WorkItemTemplateType = ProductLineWorkItemType & {
+  revision?: number;
+  workflow?: WorkItemWorkflow & { templateTypeId?: string | null };
+};
 export type UnifiedWorkItem = {
   id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;
   requirementId?: string | null; requirementTitle?: string | null; requirementInitiatorName?: string | null; customerId?: string | null; customerName?: string | null; assigneeName?: string; sourceType?: string; status?: { name?: string; group?: string; successful?: boolean };
@@ -51,6 +55,11 @@ const querySuffix = (values: Record<string,string|number>) => { const value = ne
 const page = <T>(value: PageResult<T> | T[]): PageResult<T> => Array.isArray(value) ? ({ items: value, page: 1, pageSize: value.length || 20, total: value.length }) : value;
 
 export const productRepository = {
+  workItemTemplate: () => apiRequest<WorkItemTemplateType[]>('/api/work-item-template'),
+  createWorkItemTemplateType: (body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'> & { workflow: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> }) => apiRequest<{ id: string }>('/api/work-item-template/types', { method: 'POST', body: JSON.stringify(body) }),
+  updateWorkItemTemplateType: (id: string, body: Partial<Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'>>) => apiRequest<void>(`/api/work-item-template/types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteWorkItemTemplateType: (id: string) => apiRequest<void>(`/api/work-item-template/types/${id}`, { method: 'DELETE' }),
+  updateWorkItemTemplateWorkflow: (id: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision?: number }) => apiRequest<void>(`/api/work-item-template/types/${id}/workflow`, { method: 'PUT', body: JSON.stringify(body) }),
   productLines: (keyword = '') => apiRequest<ProductLine[]>(`/api/product-lines?keyword=${encodeURIComponent(keyword)}`),
   createProductLine: (body: Partial<ProductLine>) => apiRequest<{ id: string; code: string }>('/api/product-lines', { method: 'POST', body: JSON.stringify(body) }),
   updateProductLine: (id: string, body: Partial<ProductLine>) => apiRequest<void>(`/api/product-lines/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

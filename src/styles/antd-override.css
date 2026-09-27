@@ -46,6 +46,17 @@
   line-height: 20px !important;
 }
 
+/* 规则大盘的单条状态开关不包含文字，使用紧凑宽度；顶部全局开关保持原宽度。 */
+.tech-shell .automation-rule-switch {
+  min-width: 32px !important;
+  width: 32px !important;
+}
+
+.tech-shell .automation-rule-switch .ant-switch-handle {
+  width: 16px !important;
+  height: 16px !important;
+}
+
 .product-line-health-enabled {
   color: var(--primary) !important;
   background: color-mix(in srgb, var(--primary) 12%, var(--bg-surface)) !important;
