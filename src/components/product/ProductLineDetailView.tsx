@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
+import Card from 'antd/es/card/Card';
 import { useQuery } from '@tanstack/react-query';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import {
@@ -47,6 +48,8 @@ import { AutomationRulesPanel } from './AutomationRulesPanel';
 import { normalizeProductWebsiteUrl } from './productWebsite';
 import { teamRepository } from '../../services/teamRepository';
 import { employeeJobTitle, employeeSelectOptions, PersonAvatar, PersonIdentity } from '../common/PersonIdentity';
+import { ProductLineBoard, ProductLineHours, useProductLineWorkItems } from './ProductLineInsights';
+import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -55,6 +58,15 @@ interface ProductLineDetailViewProps {
 }
 
 export type ProductLineSettingsSection = 'basic' | 'members' | 'work-items' | 'notifications' | 'automation';
+
+const productLineStatCards = [
+  { label: '协助事项', category: 'assistance' as const, tone: 'text-purple-400' },
+  { label: '产品任务', category: 'requirement' as const, tone: 'text-cyan-400' },
+  { label: '设计任务', category: 'design' as const, tone: 'text-pink-400' },
+  { label: '研发任务', category: 'dev' as const, tone: 'text-emerald-400' },
+  { label: '测试任务', category: 'test' as const, tone: 'text-amber-400' },
+  { label: '缺陷任务', category: 'bug' as const, tone: 'text-red-400' }
+];
 
 const ProductLineSettingsPanel: React.FC<{
   productLine: ProductLine;
@@ -431,9 +443,6 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     productLines,
     updateProductLine,
     versions,
-    requirementPool,
-    bugs,
-    devTasks,
     currentUser,
     addToast,
     openPageTab
@@ -458,7 +467,37 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   }, [initialSettingsSection]);
 
   // Tabs state for sub-entities
-  const [activeTab, setActiveTab] = useState<'versions' | 'members' | 'activity'>('activity');
+  const [activeTab, setActiveTab] = useState<'board' | 'versions' | 'hours' | 'performance'>('board');
+  const workItemsQuery = useProductLineWorkItems(productLineId);
+  const productInfoRef = useRef<HTMLDivElement>(null);
+  const statsPanelRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const productInfo = productInfoRef.current;
+    const statsPanel = statsPanelRef.current;
+    if (!productInfo || !statsPanel) return undefined;
+
+    const mediaQuery = window.matchMedia('(min-width: 1280px)');
+    const syncPanelHeights = () => {
+      productInfo.style.minHeight = '';
+      statsPanel.style.minHeight = '';
+      if (!mediaQuery.matches) return;
+      const height = Math.max(productInfo.offsetHeight, statsPanel.offsetHeight);
+      productInfo.style.minHeight = `${height}px`;
+      statsPanel.style.minHeight = `${height}px`;
+    };
+    const observer = new ResizeObserver(syncPanelHeights);
+    observer.observe(productInfo);
+    observer.observe(statsPanel);
+    mediaQuery.addEventListener('change', syncPanelHeights);
+    syncPanelHeights();
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', syncPanelHeights);
+      productInfo.style.minHeight = '';
+      statsPanel.style.minHeight = '';
+    };
+  }, [productLine?.id]);
 
   // Edit Leads Form state
   const [leadReqOwnerUserId, setLeadReqOwnerUserId] = useState(productLine?.requirementOwnerUserId || '');
@@ -483,19 +522,12 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const lineVersions = versions.filter(
     (v) => v.productLineId === productLine.id || v.productLineName === productLine.name
   );
-  const latestCreatedVersion = [...lineVersions].sort((a, b) => String(b.createdAt || b.releaseDate || b.endDate || '').localeCompare(String(a.createdAt || a.releaseDate || a.endDate || '')))[0]?.code || 'V1.0.0';
-  const linkedRequirementIds = new Set(
-    lineVersions.flatMap((version) => version.linkedRequirementIds || [])
-  );
-  const lineReqs = requirementPool.filter(
-    (r) => r.productLineName === productLine.name || linkedRequirementIds.has(r.id)
-  );
-  const lineBugs = bugs.filter(
-    (b) => b.productLineId === productLine.id || b.productLineName === productLine.name
-  );
-  const lineDevTasks = devTasks.filter(
-    (t) => t.productLineName === productLine.name
-  );
+  const latestIteration = [...lineVersions].sort((a, b) => {
+    const startDiff = String(b.startDate || '').localeCompare(String(a.startDate || ''));
+    if (startDiff !== 0) return startDiff;
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+  })[0];
+  const productStatus = productLine.health === '已停用' ? '已停用' : latestIteration?.status || '启用中';
   const memberUserIds = new Set((productLine.members || [])
     .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId))
     .map((member) => member.userId));
@@ -507,12 +539,6 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId) && !directoryLeadIds.has(member.userId))
       .map((member) => ({ value: member.userId, label: `${member.name} · 未设置职位` })),
   ];
-  const pendingReqsCount = Number(productLine.pendingRequirementCount ?? productLine.pendingReqCount ?? lineReqs.filter((r) => r.status !== '已转任务' && r.status !== '已转版本' && r.status !== '已拒绝').length);
-  const pendingBugsCount = lineBugs.filter((b) => b.status !== '已关闭' && b.status !== '已拒绝').length;
-  const pendingTasksCount = lineDevTasks.filter((t) => t.status !== '已合并上线').length;
-  const totalTasksCount = lineDevTasks.length;
-  const completedTasksCount = lineDevTasks.filter((t) => ['已完成', '已合并上线'].includes(t.status)).length;
-  const progressText = `${totalTasksCount ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0}%`;
 
   const navigateWithLine = (menuId: string, tab?: string, applyFilter = true) => {
     if (applyFilter) sessionStorage.setItem('shichuang.productLineFilter', productLine.id);
@@ -560,6 +586,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const activityItems: ProductLineActivity[] = productLine.activities?.length
     ? productLine.activities
     : lineVersions.map((version) => ({ id: version.id, action: '创建了版本', detail: version.code || version.name, operatorName: currentUser.name, createdAt: version.createdAt || version.releaseDate || '' }));
+  const workItems = workItemsQuery.data || [];
+  const pendingByCategory = (category: string) => workItems.filter((item) => item.category === category && (item.status?.group === 'NOT_STARTED' || item.status?.group === 'IN_PROGRESS')).length;
 
   const resetLeadForm = () => {
     setLeadReqOwnerUserId(productLine.requirementOwnerUserId || '');
@@ -616,12 +644,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
         {/* Header Action Buttons */}
         <div className="flex items-center gap-2">
+          <Button onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }} icon={<Edit3 className="w-3.5 h-3.5" />}>责任人配置</Button>
           <Button onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品设置</Button>
         </div>
       </div>
 
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,2.35fr)_minmax(300px,0.95fr)]">
+      <main className="min-w-0 space-y-5">
       {/* Hero Overview Banner with Cover */}
-      <div className="product-line-hero relative rounded-2xl border border-[var(--border-main)] overflow-hidden bg-[var(--bg-surface)] shadow-lg">
+      <div ref={productInfoRef} className="product-line-hero relative rounded-2xl border border-[var(--border-main)] overflow-hidden bg-[var(--bg-surface)] shadow-lg">
         {/* Cover Background Graphic */}
         <div className="hidden">
           {productLine.coverImage ? (
@@ -669,41 +700,25 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </div>
 
         {/* Banner Content Body */}
-        <div className="product-line-hero-body p-6 relative z-10 space-y-4">
+      <div className="product-line-hero-body p-6 relative z-10 space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-2xl font-bold text-[var(--text-primary)]">{productLine.name}</h2>
+                <h2 className="min-w-0 truncate text-2xl font-bold text-[var(--text-primary)]">{productLine.name}</h2>
+                <StatusTag type={productStatus === '已停用' ? 'default' : 'info'} status={productStatus} className="shrink-0" />
               </div>
               <p className="text-xs text-[var(--text-body)] max-w-3xl mt-2 leading-relaxed">
                 {productLine.description}
               </p>
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-2 text-xs text-[var(--text-muted)]">
-              <Switch
-                className="product-line-switch"
-                checked={(productLine.status || productLine.health) !== '已停用'}
-                onChange={(checked) => updateProductLine(productLine.id, { status: checked ? '启用中' : '已停用' })}
-                checkedChildren="启用中"
-                unCheckedChildren="已停用"
-              />
-              <div>综合负责人：<span className="text-[var(--active-text)] font-medium">{productLine.owner || productLine.ownerName || '暂无'}</span></div>
+              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-[var(--border-main)] pt-3 text-xs sm:grid-cols-2">
+                <div className="min-w-0"><span className="text-[var(--text-muted)]">负责人</span><div className="mt-1 truncate font-medium text-[var(--active-text)]">{productLine.owner || productLine.ownerName || '暂无'}</div></div>
+                <div className="min-w-0 sm:text-right"><span className="text-[var(--text-muted)]">当前版本</span><div className="mt-1 truncate font-mono font-medium text-[var(--active-text)]">{productLine.currentVersion || '暂无'}</div></div>
+              </div>
             </div>
           </div>
 
           {/* Three Key Leads Display Bar (需求负责人、技术负责人、测试负责人) */}
           <div className="pt-2 border-t border-[var(--border-main)]">
-            <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2.5 flex items-center justify-between">
-              <span>产研核心指挥体系 (三大关键责任人)</span>
-              <Button
-                type="link"
-                onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }}
-                icon={<Edit3 className="w-3 h-3" />}
-              >
-                责任人配置
-              </Button>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* 需求负责人 */}
               <div className="product-line-lead-card p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-main)] flex items-center gap-3">
@@ -755,58 +770,22 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             </div>
           </div>
 
-          {/* 6 Key Stats Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
-            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
-              <span className="text-[var(--text-muted)] text-[11px] block">当前版本号</span>
-              <div className="text-lg font-bold text-[var(--text-primary)] mt-1 font-mono">{latestCreatedVersion}</div>
-            </div>
-            <div className="product-line-stat-card p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl">
-              <span className="text-[var(--text-muted)] text-[11px] block">当前进展</span>
-              <div className="text-lg font-bold text-amber-400 mt-1 font-mono">{progressText}</div>
-            </div>
-            <button type="button" className="product-line-stat-card cursor-pointer p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]" onClick={() => navigateWithLine('prod_versions', 'detail', true)}>
-              <span className="text-[var(--text-muted)] text-[11px] block">迭代版本数</span><div className="text-lg font-bold text-[var(--active-text)] mt-1 font-mono">{lineVersions.length || productLine.versionCount || 0} 个</div>
-            </button>
-            <button type="button" className="product-line-stat-card cursor-pointer p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]" onClick={() => navigateWithLine('prod_req_tasks')}>
-              <span className="text-[var(--text-muted)] text-[11px] block">待办需求</span><div className="text-lg font-bold text-purple-400 mt-1 font-mono">{pendingReqsCount} 个</div>
-            </button>
-            <button type="button" className="product-line-stat-card cursor-pointer p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]" onClick={() => navigateWithLine('prod_bugs')}>
-              <span className="text-[var(--text-muted)] text-[11px] block">待办缺陷</span><div className="text-lg font-bold text-red-400 mt-1 font-mono">{pendingBugsCount} 处</div>
-            </button>
-            <button type="button" className="product-line-stat-card cursor-pointer p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-xl text-left transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]" onClick={() => navigateWithLine('prod_rd_tasks')}>
-              <span className="text-[var(--text-muted)] text-[11px] block">研发任务中</span><div className="text-lg font-bold text-emerald-400 mt-1 font-mono">{pendingTasksCount} 项</div>
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Tabs Navigation */}
       <div className="product-line-tabs border-b border-[var(--border-main)] flex items-center gap-2 overflow-x-auto text-xs">
         <button
-          onClick={() => setActiveTab('activity')}
-          aria-selected={activeTab === 'activity'}
+          onClick={() => setActiveTab('board')}
+          aria-selected={activeTab === 'board'}
           className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
-            activeTab === 'activity'
+            activeTab === 'board'
               ? 'border-[var(--primary)] text-[var(--primary)]'
               : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
-          <Activity className="w-3.5 h-3.5" />
-          <span>产品动态</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('members')}
-          aria-selected={activeTab === 'members'}
-          className={`pb-3 px-3.5 font-bold transition-colors flex items-center gap-1.5 border-b-2 ${
-            activeTab === 'members'
-              ? 'border-[var(--primary)] text-[var(--primary)]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          <span>成员管理 ({memberCount})</span>
+          <Boxes className="w-3.5 h-3.5" />
+          <span>产品看板</span>
         </button>
 
         <button
@@ -819,9 +798,23 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
-          <span>版本甘特图 ({lineVersions.length})</span>
+          <span>产品迭代</span>
         </button>
+        <button onClick={() => setActiveTab('hours')} aria-selected={activeTab === 'hours'} className={`shrink-0 border-b-2 px-3.5 pb-3 font-bold transition-colors ${activeTab === 'hours' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><Clock className="mr-1 inline h-3.5 w-3.5" />产品工时</button>
+        <button onClick={() => setActiveTab('performance')} aria-selected={activeTab === 'performance'} className={`shrink-0 border-b-2 px-3.5 pb-3 font-bold transition-colors ${activeTab === 'performance' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><TrendingUp className="mr-1 inline h-3.5 w-3.5" />产品效能</button>
       </div>
+
+      {(activeTab === 'board' || activeTab === 'hours' || activeTab === 'performance') && (workItemsQuery.isPending
+        ? <div className="py-12 text-center text-xs text-[var(--text-muted)]">正在加载产品工作项...</div>
+        : workItemsQuery.isError
+          ? <div className="py-12 text-center text-xs text-[var(--danger)]">工作项加载失败 <Button size="small" onClick={() => workItemsQuery.refetch()}>重试</Button></div>
+          : activeTab === 'board'
+            ? <Card size="small" className="product-line-board-panel">
+                <ProductLineBoard items={workItems} versions={lineVersions} onOpenCategory={(category) => navigateWithLine(({ requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks', test: 'prod_test_tasks', bug: 'prod_bugs' } as const)[category])} />
+              </Card>
+            : activeTab === 'hours'
+              ? <ProductLineHours items={workItems} memberCount={memberCount} />
+              : <div className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-5"><h3 className="text-sm font-bold text-[var(--text-primary)]">产品效能</h3><p className="mt-3 text-xs text-[var(--text-muted)]">工作项 {workItems.length} 个，已完成 {workItems.filter((item) => item.status?.group === 'COMPLETED').length} 个。当前没有周期效能数据。</p></div>)}
 
       {/* Tab 1: 版本迭代计划 */}
       {activeTab === 'versions' && (
@@ -886,53 +879,65 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </div>
       )}
 
-      {/* Tab 3: 成员管理 */}
-      {activeTab === 'members' && (
-        <div className="space-y-4">
+      </main>
+      <aside className="min-w-0 space-y-5">
+        <section ref={statsPanelRef}>
+          <Card size="small" title={<span className="text-sm font-bold text-[var(--text-primary)]">统计</span>} className="product-line-stat-panel h-full">
+          {workItemsQuery.isError ? <div className="p-2 text-xs text-[var(--danger)]">统计加载失败 <Button size="small" onClick={() => workItemsQuery.refetch()}>重试</Button></div> : <div className="grid grid-cols-2 gap-3">
+            {productLineStatCards.map(({ label, category, tone }) => {
+              const scoped = category === 'assistance'
+                ? workItems.filter((item) => item.category === 'requirement' && item.sourceType === 'WORK_ORDER')
+                : workItems.filter((item) => item.category === category && (category !== 'requirement' || item.sourceType !== 'WORK_ORDER'));
+              return <div key={category} className="product-line-stat-card flex flex-col items-center justify-center gap-1.5 rounded-lg bg-[var(--bg-surface-soft)] p-3 text-center"><div className="flex items-center justify-center gap-1.5 text-xs font-normal text-[var(--text-primary)]"><WorkItemCategoryIcon category={category} className={`h-3.5 w-3.5 ${tone}`} /><span>{label}</span></div><div className="text-xl font-bold font-mono tabular-nums text-[var(--text-primary)]">{workItemsQuery.isPending ? '--' : scoped.length}</div></div>;
+            })}
+          </div>}
+          </Card>
+        </section>
+        <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-3">
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-sm text-[var(--text-primary)]">成员管理</h3>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                支持配置产品需求、架构、研发、测试与运维人员权限与职责
-              </p>
-            </div>
+            <h3 className="font-bold text-sm text-[var(--text-primary)]">成员管理</h3>
             <div className="flex items-center gap-1">
               <Button type="text" style={{ color: 'var(--primary)' }} className="hover:text-[var(--active-text)]" aria-label="添加成员" title="添加成员" icon={<UserAddOutlined style={{ color: 'var(--primary)' }} />} onClick={() => setIsManageMembersOpen(true)} />
               <Button type="text" aria-label="成员设置" title="成员设置" icon={<SettingOutlined />} onClick={() => { setSettingsSection('members'); setIsSettingsOpen(true); }} />
             </div>
           </div>
 
+          <div className="divide-y divide-[var(--border-main)]">
           {memberRoleGroups.map((group) => (
-            <section key={group.label}>
-              <h4 className="mb-3 text-sm font-medium text-[var(--text-body)]">{group.label}</h4>
-              <div className="flex flex-wrap gap-x-8 gap-y-4">
+            <section key={group.label} className="flex items-center gap-3 py-2 first:pt-1 last:pb-1">
+              <span className="w-16 shrink-0 rounded bg-[var(--primary)]/10 px-2 py-1 text-center text-[11px] font-semibold text-[var(--active-text)]">{group.label}</span>
+              <div className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-2">
                 {group.members.map((member) => (
-                  <div key={member.id} className="w-28 text-center">
-                    <PersonAvatar name={member.name} size={32} />
-                    <div className="mt-2 truncate text-xs text-[var(--text-body)]" title={member.name}>{member.name}</div>
+                  <div key={member.id} className="flex min-w-0 items-center gap-2">
+                    <PersonAvatar name={member.name} size={28} />
+                    <div className="max-w-24 truncate text-xs text-[var(--text-body)]" title={member.name}>{member.name}</div>
                   </div>
                 ))}
               </div>
             </section>
           ))}
+          </div>
+          {memberRoleGroups.length === 0 && <div className="py-6 text-center text-xs text-[var(--text-muted)]">暂无成员</div>}
         </div>
-      )}
+        </section>
 
-      {activeTab === 'activity' && (
+        <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
         <div className="space-y-4">
           <h3 className="font-bold text-sm text-[var(--text-primary)]">产品动态</h3>
-          <div className="space-y-3">
+          <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
             {activityItems.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 text-sm">
+              <div key={activity.id} className="flex min-w-0 items-start gap-3 border-b border-[var(--border-main)] py-3 text-xs last:border-b-0">
                 <PersonAvatar name={activity.operatorName || currentUser.name || '系'} size={32} />
-                <span className="text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span>
-                <span className="ml-auto text-xs text-[var(--text-muted)]">{activity.createdAt}</span>
+                <span className="min-w-0 flex-1 break-words text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span><span className="mt-1 block text-[11px] text-[var(--text-muted)]">{activity.createdAt}</span></span>
               </div>
             ))}
             {activityItems.length === 0 && <div className="py-12 text-center text-sm text-[var(--text-muted)]">暂无产品动态</div>}
           </div>
         </div>
-      )}
+        </section>
+      </aside>
+      </div>
 
       {/* Modal: Edit Leads Modal */}
       <Modal

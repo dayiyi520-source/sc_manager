@@ -40,9 +40,15 @@ describe('product line work item defaults', () => {
     expect(normalizeProductWebsiteUrl('https://product.example.com/')).toBe('https://product.example.com/');
     expect(normalizeProductWebsiteUrl('javascript:alert(1)')).toBeNull();
     expect(normalizeProductWebsiteUrl('')).toBeNull();
-    expect(productLinesSource).toContain('<span>产品网址</span>');
+    expect(productLinesSource).toContain('产品网址');
     expect(productLinesSource).toContain('disabled={!productWebsiteUrl}');
     expect(productLinesSource).toContain("window.open(productWebsiteUrl, '_blank', 'noopener,noreferrer')");
+  });
+
+  it('shows an actionable empty state when the product card area has no results', () => {
+    expect(productLinesSource).toContain("title={productLines.length === 0 ? '暂无产品' : '未找到匹配产品'}");
+    expect(productLinesSource).toContain('清除搜索');
+    expect(productLinesSource).toContain('<EmptyState');
   });
 
   it('edits and labels the default work item type', () => {

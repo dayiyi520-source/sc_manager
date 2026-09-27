@@ -14,7 +14,7 @@ describe('requirement task Ant Design contract', () => {
   });
 
   it('exposes the selected product-line detail tab state', () => {
-    expect(productLineSource.match(/aria-selected=/g)).toHaveLength(3);
+    expect(productLineSource.match(/aria-selected=/g)).toHaveLength(4);
   });
 
   it('keeps the persisted product-line code read-only in settings', () => {
@@ -49,7 +49,7 @@ describe('requirement task Ant Design contract', () => {
   });
 
   it('uses category icons instead of text tags before task titles', () => {
-    expect(requirementSource).toContain('workItemCategoryIcon');
+    expect(requirementSource).toContain('WorkItemCategoryIcon');
     expect(requirementSource).toContain('work-item-category-icon');
     expect(requirementSource).not.toContain('shrink-0 rounded border border-[var(--border-main)] bg-[var(--bg-surface)] px-1.5');
   });

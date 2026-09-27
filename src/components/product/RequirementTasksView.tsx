@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popover, Segmented, Select, Tag, Tooltip, Upload } from 'antd';
-import { ApartmentOutlined, BgColorsOutlined, BugOutlined, CodeOutlined, CopyOutlined, DeleteOutlined, ExperimentOutlined, FileTextOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
@@ -28,6 +28,7 @@ import { readSession } from '../../services/session';
 import { preferredWorkItemTypeName } from './workItemTypeDefaults';
 import { CollapsibleDescription } from './CollapsibleDescription';
 import { employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity';
+import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
 
 type RequirementFilterState = {
   title: { operator: TextFilterOperator; value: string };
@@ -64,14 +65,6 @@ const normalizePriority = (priority: string) => ({
 }[priority] || priority);
 const apiPriority = (priority: string) => ({ 紧急: 'P0', 高: 'P1', 中: 'P2', 低: 'P3' }[normalizePriority(priority)] || 'P2');
 const workItemCategoryLabel: Record<string, string> = { requirement: '需求', design: '设计', dev: '研发', test: '测试', bug: '缺陷' };
-const workItemCategoryIcon: Record<string, React.ReactNode> = {
-  requirement: <FileTextOutlined />,
-  design: <BgColorsOutlined />,
-  dev: <CodeOutlined />,
-  test: <ExperimentOutlined />,
-  bug: <BugOutlined />,
-};
-
 const SearchableSelect: React.FC<{ label: string; value: string; options: string[]; onChange: (value: string) => void; placeholder?: string; clearable?: boolean }> = ({ label, value, options, onChange, placeholder = '请选择', clearable }) => (
   <label className="block text-[var(--text-muted)]"><span>{label}</span><Select showSearch optionFilterProp="label" allowClear={clearable} value={value || undefined} onChange={(next) => onChange(next || '')} options={options.map((option) => ({ label: option, value: option }))} placeholder={placeholder} className="mt-1 w-full" /></label>
 );
@@ -1335,7 +1328,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
             {depth > 0 && <span aria-hidden="true" className="shrink-0 font-mono text-[var(--text-muted)]">{isLast ? '└─' : '├─'}</span>}
             {hasChildren ? <button type="button" aria-label={`${expanded ? '收起' : '展开'}${task.title}`} onClick={() => void toggleListRow(task)} className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]">{expanded ? '⌄' : '›'}</button> : <span className="w-5 shrink-0" />}
             <Tooltip title={workItemCategoryLabel[String(task.category)] || '任务'}>
-              <span className="work-item-category-icon" aria-label={workItemCategoryLabel[String(task.category)] || '任务'}>{workItemCategoryIcon[String(task.category)] || <FileTextOutlined />}</span>
+              <span className="work-item-category-icon" aria-label={workItemCategoryLabel[String(task.category)] || '任务'}><WorkItemCategoryIcon category={String(task.category)} /></span>
             </Tooltip>
             <button type="button" onClick={() => setSelectedTask(task)} className="min-w-0 truncate text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]" title={task.title}>{task.title}</button>
           </div>

@@ -7,21 +7,17 @@ import {
   Layers,
   Globe,
   Users,
-  FileText,
-  Bug,
-  Code2,
-  Briefcase,
-  Edit,
-  Beaker,
 } from '../common/octicons-compat';
 import { ViewModeSwitch } from '../common/ViewModeSwitch';
 import { useApp } from '../../context/AppContext';
 import { StatusTag, Modal } from '../common/UIComponents';
+import { EmptyState } from '../common/Data/EmptyState';
 import { ProductLine } from '../../types';
 import { ProductLineDetailView, type ProductLineSettingsSection } from './ProductLineDetailView';
 import { teamRepository } from '../../services/teamRepository';
 import { normalizeProductWebsiteUrl } from './productWebsite';
 import { employeeSelectOptions } from '../common/PersonIdentity';
+import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
 
 export { normalizeProductWebsiteUrl } from './productWebsite';
 
@@ -310,7 +306,19 @@ export const ProductLinesView: React.FC = () => {
           />
         </div>
       ) : (
-      <div className="product-lines-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      filteredLines.length === 0 ? (
+        <div className="product-lines-empty rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]">
+          <EmptyState
+            title={productLines.length === 0 ? '暂无产品' : '未找到匹配产品'}
+            description={productLines.length === 0 ? '创建第一个产品，开始管理产品迭代和工作项' : '请调整搜索条件后重试'}
+            action={productLines.length === 0 ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { resetCreateForm(); setIsModalOpen(true); }}>新建产品</Button>
+            ) : (
+              <Button onClick={() => setSearchQuery('')}>清除搜索</Button>
+            )}
+          />
+        </div>
+      ) : <div className="product-lines-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredLines.map((pl) => {
           const stats = getLineStats(pl);
           const versionCount = productLineVersionCount(pl.id, versions);
@@ -365,8 +373,8 @@ export const ProductLinesView: React.FC = () => {
                     onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_req_tasks'); }}
                     className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
-                    <div className="flex items-center justify-center gap-1 text-purple-400 text-[10px] font-medium mb-0.5">
-                      <FileText className="w-3 h-3" />
+                    <div className="flex items-center justify-center gap-1 text-[var(--text-primary)] text-[10px] font-medium mb-0.5">
+                      <WorkItemCategoryIcon category="assistance" className="w-3 h-3 text-purple-400" />
                       <span>协助事项</span>
                     </div>
                     <span className="product-line-pending-req text-sm font-bold font-mono text-[var(--text-primary)]">
@@ -374,18 +382,18 @@ export const ProductLinesView: React.FC = () => {
                     </span>
                   </div>
 
-                  <div onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_req_tasks'); }} className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"><div className="flex items-center justify-center gap-1 text-cyan-400 text-[10px] font-medium mb-0.5"><Briefcase className="w-3 h-3" /><span>产品任务</span></div><span className="text-sm font-bold font-mono text-cyan-400">{stats.pendingReqs}</span></div>
-                  <div onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_design_tasks'); }} className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"><div className="flex items-center justify-center gap-1 text-pink-400 text-[10px] font-medium mb-0.5"><Edit className="w-3 h-3" /><span>设计任务</span></div><span className="text-sm font-bold font-mono text-pink-400">{stats.designTasks}</span></div>
+                  <div onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_req_tasks'); }} className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"><div className="flex items-center justify-center gap-1 text-[var(--text-primary)] text-[10px] font-medium mb-0.5"><WorkItemCategoryIcon category="requirement" className="w-3 h-3 text-cyan-400" /><span>产品任务</span></div><span className="text-sm font-bold font-mono text-[var(--text-primary)]">{stats.pendingReqs}</span></div>
+                  <div onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_design_tasks'); }} className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"><div className="flex items-center justify-center gap-1 text-[var(--text-primary)] text-[10px] font-medium mb-0.5"><WorkItemCategoryIcon category="design" className="w-3 h-3 text-pink-400" /><span>设计任务</span></div><span className="text-sm font-bold font-mono text-[var(--text-primary)]">{stats.designTasks}</span></div>
                   {/* 待办缺陷 */}
                   <div
                     onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_bugs'); }}
                     className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
-                    <div className="flex items-center justify-center gap-1 text-red-400 text-[10px] font-medium mb-0.5">
-                      <Bug className="w-3 h-3" />
+                    <div className="flex items-center justify-center gap-1 text-[var(--text-primary)] text-[10px] font-medium mb-0.5">
+                      <WorkItemCategoryIcon category="bug" className="w-3 h-3 text-red-400" />
                       <span>待办缺陷</span>
                     </div>
-                    <span className="text-sm font-bold font-mono text-red-400">
+                    <span className="text-sm font-bold font-mono text-[var(--text-primary)]">
                       {stats.pendingBugs}
                     </span>
                   </div>
@@ -395,16 +403,16 @@ export const ProductLinesView: React.FC = () => {
                     onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_dev_tasks'); }}
                     className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
-                    <div className="flex items-center justify-center gap-1 text-emerald-400 text-[10px] font-medium mb-0.5">
-                      <Code2 className="w-3 h-3" />
+                    <div className="flex items-center justify-center gap-1 text-[var(--text-primary)] text-[10px] font-medium mb-0.5">
+                      <WorkItemCategoryIcon category="dev" className="w-3 h-3 text-emerald-400" />
                       <span>研发任务</span>
                     </div>
-                    <span className="text-sm font-bold font-mono text-emerald-400">
+                    <span className="text-sm font-bold font-mono text-[var(--text-primary)]">
                       {stats.activeTasks}
                     </span>
                   </div>
 
-                  <div onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_test_tasks'); }} className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"><div className="flex items-center justify-center gap-1 text-amber-400 text-[10px] font-medium mb-0.5"><Beaker className="w-3 h-3" /><span>测试任务</span></div><span className="text-sm font-bold font-mono text-amber-400">{stats.testTasks}</span></div>
+                  <div onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_test_tasks'); }} className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"><div className="flex items-center justify-center gap-1 text-[var(--text-primary)] text-[10px] font-medium mb-0.5"><WorkItemCategoryIcon category="test" className="w-3 h-3 text-amber-400" /><span>测试任务</span></div><span className="text-sm font-bold font-mono text-[var(--text-primary)]">{stats.testTasks}</span></div>
                 </div>
 
                 {/* Footer Controls: 版本管理 & 成员管理 (满足需求2) */}
