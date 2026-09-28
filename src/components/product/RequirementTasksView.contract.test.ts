@@ -72,6 +72,13 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('label="关联客户"><Input value={selectedTask?.customerName || \'未关联\'} disabled');
   });
 
+  it('consumes an iteration work-item target and opens the persisted real detail', () => {
+    expect(requirementSource).toContain('pendingDetailTarget');
+    expect(requirementSource).toContain('payload.itemId');
+    expect(requirementSource).toContain('productRepository.workItemDetail(productLineId, pendingDetailTarget.itemId)');
+    expect(requirementSource).toContain('setSelectedTask(storedTask(detail, fallback))');
+  });
+
   it('creates children only from the parent category and uses child-task copy', () => {
     expect(requirementSource).toContain('{selectedTask && !childModalOpen && (');
     expect(requirementSource).toContain('workItemCategoryLabel[selectedTask.category] === item.category');

@@ -1,40 +1,44 @@
 /* @vitest-environment jsdom */
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as testingLibraryRender, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VersionIterationView } from './VersionIterationView';
 
 const appMocks = vi.hoisted(() => ({
+  versions: [] as Array<Record<string, unknown>>,
   workItemTypes: vi.fn().mockResolvedValue([{ id: 'type-test', category: '测试', name: '功能测试', enabled: true, isDefault: true }]),
+  childTypeRules: vi.fn().mockResolvedValue([]),
   createWorkItem: vi.fn().mockResolvedValue({ id: 'created-1' }),
   workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }),
+  workItemDetail: vi.fn().mockImplementation(async (_productLineId: string, id: string) => ({ id, title: id === 'requirement-1' ? '支持版本规划拖拽' : '已纳入迭代的工作项', children: [] })),
+  requirementSummary: vi.fn().mockResolvedValue({ requirement: undefined, linkedItems: [] }),
+  workItemRelations: vi.fn().mockResolvedValue({ relations: [] }),
   assignRequirementToVersion: vi.fn().mockResolvedValue(true),
   addToast: vi.fn(),
   deleteVersion: vi.fn(),
   updateVersion: vi.fn().mockResolvedValue(true),
   showDeleteConfirm: vi.fn(),
   openPageTab: vi.fn(),
+  addRequirementTask: vi.fn().mockResolvedValue(true),
+  updateRequirementTask: vi.fn().mockResolvedValue(true),
+  addDesignTask: vi.fn().mockResolvedValue(true),
+  updateDesignTask: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock('../../services/productRepository', () => ({ productRepository: { workItemTypes: appMocks.workItemTypes, createWorkItem: appMocks.createWorkItem, workItems: appMocks.workItems } }));
+vi.mock('../../services/productRepository', () => ({ productRepository: { workItemTypes: appMocks.workItemTypes, childTypeRules: appMocks.childTypeRules, createWorkItem: appMocks.createWorkItem, workItems: appMocks.workItems, workItemDetail: appMocks.workItemDetail, requirementSummary: appMocks.requirementSummary, workItemRelations: appMocks.workItemRelations } }));
 vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.fn().mockResolvedValue([{ id: 'member-1', name: '王丽' }, { id: 'member-2', name: '李明' }]) } }));
 
 vi.mock('../../context/AppContext', () => ({
   useApp: () => ({
-    versions: [{
-      id: 'version-1',
-      code: 'V1.2.0',
-      name: '秋季迭代',
-      ownerName: '张瑞',
-      productLineId: 'line-1',
-      productLineName: '协同产品线',
-      startDate: '2026-09-01',
-      endDate: '2026-09-30',
-      status: '迭代中',
-      requirementsCount: 1,
-      completedReqCount: 0,
-    }],
+    versions: appMocks.versions,
     productLines: [{ id: 'line-1', name: '协同产品线' }],
+    customers: [],
+    currentUser: { id: 'user-1', name: '林志豪' },
+    requirementPool: [],
+    risks: [],
+    requirementTaskDraft: null,
+    setRequirementTaskDraft: vi.fn(),
     requirementTasks: [{
       id: 'requirement-1',
       code: 'REQ-001',
@@ -66,6 +70,11 @@ vi.mock('../../context/AppContext', () => ({
     }],
     devTasks: [],
     bugs: [],
+    addRequirementTask: appMocks.addRequirementTask,
+    updateRequirementTask: appMocks.updateRequirementTask,
+    addDesignTask: appMocks.addDesignTask,
+    updateDesignTask: appMocks.updateDesignTask,
+    addRequirementTaskComment: vi.fn(),
     deleteVersion: appMocks.deleteVersion,
     assignRequirementToVersion: appMocks.assignRequirementToVersion,
     addToast: appMocks.addToast,
@@ -80,8 +89,26 @@ vi.mock('./WorkItemCreatePanel', () => ({ WorkItemCreatePanel: ({ isOpen, title,
 vi.mock('./VersionTestReportPanel', () => ({ VersionTestReportPanel: () => <div>暂无测试报告</div> }));
 vi.mock('../common/Feedback', () => ({ showDeleteConfirm: appMocks.showDeleteConfirm }));
 
+const render = (ui: React.ReactElement) => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return testingLibraryRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+};
+
 describe('VersionIterationView', () => {
   beforeEach(() => {
+    appMocks.versions.splice(0, appMocks.versions.length, {
+      id: 'version-1',
+      code: 'V1.2.0',
+      name: '秋季迭代',
+      ownerName: '张瑞',
+      productLineId: 'line-1',
+      productLineName: '协同产品线',
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+      status: '进行中',
+      requirementsCount: 1,
+      completedReqCount: 0,
+    });
     appMocks.assignRequirementToVersion.mockClear();
     appMocks.addToast.mockClear();
     appMocks.deleteVersion.mockClear();
@@ -98,6 +125,10 @@ describe('VersionIterationView', () => {
 
     expect(screen.getByRole('button', { name: '迭代列表' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '迭代规划' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: '产品导航栏' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '搜索产品' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '全部产品' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('combobox', { name: '产品线筛选' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '详情' })).not.toBeInTheDocument();
     expect(screen.getByText('版本号')).toBeInTheDocument();
     expect(screen.getByText('V1.2.0')).toBeInTheDocument();
@@ -116,6 +147,7 @@ describe('VersionIterationView', () => {
     expect(screen.getByRole('checkbox', { name: '选择迭代任务：已纳入迭代的工作项' })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: '收起迭代目录' }));
     expect(screen.getByRole('button', { name: '展开迭代目录' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'V1.2.0' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '展开迭代目录' }));
     expect(screen.getByRole('button', { name: '搜索' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '过滤器' })).toBeInTheDocument();
@@ -144,9 +176,12 @@ describe('VersionIterationView', () => {
     expect(screen.getByText('已纳入迭代的工作项')).toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole('textbox', { name: '搜索迭代任务' }), { key: 'Enter', code: 'Enter' });
     expect(screen.getByText('暂无匹配工作项')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }));
     fireEvent.change(screen.getByRole('textbox', { name: '搜索迭代任务' }), { target: { value: '' } });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '搜索迭代任务' }), { key: 'Enter', code: 'Enter' });
     fireEvent.click(screen.getByRole('button', { name: '已纳入迭代的工作项' }));
-    expect(screen.getByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
+    expect(appMocks.openPageTab).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('tab', { name: '迭代信息' }));
     fireEvent.click(screen.getByRole('button', { name: '测试报告' }));
     expect(screen.getByText('暂无测试报告')).toBeInTheDocument();
@@ -154,6 +189,35 @@ describe('VersionIterationView', () => {
     expect(screen.getByText('暂无版本评审')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '完成迭代' }));
     await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '已完成' }));
+  });
+
+  it('paginates the iteration list and resets to the first page after filtering', () => {
+    appMocks.versions.push(...Array.from({ length: 10 }, (_, index) => ({
+      id: `version-${index + 2}`,
+      code: `V1.${index + 3}.0`,
+      name: `后续迭代 ${index + 1}`,
+      ownerName: '张瑞',
+      productLineId: 'line-1',
+      productLineName: '协同产品线',
+      startDate: '2026-10-01',
+      endDate: '2026-10-31',
+      status: '未开始',
+      requirementsCount: 0,
+      completedReqCount: 0,
+    })));
+    render(<VersionIterationView />);
+
+    expect(screen.getByText('共 11 条，第 1 / 2 页')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '下一页' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '秋季迭代' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    expect(screen.getByText('共 11 条，第 2 / 2 页')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '秋季迭代' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('textbox', { name: '搜索迭代' }), { target: { value: '秋季' } });
+    expect(screen.getByText('共 1 条，第 1 / 1 页')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '秋季迭代' })).toBeInTheDocument();
   });
 
   it('opens the requested version detail from product-line gantt context', () => {
@@ -218,6 +282,15 @@ describe('VersionIterationView', () => {
     expect(screen.getByRole('button', { name: '迭代规划' })).toBeInTheDocument();
   });
 
+  it('offers a design task from the iteration create menu', async () => {
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    fireEvent.click(screen.getByRole('button', { name: '新建' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '设计' }));
+    expect(screen.getByRole('dialog', { name: '新建设计任务' })).toBeInTheDocument();
+    await waitFor(() => expect(appMocks.workItemTypes).toHaveBeenCalledWith('line-1', '设计'));
+  });
+
   it('uses the task grouping choices and offers work-item owners after @', async () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
@@ -241,11 +314,12 @@ describe('VersionIterationView', () => {
     expect(screen.getByRole('dialog', { name: '新建子任务产品任务' })).toHaveTextContent('已纳入迭代的工作项');
   });
 
-  it('tolerates a legacy association title string in task detail', () => {
+  it('opens a version work item detail without leaving the iteration page', async () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
     fireEvent.click(screen.getByRole('button', { name: '已纳入迭代的工作项' }));
-    expect(screen.getByRole('dialog', { name: '需求详情' })).toHaveTextContent('关联的历史协助事项');
+    expect(await screen.findByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
+    expect(appMocks.openPageTab).not.toHaveBeenCalled();
   });
 
   it('uses the themed Ant Design confirmation instead of a native browser dialog', () => {
@@ -268,9 +342,12 @@ describe('VersionIterationView', () => {
     const planningHeading = screen.getByText('待规划工作项 · 1').parentElement;
     expect(planningHeading).toHaveClass('items-center');
     expect(planningHeading).not.toHaveClass('justify-center');
+    expect(screen.getByRole('navigation', { name: '产品导航栏' })).toBeInTheDocument();
+    expect(screen.queryByText('新建工作项')).not.toBeInTheDocument();
+    expect(screen.getByText('李明').parentElement).toHaveTextContent('李明');
 
     fireEvent.click(screen.getByRole('button', { name: '支持版本规划拖拽' }));
-    expect(screen.getByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
+    expect(appMocks.openPageTab).toHaveBeenCalledWith('prod_req_tasks');
   });
 
   it('collapses the planning filter when clicking outside and highlights active filter/search icons', () => {

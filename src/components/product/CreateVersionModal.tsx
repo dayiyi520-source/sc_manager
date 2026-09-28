@@ -49,7 +49,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
   const [endDate, setEndDate] = useState(editingVersion?.endDate || '');
   const [content, setContent] = useState(editingVersion?.content || editingVersion?.changelog || '');
   const [productLinePickerOpen, setProductLinePickerOpen] = useState(false);
-  const versionStatus = editingVersion?.status || '规划中';
+  const versionStatus = editingVersion?.status || '未开始';
 
   useEffect(() => {
     if (!isOpen) return;

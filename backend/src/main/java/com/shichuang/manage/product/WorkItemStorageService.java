@@ -71,7 +71,7 @@ public class WorkItemStorageService {
         if (versionId!=null) {
             Map<String,Object> version=mapper.version(tenant,line,versionId);
             if (version==null) throw new IllegalArgumentException("版本不存在或不属于当前产品线");
-            if ("已发布".equals(version.get("status"))) throw conflict("已发布版本只读");
+            if (Set.of("已完成", "已发布").contains(String.valueOf(version.get("status")))) throw conflict("已完成版本只读");
         }
         String assigneeId=optional(body.assigneeId());
         String assigneeName=assigneeId==null?null:mapper.assignee(tenant,assigneeId);

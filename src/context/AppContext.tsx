@@ -1225,7 +1225,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       startDate: v.startDate || '',
       endDate: v.endDate || '',
       releaseDate: v.releaseDate || '',
-      status: v.status || '规划中',
+      status: v.status || '未开始',
       requirementsCount: v.reqCount || v.requirementsCount || 0,
       reqCount: v.reqCount || v.requirementsCount || 0,
       bugCount: v.bugCount || 0,

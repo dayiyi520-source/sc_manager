@@ -86,7 +86,7 @@ public class WorkItemRelationService {
     private void editable(String line,Map<String,Object> item) {
         if(item.get("versionId")==null) return;
         Map<String,Object> version=storage.version(RequestContext.tenantId(),line,item.get("versionId").toString());
-        if(version==null || "已发布".equals(version.get("status"))) throw conflict("关联版本不存在或已发布，只读");
+        if(version==null || Set.of("已完成", "已发布").contains(String.valueOf(version.get("status")))) throw conflict("关联版本不存在或已完成，只读");
     }
     private void audit(String line,String from,String to,String event,String id) {
         String json=configurations.encode(Map.of("relationId",id,"sourceId",from,"targetId",to));
