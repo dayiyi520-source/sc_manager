@@ -34,7 +34,7 @@ const RolesPanel = () => <div className="mx-auto w-full max-w-4xl space-y-4 text
 
 export const ResearchTemplateView: React.FC = () => {
   const [section, setSection] = useState<Section>('work-items');
-  return <div className="space-y-5 animate-in fade-in duration-200">
+  return <div className="research-template-view space-y-5 animate-in fade-in duration-200">
     <header className="border-b border-[var(--border-main)] pb-3"><h1 className="text-lg font-bold text-[var(--text-primary)]">产研模板</h1><p className="mt-1 text-xs text-[var(--text-muted)]">预设新产品的工作项、通知和自动化配置。</p></header>
     <div className="grid min-h-[520px] grid-cols-1 border border-[var(--border-main)] bg-[var(--bg-surface)] md:grid-cols-[190px_minmax(0,1fr)]">
       <nav aria-label="产研模板菜单" className="flex gap-1 overflow-x-auto border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:block md:overflow-visible md:border-b-0 md:border-r">
