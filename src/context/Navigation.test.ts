@@ -37,7 +37,16 @@ describe('design task navigation', () => {
     const product = MENU_GROUPS.find((group) => group.id === 'product')!.subMenus;
     expect(product.some((menu) => menu.id === 'prod_reviews' || menu.id === 'prod_planning')).toBe(false);
     expect(MENU_GROUPS.find((group) => group.id === 'system')?.subMenus).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'sys_work_items', title: '产研模板' })
+      expect.objectContaining({ id: 'sys_work_items', title: '产研模板' }),
+      expect.objectContaining({ id: 'sys_permission_demo', title: '权限演示' }),
+      expect.objectContaining({ id: 'sys_workflow_demo', title: '工作流演示' })
     ]));
+  });
+
+  it('places permission and workflow demos after the research template', () => {
+    const system = MENU_GROUPS.find((group) => group.id === 'system')!.subMenus;
+    const templateIndex = system.findIndex((menu) => menu.id === 'sys_work_items');
+    expect(system[templateIndex + 1]).toEqual(expect.objectContaining({ id: 'sys_permission_demo', title: '权限演示' }));
+    expect(system[templateIndex + 2]).toEqual(expect.objectContaining({ id: 'sys_workflow_demo', title: '工作流演示' }));
   });
 });

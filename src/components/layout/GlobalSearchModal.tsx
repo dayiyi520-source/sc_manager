@@ -37,7 +37,9 @@ export const GlobalSearchModal: React.FC = () => {
       return [
         { type: 'menu', id: 'wb_my_tasks', title: '工作台 · 我的任务', desc: '查看待办事项、审批与个人OKR', icon: Layers },
         { type: 'menu', id: 'prod_req_tasks', title: '产研管理 · 产品任务', desc: '产品任务列表与看板', icon: Layers },
-        { type: 'menu', id: 'sys_work_items', title: '系统与组织 · 产研模板', desc: '配置新建产品的工作项、通知与自动化预设', icon: FileCheck }
+        { type: 'menu', id: 'sys_work_items', title: '系统与组织 · 产研模板', desc: '配置新建产品的工作项、通知与自动化预设', icon: FileCheck },
+        { type: 'menu', id: 'sys_permission_demo', title: '系统与组织 · 权限演示', desc: '按部门、产品身份与可见性查看权限范围', icon: FileCheck },
+        { type: 'menu', id: 'sys_workflow_demo', title: '系统与组织 · 工作流演示', desc: '演示协助事项、产研任务与我的任务流转', icon: FileText }
       ];
     }
 

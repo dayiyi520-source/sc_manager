@@ -71,6 +71,8 @@ export type SubMenuId =
   | 'know_base'
   | 'team_org'
   | 'sys_work_items'
+  | 'sys_permission_demo'
+  | 'sys_workflow_demo'
   | 'sys_settings'
   // 项目管理
   | 'proj_list'
