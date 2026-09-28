@@ -86,7 +86,7 @@ public class WorkItemTransitionService {
         if (versionId!=null) {
             Map<String,Object> version=mapper.version(tenant,line,versionId);
             if (version==null) result.add("关联版本不存在");
-            else if ("已发布".equals(version.get("status"))) result.add("已发布版本只读");
+            else if (Set.of("已完成", "已发布").contains(String.valueOf(version.get("status")))) result.add("已完成版本只读");
         }
         boolean terminal=target.group()==WorkItemStatus.Group.COMPLETED || target.group()==WorkItemStatus.Group.CANCELLED;
         if(target.successful() && "requirement".equals(item.get("category")) && completion.governed(workflow(line,item)))

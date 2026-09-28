@@ -155,12 +155,13 @@ type RequirementTasksViewProps = {
   productLineFilter?: string;
   itemLabel?: string;
   taskKind?: 'requirement' | 'design' | 'test' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops';
+  initialDetail?: RequirementTask;
   renderDetail?: (context: WorkItemDetailContext) => React.ReactNode;
   createPolicy?: WorkItemCreatePolicy;
   creationContext?: WorkItemCreationContext;
 };
 
-export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', renderDetail, createPolicy, creationContext }) => {
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialDetail, renderDetail, createPolicy, creationContext }) => {
   const {
     requirementTasks,
     designTasks,
@@ -228,12 +229,13 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const [groupValue, setGroupValue] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [pendingDetailTarget, setPendingDetailTarget] = useState<{ itemId: string; productLineId: string } | null>(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('shichuang.task.search');
     if (!raw) return;
     try {
-      const payload = JSON.parse(raw) as { targetPage?: string; title?: string };
+      const payload = JSON.parse(raw) as { targetPage?: string; title?: string; itemId?: string; productLineId?: string };
       const targetPageByKind: Record<string, string> = {
         requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks',
         bug: 'prod_bugs', test: 'prod_test_tasks', presales: 'crm_presales_tasks',
@@ -244,6 +246,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       setSearchDraft(title);
       setSearchQuery(title);
       setSearchOpen(Boolean(title));
+      if (payload.itemId) setPendingDetailTarget({ itemId: payload.itemId, productLineId: String(payload.productLineId || '') });
       sessionStorage.removeItem('shichuang.task.search');
     } catch {
       sessionStorage.removeItem('shichuang.task.search');
@@ -397,7 +400,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     return true;
   };
 
-  const [selectedTask, setSelectedTask] = useState<RequirementTask | null>(null);
+  const [selectedTask, setSelectedTask] = useState<RequirementTask | null>(initialDetail || null);
   const [detailEditing, setDetailEditing] = useState(false);
   const detailDescriptionEditor = useRef<HTMLDivElement>(null);
   const [detailDescription, setDetailDescription] = useState('');
@@ -1049,6 +1052,26 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     expectedGoal: String(item.expectedGoal || ''),
     hasChildren: Boolean(item.hasChildren)
   });
+
+  useEffect(() => {
+    if (!pendingDetailTarget) return;
+    const fallback = activeTasks.find((task) => task.id === pendingDetailTarget.itemId);
+    const productLineId = pendingDetailTarget.productLineId || fallback?.productLineId || '';
+    if (!productLineId) return;
+    let active = true;
+    productRepository.workItemDetail(productLineId, pendingDetailTarget.itemId)
+      .then((detail) => {
+        if (!active) return;
+        setSelectedTask(storedTask(detail, fallback));
+        setPendingDetailTarget(null);
+      })
+      .catch((error) => {
+        if (!active) return;
+        addToast('error', `${itemLabel}详情加载失败`, error instanceof Error ? error.message : '请稍后重试');
+        setPendingDetailTarget(null);
+      });
+    return () => { active = false; };
+  }, [activeTasks, pendingDetailTarget]);
 
   const loadTransitionOptions = async (task: RequirementTask, force = false) => {
     if (!task.productLineId || task.hasChildren || (!force && transitionOptions[task.id])) return;

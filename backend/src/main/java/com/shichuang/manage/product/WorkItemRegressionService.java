@@ -54,7 +54,7 @@ public class WorkItemRegressionService {
         if(WorkItemDependencyGraph.terminal(bug)) throw conflict("已结束缺陷不能新建回归任务，请先按流程重开");
         if(bug.get("versionId")!=null) {
             var version=mapper.version(RequestContext.tenantId(),line,bug.get("versionId").toString());
-            if(version==null || "已发布".equals(version.get("status"))) throw conflict("缺陷所属版本不存在或已发布，只读");
+            if(version==null || Set.of("已完成", "已发布").contains(String.valueOf(version.get("status")))) throw conflict("缺陷所属版本不存在或已完成，只读");
         }
         if(origins.hasPendingRegression(RequestContext.tenantId(),line,bugId)) throw conflict("已有未通过的回归任务，请继续处理原任务");
         var before=relations.snapshot(line);

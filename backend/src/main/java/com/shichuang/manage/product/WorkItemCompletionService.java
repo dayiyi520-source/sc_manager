@@ -62,7 +62,7 @@ public class WorkItemCompletionService {
                 if(WorkItemDependencyGraph.terminal(item)) continue;
                 if(item.get("versionId")!=null) {
                     var version=storage.version(tenant,line,item.get("versionId").toString());
-                    if(version==null || "已发布".equals(version.get("status"))) continue;
+                    if(version==null || Set.of("已完成", "已发布").contains(String.valueOf(version.get("status")))) continue;
                 }
                 Workflow definition=workflow(line,item);
                 var edge=definition.transitions().stream().filter(e->e.autoComplete() && e.from().equals(item.get("statusKey"))).findFirst().orElse(null);

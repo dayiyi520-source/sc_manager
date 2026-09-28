@@ -114,6 +114,7 @@ public class ProductLineService {
   Map<String,Object> line=mapper.find(RequestContext.tenantId(),id);
   if(line==null) throw new NoSuchElementException("产品线不存在");
   Map<String,Object> body=normalizeVersionDates(input,Map.of());
+  body.put("status",validateVersionStatus(Objects.toString(body.getOrDefault("status","未开始"),"未开始")));
   if(Objects.toString(body.get("ownerName"),"").isBlank()) body.put("ownerName",line.get("ownerName"));
   mapper.addVersion(RequestContext.tenantId(),id,body,RequestContext.userId());
   mapper.updateCurrentVersion(RequestContext.tenantId(),id,String.valueOf(body.get("code")),RequestContext.userId());
@@ -124,8 +125,13 @@ public class ProductLineService {
   Map<String,Object> version=mapper.version(RequestContext.tenantId(),versionId);
   if(version==null || !lineId.equals(String.valueOf(version.get("productLineId")))) throw new NoSuchElementException("版本不存在");
   Map<String,Object> body=normalizeVersionDates(input,version);
+  if(body.containsKey("status")) body.put("status",validateVersionStatus(Objects.toString(body.get("status"),"")));
   if(mapper.updateVersion(RequestContext.tenantId(),versionId,body,RequestContext.userId())==0) throw new NoSuchElementException("版本不存在");
   mapper.addActivity(RequestContext.tenantId(),lineId,"修改版本",String.valueOf(version.get("code")),RequestContext.operatorName());
+ }
+ private static String validateVersionStatus(String status){
+  if(!Set.of("未开始","进行中","已完成").contains(status)) throw new IllegalArgumentException("迭代状态仅支持未开始、进行中和已完成");
+  return status;
  }
  static Map<String,Object> normalizeVersionDates(Map<String,Object> input,Map<String,Object> previous){
   Map<String,Object> result=new HashMap<>(input);

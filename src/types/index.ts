@@ -704,7 +704,7 @@ export interface VersionIteration {
   startDate?: string;
   endDate?: string;
   releaseDate?: string;
-  status: '规划中' | '迭代中' | '封版测试' | '已发布' | string;
+  status: '未开始' | '进行中' | '已完成' | string;
   requirementsCount?: number;
   reqCount?: number;
   bugCount?: number;

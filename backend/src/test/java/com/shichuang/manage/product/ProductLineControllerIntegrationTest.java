@@ -305,8 +305,18 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
                 .content("{\"name\":\"空日期版本\",\"code\":\"DATE-1\",\"startDate\":\"\",\"endDate\":\"\"}"))
             .andExpect(status().isOk());
         String versionId = jdbc.queryForObject("SELECT id_ FROM t_product_line_version WHERE product_line_id_=?", String.class, lineId);
+        assertEquals("未开始", jdbc.queryForObject("SELECT status_ FROM t_product_line_version WHERE id_=?", String.class, versionId));
         assertNull(jdbc.queryForObject("SELECT start_date_ FROM t_product_line_version WHERE id_=?", String.class, versionId));
         String path = "/api/product-lines/" + lineId + "/versions/" + versionId;
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json").content("{\"status\":\"进行中\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json").content("{\"status\":\"已完成\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json").content("{\"status\":\"进行中\"}"))
+            .andExpect(status().isOk());
+        assertEquals("进行中", jdbc.queryForObject("SELECT status_ FROM t_product_line_version WHERE id_=?", String.class, versionId));
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json").content("{\"status\":\"迭代中\"}"))
+            .andExpect(status().isBadRequest());
         mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json")
                 .content("{\"startDate\":\"2026-09-14\",\"endDate\":\"2026-09-30\"}"))
             .andExpect(status().isOk());
