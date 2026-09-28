@@ -14,7 +14,7 @@ describe('requirement task Ant Design contract', () => {
   });
 
   it('exposes the selected product-line detail tab state', () => {
-    expect(productLineSource.match(/aria-selected=/g)).toHaveLength(4);
+    expect(productLineSource.match(/aria-selected=/g)).toHaveLength(5);
   });
 
   it('keeps the persisted product-line code read-only in settings', () => {

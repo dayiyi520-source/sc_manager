@@ -2127,10 +2127,12 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 .tech-current-avatar, .tech-current-avatar * { color: #fff !important; -webkit-text-fill-color: #fff !important; }
 
 .product-lines-view .product-view-switch { flex: 0 0 auto; }
-.product-lines-view .responsibility-person { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; gap: 4px; border: 1px solid var(--border-main); border-radius: 999px; padding: 2px 7px 2px 3px; background: var(--bg-surface-soft); color: var(--text-body); line-height: 16px; }
+.product-lines-view .responsibility-person { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; justify-content: flex-start; gap: 4px; border: 1px solid var(--border-main); border-radius: 999px; padding: 2px 7px 2px 3px; background: var(--bg-surface-soft); color: var(--text-body); line-height: 16px; text-align: left; }
 .product-lines-view .responsibility-role { display: inline-flex; width: 17px; height: 17px; flex: 0 0 17px; align-items: center; justify-content: center; border-radius: 50%; font-size: 10px; font-weight: 700; }
 .product-lines-view .responsibility-person-primary .responsibility-role { background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--primary); }
 .product-lines-view .responsibility-person-secondary .responsibility-role { background: color-mix(in srgb, var(--text-muted) 20%, transparent); color: var(--text-muted); }
+.product-lines-view .responsibility-name-primary { color: var(--primary); }
+.product-lines-view .responsibility-name-secondary { color: var(--text-body); }
 .product-lines-view .product-line-list-header { position: sticky; top: 0; z-index: 1; }
 .product-lines-view .product-line-list-row > span { min-width: 0; }
 .product-lines-view .product-lines-ant-table .ant-table { background: var(--bg-surface); color: var(--text-body); }

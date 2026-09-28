@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -320,8 +321,14 @@ class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
                 .content("{\"startDate\":null,\"endDate\":\"\"}"))
             .andExpect(status().isOk());
         assertNull(jdbc.queryForObject("SELECT end_date_ FROM t_product_line_version WHERE id_=?", String.class, versionId));
+        mockMvc.perform(put(path).header("Authorization", authorization).contentType("application/json")
+                .content("{\"status\":\"已发布\"}"))
+            .andExpect(status().isOk());
+        assertNotNull(jdbc.queryForObject("SELECT release_time_ FROM t_product_line_version WHERE id_=?", String.class, versionId));
         mockMvc.perform(get("/api/product-lines/{id}", lineId).header("Authorization", authorization))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.versions[0].id").value(versionId));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.versions[0].id").value(versionId))
+            .andExpect(jsonPath("$.data.versions[0].releaseDate").isNotEmpty());
     }
 
     @Test

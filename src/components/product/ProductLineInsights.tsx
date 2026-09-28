@@ -51,7 +51,7 @@ export const ProductLineBoard: React.FC<{
   items: UnifiedWorkItem[];
   versions?: VersionIteration[];
   onOpenCategory?: (category: Exclude<WorkItemCategoryKey, 'case'>) => void;
-}> = ({ items, versions = [] }) => {
+}> = ({ items, versions = [], onOpenCategory }) => {
   const [category, setCategory] = useState<BoardCategoryKey>('requirement');
   const itemsForCategory = (key: BoardCategoryKey) => items.filter((item) => key === 'assistance'
     ? item.category === 'requirement' && item.sourceType === 'WORK_ORDER'

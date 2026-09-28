@@ -794,6 +794,19 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   }, [taskKind, productLines, versions]);
 
   useEffect(() => {
+    const raw = sessionStorage.getItem('shichuang.productTaskCreate');
+    if (!raw) return;
+    let intent: { kind?: string; productLineId?: string };
+    try { intent = JSON.parse(raw); } catch { sessionStorage.removeItem('shichuang.productTaskCreate'); return; }
+    if (intent.kind !== taskKind) return;
+    const line = productLines.find((item) => item.id === intent.productLineId);
+    if (!line) return;
+    sessionStorage.removeItem('shichuang.productTaskCreate');
+    openAddModal();
+    setFormProductLineName(line.name);
+  }, [taskKind, productLines]);
+
+  useEffect(() => {
     if (!requirementTaskDraft) return;
     setEditingTask(null);
     setFormTitle(requirementTaskDraft.title || '');

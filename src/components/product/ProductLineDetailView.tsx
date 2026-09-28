@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Input, Select, Button, Switch, Drawer, Tag } from 'antd';
+import { Input, Select, Button, Switch, Drawer, Tag, Dropdown } from 'antd';
 import Card from 'antd/es/card/Card';
 import { useQuery } from '@tanstack/react-query';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
@@ -50,6 +50,7 @@ import { normalizeProductWebsiteUrl } from './productWebsite';
 import { teamRepository } from '../../services/teamRepository';
 import { employeeJobTitle, employeeSelectOptions, PersonAvatar, PersonIdentity } from '../common/PersonIdentity';
 import { ProductLineBoard, ProductLineHours, useProductLineWorkItems } from './ProductLineInsights';
+import { ProductLinePerformance } from './ProductLinePerformance';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
 import { formatVersionPublishedAt, latestReleasedVersion } from './productLinePresentation';
 
@@ -440,7 +441,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   }, [initialSettingsSection]);
 
   // Tabs state for sub-entities
-  const [activeTab, setActiveTab] = useState<'board' | 'versions' | 'hours' | 'performance'>('board');
+  const [activeTab, setActiveTab] = useState<'basic' | 'board' | 'versions' | 'hours' | 'performance'>('basic');
   const workItemsQuery = useProductLineWorkItems(productLineId);
   const productInfoRef = useRef<HTMLDivElement>(null);
   const statsPanelRef = useRef<HTMLElement>(null);
@@ -558,6 +559,12 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     openPageTab(menuId);
   };
 
+  const openBoardTaskCreate = (kind: 'requirement' | 'design' | 'dev' | 'test' | 'bug') => {
+    const menuByKind = { requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks', test: 'prod_test_tasks', bug: 'prod_bugs' } as const;
+    sessionStorage.setItem('shichuang.productTaskCreate', JSON.stringify({ kind, productLineId: productLine.id }));
+    navigateWithLine(menuByKind[kind]);
+  };
+
   const openVersionDetail = (versionId: string) => {
     sessionStorage.setItem('shichuang.productLineFilter', productLine.id);
     sessionStorage.setItem('shichuang.productLineTargetTab', 'detail');
@@ -596,6 +603,11 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const activityItems: ProductLineActivity[] = productLine.activities?.length
     ? productLine.activities
     : lineVersions.map((version) => ({ id: version.id, action: '创建了版本', detail: version.code || version.name, operatorName: currentUser.name, createdAt: version.createdAt || version.releaseDate || '' }));
+  const activityGroups = Object.entries(activityItems.reduce<Record<string, ProductLineActivity[]>>((groups, activity) => {
+    const dateKey = activity.createdAt ? activity.createdAt.slice(0, 10) : '暂无日期';
+    (groups[dateKey] ||= []).push(activity);
+    return groups;
+  }, {})).sort(([left], [right]) => right.localeCompare(left));
   const workItems = workItemsQuery.data || [];
   const pendingByCategory = (category: string) => workItems.filter((item) => item.category === category && (item.status?.group === 'NOT_STARTED' || item.status?.group === 'IN_PROGRESS')).length;
 
@@ -640,29 +652,47 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   }
 
   return (
-    <div className="product-line-detail space-y-6 animate-in fade-in duration-200">
+    <div className="product-line-detail space-y-6 px-4 pb-6 animate-in fade-in duration-200 sm:px-6">
       {/* Top Navigation & Breadcrumb */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center justify-between gap-4 border-b border-[var(--border-main)] pb-0">
+        <div className="flex min-w-0 items-center gap-3">
           <Button
             onClick={onBack}
             icon={<ArrowLeft className="w-3.5 h-3.5" />}
-          >
-            返回产品管理
-          </Button>
+            aria-label="返回产品列表"
+            title="返回产品列表"
+            className="shrink-0"
+          />
+          <h1 className="shrink-0 text-lg font-bold text-[var(--text-primary)]">产品详情</h1>
+          <span className="h-7 w-px shrink-0 bg-[var(--border-main)]" aria-hidden="true" />
+          <nav aria-label="产品详情分类" className="flex min-w-0 items-stretch gap-1 overflow-x-auto">
+            {([
+              ['basic', '基本信息', FileText],
+              ['board', '产品看板', Boxes],
+              ['versions', '产品迭代', Layers],
+              ['hours', '产品工时', Clock],
+              ['performance', '产品效能', TrendingUp]
+            ] as const).map(([key, label, Icon]) => <button key={key} type="button" onClick={() => setActiveTab(key)} aria-selected={activeTab === key} className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-4 text-xs font-bold transition-colors sm:px-4 ${activeTab === key ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
+          </nav>
         </div>
 
-        {/* Header Action Buttons */}
-        <div className="flex items-center gap-2">
-          <Button onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }} icon={<Edit3 className="w-3.5 h-3.5" />}>责任人配置</Button>
-          <Button onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品设置</Button>
-        </div>
       </div>
 
+      {activeTab === 'basic' && <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-bold text-[var(--text-primary)]">基本信息</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">查看产品概况、责任人配置、线上版本和产品动态。</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button size="small" onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }} icon={<Edit3 className="w-3.5 h-3.5" />}>责任人配置</Button>
+          <Button size="small" onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品设置</Button>
+        </div>
+      </div>}
+
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,2.35fr)_minmax(300px,0.95fr)]">
-      <main className="min-w-0 space-y-5">
+      <main className={`min-w-0 space-y-5 ${activeTab !== 'basic' ? 'xl:col-span-2' : ''}`}>
       {/* Hero Overview Banner with Cover */}
-      <div ref={productInfoRef} className="product-line-hero relative rounded-2xl border border-[var(--border-main)] overflow-hidden bg-[var(--bg-surface)] shadow-lg">
+      {activeTab === 'basic' && <div ref={productInfoRef} className="product-line-hero relative rounded-2xl border border-[var(--border-main)] overflow-hidden bg-[var(--bg-surface)] shadow-lg">
         {/* Cover Background Graphic */}
         <div className="hidden">
           {productLine.coverImage ? (
@@ -782,11 +812,21 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           </div>
 
         </div>
-      </div>
+      </div>}
 
-      <div ref={tabWorkspaceRef} className="product-line-tab-workspace min-h-0">
+      {activeTab === 'basic' && <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
+        <div className="space-y-4">
+          <h3 className="font-bold text-sm text-[var(--text-primary)]">产品动态</h3>
+          <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
+            {activityGroups.map(([date, activities]) => <section key={date} className="space-y-2"><div className="inline-flex rounded-md bg-[var(--bg-surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">{date === '暂无日期' ? date : `${date} ${new Date(`${date}T00:00:00`).toLocaleDateString('zh-CN', { weekday: 'short' })}`}</div><div className="space-y-1">{[...activities].sort((left, right) => String(right.createdAt || '').localeCompare(String(left.createdAt || ''))).map((activity) => <div key={activity.id} className="flex min-w-0 items-center gap-3 py-3 text-xs"><PersonAvatar name={activity.operatorName || currentUser.name || '系'} size={32} /><span className="w-16 shrink-0 font-mono text-sm font-semibold text-[var(--text-muted)]">{activity.createdAt ? activity.createdAt.slice(11, 16) : '--:--'}</span><span className="min-w-0 flex-1 break-words text-sm text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span></div>)}</div></section>)}
+            {activityItems.length === 0 && <div className="py-12 text-center text-sm text-[var(--text-muted)]">暂无产品动态</div>}
+          </div>
+        </div>
+      </section>}
+
+      {activeTab !== 'basic' && <div ref={tabWorkspaceRef} className="product-line-tab-workspace min-h-[calc(100vh-180px)]">
       {/* Tabs Navigation */}
-      <div className="product-line-tabs flex items-center gap-2 overflow-x-auto text-xs">
+      <div className="hidden">
         <button
           onClick={() => setActiveTab('board')}
           aria-selected={activeTab === 'board'}
@@ -816,35 +856,39 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         <button onClick={() => setActiveTab('performance')} aria-selected={activeTab === 'performance'} className={`shrink-0 border-b-2 px-3.5 pb-3 font-bold transition-colors ${activeTab === 'performance' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><TrendingUp className="mr-1 inline h-3.5 w-3.5" />产品效能</button>
       </div>
 
+      {activeTab === 'board' && <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-base font-bold text-[var(--text-primary)]">产品看板</h2><p className="mt-1 text-xs text-[var(--text-muted)]">按任务类型和处理状态查看当前产品的工作项分布。</p></div><Dropdown menu={{ items: [{ key: 'requirement', label: '产品' }, { key: 'design', label: '设计' }, { key: 'dev', label: '研发' }, { key: 'test', label: '测试' }, { key: 'bug', label: '缺陷' }], onClick: ({ key }) => openBoardTaskCreate(key as 'requirement' | 'design' | 'dev' | 'test' | 'bug') }} trigger={['click']}><Button size="small" icon={<Plus className="h-3.5 w-3.5" />}>新建</Button></Dropdown></div>}
+      {activeTab === 'hours' && <div className="mb-4"><h2 className="text-base font-bold text-[var(--text-primary)]">产品工时</h2><p className="mt-1 text-xs text-[var(--text-muted)]">汇总当前产品工作项的预计工时、实际投入和人员分布。</p></div>}
+      {activeTab === 'performance' && <div className="mb-4"><h2 className="text-base font-bold text-[var(--text-primary)]">产品效能</h2><p className="mt-1 text-xs text-[var(--text-muted)]">基于当前产品工作项汇总，帮助快速了解交付和质量状态。</p></div>}
+
       {(activeTab === 'board' || activeTab === 'hours' || activeTab === 'performance') && (workItemsQuery.isPending
-        ? <div className="py-12 text-center text-xs text-[var(--text-muted)]">正在加载产品工作项...</div>
+        ? <div className="min-h-[calc(100vh-280px)] py-12 text-center text-xs text-[var(--text-muted)]">正在加载产品工作项...</div>
         : workItemsQuery.isError
           ? <div className="py-12 text-center text-xs text-[var(--danger)]">工作项加载失败 <Button size="small" onClick={() => workItemsQuery.refetch()}>重试</Button></div>
           : activeTab === 'board'
-            ? <Card size="small" className="product-line-board-panel h-full">
+            ? <Card size="small" className="product-line-board-panel flex min-h-[calc(100vh-280px)] h-full flex-col [&>.ant-card-body]:min-h-0 [&>.ant-card-body]:flex-1">
                 <ProductLineBoard items={workItems} versions={lineVersions} onOpenCategory={(category) => navigateWithLine(({ requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks', test: 'prod_test_tasks', bug: 'prod_bugs' } as const)[category])} />
               </Card>
             : activeTab === 'hours'
               ? <ProductLineHours items={workItems} memberCount={memberCount} />
-              : <div className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-5"><h3 className="text-sm font-bold text-[var(--text-primary)]">产品效能</h3><p className="mt-3 text-xs text-[var(--text-muted)]">工作项 {workItems.length} 个，已完成 {workItems.filter((item) => item.status?.group === 'COMPLETED').length} 个。当前没有周期效能数据。</p></div>)}
+              : <ProductLinePerformance items={workItems} />)}
 
       {/* Tab 1: 版本迭代计划 */}
       {activeTab === 'versions' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h3 className="font-bold text-sm text-[var(--text-primary)]">版本迭代演进路线</h3>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                记录该产品已发布及规划中的各版本周期、关键更新与关联需求
+              <h2 className="text-base font-bold text-[var(--text-primary)]">产品迭代</h2>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                记录该产品已发布及规划中的各版本周期、关键更新与关联需求。
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <Button type="text" style={{ color: 'var(--primary)' }} className="hover:text-[var(--active-text)]" aria-label="创建新版本" title="创建新版本" onClick={() => { setEditingVersion(null); setIsCreateVersionOpen(true); }} icon={<Plus className="w-4 h-4 text-[var(--primary)]" />} />
-              <Button type="text" className="text-[var(--primary)] hover:text-[var(--active-text)]" aria-label="管理版本" title="管理版本" onClick={() => navigateWithLine('prod_versions', 'detail', true)} icon={<GitBranch className="w-4 h-4" />} />
+              <Button size="small" onClick={() => { setEditingVersion(null); setIsCreateVersionOpen(true); }} icon={<Plus className="w-3.5 h-3.5" />}>创建新版本</Button>
+              <Button size="small" onClick={() => navigateWithLine('prod_versions', 'detail', true)} icon={<GitBranch className="w-3.5 h-3.5" />}>版本管理</Button>
             </div>
           </div>
 
-          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
+          <div className="min-h-[calc(100vh-280px)] rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
             {lineVersions.length > 0 && (() => {
               const dayMs = 86400000;
               const toTime = (value?: string) => value ? new Date(value).getTime() : Date.now();
@@ -890,10 +934,10 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           {lineVersions.length === 0 && <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">暂无版本迭代记录，点击右上角“创建新版本”规划版本交付</div>}
         </div>
       )}
-      </div>
+      </div>}
 
       </main>
-      <aside className="min-w-0 space-y-5">
+      {activeTab === 'basic' && <aside className="min-w-0 space-y-5">
         <section ref={statsPanelRef}>
           <Card size="small" title={<span className="text-sm font-bold text-[var(--text-primary)]">统计</span>} className="product-line-stat-panel h-full">
           {workItemsQuery.isError ? <div className="p-2 text-xs text-[var(--danger)]">统计加载失败 <Button size="small" onClick={() => workItemsQuery.refetch()}>重试</Button></div> : <div className="grid grid-cols-2 gap-3">
@@ -935,21 +979,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </div>
         </section>
 
-        <section ref={activityPanelRef} className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
-        <div className="space-y-4">
-          <h3 className="font-bold text-sm text-[var(--text-primary)]">产品动态</h3>
-          <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
-            {activityItems.map((activity) => (
-              <div key={activity.id} className="flex min-w-0 items-start gap-3 border-b border-[var(--border-main)] py-3 text-xs last:border-b-0">
-                <PersonAvatar name={activity.operatorName || currentUser.name || '系'} size={32} />
-                <span className="min-w-0 flex-1 break-words text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span><span className="mt-1 block text-[11px] text-[var(--text-muted)]">{activity.createdAt}</span></span>
-              </div>
-            ))}
-            {activityItems.length === 0 && <div className="py-12 text-center text-sm text-[var(--text-muted)]">暂无产品动态</div>}
-          </div>
-        </div>
-        </section>
       </aside>
+      }
       </div>
 
       {/* Modal: Edit Leads Modal */}
