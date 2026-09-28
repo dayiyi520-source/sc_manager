@@ -64,16 +64,16 @@ export const ProductLineBoard: React.FC<{
     return version?.code || '版本已归档';
   };
 
-  return <div className="product-line-board grid min-w-0 gap-4 md:grid-cols-[148px_minmax(0,1fr)]">
+  return <div className="product-line-board grid h-full min-h-0 min-w-0 gap-4 md:grid-cols-[148px_minmax(0,1fr)]">
     <nav aria-label="工作项类型" className="space-y-1 border-r border-[var(--border-main)] pr-3">
       {categories.map((option) => <button key={option.key} type="button" onClick={() => setCategory(option.key)} aria-current={category === option.key ? 'true' : undefined}
         className={`flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${category === option.key ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]'}`}>
         <span>{option.label}</span><span className="font-mono">{itemsForCategory(option.key).length}</span>
       </button>)}
     </nav>
-    <div className="min-w-0">
+    <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)]">
       {unclassified > 0 && <p className="mb-3 text-xs text-[var(--text-muted)]">另有 {unclassified} 条已取消或状态未归类的工作项，不计入三列。</p>}
-      <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+      <div className="grid min-h-0 min-w-0 gap-3 lg:grid-cols-3 lg:auto-rows-fr">
         {statusColumns.map((column) => {
           const columnItems = scoped.filter((item) => item.status?.group === column.key);
           return <section key={column.key} aria-label={column.label} className="min-w-0">

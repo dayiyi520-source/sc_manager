@@ -51,6 +51,7 @@ import { teamRepository } from '../../services/teamRepository';
 import { employeeJobTitle, employeeSelectOptions, PersonAvatar, PersonIdentity } from '../common/PersonIdentity';
 import { ProductLineBoard, ProductLineHours, useProductLineWorkItems } from './ProductLineInsights';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
+import { formatVersionPublishedAt, latestReleasedVersion } from './productLinePresentation';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -59,6 +60,9 @@ interface ProductLineDetailViewProps {
 }
 
 export type ProductLineSettingsSection = 'basic' | 'members' | 'work-items' | 'notifications' | 'automation';
+
+const normalizeProductVisibility = (value?: ProductLine['visibility']): '公开' | '私密' =>
+  value === '私密' || value === '部门可见' || value === '保密' || value === '仅创建者可见' ? '私密' : '公开';
 
 const productLineStatCards = [
   { label: '协助事项', category: 'assistance' as const, tone: 'text-purple-400' },
@@ -85,7 +89,7 @@ const ProductLineSettingsPanel: React.FC<{
   const [websiteError, setWebsiteError] = useState('');
   const [isSavingBasic, setIsSavingBasic] = useState(false);
   const [description, setDescription] = useState(productLine.description);
-  const [visibility, setVisibility] = useState<ProductLine['visibility']>(productLine.visibility === '部门可见' ? '私密' : productLine.visibility === '保密' ? '仅创建者可见' : productLine.visibility || '公开');
+  const [visibility, setVisibility] = useState<'公开' | '私密'>(normalizeProductVisibility(productLine.visibility));
   const [status, setStatus] = useState<'启用中' | '已停用'>(productLine.health === '已停用' || productLine.status === '已停用' ? '已停用' : '启用中');
   const [memberTab, setMemberTab] = useState('全部');
   const [memberToRemove, setMemberToRemove] = useState<ProductLineMember | null>(null);
@@ -100,7 +104,7 @@ const ProductLineSettingsPanel: React.FC<{
     setSort(productLine.sort ?? 0);
     setWebsiteError('');
     setDescription(productLine.description);
-    setVisibility(productLine.visibility === '部门可见' ? '私密' : productLine.visibility === '保密' ? '仅创建者可见' : productLine.visibility || '公开');
+    setVisibility(normalizeProductVisibility(productLine.visibility));
     setStatus(productLine.health === '已停用' || productLine.status === '已停用' ? '已停用' : '启用中');
   }, [productLine]);
 
@@ -185,13 +189,23 @@ const ProductLineSettingsPanel: React.FC<{
               </div>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品负责人 *</span><Select showSearch allowClear className="w-full" value={ownerUserId || undefined} onChange={(value) => setOwnerUserId(value || '')} options={(employeesQuery.data || []).map((employee) => ({ value: employee.id, label: `${employee.name} · ${employeeJobTitle(employee) || '未设置职位'}` }))} optionFilterProp="label" placeholder="请选择产品负责人" /></label>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品网址</span><Input value={website} status={websiteError ? 'error' : undefined} aria-invalid={Boolean(websiteError)} onChange={(event) => { setWebsite(event.target.value); if (websiteError) setWebsiteError(''); }} placeholder="https://example.com" />{websiteError && <span className="text-[11px] font-normal text-[var(--danger)]">{websiteError}</span>}</label>
-              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>可见范围 *</span><Select className="w-full" value={visibility} onChange={setVisibility} options={[{ value: '公开', label: '公开（组织全员可访问）' }, { value: '私密', label: '私密（仅成员可见）' }, { value: '仅创建者可见', label: '仅创建者可见' }]} /></label>
+              <div>
+                <label className="mb-1 block font-medium text-[var(--text-body)]">可见范围 *</label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {(['公开', '私密'] as const).map((value) => (
+                    <button type="button" key={value} onClick={() => setVisibility(value)} className={`rounded-md border p-3 text-left transition-colors ${visibility === value ? 'border-[var(--primary)] bg-[var(--primary)]/10' : 'border-[var(--border-main)] bg-[var(--bg-surface-soft)] hover:border-[var(--primary)]/60'}`}>
+                      <span className="block font-semibold text-[var(--text-body)]">{value}</span>
+                      <span className="mt-1 block text-[11px] text-[var(--text-muted)]">{value === '公开' ? '组织全员可访问' : '仅产品成员可见'}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品描述</span><Input.TextArea rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="请输入产品描述" /></label>
               <div className="flex items-center justify-between gap-4">
-                <div><div className="font-medium text-[var(--text-body)]">产品状态</div><p className="mt-[5px] text-[11px] text-[var(--text-muted)]">关闭后，产品仅保留查看和历史记录能力。</p></div>
-                <Switch className="product-line-switch" checked={status === '启用中'} onChange={(checked) => setStatus(checked ? '启用中' : '已停用')} checkedChildren="启用中" unCheckedChildren="已停用" />
+                <div><div className="font-medium text-[var(--text-body)]">是否启用</div><p className="mt-[5px] text-[11px] text-[var(--text-muted)]">关闭后，产品仅保留查看和历史记录能力。</p></div>
+                <Switch className="product-line-switch" checked={status === '启用中'} onChange={(checked) => setStatus(checked ? '启用中' : '已停用')} checkedChildren="启用" unCheckedChildren="停用" />
               </div>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>排序</span><Input type="number" min={0} max={999} step={1} value={sort} onChange={(event) => setSort(Number(event.target.value))} /></label>
-              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品描述</span><Input.TextArea rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="请输入产品描述" /></label>
               <div className="flex justify-end"><Button type="primary" htmlType="submit" loading={isSavingBasic}>保存基本信息</Button></div>
             </form>
           )}
@@ -430,6 +444,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const workItemsQuery = useProductLineWorkItems(productLineId);
   const productInfoRef = useRef<HTMLDivElement>(null);
   const statsPanelRef = useRef<HTMLElement>(null);
+  const tabWorkspaceRef = useRef<HTMLDivElement>(null);
+  const activityPanelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const productInfo = productInfoRef.current;
@@ -457,6 +473,39 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       statsPanel.style.minHeight = '';
     };
   }, [productLine?.id]);
+
+  useEffect(() => {
+    const tabWorkspace = tabWorkspaceRef.current;
+    const activityPanel = activityPanelRef.current;
+    if (!tabWorkspace || !activityPanel) return undefined;
+
+    const mediaQuery = window.matchMedia('(min-width: 1280px)');
+    const syncTabWorkspaceHeight = () => {
+      tabWorkspace.style.height = '';
+      tabWorkspace.style.maxHeight = '';
+      tabWorkspace.style.overflowY = '';
+      if (!mediaQuery.matches) return;
+      const availableHeight = activityPanel.getBoundingClientRect().bottom - tabWorkspace.getBoundingClientRect().top;
+      const viewportHeight = window.innerHeight - tabWorkspace.getBoundingClientRect().top - 24;
+      const maxHeight = Math.max(320, Math.min(availableHeight, viewportHeight));
+      tabWorkspace.style.height = `${maxHeight}px`;
+      tabWorkspace.style.maxHeight = `${maxHeight}px`;
+      tabWorkspace.style.overflowY = 'auto';
+    };
+    const observer = new ResizeObserver(syncTabWorkspaceHeight);
+    observer.observe(activityPanel);
+    window.addEventListener('resize', syncTabWorkspaceHeight);
+    mediaQuery.addEventListener('change', syncTabWorkspaceHeight);
+    syncTabWorkspaceHeight();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', syncTabWorkspaceHeight);
+      mediaQuery.removeEventListener('change', syncTabWorkspaceHeight);
+      tabWorkspace.style.height = '';
+      tabWorkspace.style.maxHeight = '';
+      tabWorkspace.style.overflowY = '';
+    };
+  }, [productLine?.id, activeTab, productLine?.activities?.length, versions.length]);
 
   // Edit Leads Form state
   const [leadReqOwnerUserId, setLeadReqOwnerUserId] = useState(productLine?.requirementOwnerUserId || '');
@@ -487,6 +536,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   })[0];
   const productStatus = productLine.health === '已停用' ? '已停用' : latestIteration?.status || '启用中';
+  const onlineVersion = latestReleasedVersion({ versions: lineVersions });
+  const onlinePublishedAt = formatVersionPublishedAt(onlineVersion);
   const memberUserIds = new Set((productLine.members || [])
     .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId))
     .map((member) => member.userId));
@@ -632,7 +683,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               {productLine.code}
             </span>
             <span className="px-2.5 py-1 rounded-md bg-[var(--primary)]/80 backdrop-blur-md text-white font-mono font-bold text-xs">
-              当前版本 {productLine.currentVersion || '1.0.0'}
+              线上版本 {onlineVersion?.code || onlineVersion?.name || '暂无发布'}
             </span>
           </div>
 
@@ -660,20 +711,21 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
         {/* Banner Content Body */}
       <div className="product-line-hero-body p-6 relative z-10 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+              <div className="flex min-w-0 items-start justify-between gap-4">
                 <h2 className="min-w-0 truncate text-2xl font-bold text-[var(--text-primary)]">{productLine.name}</h2>
-                <StatusTag type={productStatus === '已停用' ? 'default' : 'info'} status={productStatus} className="shrink-0" />
+                <StatusTag type={productStatus === '已停用' ? 'default' : 'info'} status={productStatus} />
               </div>
-              <p className="text-xs text-[var(--text-body)] max-w-3xl mt-2 leading-relaxed">
-                {productLine.description}
-              </p>
-              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-[var(--border-main)] pt-3 text-xs sm:grid-cols-2">
-                <div className="min-w-0"><span className="text-[var(--text-muted)]">负责人</span><div className="mt-1 truncate font-medium text-[var(--active-text)]">{productLine.owner || productLine.ownerName || '暂无'}</div></div>
-                <div className="min-w-0 sm:text-right"><span className="text-[var(--text-muted)]">当前版本</span><div className="mt-1 truncate font-mono font-medium text-[var(--active-text)]">{productLine.currentVersion || '暂无'}</div></div>
+              <div className="mt-1 flex items-start justify-between gap-6">
+                <p className="min-w-0 max-w-3xl text-xs leading-relaxed text-[var(--text-body)]">
+                  {productLine.description}
+                </p>
+                <div className="shrink-0 max-w-48 truncate text-right text-xs text-[var(--primary)]" title={productLine.owner || productLine.ownerName || '暂无'}>负责人：{productLine.owner || productLine.ownerName || '暂无'}</div>
               </div>
-            </div>
+              <div className="mt-4 flex min-w-0 items-center justify-between gap-4 border-t border-[var(--border-main)] pt-3 text-xs">
+                <span className="font-mono font-medium text-[var(--text-body)]">线上版本：{onlineVersion?.code || onlineVersion?.name || '暂无发布'}</span>
+                <span className="shrink-0 text-[var(--text-muted)]">发布时间：{onlineVersion ? onlinePublishedAt : '无发布'}</span>
+              </div>
           </div>
 
           {/* Three Key Leads Display Bar (需求负责人、技术负责人、测试负责人) */}
@@ -686,8 +738,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] text-[var(--text-muted)]">产品责任人 (Product Owner)</div>
-                  <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
-                    主：{productLine.requirementOwner || '暂无'}{productLine.requirementOwnerSecondary ? ` · 次：${productLine.requirementOwnerSecondary}` : ''}
+                  <div className="mt-0.5 truncate text-sm font-bold">
+                    <span className="text-[var(--primary)]">主：{productLine.requirementOwner || '暂无'}</span>{productLine.requirementOwnerSecondary && <span className="text-[var(--text-body)]"> · 次：{productLine.requirementOwnerSecondary}</span>}
                   </div>
                   <div className="text-[10px] text-purple-400/90 font-medium mt-0.5">
                     负责产品矩阵定位、需求全生命周期规划
@@ -702,8 +754,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] text-[var(--text-muted)]">研发责任人 (Tech Lead)</div>
-                  <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
-                    主：{productLine.techOwner || '暂无'}{productLine.techOwnerSecondary ? ` · 次：${productLine.techOwnerSecondary}` : ''}
+                  <div className="mt-0.5 truncate text-sm font-bold">
+                    <span className="text-[var(--primary)]">主：{productLine.techOwner || '暂无'}</span>{productLine.techOwnerSecondary && <span className="text-[var(--text-body)]"> · 次：{productLine.techOwnerSecondary}</span>}
                   </div>
                   <div className="text-[10px] text-[var(--active-text)]/90 font-medium mt-0.5">
                     把控系统架构演进、技术选型与高可用交付
@@ -718,8 +770,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] text-[var(--text-muted)]">测试责任人 (QA Lead)</div>
-                  <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5 truncate">
-                    主：{productLine.testOwner || '暂无'}{productLine.testOwnerSecondary ? ` · 次：${productLine.testOwnerSecondary}` : ''}
+                  <div className="mt-0.5 truncate text-sm font-bold">
+                    <span className="text-[var(--primary)]">主：{productLine.testOwner || '暂无'}</span>{productLine.testOwnerSecondary && <span className="text-[var(--text-body)]"> · 次：{productLine.testOwnerSecondary}</span>}
                   </div>
                   <div className="text-[10px] text-emerald-400/90 font-medium mt-0.5">
                     负责封版验收、自动化回归与质量基线
@@ -732,8 +784,9 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </div>
       </div>
 
+      <div ref={tabWorkspaceRef} className="product-line-tab-workspace min-h-0">
       {/* Tabs Navigation */}
-      <div className="product-line-tabs border-b border-[var(--border-main)] flex items-center gap-2 overflow-x-auto text-xs">
+      <div className="product-line-tabs flex items-center gap-2 overflow-x-auto text-xs">
         <button
           onClick={() => setActiveTab('board')}
           aria-selected={activeTab === 'board'}
@@ -768,7 +821,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         : workItemsQuery.isError
           ? <div className="py-12 text-center text-xs text-[var(--danger)]">工作项加载失败 <Button size="small" onClick={() => workItemsQuery.refetch()}>重试</Button></div>
           : activeTab === 'board'
-            ? <Card size="small" className="product-line-board-panel">
+            ? <Card size="small" className="product-line-board-panel h-full">
                 <ProductLineBoard items={workItems} versions={lineVersions} onOpenCategory={(category) => navigateWithLine(({ requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks', test: 'prod_test_tasks', bug: 'prod_bugs' } as const)[category])} />
               </Card>
             : activeTab === 'hours'
@@ -837,6 +890,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           {lineVersions.length === 0 && <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">暂无版本迭代记录，点击右上角“创建新版本”规划版本交付</div>}
         </div>
       )}
+      </div>
 
       </main>
       <aside className="min-w-0 space-y-5">
@@ -881,7 +935,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </div>
         </section>
 
-        <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
+        <section ref={activityPanelRef} className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
         <div className="space-y-4">
           <h3 className="font-bold text-sm text-[var(--text-primary)]">产品动态</h3>
           <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
@@ -926,7 +980,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <div>
             <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-purple-400" />
-              产品责任人 - 主责任人 (Product Owner / PO) *
+              产品责任人 (Product Owner / PO) *
             </label>
             <Select
               showSearch
@@ -935,7 +989,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               value={leadReqOwnerUserId || undefined}
               onChange={(value) => setLeadReqOwnerUserId(value || '')}
               options={leadOptions}
-              placeholder="搜索并选择负责人"
+              placeholder="选择主负责人"
               optionFilterProp="label"
             />
             <Select showSearch allowClear className="w-full mt-2" value={leadReqOwnerSecondaryUserId || undefined} onChange={(value) => setLeadReqOwnerSecondaryUserId(value || '')} options={leadOptions} placeholder="选择次责任人" optionFilterProp="label" />
@@ -945,7 +999,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <div>
             <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[var(--primary)]" />
-              研发责任人 - 主责任人 (Tech Lead / 架构师) *
+              研发责任人 (Tech Lead / 架构师) *
             </label>
             <Select
               showSearch
@@ -954,7 +1008,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               value={leadTechOwnerUserId || undefined}
               onChange={(value) => setLeadTechOwnerUserId(value || '')}
               options={leadOptions}
-              placeholder="搜索并选择负责人"
+              placeholder="选择主负责人"
               optionFilterProp="label"
             />
             <Select showSearch allowClear className="w-full mt-2" value={leadTechOwnerSecondaryUserId || undefined} onChange={(value) => setLeadTechOwnerSecondaryUserId(value || '')} options={leadOptions} placeholder="选择次责任人" optionFilterProp="label" />
@@ -964,7 +1018,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <div>
             <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              测试责任人 - 主责任人 (QA Lead / 质量主管) *
+              测试责任人 (QA Lead / 质量主管) *
             </label>
             <Select
               showSearch
@@ -973,7 +1027,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               value={leadTestOwnerUserId || undefined}
               onChange={(value) => setLeadTestOwnerUserId(value || '')}
               options={leadOptions}
-              placeholder="搜索并选择负责人"
+              placeholder="选择主负责人"
               optionFilterProp="label"
             />
             <Select showSearch allowClear className="w-full mt-2" value={leadTestOwnerSecondaryUserId || undefined} onChange={(value) => setLeadTestOwnerSecondaryUserId(value || '')} options={leadOptions} placeholder="选择次责任人" optionFilterProp="label" />
