@@ -2145,3 +2145,14 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
 .product-lines-view .product-lines-ant-table .ant-table-cell-fix-right { background: var(--bg-surface); }
 .product-lines-view .product-lines-ant-table .ant-table-tbody > tr:hover > .ant-table-cell-fix-left,
 .product-lines-view .product-lines-ant-table .ant-table-tbody > tr:hover > .ant-table-cell-fix-right { background: var(--bg-surface-soft); }
+
+.tech-main .research-template-view .ant-tabs-nav::before { border-bottom-color: var(--border-main); }
+.tech-main .research-template-view .ant-tabs-tab { border-radius: 0; background: transparent; }
+.tech-main .research-template-view .ant-tabs-tab:hover .ant-tabs-tab-btn { color: var(--primary); }
+.tech-main .research-template-view .ant-tabs-ink-bar { height: 3px; background: var(--primary); }
+html:not(.dark) .tech-main .research-template-view .ant-tabs-tab-btn[role="tab"],
+.dark .tech-main .research-template-view .ant-tabs-tab-btn[role="tab"] { border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+html:not(.dark) .tech-main .research-template-view .ant-tabs-tab-btn[role="tab"][aria-selected="true"],
+.dark .tech-main .research-template-view .ant-tabs-tab-btn[role="tab"][aria-selected="true"] { color: var(--primary) !important; }
+html:not(.dark) .tech-main .research-template-view .ant-tabs-tab-btn[role="tab"][aria-selected="true"] *,
+.dark .tech-main .research-template-view .ant-tabs-tab-btn[role="tab"][aria-selected="true"] * { color: var(--primary) !important; }
