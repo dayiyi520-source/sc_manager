@@ -50,6 +50,10 @@ describe('TestCaseLibraryView', () => {
     render(<QueryClientProvider client={client}><TestCaseLibraryView productLineFilter="all" /></QueryClientProvider>);
 
     await screen.findByText('当前目录暂无测试用例');
+    const scopeTabs = screen.getByRole('tablist', { name: '用例范围' });
+    expect(scopeTabs.closest('.test-case-data-plane')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '搜索' }).closest('.test-case-data-plane')).not.toBeNull();
+    expect(screen.getByText('新建用例').closest('button')?.closest('.test-case-data-plane')).not.toBeNull();
     expect(screen.queryByText('测试用例库')).not.toBeInTheDocument();
     expect(screen.queryByText('匹配操作')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('搜索编号或标题')).not.toBeInTheDocument();
