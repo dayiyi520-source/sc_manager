@@ -19,17 +19,18 @@ import java.util.Set;
 @Service
 @Transactional(readOnly = true)
 public class UnifiedWorkItemService {
-    private static final Set<String> CATEGORIES = Set.of("requirement", "design", "dev", "test", "bug", "case");
     private static final List<String> LIMITATIONS = List.of(
         "历史工作项尚未绑定分类流程版本", "历史数据或未配置交付规则的需求不能判定自动完成与可发布资格");
     private final UnifiedWorkItemMapper mapper;
     private final ProductLineMapper productLines;
     private final WorkItemCompletionService completion;
+    private final WorkItemCategoryService categories;
 
-    public UnifiedWorkItemService(UnifiedWorkItemMapper mapper, ProductLineMapper productLines,WorkItemCompletionService completion) {
+    public UnifiedWorkItemService(UnifiedWorkItemMapper mapper, ProductLineMapper productLines,WorkItemCompletionService completion,WorkItemCategoryService categories) {
         this.mapper = mapper;
         this.productLines = productLines;
         this.completion=completion;
+        this.categories=categories;
     }
 
     public record Listing(PageResult<UnifiedWorkItem> page, List<String> limitations) {}
@@ -46,7 +47,7 @@ public class UnifiedWorkItemService {
 
     public Listing list(String lineId, String versionId, String category, String keyword, int page, int size) {
         requireLine(lineId);
-        if (!category.isBlank() && !CATEGORIES.contains(category)) throw new IllegalArgumentException("不支持的工作项分类");
+        if (!category.isBlank()) categories.requireByCode(category,false);
         if (!versionId.isBlank()) requireVersion(lineId, versionId);
         int safePage = Math.max(1, page);
         int safeSize = Math.max(1, Math.min(100, size));

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Drawer, Input, Popconfirm, Select, Switch } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { ProductLine, ProductLineWorkItemType } from '../../types';
-import { AutomationLog, AutomationRule, productRepository } from '../../services/productRepository';
+import { AutomationLog, AutomationRule, productRepository, type WorkItemTemplateType } from '../../services/productRepository';
 import { useApp } from '../../context/AppContext';
 
 type RuleDraft = Omit<AutomationRule, 'id' | 'revision' | 'updatedAt'>;
@@ -27,7 +27,9 @@ const relativeTime = (value?: string) => {
   return new Date(value).toLocaleString('zh-CN', { hour12: false });
 };
 
-export const AutomationRulesPanel: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
+export const AutomationRulesPanel: React.FC<{ productLine?: ProductLine; scope?: 'template' | 'product' }> = ({ productLine, scope = 'product' }) => {
+  const template = scope === 'template';
+  const lineId = productLine?.id || '';
   const { addToast } = useApp();
   const [rules, setRules] = useState<AutomationRule[]>([]);
   const [types, setTypes] = useState<ProductLineWorkItemType[]>([]);
@@ -49,12 +51,15 @@ export const AutomationRulesPanel: React.FC<{ productLine: ProductLine }> = ({ p
     setLoading(true);
     try {
       const [overview, allTypes, nextLogs] = await Promise.all([
-        productRepository.automationRules(productLine.id), productRepository.workItemTypes(productLine.id), productRepository.automationLogs(productLine.id)
+        template ? productRepository.automationTemplate() : productRepository.automationRules(lineId),
+        template ? productRepository.workItemTemplate() : productRepository.workItemTypes(lineId),
+        template ? Promise.resolve([] as AutomationLog[]) : productRepository.automationLogs(lineId)
       ]);
       const workflowEntries = await Promise.all(allTypes.map(async (type) => {
         try {
-          const workflows = await productRepository.typeWorkflows(productLine.id, type.id);
-          const current = workflows.find((workflow) => workflow.status === 'PUBLISHED');
+          const templateWorkflow = template ? (type as WorkItemTemplateType).workflow : undefined;
+          const workflows = template ? [templateWorkflow] : await productRepository.typeWorkflows(lineId, type.id);
+          const current = workflows.find((workflow) => workflow?.status === 'PUBLISHED') || templateWorkflow;
           return [type.id, (current?.definition.states || []).map((state) => ({ key: String(state.key), name: String(state.name) }))] as const;
         } catch { return [type.id, []] as const; }
       }));
@@ -67,7 +72,7 @@ export const AutomationRulesPanel: React.FC<{ productLine: ProductLine }> = ({ p
       addToast('error', '自动化规则读取失败', error instanceof Error ? error.message : '请稍后重试');
     } finally { setLoading(false); }
   };
-  useEffect(() => { void load(); }, [productLine.id]);
+  useEffect(() => { void load(); }, [lineId, template]);
 
   const openCreate = () => { setEditing(null); setDraft(emptyRule()); setStates([]); setConditions([]); setActions([defaultAction()]); setOpen(true); };
   const openEdit = (rule: AutomationRule) => {
@@ -100,8 +105,11 @@ export const AutomationRulesPanel: React.FC<{ productLine: ProductLine }> = ({ p
         : selectedAction.type === 'DISPATCH_REQUIREMENT_TASKS' ? { designTypeId: defaults('设计'), devTypeId: defaults('研发'), testTypeId: defaults('测试') }
         : selectedAction.type === 'SET_ACTUAL_START_TIME' ? {} : { actions };
       const body = { ...draft, name: draft.name.trim(), conditionType: conditions.length ? 'MULTI' as const : 'NONE' as const, conditionValue: '', conditions, actionType: actions.length > 1 ? 'MULTI' as const : selectedAction.type, actions, actionConfig: nextActionConfig };
-      if (editing) await productRepository.updateAutomationRule(productLine.id, editing.id, { ...body, revision: editing.revision });
-      else await productRepository.createAutomationRule(productLine.id, body);
+      if (editing) {
+        if (template) await productRepository.updateAutomationTemplateRule(editing.id, { ...body, revision: editing.revision });
+        else await productRepository.updateAutomationRule(lineId, editing.id, { ...body, revision: editing.revision });
+      } else if (template) await productRepository.createAutomationTemplateRule(body);
+      else await productRepository.createAutomationRule(lineId, body);
       addToast('success', editing ? '自动化规则已更新' : '自动化规则已创建');
       setOpen(false);
       await load();
@@ -109,7 +117,7 @@ export const AutomationRulesPanel: React.FC<{ productLine: ProductLine }> = ({ p
     finally { setLoading(false); }
   };
   const toggleRule = async (rule: AutomationRule, enabled: boolean) => {
-    try { await productRepository.updateAutomationRule(productLine.id, rule.id, { ...rule, enabled, actionConfig: actionConfig(rule.actionConfig) }); await load(); }
+    try { if (template) await productRepository.updateAutomationTemplateRule(rule.id, { ...rule, enabled, actionConfig: actionConfig(rule.actionConfig) }); else await productRepository.updateAutomationRule(lineId, rule.id, { ...rule, enabled, actionConfig: actionConfig(rule.actionConfig) }); await load(); }
     catch (error) { addToast('error', '规则状态更新失败', error instanceof Error ? error.message : '请稍后重试'); }
   };
 
@@ -134,13 +142,13 @@ export const AutomationRulesPanel: React.FC<{ productLine: ProductLine }> = ({ p
 
   return <div className="mx-auto w-full max-w-5xl space-y-4 text-xs">
     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border-main)] pb-4">
-      <div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--active-text)]"><ThunderboltOutlined /></span><div className="min-w-0"><h3 className="text-sm font-bold text-[var(--text-primary)]">跨工种自动联动引擎</h3><p className="mt-1 truncate text-[var(--text-muted)]">统一控制当前产品线的状态触发和后续动作。</p></div><Switch checked={globalEnabled} checkedChildren="已开启" unCheckedChildren="已暂停" onChange={async (enabled) => { try { await productRepository.updateAutomationSetting(productLine.id, enabled); setGlobalEnabled(enabled); } catch (error) { addToast('error', '全局开关更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /></div>
+      <div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--active-text)]"><ThunderboltOutlined /></span><div className="min-w-0"><h3 className="text-sm font-bold text-[var(--text-primary)]">跨工种自动联动引擎</h3><p className="mt-1 truncate text-[var(--text-muted)]">{template ? '新产品创建时继承这里的初始规则。' : '统一控制当前产品线的状态触发和后续动作。'}</p></div><Switch checked={globalEnabled} checkedChildren="已开启" unCheckedChildren="已暂停" onChange={async (enabled) => { try { if (template) await productRepository.updateAutomationTemplateSetting(enabled); else await productRepository.updateAutomationSetting(lineId, enabled); setGlobalEnabled(enabled); } catch (error) { addToast('error', '全局开关更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /></div>
       <div className="flex items-center gap-2"><Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建规则</Button></div>
     </div>
-    <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center border-b border-[var(--border-main)]"><button type="button" onClick={() => setView('rules')} className={`h-10 border-b-2 px-4 text-sm ${view === 'rules' ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)]'}`}>规则大盘</button><button type="button" onClick={() => setView('logs')} className={`h-10 border-b-2 px-4 text-sm ${view === 'logs' ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)]'}`}>执行日志</button></div>{view === 'rules' && <div className="flex items-center gap-2"><Input className="w-64" prefix={<SearchOutlined />} value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索规则名称" allowClear /><Select className="w-32" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'ALL', label: '全部状态' }, { value: 'ENABLED', label: '已启用' }, { value: 'DISABLED', label: '已停用' }]} /></div>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center border-b border-[var(--border-main)]"><button type="button" onClick={() => setView('rules')} className={`h-10 border-b-2 px-4 text-sm ${view === 'rules' ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)]'}`}>规则大盘</button>{!template && <button type="button" onClick={() => setView('logs')} className={`h-10 border-b-2 px-4 text-sm ${view === 'logs' ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)]'}`}>执行日志</button>}</div>{view === 'rules' && <div className="flex items-center gap-2"><Input className="w-64" prefix={<SearchOutlined />} value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索规则名称" allowClear /><Select className="w-32" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'ALL', label: '全部状态' }, { value: 'ENABLED', label: '已启用' }, { value: 'DISABLED', label: '已停用' }]} /></div>}</div>
 
     {view === 'rules' ? <><div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[900px]"><div className="grid grid-cols-[minmax(170px,1.3fr)_minmax(190px,1.4fr)_minmax(190px,1.4fr)_110px_80px_88px] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>规则名称</span><span>触发条件（When）</span><span>执行动作（Then）</span><span>最近执行</span><span>状态</span><span className="text-right">操作</span></div>{filteredRules.length ? filteredRules.map((rule) => {
-      return <div key={rule.id} className="grid grid-cols-[minmax(170px,1.3fr)_minmax(190px,1.4fr)_minmax(190px,1.4fr)_110px_80px_88px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="truncate font-medium text-[var(--text-primary)]" title={rule.name}>{rule.name}</span><span className="truncate text-[var(--text-body)]" title={`${typeName(rule.triggerTypeId)} 进入 ${stateName(rule.triggerTypeId, rule.triggerStateKey)}`}>{typeName(rule.triggerTypeId)} 进入「{stateName(rule.triggerTypeId, rule.triggerStateKey)}」</span><span className="truncate text-[var(--text-body)]">{actionName(rule)}</span><span className="text-[var(--text-muted)]">{relativeTime(latestLogByRule[rule.id]?.createdAt)}</span><Switch className="automation-rule-switch" checked={rule.enabled} disabled={!globalEnabled} onChange={(enabled) => void toggleRule(rule, enabled)} /><span className="flex justify-end gap-1"><Button type="text" icon={<EditOutlined />} title="编辑规则" aria-label={`编辑规则：${rule.name}`} onClick={() => openEdit(rule)} /><Popconfirm title="删除自动化规则" description="删除后不会再触发该规则。" okText="删除" cancelText="取消" onConfirm={async () => { try { await productRepository.deleteAutomationRule(productLine.id, rule.id); addToast('success', '自动化规则已删除'); await load(); } catch (error) { addToast('error', '自动化规则删除失败', error instanceof Error ? error.message : '请稍后重试'); } }}><Button type="text" danger icon={<DeleteOutlined />} title="删除规则" aria-label={`删除规则：${rule.name}`} /></Popconfirm></span></div>;
+      return <div key={rule.id} className="grid grid-cols-[minmax(170px,1.3fr)_minmax(190px,1.4fr)_minmax(190px,1.4fr)_110px_80px_88px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="truncate font-medium text-[var(--text-primary)]" title={rule.name}>{rule.name}</span><span className="truncate text-[var(--text-body)]" title={`${typeName(rule.triggerTypeId)} 进入 ${stateName(rule.triggerTypeId, rule.triggerStateKey)}`}>{typeName(rule.triggerTypeId)} 进入「{stateName(rule.triggerTypeId, rule.triggerStateKey)}」</span><span className="truncate text-[var(--text-body)]">{actionName(rule)}</span><span className="text-[var(--text-muted)]">{template ? '新产品继承后执行' : relativeTime(latestLogByRule[rule.id]?.createdAt)}</span><Switch className="automation-rule-switch" checked={rule.enabled} disabled={!globalEnabled} onChange={(enabled) => void toggleRule(rule, enabled)} /><span className="flex justify-end gap-1"><Button type="text" icon={<EditOutlined />} title="编辑规则" aria-label={`编辑规则：${rule.name}`} onClick={() => openEdit(rule)} /><Popconfirm title="删除自动化规则" description={template ? '删除后新产品不再继承该规则。' : '删除后不会再触发该规则。'} okText="删除" cancelText="取消" onConfirm={async () => { try { if (template) await productRepository.deleteAutomationTemplateRule(rule.id); else await productRepository.deleteAutomationRule(lineId, rule.id); addToast('success', '自动化规则已删除'); await load(); } catch (error) { addToast('error', '自动化规则删除失败', error instanceof Error ? error.message : '请稍后重试'); } }}><Button type="text" danger icon={<DeleteOutlined />} title="删除规则" aria-label={`删除规则：${rule.name}`} /></Popconfirm></span></div>;
     }) : <div className="px-4 py-12 text-center text-[var(--text-muted)]">{loading ? '正在读取规则...' : '暂无匹配的自动化规则'}</div>}</div></div><div className="text-right text-[11px] text-[var(--text-muted)]">共 {filteredRules.length} 条规则</div></> : <div className="overflow-hidden rounded-md border border-[var(--border-main)]"><div className="grid grid-cols-[180px_160px_100px_minmax(180px,1fr)] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>执行时间</span><span>工作项</span><span>结果</span><span>说明</span></div>{logs.length ? logs.map((log) => <div key={log.id} className="grid grid-cols-[180px_160px_100px_minmax(180px,1fr)] gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span>{new Date(log.createdAt).toLocaleString('zh-CN', { hour12: false })}</span><span className="truncate">{log.workItemId}</span><span>{log.result === 'SUCCESS' ? '成功' : '失败'}</span><span className="truncate" title={log.detail}>{log.detail || '暂无说明'}</span></div>) : <div className="px-4 py-12 text-center text-[var(--text-muted)]">暂无执行日志</div>}</div>}
 
     <Drawer width={680} open={open} onClose={() => setOpen(false)} destroyOnClose={false} title={editing ? `编辑规则 · ${editing.name}` : '新建自动化规则'} footer={<div className="flex justify-end gap-2"><Button onClick={() => setOpen(false)}>取消</Button><Button type="primary" loading={loading} onClick={() => void save()}>保存规则</Button></div>}>

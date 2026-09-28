@@ -6,7 +6,11 @@ import type { SaveVersionReviewInput, VersionReview, VersionReviewListItem } fro
 
 type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
-export type WorkItemCategoryKey = 'requirement' | 'design' | 'dev' | 'test' | 'bug' | 'case';
+export type WorkItemCategoryKey = string;
+export type WorkItemCategoryDefinition = { id: string; code: WorkItemCategoryKey; name: string; displayName: string; iconKey: string; capabilityType: 'STANDARD' | 'TEST_CASE'; sort: number; enabled: boolean; builtIn: boolean; revision: number };
+export type WorkItemFieldScene = 'CREATE' | 'CREATE_CHILD' | 'LIST' | 'ITERATION';
+export type WorkItemFieldConfiguration = { fieldCode: string; label: string; fieldType: string; visible: boolean; required: boolean; sort: number; locked: boolean };
+export type WorkItemFieldConfigurationSet = { categoryCode: string; scenes: Array<{ scene: WorkItemFieldScene; fields: WorkItemFieldConfiguration[] }> };
 export type WorkItemWorkflow = {
   id: string;
   category: WorkItemCategoryKey;
@@ -48,6 +52,8 @@ export type AutomationRule = {
   revision: number; updatedAt?: string;
 };
 export type AutomationLog = { id: string; ruleId: string; workItemId: string; result: string; detail?: string; createdAt: string };
+export type NotificationEvent = 'ASSIGNED' | 'STATUS_CHANGED' | 'COMMENTED' | 'DELETED' | 'REPLIED' | 'MENTIONED' | 'CC_ADDED' | 'PARTICIPANT_ADDED';
+export type NotificationSettings = { rules: Array<{ event: NotificationEvent; recipients: string[]; channels: Array<'IN_APP' | 'DINGTALK'> }> };
 
 const specialTaskPath = (kind: SpecialTaskKind) => kind === 'bug' ? '/api/bugs' : '/api/dev-tasks';
 const businessTaskPath = (kind: BusinessTaskKind) => `/api/${kind}-tasks`;
@@ -55,7 +61,17 @@ const querySuffix = (values: Record<string,string|number>) => { const value = ne
 const page = <T>(value: PageResult<T> | T[]): PageResult<T> => Array.isArray(value) ? ({ items: value, page: 1, pageSize: value.length || 20, total: value.length }) : value;
 
 export const productRepository = {
+  workItemCategories: () => apiRequest<WorkItemCategoryDefinition[]>('/api/work-item-categories'),
+  createWorkItemCategory: (body: Pick<WorkItemCategoryDefinition, 'code' | 'name' | 'displayName' | 'iconKey' | 'capabilityType' | 'sort' | 'enabled'>) => apiRequest<{ id: string; code: string }>('/api/work-item-categories', { method: 'POST', body: JSON.stringify(body) }),
+  updateWorkItemCategory: (id: string, body: Partial<Pick<WorkItemCategoryDefinition, 'name' | 'displayName' | 'iconKey' | 'capabilityType' | 'sort' | 'enabled'>>) => apiRequest<void>(`/api/work-item-categories/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteWorkItemCategory: (id: string) => apiRequest<void>(`/api/work-item-categories/${id}`, { method: 'DELETE' }),
+  workItemFieldConfigurations: (categoryCode: string) => apiRequest<WorkItemFieldConfigurationSet>(`/api/work-item-field-configurations?categoryCode=${encodeURIComponent(categoryCode)}`),
+  saveWorkItemFieldConfigurations: (categoryCode: string, scene: WorkItemFieldScene, fields: WorkItemFieldConfiguration[]) => apiRequest<WorkItemFieldConfigurationSet>(`/api/work-item-field-configurations/${encodeURIComponent(categoryCode)}/${scene}`, { method: 'PUT', body: JSON.stringify({ fields }) }),
   workItemTemplate: () => apiRequest<WorkItemTemplateType[]>('/api/work-item-template'),
+  notificationTemplate: () => apiRequest<NotificationSettings>('/api/notification-template'),
+  saveNotificationTemplate: (body: NotificationSettings) => apiRequest<NotificationSettings>('/api/notification-template', { method: 'PUT', body: JSON.stringify(body) }),
+  productNotificationSettings: (id: string) => apiRequest<NotificationSettings>(`/api/product-lines/${id}/notification-settings`),
+  saveProductNotificationSettings: (id: string, body: NotificationSettings) => apiRequest<NotificationSettings>(`/api/product-lines/${id}/notification-settings`, { method: 'PUT', body: JSON.stringify(body) }),
   createWorkItemTemplateType: (body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'> & { workflow: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> }) => apiRequest<{ id: string }>('/api/work-item-template/types', { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItemTemplateType: (id: string, body: Partial<Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'>>) => apiRequest<void>(`/api/work-item-template/types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteWorkItemTemplateType: (id: string) => apiRequest<void>(`/api/work-item-template/types/${id}`, { method: 'DELETE' }),
@@ -79,6 +95,11 @@ export const productRepository = {
   updateWorkflow: (id: string, workflowId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision: number }) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(body) }),
   publishWorkflow: (id: string, workflowId: string, revision: number) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}/publish`, { method: 'POST', body: JSON.stringify({ revision }) }),
   automationRules: (id: string, keyword = '') => apiRequest<{ enabled: boolean; rules: AutomationRule[] }>(`/api/product-lines/${id}/automation-rules?keyword=${encodeURIComponent(keyword)}`),
+  automationTemplate: () => apiRequest<{ enabled: boolean; rules: AutomationRule[] }>('/api/automation-template/rules'),
+  createAutomationTemplateRule: (body: Omit<AutomationRule, 'id' | 'revision' | 'updatedAt'>) => apiRequest<AutomationRule>('/api/automation-template/rules', { method: 'POST', body: JSON.stringify(body) }),
+  updateAutomationTemplateRule: (ruleId: string, body: Omit<AutomationRule, 'id' | 'updatedAt'>) => apiRequest<AutomationRule>(`/api/automation-template/rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteAutomationTemplateRule: (ruleId: string) => apiRequest<void>(`/api/automation-template/rules/${ruleId}`, { method: 'DELETE' }),
+  updateAutomationTemplateSetting: (enabled: boolean) => apiRequest<{ enabled: boolean }>('/api/automation-template/setting', { method: 'PUT', body: JSON.stringify({ enabled }) }),
   createAutomationRule: (id: string, body: Omit<AutomationRule, 'id' | 'revision' | 'updatedAt'>) => apiRequest<AutomationRule>(`/api/product-lines/${id}/automation-rules`, { method: 'POST', body: JSON.stringify(body) }),
   updateAutomationRule: (id: string, ruleId: string, body: Omit<AutomationRule, 'id' | 'updatedAt'>) => apiRequest<AutomationRule>(`/api/product-lines/${id}/automation-rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteAutomationRule: (id: string, ruleId: string) => apiRequest<void>(`/api/product-lines/${id}/automation-rules/${ruleId}`, { method: 'DELETE' }),

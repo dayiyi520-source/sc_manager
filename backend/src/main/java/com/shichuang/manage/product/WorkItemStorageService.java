@@ -18,12 +18,13 @@ public class WorkItemStorageService {
     private final WorkItemStorageMapper mapper;
     private final WorkItemAccess access;
     private final WorkItemConfigurationService configurations;
-    public WorkItemStorageService(WorkItemStorageMapper mapper,WorkItemAccess access,WorkItemConfigurationService configurations) {
-        this.mapper=mapper; this.access=access; this.configurations=configurations;
+    private final WorkItemCategoryService categories;
+    public WorkItemStorageService(WorkItemStorageMapper mapper,WorkItemAccess access,WorkItemConfigurationService configurations,WorkItemCategoryService categories) {
+        this.mapper=mapper; this.access=access; this.configurations=configurations;this.categories=categories;
     }
     @Transactional public Map<String,Object> create(CreateItem body) {
         access.check(body.productLineId(),true);
-        category(body.category()); required(body.title(),"标题",255); required(body.requestId(),"请求标识",64);
+        categories.requireByCode(body.category(),true); required(body.title(),"标题",255); required(body.requestId(),"请求标识",64);
         if (body.priority()==null || !Set.of("P0","P1","P2","P3").contains(body.priority())) throw new IllegalArgumentException("优先级必须为P0至P3");
         if ((body.description()!=null && body.description().length()>200000) || (body.descriptionHtml()!=null && body.descriptionHtml().length()>500000)
             || (body.expectedGoal()!=null && body.expectedGoal().length()>10000))

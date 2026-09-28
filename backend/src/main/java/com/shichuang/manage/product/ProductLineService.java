@@ -16,8 +16,10 @@ public class ProductLineService {
  private final WorkItemAccess workItemAccess;
  private final WorkItemConfigurationService workItemConfigurations;
  private final WorkItemTemplateMapper templateMapper;
+ private final NotificationSettingsService notificationSettings;
+ private final AutomationTemplateService automationTemplates;
  private final ObjectMapper json;
- public ProductLineService(ProductLineMapper mapper,RequirementService requirementService,WorkItemAccess workItemAccess,WorkItemConfigurationService workItemConfigurations,WorkItemTemplateMapper templateMapper,ObjectMapper json){this.mapper=mapper;this.requirementService=requirementService;this.workItemAccess=workItemAccess;this.workItemConfigurations=workItemConfigurations;this.templateMapper=templateMapper;this.json=json;}
+ public ProductLineService(ProductLineMapper mapper,RequirementService requirementService,WorkItemAccess workItemAccess,WorkItemConfigurationService workItemConfigurations,WorkItemTemplateMapper templateMapper,NotificationSettingsService notificationSettings,AutomationTemplateService automationTemplates,ObjectMapper json){this.mapper=mapper;this.requirementService=requirementService;this.workItemAccess=workItemAccess;this.workItemConfigurations=workItemConfigurations;this.templateMapper=templateMapper;this.notificationSettings=notificationSettings;this.automationTemplates=automationTemplates;this.json=json;}
  public List<Map<String,Object>> list(String keyword){
   AuthorizationService.requireRead("product");
   String tenant=RequestContext.tenantId();
@@ -53,7 +55,8 @@ public class ProductLineService {
   if(members.stream().noneMatch(member -> ownerUserId.equals(memberUserId(member)))) members.add(0,Map.of("userId",ownerUserId,"role","管理员"));
    replaceMembers(id,members);
    for(String field:List.of("requirementOwnerUserId","requirementOwnerSecondaryUserId","techOwnerUserId","techOwnerSecondaryUserId","testOwnerUserId","testOwnerSecondaryUserId")){String userId=Objects.toString(b.get(field),"");if(!userId.isBlank()&&!mapper.activeMemberUser(RequestContext.tenantId(),id,userId))throw new IllegalArgumentException("责任人必须从产品线成员中选择");}
-   if(Boolean.TRUE.equals(b.get("initializeWorkItemTemplate"))) initializeWorkItemTemplate(id);
+   if(Boolean.TRUE.equals(b.get("initializeWorkItemTemplate"))) automationTemplates.copyToProduct(id,initializeWorkItemTemplate(id));
+   notificationSettings.copyToProduct(id);
    return Map.of("id",id,"code",code);
  }
  @Transactional public void update(String id,Map<String,Object>b){requireWriteLine(id); if(b.containsKey("sort")) validateSort(b.get("sort")); if(b.containsKey("visibility") && !Set.of("公开","私密","仅创建者可见").contains(String.valueOf(b.get("visibility")))) throw new IllegalArgumentException("可见范围无效"); if(b.containsKey("status") && !Set.of("启用中","已停用").contains(String.valueOf(b.get("status")))) throw new IllegalArgumentException("状态无效"); if(b.containsKey("website")) b.put("website",normalizeWebsite(b.get("website"))); Map<String,Object> before=mapper.find(RequestContext.tenantId(),id); if(before==null) throw new NoSuchElementException("产品线不存在"); resolveResponsibility(b,"ownerUserId","ownerName",false,id); resolveResponsibility(b,"requirementOwnerUserId","requirementOwner",false,id); resolveResponsibility(b,"requirementOwnerSecondaryUserId","requirementOwnerSecondary",false,id); resolveResponsibility(b,"techOwnerUserId","techOwner",false,id); resolveResponsibility(b,"techOwnerSecondaryUserId","techOwnerSecondary",false,id); resolveResponsibility(b,"testOwnerUserId","testOwner",false,id); resolveResponsibility(b,"testOwnerSecondaryUserId","testOwnerSecondary",false,id); if(b.containsKey("ownerUserId")&&Objects.toString(b.get("ownerUserId"),"").isBlank())throw new IllegalArgumentException("产品线负责人不能为空"); if(mapper.update(RequestContext.tenantId(),id,b,RequestContext.userId())==0) throw new NoSuchElementException("产品线不存在"); if(mapper.updateSecondaryResponsibility(RequestContext.tenantId(),id,b,RequestContext.userId())==0) throw new NoSuchElementException("产品线不存在"); if(b.containsKey("sort")) mapper.updateSort(RequestContext.tenantId(),id,((Number)b.get("sort")).intValue(),RequestContext.userId()); if(b.containsKey("ownerUserId"))ensureOwnerMember(id,Objects.toString(b.get("ownerUserId"),""),Objects.toString(b.get("ownerName"),"")); recordChanges(id,b,before); if(b.get("members") instanceof List<?> members) replaceMembers(id,members);}
@@ -75,8 +78,9 @@ public class ProductLineService {
  }
   @Transactional public void updateWorkItemType(String id,String typeId,Map<String,Object>b){workItemAccess.check(id,true);requireLine(id); String tenant=RequestContext.tenantId(),user=RequestContext.userId(); mapper.lockLine(tenant,id); Map<String,Object> current=mapper.workItemType(tenant,id,typeId); if(current==null) throw new NoSuchElementException("工作项类型不存在"); boolean categoryChanged=b.containsKey("category")&&!Objects.equals(b.get("category"),current.get("category")); if(categoryChanged&&mapper.workItemTypeReferenced(tenant,typeId)) throw new IllegalArgumentException("已使用的任务类型不能更换分类"); if(b.containsKey("category")&&!Set.of("需求","设计","研发","测试","缺陷","用例").contains(String.valueOf(b.get("category")))) throw new IllegalArgumentException("工作项类型分类无效"); if(b.containsKey("name")&&String.valueOf(b.get("name")).trim().isBlank()) throw new IllegalArgumentException("工作项类型名称不能为空"); boolean enabled=b.containsKey("enabled")?Boolean.TRUE.equals(b.get("enabled")):WorkItemConfigurationService.enabled(current.get("enabled")); boolean defaultRequested=b.containsKey("isDefault")?Boolean.TRUE.equals(b.get("isDefault")):WorkItemConfigurationService.enabled(current.get("isDefault")); if(!enabled)b.put("isDefault",false); else if(categoryChanged&&defaultRequested)b.put("isDefault",true); boolean setDefault=enabled&&Boolean.TRUE.equals(b.get("isDefault")); if(setDefault)mapper.clearDefaultWorkItemType(tenant,id,Objects.toString(b.getOrDefault("category",current.get("category"))),user); if(mapper.updateWorkItemType(tenant,id,typeId,b,user)==0) throw new NoSuchElementException("工作项类型不存在"); mapper.addActivity(tenant,id,"修改工作项类型",String.valueOf(b.getOrDefault("name",current.get("name"))),RequestContext.operatorName()); }
   @Transactional public void deleteWorkItemType(String id,String typeId){workItemAccess.check(id,true);requireLine(id); if(mapper.workItemTypeReferenced(RequestContext.tenantId(),typeId)) throw new IllegalArgumentException("已使用的任务类型不能删除，请停用"); Map<String,Object> current=mapper.workItemType(RequestContext.tenantId(),id,typeId); if(current==null || mapper.deleteWorkItemType(RequestContext.tenantId(),id,typeId,RequestContext.userId())==0) throw new NoSuchElementException("工作项类型不存在"); mapper.addActivity(RequestContext.tenantId(),id,"删除工作项类型",String.valueOf(current.get("name")),RequestContext.operatorName()); }
- private void initializeWorkItemTemplate(String id){
+ private Map<String,String> initializeWorkItemTemplate(String id){
    Map<String,String> typeIds=new HashMap<>();
+   Map<String,String> templateIds=new HashMap<>();
    List<Map<String,Object>> configured=templateMapper.types(RequestContext.tenantId());
    if(configured.isEmpty()) {
     for(WorkItemTemplate.Type type:WorkItemTemplate.types()) configured.add(new HashMap<>(Map.of("id",type.name(),"category",type.category(),"name",type.name(),"description","","enabled",true,"isDefault",type.isDefault(),"workflow",WorkItemTemplate.workflow(type))));
@@ -97,10 +101,12 @@ public class ProductLineService {
     }
     Map<String,Object> created=addWorkItemTypeWithWorkflow(id,new WorkItemDefinition.CreateWorkItemType(category,String.valueOf(type.get("name")),String.valueOf(type.getOrDefault("description","")),WorkItemTemplateService.asBoolean(type.get("enabled")),WorkItemTemplateService.asBoolean(type.get("isDefault")),workflow));
     typeIds.put(String.valueOf(type.get("name")),created.get("id").toString());
+    templateIds.put(String.valueOf(type.get("id")),created.get("id").toString());
    }
    String parentTypeId=typeIds.get("测试任务");
    if(parentTypeId!=null) for(String childName:List.of("用例编写","测试任务","测试验收","安全测试","回归测试")) if(typeIds.containsKey(childName))
     workItemConfigurations.childRule(id,new WorkItemDefinition.ChildRule(parentTypeId,typeIds.get(childName),true));
+   return templateIds;
  }
  public List<Map<String,Object>> versions(String id){requireReadLine(id); return mapper.versions(RequestContext.tenantId(),id);}
  @Transactional public void addVersion(String id,Map<String,Object> input){

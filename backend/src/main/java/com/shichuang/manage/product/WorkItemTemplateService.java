@@ -13,7 +13,9 @@ import static com.shichuang.manage.product.WorkItemDefinition.*;
 public class WorkItemTemplateService {
     private final WorkItemTemplateMapper mapper;
     private final ObjectMapper json;
-    public WorkItemTemplateService(WorkItemTemplateMapper mapper, ObjectMapper json) { this.mapper = mapper; this.json = json; }
+    private final AutomationTemplateService automationTemplates;
+    private final WorkItemCategoryService categories;
+    public WorkItemTemplateService(WorkItemTemplateMapper mapper, ObjectMapper json, AutomationTemplateService automationTemplates,WorkItemCategoryService categories) { this.mapper = mapper; this.json = json; this.automationTemplates=automationTemplates;this.categories=categories; }
     @Transactional
     public List<Map<String,Object>> list() {
         AuthorizationService.requireRead("product");
@@ -27,18 +29,19 @@ public class WorkItemTemplateService {
     }
     @Transactional public void updateType(String id, Map<String,Object> body) {
         AuthorizationService.requireWrite("product"); requireType(id); String tenant=RequestContext.tenantId(), user=RequestContext.userId();
-        if (body.containsKey("category") && !CATEGORIES.containsKey(String.valueOf(body.get("category")))) throw new IllegalArgumentException("工作项分类无效");
+        if(Boolean.FALSE.equals(body.get("enabled"))) automationTemplates.requireUnreferenced(id,null);
+        if (body.containsKey("category")) categories.requireByTemplateCategory(String.valueOf(body.get("category")),true);
         if (body.containsKey("name") && Objects.toString(body.get("name"),"").trim().isBlank()) throw new IllegalArgumentException("工作项类型名称不能为空");
         if (Boolean.TRUE.equals(body.get("isDefault"))) mapper.clearDefaults(tenant, String.valueOf(body.getOrDefault("category", requireType(id).get("category"))), user);
         if (mapper.updateType(tenant,id,body,user)==0) throw new NoSuchElementException("模板子类型不存在");
     }
-    @Transactional public void deleteType(String id) { AuthorizationService.requireWrite("product"); requireType(id); mapper.deleteWorkflow(RequestContext.tenantId(),id,RequestContext.userId()); if(mapper.deleteType(RequestContext.tenantId(),id,RequestContext.userId())==0) throw new NoSuchElementException("模板子类型不存在"); }
-    @Transactional public void saveWorkflow(String id, SaveWorkflow body) { AuthorizationService.requireWrite("product"); Map<String,Object> type=requireType(id); validate(body); String definition=mapper.encode(body.definition()); Map<String,Object> existing=mapper.workflow(RequestContext.tenantId(),id); String name=body.name().trim(); if(existing==null) mapper.insertWorkflow(RequestContext.tenantId(),id,String.valueOf(type.get("category")),name,definition,RequestContext.userId()); else if(body.revision()==null || mapper.updateWorkflow(RequestContext.tenantId(),id,name,definition,body.revision(),RequestContext.userId())==0) throw new IllegalArgumentException("模板状态已被其他人修改，请刷新后重试"); }
+    @Transactional public void deleteType(String id) { AuthorizationService.requireWrite("product"); requireType(id); automationTemplates.requireUnreferenced(id,null); mapper.deleteWorkflow(RequestContext.tenantId(),id,RequestContext.userId()); if(mapper.deleteType(RequestContext.tenantId(),id,RequestContext.userId())==0) throw new NoSuchElementException("模板子类型不存在"); }
+    @Transactional public void saveWorkflow(String id, SaveWorkflow body) { AuthorizationService.requireWrite("product"); Map<String,Object> type=requireType(id); validate(body); String definition=mapper.encode(body.definition()); Map<String,Object> existing=mapper.workflow(RequestContext.tenantId(),id); if(existing!=null) try { Map<?,?> previous=json.readValue(Objects.toString(existing.get("definition")),Map.class); Set<String> removed=new HashSet<>(); if(previous.get("states") instanceof List<?> states) for(Object state:states) if(state instanceof Map<?,?> row && body.definition().states().stream().noneMatch(next->Objects.equals(next.key(),row.get("key")) && next.enabled())) removed.add(Objects.toString(row.get("key"))); automationTemplates.requireUnreferenced(id,removed); } catch(JsonProcessingException error){throw new IllegalStateException("模板状态格式无效",error);} String name=body.name().trim(); if(existing==null) mapper.insertWorkflow(RequestContext.tenantId(),id,String.valueOf(type.get("category")),name,definition,RequestContext.userId()); else if(body.revision()==null || mapper.updateWorkflow(RequestContext.tenantId(),id,name,definition,body.revision(),RequestContext.userId())==0) throw new IllegalArgumentException("模板状态已被其他人修改，请刷新后重试"); }
     private List<Map<String,Object>> viewAll() { List<Map<String,Object>> types=mapper.types(RequestContext.tenantId()); Map<String,Map<String,Object>> workflows=new HashMap<>(); mapper.workflows(RequestContext.tenantId()).forEach(row->{ try { Map<String,Object> copy=new LinkedHashMap<>(row); copy.put("definition",json.readValue(Objects.toString(row.get("definition")),Map.class)); workflows.put(String.valueOf(row.get("templateTypeId")),copy); } catch(JsonProcessingException e){ throw new IllegalStateException("模板状态格式无效",e); }}); types.forEach(type->{ type.put("enabled",asBoolean(type.get("enabled"))); type.put("isDefault",asBoolean(type.get("isDefault"))); type.put("workflow",workflows.get(type.get("id"))); }); return types; }
     static boolean asBoolean(Object value) { return value instanceof Boolean booleanValue ? booleanValue : value instanceof Number number ? number.intValue() != 0 : Boolean.parseBoolean(Objects.toString(value, "false")); }
     private Map<String,Object> requireType(String id) { Map<String,Object> type=mapper.type(RequestContext.tenantId(),id); if(type==null) throw new NoSuchElementException("模板子类型不存在"); return type; }
-    private void validateType(CreateWorkItemType body) { if(body==null||!CATEGORIES.containsKey(body.category())) throw new IllegalArgumentException("工作项分类无效"); required(body.name(),"工作项类型名称",128); if(body.workflow()==null) throw new IllegalArgumentException("请配置初始状态"); validate(body.workflow()); }
-    private void validate(SaveWorkflow body) { if(body==null||!CATEGORIES.containsKey(body.category())) throw new IllegalArgumentException("工作项分类无效"); required(body.name(),"流程名称",128); validate(body.definition()); }
+    private void validateType(CreateWorkItemType body) { if(body==null) throw new IllegalArgumentException("工作项分类无效"); categories.requireByTemplateCategory(body.category(),true); required(body.name(),"工作项类型名称",128); if(body.workflow()==null) throw new IllegalArgumentException("请配置初始状态"); validate(body.workflow()); }
+    private void validate(SaveWorkflow body) { if(body==null) throw new IllegalArgumentException("工作项分类无效"); categories.requireByCode(body.category(),true); required(body.name(),"流程名称",128); validate(body.definition()); }
     private void validate(Workflow definition) {
         if (definition == null || definition.states() == null || definition.states().size() < 2)
             throw new IllegalArgumentException("每个工作项类型至少保留两个状态");

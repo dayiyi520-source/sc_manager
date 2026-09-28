@@ -9,7 +9,7 @@ export type StateGroup = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLE
 export type StateTagColor = 'neutral' | 'blue' | 'cyan' | 'green' | 'yellow' | 'red' | 'purple';
 export type EditableWorkflowState = { key: string; name: string; group: StateGroup; initial: boolean; successful: boolean; enabled: boolean; stage: string; color: StateTagColor };
 
-export const CATEGORY_KEYS: Record<ProductLineWorkItemCategory, WorkItemCategoryKey> = { 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' };
+export const CATEGORY_KEYS: Record<string, WorkItemCategoryKey> = { 需求: 'requirement', 产品: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' };
 const GROUP_OPTIONS: Array<{ value: StateGroup; label: string }> = [
   { value: 'NOT_STARTED', label: '未开始' },
   { value: 'IN_PROGRESS', label: '进行中' },
@@ -27,7 +27,7 @@ const TAG_COLOR_OPTIONS: Array<{ value: StateTagColor; label: string; token: str
 ];
 const TAG_COLOR_VALUES = new Set(TAG_COLOR_OPTIONS.map((option) => option.value));
 
-const stateStage = (category: WorkItemCategoryKey) => category === 'bug' ? 'dev' : category === 'case' ? 'test' : category;
+const stateStage = (category: WorkItemCategoryKey) => category === 'bug' ? 'dev' : category === 'case' ? 'test' : ['requirement', 'design', 'dev', 'test'].includes(category) ? category : 'requirement';
 const createKey = () => `status_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 export const createDefaultWorkItemStates = (category: WorkItemCategoryKey): EditableWorkflowState[] => category === 'case' ? [
   { key: 'status_pending', name: '待测试', group: 'NOT_STARTED', initial: true, successful: false, enabled: true, stage: 'test', color: 'neutral' },

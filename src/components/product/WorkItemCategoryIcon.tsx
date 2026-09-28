@@ -1,7 +1,7 @@
 import React from 'react';
 import { BgColorsOutlined, BugOutlined, CodeOutlined, CustomerServiceOutlined, ExperimentOutlined, FileTextOutlined } from '@ant-design/icons';
 
-export type WorkItemCategoryIconKey = 'assistance' | 'requirement' | 'design' | 'dev' | 'test' | 'bug';
+export type WorkItemCategoryIconKey = 'assistance' | 'requirement' | 'design' | 'dev' | 'test' | 'bug' | 'case';
 
 const icons = {
   assistance: CustomerServiceOutlined,
@@ -9,7 +9,8 @@ const icons = {
   design: BgColorsOutlined,
   dev: CodeOutlined,
   test: ExperimentOutlined,
-  bug: BugOutlined
+  bug: BugOutlined,
+  case: ExperimentOutlined
 } satisfies Record<WorkItemCategoryIconKey, React.ComponentType<{ className?: string }>>;
 
 export const WorkItemCategoryIcon: React.FC<{ category: string; className?: string }> = ({ category, className }) => {

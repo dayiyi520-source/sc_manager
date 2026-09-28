@@ -121,7 +121,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     icon: 'Settings',
     subMenus: [
       { id: 'team_org', title: '团队组织', mainMenuId: 'system', icon: 'Users' },
-      { id: 'sys_work_items', title: '工作项模版', mainMenuId: 'system', icon: 'Appstore' },
+      { id: 'sys_work_items', title: '产研模板', mainMenuId: 'system', icon: 'Appstore' },
       { id: 'sys_settings', title: '系统设置', mainMenuId: 'system', icon: 'Sliders' }
     ]
   }

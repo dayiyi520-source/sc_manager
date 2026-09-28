@@ -13,7 +13,7 @@ public class WorkItemTemplateMapper {
     public WorkItemTemplateMapper(JdbcTemplate jdbc, ObjectMapper json) { this.jdbc = jdbc; this.json = json; }
 
     List<Map<String,Object>> types(String tenant) {
-        return jdbc.queryForList("SELECT id_ AS id,category_ AS category,name_ AS name,description_ AS description,enabled_ AS enabled,is_default_ AS isDefault,version_ AS revision FROM t_work_item_template_type WHERE tenant_id_=? AND delete_flag_=0 ORDER BY category_,is_default_ DESC,create_time_,id_", tenant);
+        return jdbc.queryForList("SELECT t.id_ AS id,t.category_ AS category,t.name_ AS name,t.description_ AS description,COALESCE(u.name_,t.create_by_) AS creatorName,t.create_time_ AS createdAt,t.enabled_ AS enabled,t.is_default_ AS isDefault,t.version_ AS revision FROM t_work_item_template_type t LEFT JOIN t_sys_user u ON u.tenant_id_=t.tenant_id_ AND u.id_=t.create_by_ AND u.delete_flag_=0 WHERE t.tenant_id_=? AND t.delete_flag_=0 ORDER BY t.category_,t.is_default_ DESC,t.create_time_,t.id_", tenant);
     }
     Map<String,Object> type(String tenant, String id) {
         List<Map<String,Object>> rows = jdbc.queryForList("SELECT id_ AS id,category_ AS category,name_ AS name,description_ AS description,enabled_ AS enabled,is_default_ AS isDefault,version_ AS revision FROM t_work_item_template_type WHERE tenant_id_=? AND id_=? AND delete_flag_=0", tenant, id);

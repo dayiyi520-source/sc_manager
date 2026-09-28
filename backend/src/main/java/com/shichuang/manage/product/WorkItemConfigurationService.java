@@ -16,8 +16,9 @@ public class WorkItemConfigurationService {
     private final WorkItemStorageMapper mapper;
     private final WorkItemAccess access;
     private final ObjectMapper json;
-    public WorkItemConfigurationService(WorkItemStorageMapper mapper,WorkItemAccess access,ObjectMapper json) {
-        this.mapper=mapper; this.access=access; this.json=json;
+    private final WorkItemCategoryService categories;
+    public WorkItemConfigurationService(WorkItemStorageMapper mapper,WorkItemAccess access,ObjectMapper json,WorkItemCategoryService categories) {
+        this.mapper=mapper; this.access=access; this.json=json;this.categories=categories;
     }
     public List<Map<String,Object>> workflows(String line) {
         access.check(line,false);
@@ -33,7 +34,7 @@ public class WorkItemConfigurationService {
     }
     @Transactional public Map<String,Object> save(String line,String taskTypeId,String id,SaveWorkflow body) {
         access.check(line,true);
-        category(body.category()); required(body.name(),"流程名称",128); validate(body.definition());
+        categories.requireByCode(body.category(),true); required(body.name(),"流程名称",128); validate(body.definition());
         if(taskTypeId!=null) requireType(line,taskTypeId,body.category(),false);
         validateApproval(line,body.category(),body.definition(),false);
         String tenant=RequestContext.tenantId(), user=RequestContext.userId();
@@ -90,7 +91,7 @@ public class WorkItemConfigurationService {
         required(id,"任务类型",36);
         Map<String,Object> type=mapper.type(RequestContext.tenantId(),line,id);
         if (type==null || (requireEnabled && !enabled(type.get("enabled")))) throw new IllegalArgumentException("任务类型不存在或已停用");
-        if (category!=null && !CATEGORIES.get(category).equals(type.get("category"))) throw new IllegalArgumentException("任务类型不属于当前分类");
+        if (category!=null && !categories.templateCategoryName(category,false).equals(type.get("category"))) throw new IllegalArgumentException("任务类型不属于当前分类");
         return type;
     }
     public Map<String,Object> requireTypeForLegacy(String line,String id,String category) {

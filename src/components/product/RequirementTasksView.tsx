@@ -979,7 +979,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     id: item.id,
     code: item.code,
     title: item.title,
-    category: item.category,
+    category: item.category as RequirementTask['category'],
     status: item.status?.name || '待处理',
     priority: item.priority || 'P2',
     ownerName: item.assigneeName || '',

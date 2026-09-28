@@ -37,7 +37,7 @@ describe('design task navigation', () => {
     const product = MENU_GROUPS.find((group) => group.id === 'product')!.subMenus;
     expect(product.some((menu) => menu.id === 'prod_reviews' || menu.id === 'prod_planning')).toBe(false);
     expect(MENU_GROUPS.find((group) => group.id === 'system')?.subMenus).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'sys_work_items', title: '工作项模版' })
+      expect.objectContaining({ id: 'sys_work_items', title: '产研模板' })
     ]));
   });
 });

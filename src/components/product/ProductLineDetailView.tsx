@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Input, Select, Button, Switch, Checkbox, Drawer, Tag } from 'antd';
+import { Input, Select, Button, Switch, Drawer, Tag } from 'antd';
 import Card from 'antd/es/card/Card';
 import { useQuery } from '@tanstack/react-query';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
@@ -45,6 +45,7 @@ import {
   WorkItemStateEditor
 } from './WorkItemStateConfigDrawer';
 import { AutomationRulesPanel } from './AutomationRulesPanel';
+import { NotificationSettingsPanel } from './NotificationSettingsPanel';
 import { normalizeProductWebsiteUrl } from './productWebsite';
 import { teamRepository } from '../../services/teamRepository';
 import { employeeJobTitle, employeeSelectOptions, PersonAvatar, PersonIdentity } from '../common/PersonIdentity';
@@ -213,7 +214,7 @@ const ProductLineSettingsPanel: React.FC<{
             </div>
           )}
           {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
-          {section === 'notifications' && <ProductLineNotificationSettings />}
+          {section === 'notifications' && <NotificationSettingsPanel scope="product" productLineId={productLine.id} />}
           {section === 'automation' && <AutomationRulesPanel productLine={productLine} />}
         </section>
       </div>
@@ -388,48 +389,6 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
       </Drawer>
       <Modal isOpen={Boolean(itemToDelete)} onClose={() => setItemToDelete(null)} title="删除工作项类型" footer={<><Button onClick={() => setItemToDelete(null)}>取消</Button><Button type="primary" danger onClick={() => void deleteItem()}>确认删除</Button></>}><p className="text-sm text-[var(--text-body)]">确定删除“{itemToDelete?.name}”吗？删除后不可恢复。</p></Modal>
       <WorkItemStateConfigDrawer productLine={productLine} item={stateConfigItem} open={Boolean(stateConfigItem)} onClose={() => setStateConfigItem(null)} />
-    </div>
-  );
-};
-
-type NotificationRecipient = { label: string; checked: boolean };
-type NotificationRule = { event: string; recipients: NotificationRecipient[] };
-
-const checkedRecipients = (labels: string[]): NotificationRecipient[] => labels.map((label) => ({ label, checked: true }));
-
-const NOTIFICATION_RULES: NotificationRule[] = [
-  { event: '需求被指派', recipients: checkedRecipients(['创建人', '负责人', '参与人', '抄送人']) },
-  { event: '状态更新', recipients: checkedRecipients(['创建人', '负责人', '参与人', '抄送人']) },
-  { event: '提交评论', recipients: checkedRecipients(['创建人', '负责人', '参与人', '抄送人']) },
-  { event: '删除', recipients: checkedRecipients(['创建人', '负责人', '参与人', '抄送人']) },
-  { event: '评论回复', recipients: checkedRecipients(['被回复人']) },
-  { event: '评论@某人', recipients: checkedRecipients(['被@人']) },
-  { event: '添加抄送', recipients: [{ label: '创建人', checked: false }, { label: '负责人', checked: false }, { label: '被添加成员', checked: true }] },
-  { event: '添加参与人', recipients: [{ label: '创建人', checked: false }, { label: '负责人', checked: false }, { label: '被添加成员', checked: true }] }
-];
-
-const ProductLineNotificationSettings: React.FC = () => {
-  const [enabledRules, setEnabledRules] = useState(() => NOTIFICATION_RULES.map(() => true));
-  const toggleRule = (index: number, checked: boolean) => setEnabledRules((previous) => previous.map((enabled, itemIndex) => itemIndex === index ? checked : enabled));
-
-  return (
-    <div className="product-line-notifications overflow-x-auto rounded-md border border-[var(--border-main)]">
-      <div className="min-w-[760px]">
-        <div className="grid grid-cols-[180px_minmax(420px,1fr)_210px] border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-sm text-[var(--text-muted)]">
-          <div className="border-r border-[var(--border-main)] px-4 py-4">事件</div>
-          <div className="border-r border-[var(--border-main)] px-4 py-4">通知对象</div>
-          <div className="px-4 py-4">站内信&amp;钉钉通知</div>
-        </div>
-        {NOTIFICATION_RULES.map((rule, index) => (
-          <div key={rule.event} className="grid min-h-20 grid-cols-[180px_minmax(420px,1fr)_210px] border-b border-[var(--border-main)] last:border-b-0">
-            <div className="flex items-center border-r border-[var(--border-main)] px-4 py-4 text-sm text-[var(--text-body)]">{rule.event}</div>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-r border-[var(--border-main)] px-4 py-4">
-              {rule.recipients.map((recipient) => <Checkbox key={recipient.label} defaultChecked={recipient.checked}>{recipient.label}</Checkbox>)}
-            </div>
-            <div className="flex items-center px-4 py-4"><Checkbox checked={enabledRules[index]} onChange={(event) => toggleRule(index, event.target.checked)} /></div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };

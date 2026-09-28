@@ -420,7 +420,7 @@ export interface ProductLineMember {
   phone?: string;
 }
 
-export type ProductLineWorkItemCategory = '需求' | '设计' | '研发' | '测试' | '缺陷' | '用例';
+export type ProductLineWorkItemCategory = '需求' | '设计' | '研发' | '测试' | '缺陷' | '用例' | (string & {});
 
 export interface ProductLineWorkItemType {
   id: string;

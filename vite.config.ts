@@ -97,6 +97,10 @@ function devApiMockPlugin() {
 }
 
 export default defineConfig(() => {
+  const researchPort = process.env.PORT === '3011' || process.argv.includes('3011');
+  const templatePreviewPort = process.env.PORT === '3014' || process.argv.includes('3014');
+  const backendTarget = process.env.VITE_BACKEND_URL
+    || (templatePreviewPort ? 'http://127.0.0.1:8084' : researchPort ? 'http://127.0.0.1:8082' : 'http://127.0.0.1:8081');
   return {
     base: process.env.VITE_BASE_PATH || '/',
     plugins: [devApiMockPlugin(), react(), tailwindcss()],
@@ -138,7 +142,7 @@ export default defineConfig(() => {
       strictPort: true,
       proxy: {
         '/api': {
-          target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8081',
+          target: backendTarget,
           changeOrigin: true,
           configure: (proxy) => {
             proxy.on('error', (_err, _req, res) => {
