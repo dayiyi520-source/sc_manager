@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Input, Modal, Popconfirm, Select, Spin, Tabs } from 'antd';
+import { Alert, Button, Input, InputNumber, Modal, Popconfirm, Select, Spin, Tabs } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, UndoOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { WorkItemModuleView } from './WorkItemModuleView';
@@ -69,11 +69,12 @@ const RolesPanel = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [responsibility, setResponsibility] = useState('');
+  const [sort, setSort] = useState<number | null>(0);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState('');
 
-  const openCreate = () => { setEditing(null); setName(''); setResponsibility(''); setModalOpen(true); };
-  const openEdit = (role: ProductRoleTemplate) => { setEditing(role); setName(role.name); setResponsibility(role.responsibility); setModalOpen(true); };
+  const openCreate = () => { setEditing(null); setName(''); setResponsibility(''); setSort(0); setModalOpen(true); };
+  const openEdit = (role: ProductRoleTemplate) => { setEditing(role); setName(role.name); setResponsibility(role.responsibility); setSort(role.sort); setModalOpen(true); };
   const closeModal = () => { if (!saving) setModalOpen(false); };
   const refreshRoles = async () => { await queryClient.invalidateQueries({ queryKey: ['product-role-templates'] }); };
 
@@ -82,10 +83,14 @@ const RolesPanel = () => {
       addToast('warning', '请填写角色名称和职责');
       return;
     }
+    if (sort === null || !Number.isInteger(sort) || sort < 0 || sort > 999) {
+      addToast('warning', '排序请输入0到999的整数');
+      return;
+    }
     setSaving(true);
     try {
-      if (editing) await productRepository.updateProductRoleTemplate(editing.id, { name: name.trim(), responsibility: responsibility.trim(), revision: editing.revision });
-      else await productRepository.createProductRoleTemplate({ name: name.trim(), responsibility: responsibility.trim() });
+      if (editing) await productRepository.updateProductRoleTemplate(editing.id, { name: name.trim(), responsibility: responsibility.trim(), sort, revision: editing.revision });
+      else await productRepository.createProductRoleTemplate({ name: name.trim(), responsibility: responsibility.trim(), sort });
       await refreshRoles();
       setModalOpen(false);
       addToast('success', editing ? '角色已更新' : '角色已创建');
@@ -112,13 +117,13 @@ const RolesPanel = () => {
   return <div className="mx-auto w-full max-w-4xl space-y-4 text-xs">
     <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">角色与职责</h3><p className="mt-1 text-[var(--text-muted)]">统一维护产品成员可选择的角色及职责。</p></div><Button type="primary" className="!h-9" icon={<PlusOutlined />} onClick={openCreate}>新建角色</Button></div>
     {rolesQuery.isError && <Alert type="error" showIcon message="角色加载失败" description="现有角色暂时无法查看，请稍后重试。" action={<Button onClick={() => rolesQuery.refetch()}>重试</Button>} />}
-    {rolesQuery.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : !rolesQuery.isError && <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
-      <div className="grid grid-cols-[minmax(130px,1fr)_minmax(200px,2fr)_120px] gap-4 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-3 text-[var(--text-muted)]"><span>角色</span><span>职责</span><span className="text-right">操作</span></div>
-      {(rolesQuery.data || []).map((role) => <div key={role.id} className="grid grid-cols-[minmax(130px,1fr)_minmax(200px,2fr)_120px] items-center gap-4 border-b border-[var(--border-main)] px-4 py-3 last:border-0"><span className="font-medium text-[var(--text-primary)]">{role.name}</span><span className="text-[var(--text-body)]">{role.responsibility}</span><span className="flex justify-end gap-1"><Button type="text" icon={<EditOutlined />} aria-label={`编辑角色 ${role.name}`} title="编辑角色" onClick={() => openEdit(role)} /><Popconfirm title="删除角色" description={`确定删除“${role.name}”吗？`} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => remove(role)}><Button type="text" danger loading={deletingId === role.id} icon={<DeleteOutlined />} aria-label={`删除角色 ${role.name}`} title="删除角色" /></Popconfirm></span></div>)}
+    {rolesQuery.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : !rolesQuery.isError && <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[640px]">
+      <div className="grid grid-cols-[minmax(130px,1fr)_minmax(200px,2fr)_72px_120px] gap-4 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-3 text-[var(--text-muted)]"><span>角色</span><span>职责</span><span>排序</span><span className="text-right">操作</span></div>
+      {(rolesQuery.data || []).map((role) => <div key={role.id} className="grid grid-cols-[minmax(130px,1fr)_minmax(200px,2fr)_72px_120px] items-center gap-4 border-b border-[var(--border-main)] px-4 py-3 last:border-0"><span className="font-medium text-[var(--text-primary)]">{role.name}</span><span className="min-w-0 break-words text-[var(--text-body)]">{role.responsibility}</span><span>{role.sort}</span><span className="flex justify-end gap-1"><Button type="text" icon={<EditOutlined />} aria-label={`编辑角色 ${role.name}`} title="编辑角色" onClick={() => openEdit(role)} /><Popconfirm title="删除角色" description={`确定删除“${role.name}”吗？`} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => remove(role)}><Button type="text" danger loading={deletingId === role.id} icon={<DeleteOutlined />} aria-label={`删除角色 ${role.name}`} title="删除角色" /></Popconfirm></span></div>)}
       {!rolesQuery.data?.length && <div className="px-4 py-10 text-center text-[var(--text-muted)]">暂无角色，请新建角色</div>}
-    </div>}
+    </div></div>}
     <Modal open={modalOpen} title={editing ? '编辑角色' : '新建角色'} onCancel={closeModal} onOk={save} okText="保存" cancelText="取消" confirmLoading={saving} destroyOnHidden>
-      <div className="space-y-4 pt-2 text-xs"><label className="block"><span className="mb-1 block text-[var(--text-body)]">角色名称 *</span><Input value={name} maxLength={32} showCount onChange={(event) => setName(event.target.value)} placeholder="请输入角色名称" /></label><label className="block"><span className="mb-1 block text-[var(--text-body)]">角色职责 *</span><Input.TextArea value={responsibility} maxLength={500} showCount rows={4} onChange={(event) => setResponsibility(event.target.value)} placeholder="请输入角色职责" /></label></div>
+      <div className="space-y-5 pb-8 pt-2 text-xs"><label className="block"><span className="mb-1 block text-[var(--text-body)]">角色名称 *</span><Input value={name} maxLength={32} showCount onChange={(event) => setName(event.target.value)} placeholder="请输入角色名称" /></label><label className="block"><span className="mb-1 block text-[var(--text-body)]">排序 *</span><InputNumber style={{ width: '100%' }} min={0} max={999} precision={0} value={sort} onChange={setSort} placeholder="0 最优先" /></label><label className="block"><span className="mb-1 block text-[var(--text-body)]">角色职责 *</span><Input.TextArea value={responsibility} maxLength={500} showCount rows={4} onChange={(event) => setResponsibility(event.target.value)} placeholder="请输入角色职责" /></label></div>
     </Modal>
   </div>;
 };

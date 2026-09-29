@@ -86,6 +86,9 @@ public class RequirementService {
         validateAssistance(body);
         Map<String,Object> created=tasks.create("requirement",body);
         String owner=text(body,"ownerName");
+        if (!text(body,"workOrderType").isBlank() && !owner.isBlank()) {
+            mapper.setAssistanceOwner(RequestContext.tenantId(), created.get("id").toString());
+        }
         if(!owner.isBlank())mapper.notifyOwner(RequestContext.tenantId(),owner,text(body,"title"),created.get("id").toString());
         return created;
     }

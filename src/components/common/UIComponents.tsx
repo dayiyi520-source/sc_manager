@@ -108,15 +108,21 @@ export const StatusTag: React.FC<{
   type?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'gold';
   className?: string;
 }> = ({ status, type, className = '' }) => {
+  const priorityLabels: Record<string, string> = {
+    P0: '紧急', P1: '高', P2: '中', P3: '低',
+    'P0-紧急阻断': '紧急', 'P0-紧急': '紧急',
+    'P1-高优': '高', 'P2-标准': '中', 'P2-普通': '中', 'P3-低优': '低'
+  };
+  const label = priorityLabels[status] || status;
   // Auto detect type if not provided
   let detectedType = type;
   if (!detectedType) {
     if (['已通过', '中标', '已发布', '已完成', '合作中', '履行中', 'healthy', '低风险', 'reviewed'].includes(status)) {
       detectedType = 'success';
-    } else if (['待审批', '招投标', '制作标书中', '进行中', '测试中', '研发中', 'warning', '中度预警', '待修复', '待评审'].includes(status)) {
-      detectedType = 'warning';
-    } else if (['已驳回', '未中标', '流标', '已终止', 'P0-紧急阻断', '致命', '严重', 'error', '严重滞后', '有逾期款项'].includes(status)) {
+    } else if (priorityLabels[status] === '紧急' || status === '紧急' || ['已驳回', '未中标', '流标', '已终止', '致命', '严重', 'error', '严重滞后', '有逾期款项'].includes(status)) {
       detectedType = 'danger';
+    } else if (priorityLabels[status] === '高' || status === '高' || ['待审批', '招投标', '制作标书中', '进行中', '处理中', '测试中', '研发中', 'warning', '中度预警', '待修复', '待评审'].includes(status)) {
+      detectedType = 'warning';
     } else if (['方案设计', '需求确认', '待处理', '设计中', '规划中', '封版测试'].includes(status)) {
       detectedType = 'info';
     } else if (['S级-战略', '战略核心伙伴', '一级'].includes(status)) {
@@ -140,7 +146,7 @@ export const StatusTag: React.FC<{
     <Tag
       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap ${styles[detectedType]} ${className}`}
     >
-      {status}
+      {label}
     </Tag>
   );
 };

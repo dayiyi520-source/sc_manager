@@ -23,8 +23,9 @@ class ProductRoleTemplateControllerIntegrationTest extends AbstractApiIntegratio
         JsonNode created = data(mockMvc.perform(post("/api/research-template/roles")
                 .header("Authorization", authorization)
                 .contentType("application/json")
-                .content(objectMapper.writeValueAsString(role(name, "协调跨团队计划"))))
+                .content(objectMapper.writeValueAsString(java.util.Map.of("name", name, "responsibility", "协调跨团队计划", "sort", 999))))
             .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.sort").value(999))
             .andExpect(jsonPath("$.data.revision").value(0))
             .andReturn().getResponse().getContentAsString());
 
@@ -36,10 +37,23 @@ class ProductRoleTemplateControllerIntegrationTest extends AbstractApiIntegratio
         JsonNode updated = data(mockMvc.perform(put("/api/research-template/roles/{id}", id)
                 .header("Authorization", authorization)
                 .contentType("application/json")
-                .content(objectMapper.writeValueAsString(role(name, "协调计划并跟踪交付", 0))))
+                .content(objectMapper.writeValueAsString(java.util.Map.of("name", name, "responsibility", "协调计划并跟踪交付", "sort", 0, "revision", 0))))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.sort").value(0))
             .andExpect(jsonPath("$.data.revision").value(1))
             .andReturn().getResponse().getContentAsString());
+
+        assertEquals(0, jdbc.queryForObject("SELECT sort_ FROM t_product_role_template WHERE id_=?", Integer.class, id));
+        mockMvc.perform(get("/api/research-template/roles").header("Authorization", authorization))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[?(@.id == '%s')].sort".formatted(id)).value(0));
+
+        for (Object sort : new Object[] {-1, 1000, 1.5, "1"}) {
+            mockMvc.perform(put("/api/research-template/roles/{id}", id)
+                    .header("Authorization", authorization).contentType("application/json")
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("name", name, "responsibility", "排序校验", "sort", sort, "revision", 1))))
+                .andExpect(status().isBadRequest());
+        }
 
         mockMvc.perform(delete("/api/research-template/roles/{id}", id)
                 .param("revision", updated.path("revision").asText())
@@ -47,6 +61,34 @@ class ProductRoleTemplateControllerIntegrationTest extends AbstractApiIntegratio
             .andExpect(status().isOk());
         assertEquals(0, jdbc.queryForObject(
             "SELECT COUNT(*) FROM t_product_role_template WHERE id_=? AND delete_flag_=0", Integer.class, id));
+    }
+
+    @Test
+    void rejectsInvalidSortAndListsByAscendingSort() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        for (Object sort : new Object[] {-1, 1000, 1.5, "1"}) {
+            mockMvc.perform(post("/api/research-template/roles")
+                    .header("Authorization", authorization).contentType("application/json")
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("name", "非法排序", "responsibility", "校验", "sort", sort))))
+                .andExpect(status().isBadRequest());
+        }
+        String suffix = String.valueOf(System.nanoTime());
+        for (int sort : new int[] {9, 0}) {
+            mockMvc.perform(post("/api/research-template/roles")
+                    .header("Authorization", authorization).contentType("application/json")
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("name", suffix + sort, "responsibility", "排序", "sort", sort))))
+                .andExpect(status().isCreated());
+        }
+        JsonNode roles = data(mockMvc.perform(get("/api/research-template/roles")
+                .header("Authorization", authorization)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString());
+        int first = -1;
+        int second = -1;
+        for (int index = 0; index < roles.size(); index++) {
+            if ((suffix + 0).equals(roles.get(index).path("name").asText())) first = index;
+            if ((suffix + 9).equals(roles.get(index).path("name").asText())) second = index;
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(first >= 0 && second > first);
     }
 
     @Test

@@ -40,7 +40,7 @@ const CUSTOMER_CATEGORIES = ['客户成功', '服务响应', '体验优化'];
 const fieldConfig = (index: number, productLineOptions: string[], projectOptions: string[], settings?: OkrSettings, department?: string): ParentFieldConfig => {
   const configuredType = settings?.templates.find(template => template.department === department)?.type;
   const type = configuredType || (index === 0 ? 'product' : index === 1 ? 'delivery' : 'support');
-  if (type === 'product') return { relationLabel: '关联产品线', relationPlaceholder: '选择产品线', relationOptions: productLineOptions, resultLabel: '需要达成的关键节点', resultPlaceholder: '选择关键节点', resultOptions: settings?.dictionaries.productNodes || MILESTONES };
+  if (type === 'product') return { relationLabel: '关联产品', relationPlaceholder: '选择产品', relationOptions: productLineOptions, resultLabel: '需要达成的关键节点', resultPlaceholder: '选择关键节点', resultOptions: settings?.dictionaries.productNodes || MILESTONES };
   if (type === 'delivery') return { relationLabel: '关联项目', relationPlaceholder: '选择项目', relationOptions: projectOptions, resultLabel: '需要达成的关键节点', resultPlaceholder: '选择关键节点', resultOptions: settings?.dictionaries.deliveryNodes || MILESTONES };
   if (type === 'presales') return { relationLabel: '关联线索/商机/投标', relationPlaceholder: '选择线索/商机/投标', relationOptions: settings?.dictionaries.supportTypes || CUSTOMER_CATEGORIES, resultLabel: '需要达成的关键节点', resultPlaceholder: '选择关键节点', resultOptions: settings?.dictionaries.presalesNodes || MILESTONES };
   return { relationLabel: '类型', relationPlaceholder: '选择类型', relationOptions: settings?.dictionaries.supportTypes || CUSTOMER_CATEGORIES, resultLabel: '预期结果', resultPlaceholder: '填写预期结果' };

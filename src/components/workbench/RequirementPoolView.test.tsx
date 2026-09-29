@@ -33,7 +33,7 @@ describe('workbench work-order creation layout', () => {
       requirementTasks: [],
       addRequirementTask,
       setRequirementTasks: vi.fn(),
-      productLines: [{ id: 'line-1', name: '协同产品线' }],
+      productLines: [{ id: 'line-1', name: '协同产品' }],
       customers: [],
       leads: [],
       biddings: [{ id: 'bid-1', projectName: '中标项目甲', customerName: '客户甲', status: '中标', result: '中标' }],
@@ -55,9 +55,9 @@ describe('workbench work-order creation layout', () => {
     await openCustomerRequest();
 
     expect(screen.getByLabelText('事项标题 *')).toHaveClass('ant-input');
-    expect(screen.getByLabelText('所属产品线').closest('.ant-select')).not.toBeNull();
+    expect(screen.getByLabelText('所属产品').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('负责人 *').closest('.ant-select')).not.toBeNull();
-    expect(screen.getByLabelText('负责人 *').compareDocumentPosition(screen.getByLabelText('所属产品线')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByLabelText('负责人 *').compareDocumentPosition(screen.getByLabelText('所属产品')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByLabelText('优先级').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('期望完成时间').closest('.ant-picker')).not.toBeNull();
     expect(screen.getByLabelText('诉求类型 *').closest('.ant-select')).not.toBeNull();
@@ -89,8 +89,8 @@ describe('workbench work-order creation layout', () => {
     await openCustomerRequest();
 
     fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '客户反馈事项' } });
-    fireEvent.mouseDown(screen.getByLabelText('所属产品线'));
-    fireEvent.click(await screen.findByText('协同产品线', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('所属产品'));
+    fireEvent.click(await screen.findByText('协同产品', { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
     fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('所属项目 *'));
@@ -123,7 +123,7 @@ describe('workbench work-order creation layout', () => {
       requirementTasks: [task],
       addRequirementTask,
       setRequirementTasks: vi.fn(),
-      productLines: [{ id: 'line-1', name: '协同产品线' }],
+      productLines: [{ id: 'line-1', name: '协同产品' }],
       customers: [],
       biddings: [],
       opportunities: [],
@@ -189,12 +189,12 @@ describe('workbench work-order creation layout', () => {
   it('keeps the reassignment dialog and local data when persistence fails', async () => {
     const addToast = vi.fn();
     const setRequirementTasks = vi.fn();
-    const task = { id: 'work-order-2', title: '转派失败工单', status: '待处理', priority: '中', ownerName: '林志豪', creatorName: '林志豪', productLineId: 'line-1', productLineName: '协同产品线', revision: 2, events: [] } as unknown as RequirementTask;
+    const task = { id: 'work-order-2', title: '转派失败工单', status: '待处理', priority: '中', ownerName: '林志豪', creatorName: '林志豪', productLineId: 'line-1', productLineName: '协同产品', revision: 2, events: [] } as unknown as RequirementTask;
     vi.mocked(requirementRepository.detail).mockResolvedValue({ ...task, events: [], workItems: [] });
     vi.mocked(requirementRepository.reassign).mockRejectedValue(new Error('工单已变化，请刷新后重试'));
     vi.mocked(useApp).mockReturnValue({
       requirementTasks: [task], addRequirementTask, setRequirementTasks,
-      productLines: [{ id: 'line-1', name: '协同产品线' }], customers: [], biddings: [], opportunities: [],
+      productLines: [{ id: 'line-1', name: '协同产品' }], customers: [], biddings: [], opportunities: [],
       currentUser: { name: '林志豪', department: '管理部' }, addToast, openPageTab: vi.fn(), setRequirementTaskDraft: vi.fn(),
     } as unknown as ReturnType<typeof useApp>);
 

@@ -58,7 +58,7 @@ export const BugManagementView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBug, setEditingBug] = useState<BugItem | null>(null);
 
-  // Form Fields: 缺陷名称、所属产品线、关联版本、缺陷类型、严重程度、处理人、参与人、预计解决时间、所属环境、缺陷描述、复现步骤
+  // Form Fields: 缺陷名称、所属产品、关联版本、缺陷类型、严重程度、处理人、参与人、预计解决时间、所属环境、缺陷描述、复现步骤
   const [formTitle, setFormTitle] = useState('');
   const [formProductLine, setFormProductLine] = useState('');
   const [formVersion, setFormVersion] = useState('');
@@ -245,7 +245,7 @@ export const BugManagementView: React.FC = () => {
         />
       </div>
 
-      {/* Filter and Action Bar (筛选项: 编号/名称、所属产品线、所属版本、状态、优先级、环境) */}
+      {/* Filter and Action Bar (筛选项: 编号/名称、所属产品、所属版本、状态、优先级、环境) */}
       <div className="task-page-toolbar bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
@@ -389,7 +389,7 @@ export const BugManagementView: React.FC = () => {
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
               <DetailField label="当前状态"><StatusTag status={selectedBug.status} /></DetailField>
-              <DetailField label="所属产品线">{selectedBug.productLineName || '未设置'}</DetailField>
+              <DetailField label="所属产品">{selectedBug.productLineName || '未设置'}</DetailField>
               <DetailField label="关联版本">{selectedBug.versionName || '未设置'}</DetailField>
               <DetailField label="严重程度"><StatusTag status={selectedBug.severity} /></DetailField>
               <DetailField label="优先级"><StatusTag status={selectedBug.priority || '中'} /></DetailField>
@@ -440,7 +440,7 @@ export const BugManagementView: React.FC = () => {
           </>
         }
         properties={<div className="space-y-4 text-xs">
-          <SearchableSelect label="所属产品线" required value={formProductLine} options={productLines.map((pl) => pl.name)} onChange={(value) => { setFormProductLine(value); setFormVersion(''); }} placeholder="请选择所属产品线" />
+          <SearchableSelect label="所属产品" required value={formProductLine} options={productLines.map((pl) => pl.name)} onChange={(value) => { setFormProductLine(value); setFormVersion(''); }} placeholder="请选择所属产品" />
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-[var(--text-primary)]">关联版本 <span className="text-red-500">*</span></label>
             <Cascader

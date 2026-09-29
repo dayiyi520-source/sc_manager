@@ -46,7 +46,7 @@ public class TaskAliasService {
         String category=category(type);
         if(category==null) return mapper.createLegacy(type,body);
         String line=text(body,"productLineId");
-        if(line.isBlank()) throw new IllegalArgumentException("请选择所属产品线");
+        if(line.isBlank()) throw new IllegalArgumentException("请选择所属产品");
         String taskType=text(body,"workItemTypeId");
         if(taskType.isBlank()) taskType=mapper.defaultType(line,category);
         if(taskType==null || taskType.isBlank()) throw new IllegalArgumentException("请先配置并启用该分类的工作项类型");

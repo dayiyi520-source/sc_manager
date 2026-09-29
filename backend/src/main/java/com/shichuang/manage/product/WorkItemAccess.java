@@ -26,11 +26,11 @@ public class WorkItemAccess {
         String role=RequestContext.role();
         if (!(write?Set.of("admin","product_manager","tech_lead"):Set.of("admin","product_manager","tech_lead","product","tech")).contains(role))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前角色无权执行该产品操作");
-        if (line == null || line.isBlank()) throw new IllegalArgumentException("产品线不能为空");
+        if (line == null || line.isBlank()) throw new IllegalArgumentException("产品不能为空");
         String tenant=RequestContext.tenantId();
         if (write ? !storage.lockLine(tenant,line) : lines.find(tenant,line)==null)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,"产品线不存在");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,"产品不存在");
         if (!"admin".equals(role) && !reads.canRead(tenant,line,RequestContext.userId()))
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前用户无权访问该产品线");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前用户无权访问该产品");
     }
 }

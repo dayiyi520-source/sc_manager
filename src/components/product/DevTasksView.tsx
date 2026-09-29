@@ -265,7 +265,7 @@ export const DevTasksView: React.FC = () => {
               <DetailField label="特性分支"><span className="font-mono">{selectedTask.branch || '未设置'}</span></DetailField>
               <DetailField label="责任开发者">{selectedTask.developer || '未设置'}</DetailField>
               <DetailField label="优先级"><StatusTag status={selectedTask.priority} /></DetailField>
-              <DetailField label="所属产品线">{selectedTask.productLineName || '未设置'}</DetailField>
+              <DetailField label="所属产品">{selectedTask.productLineName || '未设置'}</DetailField>
               <DetailField label="迭代版本">{selectedTask.versionName || '未设置'}</DetailField>
               <DetailField label="截止时间"><span className="font-mono">{selectedTask.dueDate || '未设置'}</span></DetailField>
             </section>

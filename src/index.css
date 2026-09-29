@@ -2092,6 +2092,12 @@ html:not(.dark) .tech-main .primary-line-tabs[role="tablist"] > :is([role="tab"]
   color: currentColor !important;
   fill: currentColor !important;
 }
+.tech-main .primary-line-tabs[role="tablist"] > [role="tab"][aria-selected="true"] svg,
+.tech-main .primary-line-tabs[role="tablist"] > [role="tab"][aria-selected="true"] svg * {
+  color: var(--primary) !important;
+  -webkit-text-fill-color: var(--primary) !important;
+  fill: currentColor !important;
+}
 
 /* Match the version workspace: keep first-level tabs 24px above the content. */
 .tech-main .test-and-defect-tabs > .ant-tabs-nav {
@@ -2305,6 +2311,14 @@ html:not(.dark) .tech-main .research-template-view .ant-tabs-tab-btn[role="tab"]
   box-shadow: none !important;
 }
 
+.tech-main .notification-category-tabs .ant-tabs-tab,
+.tech-main .notification-category-tabs .ant-tabs-tab-btn,
+.tech-main .work-item-template-tabs .ant-tabs-tab,
+.tech-main .work-item-template-tabs .ant-tabs-tab-btn {
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+
 .tech-main .notification-category-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn,
 .tech-main .notification-category-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
   color: var(--primary) !important;
@@ -2365,4 +2379,10 @@ html:not(.dark) .tech-main .notification-category-tabs .ant-tabs-tab-btn[role="t
 .product-line-settings .product-operation-switch .ant-switch-inner-unchecked {
   font-size: 12px;
   line-height: 34px;
+}
+.work-item-batch-modal .ant-modal-body .ant-select-selection-item,
+.work-item-batch-modal .ant-modal-body .ant-select-selection-placeholder,
+.work-item-batch-modal .ant-modal-body .ant-select-selection-search-input {
+  font-size: 12px;
+  font-weight: 400;
 }

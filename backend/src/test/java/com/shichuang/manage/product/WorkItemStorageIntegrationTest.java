@@ -15,6 +15,7 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
     @Autowired WorkItemConfigurationService configurations;
     @Autowired WorkItemStorageService storage;
     @Autowired ProductLineService productLines;
+    @Autowired WorkItemCategoryService categories;
     @Autowired UnifiedWorkItemService unified;
     @Autowired AutomationRuleService automations;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -23,6 +24,7 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
 
     @BeforeEach void fixture() {
         RequestContext.set(Map.of("sub","test-user","tenant",tenant,"role","admin"));
+        categories.list();
         line=UUID.randomUUID().toString();
         jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'统一存储测试','test-user','test-user',NOW(),NOW())",line,tenant,"TEST-"+line);
         type=type("test","测试执行");
@@ -86,10 +88,10 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES('assignee-user',?,'assignee-user','测试负责人','测试部','product_manager','测试负责人','enabled','test-user','test-user',NOW(),NOW())",tenant);
         var created=storage.create(input("update-fields","test",type,null,null,null));
         var update=new UpdateItem("更新后的统一任务","新描述","新目标",null,"测试负责人","P2",java.time.LocalDate.now(),java.time.LocalDate.now().plusDays(3),new java.math.BigDecimal("12.50"),new java.math.BigDecimal("2.25"),0);
-        assertThrows(IllegalArgumentException.class,()->storage.update(line,created.get("id").toString(),update));
-        var changed=storage.update(line,created.get("id").toString(),new UpdateItem("更新后的统一任务","新描述","新目标",null,null,"P2",java.time.LocalDate.now(),java.time.LocalDate.now().plusDays(3),new java.math.BigDecimal("12.50"),new java.math.BigDecimal("2.25"),0));
+        var changed=storage.update(line,created.get("id").toString(),update);
         assertEquals("更新后的统一任务",changed.get("title"));
         assertEquals("P2",changed.get("priority"));
+        assertEquals("测试负责人",changed.get("assigneeName"));
         assertEquals(1,((Number)changed.get("revision")).intValue());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.update(line,created.get("id").toString(),update)).getStatusCode().value());
     }
@@ -166,6 +168,34 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(parent.get("id"),child.get("parentWorkItemId"));
         assertThrows(IllegalArgumentException.class,()->storage.create(input("wrong-version","test",childType,parent.get("id").toString(),UUID.randomUUID().toString(),null)));
     }
+    @Test void defectCannotHaveChildrenEvenWhenAChildRuleExists() {
+        String bugType=type("bug","缺陷任务"); publish("bug");
+        configurations.childRule(line,new ChildRule(bugType,bugType,true));
+        String parent=storage.create(input("bug-parent","bug",bugType,null,null,null)).get("id").toString();
+        assertEquals("缺陷任务不支持子任务",assertThrows(IllegalArgumentException.class,()->storage.create(input("bug-child","bug",bugType,parent,null,null))).getMessage());
+        assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE tenant_id_=? AND parent_work_item_id_=?",Integer.class,tenant,parent));
+    }
+    @Test void planningRootMovesItsEntireTreeAndRejectsIndependentChildPlanning() {
+        configurations.childRule(line,new ChildRule(type,type,true));
+        String root=storage.create(input("plan-root","test",type,null,null,null)).get("id").toString();
+        String child=storage.create(input("plan-child","test",type,root,null,null)).get("id").toString();
+        String grandchild=storage.create(input("plan-grandchild","test",type,child,null,null)).get("id").toString();
+        String independent=storage.create(input("plan-independent","test",type,null,null,null)).get("id").toString();
+        var timeline=unified.iterationTimeline(line);
+        assertEquals(Set.of(root,child,grandchild,independent),timeline.stream().map(UnifiedWorkItem::id).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(root,timeline.stream().filter(item->child.equals(item.id())).findFirst().orElseThrow().parentWorkItemId());
+        assertEquals(2,unified.list(line,"","test","",1,20).page().total());
+        String version=version("待开始"),otherVersion=version("待开始");
+        productLines.assignWorkItem(line,version,"test",root);
+        for(String id:List.of(root,child,grandchild)) assertEquals(version,storage.detail(line,id).get("versionId"));
+        assertNull(storage.detail(line,independent).get("versionId"));
+        assertThrows(IllegalArgumentException.class,()->productLines.assignWorkItem(line,otherVersion,"test",child));
+        productLines.assignWorkItem(line,otherVersion,"test",root);
+        assertThrows(IllegalArgumentException.class,()->productLines.unassignWorkItem(line,version,"test",root));
+        for(String id:List.of(root,child,grandchild)) assertEquals(otherVersion,storage.detail(line,id).get("versionId"));
+        productLines.unassignWorkItem(line,otherVersion,"test",root);
+        for(String id:List.of(root,child,grandchild)) assertNull(storage.detail(line,id).get("versionId"));
+    }
     @Test void childMustUseTheSameCategoryAsItsParent() {
         var parent=storage.create(input("same-category-parent","test",type,null,null,null));
         String devType=type("dev","研发子任务");
@@ -189,6 +219,8 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(parent.get("id"),topLevel.items().get(0).id());
         assertTrue(topLevel.items().get(0).hasChildren());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.delete(line,parent.get("id").toString(),((Number)parent.get("revision")).intValue())).getStatusCode().value());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.update(line,parent.get("id").toString(),
+            new UpdateItem(null,null,null,null,"测试负责人",null,null,null,null,null,((Number)parent.get("revision")).intValue()))).getStatusCode().value());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.delete(line,child.get("id").toString(),99)).getStatusCode().value());
 
         storage.delete(line,child.get("id").toString(),((Number)child.get("revision")).intValue());

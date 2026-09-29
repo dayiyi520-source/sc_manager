@@ -57,7 +57,7 @@ export function ProductIterationTimeline({ productLineId, versions, onOpenVersio
 
   return <section className="iteration-timeline" aria-label="产品迭代甘特图">
     <div className="iteration-view-tabs" role="tablist" aria-label="甘特图视角">
-      {(['version', 'task'] as const).map((value) => <button type="button" role="tab" aria-selected={view === value} key={value} onClick={() => setView(value)}>{value === 'version' ? '版本视角' : '产品任务视角'}</button>)}
+      {(['version', 'task'] as const).map((value) => <button type="button" role="tab" aria-selected={view === value} key={value} onClick={() => setView(value)}>{value === 'version' ? '版本视角' : '任务视角'}</button>)}
     </div>
     {query.isPending ? <div className="iteration-feedback"><Spin size="small" /> 正在加载迭代排期...</div>
       : query.isError ? <div className="iteration-feedback iteration-risk-danger">迭代排期加载失败 <Button size="small" onClick={() => query.refetch()}>重试</Button></div>

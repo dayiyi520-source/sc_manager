@@ -103,22 +103,27 @@ public class RequirementMapper {
 
     List<Map<String,Object>> myTasks(String tenantId,String userId) {
         return jdbc.queryForList("""
-            SELECT w.id_ AS id,CASE WHEN w.source_type_='WORK_ORDER' THEN 'assistance' ELSE w.category_ END AS type,
-              w.title_ AS title,w.status_name_ AS status,w.assignee_name_ AS assigneeName,w.create_time_ AS time,
+            SELECT w.id_ AS id,CASE WHEN w.category_='requirement' AND COALESCE(w.work_order_type_,'')<>'' THEN 'assistance' ELSE w.category_ END AS type,
+              w.title_ AS title,CASE WHEN w.category_='requirement' AND COALESCE(w.work_order_type_,'')<>'' THEN COALESCE(w.assistance_status_,w.status_name_) ELSE w.status_name_ END AS status,w.assignee_name_ AS assigneeName,w.create_time_ AS time,
               w.planned_end_date_ AS dueDate,w.progress_ AS progress,
               w.planned_end_date_ < CURRENT_DATE AND w.successful_=0 AND w.status_group_ NOT IN ('CANCELLED') AS overdueRisk,
-              CASE WHEN w.source_type_='WORK_ORDER' THEN 'assist' ELSE 'mine' END AS taskGroup,
+              CASE WHEN w.category_='requirement' AND COALESCE(w.work_order_type_,'')<>'' THEN 'assist' ELSE 'mine' END AS taskGroup,
               CASE w.category_ WHEN 'design' THEN 'prod_design_tasks' WHEN 'dev' THEN 'prod_rd_tasks' WHEN 'test' THEN 'prod_test_tasks' WHEN 'bug' THEN 'prod_bugs' ELSE 'prod_req_tasks' END AS targetPage,
               COALESCE(w.requirement_id_,w.id_) AS sourceId
             FROM t_product_work_item w
             WHERE w.tenant_id_=? AND w.delete_flag_=0
               AND w.category_ IN ('requirement','design','dev','test','bug')
-              AND (w.assignee_id_=? OR (w.source_type_='WORK_ORDER' AND w.assistance_owner_id_=?))
+              AND ((w.category_='requirement' AND COALESCE(w.work_order_type_,'')<>'' AND COALESCE(w.assistance_owner_id_,w.assignee_id_)=?)
+                OR (NOT (w.category_='requirement' AND COALESCE(w.work_order_type_,'')<>'') AND w.assignee_id_=?))
               AND w.status_group_ NOT IN ('COMPLETED','CANCELLED')
               AND w.status_name_ NOT IN ('已完成','已发布','已关闭','已取消')
               AND COALESCE(w.assistance_status_,'') NOT IN ('已完成','已发布','已关闭','已取消')
             ORDER BY w.create_time_ DESC LIMIT 200
             """,tenantId,userId,userId);
+    }
+
+    void setAssistanceOwner(String tenantId,String id) {
+        jdbc.update("UPDATE t_product_work_item SET assistance_owner_id_=assignee_id_,assistance_initiator_id_=COALESCE(assistance_initiator_id_,create_by_),assistance_status_=COALESCE(assistance_status_,status_name_),update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND COALESCE(work_order_type_,'')<>'' AND delete_flag_=0", tenantId, id);
     }
 
     boolean activeUser(String tenantId,String userId) {

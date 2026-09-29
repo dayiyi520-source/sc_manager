@@ -47,10 +47,12 @@ public class WorkItemStorageService {
         configurations.requireType(line,body.taskTypeId(),body.category(),true);
         String parentId=optional(body.parentWorkItemId()), requirementId=optional(body.requirementId()), versionId=optional(body.versionId());
         if (parentId!=null) {
+            mapper.lockLine(tenant,line);
             Map<String,Object> parent=requireItem(line,parentId);
+            if ("bug".equals(parent.get("category"))) throw new IllegalArgumentException("缺陷任务不支持子任务");
             if (Set.of("COMPLETED","CANCELLED").contains(parent.get("statusGroup"))) throw conflict("已结束任务不能新增子任务");
             if (!Objects.equals(parent.get("category"), body.category())) throw new IllegalArgumentException("子任务分类必须与父任务一致");
-            if (!mapper.childAllowed(tenant,line,parent.get("taskTypeId").toString(),body.taskTypeId())) throw new IllegalArgumentException("产品线未允许该父子任务类型组合");
+            if (!mapper.childAllowed(tenant,line,parent.get("taskTypeId").toString(),body.taskTypeId())) throw new IllegalArgumentException("产品未允许该父子任务类型组合");
             String inheritedVersion=optional(Objects.toString(parent.get("versionId"),null));
             String inheritedRequirement=optional(Objects.toString(parent.get("requirementId"),null));
             if (inheritedRequirement==null && "requirement".equals(parent.get("category"))) inheritedRequirement=parentId;
@@ -66,11 +68,11 @@ public class WorkItemStorageService {
         if (requirementId!=null) {
             Map<String,Object> requirement=mapper.item(tenant,line,requirementId);
             if (requirement==null || !"requirement".equals(requirement.get("category")))
-                throw new IllegalArgumentException("关联需求不存在或不属于当前产品线");
+                throw new IllegalArgumentException("关联需求不存在或不属于当前产品");
         }
         if (versionId!=null) {
             Map<String,Object> version=mapper.version(tenant,line,versionId);
-            if (version==null) throw new IllegalArgumentException("版本不存在或不属于当前产品线");
+            if (version==null) throw new IllegalArgumentException("版本不存在或不属于当前产品");
             if (Set.of("已完成", "已发布").contains(String.valueOf(version.get("status")))) throw conflict("已完成版本只读");
         }
         String assigneeId=optional(body.assigneeId());
@@ -99,8 +101,6 @@ public class WorkItemStorageService {
         Map<String,Object> item=requireItem(line,id);
         if (item.get("parentWorkItemId")==null && mapper.hasChildren(RequestContext.tenantId(),line,id)) throw conflict("存在子任务的主任务不可修改基础字段，请调整子任务");
         if (body.revision()==null || body.revision()!=((Number)item.get("revision")).intValue()) throw conflict("任务已被其他人修改，请刷新后重试");
-        if (body.assigneeName()!=null && item.get("parentWorkItemId")==null)
-            throw new IllegalArgumentException("主任务负责人不可修改，请调整子任务负责人");
         if (body.title()!=null) required(body.title(),"标题",255);
         if (body.description()!=null && body.description().length()>200000) throw new IllegalArgumentException("描述超出长度限制");
         if (body.descriptionHtml()!=null && body.descriptionHtml().length()>500000) throw new IllegalArgumentException("富文本描述超出长度限制");
@@ -110,7 +110,7 @@ public class WorkItemStorageService {
         validateHours(body.estimatedHours(),"预计工时");
         validateHours(body.actualHours(),"实际工时");
         String versionId=optional(body.versionId());
-        if (versionId!=null && mapper.version(RequestContext.tenantId(),line,versionId)==null) throw new IllegalArgumentException("版本不存在或不属于当前产品线");
+        if (versionId!=null && mapper.version(RequestContext.tenantId(),line,versionId)==null) throw new IllegalArgumentException("版本不存在或不属于当前产品");
         String assigneeId=null,assigneeName=body.assigneeName();
         if (assigneeName!=null && !assigneeName.isBlank()) {
             Map<String,Object> assignee=mapper.assigneeByName(RequestContext.tenantId(),assigneeName.trim());
@@ -138,7 +138,7 @@ public class WorkItemStorageService {
         if(value!=null && (value.signum()<0 || value.compareTo(new java.math.BigDecimal("99999999.99"))>0 || value.scale()>2))
             throw new IllegalArgumentException(label+"须为非负数，最多两位小数且不超过99999999.99");
     }
-    private List<String> validatedCcNames(List<String> values,String tenant) {
+    List<String> validatedCcNames(List<String> values,String tenant) {
         if (values==null || values.isEmpty()) return List.of();
         if (values.size()>100) throw new IllegalArgumentException("参与人最多选择100人");
         Set<String> names=new LinkedHashSet<>();

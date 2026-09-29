@@ -56,7 +56,7 @@ export type AutomationLog = { id: string; ruleId: string; ruleName?: string; wor
 export type NotificationEvent = 'ASSIGNED' | 'STATUS_CHANGED' | 'COMMENTED' | 'DELETED' | 'REPLIED' | 'MENTIONED' | 'CC_ADDED' | 'PARTICIPANT_ADDED';
 export type NotificationRule = { event: NotificationEvent; recipients: string[]; channels: Array<'IN_APP' | 'DINGTALK'> };
 export type NotificationSettings = { categories: Array<{ categoryCode: string; rules: NotificationRule[] }> };
-export type ProductRoleTemplate = { id: string; name: string; responsibility: string; revision: number; updatedAt?: string };
+export type ProductRoleTemplate = { id: string; name: string; responsibility: string; sort: number; revision: number; updatedAt?: string };
 export type ResearchStatusScope = 'PRODUCT' | 'ITERATION';
 export type ResearchStatusTemplate = { id: string; scope: ResearchStatusScope; name: string; phase: '待开始' | '处理中' | '已完成' | '已结束'; color: string; initial: boolean; enabled: boolean; sort: number; revision: number };
 export type ArchivedProductLine = { id: string; name: string; code: string; ownerName?: string; archivedAt: string; archivedByName?: string };
@@ -70,8 +70,8 @@ const page = <T>(value: PageResult<T> | T[]): PageResult<T> => Array.isArray(val
 export const productRepository = {
   iterationTimeline: (lineId: string) => apiRequest<UnifiedWorkItem[]>(`/api/product-lines/${encodeURIComponent(lineId)}/iteration-timeline`),
   productRoleTemplates: () => apiRequest<ProductRoleTemplate[]>('/api/research-template/roles'),
-  createProductRoleTemplate: (body: Pick<ProductRoleTemplate, 'name' | 'responsibility'>) => apiRequest<ProductRoleTemplate>('/api/research-template/roles', { method: 'POST', body: JSON.stringify(body) }),
-  updateProductRoleTemplate: (id: string, body: Pick<ProductRoleTemplate, 'name' | 'responsibility' | 'revision'>) => apiRequest<ProductRoleTemplate>(`/api/research-template/roles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  createProductRoleTemplate: (body: Pick<ProductRoleTemplate, 'name' | 'responsibility' | 'sort'>) => apiRequest<ProductRoleTemplate>('/api/research-template/roles', { method: 'POST', body: JSON.stringify(body) }),
+  updateProductRoleTemplate: (id: string, body: Pick<ProductRoleTemplate, 'name' | 'responsibility' | 'sort' | 'revision'>) => apiRequest<ProductRoleTemplate>(`/api/research-template/roles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteProductRoleTemplate: (id: string, revision: number) => apiRequest<void>(`/api/research-template/roles/${id}?revision=${revision}`, { method: 'DELETE' }),
   researchStatusTemplates: (scope: ResearchStatusScope) => apiRequest<ResearchStatusTemplate[]>(`/api/research-template/statuses?scope=${scope}`),
   createResearchStatusTemplate: (scope: ResearchStatusScope, body: Omit<ResearchStatusTemplate, 'id' | 'scope' | 'revision'>) => apiRequest<ResearchStatusTemplate>(`/api/research-template/statuses?scope=${scope}`, { method: 'POST', body: JSON.stringify(body) }),
@@ -128,6 +128,7 @@ export const productRepository = {
   updateAutomationSetting: (id: string, enabled: boolean) => apiRequest<{ enabled: boolean }>(`/api/product-lines/${id}/automation-rules/setting`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
   automationLogs: (id: string) => apiRequest<AutomationLog[]>(`/api/product-lines/${id}/automation-rules/logs`),
   workItemDetail: (lineId: string, id: string) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(lineId)}`),
+  batchWorkItems: (body: { targets: Array<{ productLineId: string; id: string; revision: number }>; operation: string; value?: string; participants?: string[] }) => apiRequest<number>('/api/work-items/batch', { method: 'POST', body: JSON.stringify(body) }),
   workItems: (productLineId: string, category = '', keyword = '', values: { page?: number; pageSize?: number } = {}) => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number; page?: number; pageSize?: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=${values.page || 1}&pageSize=${values.pageSize || 100}`),
   createWorkItem: (body: { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; requirementId?: string; customerId?: string; customerName?: string; parentWorkItemId?: string; assigneeId?: string; ccNames?: string[]; media?: RequirementMedia[]; priority: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItem: (productLineId: string, id: string, body: { title?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; assigneeName?: string; priority?: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number; actualHours?: number; revision: number }) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -142,8 +143,8 @@ export const productRepository = {
   updateVersion: (lineId: string, versionId: string, body: Partial<VersionIteration>) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteVersion: (lineId: string, versionId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}`, { method: 'DELETE' }),
   assignRequirementToVersion: (lineId: string, versionId: string, requirementId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/requirements/${requirementId}`, { method: 'POST' }),
-  assignWorkItemToVersion: (lineId: string, versionId: string, kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/work-items/${kind}/${itemId}`, { method: 'POST' }),
-  unassignWorkItemFromVersion: (lineId: string, versionId: string, kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/work-items/${kind}/${itemId}`, { method: 'DELETE' }),
+  assignWorkItemToVersion: (lineId: string, versionId: string, kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/work-items/${kind}/${itemId}`, { method: 'POST' }),
+  unassignWorkItemFromVersion: (lineId: string, versionId: string, kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/work-items/${kind}/${itemId}`, { method: 'DELETE' }),
   tasks: async (taskType: SpecialTaskKind, values: Record<string,string|number> = {}) => page(await apiRequest<PageResult<DefectBug | DevTask> | Array<DefectBug | DevTask>>(`${specialTaskPath(taskType)}${querySuffix(values)}`)),
   task: (taskType: SpecialTaskKind, id: string) => apiRequest<DefectBug | DevTask>(`${specialTaskPath(taskType)}/${id}`),
   createTask: (taskType: SpecialTaskKind, body: Partial<DefectBug> | Partial<DevTask>) => apiRequest<{ id: string; code: string }>(specialTaskPath(taskType), { method: 'POST', body: JSON.stringify(body) }),

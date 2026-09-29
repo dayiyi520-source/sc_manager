@@ -17,7 +17,7 @@ public class ProductRoleTemplateMapper {
 
     List<Map<String, Object>> list(String tenantId) {
         return jdbc.queryForList("""
-            SELECT id_ AS id, name_ AS name, responsibility_ AS responsibility,
+            SELECT id_ AS id, name_ AS name, responsibility_ AS responsibility, sort_ AS sort,
                    version_ AS revision, update_time_ AS updatedAt
             FROM t_product_role_template
             WHERE tenant_id_=? AND delete_flag_=0
@@ -27,7 +27,7 @@ public class ProductRoleTemplateMapper {
 
     Map<String, Object> find(String tenantId, String id) {
         return jdbc.query("""
-            SELECT id_ AS id, name_ AS name, responsibility_ AS responsibility,
+            SELECT id_ AS id, name_ AS name, responsibility_ AS responsibility, sort_ AS sort,
                    version_ AS revision, update_time_ AS updatedAt
             FROM t_product_role_template
             WHERE tenant_id_=? AND id_=? AND delete_flag_=0
@@ -37,6 +37,7 @@ public class ProductRoleTemplateMapper {
                 role.put("id", result.getString("id"));
                 role.put("name", result.getString("name"));
                 role.put("responsibility", result.getString("responsibility"));
+                role.put("sort", result.getInt("sort"));
                 role.put("revision", result.getInt("revision"));
                 role.put("updatedAt", result.getTimestamp("updatedAt") == null ? null : result.getTimestamp("updatedAt").toLocalDateTime());
                 return role;
@@ -63,12 +64,12 @@ public class ProductRoleTemplateMapper {
             """, id, tenantId, name, responsibility, sort, userId, userId);
     }
 
-    int update(String tenantId, String id, int revision, String name, String responsibility, String userId) {
+    int update(String tenantId, String id, int revision, String name, String responsibility, int sort, String userId) {
         return jdbc.update("""
             UPDATE t_product_role_template
-            SET name_=?,responsibility_=?,version_=version_+1,update_by_=?,update_time_=NOW(6)
+            SET name_=?,responsibility_=?,sort_=?,version_=version_+1,update_by_=?,update_time_=NOW(6)
             WHERE tenant_id_=? AND id_=? AND version_=? AND delete_flag_=0
-            """, name, responsibility, userId, tenantId, id, revision);
+            """, name, responsibility, sort, userId, tenantId, id, revision);
     }
 
     int delete(String tenantId, String id, int revision, String userId) {

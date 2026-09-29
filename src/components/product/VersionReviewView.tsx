@@ -115,7 +115,7 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
       {detail.isError && !creating ? <Alert type="error" showIcon title="版本评审加载失败" action={<Button onClick={() => detail.refetch()}>重试</Button>} /> : !creating && !current ? <div className="flex min-h-56 items-center justify-center"><Spin /></div> : <Form form={form} layout="vertical" disabled={readOnly} className="grid gap-x-4 md:grid-cols-2">
         <Form.Item name="meetingTopic" label="会议主题" rules={[{ required: true, whitespace: true, message: '请输入会议主题' }]}><Input placeholder="请输入会议主题" maxLength={200} /></Form.Item>
         <Form.Item name="reviewType" label="会议类型" rules={[{ required: true, message: '请选择会议类型' }]}><Select placeholder="请选择会议类型" options={['版本评审', '发布评审', '专项评审'].map((value) => ({ value, label: value }))} /></Form.Item>
-        <Form.Item name="productLineId" label="所属产品线" rules={[{ required: true, message: '请选择所属产品线' }]}><Select showSearch optionFilterProp="label" placeholder="请选择产品线" disabled={Boolean(fixedLineId) || Boolean(selectedId)} options={productLines.map((item) => ({ value: item.id, label: item.name }))} onChange={() => form.setFieldValue('versionId', undefined)} /></Form.Item>
+        <Form.Item name="productLineId" label="所属产品" rules={[{ required: true, message: '请选择所属产品' }]}><Select showSearch optionFilterProp="label" placeholder="请选择产品" disabled={Boolean(fixedLineId) || Boolean(selectedId)} options={productLines.map((item) => ({ value: item.id, label: item.name }))} onChange={() => form.setFieldValue('versionId', undefined)} /></Form.Item>
         <Form.Item name="versionId" label="所属版本" rules={[{ required: true, message: '请选择所属版本' }]}><Select showSearch optionFilterProp="label" placeholder="请选择迭代版本" disabled={!selectedLineId || Boolean(selectedId)} options={versions.map((item) => ({ value: item.id, label: item.name }))} /></Form.Item>
         <Form.Item name="meetingTime" label="会议时间" rules={[{ required: true, message: '请选择会议时间' }]}><DatePicker showTime className="w-full" /></Form.Item>
         <Form.Item name="participantIds" label="参与人" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一名参与人' }]}><Select mode="multiple" showSearch optionFilterProp="label" loading={employees.isLoading} options={employeeOptions} placeholder="搜索并选择在职员工" /></Form.Item>
@@ -134,7 +134,7 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
       <Table<VersionReviewListItem> rowKey="id" dataSource={listItems} scroll={{ x: 1120 }} locale={{ emptyText: '暂无可访问的版本评审' }} onRow={(item) => ({ onClick: () => openReview(item), className: 'cursor-pointer' })} columns={[
         { title: '会议主题', dataIndex: 'meetingTopic', width: 220, ellipsis: true },
         { title: '评审类型', dataIndex: 'reviewType', width: 120 },
-        { title: '产品线', dataIndex: 'productLineName', width: 180, ellipsis: true },
+        { title: '产品', dataIndex: 'productLineName', width: 180, ellipsis: true },
         { title: '迭代版本', dataIndex: 'versionName', width: 180, ellipsis: true },
         { title: '发起人', dataIndex: 'initiatorName', width: 120 },
         { title: '参与人', dataIndex: 'participantNames', width: 220, ellipsis: true, render: (value) => value || '--' },

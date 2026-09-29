@@ -85,7 +85,7 @@ const okrState = {
   people: defaultPeople,
   work: [],
   actionParents: [actionParent],
-  productLineOptions: ['真实产品线'],
+  productLineOptions: ['真实产品'],
   projectOptions: ['真实交付项目'],
   businessOptionsLoading: false,
   businessOptionsError: undefined,

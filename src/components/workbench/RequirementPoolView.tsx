@@ -849,10 +849,10 @@ export const RequirementPoolView: React.FC = () => {
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <EmployeeSearchSelect label="负责人 *" value={ownerName} employees={employees} placeholder="搜索姓名或职位" onChange={setOwnerName} />
       <WorkOrderSelect
-        label="所属产品线"
+        label="所属产品"
         value={productLines.find((item) => item.id === productLineId)?.name || ""}
         options={productLines.map((item) => item.name)}
-        placeholder={productLines.length ? "请选择所属产品线（选填）" : "暂无可用产品线"}
+        placeholder={productLines.length ? "请选择所属产品（选填）" : "暂无可用产品"}
         onChange={(value) => setProductLineId(productLines.find((item) => item.name === value)?.id || "")}
       />
       <SearchSelect label="关联客户" value={customerQuery} options={customers.map((item) => item.name)} placeholder="输入客户名称模糊搜索并选择" onChange={(name) => { setCustomerQuery(name); setCustomerId(customers.find((item) => item.name === name)?.id || ""); }} />
@@ -989,7 +989,7 @@ export const RequirementPoolView: React.FC = () => {
                     className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
-                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品线" : "发起协助"}
+                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品" : "发起协助"}
                   </button>
                 </div>
               </div>

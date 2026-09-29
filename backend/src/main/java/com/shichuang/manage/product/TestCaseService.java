@@ -27,9 +27,9 @@ public class TestCaseService {
     }
     @Transactional public DirectoryView createDirectory(String line,SaveDirectory input){
         String actualLine = "all".equals(line) ? blank(input.productLineId()) : line;
-        if (actualLine == null) throw bad("全部产品线模式下必须选择产品线");
+        if (actualLine == null) throw bad("全部产品模式下必须选择产品");
         access.check(actualLine,true);String name=required(input.name(),"目录名称",120);String parent=blank(input.parentId());
-        if(parent!=null&&mapper.directory(RequestContext.tenantId(),actualLine,parent)==null)throw bad("父级目录不存在或不属于当前产品线");
+        if(parent!=null&&mapper.directory(RequestContext.tenantId(),actualLine,parent)==null)throw bad("父级目录不存在或不属于当前产品");
         String id=UUID.randomUUID().toString();
         try{mapper.insertDirectory(RequestContext.tenantId(),actualLine,id,parent,name,input.sort()==null?0:input.sort(),RequestContext.userId());}
         catch(DataIntegrityViolationException e){throw conflict("同级目录名称已存在");}
@@ -50,7 +50,7 @@ public class TestCaseService {
         if(source==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"目录不存在");
         String actual=text(source,"productLineId");access.check(actual,true);String parent=blank(input.parentId());
         if(parent==null)parent=nullable(source,"parentId");
-        if(parent!=null){Map<String,Object> target=mapper.directory(tenant,actual,parent);if(target==null)throw bad("目标父目录不存在或不属于当前产品线");if(id.equals(parent)||descendant(tenant,actual,id,parent))throw bad("不能将目录复制到自身或其子目录下");}
+        if(parent!=null){Map<String,Object> target=mapper.directory(tenant,actual,parent);if(target==null)throw bad("目标父目录不存在或不属于当前产品");if(id.equals(parent)||descendant(tenant,actual,id,parent))throw bad("不能将目录复制到自身或其子目录下");}
         String name=blank(input.name());if(name==null)name=text(source,"name")+" - 副本";
         String copiedId=copyDirectoryTree(tenant,actual,source,parent,required(name,"目录名称",120));
         return directories(actual).stream().filter(value->value.id().equals(copiedId)).findFirst().orElseThrow();
@@ -104,7 +104,7 @@ public class TestCaseService {
         String tenant=RequestContext.tenantId(),operation=required(input.operation(),"批量操作",20).toUpperCase(Locale.ROOT),value=blank(input.value());
         Map<String,List<String>> byLine=new LinkedHashMap<>();List<Map<String,Object>> rows=new ArrayList<>();
         for(String id:ids){Map<String,Object> row=mapper.item(tenant,line,id);if(row==null)throw bad("所选测试用例不存在或不在当前范围内");String actual=text(row,"productLineId");access.check(actual,true);byLine.computeIfAbsent(actual,key->new ArrayList<>()).add(id);rows.add(row);}
-        if("MOVE".equals(operation)){if(value==null)throw bad("请选择目标目录");Map<String,Object> directory=mapper.directory(tenant,"all",value);if(directory==null)throw bad("目标目录不存在");String targetLine=text(directory,"productLineId");if(byLine.size()!=1||!byLine.containsKey(targetLine))throw bad("测试用例只能移动到同一产品线的目录");if(mapper.moveCases(tenant,targetLine,ids,value,RequestContext.userId())!=ids.size())throw conflict("部分测试用例已变化，请刷新后重试");return;}
+        if("MOVE".equals(operation)){if(value==null)throw bad("请选择目标目录");Map<String,Object> directory=mapper.directory(tenant,"all",value);if(directory==null)throw bad("目标目录不存在");String targetLine=text(directory,"productLineId");if(byLine.size()!=1||!byLine.containsKey(targetLine))throw bad("测试用例只能移动到同一产品的目录");if(mapper.moveCases(tenant,targetLine,ids,value,RequestContext.userId())!=ids.size())throw conflict("部分测试用例已变化，请刷新后重试");return;}
         if("OWNER".equals(operation)){Map<String,Object> owner=value==null?null:mapper.employee(tenant,value);if(owner==null)throw bad("负责人不存在或已停用");byLine.forEach((actual,caseIds)->mapper.updateOwner(tenant,actual,caseIds,value,text(owner,"name"),RequestContext.userId()));return;}
         if("PRIORITY".equals(operation)){if(!Set.of("P0","P1","P2","P3").contains(value))throw bad("优先级必须为P0至P3");byLine.forEach((actual,caseIds)->mapper.updatePriority(tenant,actual,caseIds,value,RequestContext.userId()));return;}
         if("DELETE".equals(operation)){if(rows.stream().anyMatch(row->longNumber(row,"referenceCount")>0))throw bad("已被测试任务引用的用例不能删除");byLine.forEach((actual,caseIds)->mapper.deleteCases(tenant,actual,caseIds,RequestContext.userId()));return;}
@@ -112,10 +112,10 @@ public class TestCaseService {
         throw bad("不支持的批量操作");
     }
     private void validate(String line,SaveCase input,boolean updating){
-        required(input.title(),"用例标题",255);if(mapper.directory(RequestContext.tenantId(),line,required(input.directoryId(),"功能目录",36))==null)throw bad("功能目录不存在或不属于当前产品线");
+        required(input.title(),"用例标题",255);if(mapper.directory(RequestContext.tenantId(),line,required(input.directoryId(),"功能目录",36))==null)throw bad("功能目录不存在或不属于当前产品");
         if(!Set.of("P0","P1","P2","P3").contains(input.priority()))throw bad("优先级必须为P0至P3");
         if(mapper.employee(RequestContext.tenantId(),required(input.ownerId(),"负责人",36))==null)throw bad("负责人不存在或已停用");
-        String requirement=blank(input.sourceRequirementId());if(requirement!=null&&mapper.requirement(RequestContext.tenantId(),line,requirement)==null)throw bad("来源需求不存在或不属于当前产品线");
+        String requirement=blank(input.sourceRequirementId());if(requirement!=null&&mapper.requirement(RequestContext.tenantId(),line,requirement)==null)throw bad("来源需求不存在或不属于当前产品");
         if(input.steps()==null||input.steps().isEmpty())throw bad("至少添加一个测试步骤");
         for(int i=0;i<input.steps().size();i++){StepInput step=input.steps().get(i);required(step.action(),"第"+(i+1)+"步操作",5000);required(step.expectedResult(),"第"+(i+1)+"步预期结果",5000);}
         if(updating&&input.revision()==null)throw bad("修改测试用例必须提供数据版本");
@@ -139,7 +139,7 @@ public class TestCaseService {
     }
     private CaseState initialState(String line,String requestedType,String requestedStatus){
         String tenant=RequestContext.tenantId();String typeId=blank(requestedType);
-        if(typeId==null){Map<String,Object> defaultType=workItems.defaultType(tenant,line,"用例");if(defaultType==null)throw bad("当前产品线未配置可用的用例类型");typeId=text(defaultType,"id");}
+        if(typeId==null){Map<String,Object> defaultType=workItems.defaultType(tenant,line,"用例");if(defaultType==null)throw bad("当前产品未配置可用的用例类型");typeId=text(defaultType,"id");}
         configurations.requireTypeForLegacy(line,typeId,"case");
         Map<String,Object> workflow=workItems.publishedWorkflow(tenant,line,"case",typeId);
         if(workflow==null||!typeId.equals(workflow.get("taskTypeId")))throw conflict("所选用例类型没有已发布的阶段流程");

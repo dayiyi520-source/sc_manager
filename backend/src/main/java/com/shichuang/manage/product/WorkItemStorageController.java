@@ -12,7 +12,10 @@ import java.util.*;
 @Tag(name="统一工作项存储")
 public class WorkItemStorageController {
     private final WorkItemStorageService service;
-    public WorkItemStorageController(WorkItemStorageService service) { this.service=service; }
+    private final WorkItemBatchService batch;
+    public WorkItemStorageController(WorkItemStorageService service, WorkItemBatchService batch) { this.service=service; this.batch=batch; }
+    @PostMapping("/batch") @Operation(summary="批量修改或软删除同类工作项")
+    public ApiResponse<Integer> batch(@RequestBody WorkItemBatchService.Command body) { return ApiResponse.ok(batch.execute(body)); }
     @PostMapping @Operation(summary="创建统一工作项，含测试及类型化子任务")
     public ApiResponse<Map<String,Object>> create(@RequestBody WorkItemDefinition.CreateItem body) { return ApiResponse.ok(service.create(body)); }
     @GetMapping("/{id}") @Operation(summary="读取统一核心工作项详情")

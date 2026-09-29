@@ -123,6 +123,10 @@ public class WorkItemStorageMapper {
             input.assigneeName()!=null,assigneeId,input.assigneeName()!=null,assigneeName,input.priority(),input.plannedStartDate(),
             input.plannedEndDate(),input.estimatedHours(),input.actualHours(),user,tenant,line,id,input.revision());
     }
+    public int updateParticipants(String tenant,String line,String id,int revision,String participants,String user) {
+        return jdbc.update("UPDATE t_product_work_item SET cc_names_=CAST(? AS JSON),version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND delete_flag_=0",
+            participants,user,tenant,line,id,revision);
+    }
     public void insertItem(String tenant,String id,String code,WorkItemDefinition.CreateItem input,String versionId,String requirementId,String customerId,String customerName,
         String ccNamesJson,String mediaJson,String parentId,String assigneeName,String workflowId,WorkItemDefinition.State initial,String hash,String user) {
         jdbc.update("""

@@ -156,11 +156,11 @@ public class UnifiedWorkItemService {
     private void requireLine(String lineId) {
         if (!Set.of("admin", "product_manager", "tech_lead", "product", "tech").contains(RequestContext.role()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前角色无权访问产品数据");
-        if (lineId == null || lineId.isBlank()) throw new IllegalArgumentException("请选择产品线");
+        if (lineId == null || lineId.isBlank()) throw new IllegalArgumentException("请选择产品");
         if (productLines.find(RequestContext.tenantId(), lineId) == null)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "产品线不存在");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "产品不存在");
         if (!"admin".equals(RequestContext.role()) && !mapper.canRead(RequestContext.tenantId(), lineId, RequestContext.userId()))
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前用户无权访问该产品线");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前用户无权访问该产品");
     }
 
     private void requireVersion(String lineId, String versionId) {

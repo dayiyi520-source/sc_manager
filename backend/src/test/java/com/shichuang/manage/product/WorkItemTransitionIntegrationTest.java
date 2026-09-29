@@ -18,11 +18,12 @@ class WorkItemTransitionIntegrationTest extends AbstractApiIntegrationTest {
     @Autowired WorkItemStorageService storage;
     @Autowired WorkItemTransitionService transitions;
     @Autowired ProductLineService lines;
+    @Autowired WorkItemCategoryService categories;
     @Autowired WorkItemStorageMapper persistence;
     private String line,type,id,flow;
     private static final String TENANT="transition-test";
     @BeforeEach void setup() {
-        session("admin"); line=UUID.randomUUID().toString();
+        session("admin"); categories.list(); line=UUID.randomUUID().toString();
         jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'流转测试','u','u',NOW(),NOW())",line,TENANT,line);
         type=lines.addWorkItemType(line,new HashMap<>(Map.of("category","设计","name","主设计","enabled",true))).get("id").toString();
         flow=publish(workflow()); id=create(null,null);

@@ -22,7 +22,7 @@ const parents: OkrRecord[] = titles.map((title, index) => ({
   payload: { title, parentObjectiveId: `objective-${index + 1}`, parentActionId: `parent-${index + 1}` },
 }));
 
-const renderForm = () => render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[]} people={people} productLineOptions={['真实产品线']} projectOptions={['真实交付项目']} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
+const renderForm = () => render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[]} people={people} productLineOptions={['真实产品']} projectOptions={['真实交付项目']} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
 
 describe('ActionBreakdownForm', () => {
   it('shows dynamic month choices, three untouched parent targets, and source names', () => {
@@ -60,9 +60,9 @@ describe('ActionBreakdownForm', () => {
     fireEvent.click(screen.getByRole('button', { name: '拆解 O1' }));
     expectPeriodActions();
     expect(screen.getByText('A1')).toBeInTheDocument();
-    expect(screen.getByLabelText('A1 关联产品线')).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByLabelText('A1 关联产品线'));
-    expect(screen.getAllByText('真实产品线').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('A1 关联产品')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('A1 关联产品'));
+    expect(screen.getAllByText('真实产品').length).toBeGreaterThan(0);
     expect(screen.queryByText('师创智联协同OS')).not.toBeInTheDocument();
     expect(screen.getByLabelText('A1 动作描述')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 需要达成的关键节点')).toBeInTheDocument();

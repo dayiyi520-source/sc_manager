@@ -80,7 +80,7 @@ public class TeamMemberService {
         Map<String, Object> current = requireEmployee(id);
         if ("disabled".equals(input.status())) {
             if (Boolean.TRUE.equals(hasLogin(current))) throw new IllegalArgumentException("超级管理员不能停用");
-            if (mapper.activeResponsibilities(RequestContext.tenantId(), id) > 0) throw new ResponseStatusException(HttpStatus.CONFLICT, "该员工仍是产品线负责人，请先调整负责人配置");
+            if (mapper.activeResponsibilities(RequestContext.tenantId(), id) > 0) throw new ResponseStatusException(HttpStatus.CONFLICT, "该员工仍是产品负责人，请先调整负责人配置");
         }
         if (mapper.updateStatus(RequestContext.tenantId(), id, input.status(), input.version(), RequestContext.userId()) == 0) conflict();
         return view(Objects.requireNonNull(mapper.find(RequestContext.tenantId(), id)));

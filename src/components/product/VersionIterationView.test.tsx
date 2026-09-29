@@ -11,6 +11,7 @@ const appMocks = vi.hoisted(() => ({
   childTypeRules: vi.fn().mockResolvedValue([]),
   createWorkItem: vi.fn().mockResolvedValue({ id: 'created-1' }),
   workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }),
+  iterationTimeline: vi.fn().mockResolvedValue([]),
   workItemDetail: vi.fn().mockImplementation(async (_productLineId: string, id: string) => ({ id, title: id === 'requirement-1' ? '支持版本规划拖拽' : '已纳入迭代的工作项', children: [] })),
   requirementSummary: vi.fn().mockResolvedValue({ requirement: undefined, linkedItems: [] }),
   workItemRelations: vi.fn().mockResolvedValue({ relations: [] }),
@@ -26,13 +27,13 @@ const appMocks = vi.hoisted(() => ({
   updateDesignTask: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock('../../services/productRepository', () => ({ productRepository: { workItemTypes: appMocks.workItemTypes, childTypeRules: appMocks.childTypeRules, createWorkItem: appMocks.createWorkItem, workItems: appMocks.workItems, workItemDetail: appMocks.workItemDetail, requirementSummary: appMocks.requirementSummary, workItemRelations: appMocks.workItemRelations } }));
+vi.mock('../../services/productRepository', () => ({ productRepository: { iterationTimeline: appMocks.iterationTimeline, workItemTypes: appMocks.workItemTypes, childTypeRules: appMocks.childTypeRules, createWorkItem: appMocks.createWorkItem, workItems: appMocks.workItems, workItemDetail: appMocks.workItemDetail, requirementSummary: appMocks.requirementSummary, workItemRelations: appMocks.workItemRelations } }));
 vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.fn().mockResolvedValue([{ id: 'member-1', name: '王丽' }, { id: 'member-2', name: '李明' }]) } }));
 
 vi.mock('../../context/AppContext', () => ({
   useApp: () => ({
     versions: appMocks.versions,
-    productLines: [{ id: 'line-1', name: '协同产品线' }],
+    productLines: [{ id: 'line-1', name: '协同产品' }],
     customers: [],
     currentUser: { id: 'user-1', name: '林志豪' },
     requirementPool: [],
@@ -48,7 +49,7 @@ vi.mock('../../context/AppContext', () => ({
       ownerName: '李明',
       versionName: '',
       productLineId: 'line-1',
-      productLineName: '协同产品线',
+      productLineName: '协同产品',
       estimatedHours: 8,
       dueDate: '2026-09-20',
     }, {
@@ -64,7 +65,7 @@ vi.mock('../../context/AppContext', () => ({
       versionId: 'version-1',
       versionName: '秋季迭代',
       productLineId: 'line-1',
-      productLineName: '协同产品线',
+      productLineName: '协同产品',
       estimatedHours: 5,
       actualHours: 4,
     }],
@@ -84,7 +85,7 @@ vi.mock('../../context/AppContext', () => ({
   }),
 }));
 
-vi.mock('./CreateVersionModal', () => ({ CreateVersionModal: ({ isOpen, productLine }: { isOpen: boolean; productLine?: { id: string } }) => isOpen ? <div role="dialog" aria-label="创建迭代版本">产品线：{productLine?.id || '未选择'}</div> : null }));
+vi.mock('./CreateVersionModal', () => ({ CreateVersionModal: ({ isOpen, productLine }: { isOpen: boolean; productLine?: { id: string } }) => isOpen ? <div role="dialog" aria-label="创建迭代版本">产品：{productLine?.id || '未选择'}</div> : null }));
 vi.mock('./WorkItemCreatePanel', () => ({ WorkItemCreatePanel: ({ isOpen, title, children, footer, properties }: { isOpen: boolean; title: string; children: React.ReactNode; footer: React.ReactNode; properties?: React.ReactNode }) => isOpen ? <div role="dialog" aria-label={title}>{children}{properties}{footer}</div> : null }));
 vi.mock('./VersionTestReportPanel', () => ({ VersionTestReportPanel: () => <div>暂无测试报告</div> }));
 vi.mock('../common/Feedback', () => ({ showDeleteConfirm: appMocks.showDeleteConfirm }));
@@ -102,7 +103,7 @@ describe('VersionIterationView', () => {
       name: '秋季迭代',
       ownerName: '张瑞',
       productLineId: 'line-1',
-      productLineName: '协同产品线',
+      productLineName: '协同产品',
       startDate: '2026-09-01',
       endDate: '2026-09-30',
       status: '进行中',
@@ -118,6 +119,7 @@ describe('VersionIterationView', () => {
     appMocks.createWorkItem.mockClear();
     appMocks.workItemTypes.mockClear();
     appMocks.workItems.mockReset().mockResolvedValue({ page: { items: [], total: 0 } });
+    appMocks.iterationTimeline.mockReset().mockResolvedValue([]);
     sessionStorage.clear();
   });
 
@@ -129,17 +131,17 @@ describe('VersionIterationView', () => {
     expect(screen.getByRole('navigation', { name: '产品导航栏' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '搜索产品' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '全部产品' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.queryByRole('combobox', { name: '产品线筛选' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '产品筛选' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '详情' })).not.toBeInTheDocument();
     expect(screen.getByText('版本号')).toBeInTheDocument();
     expect(screen.getByText('V1.2.0')).toBeInTheDocument();
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent?.trim());
-    expect(headers.indexOf('所属产品线')).toBe(headers.indexOf('起止时间') + 1);
+    expect(headers.indexOf('所属产品')).toBe(headers.indexOf('起止时间') + 1);
 
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
     expect(screen.getByRole('button', { name: '返回迭代列表' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '迭代规划' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: '产品线筛选' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '产品筛选' })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '迭代信息' })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByRole('tab', { name: '迭代任务' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('checkbox', { name: '全选迭代任务' })).toBeInTheDocument();
@@ -191,6 +193,44 @@ describe('VersionIterationView', () => {
     fireEvent.click(screen.getByRole('button', { name: '完成迭代' }));
     await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '已完成' }));
   });
+  it('collapses version task descendants and excludes child creation for defects', async () => {
+    sessionStorage.setItem('shichuang.session.token', 'test');
+    const items = [
+      { id: 'parent', category: 'dev', title: '研发主任务', productLineId: 'line-1', versionId: 'version-1', hasChildren: true },
+      { id: 'child', category: 'dev', title: '研发子任务', productLineId: 'line-1', versionId: 'version-1', parentWorkItemId: 'parent' },
+      { id: 'defect', category: 'bug', title: '独立缺陷', productLineId: 'line-1', versionId: 'version-1' },
+    ];
+    appMocks.iterationTimeline.mockResolvedValue(items);
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    await screen.findByRole('button', { name: '展开研发主任务' });
+    expect(screen.queryByRole('button', { name: '研发子任务' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开研发主任务' }));
+    expect(screen.getByRole('button', { name: '研发子任务' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '收起研发主任务' }));
+    expect(screen.queryByRole('button', { name: '研发子任务' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '操作独立缺陷' }));
+    await screen.findByText('复制任务');
+    expect(screen.queryByText('添加子任务')).not.toBeInTheDocument();
+  });
+  it('loads all five categories for planning and keeps children view-only under roots', async () => {
+    sessionStorage.setItem('shichuang.session.token', 'test');
+    const items = [
+      { id: 'parent', category: 'test', title: '测试主任务', productLineId: 'line-1', hasChildren: true },
+      { id: 'child', category: 'test', title: '测试子任务', productLineId: 'line-1', parentWorkItemId: 'parent' },
+    ];
+    appMocks.iterationTimeline.mockResolvedValue(items);
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '迭代规划' }));
+    await screen.findByRole('button', { name: '展开测试主任务' });
+    expect(screen.getByLabelText('拖动工作项：测试主任务')).toHaveAttribute('draggable', 'true');
+    expect(screen.queryByRole('button', { name: '测试子任务' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '展开测试主任务' }));
+    expect(screen.getByLabelText('子任务：测试子任务')).toHaveAttribute('draggable', 'false');
+    expect(screen.queryByRole('checkbox', { name: '选择工作项：测试子任务' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: '全选待规划工作项' }));
+    expect(screen.getByRole('checkbox', { name: '选择工作项：测试主任务' })).toBeChecked();
+  });
 
   it('paginates the iteration list and resets to the first page after filtering', () => {
     appMocks.versions.push(...Array.from({ length: 10 }, (_, index) => ({
@@ -199,7 +239,7 @@ describe('VersionIterationView', () => {
       name: `后续迭代 ${index + 1}`,
       ownerName: '张瑞',
       productLineId: 'line-1',
-      productLineName: '协同产品线',
+      productLineName: '协同产品',
       startDate: '2026-10-01',
       endDate: '2026-10-31',
       status: '未开始',
@@ -248,7 +288,7 @@ describe('VersionIterationView', () => {
 
     expect(await screen.findByText('测试任务加载失败，其他任务仍可查看')).toBeInTheDocument();
     expect(screen.getByText('已纳入迭代的工作项')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    fireEvent.click(screen.getByRole('button', { name: /重\s*试/ }));
     await waitFor(() => expect(testAttempts).toBe(2));
     await waitFor(() => expect(screen.queryByText('测试任务加载失败，其他任务仍可查看')).not.toBeInTheDocument());
   });
@@ -280,13 +320,13 @@ describe('VersionIterationView', () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
 
-    expect(screen.queryByRole('combobox', { name: '产品线筛选' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '产品筛选' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '迭代信息' }));
     expect(screen.getAllByRole('button', { name: '进入规划' })).toHaveLength(1);
     const createButton = screen.getByLabelText('新建迭代');
     expect(createButton.className).toContain('text-[var(--primary)]');
     fireEvent.click(createButton);
-    expect(screen.getByRole('dialog', { name: '创建迭代版本' })).toHaveTextContent('产品线：line-1');
+    expect(screen.getByRole('dialog', { name: '创建迭代版本' })).toHaveTextContent('产品：line-1');
   });
 
   it('creates inside the iteration without navigating away', async () => {

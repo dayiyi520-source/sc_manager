@@ -23,7 +23,7 @@ import {
   Undo2,
   UserRound
 } from '@/components/common/octicons-compat';
-import { Alert, Button, Dropdown, Input, Modal, Select } from 'antd';
+import { Alert, Button, Dropdown, Input, Modal, Select, message } from 'antd';
 import { ApartmentOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
@@ -38,8 +38,10 @@ import { teamRepository } from '../../services/teamRepository';
 import { Pagination } from '../common/Pagination';
 import { UnifiedWorkItemControls, type UnifiedFilterState } from './UnifiedWorkItemControls';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
+import { WorkItemBatchBar } from './WorkItemBatchBar';
 import { ProductNavigation } from './ProductNavigation';
 import { useQuery } from '@tanstack/react-query';
+import { parentWorkItemId, workItemHierarchy, workItemKey } from './workItemHierarchy';
 
 type ViewMode = 'list' | 'planning';
 type DetailTab = 'hours' | 'testReports' | 'review';
@@ -260,7 +262,15 @@ const BugRows: React.FC<{ items: DefectBug[]; onOpen: (item: DefectBug) => void 
   </div>
 );
 
-const WorkItemRows: React.FC<{ items: PlanningItem[]; groupBy: TaskGroupBy; selectedIds: string[]; onSelectionChange: (ids: string[]) => void; onOpen: (item: PlanningItem) => void; onOperation: (key: string, item: PlanningItem) => void }> = ({ items, groupBy, selectedIds, onSelectionChange, onOpen, onOperation }) => (
+const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<string, PlanningItem[]>; groupBy: TaskGroupBy; selectedIds: string[]; onSelectionChange: (ids: string[]) => void; onOpen: (item: PlanningItem) => void; onOperation: (key: string, item: PlanningItem) => void; employees: string[]; onUpdated: () => void }> = ({ items, childrenByParent, groupBy, selectedIds, onSelectionChange, onOpen, onOperation, employees, onUpdated }) => {
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const rows: Array<{ item: PlanningItem; depth: number }> = [];
+  const append = (item: PlanningItem, depth = 0) => {
+    rows.push({ item, depth });
+    if (expanded.includes(workItemKey(item))) (childrenByParent.get(workItemKey(item)) || []).forEach((child) => append(child, depth + 1));
+  };
+  items.forEach((item) => append(item));
+  return (
   <div className="overflow-x-auto">
     <table className="w-full min-w-[1040px] text-left">
       <thead className="bg-[var(--bg-surface-soft)] text-[11px] text-[var(--text-muted)]">
@@ -278,19 +288,24 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; groupBy: TaskGroupBy; sele
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--border-main)]">
-        {items.map((item, index) => {
+        {rows.map(({ item, depth }, index) => {
           const group = normalizedTaskGroupValue(item, groupBy);
-          const previous = items[index - 1];
+          const previous = rows.slice(0, index).reverse().find((row) => row.depth === 0)?.item;
           const previousGroup = previous && normalizedTaskGroupValue(previous, groupBy);
-          const operationMenu = { items: [{ key: 'child', icon: <PlusOutlined />, label: '添加子任务' }, { key: 'copy', icon: <CopyOutlined />, label: '复制任务' }, { key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' }, { type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true }], onClick: ({ key }: { key: string }) => onOperation(key, item) };
-          return <React.Fragment key={`${item.kind}-${item.id}`}>{groupBy !== 'none' && (index === 0 || group !== previousGroup) && <tr className="bg-[var(--bg-surface-soft)]"><td colSpan={10} className="px-4 py-2 font-semibold text-[var(--text-body)]">{group} · {items.filter((entry) => normalizedTaskGroupValue(entry, groupBy) === group).length}</td></tr>}
+          const children = childrenByParent.get(workItemKey(item)) || [];
+          const open = expanded.includes(workItemKey(item));
+          const operationMenu = { items: [...(item.kind === 'bug' ? [] : [{ key: 'child', icon: <PlusOutlined />, label: '添加子任务' }]), { key: 'copy', icon: <CopyOutlined />, label: '复制任务' }, { key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' }, { type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true }], onClick: ({ key }: { key: string }) => onOperation(key, item) };
+          return <React.Fragment key={workItemKey(item)}>{depth === 0 && groupBy !== 'none' && (index === 0 || group !== previousGroup) && <tr className="bg-[var(--bg-surface-soft)]"><td colSpan={10} className="px-4 py-2 font-semibold text-[var(--text-body)]">{group} · {items.filter((entry) => normalizedTaskGroupValue(entry, groupBy) === group).length}</td></tr>}
           <tr className="hover:bg-[var(--bg-surface-soft)]">
             <td className="px-4 py-3"><input type="checkbox" aria-label={`选择迭代任务：${item.title}`} checked={selectedIds.includes(`${item.kind}:${item.id}`)} onChange={(event) => onSelectionChange(event.target.checked ? [...selectedIds, `${item.kind}:${item.id}`] : selectedIds.filter((id) => id !== `${item.kind}:${item.id}`))} className="h-4 w-4 accent-[var(--primary)]" /></td>
             <td className="max-w-[360px] px-3 py-3">
-              <div className="flex items-center gap-2"><span aria-label={planningKindLabel[item.kind]} title={planningKindLabel[item.kind]}>{planningKindIcon[item.kind]}</span><button type="button" onClick={() => onOpen(item)} className="block max-w-full truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">{item.title}</button></div>
+              <div className="flex items-center gap-2" style={{ paddingLeft: depth * 24 }}>
+                {children.length > 0 ? <button type="button" aria-label={`${open ? '收起' : '展开'}${item.title}`} aria-expanded={open} onClick={() => setExpanded((current) => open ? current.filter((key) => key !== workItemKey(item)) : [...current, workItemKey(item)])} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--primary)]">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button> : <span className="w-4 shrink-0" />}
+                {depth > 0 && <span className="text-[var(--text-muted)]">└─</span>}<span aria-label={planningKindLabel[item.kind]} title={planningKindLabel[item.kind]}>{planningKindIcon[item.kind]}</span><button type="button" onClick={() => onOpen(item)} className="block min-w-0 max-w-full truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">{item.title}</button>
+              </div>
             </td>
-            <td className="px-3 py-3"><StatusTag status={item.status} /></td>
-            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" /></td>
+            <td className="px-3 py-3"><VersionWorkItemCell item={item} field="status" onUpdated={onUpdated} employees={employees} /></td>
+            <td className="px-3 py-3 text-[var(--text-body)]"><VersionWorkItemCell item={item} field="owner" onUpdated={onUpdated} employees={employees} /></td>
             <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.creatorName} emptyLabel="未设置" variant="list" /></td>
             <td className="px-3 py-3 font-mono text-[var(--text-muted)]">{item.createdAt?.slice(0, 10) || '—'}</td>
             <td className="px-3 py-3"><StatusTag status={item.priority} /></td>
@@ -302,7 +317,67 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; groupBy: TaskGroupBy; sele
       </tbody>
     </table>
   </div>
-);
+  );
+};
+
+const VersionWorkItemCell: React.FC<{ item: PlanningItem; field: 'status' | 'owner'; employees: string[]; onUpdated: () => void }> = ({ item, field, employees, onUpdated }) => {
+  const [options, setOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [messageApi, contextHolder] = message.useMessage();
+  const source = item.source as RequirementTask;
+  const editable = Boolean(item.productLineId && Number.isInteger(source.revision) && !source.hasChildren);
+  const open = async () => {
+    if (!editable) return;
+    if (field === 'owner') { setOptions(employees.map((name) => ({ value: name, label: name }))); setEditing(true); return; }
+    setBusy(true);
+    try {
+      const result = await productRepository.workItemTransitions(item.productLineId!, item.id);
+      setOptions(result.statuses.filter((status) => status.allowed && !status.current).map((status) => ({ value: status.key, label: status.name })));
+      setEditing(true);
+    } catch (error) { messageApi.error(error instanceof Error ? error.message : '状态加载失败'); }
+    finally { setBusy(false); }
+  };
+  const change = async (value: string) => {
+    setBusy(true);
+    try {
+      if (field === 'owner') await productRepository.updateWorkItem(item.productLineId!, item.id, { assigneeName: value, revision: source.revision! });
+      else {
+        const result = await productRepository.workItemTransitions(item.productLineId!, item.id);
+        const action = result.actions.find((entry) => entry.to === value && entry.allowed);
+        if (!action) throw new Error('当前状态不可流转到所选状态');
+        await productRepository.transitionWorkItem(item.productLineId!, item.id, { edgeKey: action.edgeKey, revision: result.revision });
+      }
+      setEditing(false);
+      onUpdated();
+    } catch (error) { messageApi.error(error instanceof Error ? error.message : '修改失败'); }
+    finally { setBusy(false); }
+  };
+  return <>{contextHolder}{editing ? <Select autoFocus showSearch optionFilterProp="label" aria-label={`${item.title}${field === 'status' ? '状态' : '负责人'}`} className="min-w-32" placeholder="请选择" options={options} onChange={(value) => void change(value)} onBlur={() => setEditing(false)} loading={busy} /> : <button type="button" onClick={() => void open()} disabled={!editable || busy} title={editable ? `修改${field === 'status' ? '状态' : '负责人'}` : '当前任务不可编辑'} className="inline-flex min-h-8 items-center text-left disabled:cursor-default">{field === 'status' ? <StatusTag status={item.status} /> : <PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" />}</button>}</>;
+};
+
+const PlanningTree: React.FC<{ items: PlanningItem[]; matches?: PlanningItem[]; selectedIds?: string[]; onSelect?: (item: PlanningItem) => void; onOpen: (item: PlanningItem) => void; onDrag: (event: React.DragEvent, item: PlanningItem) => void; onDragEnd: () => void; busy?: boolean }> = ({ items, matches, selectedIds, onSelect, onOpen, onDrag, onDragEnd, busy }) => {
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const tree = workItemHierarchy<PlanningItem>(items, matches);
+  const renderItem = (item: PlanningItem, depth = 0): React.ReactNode => {
+    const key = workItemKey(item);
+    const children = tree.children.get(key) || [];
+    const open = expanded.includes(key);
+    const plannable = !parentWorkItemId(item);
+    return <React.Fragment key={key}>
+      <div draggable={plannable && !busy} onDragStart={(event) => onDrag(event, item)} onDragEnd={onDragEnd} aria-label={plannable ? `拖动工作项：${item.title}` : `子任务：${item.title}`} className={`mb-1 border-b border-[var(--border-main)] px-3 py-3 hover:bg-[var(--bg-surface-soft)] ${plannable && !busy ? 'cursor-grab' : ''}`} style={{ paddingLeft: 12 + depth * 24 }}>
+        <div className="flex items-center gap-2">
+          {onSelect && plannable && <input type="checkbox" aria-label={`选择工作项：${item.title}`} checked={selectedIds?.includes(`${item.kind}:${item.id}`) || false} onChange={() => onSelect(item)} className="h-4 w-4 shrink-0 accent-[var(--primary)]" />}
+          {children.length ? <button type="button" aria-label={`${open ? '收起' : '展开'}${item.title}`} aria-expanded={open} onClick={() => setExpanded((current) => open ? current.filter((value) => value !== key) : [...current, key])} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--primary)]">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button> : <span className="w-4 shrink-0" />}
+          {depth > 0 && <span className="text-[var(--text-muted)]">└─</span>}<span className="shrink-0">{planningKindIcon[item.kind]}</span><button type="button" onClick={() => onOpen(item)} title={item.title} className="min-w-0 flex-1 truncate text-left font-medium text-[var(--text-primary)] hover:text-[var(--primary)]">{item.title}</button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3 pl-6 text-[11px] text-[var(--text-muted)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" /><span>{item.estimatedHours}h</span><StatusTag status={item.priority} /><StatusTag status={item.status} /></div>
+      </div>
+      {open && children.map((child) => renderItem(child, depth + 1))}
+    </React.Fragment>;
+  };
+  return <>{tree.roots.map((item) => renderItem(item))}</>;
+};
 
 export const VersionIterationView: React.FC = () => {
   const {
@@ -351,6 +426,7 @@ export const VersionIterationView: React.FC = () => {
   const [testItems, setTestItems] = useState<UnifiedWorkItem[]>([]);
   const [testItemsError, setTestItemsError] = useState(false);
   const [testItemsReloadKey, setTestItemsReloadKey] = useState(0);
+  const [workItemsReloadKey, setWorkItemsReloadKey] = useState(0);
   const [taskStatus, setTaskStatus] = useState('all');
   const [taskOwner, setTaskOwner] = useState('all');
   const [taskTitleFilter, setTaskTitleFilter] = useState('');
@@ -378,7 +454,7 @@ export const VersionIterationView: React.FC = () => {
   const [planningSearchOpen, setPlanningSearchOpen] = useState(false);
   const [planningQuery, setPlanningQuery] = useState('');
   const [planningFilterOpen, setPlanningFilterOpen] = useState(false);
-  const [planningKinds, setPlanningKinds] = useState<PlanningKind[]>(['requirement', 'design', 'bug', 'dev']);
+  const [planningKinds, setPlanningKinds] = useState<PlanningKind[]>(['requirement', 'design', 'bug', 'dev', 'test']);
   const [planningStatuses, setPlanningStatuses] = useState<string[]>([]);
   const [planningPriorities, setPlanningPriorities] = useState<string[]>([]);
   const [planningOwners, setPlanningOwners] = useState<string[]>([]);
@@ -476,6 +552,7 @@ export const VersionIterationView: React.FC = () => {
   const selectedVersionProductLineId = selectedVersion?.productLineId
     || productLines.find((line) => line.name === selectedVersion?.productLineName)?.id
     || (productLineFilter !== 'all' ? productLineFilter : '');
+  const planningLineIdsKey = (productLineFilter === 'all' ? productLines.map((line) => line.id) : [productLineFilter]).join(',');
 
   useEffect(() => {
     setTestItems([]);
@@ -501,20 +578,19 @@ export const VersionIterationView: React.FC = () => {
   }, [selectedVersionProductLineId, showDetail, testItemsReloadKey]);
 
   useEffect(() => {
-    if (!showDetail || !selectedVersionProductLineId || !sessionStorage.getItem('shichuang.session.token')) return;
+    if ((!showDetail && mode !== 'planning') || !sessionStorage.getItem('shichuang.session.token')) return;
     let active = true;
     const load = async () => {
       const items: UnifiedWorkItem[] = [];
-      for (let page = 1; page <= 100; page += 1) {
-        const result = await productRepository.workItems(selectedVersionProductLineId, '', '', { page, pageSize: 100 });
-        items.push(...result.page.items);
-        if (!result.page.items.length || items.length >= result.page.total) break;
+      const lineIds = showDetail ? [selectedVersionProductLineId] : planningLineIdsKey.split(',');
+      for (const lineId of lineIds.filter(Boolean)) {
+        items.push(...await productRepository.iterationTimeline(lineId));
       }
       if (active) setRecentItems(items);
     };
     load().catch(() => { if (active) addToast('error', '工作项列表刷新失败'); });
     return () => { active = false; };
-  }, [showDetail, selectedVersionProductLineId]);
+  }, [showDetail, mode, planningLineIdsKey, selectedVersionProductLineId, workItemsReloadKey]);
 
   useEffect(() => {
     if (!createTaskKind || !selectedVersionProductLineId) return;
@@ -548,16 +624,28 @@ export const VersionIterationView: React.FC = () => {
     () => (selectedVersion ? bugs.filter((item) => versionMatches(selectedVersion, item.versionName)) : []),
     [bugs, selectedVersion]
   );
-  const planningItems = useMemo<PlanningItem[]>(() => [
+  const planningItems = useMemo<PlanningItem[]>(() => {
+    const items: PlanningItem[] = [
+    ...recentItems.map((item) => {
+      const source = { ...item, workItemTypeId: item.taskTypeId || undefined, status: item.status?.name || '未设置', ownerName: item.assigneeName || '', versionId: item.versionId || '', versionName: selectedVersion?.id === item.versionId ? selectedVersion.name : '', productLineName: selectedVersion?.productLineName || '', description: '', dueDate: item.dueDate || '', estimatedHours: item.estimatedHours || 0 } as RequirementTask;
+      return { id: item.id, kind: item.category as PlanningKind, title: item.title, ownerName: source.ownerName, creatorName: item.creatorName, createdAt: item.createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: source.status, productLineId: item.productLineId, versionId: item.versionId || undefined, versionName: source.versionName, source };
+    }),
     ...requirementTasks.map((item) => ({ id: item.id, kind: 'requirement' as const, title: item.title, ownerName: item.ownerName || '', creatorName: item.creatorName, createdAt: item.createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: item.versionId, versionName: item.versionName, source: item })),
     ...designTasks.map((item) => ({ id: item.id, kind: 'design' as const, title: item.title, ownerName: item.ownerName || '', creatorName: item.creatorName, createdAt: item.createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: item.versionId, versionName: item.versionName, source: item })),
     ...bugs.map((item) => ({ id: item.id, kind: 'bug' as const, title: item.title, ownerName: item.ownerName || item.assignee || '', creatorName: item.creatorName || item.creator, createdAt: item.createdAt, estimatedHours: (item as DefectBug & { estimatedHours?: number }).estimatedHours || 0, actualHours: (item as DefectBug & { actualHours?: number }).actualHours || 0, priority: item.priority || '中', status: item.status, productLineId: item.productLineId, versionId: (item as DefectBug & { versionId?: string }).versionId, versionName: item.versionName, source: item })),
     ...devTasks.map((item) => ({ id: item.id, kind: 'dev' as const, title: item.title, ownerName: item.developer || '', creatorName: (item as DevTask & { creatorName?: string }).creatorName, createdAt: (item as DevTask & { createdAt?: string }).createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.spentHours || 0, priority: item.priority || '中', status: item.status, productLineId: (item as DevTask & { productLineId?: string }).productLineId, versionId: (item as DevTask & { versionId?: string }).versionId, versionName: item.versionName, source: item })),
-    ...[...testItems, ...recentItems].map((item) => {
+    ...testItems.map((item) => {
       const source = { ...item, workItemTypeId: item.taskTypeId || undefined, status: item.status?.name || '未设置', ownerName: item.assigneeName || '', versionId: item.versionId || '', versionName: selectedVersion?.id === item.versionId ? selectedVersion.name : '', productLineName: selectedVersion?.productLineName || '', description: '', dueDate: item.dueDate || '', estimatedHours: item.estimatedHours || 0 } as RequirementTask;
       return { id: item.id, kind: item.category as PlanningKind, title: item.title, ownerName: source.ownerName, creatorName: item.creatorName, createdAt: item.createdAt, estimatedHours: item.estimatedHours || 0, actualHours: item.actualHours || 0, priority: item.priority || '中', status: source.status, productLineId: item.productLineId, versionId: item.versionId || undefined, versionName: source.versionName, source };
     })
-  ], [bugs, designTasks, devTasks, recentItems, requirementTasks, selectedVersion, testItems]);
+    ];
+    const unique = new Map<string, PlanningItem>();
+    for (const item of items) {
+      if (!(item.kind in planningKindLabel) || unique.has(workItemKey(item))) continue;
+      unique.set(workItemKey(item), item);
+    }
+    return [...unique.values()];
+  }, [bugs, designTasks, devTasks, recentItems, requirementTasks, selectedVersion, testItems]);
 
   const unplannedWorkItems = useMemo(() => planningItems.filter((item) => {
     const matchesLine = productLineFilter === 'all' || item.productLineId === productLineFilter;
@@ -568,6 +656,9 @@ export const VersionIterationView: React.FC = () => {
     const matchesOwner = !planningOwners.length || planningOwners.includes(item.ownerName);
     return !item.versionId && !item.versionName && matchesLine && matchesText && matchesKind && matchesStatus && matchesPriority && matchesOwner;
   }), [planningItems, planningKinds, planningOwners, planningPriorities, planningQuery, planningStatuses, productLineFilter]);
+  const unplannedCandidates = planningItems.filter((item) => !item.versionId && !item.versionName && (productLineFilter === 'all' || item.productLineId === productLineFilter));
+  const unplannedRoots = workItemHierarchy(unplannedCandidates, unplannedWorkItems).roots;
+  const plannableRoots = unplannedRoots.filter((item) => !parentWorkItemId(item));
 
   const plannedWorkItems = useMemo(() => {
     const result = new Map<string, PlanningItem[]>();
@@ -659,20 +750,22 @@ export const VersionIterationView: React.FC = () => {
   const renderProductNavigation = () => <ProductNavigation productLines={productLines} value={productLineFilter} onChange={setProductLineFilter} />;
 
   const assignPlanningItem = async (item: PlanningItem, version: VersionIteration) => {
+    if (parentWorkItemId(item)) { addToast('warning', '请通过主任务规划子任务'); return; }
     if (assigningRequirementId) return;
     setAssigningRequirementId(item.id);
-    const saved = item.kind === 'requirement'
+    const saved = item.kind === 'requirement' && !assignWorkItemToVersion
       ? await assignRequirementToVersion(item.id, version.id)
       : await assignWorkItemToVersion?.(item.kind, item.id, version.id);
     setAssigningRequirementId(null);
     setDraggedWorkItem(null);
     setDropTargetVersionId(null);
-    if (saved) addToast('success', '工作项已加入迭代', `${item.title} → ${version.name}`);
+    if (saved) { setWorkItemsReloadKey((value) => value + 1); addToast('success', '工作项已加入迭代', `${item.title} → ${version.name}`); }
   };
 
   const unassignPlanningItem = async (item: PlanningItem, version: VersionIteration) => {
+    if (parentWorkItemId(item)) { addToast('warning', '请通过主任务移出子任务'); return; }
     const saved = await unassignWorkItemFromVersion?.(item.kind, item.id, version.id);
-    if (saved) addToast('success', '工作项已移出迭代', item.title);
+    if (saved) { setWorkItemsReloadKey((value) => value + 1); addToast('success', '工作项已移出迭代', item.title); }
   };
 
   const tabButton = (key: ViewMode, label: string, icon: React.ReactNode) => (
@@ -750,12 +843,12 @@ export const VersionIterationView: React.FC = () => {
     const source = { ...(item.source as PlanningItem['source'] & Record<string, unknown>), ...(persisted || {}) } as PlanningItem['source'] & Record<string, unknown>;
     const productLineId = item.productLineId || selectedVersionProductLineId;
     if (key === 'child') {
-      if (item.kind === 'requirement' || item.kind === 'dev' || item.kind === 'test' || item.kind === 'bug') createIterationTask(item.kind, item);
+      if (item.kind === 'requirement' || item.kind === 'dev' || item.kind === 'test') createIterationTask(item.kind, item);
       else addToast('warning', '该工作项类型暂不支持直接添加子任务');
       return;
     }
     if (!productLineId) {
-      addToast('warning', '工作项缺少产品线，无法操作');
+      addToast('warning', '工作项缺少产品，无法操作');
       return;
     }
     if (key === 'copy' || key === 'copy-link') {
@@ -842,7 +935,7 @@ export const VersionIterationView: React.FC = () => {
                     <td className="px-3 py-3 font-mono text-[var(--text-body)]">{version.code || '--'}</td>
                     <td className="px-3 py-3"><StatusTag status={normalizeVersionStatus(version.status, version.statusPhase)} /></td>
                     <td className="px-3 py-3 text-[var(--text-body)]">{version.startDate || '--'} ~ {version.endDate || version.releaseDate || '--'}</td>
-                    <td className="max-w-48 px-3 py-3 text-[var(--text-body)]"><span className="block truncate" title={version.productLineName || '未关联产品线'}>{version.productLineName || '未关联产品线'}</span></td>
+                    <td className="max-w-48 px-3 py-3 text-[var(--text-body)]"><span className="block truncate" title={version.productLineName || '未关联产品'}>{version.productLineName || '未关联产品'}</span></td>
                     <td className="px-3 py-3"><PersonIdentity name={version.ownerName} emptyLabel="未分配" variant="list" /></td>
                     <td className="px-3 py-3">
                       <div className="flex min-w-44 items-center gap-2">
@@ -946,7 +1039,8 @@ export const VersionIterationView: React.FC = () => {
       : [...new Set(filteredItems.map((item) => normalizedTaskGroupValue(item, taskGroupBy)))].map((value) => ({ value, count: filteredItems.filter((item) => normalizedTaskGroupValue(item, taskGroupBy) === value).length }));
     const effectiveTaskGroupValue = taskGroupBy === 'none' ? '' : taskGroupEntries.some((entry) => entry.value === taskGroupSelection) ? taskGroupSelection : taskGroupEntries[0]?.value || '';
     const visibleTaskItems = taskGroupBy === 'none' || !effectiveTaskGroupValue ? filteredItems : filteredItems.filter((item) => normalizedTaskGroupValue(item, taskGroupBy) === effectiveTaskGroupValue);
-    const pagedItems = visibleTaskItems.slice((taskPage - 1) * taskPageSize, taskPage * taskPageSize);
+    const taskTree = workItemHierarchy(selectedItems, visibleTaskItems);
+    const pagedItems = taskTree.roots.slice((taskPage - 1) * taskPageSize, taskPage * taskPageSize);
     const emptyTaskFilters = (): UnifiedFilterState => ({ title: '', status: [], owner: [], creator: [], customer: [], version: [], cc: [], createdAt: ['', ''], plannedStartDate: ['', ''], operators: {}, dateOperators: {} });
     const appliedTaskFilterLabels = [
       taskFilters.title.trim() ? { key: 'title', text: `标题：${taskFilters.title.trim()}` } : null,
@@ -1016,7 +1110,7 @@ export const VersionIterationView: React.FC = () => {
                   className={`mb-1 w-full rounded-md border p-3 text-left transition ${active ? 'border-[var(--primary)] bg-[var(--bg-surface)] shadow-sm' : 'border-transparent hover:border-[var(--border-main)] hover:bg-[var(--bg-surface)]'}`}
                 >
                   <div className="truncate font-medium text-[var(--text-primary)]">{version.name}</div>
-                  <div className="mt-1 truncate text-[11px] text-[var(--text-muted)]">{version.productLineName || '未关联产品线'}</div>
+                  <div className="mt-1 truncate text-[11px] text-[var(--text-muted)]">{version.productLineName || '未关联产品'}</div>
                   <div className="mt-3 flex items-center gap-2">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--border-main)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${progress}%` }} /></div>
                     <span className="text-[10px] text-[var(--text-muted)]">{progress}%</span>
@@ -1072,7 +1166,7 @@ export const VersionIterationView: React.FC = () => {
                 {detailTab === 'hours' && <div className="space-y-3"><div className="grid gap-3 lg:grid-cols-2"><section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><h3 className="text-sm font-semibold text-[var(--text-primary)]">工作项分布</h3><div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3"><Metric label="工作项总数" value={`${selectedStats.total} 个`} /><Metric label="工作项完成数" value={`${selectedStats.completed} 个`} /><Metric label="工作项未完成数" value={`${selectedStats.total - selectedStats.completed} 个`} /></div></section><section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><h3 className="text-sm font-semibold text-[var(--text-primary)]">迭代工时概览</h3><div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3"><Metric label="预计工时" value={`${estimatedHours} 小时`} /><Metric label="实际工时" value={`${actualHours} 小时`} /><Metric label="预计偏差" value={`${actualHours - estimatedHours} 小时`} /></div></section></div><div className="grid gap-3 lg:grid-cols-2"><section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-[var(--text-primary)]">工作项排名</h3><div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[var(--primary)]" />完成</span><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[var(--active-text)]/40" />总量</span></div></div><div className="mt-5 space-y-4">{memberStats.length ? memberStats.map((member) => <div key={`work-${member.name}`} className="grid grid-cols-[72px_minmax(0,1fr)_52px] items-center gap-2 text-xs"><span className="truncate text-[var(--text-muted)]" title={member.name}>{member.name}</span><div className="space-y-1"><div className="h-2 overflow-hidden rounded-full bg-[var(--active-text)]/20"><div className="h-full rounded-full bg-[var(--active-text)]/45" style={{ width: `${selectedStats.total ? (member.total / selectedStats.total) * 100 : 0}%` }}><div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${member.total ? (member.completed / member.total) * 100 : 0}%` }} /></div></div></div><span className="text-right text-[var(--text-muted)]">{member.completed}/{member.total}</span></div>) : <p className="py-6 text-center text-xs text-[var(--text-muted)]">暂无成员工作项</p>}</div></section><section className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-[var(--text-primary)]">工时排名</h3><div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[var(--primary)]" />实际工时(小时)</span><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[var(--active-text)]/40" />预计工时(小时)</span></div></div><div className="mt-5 space-y-4">{memberStats.length ? memberStats.map((member) => <div key={`hours-${member.name}`} className="grid grid-cols-[72px_minmax(0,1fr)_52px] items-center gap-2 text-xs"><span className="truncate text-[var(--text-muted)]" title={member.name}>{member.name}</span><div className="space-y-1"><div className="h-2 overflow-hidden rounded-full bg-[var(--active-text)]/20"><div className="h-full rounded-full bg-[var(--active-text)]/45" style={{ width: `${estimatedHours ? (member.estimated / estimatedHours) * 100 : 0}%` }}><div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${estimatedHours ? (member.actual / estimatedHours) * 100 : 0}%` }} /></div></div></div><span className="text-right text-[var(--text-muted)]">{member.actual}/{member.estimated}</span></div>) : <p className="py-6 text-center text-xs text-[var(--text-muted)]">暂无成员工时</p>}</div></section></div></div>}
                 {detailTab === 'testReports' && (selectedVersionProductLineId
                   ? <VersionTestReportPanel productLineId={selectedVersionProductLineId} versionId={selectedVersion.id} versionName={selectedVersion.name} />
-                  : <Alert type="error" showIcon title="测试报告加载失败" description="当前迭代未关联有效产品线，请先修正迭代归属。" />)}
+                  : <Alert type="error" showIcon title="测试报告加载失败" description="当前迭代未关联有效产品，请先修正迭代归属。" />)}
                 {detailTab === 'review' && <EmptyState icon={<CheckCircle className="h-5 w-5" />} title="暂无版本评审" description="当前迭代还没有版本评审记录。" />}
               </div>
               </>}
@@ -1091,8 +1185,8 @@ export const VersionIterationView: React.FC = () => {
                 </div>}
                 <div ref={setTaskFilterTarget} className="empty:hidden" />
                 {testItemsError && <Alert type="warning" showIcon title="测试任务加载失败，其他任务仍可查看" description="请稍后重试。" action={<Button size="small" onClick={() => setTestItemsReloadKey((value) => value + 1)}>重试</Button>} />}
-                <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{filteredItems.length ? <WorkItemRows items={pagedItems} groupBy={taskGroupBy} selectedIds={selectedTaskIds} onSelectionChange={setSelectedTaskIds} onOperation={(key, item) => void operatePlanningItem(key, item)} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'test' ? openTestTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无匹配工作项" description="当前迭代无对应任务，请调整筛选条件或新建任务。" />}</div>
-                <Pagination total={filteredItems.length} page={taskPage} pageSize={taskPageSize} onPageChange={setTaskPage} onPageSizeChange={(size) => { setTaskPageSize(size); setTaskPage(1); }} />
+                <div className="overflow-hidden rounded-lg border border-[var(--border-main)]"><WorkItemBatchBar targets={selectedItems.filter((item) => selectedTaskIds.includes(`${item.kind}:${item.id}`)).map((item) => ({ id: item.id, category: item.kind, productLineId: item.productLineId, revision: (item.source as RequirementTask).revision }))} versions={versions.map((version) => ({ value: version.id, label: version.name, productLineId: version.productLineId }))} employees={directoryOwnerNames.map((name) => ({ value: name, label: name }))} onCancel={() => setSelectedTaskIds([])} onComplete={() => { setWorkItemsReloadKey((value) => value + 1); setTestItemsReloadKey((value) => value + 1); }} />{filteredItems.length ? <WorkItemRows items={pagedItems} childrenByParent={taskTree.children} groupBy={taskGroupBy} selectedIds={selectedTaskIds} onSelectionChange={setSelectedTaskIds} onOperation={(key, item) => void operatePlanningItem(key, item)} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'test' ? openTestTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} employees={directoryOwnerNames} onUpdated={() => setWorkItemsReloadKey((value) => value + 1)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无匹配工作项" description="当前迭代无对应任务，请调整筛选条件或新建任务。" />}</div>
+                <Pagination total={taskTree.roots.length} page={taskPage} pageSize={taskPageSize} onPageChange={setTaskPage} onPageSizeChange={(size) => { setTaskPageSize(size); setTaskPage(1); }} />
               </div>}
             </>
           ) : <EmptyState icon={<GitBranch className="h-5 w-5" />} title="暂无迭代" description="创建一个迭代后即可查看详情。" />}
@@ -1110,9 +1204,9 @@ export const VersionIterationView: React.FC = () => {
               <input
                 type="checkbox"
                 aria-label="全选待规划工作项"
-                checked={unplannedWorkItems.length > 0 && unplannedWorkItems.every((item) => selectedPlanningItemIds.includes(`${item.kind}:${item.id}`))}
+                checked={plannableRoots.length > 0 && plannableRoots.every((item) => selectedPlanningItemIds.includes(`${item.kind}:${item.id}`))}
                 onChange={() => {
-                  const visibleIds = unplannedWorkItems.map((item) => `${item.kind}:${item.id}`);
+                  const visibleIds = plannableRoots.map((item) => `${item.kind}:${item.id}`);
                   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedPlanningItemIds.includes(id));
                   setSelectedPlanningItemIds((current) => allSelected
                     ? current.filter((id) => !visibleIds.includes(id))
@@ -1120,28 +1214,25 @@ export const VersionIterationView: React.FC = () => {
                 }}
                 className="h-4 w-4 shrink-0 accent-[var(--primary)]"
               />
-              <span className="truncate font-semibold">待规划工作项 · {unplannedWorkItems.length}</span>
+              <span className="truncate font-semibold">待规划工作项 · {unplannedRoots.length}</span>
               <span className="hidden text-[11px] font-normal text-[var(--text-muted)] sm:inline">可拖动到右侧迭代</span>
             </label>
             <div className="flex items-center gap-1.5">
               <div data-planning-search className={`flex items-center overflow-hidden transition-all duration-300 ${planningSearchOpen ? 'w-44 opacity-100' : 'w-0 opacity-0'}`}><input autoFocus={planningSearchOpen} value={planningQuery} onChange={(event) => setPlanningQuery(event.target.value)} placeholder="输入关键词" className="app-control h-8 w-44 px-2 text-xs" /></div>
               <button type="button" aria-label="搜索待规划工作项" onClick={(event) => { event.stopPropagation(); setPlanningSearchOpen(true); }} className={`rounded p-1.5 ${planningQuery.trim() ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--primary)]'}`}><Search className="h-4 w-4" /></button>
               <div data-planning-filter>
-                <button type="button" aria-label="过滤待规划工作项" onClick={() => setPlanningFilterOpen((open) => !open)} className={`rounded p-1.5 ${planningFilterOpen || planningStatuses.length || planningPriorities.length || planningOwners.length || planningKinds.length < 4 ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--primary)]'}`}><Filter className="h-4 w-4" /></button>
+                <button type="button" aria-label="过滤待规划工作项" onClick={() => setPlanningFilterOpen((open) => !open)} className={`rounded p-1.5 ${planningFilterOpen || planningStatuses.length || planningPriorities.length || planningOwners.length || planningKinds.length < 5 ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--primary)]'}`}><Filter className="h-4 w-4" /></button>
               </div>
             </div>
           </div>
           {planningFilterOpen && <div className="space-y-3 border-t border-[var(--border-main)] py-3" data-testid="planning-filter-panel" data-planning-filter>
             <div><div className="mb-2 font-medium text-[var(--text-muted)]">工作项类型</div><div className="flex flex-wrap gap-4">{(Object.keys(planningKindLabel) as PlanningKind[]).map((kind) => <label key={kind} className="inline-flex items-center gap-2 text-[var(--text-body)]"><input type="checkbox" checked={planningKinds.includes(kind)} onChange={() => setPlanningKinds((current) => current.includes(kind) ? current.filter((value) => value !== kind) : [...current, kind])} className="h-4 w-4 accent-[var(--primary)]" />{planningKindLabel[kind]}</label>)}</div></div>
             <div className="space-y-3"><label className="block space-y-1"><span className="block text-[var(--text-muted)]">状态</span><Select mode="multiple" showSearch allowClear value={planningStatuses} onChange={setPlanningStatuses} options={filterOptions.statuses.map((value) => ({ value, label: value }))} placeholder="请选择或输入关键词查询" getPopupContainer={(trigger) => trigger.parentElement || document.body} className="w-full" /></label><label className="block space-y-1"><span className="block text-[var(--text-muted)]">优先级</span><Select mode="multiple" showSearch allowClear value={planningPriorities} onChange={setPlanningPriorities} options={filterOptions.priorities.map((value) => ({ value, label: value }))} placeholder="请选择" getPopupContainer={(trigger) => trigger.parentElement || document.body} className="w-full" /></label><label className="block space-y-1"><span className="block text-[var(--text-muted)]">负责人</span><Select mode="multiple" showSearch allowClear value={planningOwners} onChange={setPlanningOwners} options={filterOptions.owners.map((value) => ({ value, label: value }))} placeholder="请选择" getPopupContainer={(trigger) => trigger.parentElement || document.body} className="w-full" /></label></div>
-            <button type="button" aria-label="重置过滤器" onClick={() => { setPlanningKinds(['requirement', 'design', 'bug', 'dev']); setPlanningStatuses([]); setPlanningPriorities([]); setPlanningOwners([]); setPlanningQuery(''); }} className="inline-flex items-center gap-1 text-xs text-[var(--primary)]"><Undo2 className="h-3.5 w-3.5" />重置</button>
+            <button type="button" aria-label="重置过滤器" onClick={() => { setPlanningKinds(['requirement', 'design', 'bug', 'dev', 'test']); setPlanningStatuses([]); setPlanningPriorities([]); setPlanningOwners([]); setPlanningQuery(''); }} className="inline-flex items-center gap-1 text-xs text-[var(--primary)]"><Undo2 className="h-3.5 w-3.5" />重置</button>
           </div>}
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          {unplannedWorkItems.slice(0, 100).map((item) => <div key={`${item.kind}-${item.id}`} draggable={!assigningRequirementId} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', JSON.stringify({ id: item.id, kind: item.kind })); setDraggedWorkItem(item); }} onDragEnd={() => { setDraggedWorkItem(null); setDropTargetVersionId(null); }} className={`mb-1 rounded-md border p-3 transition-all ${assigningRequirementId === item.id ? 'cursor-wait border-[var(--primary)] opacity-60' : draggedWorkItem?.id === item.id ? 'cursor-grabbing border-[var(--primary)] bg-[var(--bg-surface-soft)] opacity-70' : 'cursor-grab border-transparent hover:border-[var(--border-main)] hover:bg-[var(--bg-surface-soft)]'}`} aria-label={`拖动工作项：${item.title}`}>
-            <div className="flex items-start gap-2"><input type="checkbox" aria-label={`选择工作项：${item.title}`} checked={selectedPlanningItemIds.includes(`${item.kind}:${item.id}`)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" onChange={() => setSelectedPlanningItemIds((current) => current.includes(`${item.kind}:${item.id}`) ? current.filter((value) => value !== `${item.kind}:${item.id}`) : [...current, `${item.kind}:${item.id}`])} onClick={(event) => event.stopPropagation()} /><span className="mt-0.5 shrink-0">{planningKindIcon[item.kind]}</span><button type="button" onClick={() => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} className="min-w-0 truncate text-left font-semibold text-[var(--text-primary)] hover:text-[var(--primary)]">{item.title.length > 30 ? `${item.title.slice(0, 30)}...` : item.title}</button></div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-6 text-[11px] text-[var(--text-muted)]"><span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />{item.ownerName || '未分配'}</span><span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{item.estimatedHours}h</span><StatusTag status={item.priority} /><StatusTag status={item.status} /></div>
-          </div>)}
+          <PlanningTree items={unplannedCandidates} matches={unplannedWorkItems} selectedIds={selectedPlanningItemIds} onSelect={(item) => setSelectedPlanningItemIds((current) => current.includes(`${item.kind}:${item.id}`) ? current.filter((value) => value !== `${item.kind}:${item.id}`) : [...current, `${item.kind}:${item.id}`])} onOpen={openWorkItemDetail} busy={Boolean(assigningRequirementId)} onDrag={(event, item) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", JSON.stringify({ id: item.id, kind: item.kind })); setDraggedWorkItem(item); }} onDragEnd={() => { setDraggedWorkItem(null); setDropTargetVersionId(null); }} />
           {unplannedWorkItems.length === 0 && <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无待规划工作项" description="所有工作项都已加入迭代。" />}
         </div>
       </section>
@@ -1150,7 +1241,7 @@ export const VersionIterationView: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-2">{visibleVersions.map((version) => { const versionItems = plannedWorkItems.get(version.id) || []; const stats = getVersionStats(version); const progress = stats.total ? Math.round((stats.completed / stats.total) * 100) : 0; const expanded = expandedVersionIds.includes(version.id); return <div key={version.id} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropTargetVersionId(version.id); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTargetVersionId(null); }} onDrop={(event) => { event.preventDefault(); const raw = event.dataTransfer.getData('text/plain') || ''; let payload: { id: string; kind: PlanningKind } | null = null; try { payload = raw ? JSON.parse(raw) : null; } catch { payload = raw ? { id: raw, kind: 'requirement' } : null; } const item = payload ? planningItems.find((candidate) => candidate.id === payload?.id && candidate.kind === payload?.kind) : draggedWorkItem; if (item) void assignPlanningItem(item, version); }} className={`mb-2 rounded-md border p-3 transition-all ${dropTargetVersionId === version.id ? 'border-[var(--primary)] bg-[var(--bg-surface-soft)] shadow-sm' : selectedVersion?.id === version.id ? 'border-[var(--primary)] bg-[var(--bg-surface-soft)]' : 'border-transparent hover:border-[var(--border-main)]'}`} aria-label={`迭代版本：${version.name}`}>
             <div className="flex items-center gap-3"><button type="button" onClick={() => { setSelectedId(version.id); setExpandedVersionIds((current) => current.includes(version.id) ? current.filter((id) => id !== version.id) : [...current, version.id]); }} className="min-w-0 flex-1 truncate text-left font-semibold text-[var(--text-primary)] hover:text-[var(--primary)]">{version.name.length > 20 ? `${version.name.slice(0, 20)}...` : version.name}</button><span className="text-[var(--text-muted)]">{versionItems.length}</span><button type="button" aria-label={expanded ? `收起${version.name}` : `展开${version.name}`} onClick={() => setExpandedVersionIds((current) => current.includes(version.id) ? current.filter((id) => id !== version.id) : [...current, version.id])} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--primary)]">{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button><StatusTag status={normalizeVersionStatus(version.status, version.statusPhase)} /></div>
             <div className="mt-2 flex items-center gap-3 text-[11px] text-[var(--text-muted)]"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--border-main)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${progress}%` }} /></div><span>{stats.completed}/{stats.total}</span></div>
-            {expanded && <div className="mt-3 space-y-1 border-t border-[var(--border-main)] pt-2">{versionItems.length ? versionItems.map((item) => <div key={`${item.kind}-${item.id}`} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', JSON.stringify({ id: item.id, kind: item.kind, fromVersionId: version.id })); setDraggedWorkItem(item); }} className="rounded-md border border-[var(--border-main)] bg-[var(--bg-surface)] p-2"><div className="flex items-center gap-2"><span>{planningKindIcon[item.kind]}</span><button type="button" onClick={() => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} className="min-w-0 flex-1 truncate text-left font-medium text-[var(--text-primary)] hover:text-[var(--primary)]">{item.title.length > 30 ? `${item.title.slice(0, 30)}...` : item.title}</button></div><div className="mt-1 flex gap-3 pl-6 text-[11px] text-[var(--text-muted)]"><span>{item.ownerName || '未分配'}</span><span>{item.estimatedHours}h</span><StatusTag status={item.priority} /><StatusTag status={item.status} /></div></div>) : <div className="px-2 py-3 text-center text-xs text-[var(--text-muted)]">该版本暂无工作项</div>}</div>}
+            {expanded && <div className="mt-3 border-t border-[var(--border-main)] pt-2">{versionItems.length ? <PlanningTree items={versionItems} onOpen={openWorkItemDetail} busy={Boolean(assigningRequirementId)} onDrag={(event, item) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", JSON.stringify({ id: item.id, kind: item.kind, fromVersionId: version.id })); setDraggedWorkItem(item); }} onDragEnd={() => { setDraggedWorkItem(null); setDropTargetVersionId(null); }} /> : <div className="px-2 py-3 text-center text-xs text-[var(--text-muted)]">该版本暂无工作项</div>}</div>}
             {dropTargetVersionId === version.id && <div className="mt-2 rounded-md border border-dashed border-[var(--primary)] px-3 py-2 text-center text-[11px] font-semibold text-[var(--primary)]">释放后加入该迭代</div>}
           </div>; })}{visibleVersions.length === 0 && <EmptyState icon={<GitBranch className="h-5 w-5" />} title="暂无可用迭代" description="请先创建迭代，再安排工作项。" />}</div>
       </section>

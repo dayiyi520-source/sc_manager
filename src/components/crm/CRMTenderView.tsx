@@ -262,7 +262,7 @@ export const CRMTenderView: React.FC = () => {
     setFormPriority(tender.priority || '高');
     setFormAssignedTo(tender.assignedTo || '周市场');
     setFormOpportunity(tender.relatedOpportunity || `${tender.potentialCustomer}AI项目商机`);
-    setFormRemarks(tender.remarks || '已确认客户采购编制计划，符合我司产品线，准备跟进。');
+    setFormRemarks(tender.remarks || '已确认客户采购编制计划，符合我司产品，准备跟进。');
     setIsTrackModalOpen(true);
   };
 
@@ -670,7 +670,7 @@ export const CRMTenderView: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* 第三行：匹配度、产品线与操作按键 */}
+                    {/* 第三行：匹配度、产品与操作按键 */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[var(--border-main)]/40 text-xs">
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* 匹配度 */}
@@ -679,10 +679,10 @@ export const CRMTenderView: React.FC = () => {
                           匹配度 {tender.matchRate}% ({tender.matchLevel})
                         </span>
 
-                        {/* 产品线 */}
+                        {/* 产品 */}
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--bg-elevated)] border border-[var(--border-main)] text-[var(--text-muted)] text-[11px]">
                           <Layers className="w-3 h-3" />
-                          产品线: {tender.productLine}
+                          产品: {tender.productLine}
                         </span>
 
                         {tender.assignedTo && (
@@ -761,7 +761,7 @@ export const CRMTenderView: React.FC = () => {
                     <th className="p-3">规则名称</th>
                     <th className="p-3">核心匹配关键词</th>
                     <th className="p-3">行业范围</th>
-                    <th className="p-3">对应产品线</th>
+                    <th className="p-3">对应产品</th>
                     <th className="p-3">基础规则权重</th>
                     <th className="p-3">匹配联动动作</th>
                     <th className="p-3">状态</th>
@@ -1080,7 +1080,7 @@ export const CRMTenderView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[var(--text-muted)] mb-1">关联公司产品线</label>
+              <label className="block text-[var(--text-muted)] mb-1">关联公司产品</label>
               <select
                 value={ruleProductLine}
                 onChange={(e) => setRuleProductLine(e.target.value)}

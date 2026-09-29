@@ -21,7 +21,7 @@ vi.mock('../../services/productRepository', () => ({ productRepository: {
   updateVersionTestReport: vi.fn(),
   deleteVersionTestReport: vi.fn(),
 } }));
-vi.mock('../../context/AppContext', () => ({ useApp: () => ({ productLines: [{ id: 'line-1', name: '核心产品线', versions: [{ id: 'version-1', name: '秋季迭代' }] }] }) }));
+vi.mock('../../context/AppContext', () => ({ useApp: () => ({ productLines: [{ id: 'line-1', name: '核心产品', versions: [{ id: 'version-1', name: '秋季迭代' }] }] }) }));
 vi.mock('./LazyRichTextEditor', () => ({ LazyRichTextEditor: () => <div>报告总结编辑器</div> }));
 
 const renderPanel = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><VersionTestReportPanel productLineId="line-1" versionId="version-1" versionName="秋季迭代" /></QueryClientProvider>);
@@ -44,18 +44,18 @@ describe('VersionTestReportPanel', () => {
     expect(screen.getByRole('dialog', { name: '新建测试报告' })).toBeInTheDocument();
     expect(screen.getByLabelText('报告名称')).toBeInTheDocument();
     expect(screen.getByLabelText('报告类型')).toBeInTheDocument();
-    expect(screen.getByLabelText('选择产品线')).toBeInTheDocument();
+    expect(screen.getByLabelText('选择产品')).toBeInTheDocument();
     expect(screen.getByLabelText('选择迭代')).toBeInTheDocument();
     expect(screen.getByLabelText('关联计划')).toBeInTheDocument();
   });
 
   it('renders report list fields and the top-right create action', async () => {
-    mocks.versionTestReports.mockResolvedValue([{ id: 'report-1', name: '回归报告', reportType: '回归测试', productLineName: '核心产品线', versionName: '秋季迭代', creatorName: '张三', firstPlanName: '冒烟计划', planCount: 2, revision: 0, createdAt: '2026-09-19T10:00:00', updatedAt: '2026-09-19T10:00:00' }]);
+    mocks.versionTestReports.mockResolvedValue([{ id: 'report-1', name: '回归报告', reportType: '回归测试', productLineName: '核心产品', versionName: '秋季迭代', creatorName: '张三', firstPlanName: '冒烟计划', planCount: 2, revision: 0, createdAt: '2026-09-19T10:00:00', updatedAt: '2026-09-19T10:00:00' }]);
     renderPanel();
     expect(await screen.findByText('回归报告')).toBeInTheDocument();
     expect(screen.getByText('冒烟计划等2个')).toBeInTheDocument();
     expect(screen.getByText('回归测试')).toBeInTheDocument();
-    expect(screen.getByText('核心产品线')).toBeInTheDocument();
+    expect(screen.getByText('核心产品')).toBeInTheDocument();
     expect(screen.getByText('秋季迭代')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /新建报告/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /修改/ })).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('VersionTestReportPanel', () => {
   });
 
   it('allows editing the report type and cancels back to the report list', async () => {
-    mocks.versionTestReports.mockResolvedValue([{ id: 'report-1', name: '回归报告', reportType: '回归测试', productLineId: 'line-1', productLineName: '核心产品线', versionId: 'version-1', versionName: '秋季迭代', creatorName: '张三', firstPlanName: '冒烟计划', planCount: 1, revision: 0, createdAt: '2026-09-19T10:00:00', updatedAt: '2026-09-19T10:00:00' }]);
+    mocks.versionTestReports.mockResolvedValue([{ id: 'report-1', name: '回归报告', reportType: '回归测试', productLineId: 'line-1', productLineName: '核心产品', versionId: 'version-1', versionName: '秋季迭代', creatorName: '张三', firstPlanName: '冒烟计划', planCount: 1, revision: 0, createdAt: '2026-09-19T10:00:00', updatedAt: '2026-09-19T10:00:00' }]);
     mocks.versionTestReport.mockResolvedValue({
       id: 'report-1', name: '回归报告', reportType: '回归测试', summary: '本轮回归通过', creatorName: '张三', versionName: '秋季迭代', planCount: 1, revision: 0,
       createdAt: '2026-09-19T10:00:00', updatedAt: '2026-09-19T10:00:00',
@@ -87,13 +87,13 @@ describe('VersionTestReportPanel', () => {
   });
 
   it('renders the global report list without selecting a product line or iteration first', async () => {
-    mocks.testReports.mockResolvedValue([{ id: 'report-global', name: '全局测试报告', reportType: '测试报告', productLineId: 'line-1', productLineName: '核心产品线', versionId: 'version-1', versionName: '秋季迭代', creatorName: '张三', firstPlanName: '冒烟计划', planCount: 1, revision: 0, createdAt: '2026-09-19T10:00:00', updatedAt: '2026-09-19T10:00:00' }]);
+    mocks.testReports.mockResolvedValue([{ id: 'report-global', name: '全局测试报告', reportType: '测试报告', productLineId: 'line-1', productLineName: '核心产品', versionId: 'version-1', versionName: '秋季迭代', creatorName: '张三', firstPlanName: '冒烟计划', planCount: 1, revision: 0, createdAt: '2026-09-19T10:00:00', updatedAt: '2026-09-19T10:00:00' }]);
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><VersionTestReportPanel productLineId="" versionId="" versionName="" /></QueryClientProvider>);
 
     expect(await screen.findByText('全局测试报告')).toBeInTheDocument();
     expect(mocks.testReports).toHaveBeenCalledTimes(1);
     expect(mocks.versionTestReports).not.toHaveBeenCalled();
-    expect(screen.getByText('核心产品线')).toBeInTheDocument();
+    expect(screen.getByText('核心产品')).toBeInTheDocument();
     expect(screen.getByText('秋季迭代')).toBeInTheDocument();
   });
 });

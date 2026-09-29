@@ -26,9 +26,9 @@ export const ProductVersionScope: React.FC<Props> = ({ productLineFilter = 'all'
 
   return <div className="space-y-3">
     <div className="grid gap-3 md:grid-cols-2">
-      <Select aria-label="评审产品线" showSearch optionFilterProp="label" value={activeLineId || undefined} disabled={Boolean(fixedLineId)} placeholder="选择产品线" options={productLines.map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => { onProductLineChange(value); onVersionChange(''); }} />
+      <Select aria-label="评审产品" showSearch optionFilterProp="label" value={activeLineId || undefined} disabled={Boolean(fixedLineId)} placeholder="选择产品" options={productLines.map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => { onProductLineChange(value); onVersionChange(''); }} />
       <Select aria-label="迭代版本" showSearch optionFilterProp="label" value={versionId || undefined} disabled={!activeLineId} placeholder="选择迭代版本" options={versions.map((item) => ({ value: item.id, label: item.name }))} onChange={onVersionChange} />
     </div>
-    {activeLineId && versions.length === 0 && <Alert type="info" showIcon title="当前产品线暂无迭代版本" />}
+    {activeLineId && versions.length === 0 && <Alert type="info" showIcon title="当前产品暂无迭代版本" />}
   </div>;
 };

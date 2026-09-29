@@ -207,7 +207,7 @@ const MainContent: React.FC = () => {
   return (
     <main className="tech-main flex-1 overflow-y-auto p-4 lg:p-6">
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
-        {/* 产品线范围由任务工作区与测试资产共同复用。 */}
+        {/* 产品范围由任务工作区与测试资产共同复用。 */}
         {/* Dynamic View Component */}
         {String(routedTabId).startsWith('crm_') && (crmLoading || crmError) && (
           <div role={crmError ? 'alert' : 'status'} className={`flex items-center justify-between gap-3 border px-4 py-3 text-xs ${crmError ? 'border-[var(--danger)]/40 bg-[var(--danger)]/10 text-[var(--text-primary)]' : 'border-[var(--warning)]/40 bg-[var(--warning)]/10 text-[var(--text-primary)]'}`}>

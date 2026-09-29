@@ -23,7 +23,7 @@ describe('产品迭代甘特图界面', () => {
     const open = mount();
     fireEvent.click(await screen.findByRole('button', { name: '秋季版本 V1.0：V1.0' }));
     expect(open).toHaveBeenCalledWith('v');
-    fireEvent.click(screen.getByRole('tab', { name: '产品任务视角' }));
+    fireEvent.click(screen.getByRole('tab', { name: '任务视角' }));
     expect(screen.getByText('产品任务一')).toBeTruthy();
     expect(screen.queryByText('设计子任务')).toBeNull();
     expect(document.querySelectorAll('.iteration-stage')).toHaveLength(2);

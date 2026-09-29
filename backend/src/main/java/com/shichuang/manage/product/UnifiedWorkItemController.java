@@ -13,7 +13,7 @@ public class UnifiedWorkItemController {
     public UnifiedWorkItemController(UnifiedWorkItemService service) { this.service = service; }
 
     @GetMapping("/api/work-items")
-    @Operation(summary = "按产品线查询统一工作项")
+    @Operation(summary = "按产品查询统一工作项")
     public ApiResponse<UnifiedWorkItemService.Listing> list(@RequestParam String productLineId,
         @RequestParam(defaultValue = "") String versionId, @RequestParam(defaultValue = "") String category,
         @RequestParam(defaultValue = "") String keyword, @RequestParam(defaultValue = "1") int page,

@@ -249,7 +249,7 @@ const ProductLineSettingsPanel: React.FC<{
             </form>
           )}
           {section === 'members' && (
-            <div className="mx-auto w-full max-w-2xl space-y-5 text-xs">
+            <div className="mx-auto w-full max-w-5xl space-y-5 px-4 text-xs sm:px-6">
               <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品成员</h3><p className="mt-1 text-[var(--text-muted)]">配置产品成员及其角色。</p></div><Button type="primary" onClick={onOpenMembers} icon={<UserAddOutlined />}>添加成员</Button></div>
               {(() => {
                 const members: ProductLineMember[] = (productLine.members || []).map((member, index) => typeof member === 'string' ? { id: `legacy-${index}-${member}`, userId: '', name: member, role: '参与人' } : member);
@@ -258,11 +258,11 @@ const ProductLineSettingsPanel: React.FC<{
                 const memberTabs = ['全部', ...configuredRoles, ...historicalRoles];
                 const visibleMembers = memberTab === '全部' ? members : members.filter((member) => member.role === memberTab);
                 return <>
-                  <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">{memberTabs.map((tab) => { const count = tab === '全部' ? members.length : members.filter((member) => member.role === tab).length; return <button key={tab} type="button" onClick={() => setMemberTab(tab)} className={`h-10 px-3 text-sm font-medium border-b-2 transition-colors ${memberTab === tab ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{tab}</span><span className="ml-1 text-base font-normal text-[var(--primary)]">{count}</span></button>; })}</div>
-                  <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
+                  <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">{memberTabs.map((tab) => { const count = tab === '全部' ? members.length : members.filter((member) => member.role === tab).length; return <button key={tab} type="button" onClick={() => setMemberTab(tab)} className={`h-10 px-3 text-xs font-normal border-b-2 transition-colors ${memberTab === tab ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{tab}</span><span className="ml-1 text-xs font-normal text-[var(--primary)]">{count}</span></button>; })}</div>
+                  <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[560px]">
                     <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-[11px] text-[var(--text-muted)]"><span>成员</span><span>角色</span><span className="text-right">操作</span></div>
                     {visibleMembers.length ? visibleMembers.map((member) => { const employee = employeesById.get(member.userId); const roleOptions = [...new Set([...configuredRoles, member.role])].filter(Boolean).map((role) => ({ value: role, label: role })); return <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><PersonIdentity name={member.name} subtitle={employee ? employeeJobTitle(employee) || '未设置职位' : undefined} size={28} /><Select className="w-full" value={member.role} loading={roleTemplatesQuery.isLoading} disabled={roleTemplatesQuery.isError} options={roleOptions} onChange={async (role) => { try { await updateProductLineMember(productLine.id, member.id, role); addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>; }) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
-                  </div>
+                  </div></div>
                 </>;
               })()}
               <Modal isOpen={Boolean(memberToRemove)} onClose={() => setMemberToRemove(null)} title="移除产品成员" footer={<><Button onClick={() => setMemberToRemove(null)}>取消</Button><Button type="primary" danger onClick={async () => { if (!memberToRemove) return; try { await removeProductLineMember(productLine.id, memberToRemove.id); addToast('success', '成员已移除'); setMemberToRemove(null); } catch (error) { addToast('error', '成员移除失败', error instanceof Error ? error.message : '请稍后重试'); } }}>确认移除</Button></>}><p className="text-sm text-[var(--text-body)]">确定将“{memberToRemove?.name}”移除产品吗？</p></Modal>
@@ -307,7 +307,7 @@ const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({
 );
 
 const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '测试', '缺陷', '用例'];
-const workItemCategoryLabel = (category: ProductLineWorkItemCategory) => category === '需求' ? '产品' : category;
+const workItemCategoryLabel = (category: ProductLineWorkItemCategory) => ({ 需求: '产品任务', 设计: '设计任务', 研发: '研发任务', 测试: '测试任务', 缺陷: '缺陷任务', 用例: '测试用例' }[category]);
 
 const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
   const { addToast, setProductLines } = useApp();
@@ -438,7 +438,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
       <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">
         {WORK_ITEM_CATEGORIES.map((category) => {
           const count = items.filter((item) => item.category === category).length;
-          return <button key={category} type="button" onClick={() => setActiveCategory(category)} className={`h-10 px-4 text-sm font-medium border-b-2 transition-colors ${activeCategory === category ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{workItemCategoryLabel(category)}</span><span className="ml-1 text-[var(--primary)]">{count}</span></button>;
+          return <button key={category} type="button" onClick={() => setActiveCategory(category)} className={`h-10 px-4 text-xs font-normal border-b-2 transition-colors ${activeCategory === category ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{workItemCategoryLabel(category)}</span><span className="ml-1 font-normal text-[var(--primary)]">{count}</span></button>;
         })}
       </div>
       <div className="overflow-hidden rounded-md border border-[var(--border-main)]">

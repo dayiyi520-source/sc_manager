@@ -19,6 +19,6 @@ public class TestReportController {
     public TestReportController(VersionTestReportService service) { this.service = service; }
 
     @GetMapping
-    @Operation(summary = "读取可访问产品线的测试报告列表")
+    @Operation(summary = "读取可访问产品的测试报告列表")
     public ApiResponse<List<Map<String, Object>>> list() { return ApiResponse.ok(service.listAll()); }
 }

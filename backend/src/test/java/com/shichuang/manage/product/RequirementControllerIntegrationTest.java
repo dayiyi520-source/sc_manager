@@ -25,6 +25,24 @@ class RequirementControllerIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void myTasksUsesAssistanceOwnerForAssistanceItems() throws Exception {
+        String token = loginToken();
+        String ownerId = jdbc.queryForObject("SELECT id_ FROM t_sys_user WHERE tenant_id_='local-tenant' AND name_='林志豪' AND status_='enabled' AND delete_flag_=0 ORDER BY create_time_ LIMIT 1", String.class);
+        Map<String,Object> body = Map.of(
+            "title", "负责人聚合校验-" + System.nanoTime(), "ownerName", "林志豪", "description", "协助事项负责人聚合校验",
+            "workOrderType", "其他问题", "specialFields", Map.of("problemSource", "集成测试", "expectedResult", "负责人可见", "problemType", "其他"));
+        String response = mockMvc.perform(post("/api/requirements").header("Authorization", "Bearer "+token).contentType("application/json").content(objectMapper.writeValueAsString(body)))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String id = objectMapper.readTree(response).path("data").path("id").asText();
+        assertEquals(ownerId, jdbc.queryForObject("SELECT assistance_owner_id_ FROM t_product_work_item WHERE id_=?", String.class, id));
+        mockMvc.perform(get("/api/requirements/my-tasks").header("Authorization", "Bearer "+token).param("viewerId", ownerId))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.id == '"+id+"' && @.taskGroup == 'assist')]").isNotEmpty());
+        jdbc.update("UPDATE t_product_work_item SET work_order_type_=NULL,assistance_owner_id_=NULL WHERE id_=?", id);
+        mockMvc.perform(get("/api/requirements/my-tasks").header("Authorization", "Bearer "+token).param("viewerId", ownerId))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data[?(@.id == '"+id+"' && @.taskGroup == 'mine')]").isNotEmpty());
+    }
+
+    @Test
     void convertsWorkOrderToFourUnifiedCategories() throws Exception {
         String token=loginToken();
         Map<String,String> targets=Map.of("产品需求","requirement","设计任务","design","研发任务","dev","缺陷管理","bug");
