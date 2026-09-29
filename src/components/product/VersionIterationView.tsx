@@ -331,12 +331,13 @@ const VersionWorkItemCell: React.FC<{ item: PlanningItem; field: 'status' | 'own
     setBusy(true);
     try {
       const result = await productRepository.workItemTransitions(item.productLineId!, item.id);
-      setOptions(result.statuses.filter((status) => status.allowed && !status.current).map((status) => ({ value: status.key, label: status.name })));
+      setOptions(result.statuses.map((status) => ({ value: status.key, label: status.name, disabled: !status.current && !status.allowed })));
       setEditing(true);
     } catch (error) { messageApi.error(error instanceof Error ? error.message : '状态加载失败'); }
     finally { setBusy(false); }
   };
-  const change = async (value: string) => {
+  const change = async (value: string, reason = '') => {
+    if (field === 'status' && value === source.statusKey) { setEditing(false); return; }
     setBusy(true);
     try {
       if (field === 'owner') await productRepository.updateWorkItem(item.productLineId!, item.id, { assigneeName: value, revision: source.revision! });
@@ -344,7 +345,21 @@ const VersionWorkItemCell: React.FC<{ item: PlanningItem; field: 'status' | 'own
         const result = await productRepository.workItemTransitions(item.productLineId!, item.id);
         const action = result.actions.find((entry) => entry.to === value && entry.allowed);
         if (!action) throw new Error('当前状态不可流转到所选状态');
-        await productRepository.transitionWorkItem(item.productLineId!, item.id, { edgeKey: action.edgeKey, revision: result.revision });
+        if (action.requiredFields.includes('reason') && !reason.trim()) {
+          let enteredReason = '';
+          setBusy(false);
+          Modal.confirm({
+            title: `将状态改为“${result.statuses.find((status) => status.key === value)?.name || action.name}”`,
+            content: <Input.TextArea rows={4} placeholder="请输入状态变更原因" onChange={(event) => { enteredReason = event.target.value; }} />,
+            okText: '确认变更', cancelText: '取消',
+            onOk: async () => {
+              if (!enteredReason.trim()) { messageApi.warning('请填写状态变更原因'); throw new Error('状态变更原因不能为空'); }
+              await change(value, enteredReason.trim());
+            }
+          });
+          return;
+        }
+        await productRepository.transitionWorkItem(item.productLineId!, item.id, { edgeKey: action.edgeKey, revision: result.revision, reason });
       }
       setEditing(false);
       onUpdated();
@@ -719,16 +734,17 @@ export const VersionIterationView: React.FC = () => {
   };
 
   const openWorkItemDetail = (item: PlanningItem) => {
-    const fallbackDetail = item.source as unknown as Record<string, unknown>;
+    const fallbackDetail = { ...(item.source as unknown as Record<string, unknown>), __planningKind: item.kind };
     const lineId = item.productLineId || selectedVersion?.productLineId || '';
-    if (!lineId || !item.id) { setDirectWorkItem(fallbackDetail); return; }
+    setDirectWorkItem({ ...fallbackDetail, productLineId: lineId });
+    if (!lineId || !item.id) return;
     const loadDetail = productRepository.workItemDetail;
     if (typeof loadDetail !== 'function') {
       setDirectWorkItem(fallbackDetail);
       return;
     }
     void loadDetail(lineId, item.id)
-      .then((detail) => setDirectWorkItem({ ...fallbackDetail, ...(detail as Record<string, unknown>), productLineId: (detail as Record<string, unknown>).productLineId || lineId, __planningKind: item.kind }))
+      .then((detail) => setDirectWorkItem((current) => current?.id === item.id ? { ...fallbackDetail, ...(detail as Record<string, unknown>), productLineId: (detail as Record<string, unknown>).productLineId || lineId, __planningKind: item.kind } : current))
       .catch((error) => addToast('error', '工作项详情加载失败', error instanceof Error ? error.message : '请稍后重试'));
   };
   const openRequirement = (item: RequirementTask) => { const target = planningItems.find((candidate) => candidate.kind === 'requirement' && candidate.id === item.id); if (target) openWorkItemDetail(target); };
@@ -1189,7 +1205,7 @@ export const VersionIterationView: React.FC = () => {
             <label className="inline-flex min-w-0 items-center gap-2 text-[var(--text-primary)]">
               <input
                 type="checkbox"
-                aria-label="全选待规划工作项"
+                aria-label="全选待迭代任务"
                 checked={plannableRoots.length > 0 && plannableRoots.every((item) => selectedPlanningItemIds.includes(`${item.kind}:${item.id}`))}
                 onChange={() => {
                   const visibleIds = plannableRoots.map((item) => `${item.kind}:${item.id}`);
@@ -1200,14 +1216,14 @@ export const VersionIterationView: React.FC = () => {
                 }}
                 className="h-4 w-4 shrink-0 accent-[var(--primary)]"
               />
-              <span className="truncate font-semibold">待规划工作项 · {unplannedRoots.length}</span>
+              <span className="truncate font-semibold">待迭代任务 · {unplannedRoots.length}</span>
               <span className="hidden text-[11px] font-normal text-[var(--text-muted)] sm:inline">可拖动到右侧迭代</span>
             </label>
             <div className="flex items-center gap-1.5">
               <div data-planning-search className={`flex items-center overflow-hidden transition-all duration-300 ${planningSearchOpen ? 'w-44 opacity-100' : 'w-0 opacity-0'}`}><input autoFocus={planningSearchOpen} value={planningQuery} onChange={(event) => setPlanningQuery(event.target.value)} placeholder="输入关键词" className="app-control h-8 w-44 px-2 text-xs" /></div>
-              <button type="button" aria-label="搜索待规划工作项" onClick={(event) => { event.stopPropagation(); setPlanningSearchOpen(true); }} className={`rounded p-1.5 ${planningQuery.trim() ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--primary)]'}`}><Search className="h-4 w-4" /></button>
+              <button type="button" aria-label="搜索待迭代任务" onClick={(event) => { event.stopPropagation(); setPlanningSearchOpen(true); }} className={`rounded p-1.5 ${planningQuery.trim() ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--primary)]'}`}><Search className="h-4 w-4" /></button>
               <div data-planning-filter>
-                <button type="button" aria-label="过滤待规划工作项" onClick={() => setPlanningFilterOpen((open) => !open)} className={`rounded p-1.5 ${planningFilterOpen || planningStatuses.length || planningPriorities.length || planningOwners.length || planningKinds.length < 5 ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--primary)]'}`}><Filter className="h-4 w-4" /></button>
+                <button type="button" aria-label="过滤待迭代任务" onClick={() => setPlanningFilterOpen((open) => !open)} className={`rounded p-1.5 ${planningFilterOpen || planningStatuses.length || planningPriorities.length || planningOwners.length || planningKinds.length < 5 ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--primary)]'}`}><Filter className="h-4 w-4" /></button>
               </div>
             </div>
           </div>
@@ -1219,7 +1235,7 @@ export const VersionIterationView: React.FC = () => {
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           <PlanningTree items={unplannedCandidates} matches={unplannedWorkItems} selectedIds={selectedPlanningItemIds} onSelect={(item) => setSelectedPlanningItemIds((current) => current.includes(`${item.kind}:${item.id}`) ? current.filter((value) => value !== `${item.kind}:${item.id}`) : [...current, `${item.kind}:${item.id}`])} onOpen={openWorkItemDetail} busy={Boolean(assigningRequirementId)} onDrag={(event, item) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", JSON.stringify({ id: item.id, kind: item.kind })); setDraggedWorkItem(item); }} onDragEnd={() => { setDraggedWorkItem(null); setDropTargetVersionId(null); }} />
-          {unplannedWorkItems.length === 0 && <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无待规划工作项" description="所有工作项都已加入迭代。" />}
+          {unplannedWorkItems.length === 0 && <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无待迭代任务" description="所有工作项都已加入迭代。" />}
         </div>
       </section>
       <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]">

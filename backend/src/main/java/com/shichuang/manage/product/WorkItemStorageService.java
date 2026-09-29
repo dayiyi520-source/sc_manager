@@ -37,7 +37,7 @@ public class WorkItemStorageService {
         String line=body.productLineId(),tenant=RequestContext.tenantId(),user=RequestContext.userId();
         List<String> ccNames=validatedCcNames(body.ccNames(),tenant);
         List<Map<String,Object>> media=validatedMedia(body.media());
-        body=new CreateItem(body.requestId(),body.productLineId(),body.category(),body.taskTypeId(),body.title(),body.description(),body.descriptionHtml(),body.expectedGoal(),body.versionId(),body.requirementId(),body.parentWorkItemId(),body.assigneeId(),body.priority(),body.plannedStartDate(),body.plannedEndDate(),body.estimatedHours(),body.actualHours(),body.customerId(),body.customerName(),ccNames,media);
+        body=new CreateItem(body.requestId(),body.productLineId(),body.category(),body.taskTypeId(),body.title(),body.description(),body.descriptionHtml(),body.expectedGoal(),body.versionId(),body.requirementId(),body.parentWorkItemId(),body.assigneeId(),body.priority(),body.plannedStartDate(),body.plannedEndDate(),body.estimatedHours(),body.actualHours(),body.customerId(),body.customerName(),ccNames,media,body.expectedCompleteDate());
         String hash=hash(configurations.encode(body));
         Map<String,Object> duplicate=mapper.request(tenant,line,body.requestId());
         if (duplicate!=null) {
@@ -63,7 +63,7 @@ public class WorkItemStorageService {
             if (body.customerId()!=null && !Objects.equals(optional(body.customerId()), inheritedCustomerId)) throw new IllegalArgumentException("子任务必须继承父任务客户");
             if (body.customerName()!=null && !Objects.equals(optional(body.customerName()), inheritedCustomerName)) throw new IllegalArgumentException("子任务必须继承父任务客户");
             versionId=inheritedVersion; requirementId=inheritedRequirement;
-            body = new CreateItem(body.requestId(), body.productLineId(), body.category(), body.taskTypeId(), body.title(), body.description(), body.descriptionHtml(), body.expectedGoal(), versionId, requirementId, body.parentWorkItemId(), body.assigneeId(), body.priority(), body.plannedStartDate(), body.plannedEndDate(), body.estimatedHours(), body.actualHours(), inheritedCustomerId, inheritedCustomerName, ccNames, media);
+            body = new CreateItem(body.requestId(), body.productLineId(), body.category(), body.taskTypeId(), body.title(), body.description(), body.descriptionHtml(), body.expectedGoal(), versionId, requirementId, body.parentWorkItemId(), body.assigneeId(), body.priority(), body.plannedStartDate(), body.plannedEndDate(), body.estimatedHours(), body.actualHours(), inheritedCustomerId, inheritedCustomerName, ccNames, media,body.expectedCompleteDate());
         }
         if (requirementId!=null) {
             Map<String,Object> requirement=mapper.item(tenant,line,requirementId);
@@ -109,6 +109,10 @@ public class WorkItemStorageService {
         if (body.plannedStartDate()!=null && body.plannedEndDate()!=null && body.plannedEndDate().isBefore(body.plannedStartDate())) throw new IllegalArgumentException("计划完成日期不能早于开始日期");
         validateHours(body.estimatedHours(),"预计工时");
         validateHours(body.actualHours(),"实际工时");
+        if (body.expectedCompleteDate()!=null && !body.expectedCompleteDate().isBlank()) {
+            try { java.time.LocalDate.parse(body.expectedCompleteDate()); }
+            catch (java.time.format.DateTimeParseException exception) { throw new IllegalArgumentException("期望完成时间格式无效，请使用YYYY-MM-DD"); }
+        }
         String versionId=optional(body.versionId());
         if (versionId!=null && mapper.version(RequestContext.tenantId(),line,versionId)==null) throw new IllegalArgumentException("版本不存在或不属于当前产品");
         String assigneeId=null,assigneeName=body.assigneeName();

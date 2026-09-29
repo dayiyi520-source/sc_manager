@@ -61,6 +61,7 @@ const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, parent, onOpenP
       <label><span>计划开始时间</span><DatePicker disabled={!editing} value={task.plannedStartDate ? dayjs(task.plannedStartDate) : null} onChange={(date) => onUpdate({ plannedStartDate: date?.format('YYYY-MM-DD') || '' })} placeholder="未设置" /></label>
       <label><span>计划完成时间</span><DatePicker disabled={!editing} value={task.dueDate ? dayjs(task.dueDate) : null} onChange={(date) => onUpdate({ dueDate: date?.format('YYYY-MM-DD') || '' })} placeholder="未设置" /></label>
       <label><span>预计工时（小时）</span><InputNumber disabled={!editing} min={0} precision={2} value={task.estimatedHours || 0} onChange={(estimatedHours) => onUpdate({ estimatedHours: estimatedHours || 0 })} /></label>
+      <label><span>实际工时（小时）</span><InputNumber disabled={!editing} min={0} precision={2} value={task.actualHours || 0} onChange={(actualHours) => onUpdate({ actualHours: actualHours || 0 })} /></label>
     </div>
     <section className="test-task-basic-description"><h3>任务描述</h3>{editing ? <RichTextEditor key={`test-detail-${task.id}`} editor={descriptionEditor} value={description} htmlValue={descriptionHtml} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} onBlur={() => onUpdate({ description, descriptionHtml })} placeholder="详细记录测试范围、环境和验收标准..." /> : <CollapsibleDescription value={description} emptyText="未填写任务描述" />}</section>
   </div>;

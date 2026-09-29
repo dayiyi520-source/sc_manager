@@ -49,6 +49,24 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(WorkItemStatus.Group.NOT_STARTED,result.status().group());
         assertEquals("neutral",result.statusColor());
     }
+    @Test void taskMenusExcludeAssistanceSourcesAndOnlyUseLatestPublishedSubtypeInitialState() {
+        for(String category:List.of("requirement","design","dev","test","bug")) {
+            String selectedType=type(category,"子类型默认状态验证");
+            for(String name:List.of("旧默认","待处理")) {
+                var definition=new Workflow(List.of(
+                    new State("pending",name,WorkItemStatus.Group.NOT_STARTED,true,false,true,"bug".equals(category)?"dev":category,"neutral"),
+                    new State("done","完成",WorkItemStatus.Group.COMPLETED,false,true,true,"bug".equals(category)?"dev":category,"green")),
+                    List.of(new Edge("finish","pending","done","完成")));
+                var saved=configurations.save(line,selectedType,null,new SaveWorkflow(category,name,definition,null));
+                configurations.publish(line,saved.get("id").toString(),((Number)saved.get("revision")).intValue());
+            }
+            var created=storage.create(input("subtype-"+category,category,selectedType,null,null,null));
+            assertEquals("待处理",created.get("statusName"));
+            assertEquals(selectedType,created.get("taskTypeId"));
+            jdbc.update("UPDATE t_product_work_item SET source_type_='WORK_ORDER' WHERE id_=?",created.get("id"));
+            assertTrue(unified.list(line,"",category,"",1,100).page().items().stream().noneMatch(item->created.get("id").equals(item.id())));
+        }
+    }
     @Test void createIsIdempotentAndRejectsChangedPayload() {
         var input=input("same-request","test",type,null,null,null);
         var first=storage.create(input);
@@ -64,6 +82,32 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         var created=storage.create(input);
         assertEquals(0,new java.math.BigDecimal("8.50").compareTo((java.math.BigDecimal)created.get("estimatedHours")));
         assertEquals(0,new java.math.BigDecimal("3.25").compareTo((java.math.BigDecimal)created.get("actualHours")));
+    }
+    @Test void expectedCompletionDateIsIndependentAndCanBeCleared() {
+        var start=java.time.LocalDate.of(2026,9,1);
+        var end=start.plusDays(10);
+        var expected=start.plusDays(6);
+        var input=new CreateItem("independent-dates",line,"test",type,"独立日期任务",null,null,null,
+            null,null,null,null,"P2",start,end,null,null,null,null,null,null,expected);
+        var created=storage.create(input);
+        String id=created.get("id").toString();
+        assertEquals(expected.toString(),created.get("expectedCompleteDate").toString());
+        assertEquals(end.toString(),created.get("plannedEndDate").toString());
+        assertEquals(expected,unified.list(line,"","test","",1,20).page().items().get(0).expectedCompleteDate());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.create(new CreateItem(
+            input.requestId(),line,"test",type,input.title(),null,null,null,null,null,null,null,"P2",start,end,
+            null,null,null,null,null,null,expected.plusDays(1)))).getStatusCode().value());
+        var changed=storage.update(line,id,new UpdateItem(null,null,null,null,null,null,null,null,null,null,null,0,expected.plusDays(1).toString()));
+        assertEquals(expected.plusDays(1).toString(),changed.get("expectedCompleteDate").toString());
+        assertEquals(end.toString(),changed.get("plannedEndDate").toString());
+        changed=storage.update(line,id,new UpdateItem("修改标题",null,null,null,null,null,null,null,null,null,null,1));
+        assertEquals(expected.plusDays(1).toString(),changed.get("expectedCompleteDate").toString());
+        changed=storage.update(line,id,new UpdateItem(null,null,null,null,null,null,null,null,null,null,null,2,""));
+        assertNull(changed.get("expectedCompleteDate"));
+        assertEquals(end.toString(),changed.get("plannedEndDate").toString());
+        assertNull(unified.list(line,"","test","",1,20).page().items().get(0).expectedCompleteDate());
+        assertEquals("期望完成时间格式无效，请使用YYYY-MM-DD",assertThrows(IllegalArgumentException.class,()->storage.update(line,id,
+            new UpdateItem(null,null,null,null,null,null,null,null,null,null,null,3,"invalid"))).getMessage());
     }
     @Test void persistsRichTextDescriptionOnCreateAndUpdate() {
         var input=new CreateItem("rich-description",line,"test",type,"富文本任务","加粗内容","<p><strong>加粗内容</strong></p>",

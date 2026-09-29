@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const requirementSource = readFileSync(new URL('./RequirementTasksView.tsx', import.meta.url), 'utf8');
 const productLineSource = readFileSync(new URL('./ProductLineDetailView.tsx', import.meta.url), 'utf8');
+const iterationSource = readFileSync(new URL('./VersionIterationView.tsx', import.meta.url), 'utf8');
 
 describe('requirement task Ant Design contract', () => {
   it('uses flat Ant Design controls for list filters and the create form', () => {
@@ -118,5 +119,20 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain("selectedTask.hasChildren ? 'pointer-events-none opacity-80' : ''");
     expect(requirementSource).toContain('{hasChildren ? <PersonIdentity name={task.ownerName}');
     expect(requirementSource).toContain('onChange={(ownerName) => void updateTask(task.id, { ownerName })}');
+  });
+
+  it('uses the same configured status candidates and required reason in the iteration list', () => {
+    expect(iterationSource).toContain('result.statuses.map((status) =>');
+    expect(iterationSource).toContain('disabled: !status.current && !status.allowed');
+    expect(iterationSource).toContain("action.requiredFields.includes('reason')");
+    expect(requirementSource).toContain('detailWorkItemTypes.find((item) => item.id === selectedTask.workItemTypeId)?.name');
+  });
+
+  it('shows product and version on the list and aligns editable and read-only owners', () => {
+    expect(requirementSource).toContain("versionName: versions.find((version) => version.id === item.versionId)?.name || ''");
+    expect(requirementSource).toContain("searchQuery, productLineKey, versionKey]");
+    expect(requirementSource).toContain("versions.find((version) => version.id === task.versionId)");
+    expect(requirementSource).toContain("[task.productLineName, linkedVersion?.code || (task.versionId ? '版本号未设置' : '未关联')].filter(Boolean).join(' / ')");
+    expect(requirementSource).toContain('className="work-item-owner-cell"');
   });
 });

@@ -4,16 +4,17 @@ import { DownOutlined, RightOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { productRepository, type UnifiedWorkItem } from '../../services/productRepository';
 import type { VersionIteration } from '../../types';
+import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
 import { DAY, dateLabel, interval, productTaskItems, riskFor, stagesFor, taskPlan, timelineStages, versionGroup, type Interval } from './iterationTimeline';
 
 type Row = {
   id: string; title: string; code?: string; owner?: string; status?: string; plan: Interval | null;
   stages: ReturnType<typeof stagesFor>; risk: ReturnType<typeof riskFor>; versionId: string;
-  kind: 'version' | 'group' | 'task'; count?: number;
+  kind: 'version' | 'group' | 'task'; count?: number; category?: string;
 };
 
-export function ProductIterationTimeline({ productLineId, versions, onOpenVersion }: {
-  productLineId: string; versions: VersionIteration[]; onOpenVersion: (id: string) => void;
+export function ProductIterationTimeline({ productLineId, versions, onOpenVersion, onOpenItem }: {
+  productLineId: string; versions: VersionIteration[]; onOpenVersion: (id: string) => void; onOpenItem?: (item: UnifiedWorkItem) => void;
 }) {
   const [view, setView] = useState<'version' | 'task'>('version');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -21,7 +22,7 @@ export function ProductIterationTimeline({ productLineId, versions, onOpenVersio
   const localNow = new Date();
   const today = Date.UTC(localNow.getFullYear(), localNow.getMonth(), localNow.getDate());
   const items = query.data || [];
-  const roots = items.filter((item) => item.category === 'requirement' && !item.parentWorkItemId && item.sourceType !== 'WORK_ORDER');
+  const roots = items.filter((item) => ['requirement', 'design', 'dev', 'test'].includes(item.category) && !item.parentWorkItemId && item.sourceType !== 'WORK_ORDER');
   const rows: Row[] = [];
   const versionRow = (version: VersionIteration, kind: Row['kind']): Row => {
     const tasks = roots.filter((item) => item.versionId === version.id);
@@ -40,7 +41,7 @@ export function ProductIterationTimeline({ productLineId, versions, onOpenVersio
         const stages = stagesFor(productTaskItems(task, items));
         const plan = taskPlan(task);
         rows.push({ id: task.id, title: task.title, owner: task.assigneeName || '未分配', status: task.status?.name || '状态未设置', plan,
-          stages, risk: riskFor(plan, task.status?.group, task.completedAt, stages.stages, today), versionId: version.id, kind: 'task' });
+          stages, risk: riskFor(plan, task.status?.group, task.completedAt, stages.stages, today), versionId: version.id, kind: 'task', category: task.category });
       }
     }
   }
@@ -65,11 +66,11 @@ export function ProductIterationTimeline({ productLineId, versions, onOpenVersio
       : <>
         <div className="iteration-grid">
           <div className="iteration-labels">
-            <div className="iteration-heading">{view === 'version' ? '版本名称：版本号' : '产品任务 / 所属版本'}</div>
+            <div className="iteration-heading">{view === 'version' ? '版本名称：版本号' : '任务 / 所属版本'}</div>
             {rows.map((row) => <div key={row.id} className={`iteration-label iteration-${row.kind}`} style={{ height: height(row) }}>
               <div className="iteration-title-line">
                 {row.kind === 'group' && <button type="button" className="iteration-collapse" aria-label={`${collapsed.has(row.id) ? '展开' : '收起'} ${row.code || row.title}`} aria-expanded={!collapsed.has(row.id)} onClick={() => toggle(row.id)}>{collapsed.has(row.id) ? <RightOutlined /> : <DownOutlined />}</button>}
-                {row.kind === 'task' ? <span className="iteration-task-title" title={row.title}>{row.title}</span> : <button type="button" className="iteration-version-link" onClick={() => onOpenVersion(row.versionId)} title={versionTitle(row)}>{versionTitle(row)}</button>}
+                {row.kind === 'task' ? <button type="button" className="iteration-task-title" onClick={() => { const item = items.find((candidate) => candidate.id === row.id); if (item) onOpenItem?.(item); }} title={row.title}><span aria-hidden="true"><WorkItemCategoryIcon category={row.category || 'requirement'} /></span><span>{row.title}</span></button> : <button type="button" className="iteration-version-link" onClick={() => onOpenVersion(row.versionId)} title={versionTitle(row)}>{versionTitle(row)}</button>}
               </div>
               {row.owner && <div className="iteration-meta">{row.owner}</div>}
               {row.kind !== 'group' && <div className="iteration-meta">计划 {row.plan ? `${dateLabel(row.plan.start)} ～ ${dateLabel(row.plan.end)}` : '未排期'}</div>}
@@ -82,7 +83,7 @@ export function ProductIterationTimeline({ productLineId, versions, onOpenVersio
               <div className="iteration-heading iteration-axis"><span>时间区间（按周）</span>{Array.from({ length: weeks }, (_, index) => <span key={index} className="iteration-tick" style={{ left: `${index / weeks * 100}%` }}>{dateLabel(start + index * 7 * DAY)}</span>)}<span className="iteration-today-label" style={{ left: `${(today - start) / span * 100}%` }}>今天 {dateLabel(today).slice(5)}</span></div>
               <div className="iteration-body"><div className="iteration-today" style={{ left: `${(today - start) / span * 100}%` }} />
                 {rows.map((row) => <div key={row.id} className={`iteration-track iteration-${row.kind}`} style={{ height: height(row) }}>
-                  {row.kind === 'group' ? <div className="iteration-group-summary"><span>版本计划 {row.plan ? `${dateLabel(row.plan.start)} ～ ${dateLabel(row.plan.end)}` : '未排期'}</span><span>{row.count} 个产品任务{!row.count && !collapsed.has(row.id) ? ' · 暂无产品任务' : ''}</span></div> : <>
+                  {row.kind === 'group' ? <div className="iteration-group-summary"><span>版本计划 {row.plan ? `${dateLabel(row.plan.start)} ～ ${dateLabel(row.plan.end)}` : '未排期'}</span><span>{row.count} 个任务{!row.count && !collapsed.has(row.id) ? ' · 暂无任务' : ''}</span></div> : <>
                     {row.plan && <span className="iteration-plan" style={position(row.plan)} title={`计划：${dateLabel(row.plan.start)} ～ ${dateLabel(row.plan.end)}`} />}
                     {row.stages.stages.map((stage) => {
                       const incomplete = row.stages.missing.includes(stage.name);
@@ -96,7 +97,7 @@ export function ProductIterationTimeline({ productLineId, versions, onOpenVersio
             </div>
           </div>
         </div>
-        {view === 'task' && roots.some((item) => !item.versionId) && <div className="iteration-meta">另有 {roots.filter((item) => !item.versionId).length} 个产品任务未关联版本</div>}
+        {view === 'task' && roots.some((item) => !item.versionId) && <div className="iteration-meta">另有 {roots.filter((item) => !item.versionId).length} 个任务未关联版本</div>}
         <div className="iteration-legend"><span><i className="iteration-plan-key" />{view === 'version' ? '版本计划' : '任务计划'}</span>{timelineStages.map((stage) => <span key={stage.name}><i style={{ backgroundColor: stage.color }} />{stage.name}</span>)}<span><i className="iteration-incomplete-key" />排期不完整（无日期条为占位）</span><span><i className="iteration-delay-key" />延期部分</span></div>
       </>}
   </section>;

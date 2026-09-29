@@ -17,6 +17,14 @@ public class ResearchStatusTemplateMapper {
         return jdbc.queryForList("SELECT id_ AS id,scope_ AS scope,name_ AS name,phase_ AS phase,color_ AS color,initial_ AS initial,enabled_ AS enabled,sort_ AS sort,version_ AS revision FROM t_research_status_template WHERE tenant_id_=? AND scope_=? AND delete_flag_=0 ORDER BY sort_,create_time_,id_", tenant, scope);
     }
 
+    List<Map<String, Object>> lockScope(String tenant, String scope) {
+        return jdbc.queryForList("SELECT id_ AS id,scope_ AS scope,name_ AS name,phase_ AS phase,color_ AS color,initial_ AS initial,enabled_ AS enabled,sort_ AS sort,version_ AS revision FROM t_research_status_template WHERE tenant_id_=? AND scope_=? AND delete_flag_=0 ORDER BY id_ FOR UPDATE", tenant, scope);
+    }
+
+    void stageName(String tenant, String id, String name) {
+        jdbc.update("UPDATE t_research_status_template SET name_=? WHERE tenant_id_=? AND id_=? AND delete_flag_=0", name, tenant, id);
+    }
+
     Map<String, Object> find(String tenant, String id) {
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT id_ AS id,scope_ AS scope,name_ AS name,phase_ AS phase,color_ AS color,initial_ AS initial,enabled_ AS enabled,sort_ AS sort,version_ AS revision FROM t_research_status_template WHERE tenant_id_=? AND id_=? AND delete_flag_=0", tenant, id);
         return rows.isEmpty() ? null : rows.get(0);

@@ -54,8 +54,8 @@ public class TaskAliasService {
         String assigneeId=owner.isBlank()?null:mapper.userId(owner);
         if(!owner.isBlank() && assigneeId==null) throw new IllegalArgumentException("负责人不存在或已停用");
         WorkItemDefinition.CreateItem input=new WorkItemDefinition.CreateItem(
-            "compat-"+type+"-"+UUID.randomUUID(),line,category,taskType,text(body,"title"),text(body,"description"),text(body,"expectedGoal"),
-            nullable(body,"versionId"),nullable(body,"requirementId"),null,assigneeId,priority(body.get("priority")),date(body,"plannedStartDate"),date(body,"dueDate"),decimal(body,"estimatedHours"),decimal(body,"actualHours"));
+            "compat-"+type+"-"+UUID.randomUUID(),line,category,taskType,text(body,"title"),text(body,"description"),text(body,"descriptionHtml"),text(body,"expectedGoal"),
+            nullable(body,"versionId"),nullable(body,"requirementId"),null,assigneeId,priority(body.get("priority")),date(body,"plannedStartDate"),date(body,"dueDate"),decimal(body,"estimatedHours"),decimal(body,"actualHours"),null,null,null,null,date(body,"expectedCompleteDate"));
         Map<String,Object> created=storage.create(input);
         mapper.updateExtended(created.get("id").toString(),body);
         return Map.of("id",created.get("id"),"code",created.get("code"));
@@ -72,10 +72,10 @@ public class TaskAliasService {
         if(current==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"工作项不存在");
         if(body.get("version") instanceof Number revision && revision.intValue()!=((Number)current.get("version")).intValue()) throw new ResponseStatusException(HttpStatus.CONFLICT,"任务已被其他人修改，请刷新后重试");
         storage.update(current.get("productLineId").toString(),id,new WorkItemDefinition.UpdateItem(
-            value(body,"title"),value(body,"description"),value(body,"expectedGoal"),value(body,"versionId"),
+            value(body,"title"),value(body,"description"),value(body,"descriptionHtml"),value(body,"expectedGoal"),value(body,"versionId"),
             firstNullable(body,"assigneeName","developer","ownerName"),body.containsKey("priority")?priority(body.get("priority")):null,
             dateNullable(body,"plannedStartDate"),dateNullable(body,"dueDate"),decimalNullable(body,"estimatedHours"),decimalNullable(body,"actualHours"),
-            ((Number)current.get("version")).intValue()));
+            ((Number)current.get("version")).intValue(),value(body,"expectedCompleteDate")));
         mapper.updateExtended(id,body);
         String target=text(body,"status");
         if(!target.isBlank()&&!target.equals(current.get("status"))) executeStatus(current.get("productLineId").toString(),id,target);

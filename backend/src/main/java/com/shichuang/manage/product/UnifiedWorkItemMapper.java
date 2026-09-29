@@ -14,8 +14,8 @@ public class UnifiedWorkItemMapper {
     public UnifiedWorkItemMapper(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     static final String CORE = "SELECT w.id_ AS id, w.category_ AS category, 'core' AS source, w.code_ AS code, w.title_ AS title, w.product_line_id_ AS productLineId, w.version_id_ AS versionId, w.requirement_id_ AS requirementId, r.title_ AS requirementTitle, COALESCE(r.creator_name_,ru.name_,r.create_by_) AS requirementInitiatorName, w.source_type_ AS sourceType, w.assignee_name_ AS assigneeName, w.status_name_ AS status, "
-        + "w.priority_ AS priority, w.planned_end_date_ AS dueDate, w.estimated_hours_ AS estimatedHours, w.actual_hours_ AS actualHours, w.create_time_ AS createdAt, COALESCE(cu.name_,w.create_by_) AS creatorName, w.task_type_id_ AS taskTypeId, w.workflow_id_ AS workflowId, w.status_key_ AS statusKey, w.status_group_ AS statusGroup, w.status_color_ AS statusColor, w.successful_ AS successful, w.parent_work_item_id_ AS parentWorkItemId, w.assignee_id_ AS assigneeId, w.version_ AS revision, "
-        + "w.planned_start_date_ AS plannedStartDate,w.completed_at_ AS completedAt,EXISTS(SELECT 1 FROM t_product_work_item child WHERE child.tenant_id_=w.tenant_id_ AND child.product_line_id_=w.product_line_id_ AND child.parent_work_item_id_=w.id_ AND child.delete_flag_=0) AS hasChildren"
+        + "w.priority_ AS priority, w.planned_end_date_ AS dueDate, w.expected_complete_date_ AS expectedCompleteDate, w.estimated_hours_ AS estimatedHours, w.actual_hours_ AS actualHours, w.create_time_ AS createdAt, COALESCE(cu.name_,w.create_by_) AS creatorName, w.task_type_id_ AS taskTypeId, w.workflow_id_ AS workflowId, w.status_key_ AS statusKey, w.status_group_ AS statusGroup, w.status_color_ AS statusColor, w.successful_ AS successful, w.parent_work_item_id_ AS parentWorkItemId, w.assignee_id_ AS assigneeId, w.version_ AS revision, "
+        + "w.planned_start_date_ AS plannedStartDate,w.completed_at_ AS completedAt,w.cc_names_ AS ccNames,EXISTS(SELECT 1 FROM t_product_work_item child WHERE child.tenant_id_=w.tenant_id_ AND child.product_line_id_=w.product_line_id_ AND child.parent_work_item_id_=w.id_ AND child.delete_flag_=0) AS hasChildren"
         + " FROM t_product_work_item w LEFT JOIN t_product_work_item r ON r.tenant_id_=w.tenant_id_ AND r.id_=w.requirement_id_ AND r.category_='requirement' AND r.delete_flag_=0 LEFT JOIN t_sys_user ru ON ru.tenant_id_=r.tenant_id_ AND ru.id_=r.create_by_ AND ru.delete_flag_=0 LEFT JOIN t_sys_user cu ON cu.tenant_id_=w.tenant_id_ AND cu.id_=w.create_by_ AND cu.delete_flag_=0 WHERE w.tenant_id_=? AND w.product_line_id_=? AND w.delete_flag_=0";
 
     public List<Map<String, Object>> byProductLine(String tenant, String lineId) {
@@ -39,7 +39,7 @@ public class UnifiedWorkItemMapper {
     }
 
     private Query menuQuery(String tenant, String lineId, String versionId, String category, String keyword) {
-        StringBuilder sql = new StringBuilder(CORE).append(" AND w.parent_work_item_id_ IS NULL");
+        StringBuilder sql = new StringBuilder(CORE).append(" AND w.parent_work_item_id_ IS NULL AND COALESCE(w.source_type_,'')<>'WORK_ORDER'");
         List<Object> args = new ArrayList<>(List.of(tenant, lineId));
         if (!category.isBlank()) { sql.append(" AND w.category_=?"); args.add(category); }
         if (!versionId.isBlank()) { sql.append(" AND w.version_id_=?"); args.add(versionId); }

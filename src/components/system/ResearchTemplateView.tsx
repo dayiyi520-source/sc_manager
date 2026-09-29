@@ -14,8 +14,8 @@ import { WorkItemStateEditor, validateWorkflowStates, type EditableWorkflowState
 type Section = 'dictionary' | 'work-items' | 'roles' | 'statuses' | 'notifications' | 'automation' | 'archive';
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'dictionary', label: '产研字典' }, { id: 'work-items', label: '工作项模板' },
-  { id: 'roles', label: '角色与职责' }, { id: 'notifications', label: '通知与提醒' },
   { id: 'statuses', label: '产品与迭代状态' },
+  { id: 'roles', label: '角色与职责' }, { id: 'notifications', label: '通知与提醒' },
   { id: 'automation', label: '自动化配置' },
   { id: 'archive', label: '归档' }
 ];
@@ -142,22 +142,21 @@ const StatusesPanel = () => {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['research-status-templates', scope] });
   const save = async () => {
     const invalid = validateWorkflowStates(states); if (invalid) { addToast('warning', invalid); return; }
+    if (Object.keys(GROUP_TO_PHASE).some((group) => !states.some((state) => state.group === group))) { addToast('warning', '每个阶段至少保留一个启用状态'); return; }
     setSaving(true);
     try {
       const originals = statusesQuery.data || [];
-      const payload = (state: EditableWorkflowState, index: number) => ({ name: state.name.trim(), phase: GROUP_TO_PHASE[state.group], color: state.color, initial: state.initial, enabled: true, sort: index + 1 });
-      const changed = (state: EditableWorkflowState, index: number) => { const old = originals.find((item) => item.id === state.key); const next = payload(state, index); return !old || old.name !== next.name || old.phase !== next.phase || old.color !== next.color || old.initial !== next.initial || old.sort !== next.sort || !old.enabled; };
-      for (const [index, state] of states.entries()) if (!state.initial && changed(state, index)) { const old = originals.find((item) => item.id === state.key); if (old) await productRepository.updateResearchStatusTemplate(old.id, { ...payload(state, index), revision: old.revision }); else await productRepository.createResearchStatusTemplate(scope, payload(state, index)); }
-      for (const [index, state] of states.entries()) if (state.initial && changed(state, index)) { const old = originals.find((item) => item.id === state.key); if (old) await productRepository.updateResearchStatusTemplate(old.id, { ...payload(state, index), revision: old.revision }); else await productRepository.createResearchStatusTemplate(scope, payload(state, index)); }
-      const latest = await productRepository.researchStatusTemplates(scope);
-      for (const removed of latest.filter((item) => !states.some((state) => state.key === item.id))) await productRepository.deleteResearchStatusTemplate(removed.id, removed.revision);
+      await productRepository.saveResearchStatusTemplates(scope, {
+        originals: originals.map(({ id, revision }) => ({ id, revision })),
+        states: states.map((state, index) => ({ id: state.key, revision: originals.find((item) => item.id === state.key)?.revision, name: state.name.trim(), phase: GROUP_TO_PHASE[state.group], color: state.color, initial: state.initial, enabled: true, sort: index + 1 }))
+      });
       await refresh(); addToast('success', '状态配置已保存');
     } catch (error) { addToast('error', '状态配置保存失败', error instanceof Error ? error.message : '请稍后重试'); }
     finally { setSaving(false); }
   };
   return <div className="mx-auto w-full max-w-5xl space-y-4 text-xs">
     <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品与迭代状态</h3><p className="mt-1 text-[var(--text-muted)]">状态名称可自定义，通用阶段固定为未开始、进行中、已完成和已取消。</p></div><Button type="primary" className="!h-9" loading={saving} onClick={() => void save()}>保存配置</Button></div>
-    <Tabs activeKey={scope} onChange={(key) => setScope(key as ResearchStatusScope)} items={[{ key: 'PRODUCT', label: '产品状态' }, { key: 'ITERATION', label: '迭代状态' }]} />
+    <Tabs activeKey={scope} onChange={(key) => { if (!saving) { setStates([]); setScope(key as ResearchStatusScope); } }} items={[{ key: 'PRODUCT', label: '产品状态', disabled: saving }, { key: 'ITERATION', label: '迭代状态', disabled: saving }]} />
     {statusesQuery.isError && <Alert type="error" showIcon message="状态加载失败" action={<Button onClick={() => statusesQuery.refetch()}>重试</Button>} />}
     {statusesQuery.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : !statusesQuery.isError && <WorkItemStateEditor states={states} category="requirement" onChange={setStates} />}
   </div>;

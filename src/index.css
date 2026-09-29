@@ -380,6 +380,13 @@ html:not(.dark) .tech-sidebar {
 .task-page-table :where(tbody td) {
   vertical-align: middle;
 }
+.task-page-table .work-item-owner-cell {
+  width: 180px;
+}
+.task-page-table .work-item-owner-select.ant-select {
+  padding-inline: 0;
+  border-inline-width: 0;
+}
 .task-page [data-work-item-form] :where(input:not(.ant-input):not(.ant-input *):not(.ant-select-input):not(.ant-picker-input > input):not(.ant-input-number-input), textarea:not(.ant-input), select) {
   min-height: 32px;
 }
@@ -508,7 +515,7 @@ html:not(.dark) .product-line-detail button[class*="bg-[#2F66F6]"] {
 .iteration-view-tabs button { padding: 8px 0; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); cursor: pointer; }
 .iteration-view-tabs button[aria-selected="true"] { color: var(--primary); border-bottom-color: var(--primary); }
 .iteration-view-tabs button:hover { color: var(--primary-hover); }
-.iteration-view-tabs button:focus-visible, .iteration-version-link:focus-visible, .iteration-collapse:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.iteration-view-tabs button:focus-visible, .iteration-version-link:focus-visible, .iteration-task-title:focus-visible, .iteration-collapse:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 html:not(.dark) .tech-main .iteration-timeline .iteration-view-tabs [role="tab"],
 .dark .tech-main .iteration-timeline .iteration-view-tabs [role="tab"] { background: transparent !important; border-radius: 0 !important; box-shadow: none !important; color: var(--text-muted) !important; }
 html:not(.dark) .tech-main .iteration-timeline .iteration-view-tabs [role="tab"][aria-selected="true"],
@@ -520,7 +527,9 @@ html:not(.dark) .tech-main .iteration-timeline .iteration-view-tabs [role="tab"]
 .iteration-title-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .iteration-version-link { padding: 0; border: 0; background: transparent; color: var(--active-text); font-weight: 600; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .iteration-version-link:hover { color: var(--primary-hover); }
-.iteration-task-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.iteration-task-title { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--primary); text-align: left; font-weight: 600; cursor: pointer; }
+.iteration-task-title span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iteration-task-title:hover { color: var(--primary-hover); }
 .iteration-meta { margin-top: 4px; color: var(--text-muted); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .iteration-state-line { display: flex; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
 .iteration-risk-danger { color: var(--danger); }

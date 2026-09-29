@@ -5,6 +5,9 @@ import com.shichuang.manage.support.AbstractApiIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -18,6 +21,73 @@ class ResearchTemplateSettingsIntegrationTest extends AbstractApiIntegrationTest
    .content(objectMapper.writeValueAsString(Map.of("name","继承配置测试","code","PREF-"+System.nanoTime(),"ownerUserId","user-admin","initializeWorkItemTemplate",template))))
    .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
   return data(response).path("id").asText();
+ }
+ @Test void iterationStatusSaveValidatesFinalPhasesAndRollsBackOnConflict() throws Exception {
+  String token=auth();
+  String path="/api/research-template/statuses";
+  JsonNode existing=data(mockMvc.perform(get(path).param("scope","ITERATION").header("Authorization",token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+  List<Map<String,Object>> originals=new ArrayList<>(),states=new ArrayList<>();
+  String movedId="";
+  for (JsonNode item:existing) {
+   originals.add(Map.of("id",item.path("id").asText(),"revision",item.path("revision").asInt()));
+   Map<String,Object> state=objectMapper.convertValue(item,new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>() {});
+   if ("进行中".equals(item.path("name").asText())) { state.put("phase","已完成"); movedId=item.path("id").asText(); }
+   states.add(state);
+  }
+  assertFalse(movedId.isBlank());
+  String newName="配置补位-"+System.nanoTime();
+  Map<String,Object> added=new LinkedHashMap<>(Map.of("id","draft-"+System.nanoTime(),"name",newName,"phase","处理中","color","blue","initial",false,"enabled",true,"sort",10));
+  states.add(added);
+  String body=objectMapper.writeValueAsString(Map.of("originals",originals,"states",states));
+  mockMvc.perform(put(path).param("scope","ITERATION").header("Authorization",token).contentType("application/json").content(body)).andExpect(status().isOk());
+  JsonNode saved=data(mockMvc.perform(get(path).param("scope","ITERATION").header("Authorization",token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+  assertTrue(saved.toString().contains(newName));
+  assertEquals("已完成",jdbc.queryForObject("SELECT phase_ FROM t_research_status_template WHERE id_=?",String.class,movedId));
+  String before=saved.toString();
+  mockMvc.perform(put(path).param("scope","ITERATION").header("Authorization",token).contentType("application/json").content(body)).andExpect(status().isConflict());
+  assertEquals(before,data(mockMvc.perform(get(path).param("scope","ITERATION").header("Authorization",token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).toString());
+  List<Map<String,Object>> refreshed=new ArrayList<>(),withoutPhase=new ArrayList<>();
+  for (JsonNode item:saved) {
+   refreshed.add(Map.of("id",item.path("id").asText(),"revision",item.path("revision").asInt()));
+   Map<String,Object> state=objectMapper.convertValue(item,new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>() {});
+   if ("处理中".equals(item.path("phase").asText())) state.put("phase","已完成");
+   withoutPhase.add(state);
+  }
+  mockMvc.perform(put(path).param("scope","ITERATION").header("Authorization",token).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("originals",refreshed,"states",withoutPhase)))).andExpect(status().isBadRequest());
+  assertEquals(before,data(mockMvc.perform(get(path).param("scope","ITERATION").header("Authorization",token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).toString());
+  List<Map<String,Object>> switched=new ArrayList<>();
+  for (JsonNode item:saved) {
+   Map<String,Object> state=objectMapper.convertValue(item,new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>() {});
+   state.put("initial",false);
+   switched.add(state);
+  }
+  switched.add(new LinkedHashMap<>(Map.of("id","draft-default","name","新默认-"+System.nanoTime(),"phase","待开始","color","neutral","initial",true,"enabled",true,"sort",0)));
+  mockMvc.perform(put(path).param("scope","ITERATION").header("Authorization",token).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("originals",refreshed,"states",switched)))).andExpect(status().isOk());
+  assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM t_research_status_template WHERE tenant_id_='local-tenant' AND scope_='ITERATION' AND initial_=1 AND delete_flag_=0",Integer.class));
+ }
+ @Test void statusRenameUpdatesReferencedProductsAndVersionsIncludingLongNames() throws Exception {
+  String token=auth(),line=createLine(token,false);
+  String version=java.util.UUID.randomUUID().toString();
+  jdbc.update("INSERT INTO t_product_line_version(id_,tenant_id_,product_line_id_,code_,name_,status_,create_by_,update_by_,create_time_,update_time_) VALUES(?,'local-tenant',?,?,'重命名验证','未开始','user-admin','user-admin',NOW(),NOW())",version,line,version);
+  for(String scope:List.of("PRODUCT","ITERATION")) {
+   String path="/api/research-template/statuses";
+   JsonNode existing=data(mockMvc.perform(get(path).param("scope",scope).header("Authorization",token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+   List<Map<String,Object>> originals=new ArrayList<>(),states=new ArrayList<>();
+   String renamed="业务状态名称长度验证".repeat(5);
+   for(JsonNode item:existing) {
+    originals.add(Map.of("id",item.path("id").asText(),"revision",item.path("revision").asInt()));
+    Map<String,Object> state=objectMapper.convertValue(item,new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>() {});
+    if(item.path("initial").asBoolean()) {
+     String table="PRODUCT".equals(scope)?"t_product_line":"t_product_line_version";
+     jdbc.update("UPDATE "+table+" SET status_=? WHERE id_=?",item.path("name").asText(),"PRODUCT".equals(scope)?line:version);
+     state.put("name",renamed);
+    }
+    states.add(state);
+   }
+   mockMvc.perform(put(path).param("scope",scope).header("Authorization",token).contentType("application/json").content(objectMapper.writeValueAsString(Map.of("originals",originals,"states",states)))).andExpect(status().isOk());
+   String table="PRODUCT".equals(scope)?"t_product_line":"t_product_line_version";
+   assertEquals(renamed,jdbc.queryForObject("SELECT status_ FROM "+table+" WHERE id_=?",String.class,"PRODUCT".equals(scope)?line:version));
+  }
  }
  @Test void notificationTemplateCopiesToProductsAndOverridesRemainIndependent() throws Exception {
   String token=auth();

@@ -478,7 +478,7 @@ export const RequirementPoolView: React.FC = () => {
         priority: String(specialFields.priority || requirementPriority || "中") as RequirementTask["priority"],
         workOrderType: workOrderType || "其他问题",
         specialFields,
-        dueDate: dueDate || undefined,
+        expectedCompleteDate: dueDate || undefined,
       });
       if (!saved) return;
       setCreating(false);
@@ -538,7 +538,7 @@ export const RequirementPoolView: React.FC = () => {
       const singleTask = taskInputs[0];
       let results: Array<{ task: typeof singleTask.task; assignee: NonNullable<typeof singleTask.assignee>; result: Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }>;
       try {
-        const batch = await requirementRepository.createWorkItemsBatch(selected.id, taskInputs.map(({ task, assignee }) => ({ taskType: task.taskType!, assigneeName: assignee!.name, note: task.note, attachmentIds: task.media.map((item) => item.id), blocksClosure: true })));
+        const batch = await requirementRepository.createWorkItemsBatch(selected.id, taskInputs.map(({ task, assignee }) => ({ taskType: task.taskType!, assigneeName: assignee!.name, note: task.note, expectedCompleteDate: task.expectedDueDate, attachmentIds: task.media.map((item) => item.id), blocksClosure: true })));
         results = taskInputs.map(({ task, assignee }, index) => ({ task, assignee: assignee!, result: batch.items[index] as Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }));
       } catch {
         addToast("error", "下游任务创建失败", "本次批量操作未保存，请检查后重试");
@@ -1125,7 +1125,7 @@ export const RequirementPoolView: React.FC = () => {
               <RequirementActionButtons
                 status={selected.status}
                 hasWorkItem={taskLocked}
-                onWork={() => { setWorkflowAction(""); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "", media: [] }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setFlowMedia([]); setWorkOpen(true); }}
+                onWork={() => { setWorkflowAction(""); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setFlowMedia([]); setWorkOpen(true); }}
                 onHold={() => setReasonType("hold")}
                 onReject={() => setReasonType("reject")}
               />
@@ -1210,7 +1210,7 @@ export const RequirementPoolView: React.FC = () => {
                   期望完成时间
                 </span>
                 <p className="mt-1 text-[var(--text-primary)]">
-                  {selected.dueDate || "未设置"}
+                  {selected.expectedCompleteDate || "未设置"}
                 </p>
               </div>
             </div>
@@ -1324,7 +1324,7 @@ export const RequirementPoolView: React.FC = () => {
                 <span className="text-xs font-semibold text-[var(--text-primary)]">任务配置 ({subTasks.length})</span>
                 <button
                   type="button"
-                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "", media: [] }])}
+                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }])}
                   className="px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border-main)] text-xs text-[var(--primary)] font-medium hover:bg-[var(--bg-hover)]"
                 >
                   + 增加任务

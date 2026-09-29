@@ -226,7 +226,7 @@ describe('VersionIterationView', () => {
     fireEvent.click(screen.getByRole('button', { name: '展开测试主任务' }));
     expect(screen.getByLabelText('子任务：测试子任务')).toHaveAttribute('draggable', 'false');
     expect(screen.queryByRole('checkbox', { name: '选择工作项：测试子任务' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('checkbox', { name: '全选待规划工作项' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '全选待迭代任务' }));
     expect(screen.getByRole('checkbox', { name: '选择工作项：测试主任务' })).toBeChecked();
   });
 
@@ -401,9 +401,9 @@ describe('VersionIterationView', () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '迭代规划' }));
 
-    expect(screen.getByRole('checkbox', { name: '全选待规划工作项' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: '全选待迭代任务' })).toBeInTheDocument();
     expect(screen.getByText('可拖动到右侧迭代')).toBeInTheDocument();
-    const planningHeading = screen.getByText('待规划工作项 · 1').parentElement;
+    const planningHeading = screen.getByText('待迭代任务 · 1').parentElement;
     expect(planningHeading).toHaveClass('items-center');
     expect(planningHeading).not.toHaveClass('justify-center');
     expect(screen.getByRole('navigation', { name: '产品导航栏' })).toBeInTheDocument();
@@ -418,18 +418,18 @@ describe('VersionIterationView', () => {
   it('collapses the planning filter when clicking outside and highlights active filter/search icons', () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '迭代规划' }));
-    fireEvent.click(screen.getByRole('button', { name: '过滤待规划工作项' }));
+    fireEvent.click(screen.getByRole('button', { name: '过滤待迭代任务' }));
 
     expect(screen.getByTestId('planning-filter-panel')).toBeInTheDocument();
     expect(screen.getByText('工作项类型')).toHaveClass('text-[var(--text-muted)]');
-    const filterButton = screen.getByRole('button', { name: '过滤待规划工作项' });
+    const filterButton = screen.getByRole('button', { name: '过滤待迭代任务' });
     expect(filterButton.className).toContain('text-[var(--primary)]');
 
     fireEvent.click(document.body);
     expect(screen.queryByTestId('planning-filter-panel')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '搜索待规划工作项' }));
+    fireEvent.click(screen.getByRole('button', { name: '搜索待迭代任务' }));
     fireEvent.change(screen.getByPlaceholderText('输入关键词'), { target: { value: '拖拽' } });
-    expect(screen.getByRole('button', { name: '搜索待规划工作项' }).className).toContain('text-[var(--primary)]');
+    expect(screen.getByRole('button', { name: '搜索待迭代任务' }).className).toContain('text-[var(--primary)]');
   });
 });

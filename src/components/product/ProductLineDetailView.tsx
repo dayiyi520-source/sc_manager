@@ -30,8 +30,8 @@ import {
   GitBranch
 } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { ProductLine, ProductLineActivity, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, VersionIteration } from '../../types';
-import { productRepository } from '../../services/productRepository';
+import { ProductLine, ProductLineActivity, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, RequirementTask, VersionIteration } from '../../types';
+import { productRepository, type UnifiedWorkItem } from '../../services/productRepository';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { CreateVersionModal } from './CreateVersionModal';
 import { ManageMembersModal } from './ManageMembersModal';
@@ -494,6 +494,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   // Modals state
   const [boardCreateKind, setBoardCreateKind] = useState<'requirement' | 'design' | 'dev' | 'test' | 'bug' | null>(null);
+  const [detailWorkItem, setDetailWorkItem] = useState<UnifiedWorkItem | null>(null);
   const [isCreateVersionOpen, setIsCreateVersionOpen] = useState(false);
   const [editingVersion, setEditingVersion] = useState<VersionIteration | null>(null);
   const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
@@ -503,6 +504,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   useEffect(() => {
     if (initialSettingsSection) {
+      setBoardCreateKind(null);
       setSettingsSection(initialSettingsSection);
       setIsSettingsOpen(true);
     }
@@ -723,7 +725,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   if (isSettingsOpen) {
     return <>
-      <ProductLineSettingsPanel productLine={productLine} initialSection={settingsSection} onBack={() => setIsSettingsOpen(false)} onProductRemoved={onBack} onOpenMembers={() => setIsManageMembersOpen(true)} />
+      <ProductLineSettingsPanel productLine={productLine} initialSection={settingsSection} onBack={() => { setBoardCreateKind(null); setIsSettingsOpen(false); }} onProductRemoved={onBack} onOpenMembers={() => setIsManageMembersOpen(true)} />
       <ManageMembersModal isOpen={isManageMembersOpen} onClose={() => setIsManageMembersOpen(false)} productLine={productLine} />
     </>;
   }
@@ -762,7 +764,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button className="!h-9" size="small" onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }} icon={<Edit3 className="w-3.5 h-3.5" />}>责任人配置</Button>
-          <Button className="!h-9" size="small" onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品设置</Button>
+          <Button className="!h-9" size="small" onClick={() => { setBoardCreateKind(null); setIsSettingsOpen(true); }} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品设置</Button>
         </div>
       </div>}
 
@@ -937,7 +939,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           ? <div className="py-12 text-center text-xs text-[var(--danger)]">工作项加载失败 <Button size="small" onClick={() => workItemsQuery.refetch()}>重试</Button></div>
           : activeTab === 'board'
             ? <Card size="small" className="product-line-board-panel flex min-h-[calc(100vh-280px)] h-full flex-col [&>.ant-card-body]:min-h-0 [&>.ant-card-body]:flex-1">
-                <ProductLineBoard items={workItems} versions={lineVersions} onOpenCategory={(category) => navigateWithLine(({ requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks', test: 'prod_test_tasks', bug: 'prod_bugs' } as const)[category])} />
+                <ProductLineBoard items={workItems} versions={lineVersions} onOpenItem={setDetailWorkItem} onOpenCategory={(category) => navigateWithLine(({ requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks', test: 'prod_test_tasks', bug: 'prod_bugs' } as const)[category])} />
               </Card>
             : activeTab === 'hours'
               ? <ProductLineHours items={workItems} memberCount={memberCount} />
@@ -960,7 +962,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           </div>
 
           <div className="min-h-[calc(100vh-280px)] rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
-            <ProductIterationTimeline productLineId={productLine.id} versions={lineVersions} onOpenVersion={openVersionDetail} />
+            <ProductIterationTimeline productLineId={productLine.id} versions={lineVersions} onOpenVersion={openVersionDetail} onOpenItem={setDetailWorkItem} />
           </div>
 
         </div>
@@ -1098,7 +1100,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         </form>
       </Modal>
 
-      {boardCreateKind && (
+      {boardCreateKind && activeTab === 'board' && (
         <RequirementTasksView
           productLineFilter={productLine.id}
           itemLabel={
@@ -1121,6 +1123,15 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           }}
         />
       )}
+
+      {detailWorkItem && <RequirementTasksView
+        key={`${detailWorkItem.category}-${detailWorkItem.id}`}
+        productLineFilter={productLine.id}
+        itemLabel={{ requirement: '产品任务', design: '设计任务', dev: '研发任务', test: '测试任务', bug: '缺陷任务' }[detailWorkItem.category] || '任务'}
+        taskKind={detailWorkItem.category as 'requirement' | 'design' | 'dev' | 'test' | 'bug'}
+        initialDetail={{ ...detailWorkItem, ownerName: detailWorkItem.assigneeName || '', status: detailWorkItem.status?.name || '未设置', productLineName: productLine.name } as unknown as RequirementTask}
+        onDetailClose={() => setDetailWorkItem(null)}
+      />}
 
       {/* Modal 3: Create Version Modal (满足第4点) */}
       <CreateVersionModal

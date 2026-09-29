@@ -1,0 +1,2 @@
+ALTER TABLE t_product_line MODIFY COLUMN status_ VARCHAR(64) NOT NULL DEFAULT '启用中';
+ALTER TABLE t_product_line_version MODIFY COLUMN status_ VARCHAR(64) NOT NULL DEFAULT '未开始';

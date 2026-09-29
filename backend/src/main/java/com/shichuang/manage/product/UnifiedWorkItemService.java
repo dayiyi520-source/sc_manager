@@ -150,7 +150,8 @@ public class UnifiedWorkItemService {
             WorkItemConfigurationService.enabled(row.get("hasChildren")), ((Number)row.getOrDefault("revision",0)).intValue(),
             row.get("plannedStartDate") == null ? null : LocalDate.parse(row.get("plannedStartDate").toString()),
             row.get("completedAt") == null ? null : row.get("completedAt") instanceof java.sql.Timestamp timestamp ? timestamp.toLocalDateTime()
-                : LocalDateTime.parse(row.get("completedAt").toString().replace(' ', 'T')));
+                : LocalDateTime.parse(row.get("completedAt").toString().replace(' ', 'T')),
+            row.get("expectedCompleteDate") == null ? null : LocalDate.parse(row.get("expectedCompleteDate").toString()), nullable(row,"ccNames"));
     }
 
     private void requireLine(String lineId) {

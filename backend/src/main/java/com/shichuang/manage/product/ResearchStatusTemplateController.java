@@ -18,6 +18,9 @@ public class ResearchStatusTemplateController {
     @GetMapping
     @Operation(summary = "查询产品或迭代状态模板")
     public ApiResponse<List<Map<String, Object>>> list(@RequestParam String scope) { return ApiResponse.ok(service.list(scope)); }
+    @PutMapping
+    @Operation(summary = "整体保存产品或迭代状态配置")
+    public ApiResponse<List<Map<String, Object>>> save(@RequestParam String scope, @RequestBody Map<String, Object> body) { return ApiResponse.ok(service.save(scope, body)); }
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<Map<String, Object>> create(@RequestParam String scope, @RequestBody Map<String, Object> body) { return ApiResponse.ok(service.create(scope, body)); }

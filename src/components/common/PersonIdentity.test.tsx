@@ -5,6 +5,11 @@ import { describe, expect, it } from 'vitest';
 import { employeeSelectOptions, formatEmployeeOptionLabel, PersonAvatar, PersonIdentity } from './PersonIdentity';
 
 describe('PersonIdentity', () => {
+  it('deduplicates by the selected value while retaining distinct IDs for namesakes', () => {
+    const employees = [{ id: '1', name: '毛景强', jobTitle: '产品经理' }, { id: '2', name: '毛景强', jobTitle: '产品经理' }, { id: '1', name: '毛景强' }];
+    expect(employeeSelectOptions(employees, 'name')).toHaveLength(1);
+    expect(employeeSelectOptions(employees)).toHaveLength(2);
+  });
   it('shares the colored compact avatar style used by identity rows', () => {
     const { container } = render(<PersonAvatar name="林志豪" size={32} />);
     const avatar = container.querySelector('.ant-avatar');
