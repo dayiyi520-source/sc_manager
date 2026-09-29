@@ -163,16 +163,17 @@ describe('VersionIterationView', () => {
     expect(screen.getByRole('tab', { name: '迭代信息' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: '迭代任务' })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByText('张瑞')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '迭代工时' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '测试报告' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '版本评审' })).toBeInTheDocument();
+    expect(screen.getByText('版本工时')).toBeInTheDocument();
+    expect(screen.getByText('版本工时概览')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '测试报告' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '版本评审' })).not.toBeInTheDocument();
     expect(screen.getByText('工作项分布')).toBeInTheDocument();
     expect(screen.getByText('工作项排名')).toBeInTheDocument();
     expect(screen.getByText('工时排名')).toBeInTheDocument();
     expect(screen.getAllByText('王丽')).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('tab', { name: '迭代任务' }));
-    expect(screen.queryByText('迭代工时')).not.toBeInTheDocument();
+    expect(screen.queryByText('版本工时')).not.toBeInTheDocument();
     expect(screen.getByText('已纳入迭代的工作项')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '搜索' }));
     fireEvent.change(screen.getByRole('textbox', { name: '搜索迭代任务' }), { target: { value: '不存在' } });
@@ -186,10 +187,7 @@ describe('VersionIterationView', () => {
     expect(await screen.findByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
     expect(appMocks.openPageTab).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('tab', { name: '迭代信息' }));
-    fireEvent.click(screen.getByRole('button', { name: '测试报告' }));
-    expect(screen.getByText('暂无测试报告')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '版本评审' }));
-    expect(screen.getByText('暂无版本评审')).toBeInTheDocument();
+    expect(screen.getByText('版本工时')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '完成迭代' }));
     await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '已完成' }));
   });
