@@ -27,6 +27,12 @@ public class UnifiedWorkItemController {
         return ApiResponse.ok(service.versionSummary(lineId, versionId));
     }
 
+    @GetMapping("/api/product-lines/{lineId}/iteration-timeline")
+    @Operation(summary = "读取产品迭代排期，包含阶段子任务")
+    public ApiResponse<java.util.List<UnifiedWorkItem>> timeline(@PathVariable String lineId) {
+        return ApiResponse.ok(service.iterationTimeline(lineId));
+    }
+
     @GetMapping("/api/requirements/{id}/summary")
     @Operation(summary = "读取需求关联任务与当前处理人")
     public ApiResponse<UnifiedWorkItemService.RequirementSummary> requirement(@PathVariable String id, @RequestParam String productLineId) {

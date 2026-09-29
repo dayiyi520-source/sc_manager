@@ -20,6 +20,38 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductLineControllerIntegrationTest extends AbstractApiIntegrationTest {
 
     @Test
+    void archivesRestoresAndSoftDeletesProductWithAuditInformation() throws Exception {
+        String authorization = "Bearer " + loginToken();
+        String name = "归档流程测试-" + System.nanoTime();
+        String response = mockMvc.perform(post("/api/product-lines")
+                .header("Authorization", authorization).contentType("application/json")
+                .content("{\"name\":\"" + name + "\",\"ownerUserId\":\"user-admin\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String lineId = objectMapper.readTree(response).path("data").path("id").asText();
+
+        mockMvc.perform(post("/api/product-lines/{id}/archive", lineId).header("Authorization", authorization))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/product-lines").param("keyword", name).header("Authorization", authorization))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(0));
+        mockMvc.perform(get("/api/product-lines/archived").header("Authorization", authorization))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[?(@.id == '" + lineId + "')].name").value(name))
+            .andExpect(jsonPath("$.data[?(@.id == '" + lineId + "')].archivedAt").exists())
+            .andExpect(jsonPath("$.data[?(@.id == '" + lineId + "')].archivedByName").value("林志豪"));
+
+        mockMvc.perform(post("/api/product-lines/{id}/restore", lineId).header("Authorization", authorization))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/product-lines").param("keyword", name).header("Authorization", authorization))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].name").value(name));
+
+        mockMvc.perform(delete("/api/product-lines/{id}", lineId).header("Authorization", authorization))
+            .andExpect(status().isOk());
+        assertEquals(1, jdbc.queryForObject("SELECT delete_flag_ FROM t_product_line WHERE id_=?", Integer.class, lineId));
+    }
+
+    @Test
     void rejectsSamePrimaryAndSecondaryResponsibility() throws Exception {
         String authorization = "Bearer " + loginToken();
         mockMvc.perform(post("/api/product-lines")

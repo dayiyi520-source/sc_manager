@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Input, Select, Button, Switch, Drawer, Tag, Dropdown } from 'antd';
+import { Input, Select, Button, Switch, Drawer, Tag, Dropdown, Popconfirm, Spin } from 'antd';
 import Card from 'antd/es/card/Card';
 import { useQuery } from '@tanstack/react-query';
-import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, DeleteOutlined, DownOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined, UndoOutlined } from '@ant-design/icons';
 import {
   ArrowLeft,
   Boxes,
@@ -52,7 +52,9 @@ import { employeeJobTitle, employeeSelectOptions, PersonAvatar, PersonIdentity }
 import { ProductLineBoard, ProductLineHours, useProductLineWorkItems } from './ProductLineInsights';
 import { ProductLinePerformance } from './ProductLinePerformance';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
-import { formatVersionPublishedAt, latestReleasedVersion } from './productLinePresentation';
+import { formatVersionPublishedAt, latestReleasedVersion, productLineDisplayStatus } from './productLinePresentation';
+import { RequirementTasksView } from './RequirementTasksView';
+import { ProductIterationTimeline } from './ProductIterationTimeline';
 
 interface ProductLineDetailViewProps {
   productLineId: string;
@@ -60,7 +62,7 @@ interface ProductLineDetailViewProps {
   initialSettingsSection?: ProductLineSettingsSection;
 }
 
-export type ProductLineSettingsSection = 'basic' | 'members' | 'work-items' | 'notifications' | 'automation';
+export type ProductLineSettingsSection = 'basic' | 'members' | 'work-items' | 'notifications' | 'automation' | 'other' | 'recycle-bin';
 
 const normalizeProductVisibility = (value?: ProductLine['visibility']): '公开' | '私密' =>
   value === '私密' || value === '部门可见' || value === '保密' || value === '仅创建者可见' ? '私密' : '公开';
@@ -71,16 +73,17 @@ const productLineStatCards = [
   { label: '设计任务', category: 'design' as const, tone: 'text-pink-400' },
   { label: '研发任务', category: 'dev' as const, tone: 'text-emerald-400' },
   { label: '测试任务', category: 'test' as const, tone: 'text-amber-400' },
-  { label: '缺陷任务', category: 'bug' as const, tone: 'text-red-400' }
+  { label: '缺陷任务', category: 'bug' as const, tone: 'text-[var(--danger)]' }
 ];
 
 const ProductLineSettingsPanel: React.FC<{
   productLine: ProductLine;
   onBack: () => void;
+  onProductRemoved: () => void;
   onOpenMembers: () => void;
   initialSection?: ProductLineSettingsSection;
-}> = ({ productLine, onBack, onOpenMembers, initialSection }) => {
-  const { updateProductLine, updateProductLineMember, removeProductLineMember, addToast } = useApp();
+}> = ({ productLine, onBack, onProductRemoved, onOpenMembers, initialSection }) => {
+  const { updateProductLine, updateProductLineMember, removeProductLineMember, setProductLines, addToast } = useApp();
   const [section, setSection] = useState<ProductLineSettingsSection>(initialSection || 'basic');
   const [name, setName] = useState(productLine.name);
   const [code, setCode] = useState(productLine.code);
@@ -91,10 +94,15 @@ const ProductLineSettingsPanel: React.FC<{
   const [isSavingBasic, setIsSavingBasic] = useState(false);
   const [description, setDescription] = useState(productLine.description);
   const [visibility, setVisibility] = useState<'公开' | '私密'>(normalizeProductVisibility(productLine.visibility));
-  const [status, setStatus] = useState<'启用中' | '已停用'>(productLine.health === '已停用' || productLine.status === '已停用' ? '已停用' : '启用中');
+  const [pendingOperation, setPendingOperation] = useState<'activate' | 'disable' | 'archive' | 'delete' | null>(null);
+  const [isOperating, setIsOperating] = useState(false);
   const [memberTab, setMemberTab] = useState('全部');
   const [memberToRemove, setMemberToRemove] = useState<ProductLineMember | null>(null);
   const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
+  const roleTemplatesQuery = useQuery({ queryKey: ['product-role-templates'], queryFn: productRepository.productRoleTemplates, retry: false });
+  const productStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'PRODUCT'], queryFn: () => productRepository.researchStatusTemplates('PRODUCT'), retry: false });
+  const enabledProductStatuses = (productStatusesQuery.data || []).filter((item) => item.enabled);
+  const productStatusForPhase = (phase: '待开始' | '处理中' | '已完成' | '已结束') => enabledProductStatuses.find((item) => item.phase === phase)?.name || '';
   const employeesById = new Map((employeesQuery.data || []).map((employee) => [employee.id, employee]));
 
   useEffect(() => {
@@ -106,7 +114,6 @@ const ProductLineSettingsPanel: React.FC<{
     setWebsiteError('');
     setDescription(productLine.description);
     setVisibility(normalizeProductVisibility(productLine.visibility));
-    setStatus(productLine.health === '已停用' || productLine.status === '已停用' ? '已停用' : '启用中');
   }, [productLine]);
 
   useEffect(() => {
@@ -132,15 +139,15 @@ const ProductLineSettingsPanel: React.FC<{
     setWebsiteError('');
     setIsSavingBasic(true);
     try {
-      await updateProductLine(productLine.id, {
+      const nextBasicInfo: Partial<ProductLine> = {
         name: name.trim(),
         description: description.trim() || '该产品还没有任何简介内容。',
         website: normalizedWebsite || '',
         ownerUserId,
         sort,
-        visibility,
-        status
-      });
+        visibility
+      };
+      await updateProductLine(productLine.id, nextBasicInfo);
     } catch (error) {
       addToast('error', '产品设置保存失败', error instanceof Error ? error.message : '请稍后重试');
     } finally {
@@ -150,25 +157,60 @@ const ProductLineSettingsPanel: React.FC<{
 
   const sections: Array<{ id: ProductLineSettingsSection; label: string }> = [
     { id: 'basic', label: '基本信息' },
-    { id: 'members', label: '项目成员' },
+    { id: 'members', label: '产品成员' },
     { id: 'work-items', label: '工作项设置' },
-    { id: 'notifications', label: '通知' },
-    { id: 'automation', label: '自动化规则' }
+    { id: 'notifications', label: '通知与提醒' },
+    { id: 'automation', label: '自动化规则' },
+    { id: 'other', label: '其他' },
+    { id: 'recycle-bin', label: '回收站' }
   ];
+
+  const currentStatus = productLine.status || productLine.health || '';
+  const disabledStatus = productStatusForPhase('已结束');
+  const isEnabled = currentStatus !== disabledStatus;
+  const operationCopy = {
+    activate: { title: '启用产品', description: '启用后，产品恢复正常维护和新建操作。', confirm: '确认启用' },
+    disable: { title: '停用产品', description: '停用后，产品保留历史数据，但不再允许新建业务数据。', confirm: '确认停用' },
+    archive: { title: '归档产品', description: '归档后，产品将从产品管理列表移至产研模板的归档列表。', confirm: '确认归档' },
+    delete: { title: '删除产品', description: '删除后，产品将不再展示。此操作不可在界面中恢复。', confirm: '确认删除' }
+  } as const;
+  const executeOperation = async () => {
+    if (!pendingOperation) return;
+    setIsOperating(true);
+    try {
+      if (pendingOperation === 'activate') await productRepository.activateProductLine(productLine.id);
+      if (pendingOperation === 'disable') await productRepository.disableProductLine(productLine.id);
+      if (pendingOperation === 'archive') await productRepository.archiveProductLine(productLine.id);
+      if (pendingOperation === 'delete') await productRepository.deleteProductLine(productLine.id);
+      const refreshedProductLines = await productRepository.productLines();
+      setProductLines(refreshedProductLines);
+      if (pendingOperation === 'archive' || pendingOperation === 'delete') {
+        addToast('success', pendingOperation === 'archive' ? '产品已归档' : '产品已删除');
+        setPendingOperation(null);
+        onProductRemoved();
+        return;
+      }
+      addToast('success', pendingOperation === 'activate' ? '产品已启用' : '产品已停用');
+      setPendingOperation(null);
+    } catch (error) {
+      addToast('error', `${operationCopy[pendingOperation].title}失败`, error instanceof Error ? error.message : '请稍后重试');
+    } finally {
+      setIsOperating(false);
+    }
+  };
 
   return (
     <div className="product-line-settings space-y-5 animate-in fade-in duration-200">
-      <div className="flex items-center gap-3 border-b border-[var(--border-main)] pb-3">
-        <Button onClick={onBack} icon={<ArrowLeft className="w-3.5 h-3.5" />}>返回产品详情</Button>
+      <div className="flex min-w-0 items-center gap-3 border-b border-[var(--border-main)] pb-3">
+        <Button type="text" onClick={onBack} icon={<ArrowLeft className="w-3.5 h-3.5" />}>返回</Button>
+        <span className="text-sm font-medium text-[var(--text-primary)]">产品详情</span>
+        <span className="h-4 w-px bg-[var(--border-main)]" aria-hidden="true" />
+        <span className="min-w-0 truncate text-sm font-semibold text-[var(--active-text)]" title={`${productLine.name} ${productLine.code}`}>{productLine.name}</span>
+        <span className="shrink-0 font-mono text-xs text-[var(--text-muted)]">{productLine.code}</span>
       </div>
 
       <div className="grid min-h-[520px] grid-cols-1 border border-[var(--border-main)] bg-[var(--bg-surface)] md:grid-cols-[190px_minmax(0,1fr)]">
         <nav className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:border-b-0 md:border-r" aria-label="产品设置菜单">
-          <div className="mb-4 border-b border-[var(--border-main)] px-3 pb-4 select-none">
-            <h2 className="text-base font-bold text-[var(--text-primary)]">产品设置</h2>
-            <p className="mt-2 truncate text-xs font-medium text-[var(--active-text)]" title={productLine.name}>{productLine.name}</p>
-            <p className="mt-1 truncate font-mono text-[11px] text-[var(--text-muted)]" title={productLine.code}>{productLine.code}</p>
-          </div>
           {sections.map((item) => (
             <button
               key={item.id}
@@ -202,26 +244,24 @@ const ProductLineSettingsPanel: React.FC<{
                 </div>
               </div>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品描述</span><Input.TextArea rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="请输入产品描述" /></label>
-              <div className="flex items-center justify-between gap-4">
-                <div><div className="font-medium text-[var(--text-body)]">是否启用</div><p className="mt-[5px] text-[11px] text-[var(--text-muted)]">关闭后，产品仅保留查看和历史记录能力。</p></div>
-                <Switch className="product-line-switch" checked={status === '启用中'} onChange={(checked) => setStatus(checked ? '启用中' : '已停用')} checkedChildren="启用" unCheckedChildren="停用" />
-              </div>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>排序</span><Input type="number" min={0} max={999} step={1} value={sort} onChange={(event) => setSort(Number(event.target.value))} /></label>
               <div className="flex justify-end"><Button type="primary" htmlType="submit" loading={isSavingBasic}>保存基本信息</Button></div>
             </form>
           )}
           {section === 'members' && (
             <div className="mx-auto w-full max-w-2xl space-y-5 text-xs">
-              <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">项目成员</h3><p className="mt-1 text-[var(--text-muted)]">配置产品成员及其角色。</p></div><Button type="primary" onClick={onOpenMembers} icon={<UserAddOutlined />}>添加成员</Button></div>
+              <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品成员</h3><p className="mt-1 text-[var(--text-muted)]">配置产品成员及其角色。</p></div><Button type="primary" onClick={onOpenMembers} icon={<UserAddOutlined />}>添加成员</Button></div>
               {(() => {
                 const members: ProductLineMember[] = (productLine.members || []).map((member, index) => typeof member === 'string' ? { id: `legacy-${index}-${member}`, userId: '', name: member, role: '参与人' } : member);
-                const memberTabs = ['全部', '管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'];
+                const configuredRoles = (roleTemplatesQuery.data || []).map((role) => role.name);
+                const historicalRoles = members.map((member) => member.role).filter((role) => role && !configuredRoles.includes(role));
+                const memberTabs = ['全部', ...configuredRoles, ...historicalRoles];
                 const visibleMembers = memberTab === '全部' ? members : members.filter((member) => member.role === memberTab);
                 return <>
                   <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">{memberTabs.map((tab) => { const count = tab === '全部' ? members.length : members.filter((member) => member.role === tab).length; return <button key={tab} type="button" onClick={() => setMemberTab(tab)} className={`h-10 px-3 text-sm font-medium border-b-2 transition-colors ${memberTab === tab ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{tab}</span><span className="ml-1 text-base font-normal text-[var(--primary)]">{count}</span></button>; })}</div>
                   <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
                     <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-[11px] text-[var(--text-muted)]"><span>成员</span><span>角色</span><span className="text-right">操作</span></div>
-                    {visibleMembers.length ? visibleMembers.map((member) => { const employee = employeesById.get(member.userId); return <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><PersonIdentity name={member.name} subtitle={employee ? employeeJobTitle(employee) || '未设置职位' : undefined} size={28} /><Select className="w-full" value={member.role} options={['管理员', '参与人', '产品', '设计', '研发', '测试', '交付主管'].map((role) => ({ value: role, label: role }))} onChange={async (role) => { try { await updateProductLineMember(productLine.id, member.id, role); addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>; }) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
+                    {visibleMembers.length ? visibleMembers.map((member) => { const employee = employeesById.get(member.userId); const roleOptions = [...new Set([...configuredRoles, member.role])].filter(Boolean).map((role) => ({ value: role, label: role })); return <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><PersonIdentity name={member.name} subtitle={employee ? employeeJobTitle(employee) || '未设置职位' : undefined} size={28} /><Select className="w-full" value={member.role} loading={roleTemplatesQuery.isLoading} disabled={roleTemplatesQuery.isError} options={roleOptions} onChange={async (role) => { try { await updateProductLineMember(productLine.id, member.id, role); addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>; }) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
                   </div>
                 </>;
               })()}
@@ -231,10 +271,35 @@ const ProductLineSettingsPanel: React.FC<{
           {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
           {section === 'notifications' && <NotificationSettingsPanel scope="product" productLineId={productLine.id} />}
           {section === 'automation' && <AutomationRulesPanel productLine={productLine} />}
+          {section === 'other' && <div className="w-full space-y-5 px-0 text-xs sm:px-2 lg:px-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品操作</h3><p className="mt-1 text-[var(--text-muted)]">集中管理产品的启停、归档和删除。</p></div><div className="space-y-3"><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">是否启用</h4><p className="mt-1 text-[var(--text-muted)]">停用后保留历史数据，产品内不再支持新建操作。</p></div><Switch className="product-operation-switch" checked={isEnabled} checkedChildren="启用" unCheckedChildren="停用" onChange={(checked) => setPendingOperation(checked ? 'activate' : 'disable')} /></div><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">产品归档</h4><p className="mt-1 text-[var(--text-muted)]">产品完成后可归档，归档产品统一在产研模板中管理。</p></div><Button className="!h-9" type="primary" onClick={() => setPendingOperation('archive')}>归档</Button></div><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">删除产品</h4><p className="mt-1 text-[var(--text-muted)]">删除后产品不再展示，关联历史数据不支持从界面恢复。</p></div><Button className="!h-9" danger onClick={() => setPendingOperation('delete')}>删除</Button></div></div></div>}
+          {section === 'recycle-bin' && <ProductRecycleBin productLineId={productLine.id} />}
         </section>
       </div>
+      <Modal isOpen={Boolean(pendingOperation)} onClose={() => !isOperating && setPendingOperation(null)} title={pendingOperation ? operationCopy[pendingOperation].title : ''} footer={<><Button disabled={isOperating} onClick={() => setPendingOperation(null)}>取消</Button><Button type="primary" danger={pendingOperation !== 'activate'} loading={isOperating} onClick={() => void executeOperation()}>{pendingOperation ? operationCopy[pendingOperation].confirm : '确认'}</Button></>}><p className="text-sm text-[var(--text-body)]">{pendingOperation ? operationCopy[pendingOperation].description : ''}</p></Modal>
     </div>
   );
+};
+
+const ProductRecycleBin: React.FC<{ productLineId: string }> = ({ productLineId }) => {
+  const { addToast } = useApp();
+  const query = useQuery({ queryKey: ['product-recycle-bin', productLineId], queryFn: () => productRepository.recycleBin(productLineId), retry: false });
+  const [operatingId, setOperatingId] = useState('');
+  const restore = async (id: string, revision: number) => {
+    setOperatingId(id);
+    try { await productRepository.restoreRecycleBinItem(productLineId, id, revision); await query.refetch(); addToast('success', '任务已恢复'); }
+    catch (error) { addToast('error', '恢复失败', error instanceof Error ? error.message : '请稍后重试'); }
+    finally { setOperatingId(''); }
+  };
+  const purge = async (id: string, revision: number) => {
+    setOperatingId(id);
+    try { await productRepository.purgeRecycleBinItem(productLineId, id, revision); await query.refetch(); addToast('success', '任务已彻底删除'); }
+    catch (error) { addToast('error', '彻底删除失败', error instanceof Error ? error.message : '请稍后重试'); }
+    finally { setOperatingId(''); }
+  };
+  return <div className="w-full space-y-5 text-xs">
+    <div><h3 className="text-sm font-bold text-[var(--text-primary)]">回收站</h3><p className="mt-1 text-[var(--text-muted)]">查看当前产品已删除的产品、设计、研发、测试和缺陷任务。</p></div>
+    {query.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : query.isError ? <div role="alert" className="py-8 text-center text-[var(--danger)]">回收站加载失败<Button type="link" onClick={() => query.refetch()}>重试</Button></div> : <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[820px]"><div className="grid grid-cols-[minmax(260px,1.6fr)_160px_130px_180px_150px] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-3 text-[var(--text-muted)]"><span>标题</span><span>所属版本</span><span>操作人</span><span>操作时间</span><span className="text-right">操作</span></div>{(query.data || []).map((item) => <div key={item.id} className="grid grid-cols-[minmax(260px,1.6fr)_160px_130px_180px_150px] items-center gap-3 border-b border-[var(--border-main)] px-4 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]"><WorkItemCategoryIcon category={item.category} className="shrink-0 text-[var(--primary)]" /><span className="truncate" title={item.title}>{item.title}</span></span><span className="truncate text-[var(--text-body)]" title={item.versionName}>{item.versionName}</span><span className="truncate text-[var(--text-body)]">{item.operatorName || '未记录'}</span><span className="text-[var(--text-muted)]">{item.operatedAt ? new Date(item.operatedAt).toLocaleString('zh-CN', { hour12: false }) : '未记录'}</span><span className="flex justify-end gap-1"><Popconfirm title="恢复任务" description={`确定恢复“${item.title}”吗？`} okText="恢复" cancelText="取消" onConfirm={() => restore(item.id, item.revision)}><Button type="link" size="small" loading={operatingId === item.id} icon={<UndoOutlined />}>恢复</Button></Popconfirm><Popconfirm title="彻底删除" description={`确定彻底删除“${item.title}”吗？此操作不可恢复。`} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => purge(item.id, item.revision)}><Button type="link" danger size="small" loading={operatingId === item.id} icon={<DeleteOutlined />}>删除</Button></Popconfirm></span></div>)}{!query.data?.length && <div className="px-4 py-12 text-center text-[var(--text-muted)]">回收站为空</div>}</div></div>}
+  </div>;
 };
 
 const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({ title, description }) => (
@@ -242,6 +307,7 @@ const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({
 );
 
 const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '测试', '缺陷', '用例'];
+const workItemCategoryLabel = (category: ProductLineWorkItemCategory) => category === '需求' ? '产品' : category;
 
 const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
   const { addToast, setProductLines } = useApp();
@@ -372,12 +438,12 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
       <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">
         {WORK_ITEM_CATEGORIES.map((category) => {
           const count = items.filter((item) => item.category === category).length;
-          return <button key={category} type="button" onClick={() => setActiveCategory(category)} className={`h-10 px-4 text-sm font-medium border-b-2 transition-colors ${activeCategory === category ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{category}</span><span className="ml-1 text-[var(--primary)]">{count}</span></button>;
+          return <button key={category} type="button" onClick={() => setActiveCategory(category)} className={`h-10 px-4 text-sm font-medium border-b-2 transition-colors ${activeCategory === category ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{workItemCategoryLabel(category)}</span><span className="ml-1 text-[var(--primary)]">{count}</span></button>;
         })}
       </div>
       <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
         <div className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>类型名称</span><span>描述</span><span>添加人</span><span>添加时间</span><span>是否启用</span><span className="text-right">操作</span></div>
-        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]" title={item.name}><span className="truncate">{item.name}</span>{item.isDefault && <Tag color="blue">默认</Tag>}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}状态`} title="状态配置" icon={<ApartmentOutlined />} onClick={() => setStateConfigItem(item)} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{activeCategory}工作项类型，点击右上角“新增类型”添加</div>}
+        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]" title={item.name}><span className="truncate">{item.name}</span>{item.isDefault && <Tag color="blue">默认</Tag>}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}状态`} title="状态配置" icon={<ApartmentOutlined />} onClick={() => setStateConfigItem(item)} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{workItemCategoryLabel(activeCategory)}工作项类型，点击右上角“新增类型”添加</div>}
       </div>
       <Drawer
         width={editingItem ? 560 : 840}
@@ -390,7 +456,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
         <form id="work-item-type-form" onSubmit={saveItem} className="space-y-5 text-xs">
           <section className="space-y-4">
             <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">设置子类型的名称、分类和启用状态。</p></div>
-            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型分类</span><Select value={form.category} onChange={(category) => { setForm((previous) => ({ ...previous, category })); if (!editingItem) setInitialWorkflowStates(createDefaultWorkItemStates(CATEGORY_KEYS[category])); }} options={WORK_ITEM_CATEGORIES.map((category) => ({ value: category, label: category }))} /></label>
+            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型分类</span><Select value={form.category} onChange={(category) => { setForm((previous) => ({ ...previous, category })); if (!editingItem) setInitialWorkflowStates(createDefaultWorkItemStates(CATEGORY_KEYS[category])); }} options={WORK_ITEM_CATEGORIES.map((category) => ({ value: category, label: workItemCategoryLabel(category) }))} /></label>
             <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型名称 *</span><Input maxLength={128} value={form.name} onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))} placeholder="请输入类型名称" /></label>
             <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>描述</span><Input.TextArea rows={3} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} placeholder="请输入类型描述" /></label>
             <div className="flex items-center justify-between"><div><div className="font-medium text-[var(--text-body)]">是否启用</div><p className="mt-1 text-[11px] text-[var(--text-muted)]">停用后不能新建该类型的工作项。</p></div><Switch className="product-line-switch" checked={form.enabled} onChange={(enabled) => setForm((previous) => ({ ...previous, enabled }))} /></div>
@@ -424,8 +490,10 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   const productLine = productLines.find((pl) => pl.id === productLineId);
   const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
+  const roleTemplatesQuery = useQuery({ queryKey: ['product-role-templates'], queryFn: productRepository.productRoleTemplates, retry: false });
 
   // Modals state
+  const [boardCreateKind, setBoardCreateKind] = useState<'requirement' | 'design' | 'dev' | 'test' | 'bug' | null>(null);
   const [isCreateVersionOpen, setIsCreateVersionOpen] = useState(false);
   const [editingVersion, setEditingVersion] = useState<VersionIteration | null>(null);
   const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
@@ -531,12 +599,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const lineVersions = versions.filter(
     (v) => v.productLineId === productLine.id || v.productLineName === productLine.name
   );
-  const latestIteration = [...lineVersions].sort((a, b) => {
-    const startDiff = String(b.startDate || '').localeCompare(String(a.startDate || ''));
-    if (startDiff !== 0) return startDiff;
-    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
-  })[0];
-  const productStatus = productLine.health === '已停用' ? '已停用' : latestIteration?.status || '启用中';
+  const productStatus = productLineDisplayStatus({ ...productLine, versions: lineVersions });
   const onlineVersion = latestReleasedVersion({ versions: lineVersions });
   const onlinePublishedAt = formatVersionPublishedAt(onlineVersion);
   const memberUserIds = new Set((productLine.members || [])
@@ -559,11 +622,14 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     openPageTab(menuId);
   };
 
+  const boardCategoryLabel = (kind: 'requirement' | 'design' | 'dev' | 'test' | 'bug') => ({
+    requirement: '产品', design: '设计', dev: '研发', test: '测试', bug: '缺陷'
+  } as const)[kind];
+
   const openBoardTaskCreate = (kind: 'requirement' | 'design' | 'dev' | 'test' | 'bug') => {
-    const menuByKind = { requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks', test: 'prod_test_tasks', bug: 'prod_bugs' } as const;
-    sessionStorage.setItem('shichuang.productTaskCreate', JSON.stringify({ kind, productLineId: productLine.id }));
-    navigateWithLine(menuByKind[kind]);
+    setBoardCreateKind(kind);
   };
+
 
   const openVersionDetail = (versionId: string) => {
     sessionStorage.setItem('shichuang.productLineFilter', productLine.id);
@@ -581,7 +647,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     if (role === '设计' || role.includes('设计') || role.includes('UI') || role.includes('UX')) return '设计';
     if (role === '测试' || role.includes('测试') || role.includes('QA')) return '测试';
     if (role === '交付主管') return '交付主管';
-    return '参与人';
+    return role.trim();
   };
   const baseDetailMembers: ProductLineMember[] = (productLine.members || []).map((member, index) => (
     typeof member === 'string'
@@ -597,7 +663,18 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     productLine.techOwner,
     productLine.testOwner
   ].filter(Boolean)).size;
-  const memberRoleGroups = ['管理员', '产品', '研发', '设计', '测试', '交付主管', '参与人']
+  const configuredRoleNames = Array.from(
+    new Set((roleTemplatesQuery.data || []).map((role) => role.name).filter(Boolean))
+  );
+  const detailRoleNames = Array.from(
+    new Set([
+      ...configuredRoleNames,
+      ...detailMembers
+        .map((member) => normalizeRole(member.role))
+        .filter((role) => !configuredRoleNames.includes(role))
+    ])
+  );
+  const memberRoleGroups = detailRoleNames
     .map((label) => ({ label, members: detailMembers.filter((member) => normalizeRole(member.role) === label) }))
     .filter((group) => group.members.length > 0);
   const activityItems: ProductLineActivity[] = productLine.activities?.length
@@ -646,7 +723,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   if (isSettingsOpen) {
     return <>
-      <ProductLineSettingsPanel productLine={productLine} initialSection={settingsSection} onBack={() => setIsSettingsOpen(false)} onOpenMembers={() => setIsManageMembersOpen(true)} />
+      <ProductLineSettingsPanel productLine={productLine} initialSection={settingsSection} onBack={() => setIsSettingsOpen(false)} onProductRemoved={onBack} onOpenMembers={() => setIsManageMembersOpen(true)} />
       <ManageMembersModal isOpen={isManageMembersOpen} onClose={() => setIsManageMembersOpen(false)} productLine={productLine} />
     </>;
   }
@@ -684,8 +761,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <p className="mt-1 text-xs text-[var(--text-muted)]">查看产品概况、责任人配置、线上版本和产品动态。</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button size="small" onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }} icon={<Edit3 className="w-3.5 h-3.5" />}>责任人配置</Button>
-          <Button size="small" onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品设置</Button>
+          <Button className="!h-9" size="small" onClick={() => { resetLeadForm(); setIsEditLeadsOpen(true); }} icon={<Edit3 className="w-3.5 h-3.5" />}>责任人配置</Button>
+          <Button className="!h-9" size="small" onClick={() => setIsSettingsOpen(true)} icon={<Package className="w-3.5 h-3.5 text-emerald-400" />}>产品设置</Button>
         </div>
       </div>}
 
@@ -731,12 +808,6 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               </a>
             </div>
           )}
-          <Button
-            onClick={() => updateProductLine(productLine.id, { status: (productLine.status || productLine.health) === '已停用' ? '启用中' : '已停用' })}
-            type={(productLine.status || productLine.health) === '已停用' ? 'default' : 'primary'}
-          >
-            <span>{(productLine.status || productLine.health) === '已停用' ? '已停用' : '启用中'}</span>
-          </Button>
         </div>
 
         {/* Banner Content Body */}
@@ -856,7 +927,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         <button onClick={() => setActiveTab('performance')} aria-selected={activeTab === 'performance'} className={`shrink-0 border-b-2 px-3.5 pb-3 font-bold transition-colors ${activeTab === 'performance' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><TrendingUp className="mr-1 inline h-3.5 w-3.5" />产品效能</button>
       </div>
 
-      {activeTab === 'board' && <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-base font-bold text-[var(--text-primary)]">产品看板</h2><p className="mt-1 text-xs text-[var(--text-muted)]">按任务类型和处理状态查看当前产品的工作项分布。</p></div><Dropdown menu={{ items: [{ key: 'requirement', label: '产品' }, { key: 'design', label: '设计' }, { key: 'dev', label: '研发' }, { key: 'test', label: '测试' }, { key: 'bug', label: '缺陷' }], onClick: ({ key }) => openBoardTaskCreate(key as 'requirement' | 'design' | 'dev' | 'test' | 'bug') }} trigger={['click']}><Button size="small" icon={<Plus className="h-3.5 w-3.5" />}>新建</Button></Dropdown></div>}
+      {activeTab === 'board' && <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-base font-bold text-[var(--text-primary)]">产品看板</h2><p className="mt-1 text-xs text-[var(--text-muted)]">按任务类型和处理状态查看当前产品的工作项分布。</p></div><Dropdown menu={{ items: [{ key: 'requirement', label: '产品' }, { key: 'design', label: '设计' }, { key: 'dev', label: '研发' }, { key: 'test', label: '测试' }, { key: 'bug', label: '缺陷' }], onClick: ({ key }) => openBoardTaskCreate(key as 'requirement' | 'design' | 'dev' | 'test' | 'bug') }} trigger={['click']}><Button className="product-board-create-button !h-9" size="small" icon={<Plus className="h-3.5 w-3.5" />}>新建<DownOutlined className="text-[10px]" /></Button></Dropdown></div>}
       {activeTab === 'hours' && <div className="mb-4"><h2 className="text-base font-bold text-[var(--text-primary)]">产品工时</h2><p className="mt-1 text-xs text-[var(--text-muted)]">汇总当前产品工作项的预计工时、实际投入和人员分布。</p></div>}
       {activeTab === 'performance' && <div className="mb-4"><h2 className="text-base font-bold text-[var(--text-primary)]">产品效能</h2><p className="mt-1 text-xs text-[var(--text-muted)]">基于当前产品工作项汇总，帮助快速了解交付和质量状态。</p></div>}
 
@@ -879,59 +950,19 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">产品迭代</h2>
               <p className="mt-1 text-xs text-[var(--text-muted)]">
-                记录该产品已发布及规划中的各版本周期、关键更新与关联需求。
+                记录该产品已发布及规划中的各版本周期、阶段排期与关联产品任务。
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <Button size="small" onClick={() => { setEditingVersion(null); setIsCreateVersionOpen(true); }} icon={<Plus className="w-3.5 h-3.5" />}>创建新版本</Button>
-              <Button size="small" onClick={() => navigateWithLine('prod_versions', 'detail', true)} icon={<GitBranch className="w-3.5 h-3.5" />}>版本管理</Button>
+              <Button className="product-version-create-button !h-9" size="small" onClick={() => { setEditingVersion(null); setIsCreateVersionOpen(true); }} icon={<Plus className="w-3.5 h-3.5" />}>新建版本</Button>
+              <Button className="!h-9" size="small" onClick={() => navigateWithLine('prod_versions', 'detail', true)} icon={<GitBranch className="w-3.5 h-3.5" />}>版本管理</Button>
             </div>
           </div>
 
           <div className="min-h-[calc(100vh-280px)] rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
-            {lineVersions.length > 0 && (() => {
-              const dayMs = 86400000;
-              const toTime = (value?: string) => value ? new Date(value).getTime() : Date.now();
-              const now = new Date();
-              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-              const maxVersionEnd = Math.max(...lineVersions.map((item) => toTime(item.endDate || item.releaseDate || item.startDate)));
-              const rawEnd = new Date(Math.max(monthEnd.getTime(), maxVersionEnd));
-              const timelineStart = monthStart.getTime();
-              const timelineEnd = new Date(rawEnd.getFullYear(), rawEnd.getMonth(), rawEnd.getDate() + ((7 - rawEnd.getDay()) % 7) + 1).getTime();
-              const span = Math.max(timelineEnd - timelineStart, 7 * dayMs);
-              const weekCount = Math.max(1, Math.ceil(span / (7 * dayMs)));
-              const ticks = Array.from({ length: weekCount + 1 }, (_, index) => new Date(timelineStart + index * 7 * dayMs));
-              const timelineWidth = Math.max(680, weekCount * 96);
-              return <div className="product-line-gantt-grid">
-                <div className="product-line-gantt-heading">版本名称 / 版本号</div>
-                <div className="product-line-gantt-heading product-line-gantt-time-heading">时间区间（按周）</div>
-                <div className="product-line-gantt-labels">
-                  <div className="h-8 border-b border-[var(--border-main)]" />
-                  {lineVersions.map((version) => <div key={`gantt-label-${version.id}`} className="flex h-8 items-center"><button type="button" onClick={() => openVersionDetail(version.id)} className="block min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"><span className="block truncate text-xs font-semibold text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.name}</span><span className="mt-0.5 block truncate font-mono text-[11px] text-[var(--active-text)] hover:text-[var(--primary-hover)]">{version.code || '未设置版本号'}</span></button></div>)}
-                </div>
-                <div className="product-line-gantt-scroll">
-                  <div className="space-y-3" style={{ width: `max(100%, ${timelineWidth}px)` }}>
-                    <div className="relative h-8 border-b border-[var(--border-main)]">{ticks.map((tick, index) => {
-                      const edgeClass = index === 0 ? 'product-line-gantt-tick-first' : index === ticks.length - 1 ? 'product-line-gantt-tick-last' : 'product-line-gantt-tick-middle';
-                      return <span key={tick.toISOString()} className={`product-line-gantt-tick ${edgeClass} absolute top-0 text-[10px] text-[var(--text-muted)]`} style={{ left: `${Math.min(100, (index / weekCount) * 100)}%` }}>{tick.toISOString().slice(0, 10)}</span>;
-                    })}</div>
-                    {lineVersions.map((version) => {
-                  const start = toTime(version.startDate || version.releaseDate);
-                  const end = Math.max(toTime(version.endDate || version.releaseDate || version.startDate), start + 86400000);
-                  const visibleStart = Math.max(start, timelineStart);
-                  const left = Math.max(0, ((visibleStart - timelineStart) / span) * 100);
-                  const width = Math.max(2, ((end - visibleStart) / span) * 100);
-                  const interval = `${version.startDate || '--'} ~ ${version.endDate || version.releaseDate || '--'}`;
-                  return <div key={`gantt-${version.id}`} className="relative h-8 rounded bg-[var(--bg-surface-soft)]"><span className="absolute top-1.5 h-5 min-w-[8px] overflow-hidden whitespace-nowrap rounded bg-[var(--primary)]/80 px-2 pt-0.5 text-[10px] text-white" style={{ left: `${left}%`, width: `${width}%` }} title={interval}>{interval}</span></div>;
-                    })}
-                  </div>
-                </div>
-              </div>;
-            })()}
+            <ProductIterationTimeline productLineId={productLine.id} versions={lineVersions} onOpenVersion={openVersionDetail} />
           </div>
 
-          {lineVersions.length === 0 && <div className="text-center py-12 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl text-xs text-[var(--text-muted)]">暂无版本迭代记录，点击右上角“创建新版本”规划版本交付</div>}
         </div>
       )}
       </div>}
@@ -945,7 +976,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               const scoped = category === 'assistance'
                 ? workItems.filter((item) => item.category === 'requirement' && item.sourceType === 'WORK_ORDER')
                 : workItems.filter((item) => item.category === category && (category !== 'requirement' || item.sourceType !== 'WORK_ORDER'));
-              return <div key={category} className="product-line-stat-card flex flex-col items-center justify-center gap-1.5 rounded-lg bg-[var(--bg-surface-soft)] p-3 text-center"><div className="flex items-center justify-center gap-1.5 text-xs font-normal text-[var(--text-primary)]"><WorkItemCategoryIcon category={category} className={`h-3.5 w-3.5 ${tone}`} /><span>{label}</span></div><div className="text-xl font-bold font-mono tabular-nums text-[var(--text-primary)]">{workItemsQuery.isPending ? '--' : scoped.length}</div></div>;
+              return <div key={category} className="product-line-stat-card flex flex-col items-center justify-center gap-1.5 rounded-lg bg-[var(--bg-surface-soft)] p-3 text-center"><div className="flex items-center justify-center gap-1.5 text-xs font-normal text-[var(--text-primary)]"><WorkItemCategoryIcon category={category} className={`h-3.5 w-3.5 ${tone}`} /><span>{label}</span></div><div className={`text-xl font-bold font-mono tabular-nums ${category === 'bug' ? tone : 'text-[var(--text-primary)]'}`}>{workItemsQuery.isPending ? '--' : scoped.length}</div></div>;
             })}
           </div>}
           </Card>
@@ -1066,6 +1097,30 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           </div>
         </form>
       </Modal>
+
+      {boardCreateKind && (
+        <RequirementTasksView
+          productLineFilter={productLine.id}
+          itemLabel={
+            {
+              requirement: '产品任务',
+              design: '设计任务',
+              dev: '研发任务',
+              test: '测试任务',
+              bug: '缺陷'
+            }[boardCreateKind]
+          }
+          taskKind={boardCreateKind}
+          creationContext={{
+            productLineId: productLine.id,
+            onClose: () => setBoardCreateKind(null),
+            onCreated: () => {
+              setBoardCreateKind(null);
+              void workItemsQuery.refetch();
+            }
+          }}
+        />
+      )}
 
       {/* Modal 3: Create Version Modal (满足第4点) */}
       <CreateVersionModal

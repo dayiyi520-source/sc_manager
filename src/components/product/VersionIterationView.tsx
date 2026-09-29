@@ -38,6 +38,8 @@ import { teamRepository } from '../../services/teamRepository';
 import { Pagination } from '../common/Pagination';
 import { UnifiedWorkItemControls, type UnifiedFilterState } from './UnifiedWorkItemControls';
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
+import { ProductNavigation } from './ProductNavigation';
+import { useQuery } from '@tanstack/react-query';
 
 type ViewMode = 'list' | 'planning';
 type DetailTab = 'hours' | 'testReports' | 'review';
@@ -99,10 +101,12 @@ const versionMatches = (version: VersionIteration, value?: string) => {
 };
 
 const completedWorkItemStatuses = new Set(['已完成', '已发布', '已验收', '已关闭', '已合并上线']);
-const normalizeVersionStatus = (status?: string) => {
-  if (status === '已完成' || status === '已发布') return '已完成';
-  if (status === '进行中' || status === '迭代中' || status === '封版测试') return '进行中';
-  return '未开始';
+const normalizeVersionStatus = (status?: string, phase?: string) => {
+  if (phase === '已完成') return '已完成';
+  if (phase === '处理中') return '进行中';
+  if (phase === '已结束') return '已结束';
+  if (phase === '待开始') return '未开始';
+  return status || '未配置';
 };
 
 const workItemStats = (items: PlanningItem[]) => ({
@@ -315,6 +319,7 @@ export const VersionIterationView: React.FC = () => {
     updateVersion,
     addToast
   } = useApp();
+  const iterationStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'ITERATION'], queryFn: () => productRepository.researchStatusTemplates('ITERATION'), retry: false });
   const [mode, setMode] = useState<ViewMode>('list');
   const [showDetail, setShowDetail] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>('hours');
@@ -345,6 +350,7 @@ export const VersionIterationView: React.FC = () => {
   const [taskKinds, setTaskKinds] = useState<PlanningKind[]>(['requirement', 'design', 'dev', 'test', 'bug']);
   const [testItems, setTestItems] = useState<UnifiedWorkItem[]>([]);
   const [testItemsError, setTestItemsError] = useState(false);
+  const [testItemsReloadKey, setTestItemsReloadKey] = useState(0);
   const [taskStatus, setTaskStatus] = useState('all');
   const [taskOwner, setTaskOwner] = useState('all');
   const [taskTitleFilter, setTaskTitleFilter] = useState('');
@@ -361,8 +367,6 @@ export const VersionIterationView: React.FC = () => {
   const [status, setStatus] = useState('all');
   const [ownerFilter, setOwnerFilter] = useState('all');
   const [productLineFilter, setProductLineFilter] = useState('all');
-  const [productQuery, setProductQuery] = useState('');
-  const [productNavigationCollapsed, setProductNavigationCollapsed] = useState(false);
   const [listPage, setListPage] = useState(1);
   const [listPageSize, setListPageSize] = useState(10);
   const [selectedId, setSelectedId] = useState(versions[0]?.id || '');
@@ -382,6 +386,8 @@ export const VersionIterationView: React.FC = () => {
   const [draggedWorkItem, setDraggedWorkItem] = useState<PlanningItem | null>(null);
   const [selectedPlanningItemIds, setSelectedPlanningItemIds] = useState<string[]>([]);
   const [directWorkItem, setDirectWorkItem] = useState<Record<string, unknown> | null>(null);
+  const enabledIterationStatuses = (iterationStatusesQuery.data || []).filter((item) => item.enabled);
+  const iterationStatusForPhase = (phase: '待开始' | '处理中' | '已完成' | '已结束') => enabledIterationStatuses.find((item) => item.phase === phase)?.name || '';
 
   useEffect(() => {
     let active = true;
@@ -447,7 +453,7 @@ export const VersionIterationView: React.FC = () => {
     () =>
       visibleVersions.filter((version) => {
         const matchesQuery = `${version.name} ${version.code || ''}`.toLowerCase().includes(query.toLowerCase());
-        return matchesQuery && (status === 'all' || normalizeVersionStatus(version.status) === status) && (ownerFilter === 'all' || (version.ownerName || '未分配') === ownerFilter);
+        return matchesQuery && (status === 'all' || normalizeVersionStatus(version.status, version.statusPhase) === status) && (ownerFilter === 'all' || (version.ownerName || '未分配') === ownerFilter);
       }),
     [ownerFilter, query, status, visibleVersions]
   );
@@ -492,7 +498,7 @@ export const VersionIterationView: React.FC = () => {
     };
     loadTestItems().catch(() => { if (active) setTestItemsError(true); });
     return () => { active = false; };
-  }, [selectedVersionProductLineId, showDetail]);
+  }, [selectedVersionProductLineId, showDetail, testItemsReloadKey]);
 
   useEffect(() => {
     if (!showDetail || !selectedVersionProductLineId || !sessionStorage.getItem('shichuang.session.token')) return;
@@ -644,35 +650,13 @@ export const VersionIterationView: React.FC = () => {
   const openBug = (item: DefectBug) => { const target = planningItems.find((candidate) => candidate.kind === 'bug' && candidate.id === item.id); if (target) openWorkItemDetail(target); };
 
   const changeVersionStatus = async (nextStatus: string) => {
+    if (!nextStatus) { addToast('error', '迭代状态未配置', '请先在系统与组织-产研模板中配置对应阶段的启用状态'); return; }
     if (!selectedVersion) return;
     const saved = await updateVersion(selectedVersion.id, { status: nextStatus });
     if (saved) addToast('success', '迭代状态已更新', `${selectedVersion.name}：${nextStatus}`);
   };
 
-  const renderProductNavigation = () => {
-    const productKeyword = normalize(productQuery);
-    const navigationItems = productLines.filter((line) => !productKeyword || normalize(`${line.name} ${line.code || ''}`).includes(productKeyword));
-    return (
-      <aside role="navigation" className={`flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] transition-[width] ${productNavigationCollapsed ? 'w-16' : 'w-56'}`} aria-label="产品导航栏">
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3">
-          {!productNavigationCollapsed && <span className="font-semibold text-[var(--text-primary)]">产品</span>}
-          <button type="button" aria-label={productNavigationCollapsed ? '展开产品导航栏' : '收起产品导航栏'} onClick={() => setProductNavigationCollapsed((value) => !value)} className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:bg-[var(--bg-surface)] hover:text-[var(--primary)]">
-            {productNavigationCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
-        </div>
-        {!productNavigationCollapsed && <div className="shrink-0 border-b border-[var(--border-main)] p-3"><Input aria-label="搜索产品" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="搜索产品" prefix={<Search className="h-3.5 w-3.5 text-[var(--text-muted)]" />} allowClear /></div>}
-        <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          <button type="button" aria-current={productLineFilter === 'all' ? 'page' : undefined} aria-label="全部产品" title="全部产品" onClick={() => setProductLineFilter('all')} className={`mb-1 flex h-9 w-full items-center rounded-md text-left transition ${productNavigationCollapsed ? 'justify-center px-0' : 'gap-2 px-3'} ${productLineFilter === 'all' ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)] hover:text-[var(--text-primary)]'}`}>
-            <ApartmentOutlined className="shrink-0" />{!productNavigationCollapsed && <span className="truncate font-semibold">全部</span>}
-          </button>
-          {navigationItems.map((line) => <button type="button" key={line.id} aria-current={productLineFilter === line.id ? 'page' : undefined} aria-label={`产品：${line.name}`} title={line.name} onClick={() => setProductLineFilter(line.id)} className={`mb-1 flex h-9 w-full items-center rounded-md text-left transition ${productNavigationCollapsed ? 'justify-center px-0' : 'gap-2 px-3'} ${productLineFilter === line.id ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)] hover:text-[var(--text-primary)]'}`}>
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[var(--bg-surface-soft)] font-mono text-[11px] font-semibold">{line.name.slice(0, 1)}</span>{!productNavigationCollapsed && <span className="truncate">{line.name}</span>}
-          </button>)}
-          {!productNavigationCollapsed && navigationItems.length === 0 && <p className="px-3 py-6 text-center text-[var(--text-muted)]">暂无匹配产品</p>}
-        </nav>
-      </aside>
-    );
-  };
+  const renderProductNavigation = () => <ProductNavigation productLines={productLines} value={productLineFilter} onChange={setProductLineFilter} />;
 
   const assignPlanningItem = async (item: PlanningItem, version: VersionIteration) => {
     if (assigningRequirementId) return;
@@ -838,7 +822,7 @@ export const VersionIterationView: React.FC = () => {
                 <th className="px-3 py-3 font-medium">版本号</th>
                 <th className="px-3 py-3 font-medium">状态</th>
                 <th className="px-3 py-3 font-medium">起止时间</th>
-                <th className="px-3 py-3 font-medium">所属产品线</th>
+                <th className="px-3 py-3 font-medium">所属产品</th>
                 <th className="px-3 py-3 font-medium">负责人</th>
                 <th className="px-3 py-3 font-medium">完成度</th>
                 <th className="px-4 py-3 text-right font-medium">操作</th>
@@ -856,7 +840,7 @@ export const VersionIterationView: React.FC = () => {
                       </button>
                     </td>
                     <td className="px-3 py-3 font-mono text-[var(--text-body)]">{version.code || '--'}</td>
-                    <td className="px-3 py-3"><StatusTag status={normalizeVersionStatus(version.status)} /></td>
+                    <td className="px-3 py-3"><StatusTag status={normalizeVersionStatus(version.status, version.statusPhase)} /></td>
                     <td className="px-3 py-3 text-[var(--text-body)]">{version.startDate || '--'} ~ {version.endDate || version.releaseDate || '--'}</td>
                     <td className="max-w-48 px-3 py-3 text-[var(--text-body)]"><span className="block truncate" title={version.productLineName || '未关联产品线'}>{version.productLineName || '未关联产品线'}</span></td>
                     <td className="px-3 py-3"><PersonIdentity name={version.ownerName} emptyLabel="未分配" variant="list" /></td>
@@ -921,14 +905,14 @@ export const VersionIterationView: React.FC = () => {
       test: 'bg-[var(--warning)]',
       bug: 'bg-[var(--danger)]'
     };
-    const normalizedStatus = normalizeVersionStatus(selectedVersion?.status);
+    const normalizedStatus = normalizeVersionStatus(selectedVersion?.status, selectedVersion?.statusPhase);
     const isCompleted = normalizedStatus === '已完成';
     const isRunning = normalizedStatus === '进行中';
     const statusAction = isCompleted
-      ? { label: '重开迭代', nextStatus: '进行中', icon: <RotateCcw className="h-4 w-4" /> }
+      ? { label: '重开迭代', nextStatus: iterationStatusForPhase('处理中'), icon: <RotateCcw className="h-4 w-4" /> }
       : isRunning
-        ? { label: '完成迭代', nextStatus: '已完成', icon: <CheckCircle className="h-4 w-4" /> }
-        : { label: '开启迭代', nextStatus: '进行中', icon: <Play className="h-4 w-4" /> };
+        ? { label: '完成迭代', nextStatus: iterationStatusForPhase('已完成'), icon: <CheckCircle className="h-4 w-4" /> }
+        : { label: '开启迭代', nextStatus: iterationStatusForPhase('处理中'), icon: <Play className="h-4 w-4" /> };
     const detailTabs: Array<{ key: DetailTab; label: string; icon: React.ReactNode }> = [
       { key: 'hours', label: '迭代工时', icon: <Calendar className="h-4 w-4" /> },
       { key: 'testReports', label: '测试报告', icon: <Beaker className="h-4 w-4" /> },
@@ -1007,7 +991,7 @@ export const VersionIterationView: React.FC = () => {
                   className={`mb-1 flex w-full flex-col items-center gap-1 rounded-md border px-2 py-2 text-center transition ${active ? 'border-[var(--primary)] bg-[var(--bg-surface)] shadow-sm' : 'border-transparent hover:border-[var(--border-main)] hover:bg-[var(--bg-surface)]'}`}
                 >
                   <span className="w-full truncate text-xs font-semibold text-[var(--text-primary)]" title={version.code || version.name}>{version.code || version.name}</span>
-                  <StatusTag status={normalizeVersionStatus(version.status)} />
+                  <StatusTag status={normalizeVersionStatus(version.status, version.statusPhase)} />
                 </button>;
               })}
             </div>
@@ -1037,7 +1021,7 @@ export const VersionIterationView: React.FC = () => {
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--border-main)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${progress}%` }} /></div>
                     <span className="text-[10px] text-[var(--text-muted)]">{progress}%</span>
                   </div>
-                  <div className="mt-2 flex items-center justify-between"><StatusTag status={normalizeVersionStatus(version.status)} /><span className="text-[10px] text-[var(--text-muted)]">{version.requirementsCount ?? version.reqCount ?? 0} 项需求</span></div>
+                  <div className="mt-2 flex items-center justify-between"><StatusTag status={normalizeVersionStatus(version.status, version.statusPhase)} /><span className="text-[10px] text-[var(--text-muted)]">{stats.completed}/{stats.total}</span></div>
                 </button>
               );
             })}
@@ -1061,7 +1045,7 @@ export const VersionIterationView: React.FC = () => {
                   <h3 className="text-sm font-semibold text-[var(--text-primary)]">基本信息</h3>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <Metric label="迭代负责人" value={<span className="inline-flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5 text-[var(--text-muted)]" />{selectedVersion.ownerName || '未分配'}</span>} />
-                    <Metric label="所属产品线" value={selectedVersion.productLineName || productLines.find((line) => line.id === selectedVersion.productLineId)?.name || '未关联产品线'} />
+                    <Metric label="所属产品" value={selectedVersion.productLineName || productLines.find((line) => line.id === selectedVersion.productLineId)?.name || '未关联产品'} />
                     <Metric label="迭代状态" value={normalizedStatus} />
                     <Metric label="起止时间" value={<span className="inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />{selectedVersion.startDate || '--'} ~ {selectedVersion.endDate || selectedVersion.releaseDate || '--'}</span>} />
                     <Metric label="完成度" value={`${selectedStats.completed}/${selectedStats.total}`} />
@@ -1106,7 +1090,7 @@ export const VersionIterationView: React.FC = () => {
                   <button type="button" aria-label="取消分组" onClick={() => { setTaskGroupBy('none'); setTaskGroupSelection(''); setTaskGroupQuery(''); }} className="text-[var(--primary)]">取消分组</button>
                 </div>}
                 <div ref={setTaskFilterTarget} className="empty:hidden" />
-                {testItemsError && <Alert type="warning" showIcon title="测试任务加载失败" description="其他任务仍可查看，请稍后重试。" />}
+                {testItemsError && <Alert type="warning" showIcon title="测试任务加载失败，其他任务仍可查看" description="请稍后重试。" action={<Button size="small" onClick={() => setTestItemsReloadKey((value) => value + 1)}>重试</Button>} />}
                 <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{filteredItems.length ? <WorkItemRows items={pagedItems} groupBy={taskGroupBy} selectedIds={selectedTaskIds} onSelectionChange={setSelectedTaskIds} onOperation={(key, item) => void operatePlanningItem(key, item)} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'test' ? openTestTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无匹配工作项" description="当前迭代无对应任务，请调整筛选条件或新建任务。" />}</div>
                 <Pagination total={filteredItems.length} page={taskPage} pageSize={taskPageSize} onPageChange={setTaskPage} onPageSizeChange={(size) => { setTaskPageSize(size); setTaskPage(1); }} />
               </div>}
@@ -1164,7 +1148,7 @@ export const VersionIterationView: React.FC = () => {
       <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]">
         <div className="flex h-12 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4"><span className="font-semibold text-[var(--text-primary)]">迭代版本</span><button type="button" onClick={openCreateVersion} className="text-[var(--primary)]"><Plus className="mr-1 inline h-4 w-4" />新建迭代</button></div>
         <div className="flex-1 overflow-y-auto p-2">{visibleVersions.map((version) => { const versionItems = plannedWorkItems.get(version.id) || []; const stats = getVersionStats(version); const progress = stats.total ? Math.round((stats.completed / stats.total) * 100) : 0; const expanded = expandedVersionIds.includes(version.id); return <div key={version.id} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropTargetVersionId(version.id); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTargetVersionId(null); }} onDrop={(event) => { event.preventDefault(); const raw = event.dataTransfer.getData('text/plain') || ''; let payload: { id: string; kind: PlanningKind } | null = null; try { payload = raw ? JSON.parse(raw) : null; } catch { payload = raw ? { id: raw, kind: 'requirement' } : null; } const item = payload ? planningItems.find((candidate) => candidate.id === payload?.id && candidate.kind === payload?.kind) : draggedWorkItem; if (item) void assignPlanningItem(item, version); }} className={`mb-2 rounded-md border p-3 transition-all ${dropTargetVersionId === version.id ? 'border-[var(--primary)] bg-[var(--bg-surface-soft)] shadow-sm' : selectedVersion?.id === version.id ? 'border-[var(--primary)] bg-[var(--bg-surface-soft)]' : 'border-transparent hover:border-[var(--border-main)]'}`} aria-label={`迭代版本：${version.name}`}>
-            <div className="flex items-center gap-3"><button type="button" onClick={() => { setSelectedId(version.id); setExpandedVersionIds((current) => current.includes(version.id) ? current.filter((id) => id !== version.id) : [...current, version.id]); }} className="min-w-0 flex-1 truncate text-left font-semibold text-[var(--text-primary)] hover:text-[var(--primary)]">{version.name.length > 20 ? `${version.name.slice(0, 20)}...` : version.name}</button><span className="text-[var(--text-muted)]">{versionItems.length}</span><button type="button" aria-label={expanded ? `收起${version.name}` : `展开${version.name}`} onClick={() => setExpandedVersionIds((current) => current.includes(version.id) ? current.filter((id) => id !== version.id) : [...current, version.id])} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--primary)]">{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button><StatusTag status={normalizeVersionStatus(version.status)} /></div>
+            <div className="flex items-center gap-3"><button type="button" onClick={() => { setSelectedId(version.id); setExpandedVersionIds((current) => current.includes(version.id) ? current.filter((id) => id !== version.id) : [...current, version.id]); }} className="min-w-0 flex-1 truncate text-left font-semibold text-[var(--text-primary)] hover:text-[var(--primary)]">{version.name.length > 20 ? `${version.name.slice(0, 20)}...` : version.name}</button><span className="text-[var(--text-muted)]">{versionItems.length}</span><button type="button" aria-label={expanded ? `收起${version.name}` : `展开${version.name}`} onClick={() => setExpandedVersionIds((current) => current.includes(version.id) ? current.filter((id) => id !== version.id) : [...current, version.id])} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--primary)]">{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button><StatusTag status={normalizeVersionStatus(version.status, version.statusPhase)} /></div>
             <div className="mt-2 flex items-center gap-3 text-[11px] text-[var(--text-muted)]"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--border-main)]"><div className="h-full bg-[var(--primary)]" style={{ width: `${progress}%` }} /></div><span>{stats.completed}/{stats.total}</span></div>
             {expanded && <div className="mt-3 space-y-1 border-t border-[var(--border-main)] pt-2">{versionItems.length ? versionItems.map((item) => <div key={`${item.kind}-${item.id}`} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', JSON.stringify({ id: item.id, kind: item.kind, fromVersionId: version.id })); setDraggedWorkItem(item); }} className="rounded-md border border-[var(--border-main)] bg-[var(--bg-surface)] p-2"><div className="flex items-center gap-2"><span>{planningKindIcon[item.kind]}</span><button type="button" onClick={() => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} className="min-w-0 flex-1 truncate text-left font-medium text-[var(--text-primary)] hover:text-[var(--primary)]">{item.title.length > 30 ? `${item.title.slice(0, 30)}...` : item.title}</button></div><div className="mt-1 flex gap-3 pl-6 text-[11px] text-[var(--text-muted)]"><span>{item.ownerName || '未分配'}</span><span>{item.estimatedHours}h</span><StatusTag status={item.priority} /><StatusTag status={item.status} /></div></div>) : <div className="px-2 py-3 text-center text-xs text-[var(--text-muted)]">该版本暂无工作项</div>}</div>}
             {dropTargetVersionId === version.id && <div className="mt-2 rounded-md border border-dashed border-[var(--primary)] px-3 py-2 text-center text-[11px] font-semibold text-[var(--primary)]">释放后加入该迭代</div>}
@@ -1182,7 +1166,7 @@ export const VersionIterationView: React.FC = () => {
           <div className="version-toolbar flex w-full flex-nowrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <Input aria-label="搜索迭代" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索迭代" prefix={<Search className="h-3.5 w-3.5 text-[var(--text-muted)]" />} className="w-80 max-w-[min(320px,45vw)]" />
-              <Select aria-label="状态筛选" value={status} onChange={setStatus} options={[{ value: 'all', label: '全部状态' }, { value: '未开始', label: '未开始' }, { value: '进行中', label: '进行中' }, { value: '已完成', label: '已完成' }]} className="w-28" getPopupContainer={(trigger) => trigger.parentElement || document.body} />
+              <Select aria-label="状态筛选" value={status} onChange={setStatus} options={[{ value: 'all', label: '全部状态' }, ...enabledIterationStatuses.map((item) => ({ value: item.name, label: item.name }))]} className="w-28" getPopupContainer={(trigger) => trigger.parentElement || document.body} />
               <Select aria-label="负责人筛选" value={ownerFilter} onChange={setOwnerFilter} options={[{ value: 'all', label: '全部负责人' }, ...Array.from(new Set(visibleVersions.map((version) => version.ownerName || '未分配'))).map((owner) => ({ value: owner, label: owner }))]} className="w-32" getPopupContainer={(trigger) => trigger.parentElement || document.body} />
             </div>
             <button type="button" onClick={openCreateVersion} className={`${primaryButton} h-8 shrink-0 whitespace-nowrap`}><Plus className="h-3.5 w-3.5" />新建</button>
@@ -1223,6 +1207,7 @@ export const VersionIterationView: React.FC = () => {
         itemLabel={planningKindLabel[String(directWorkItem.__planningKind || 'requirement') as PlanningKind] || '工作项'}
         taskKind={(String(directWorkItem.__planningKind || 'requirement') === 'design' ? 'design' : String(directWorkItem.__planningKind || 'requirement') === 'dev' ? 'dev' : String(directWorkItem.__planningKind || 'requirement') === 'bug' ? 'bug' : String(directWorkItem.__planningKind || 'requirement') === 'test' ? 'test' : 'requirement')}
         initialDetail={directWorkItem as unknown as RequirementTask}
+        onDetailClose={() => setDirectWorkItem(null)}
       />}
     </div>
   );

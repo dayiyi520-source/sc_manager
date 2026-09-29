@@ -11,10 +11,18 @@ public class WorkItemAccess {
     private final WorkItemStorageMapper storage;
     private final ProductLineMapper lines;
     private final UnifiedWorkItemMapper reads;
-    public WorkItemAccess(WorkItemStorageMapper storage,ProductLineMapper lines,UnifiedWorkItemMapper reads) {
-        this.storage=storage; this.lines=lines; this.reads=reads;
+    private final ProductLifecyclePolicy lifecycle;
+    public WorkItemAccess(WorkItemStorageMapper storage,ProductLineMapper lines,UnifiedWorkItemMapper reads,ProductLifecyclePolicy lifecycle) {
+        this.storage=storage; this.lines=lines; this.reads=reads; this.lifecycle=lifecycle;
     }
     public void check(String line, boolean write) {
+        checkAccess(line, write);
+        if (write) lifecycle.requireMutable(line);
+    }
+    public void checkLifecycle(String line) {
+        checkAccess(line, true);
+    }
+    private void checkAccess(String line, boolean write) {
         String role=RequestContext.role();
         if (!(write?Set.of("admin","product_manager","tech_lead"):Set.of("admin","product_manager","tech_lead","product","tech")).contains(role))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前角色无权执行该产品操作");

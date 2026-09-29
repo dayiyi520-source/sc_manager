@@ -156,12 +156,13 @@ type RequirementTasksViewProps = {
   itemLabel?: string;
   taskKind?: 'requirement' | 'design' | 'test' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops';
   initialDetail?: RequirementTask;
+  onDetailClose?: () => void;
   renderDetail?: (context: WorkItemDetailContext) => React.ReactNode;
   createPolicy?: WorkItemCreatePolicy;
   creationContext?: WorkItemCreationContext;
 };
 
-export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialDetail, renderDetail, createPolicy, creationContext }) => {
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialDetail, onDetailClose, renderDetail, createPolicy, creationContext }) => {
   const {
     requirementTasks,
     designTasks,
@@ -214,7 +215,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     }
     return addRequirementTask(task);
   };
-  const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created' | 'my_participated'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState('');
@@ -288,7 +289,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     plannedStartFrom: appliedFilters.plannedStartDate.from,
     plannedStartTo: appliedFilters.plannedStartDate.to,
     plannedStartOperator: appliedFilters.plannedStartDate.operator,
-    ccNames: csv(appliedFilters.cc.values),
+    ccNames: activeTab === 'my_participated' ? currentUser.name : csv(appliedFilters.cc.values),
     ccOperator: appliedFilters.cc.operator,
     groupBy: groupBy === 'none' ? '' : groupBy,
     groupValue
@@ -749,7 +750,10 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     setFormPriority('');
     setFormVersionName('');
     setFormCustomerName('');
-    setFormProductLineName('');
+    const selectedProduct = productLineFilter !== 'all'
+      ? productLines.find((productLine) => productLine.id === productLineFilter)
+      : undefined;
+    setFormProductLineName(selectedProduct?.name || '');
     setFormEstimatedHours('');
     setFormActualHours('');
     setFormRequirementType('');
@@ -1230,7 +1234,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const categoryMatch = (task: RequirementTask, tab: typeof activeTab) => {
     if (tab === 'all') return true;
     if (tab === 'my_owned') return task.ownerName.trim() === currentUser.name.trim();
-    return (task.creatorName || '').trim() === currentUser.name.trim();
+    if (tab === 'my_created') return (task.creatorName || '').trim() === currentUser.name.trim();
+    return (task.ccNames || []).some((name) => name.trim() === currentUser.name.trim());
   };
   const textMatches = (value: string | undefined, query: string) => !query || (value || '').toLocaleLowerCase().includes(query.toLocaleLowerCase());
   const matchesTextFilter = (value: string | undefined, filter: { operator: TextFilterOperator; value: string }) => {
@@ -1277,7 +1282,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const tabCounts = {
     all: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId).length : remoteEnabled && activeTab === 'all' ? serverPageQuery.data?.total || 0 : productLineTasks.length,
     my_owned: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_owned')).length : remoteEnabled && activeTab === 'my_owned' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_owned')).length,
-    my_created: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_created')).length : remoteEnabled && activeTab === 'my_created' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length
+    my_created: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_created')).length : remoteEnabled && activeTab === 'my_created' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length,
+    my_participated: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_participated')).length : remoteEnabled && activeTab === 'my_participated' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_participated')).length
   };
   const getGroupValue = (task: RequirementTask) => {
     switch (groupBy) {
@@ -1418,17 +1424,17 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
             <button type="button" onClick={() => setSelectedTask(task)} className="min-w-0 truncate text-left text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)]" title={task.title}>{task.title}</button>
           </div>
         </td>
-        <td className="px-4 py-3.5">
+        <td className="whitespace-nowrap px-4 py-3.5">
           {taskStatusControl(task)}
         </td>
-        <td className="px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>
-        <td className="max-w-[240px] px-4 py-3.5 text-[var(--text-body)]"><span className="line-clamp-2 font-mono text-[var(--primary)]" title={task.versionName || '未关联'}>{task.versionName || '未关联'}</span></td>
-        <td className="px-4 py-3.5 text-[var(--text-muted)]">
+        <td className="whitespace-nowrap px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>
+        <td className="px-4 py-3.5 text-[var(--text-body)]"><span className="block truncate whitespace-nowrap font-mono text-[var(--primary)]" title={task.versionName || '未关联'}>{task.versionName || '未关联'}</span></td>
+        <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-muted)]">
           {isChild ? <Select aria-label={`${task.title}负责人`} variant="borderless" style={{ width: 180 }} popupMatchSelectWidth={220} showSearch optionFilterProp="label" value={task.ownerName || undefined} placeholder="未设置" options={employeeNameOptions} onChange={(ownerName) => updateTask(task.id, { ownerName })} /> : <PersonIdentity name={task.ownerName} emptyLabel="未设置" variant="list" />}
         </td>
-        <td className="px-4 py-3.5 text-[var(--text-muted)]"><PersonIdentity name={task.creatorName || currentUser.name} emptyLabel="未设置" variant="list" /></td>
-        <td className="px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt ? dayjs(task.createdAt).format('YYYY-MM-DD') : '—'}</td>
-        <td className="px-4 py-3.5 text-right">
+        <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-muted)]"><PersonIdentity name={task.creatorName || currentUser.name} emptyLabel="未设置" variant="list" /></td>
+        <td className="whitespace-nowrap px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt ? dayjs(task.createdAt).format('YYYY-MM-DD') : '—'}</td>
+        <td className="task-list-action-cell whitespace-nowrap px-4 py-3.5 text-right">
           <Dropdown menu={operationMenu(task)} trigger={['click']}>
             <Button type="text" icon={<MoreOutlined />} aria-label={`操作${task.title}`} />
           </Dropdown>
@@ -1440,13 +1446,13 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
   return (
     <div className="task-page space-y-6 animate-in fade-in duration-150">
-      <div className={creationContext ? 'hidden' : ''}>
+      {!creationContext && !initialDetail && <div>
       {/* Tabs + Search + Filter + Group */}
       <div ref={controlsRef} className="task-page-toolbar bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3 text-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           {/* 分类 */}
           <div role="tablist" aria-label={`${itemLabel}范围`} className="requirement-scope-tabs inline-flex h-10 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">
-            {([['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeTab === value} onClick={() => setActiveTab(value)} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{tabCounts[value]}</button>)}
+            {([['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_participated', '我参与的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeTab === value} onClick={() => setActiveTab(value)} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{tabCounts[value]}</button>)}
           </div>
 
           <div className="flex items-center gap-2">
@@ -1476,7 +1482,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               id="btn-add-req-task"
               onClick={openAddModal}
               icon={<Plus className="h-3.5 w-3.5" />}
-            >新建{itemLabel}</Button>
+            >新建</Button>
           </div>
         </div>
         {filterOpen && <div className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-4">
@@ -1511,17 +1517,27 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       {/* Requirement List Table (列表信息: 标题、状态、优先级、负责人、创建人、添加时间) */}
       <div className="task-page-table bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full min-w-[1440px] text-left border-collapse text-xs">
+              <colgroup>
+                <col className="w-[420px]" />
+                <col className="w-[150px]" />
+                <col className="w-[112px]" />
+                <col className="w-[150px]" />
+                <col className="w-[210px]" />
+                <col className="w-[210px]" />
+                <col className="w-[150px]" />
+                <col className="w-[88px]" />
+              </colgroup>
               <thead>
                 <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
                   <th className="py-3 px-4">标题</th>
-                  <th className="py-3 px-4">状态</th>
-                  <th className="py-3 px-4">优先级</th>
-                  <th className="py-3 px-4">迭代版本</th>
-                  <th className="py-3 px-4">负责人</th>
-                  <th className="py-3 px-4">创建人</th>
-                  <th className="py-3 px-4">创建时间</th>
-                  <th className="py-3 px-4 text-right">操作</th>
+                  <th className="whitespace-nowrap py-3 px-4">状态</th>
+                  <th className="whitespace-nowrap py-3 px-4">优先级</th>
+                  <th className="whitespace-nowrap py-3 px-4">迭代版本</th>
+                  <th className="whitespace-nowrap py-3 px-4">负责人</th>
+                  <th className="whitespace-nowrap py-3 px-4">创建人</th>
+                  <th className="whitespace-nowrap py-3 px-4">创建时间</th>
+                  <th className="whitespace-nowrap py-3 px-4 text-right task-list-action-cell task-list-action-header">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1532,12 +1548,13 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           </div>
           <Pagination total={paginationTotal} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </div>
+      </div>}
 
       {/* Task Detail Drawer */}
       {selectedTask && !childModalOpen && (
         <WorkItemCreatePanel
           isOpen={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => { setSelectedTask(null); onDetailClose?.(); }}
           title={taskKind === 'test' ? '测试任务详情' : `${itemLabel}详情`}
           presentation="drawer"
           showContinueOption={false}
@@ -1546,7 +1563,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               <Button type="primary" ghost={!detailEditing} disabled={Boolean(selectedTask.hasChildren && !selectedTask.parentWorkItemId)} onClick={() => setDetailEditing((value) => !value)}>{detailEditing ? '保存' : '编辑'}</Button>
               <button
                 type="button"
-                onClick={() => setSelectedTask(null)}
+                onClick={() => { setSelectedTask(null); onDetailClose?.(); }}
                 className="h-10 rounded-lg border border-[var(--border-main)] px-4 text-xs font-semibold text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]"
               >
                 关闭
@@ -1678,7 +1695,6 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           </div>
         </WorkItemCreatePanel>
       )}
-      </div>
       <WorkItemCreatePanel
         isOpen={childModalOpen}
         onClose={cancelChildCreation}

@@ -117,6 +117,7 @@ describe('VersionIterationView', () => {
     appMocks.openPageTab.mockClear();
     appMocks.createWorkItem.mockClear();
     appMocks.workItemTypes.mockClear();
+    appMocks.workItems.mockReset().mockResolvedValue({ page: { items: [], total: 0 } });
     sessionStorage.clear();
   });
 
@@ -231,6 +232,27 @@ describe('VersionIterationView', () => {
     expect(sessionStorage.getItem('shichuang.productLineTargetVersionId')).toBeNull();
   });
 
+  it('keeps other iteration tasks visible when test tasks fail and supports retry', async () => {
+    sessionStorage.setItem('shichuang.session.token', 'test-token');
+    let testAttempts = 0;
+    appMocks.workItems.mockImplementation(async (_lineId: string, category: string) => {
+      if (category === 'test') {
+        testAttempts += 1;
+        if (testAttempts === 1) throw new Error('test task unavailable');
+      }
+      return { page: { items: [], total: 0 } };
+    });
+
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+
+    expect(await screen.findByText('测试任务加载失败，其他任务仍可查看')).toBeInTheDocument();
+    expect(screen.getByText('已纳入迭代的工作项')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    await waitFor(() => expect(testAttempts).toBe(2));
+    await waitFor(() => expect(screen.queryByText('测试任务加载失败，其他任务仍可查看')).not.toBeInTheDocument());
+  });
+
   it('persists a dragged work item into the target iteration', async () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '迭代规划' }));
@@ -319,6 +341,10 @@ describe('VersionIterationView', () => {
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
     fireEvent.click(screen.getByRole('button', { name: '已纳入迭代的工作项' }));
     expect(await screen.findByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
+    expect(document.querySelectorAll('.task-page-table')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: '返回迭代列表' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(screen.queryByRole('dialog', { name: '需求详情' })).not.toBeInTheDocument();
     expect(appMocks.openPageTab).not.toHaveBeenCalled();
   });
 
@@ -333,7 +359,7 @@ describe('VersionIterationView', () => {
     }));
   });
 
-  it('keeps bulk selection in the work-item header and opens task details as a drawer', () => {
+  it('keeps bulk selection in the work-item header and opens task details as a drawer', async () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '迭代规划' }));
 
@@ -347,7 +373,8 @@ describe('VersionIterationView', () => {
     expect(screen.getByText('李明').parentElement).toHaveTextContent('李明');
 
     fireEvent.click(screen.getByRole('button', { name: '支持版本规划拖拽' }));
-    expect(appMocks.openPageTab).toHaveBeenCalledWith('prod_req_tasks');
+    expect(await screen.findByRole('dialog', { name: '需求详情' })).toBeInTheDocument();
+    expect(document.querySelectorAll('.task-page-table')).toHaveLength(0);
   });
 
   it('collapses the planning filter when clicking outside and highlights active filter/search icons', () => {

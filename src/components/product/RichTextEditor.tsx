@@ -51,6 +51,24 @@ const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-
 const themeValue = (name: string, fallback: string) => typeof window === 'undefined' ? fallback : getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 const toText = (html: string) => { const node = document.createElement('div'); node.innerHTML = html; return node.innerText || node.textContent || ''; };
 const hasMeaningfulContent = (html: string) => /<(img|table|video|audio|iframe)\b/i.test(html) || toText(html).replace(/\u00a0/g, ' ').trim().length > 0;
+const thinToolbarIcons: Record<string, string> = {
+  undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7 4 12l5 5"/><path d="M5 12h8a6 6 0 0 1 6 6"/></svg>',
+  redo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 7 5 5-5 5"/><path d="M19 12h-8a6 6 0 0 0-6 6"/></svg>',
+  'remove-formatting': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h11M10.5 6 7.8 17M5 20h7M15 15l5 5m0-5-5 5"/></svg>',
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="9" cy="9" r="1.5"/><path d="m4 17 5-5 3.5 3.5 2.5-2.5 5 5"/></svg>',
+  table: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 10h18M9 4v16M15 4v16"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 14.5 5-5"/><path d="M7.5 17.5 5 20a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0M16.5 6.5 19 4a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0" transform="translate(-2)"/></svg>',
+  quote: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11H5a4 4 0 0 1 4-4h1v10H5v-4M21 11h-5a4 4 0 0 1 4-4h1v10h-5v-4"/></svg>',
+  'code-sample': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>',
+  'align-left': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></svg>',
+  'align-center': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></svg>',
+  'align-right': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 6h16M10 10h10M4 14h16M10 18h10"/></svg>',
+  'unordered-list': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="5" cy="7" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17" r="1"/><path d="M9 7h11M9 12h11M9 17h11"/></svg>',
+  'ordered-list': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h2v3M4 9h3M4 14c0-1 3-1 3 0s-3 2-3 3h3M10 7h10M10 12h10M10 17h10"/></svg>',
+  outdent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h10M10 10h10M10 14h10M10 18h10M7 9l-3 3 3 3"/></svg>',
+  indent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h10M10 10h10M10 14h10M10 18h10M4 9l3 3-3 3"/></svg>',
+  'line-height': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6h10M11 12h10M11 18h10M6 4v16M3 7l3-3 3 3M3 17l3 3 3-3"/></svg>',
+};
 const safeGetContent = (instance: TinyMceInstance, fallback = '') => {
   try {
     return instance.serializer ? instance.getContent() : fallback;
@@ -117,6 +135,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
     content_style: `html{background:${theme.surface}}body{margin:16px;color:${theme.text};background:${theme.surface};font-family:system-ui,sans-serif;font-size:14px;line-height:1.7}.mce-content-body{color:${theme.text}}.mce-list-item{color:${theme.text}}.mce-caret{color:${theme.text}}a{color:${theme.primary};text-decoration:underline}a:hover{opacity:0.8}blockquote{border-left:3px solid ${theme.primary};margin-left:0;padding-left:12px;color:${theme.muted}}code{background:${theme.surface};color:${theme.primary};padding:2px 6px;border-radius:3px}pre{background:${theme.surface};color:${theme.text};padding:12px;border-radius:4px;overflow-x:auto}ul.checklist{list-style:none;padding-left:0}ul.checklist li::before{content:'☐';margin-right:8px;color:${theme.primary}}`,
     setup: (instance: TinyMceInstance) => {
       instanceRef.current = instance;
+      Object.entries(thinToolbarIcons).forEach(([name, svg]) => instance.ui.registry.addIcon(name, svg));
       instance.ui.registry.addButton('imageupload', { icon: 'image', tooltip: '上传图片', onAction: () => {
         const input = document.createElement('input');
         input.type = 'file';

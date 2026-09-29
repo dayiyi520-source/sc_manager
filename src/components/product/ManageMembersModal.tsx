@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Check, Users } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { teamRepository } from '../../services/teamRepository';
+import { productRepository } from '../../services/productRepository';
 import type { ProductLine, ProductLineMember } from '../../types';
 import { employeeJobTitle, PersonIdentity } from '../common/PersonIdentity';
 
@@ -14,11 +15,10 @@ interface ManageMembersModalProps {
   productLine: ProductLine;
 }
 
-const PRODUCT_LINE_MEMBER_ROLES = ['管理员', '产品', '研发', '设计', '测试', '交付主管', '参与人'];
-
 export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ isOpen, onClose, productLine }) => {
   const { addProductLineMembers, addToast } = useApp();
   const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: isOpen, retry: false });
+  const rolesQuery = useQuery({ queryKey: ['product-role-templates'], queryFn: productRepository.productRoleTemplates, enabled: isOpen, retry: false });
   const [keyword, setKeyword] = useState('');
   const [role, setRole] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -68,11 +68,12 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ isOpen, 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
     <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl">
       <div className="flex items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-6 py-4">
-        <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--primary)]/10 text-[var(--primary)]"><Users className="h-5 w-5" /></div><div><h3 className="text-base font-bold text-[var(--text-primary)]">添加成员</h3><p className="mt-1 text-xs text-[var(--text-muted)]">{productLine.name} ({productLine.code})</p></div></div>
+        <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--primary)]/10 text-[var(--primary)]"><Users className="h-5 w-5" /></div><div><h3 className="text-base font-bold text-[var(--text-primary)]">添加成员</h3><p className="mt-1 text-xs text-[var(--text-muted)]"><span className="font-medium text-[var(--primary)]">{productLine.name}</span> ({productLine.code})</p></div></div>
         <Button type="text" onClick={onClose} aria-label="关闭成员管理">✕</Button>
       </div>
       <form onSubmit={handleSave} className="flex-1 space-y-4 overflow-y-auto p-6 text-xs">
-        <label className="block"><span className="mb-1 block text-[var(--text-body)]">成员角色 *</span><Select className="w-full" value={role || undefined} onChange={setRole} placeholder="请选择成员角色" options={PRODUCT_LINE_MEMBER_ROLES.map((item) => ({ label: item, value: item }))} /></label>
+        <label className="block"><span className="mb-1 block text-[var(--text-body)]">成员角色 *</span><Select className="w-full" value={role || undefined} onChange={setRole} placeholder="请选择成员角色" loading={rolesQuery.isLoading} options={Array.from(new Set((rolesQuery.data || []).map((item) => item.name.trim()).filter(Boolean))).map((name) => ({ label: name, value: name }))} /></label>
+        {rolesQuery.isError && <Alert type="error" showIcon message="成员角色加载失败" description="请重试后再添加成员" action={<Button onClick={() => rolesQuery.refetch()}>重试</Button>} />}
         <label className="block"><span className="mb-1 block text-[var(--text-body)]">从团队组织选择 *</span><Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索姓名、部门或职位" allowClear suffix={<SearchOutlined />} /></label>
         {employeesQuery.isError && <Alert type="error" showIcon message="有效员工加载失败" description="请检查团队组织后重试" action={<Button onClick={() => employeesQuery.refetch()}>重试</Button>} />}
         {employeesQuery.isLoading ? <div className="flex min-h-32 items-center justify-center"><Spin /></div> : <div className="max-h-64 space-y-1 overflow-y-auto" aria-label="团队组织成员候选">
@@ -87,7 +88,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ isOpen, 
           {!visibleEmployees.length && !employeesQuery.isError && <div className="py-8 text-center text-[var(--text-muted)]">暂无匹配的有效员工</div>}
         </div>}
         <div className="border-t border-[var(--border-main)] pt-3 text-sm font-semibold text-[var(--primary)]">已选 {selectedUserIds.length} 人</div>
-        <div className="flex justify-end gap-2"><Button onClick={onClose} disabled={saving}>取消</Button><Button type="primary" htmlType="submit" loading={saving} disabled={employeesQuery.isError || employeesQuery.isLoading} icon={<Check className="h-3.5 w-3.5" />}>保存</Button></div>
+        <div className="flex justify-end gap-2"><Button onClick={onClose} disabled={saving}>取消</Button><Button type="primary" htmlType="submit" loading={saving} disabled={employeesQuery.isError || employeesQuery.isLoading || rolesQuery.isError || rolesQuery.isLoading} icon={<Check className="h-3.5 w-3.5" />}>保存</Button></div>
       </form>
     </div>
   </div>;

@@ -466,8 +466,9 @@ export interface ProductLine {
   technicalOwner?: string;
   versionCount?: number;
   customerCount?: number;
-  health?: '健康' | '预警' | '关注' | string;
-  status?: '启用中' | '已停用' | string;
+  health?: '待规划' | '迭代中' | '已归档' | '已停用' | '健康' | '预警' | '关注' | string;
+  statusPhase?: '待开始' | '处理中' | '已完成' | '已结束' | string;
+  status?: '待规划' | '迭代中' | '已归档' | '已停用' | '启用中' | string;
   visibility?: '公开' | '私密' | '仅创建者可见' | '部门可见' | '保密';
   sort?: number;
   coverColor?: string;
@@ -705,6 +706,7 @@ export interface VersionIteration {
   endDate?: string;
   releaseDate?: string;
   status: '未开始' | '进行中' | '已完成' | string;
+  statusPhase?: '待开始' | '处理中' | '已完成' | '已结束' | string;
   requirementsCount?: number;
   reqCount?: number;
   bugCount?: number;

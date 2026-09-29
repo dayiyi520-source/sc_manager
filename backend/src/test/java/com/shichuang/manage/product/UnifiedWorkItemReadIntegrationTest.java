@@ -31,6 +31,27 @@ class UnifiedWorkItemReadIntegrationTest extends AbstractApiIntegrationTest {
             .andExpect(status().isUnauthorized());
     }
 
+    @Test void timelineIncludesChildrenAndDateFieldsWithTenantAndRoleProtection() throws Exception {
+        var lineRow = jdbc.queryForList("SELECT tenant_id_,id_ FROM t_product_line WHERE delete_flag_=0 LIMIT 1").get(0);
+        String tenant = lineRow.get("tenant_id_").toString();
+        String line = lineRow.get("id_").toString();
+        String url = "/api/product-lines/" + line + "/iteration-timeline";
+        mockMvc.perform(get(url)).andExpect(status().isUnauthorized());
+        var response = mockMvc.perform(get(url).header("Authorization", "Bearer " + tokens.issue("timeline-read", "admin", tenant)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data").isArray()).andReturn().getResponse().getContentAsString();
+        var data = objectMapper.readTree(response).path("data");
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE tenant_id_=? AND product_line_id_=? AND delete_flag_=0", Long.class, tenant, line);
+        assertEquals(total.longValue(), data.size());
+        for (var item : data) {
+            assertTrue(item.has("plannedStartDate"));
+            assertTrue(item.has("plannedEndDate"));
+            assertTrue(item.has("completedAt"));
+            assertEquals(line, item.path("productLineId").asText());
+        }
+        mockMvc.perform(get(url).header("Authorization", "Bearer " + tokens.issue("timeline-read", "sales", tenant))).andExpect(status().isForbidden());
+        mockMvc.perform(get(url).header("Authorization", "Bearer " + tokens.issue("timeline-read", "admin", "other-tenant"))).andExpect(status().isNotFound());
+    }
+
     @Test void authenticatedReadSerializesCoverageAndEnforcesRoleAndTenant() throws Exception {
         var row = jdbc.queryForList("SELECT tenant_id_,id_ FROM t_product_line WHERE delete_flag_=0 LIMIT 1").get(0);
         String line = row.get("id_").toString();

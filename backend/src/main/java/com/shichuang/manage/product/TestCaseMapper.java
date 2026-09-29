@@ -69,6 +69,7 @@ public class TestCaseMapper {
         if(q.priority()!=null&&!q.priority().isBlank()){sql.append(" AND c.priority_=?");a.add(q.priority());}
         if(q.ownerId()!=null&&!q.ownerId().isBlank()){sql.append(" AND c.owner_id_=?");a.add(q.ownerId());}
         if(q.creatorName()!=null&&!q.creatorName().isBlank()){sql.append(" AND c.create_by_=?");a.add(q.creatorName());}
+        if(q.participantName()!=null&&!q.participantName().isBlank()){sql.append(" AND EXISTS (SELECT 1 FROM t_product_test_case_work_item link JOIN t_product_work_item w ON w.tenant_id_=link.tenant_id_ AND w.id_=link.work_item_id_ AND w.delete_flag_=0 WHERE link.tenant_id_=c.tenant_id_ AND link.test_case_id_=c.id_ AND link.delete_flag_=0 AND JSON_CONTAINS(COALESCE(w.cc_names_,JSON_ARRAY()), JSON_QUOTE(?)) )");a.add(q.participantName());}
         if(q.enabled()!=null){sql.append(" AND c.enabled_=?");a.add(q.enabled());}
     }
     public List<Map<String,Object>> steps(String tenant,String caseId) {

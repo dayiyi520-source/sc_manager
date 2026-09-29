@@ -10,7 +10,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const canRetry = method === 'GET' || method === 'HEAD'
   for (let attempt = 0; attempt < (canRetry ? 2 : 1); attempt += 1) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 8000)
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, 8000)
     const abortExternal = () => controller.abort()
     init.signal?.addEventListener('abort', abortExternal, { once: true })
     try {
@@ -23,7 +27,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
       }
       return payload.data
     } catch (err) {
-      if (canRetry && attempt === 0 && !init.signal?.aborted && (err instanceof TypeError || (err instanceof DOMException && err.name === 'AbortError'))) continue
+      const isAbortError = err instanceof DOMException && err.name === 'AbortError'
+      if (canRetry && attempt === 0 && !init.signal?.aborted && (err instanceof TypeError || isAbortError)) continue
+      if (timedOut && !init.signal?.aborted && isAbortError) {
+        throw new ApiError(408, 'REQUEST_TIMEOUT', '服务响应超时，请稍后重试')
+      }
       throw err
     } finally {
       clearTimeout(timer)

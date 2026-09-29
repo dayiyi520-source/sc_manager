@@ -8,7 +8,7 @@ export function readSession(): Session | null {
     const value = storage().getItem(KEY);
     if (!value) return null;
     const session = JSON.parse(value) as Session;
-    if (!session?.token || session.token.startsWith('local-dev-') || !session.user?.id
+    if (!session?.token || session.token.startsWith('local-dev-') || session.token.startsWith('dev-token-') || !session.user?.id
       || !Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now()
       || storage().getItem(TOKEN_KEY) !== session.token) return null;
     return session;

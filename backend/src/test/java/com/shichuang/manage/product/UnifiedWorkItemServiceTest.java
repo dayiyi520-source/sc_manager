@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 class UnifiedWorkItemServiceTest {
     private final UnifiedWorkItemMapper mapper = mock(UnifiedWorkItemMapper.class);
     private final ProductLineMapper lines = mock(ProductLineMapper.class);
-    private final UnifiedWorkItemService service = new UnifiedWorkItemService(mapper, lines, mock(WorkItemCompletionService.class));
+    private final UnifiedWorkItemService service = new UnifiedWorkItemService(mapper, lines, mock(WorkItemCompletionService.class), mock(WorkItemCategoryService.class));
 
     @AfterEach void clear() { RequestContext.clear(); }
 

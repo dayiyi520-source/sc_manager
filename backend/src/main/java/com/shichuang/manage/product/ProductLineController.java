@@ -11,10 +11,15 @@ import java.util.*;
 public class ProductLineController {
  private final ProductLineService service; public ProductLineController(ProductLineService service){this.service=service;}
  @GetMapping public ApiResponse<List<Map<String,Object>>> list(@RequestParam(defaultValue="") String keyword){return ApiResponse.ok(service.list(keyword));}
+ @GetMapping("/archived") public ApiResponse<List<Map<String,Object>>> archived(){return ApiResponse.ok(service.archived());}
  @GetMapping("/{id}") public ApiResponse<Map<String,Object>> detail(@PathVariable String id){return ApiResponse.ok(service.detail(id));}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> create(@RequestBody Map<String,Object>b){return ApiResponse.ok(service.create(b));}
  @PutMapping("/{id}") public ApiResponse<Void> update(@PathVariable String id,@RequestBody Map<String,Object>b){service.update(id,b);return ApiResponse.ok(null);}
- @PatchMapping("/{id}/status") public ApiResponse<Void> status(@PathVariable String id,@RequestBody Map<String,String>b){service.status(id,b.getOrDefault("status",""));return ApiResponse.ok(null);}
+ @PostMapping("/{id}/activate") public ApiResponse<Void> activate(@PathVariable String id){service.activate(id);return ApiResponse.ok(null);}
+ @PostMapping("/{id}/disable") public ApiResponse<Void> disable(@PathVariable String id){service.disable(id);return ApiResponse.ok(null);}
+ @PostMapping("/{id}/archive") public ApiResponse<Void> archive(@PathVariable String id){service.archive(id);return ApiResponse.ok(null);}
+ @PostMapping("/{id}/restore") public ApiResponse<Void> restore(@PathVariable String id){service.restore(id);return ApiResponse.ok(null);}
+ @DeleteMapping("/{id}") public ApiResponse<Void> delete(@PathVariable String id){service.delete(id);return ApiResponse.ok(null);}
  @GetMapping("/{id}/members") public ApiResponse<List<Map<String,Object>>> members(@PathVariable String id){return ApiResponse.ok(service.members(id));}
  @PostMapping("/{id}/members") public ApiResponse<Void> addMember(@PathVariable String id,@RequestBody Map<String,Object>b){service.addMember(id,b);return ApiResponse.ok(null);}
  @PutMapping("/{id}/members/{memberId}") public ApiResponse<Void> updateMember(@PathVariable String id,@PathVariable String memberId,@RequestBody Map<String,Object>b){service.updateMember(id,memberId,b);return ApiResponse.ok(null);}

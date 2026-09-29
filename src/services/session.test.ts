@@ -45,15 +45,16 @@ describe('devLogin', () => {
     expect(readSession()?.token).toBe('real-token');
   });
 
-  it.each(['expired', 'missing-token', 'mismatched-token', 'malformed', 'legacy'])('rejects %s sessions', async (kind) => {
+  it.each(['expired', 'missing-token', 'mismatched-token', 'malformed', 'legacy', 'mock'])('rejects %s sessions', async (kind) => {
     const session = await login();
     if (kind === 'expired') storage.setItem('shichuang.session', JSON.stringify({...session, expiresAt:Date.now()-1}));
     if (kind === 'missing-token') storage.removeItem('shichuang.session.token');
     if (kind === 'mismatched-token') storage.setItem('shichuang.session.token','another-token');
     if (kind === 'malformed') storage.setItem('shichuang.session','{');
-    if (kind === 'legacy') {
-      storage.setItem('shichuang.session', JSON.stringify({...session,token:'local-dev-tech'}));
-      storage.setItem('shichuang.session.token','local-dev-tech');
+    if (kind === 'legacy' || kind === 'mock') {
+      const token = kind === 'mock' ? 'dev-token-admin' : 'local-dev-tech';
+      storage.setItem('shichuang.session', JSON.stringify({...session,token}));
+      storage.setItem('shichuang.session.token', token);
     }
     expect(readSession()).toBeNull();
   });

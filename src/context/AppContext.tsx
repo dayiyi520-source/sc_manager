@@ -1161,14 +1161,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       coverUrl: line.coverUrl,
       members: line.members?.length ? line.members : line.ownerUserId ? [{ id: `mem-${Date.now()}`, userId: line.ownerUserId, name: ownerName, role: '管理员' }] : [],
       products: line.products || [],
-      currentVersion: 'V1.0.0',
+      currentVersion: line.currentVersion || '',
       totalRequirements: line.totalRequirements ?? 0,
       inProgressReqs: line.inProgressReqs ?? 0,
       activeTasksCount: line.activeTasksCount ?? 0,
       iterationProgress: line.iterationProgress ?? 0,
-      versionCount: line.versionCount ?? 1,
+      versionCount: line.versionCount ?? 0,
       customerCount: line.customerCount ?? 0,
-      health: (line.health as any) || '健康',
+      health: (line.health as any) || '待规划',
       initializeWorkItemTemplate: line.initializeWorkItemTemplate,
       createdAt: '2026-08-31'
     };

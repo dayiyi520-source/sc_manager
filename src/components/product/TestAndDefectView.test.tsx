@@ -58,4 +58,13 @@ describe('TestAndDefectView', () => {
     expect(screen.getByText('测试报告工作区')).toBeInTheDocument();
     expect(mocks.renderReportWorkspace).toHaveBeenCalledWith(expect.objectContaining({ productLineFilter: 'line-2' }));
   });
+
+  it('仅在测试任务和测试报告内容区显示产品导航', () => {
+    render(<TestAndDefectView productLineFilter="line-1" productLines={[{ id: 'line-1', name: '核心产品' }]} />);
+    expect(screen.getByRole('navigation', { name: '产品导航栏' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '用例库' }));
+    expect(screen.queryByRole('navigation', { name: '产品导航栏' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '测试报告' }));
+    expect(screen.getByRole('navigation', { name: '产品导航栏' })).toBeInTheDocument();
+  });
 });

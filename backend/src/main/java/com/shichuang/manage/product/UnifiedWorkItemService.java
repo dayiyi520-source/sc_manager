@@ -119,6 +119,11 @@ public class UnifiedWorkItemService {
         return mapper.byProductLine(RequestContext.tenantId(), lineId).stream().map(row -> map(row, today)).toList();
     }
 
+    public List<UnifiedWorkItem> iterationTimeline(String lineId) {
+        requireLine(lineId);
+        return read(lineId);
+    }
+
     static UnifiedWorkItem map(Map<String, Object> row, LocalDate today) {
         String category = text(row, "category");
         WorkItemStatus status = WorkItemStatus.legacy(category, text(row, "status"));
@@ -142,7 +147,10 @@ public class UnifiedWorkItemService {
             due, decimal(row.get("estimatedHours")), decimal(row.get("actualHours")), created, nullable(row,"creatorName"),
             due != null && due.isBefore(today) && !status.terminal(),
             "bug".equals(category) && ("P0".equals(priority) || "P1".equals(priority)) && !status.terminal(), nullable(row,"parentWorkItemId"), nullable(row,"assigneeId"),
-            WorkItemConfigurationService.enabled(row.get("hasChildren")), ((Number)row.getOrDefault("revision",0)).intValue());
+            WorkItemConfigurationService.enabled(row.get("hasChildren")), ((Number)row.getOrDefault("revision",0)).intValue(),
+            row.get("plannedStartDate") == null ? null : LocalDate.parse(row.get("plannedStartDate").toString()),
+            row.get("completedAt") == null ? null : row.get("completedAt") instanceof java.sql.Timestamp timestamp ? timestamp.toLocalDateTime()
+                : LocalDateTime.parse(row.get("completedAt").toString().replace(' ', 'T')));
     }
 
     private void requireLine(String lineId) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Checkbox, Spin } from 'antd';
+import { Button, Checkbox, Spin, Tabs } from 'antd';
 import { productRepository, type NotificationEvent, type NotificationSettings } from '../../services/productRepository';
 import { useApp } from '../../context/AppContext';
 
@@ -20,17 +20,19 @@ export const NotificationSettingsPanel: React.FC<{ scope: 'template' | 'product'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('');
+  const [categories, setCategories] = useState<Array<{ code: string; displayName: string }>>([]);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true;
     setLoading(true); setError(''); setSettings(null); setDirty(false);
     const request = scope === 'template' ? productRepository.notificationTemplate() : productRepository.productNotificationSettings(productLineId!);
-    request.then((result) => { if (active) setSettings(result); }).catch((failure: unknown) => { if (active) setError(failure instanceof Error ? failure.message : '通知配置读取失败'); }).finally(() => { if (active) setLoading(false); });
+    Promise.all([request, productRepository.workItemCategories()]).then(([result, categoryList]) => { if (active) { const enabled = categoryList.filter((item) => item.enabled).map((item) => ({ code: item.code, displayName: item.displayName })); setSettings(result); setCategories(enabled); setActiveCategory((current) => current && enabled.some((item) => item.code === current) ? current : enabled[0]?.code || ''); } }).catch((failure: unknown) => { if (active) setError(failure instanceof Error ? failure.message : '通知配置读取失败'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [scope, productLineId, retry]);
   const change = (event: NotificationEvent, field: 'recipients' | 'channels', value: string, checked: boolean) => {
-    setSettings((current) => current && ({ rules: current.rules.map((rule) => rule.event === event ? { ...rule, [field]: checked ? [...rule[field], value] : rule[field].filter((item) => item !== value) } : rule) } as NotificationSettings));
+    setSettings((current) => current && ({ categories: current.categories.map((category) => category.categoryCode === activeCategory ? { ...category, rules: category.rules.map((rule) => rule.event === event ? { ...rule, [field]: checked ? [...rule[field], value] : rule[field].filter((item) => item !== value) } : rule) } : category) }));
     setDirty(true);
   };
   const save = async () => {
@@ -45,11 +47,13 @@ export const NotificationSettingsPanel: React.FC<{ scope: 'template' | 'product'
   if (loading) return <div className="flex min-h-40 items-center justify-center"><Spin tip="正在读取通知配置" /></div>;
   if (error) return <div role="alert" className="text-[var(--danger)]">{error}<Button type="link" onClick={() => setRetry((value) => value + 1)}>重试</Button></div>;
   if (!settings) return <div className="text-[var(--text-muted)]">暂无通知配置</div>;
+  const rules = settings.categories.find((item) => item.categoryCode === activeCategory)?.rules || [];
   return <div className="space-y-4 text-xs">
     <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">通知与提醒</h3><p className="mt-1 text-[var(--text-muted)]">保存通知偏好；消息发送功能暂未接入。</p></div><Button type="primary" loading={saving} disabled={!dirty} onClick={() => void save()}>保存配置</Button></div>
+    <Tabs className="notification-category-tabs" activeKey={activeCategory} onChange={setActiveCategory} items={categories.map((category) => ({ key: category.code, label: category.displayName }))} />
     <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[760px]">
       <div className="grid grid-cols-[180px_minmax(420px,1fr)_210px] border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-sm text-[var(--text-muted)]"><div className="border-r border-[var(--border-main)] px-4 py-4">事件</div><div className="border-r border-[var(--border-main)] px-4 py-4">通知对象</div><div className="px-4 py-4">站内信&amp;钉钉通知</div></div>
-      {EVENTS.map((event) => { const rule = settings.rules.find((item) => item.event === event.key); return <div key={event.key} className="grid min-h-20 grid-cols-[180px_minmax(420px,1fr)_210px] border-b border-[var(--border-main)] last:border-b-0"><div className="flex items-center border-r border-[var(--border-main)] px-4 py-4 text-sm text-[var(--text-body)]">{event.label}</div><div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-r border-[var(--border-main)] px-4 py-4">{event.recipients.map((recipient) => <Checkbox key={recipient.key} checked={rule?.recipients.includes(recipient.key)} onChange={(e) => change(event.key, 'recipients', recipient.key, e.target.checked)}>{recipient.label}</Checkbox>)}</div><div className="flex items-center px-4 py-4"><Checkbox aria-label={`${event.label}站内信与钉钉通知`} checked={rule?.channels.includes('IN_APP') && rule.channels.includes('DINGTALK')} onChange={(e) => { setSettings((current) => current && ({ rules: current.rules.map((item) => item.event === event.key ? { ...item, channels: e.target.checked ? ['IN_APP', 'DINGTALK'] : [] } : item) } as NotificationSettings)); setDirty(true); }} /></div></div>; })}
+      {EVENTS.map((event) => { const rule = rules.find((item) => item.event === event.key); return <div key={event.key} className="grid min-h-20 grid-cols-[180px_minmax(420px,1fr)_210px] border-b border-[var(--border-main)] last:border-b-0"><div className="flex items-center border-r border-[var(--border-main)] px-4 py-4 text-sm text-[var(--text-body)]">{event.label}</div><div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-r border-[var(--border-main)] px-4 py-4">{event.recipients.map((recipient) => <Checkbox key={recipient.key} checked={rule?.recipients.includes(recipient.key)} onChange={(e) => change(event.key, 'recipients', recipient.key, e.target.checked)}>{recipient.label}</Checkbox>)}</div><div className="flex items-center px-4 py-4"><Checkbox aria-label={`${event.label}站内信与钉钉通知`} checked={rule?.channels.includes('IN_APP') && rule.channels.includes('DINGTALK')} onChange={(e) => { setSettings((current) => current && ({ categories: current.categories.map((category) => category.categoryCode === activeCategory ? { ...category, rules: category.rules.map((item) => item.event === event.key ? { ...item, channels: e.target.checked ? ['IN_APP', 'DINGTALK'] : [] } : item) } : category) })); setDirty(true); }} /></div></div>; })}
     </div></div>
   </div>;
 };
