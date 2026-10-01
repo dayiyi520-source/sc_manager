@@ -1,0 +1,18 @@
+.workflow-assignee-menu {
+  position: fixed;
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(left);
+  width: anchor-size(width);
+  margin: calc(var(--spacing) * 1) 0 0;
+  max-height: calc(var(--spacing) * 48);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  position-try-fallbacks: flip-block;
+  position-visibility: anchors-visible;
+}
+
+.workflow-assignee-menu::backdrop {
+  background: transparent;
+  pointer-events: none;
+}

@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+
+const styles = readFileSync(new URL('./index.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+
+describe('light workspace theme contract', () => {
+  it('excludes drawer backdrops from opaque light panel overrides', () => {
+    expect(styles).toContain('> div:not(.fixed):not(.drawer-backdrop) {');
+    expect(styles).not.toContain('> div:not(.fixed) {');
+    expect(styles).toContain('--bg-overlay: color-mix(in srgb, var(--color-black) 40%, transparent)');
+    expect(styles).toContain('--bg-overlay: color-mix(in srgb, var(--color-black) 70%, transparent)');
+  });
+  it('normalizes dialogs and page controls inside the right workspace only', () => {
+    expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 > div:not(.fixed)');
+    expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 :where(input:not(.ant-select-input), select, textarea)[class]');
+    expect(styles).toContain('html:not(.dark) .tech-main .fixed.inset-0 button:disabled');
+    expect(styles).toContain('html:not(.dark) .tech-main [role="tablist"]');
+  });
+
+  it('keeps work-order list search and select triggers at the same height', () => {
+    expect(styles).toContain('.work-order-list-filters :where(.ant-input-affix-wrapper, .ant-select)');
+    expect(styles).toContain('.work-order-list-filters .ant-input-affix-wrapper > .ant-input');
+    expect(styles).toContain('.ant-select-placeholder');
+    expect(styles).toContain('height: 36px !important;');
+  });
+
+  it('normalizes product-line detail tabs that use custom button markup', () => {
+    expect(styles).toContain('html:not(.dark) .product-line-detail .product-line-tabs > button');
+    expect(styles).toContain('html:not(.dark) .product-line-detail .product-line-tabs > button:hover');
+    expect(styles).toContain("html:not(.dark) .product-line-detail .product-line-tabs > button[aria-selected='true']");
+    expect(styles).toContain('html:not(.dark) .product-line-detail .product-line-tabs > button:focus-visible');
+    expect(styles).toContain('html:not(.dark) .product-line-detail button[class*="bg-[#2F66F6]"]');
+  });
+
+  it('preserves the existing dark navigation rail in light mode', () => {
+    expect(styles).toContain('html:not(.dark) .tech-sidebar {\n  --bg-main: #0C0F13;');
+    expect(styles).not.toContain('html:not(.dark) .tech-sidebar {\n  background: var(--bg-card)');
+  });
+});

@@ -1,0 +1,45 @@
+import { SESSION_TOKEN_KEY, invalidateSession } from './sessionStorage'
+import { mockApiRequest } from './mockApi'
+export interface ApiResponse<T> { code: string; message: string; data: T; requestId: string }
+export interface PageResult<T> { items: T[]; page: number; pageSize: number; total: number; groups?: Array<{ label: string; count: number }> }
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const MOCK_MODE = import.meta.env.VITE_MOCK_MODE !== 'false'
+export class ApiError extends Error { constructor(public status: number, public code: string, message: string) { super(message) } }
+export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (MOCK_MODE) return mockApiRequest(path, init) as Promise<T>
+  const headers = new Headers(init.headers); const token = sessionStorage.getItem(SESSION_TOKEN_KEY)
+  headers.set('Accept','application/json'); if(init.body) headers.set('Content-Type','application/json'); if(token) headers.set('Authorization',`Bearer ${token}`)
+  const method = (init.method || 'GET').toUpperCase()
+  const canRetry = method === 'GET' || method === 'HEAD'
+  for (let attempt = 0; attempt < (canRetry ? 2 : 1); attempt += 1) {
+    const controller = new AbortController()
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, 8000)
+    const abortExternal = () => controller.abort()
+    init.signal?.addEventListener('abort', abortExternal, { once: true })
+    try {
+      const response = await fetch(`${API_BASE}${path}`,{...init, headers, signal: controller.signal})
+      const payload = await response.json().catch(() => ({code:'INVALID_RESPONSE',message:'服务返回了无效数据',data:null})) as ApiResponse<T>
+      if(!response.ok){
+        if (canRetry && attempt === 0 && [502, 503, 504].includes(response.status)) continue
+        if(response.status===401 && path !== '/api/auth/dev-login') invalidateSession(token)
+        throw new ApiError(response.status,payload.code||'REQUEST_FAILED',payload.message||'请求失败')
+      }
+      return payload.data
+    } catch (err) {
+      const isAbortError = err instanceof DOMException && err.name === 'AbortError'
+      if (canRetry && attempt === 0 && !init.signal?.aborted && (err instanceof TypeError || isAbortError)) continue
+      if (timedOut && !init.signal?.aborted && isAbortError) {
+        throw new ApiError(408, 'REQUEST_TIMEOUT', '服务响应超时，请稍后重试')
+      }
+      throw err
+    } finally {
+      clearTimeout(timer)
+      init.signal?.removeEventListener('abort', abortExternal)
+    }
+  }
+  throw new Error('请求失败')
+}

@@ -1,0 +1,6 @@
+.okr-target-view-switch { display:inline-flex; gap:4px; padding:2px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-card); }
+.okr-target-view-switch .ant-btn { width:32px; border-color:transparent; border-radius:6px; background:transparent; box-shadow:none; color:var(--text-muted); }
+.okr-target-view-switch .ant-btn:hover { border-color:var(--border-strong); background:var(--bg-surface-soft); color:var(--active-text); }
+.okr-target-view-switch .ant-btn.is-selected,.okr-target-view-switch .ant-btn.is-selected:hover { border-color:var(--primary); background:var(--bg-card); color:var(--primary); box-shadow:0 0 0 1px var(--primary); }
+.okr-target-view-switch .ant-btn:focus-visible { position:relative; z-index:1; outline:2px solid color-mix(in srgb,var(--primary) 35%,transparent); outline-offset:-2px; }
+.okr-target-view-switch .ant-btn:disabled { cursor:not-allowed; color:var(--text-subtle); background:var(--bg-elevated); }

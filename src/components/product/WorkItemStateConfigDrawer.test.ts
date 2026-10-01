@@ -1,0 +1,70 @@
+import { describe, expect, it, vi } from 'vitest';
+import { productRepository, type WorkItemWorkflow } from '../../services/productRepository';
+import type { ProductLineWorkItemType } from '../../types';
+import { buildWorkflowDefinition, createDefaultWorkItemStates, reorderWorkflowStates, saveAndPublishWorkflow, setDefaultWorkflowState, validateWorkflowStates } from './WorkItemStateConfigDrawer';
+
+describe('工作项状态配置', () => {
+  it('拖拽只改变顺序，不改变默认状态', () => {
+    const states = createDefaultWorkItemStates('test');
+    const reordered = reorderWorkflowStates(states, 'status_in_progress', 'status_pending');
+
+    const definition = buildWorkflowDefinition(reordered);
+
+    expect(definition.states.map((state) => state.key)).toEqual(['status_in_progress', 'status_pending', 'status_completed']);
+    expect(definition.states.filter((state) => state.initial).map((state) => state.key)).toEqual(['status_pending']);
+  });
+
+  it('修改默认状态时保持唯一默认值', () => {
+    const states = createDefaultWorkItemStates('test');
+    const next = setDefaultWorkflowState(states, 'status_in_progress');
+    expect(next.filter((state) => state.initial).map((state) => state.key)).toEqual(['status_in_progress']);
+  });
+
+  it('缺少未开始或已完成阶段时返回统一提示', () => {
+    const states = createDefaultWorkItemStates('test');
+    const withoutCompleted = states.map((state) => ({ ...state, group: state.group === 'COMPLETED' ? 'IN_PROGRESS' as const : state.group }));
+
+    expect(validateWorkflowStates(withoutCompleted)).toBe('状态流转必须包含至少一个‘未开始’和一个‘已完成’阶段的状态。');
+  });
+
+  it('状态码创建后稳定，完成标记由通用阶段推导', () => {
+    const states = createDefaultWorkItemStates('test');
+    const code = states[2].key;
+    const definition = buildWorkflowDefinition(states.map((state) => state.key === code ? { ...state, successful: false, color: 'purple' } : state));
+
+    expect(definition.states[2]).toMatchObject({ key: code, successful: true, color: 'purple' });
+  });
+
+  it('用例分类使用约定的四个状态及通用阶段', () => {
+    const states = createDefaultWorkItemStates('case');
+    const definition = buildWorkflowDefinition(states);
+
+    expect(states.map(({ name, group }) => ({ name, group }))).toEqual([
+      { name: '待测试', group: 'NOT_STARTED' },
+      { name: '测试中', group: 'IN_PROGRESS' },
+      { name: '暂缓', group: 'IN_PROGRESS' },
+      { name: '已完成', group: 'COMPLETED' }
+    ]);
+    expect(states.every((state) => state.stage === 'test')).toBe(true);
+    expect(definition.transitions).toHaveLength(5);
+  });
+
+  it('发布前保存当前编辑内容，并使用保存后的修订号', async () => {
+    const item = { id: 'type-1', name: '产品类型需求', category: '需求', enabled: true } as ProductLineWorkItemType;
+    const states = createDefaultWorkItemStates('requirement').map((state) => state.initial ? { ...state, name: '待规划' } : state);
+    const current = { id: 'draft-1', status: 'DRAFT', revision: 2 } as WorkItemWorkflow;
+    const saved = { id: 'draft-1', revision: 3 } as WorkItemWorkflow;
+    const update = vi.spyOn(productRepository, 'updateTypeWorkflow').mockResolvedValue(saved);
+    const publish = vi.spyOn(productRepository, 'publishWorkflow').mockResolvedValue(saved);
+    try {
+      await saveAndPublishWorkflow('line-1', item, 'requirement', states, current);
+      expect(update).toHaveBeenCalledWith('line-1', 'type-1', 'draft-1', expect.objectContaining({
+        revision: 2, definition: expect.objectContaining({ states: expect.arrayContaining([expect.objectContaining({ name: '待规划', initial: true })]) })
+      }));
+      expect(publish).toHaveBeenCalledWith('line-1', 'draft-1', 3);
+      expect(update.mock.invocationCallOrder[0]).toBeLessThan(publish.mock.invocationCallOrder[0]);
+    } finally {
+      update.mockRestore(); publish.mockRestore();
+    }
+  });
+});

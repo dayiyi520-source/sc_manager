@@ -1,0 +1,182 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import type { Dayjs } from 'dayjs';
+import { Button, DatePicker, Drawer, Input, Popconfirm, Select, Switch, Tabs } from 'antd';
+import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { ProductLine, ProductLineWorkItemType } from '../../types';
+import { AutomationLog, AutomationRule, productRepository, type WorkItemTemplateType } from '../../services/productRepository';
+import { useApp } from '../../context/AppContext';
+
+type RuleDraft = Omit<AutomationRule, 'id' | 'revision' | 'updatedAt'>;
+type RuleStatusFilter = 'ALL' | 'ENABLED' | 'DISABLED';
+type StateOption = { key: string; name: string };
+type RuleCondition = { type: 'TASK_TYPE' | 'PRIORITY'; operator: 'EQUALS' | 'NOT_EQUALS' | 'CONTAINS'; value: string };
+type RuleAction = { type: 'CREATE_SUBTASK' | 'DERIVE_PARENT_STATUS' | 'DISPATCH_REQUIREMENT_TASKS' | 'SET_ACTUAL_START_TIME'; result: string };
+
+const emptyRule = (): RuleDraft => ({ name: '', enabled: true, triggerType: 'STATUS_CHANGED', triggerTypeId: '', triggerStateKey: '', conditionType: 'NONE', conditionValue: '', actionType: 'CREATE_SUBTASK', actionConfig: {} });
+const defaultCondition = (): RuleCondition => ({ type: 'PRIORITY', operator: 'EQUALS', value: '' });
+const defaultAction = (): RuleAction => ({ type: 'CREATE_SUBTASK', result: '' });
+const actionConfig = (value: AutomationRule['actionConfig']) => {
+  if (typeof value !== 'string') return value || {};
+  try { return JSON.parse(value); } catch { return {}; }
+};
+const relativeTime = (value?: string) => {
+  if (!value) return '尚未执行';
+  const minutes = Math.floor((Date.now() - new Date(value).getTime()) / 60000);
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes}分钟前`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}小时前`;
+  return new Date(value).toLocaleString('zh-CN', { hour12: false });
+};
+
+export const AutomationRulesPanel: React.FC<{ productLine?: ProductLine; scope?: 'template' | 'product' }> = ({ productLine, scope = 'product' }) => {
+  const template = scope === 'template';
+  const lineId = productLine?.id || '';
+  const { addToast } = useApp();
+  const [rules, setRules] = useState<AutomationRule[]>([]);
+  const [types, setTypes] = useState<ProductLineWorkItemType[]>([]);
+  const [typeStates, setTypeStates] = useState<Record<string, StateOption[]>>({});
+  const [states, setStates] = useState<StateOption[]>([]);
+  const [logs, setLogs] = useState<AutomationLog[]>([]);
+  const [globalEnabled, setGlobalEnabled] = useState(true);
+  const [keyword, setKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState<RuleStatusFilter>('ALL');
+  const [view, setView] = useState<'rules' | 'logs'>('rules');
+  const [logKeyword, setLogKeyword] = useState('');
+  const [logResult, setLogResult] = useState<'all' | 'success' | 'failed'>('all');
+  const [logDateRange, setLogDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+  const [editing, setEditing] = useState<AutomationRule | null>(null);
+  const [draft, setDraft] = useState<RuleDraft>(emptyRule());
+  const [conditions, setConditions] = useState<RuleCondition[]>([]);
+  const [actions, setActions] = useState<RuleAction[]>([defaultAction()]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [overview, allTypes, nextLogs] = await Promise.all([
+        template ? productRepository.automationTemplate() : productRepository.automationRules(lineId),
+        template ? productRepository.workItemTemplate() : productRepository.workItemTypes(lineId),
+        template ? Promise.resolve([] as AutomationLog[]) : productRepository.automationLogs(lineId)
+      ]);
+      const workflowEntries = await Promise.all(allTypes.map(async (type) => {
+        try {
+          const templateWorkflow = template ? (type as WorkItemTemplateType).workflow : undefined;
+          const workflows = template ? [templateWorkflow] : await productRepository.typeWorkflows(lineId, type.id);
+          const current = workflows.find((workflow) => workflow?.status === 'PUBLISHED') || templateWorkflow;
+          return [type.id, (current?.definition.states || []).map((state) => ({ key: String(state.key), name: String(state.name) }))] as const;
+        } catch { return [type.id, []] as const; }
+      }));
+      setRules(overview.rules.map((rule) => ({ ...rule, enabled: Boolean(rule.enabled) })));
+      setGlobalEnabled(overview.enabled);
+      setTypes(allTypes);
+      setTypeStates(Object.fromEntries(workflowEntries));
+      setLogs(nextLogs);
+    } catch (error) {
+      addToast('error', '自动化规则读取失败', error instanceof Error ? error.message : '请稍后重试');
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [lineId, template]);
+
+  const openCreate = () => { setEditing(null); setDraft(emptyRule()); setStates([]); setConditions([]); setActions([defaultAction()]); setOpen(true); };
+  const openEdit = (rule: AutomationRule) => {
+    setEditing(rule);
+    const rawConfig = actionConfig(rule.actionConfig) as Record<string, unknown>;
+    let parsedConditions: RuleCondition[] = [];
+    if (rule.conditionType === 'MULTI') { try { parsedConditions = JSON.parse(String(rule.conditionValue || '[]')) as RuleCondition[]; } catch { parsedConditions = []; } }
+    else if (rule.conditionType !== 'NONE') parsedConditions = [{ type: rule.conditionType, operator: 'EQUALS', value: rule.conditionValue || '' }];
+    const parsedActions = Array.isArray(rawConfig.actions) ? rawConfig.actions as RuleAction[] : [{ type: rule.actionType, result: String(rawConfig.childTypeId || '') }];
+    setDraft({ name: rule.name, enabled: rule.enabled, triggerType: rule.triggerType, triggerTypeId: rule.triggerTypeId, triggerStateKey: rule.triggerStateKey, conditionType: parsedConditions.length ? 'MULTI' : 'NONE', conditionValue: '', actionType: parsedActions.length > 1 ? 'MULTI' : parsedActions[0].type, actionConfig: rawConfig });
+    setConditions(parsedConditions); setActions(parsedActions.length ? parsedActions : [defaultAction()]);
+    setStates(typeStates[rule.triggerTypeId] || []);
+    setOpen(true);
+  };
+  const selectTriggerType = (triggerTypeId: string) => {
+    setStates(typeStates[triggerTypeId] || []);
+    setDraft((previous) => ({ ...previous, triggerTypeId, triggerStateKey: '' }));
+  };
+  const childTypeId = String(actionConfig(draft.actionConfig).childTypeId || '');
+  const save = async () => {
+    if (!draft.name.trim() || !draft.triggerTypeId || !draft.triggerStateKey) { addToast('warning', '请填写规则名称、工作项类型和触发状态'); return; }
+    if (conditions.some((condition) => !condition.value)) { addToast('warning', '请完整配置过滤条件'); return; }
+    if (actions.some((action) => ['CREATE_SUBTASK', 'DERIVE_PARENT_STATUS'].includes(action.type) && !action.result)) { addToast('warning', '请完整配置执行动作'); return; }
+    if (actions.length > 1 && actions.some((action) => ['DISPATCH_REQUIREMENT_TASKS', 'SET_ACTUAL_START_TIME'].includes(action.type))) { addToast('warning', '下发三类任务或记录实际开始时间请单独配置为一条规则'); return; }
+    setLoading(true);
+    try {
+      const selectedAction = actions[0];
+      const defaults = (category: ProductLineWorkItemType['category']) => types.find((type) => type.category === category && type.enabled && type.isDefault)?.id || types.find((type) => type.category === category && type.enabled)?.id || '';
+      const nextActionConfig = selectedAction.type === 'CREATE_SUBTASK' ? { childTypeId: selectedAction.result }
+        : selectedAction.type === 'DISPATCH_REQUIREMENT_TASKS' ? { designTypeId: defaults('设计'), devTypeId: defaults('研发'), testTypeId: defaults('测试') }
+        : selectedAction.type === 'SET_ACTUAL_START_TIME' ? {} : { actions };
+      const body = { ...draft, name: draft.name.trim(), conditionType: conditions.length ? 'MULTI' as const : 'NONE' as const, conditionValue: '', conditions, actionType: actions.length > 1 ? 'MULTI' as const : selectedAction.type, actions, actionConfig: nextActionConfig };
+      if (editing) {
+        if (template) await productRepository.updateAutomationTemplateRule(editing.id, { ...body, revision: editing.revision });
+        else await productRepository.updateAutomationRule(lineId, editing.id, { ...body, revision: editing.revision });
+      } else if (template) await productRepository.createAutomationTemplateRule(body);
+      else await productRepository.createAutomationRule(lineId, body);
+      addToast('success', editing ? '自动化规则已更新' : '自动化规则已创建');
+      setOpen(false);
+      await load();
+    } catch (error) { addToast('error', '自动化规则保存失败', error instanceof Error ? error.message : '请稍后重试'); }
+    finally { setLoading(false); }
+  };
+  const toggleRule = async (rule: AutomationRule, enabled: boolean) => {
+    try { if (template) await productRepository.updateAutomationTemplateRule(rule.id, { ...rule, enabled, actionConfig: actionConfig(rule.actionConfig) }); else await productRepository.updateAutomationRule(lineId, rule.id, { ...rule, enabled, actionConfig: actionConfig(rule.actionConfig) }); await load(); }
+    catch (error) { addToast('error', '规则状态更新失败', error instanceof Error ? error.message : '请稍后重试'); }
+  };
+
+  const typeName = (id: string) => types.find((type) => type.id === id)?.name || '未知类型';
+  const stateName = (typeId: string, key: string) => typeStates[typeId]?.find((state) => state.key === key)?.name || key;
+  const actionName = (rule: AutomationRule) => {
+    if (rule.actionType === 'CREATE_SUBTASK') return `创建「${typeName(String(actionConfig(rule.actionConfig).childTypeId || ''))}」子任务`;
+    if (rule.actionType === 'DISPATCH_REQUIREMENT_TASKS') return '下发设计、研发和测试任务';
+    if (rule.actionType === 'SET_ACTUAL_START_TIME') return '记录实际开始时间';
+    if (rule.actionType === 'MULTI') return '执行多个联动动作';
+    return '向上推导父工作项状态';
+  };
+  const typeOptions = useMemo(() => types.filter((type) => type.enabled).map((type) => ({ value: type.id, label: `${type.category} · ${type.name}` })), [types]);
+  const filteredRules = useMemo(() => rules.filter((rule) => {
+    const matchesKeyword = !keyword.trim() || rule.name.toLowerCase().includes(keyword.trim().toLowerCase());
+    return matchesKeyword && (statusFilter === 'ALL' || (statusFilter === 'ENABLED' ? rule.enabled : !rule.enabled));
+  }), [keyword, rules, statusFilter]);
+  const filteredLogs = useMemo(() => {
+    const normalizedKeyword = logKeyword.trim().toLowerCase();
+    const [startAt, endAt] = logDateRange || [];
+    return logs.filter((logItem) => {
+      const matchesKeyword = !normalizedKeyword || (logItem.ruleName || '').toLowerCase().includes(normalizedKeyword);
+      const matchesResult = logResult === 'all' || (logResult === 'success' && logItem.result === 'SUCCESS') || (logResult === 'failed' && logItem.result !== 'SUCCESS');
+      const executedAt = new Date(logItem.createdAt).getTime();
+      const matchesStart = !startAt || executedAt >= startAt.startOf('day').valueOf();
+      const matchesEnd = !endAt || executedAt <= endAt.endOf('day').valueOf();
+      return matchesKeyword && matchesResult && matchesStart && matchesEnd;
+    });
+  }, [logs, logKeyword, logResult, logDateRange]);
+  const latestLogByRule = useMemo(() => logs.reduce<Record<string, AutomationLog>>((result, log) => {
+    if (!result[log.ruleId] || new Date(log.createdAt) > new Date(result[log.ruleId].createdAt)) result[log.ruleId] = log;
+    return result;
+  }, {}), [logs]);
+
+  return <div className="mx-auto w-full max-w-5xl space-y-4 text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border-main)] pb-4">
+      <div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--active-text)]"><ThunderboltOutlined /></span><div className="min-w-0"><h3 className="text-sm font-bold text-[var(--text-primary)]">跨工种自动联动引擎</h3><p className="mt-1 truncate text-[var(--text-muted)]">{template ? '新产品创建时继承这里的初始规则。' : '统一控制当前产品的状态触发和后续动作。'}</p></div><Switch checked={globalEnabled} checkedChildren="已开启" unCheckedChildren="已暂停" onChange={async (enabled) => { try { if (template) await productRepository.updateAutomationTemplateSetting(enabled); else await productRepository.updateAutomationSetting(lineId, enabled); setGlobalEnabled(enabled); } catch (error) { addToast('error', '全局开关更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /></div>
+      <div className="flex items-center gap-2"><Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建规则</Button></div>
+    </div>
+    <div className="flex items-center justify-between gap-3 overflow-x-auto"><Tabs className="automation-rules-tabs shrink-0" activeKey={view} onChange={(value) => setView(value as 'rules' | 'logs')} items={[{ key: 'rules', label: '规则列表' }, ...(!template ? [{ key: 'logs', label: '执行日志' }] : [])]} />{view === 'rules' ? <div className="flex shrink-0 items-center gap-2"><Input className="w-64" prefix={<SearchOutlined />} value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索规则名称" allowClear /><Select className="w-32" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'ALL', label: '全部状态' }, { value: 'ENABLED', label: '已启用' }, { value: 'DISABLED', label: '已停用' }]} /></div> : <div className="flex shrink-0 items-center gap-2"><Input className="w-56" prefix={<SearchOutlined />} value={logKeyword} onChange={(event) => setLogKeyword(event.target.value)} placeholder="搜索规则名称" allowClear /><Select className="w-28" value={logResult} onChange={setLogResult} placeholder="执行结果" options={[{ value: 'all', label: '全部结果' }, { value: 'success', label: '成功' }, { value: 'failed', label: '失败' }]} /><DatePicker.RangePicker className="w-64" value={logDateRange} onChange={(value) => setLogDateRange(value)} placeholder={['开始时间', '结束时间']} /></div>}</div>
+
+    {view === 'rules' ? <><div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[900px]"><div className="grid grid-cols-[minmax(170px,1.3fr)_minmax(190px,1.4fr)_minmax(190px,1.4fr)_110px_80px_88px] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>规则名称</span><span>触发条件（When）</span><span>执行动作（Then）</span><span>最近执行</span><span>状态</span><span className="text-right">操作</span></div>{filteredRules.length ? filteredRules.map((rule) => {
+      return <div key={rule.id} className="grid grid-cols-[minmax(170px,1.3fr)_minmax(190px,1.4fr)_minmax(190px,1.4fr)_110px_80px_88px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="truncate font-medium text-[var(--text-primary)]" title={rule.name}>{rule.name}</span><span className="truncate text-[var(--text-body)]" title={`${typeName(rule.triggerTypeId)} 进入 ${stateName(rule.triggerTypeId, rule.triggerStateKey)}`}>{typeName(rule.triggerTypeId)} 进入「{stateName(rule.triggerTypeId, rule.triggerStateKey)}」</span><span className="truncate text-[var(--text-body)]">{actionName(rule)}</span><span className="text-[var(--text-muted)]">{template ? '新产品继承后执行' : relativeTime(latestLogByRule[rule.id]?.createdAt)}</span><Switch className="automation-rule-switch" checked={rule.enabled} disabled={!globalEnabled} onChange={(enabled) => void toggleRule(rule, enabled)} /><span className="flex justify-end gap-1"><Button type="text" icon={<EditOutlined />} title="编辑规则" aria-label={`编辑规则：${rule.name}`} onClick={() => openEdit(rule)} /><Popconfirm title="删除自动化规则" description={template ? '删除后新产品不再继承该规则。' : '删除后不会再触发该规则。'} okText="删除" cancelText="取消" onConfirm={async () => { try { if (template) await productRepository.deleteAutomationTemplateRule(rule.id); else await productRepository.deleteAutomationRule(lineId, rule.id); addToast('success', '自动化规则已删除'); await load(); } catch (error) { addToast('error', '自动化规则删除失败', error instanceof Error ? error.message : '请稍后重试'); } }}><Button type="text" danger icon={<DeleteOutlined />} title="删除规则" aria-label={`删除规则：${rule.name}`} /></Popconfirm></span></div>;
+    }) : <div className="px-4 py-12 text-center text-[var(--text-muted)]">{loading ? '正在读取规则...' : '暂无匹配的自动化规则'}</div>}</div></div><div className="text-right text-[11px] text-[var(--text-muted)]">共 {filteredRules.length} 条规则</div></> : <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[980px]"><div className="grid grid-cols-[180px_minmax(180px,1.2fr)_minmax(160px,1fr)_100px_minmax(220px,1.5fr)] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>执行时间</span><span>工作项标题</span><span>执行规则</span><span>执行结果</span><span>说明</span></div>{filteredLogs.length ? filteredLogs.map((log) => { const detail = log.detail || (log.result === 'SUCCESS' ? '规则执行成功' : '规则执行失败'); return <div key={log.id} className="grid grid-cols-[180px_minmax(180px,1.2fr)_minmax(160px,1fr)_100px_minmax(220px,1.5fr)] gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span>{new Date(log.createdAt).toLocaleString('zh-CN', { hour12: false })}</span><span className="truncate" title={log.workItemTitle || log.workItemId}>{log.workItemTitle || log.workItemId}</span><span className="truncate" title={log.ruleName || log.ruleId}>{log.ruleName || log.ruleId}</span><span className={log.result === 'SUCCESS' ? 'text-[var(--success)]' : 'text-[var(--danger)]'}>{log.result === 'SUCCESS' ? '成功' : '失败'}</span><span className="truncate" title={detail}>{detail}</span></div>; }) : <div className="px-4 py-12 text-center text-[var(--text-muted)]">暂无执行日志</div>}</div></div>}
+
+    <Drawer width={680} open={open} onClose={() => setOpen(false)} destroyOnClose={false} title={editing ? `编辑规则 · ${editing.name}` : '新建自动化规则'} footer={<div className="flex justify-end gap-2"><Button onClick={() => setOpen(false)}>取消</Button><Button type="primary" loading={loading} onClick={() => void save()}>保存规则</Button></div>}>
+      <div className="space-y-5 text-xs"><section className="space-y-3"><div><h4 className="text-sm font-bold text-[var(--text-primary)]">规则基本信息</h4><p className="mt-1 text-[var(--text-muted)]">用清晰的动作结果命名，便于后续排查和维护。</p></div><label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>规则名称 *</span><Input maxLength={128} value={draft.name} onChange={(event) => setDraft((previous) => ({ ...previous, name: event.target.value }))} placeholder="例如：需求评审通过后创建研发任务" /></label></section><div className="space-y-0">
+        <section className="rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><NodeHeading index="1" title="When · 当发生以下事件" primary /><div className="space-y-3"><FieldRow label="工作项类型"><Select value={draft.triggerTypeId || undefined} options={typeOptions} placeholder="选择工作项类型" showSearch optionFilterProp="label" onChange={selectTriggerType} /></FieldRow><FieldRow label="事件类型"><Select value="STATUS_CHANGED" options={[{ value: 'STATUS_CHANGED', label: '状态发生变化' }]} /></FieldRow><FieldRow label="变更为"><Select value={draft.triggerStateKey || undefined} options={states.map((state) => ({ value: state.key, label: state.name }))} placeholder="选择进入的状态" disabled={!draft.triggerTypeId} onChange={(triggerStateKey) => setDraft((previous) => ({ ...previous, triggerStateKey }))} /></FieldRow></div></section><Connector />
+        <section className="rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><NodeHeading index="2" title="If · 过滤条件" optional /><div className="space-y-2">{conditions.map((condition, index) => <div key={`condition-${index}`} className="grid grid-cols-[minmax(120px,1fr)_110px_minmax(120px,1fr)_32px] items-center gap-2"><Select value={condition.type} options={[{ value: 'TASK_TYPE', label: '工作项类型' }, { value: 'PRIORITY', label: '优先级' }]} onChange={(type: RuleCondition['type']) => setConditions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, type, value: '' } : row))} /><Select value={condition.operator} options={[{ value: 'EQUALS', label: '等于' }, { value: 'NOT_EQUALS', label: '不等于' }, { value: 'CONTAINS', label: '包含' }]} onChange={(operator: RuleCondition['operator']) => setConditions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, operator } : row))} />{condition.type === 'TASK_TYPE' ? <Select value={condition.value || undefined} options={typeOptions} placeholder="选择值" onChange={(value) => setConditions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, value } : row))} /> : <Select value={condition.value || undefined} options={['P0', 'P1', 'P2', 'P3'].map((value) => ({ value, label: value }))} placeholder="选择值" onChange={(value) => setConditions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, value } : row))} />}<Button type="text" danger icon={<DeleteOutlined />} aria-label={`删除过滤条件 ${index + 1}`} onClick={() => setConditions((current) => current.filter((_, rowIndex) => rowIndex !== index))} /></div>)}<Button type="dashed" block icon={<PlusOutlined />} onClick={() => setConditions((current) => [...current, defaultCondition()])}>添加过滤条件</Button></div></section><Connector />
+        <section className="rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4"><NodeHeading index="3" title="Then · 执行以下动作" /><div className="space-y-2">{actions.map((action, index) => <div key={`action-${index}`} className="grid grid-cols-[minmax(170px,1fr)_minmax(170px,1fr)_32px] items-center gap-2"><Select value={action.type} options={[{ value: 'CREATE_SUBTASK', label: '创建关联子任务' }, { value: 'DERIVE_PARENT_STATUS', label: '向上推导父工作项状态' }, { value: 'DISPATCH_REQUIREMENT_TASKS', label: '下发设计、研发和测试任务' }, { value: 'SET_ACTUAL_START_TIME', label: '记录实际开始时间' }]} onChange={(type: RuleAction['type']) => setActions((current) => current.map((row, rowIndex) => rowIndex === index ? { type, result: '' } : row))} />{action.type === 'CREATE_SUBTASK' ? <Select value={action.result || undefined} options={typeOptions} placeholder="选择动作结果" showSearch optionFilterProp="label" onChange={(result) => setActions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, result } : row))} /> : action.type === 'DERIVE_PARENT_STATUS' ? <Select value={action.result || undefined} options={states.map((state) => ({ value: state.key, label: `推导为「${state.name}」` }))} placeholder="选择动作结果" onChange={(result) => setActions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, result } : row))} /> : <Input value={action.type === 'DISPATCH_REQUIREMENT_TASKS' ? '使用默认设计、研发和测试类型' : '首次进入非待开始阶段时记录'} disabled />}<Button type="text" danger icon={<DeleteOutlined />} aria-label={`删除执行动作 ${index + 1}`} onClick={() => setActions((current) => current.filter((_, rowIndex) => rowIndex !== index))} /></div>)}<Button type="dashed" block icon={<PlusOutlined />} onClick={() => setActions((current) => [...current, defaultAction()])}>添加执行动作</Button></div></section>
+      </div><div className="flex items-center justify-between border-t border-[var(--border-main)] pt-4"><div><div className="font-medium text-[var(--text-body)]">启用规则</div><p className="mt-1 text-[11px] text-[var(--text-muted)]">关闭后保留配置，但不参与后续触发。</p></div><Switch checked={draft.enabled} onChange={(enabled) => setDraft((previous) => ({ ...previous, enabled }))} /></div></div>
+    </Drawer>
+  </div>;
+};
+
+const NodeHeading: React.FC<{ index: string; title: string; primary?: boolean; optional?: boolean }> = ({ index, title, primary, optional }) => <div className="mb-3 flex items-center gap-2"><span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${primary ? 'bg-[var(--primary)] text-white' : 'border border-[var(--border-strong)] text-[var(--text-body)]'}`}>{index}</span><h4 className="text-sm font-bold text-[var(--text-primary)]">{title}</h4>{optional && <span className="text-[11px] text-[var(--text-muted)]">可选</span>}</div>;
+const Connector = () => <div className="mx-7 h-6 border-l border-[var(--border-strong)]" aria-hidden="true" />;
+const FieldRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => <label className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-3"><span className="text-[var(--text-muted)]">{label}</span>{children}</label>;

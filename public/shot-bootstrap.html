@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><script>
+(async () => {
+  const response = await fetch('http://localhost:8080/api/auth/dev-login', { method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({username: 'admin'}) });
+  const envelope = await response.json();
+  const data = envelope.data || envelope;
+  const session = { token: data.token, user: data.user, expiresAt: Date.now() + data.expiresIn * 1000 };
+  sessionStorage.setItem('shichuang.session.token', data.token);
+  sessionStorage.setItem('shichuang.session', JSON.stringify(session));
+  const route = new URLSearchParams(location.search).get('route') || '/app/wb_my_tasks';
+  location.replace(route);
+})();
+</script>

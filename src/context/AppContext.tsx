@@ -1,0 +1,1754 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { crmRepository } from '../services/crmRepository';
+import { requirementRepository } from '../services/requirementRepository';
+import { productRepository } from '../services/productRepository';
+import { useSessionState } from './modules/useSessionState';
+import { useCrmQueries } from './modules/useCrmQueries';
+import { useProductQueries } from './modules/useProductQueries';
+import { useOkrState } from './modules/useOkrState';
+import { useNavigationState } from './modules/useNavigationState';
+import { useWorkspaceUiState, type WorkspaceToast } from './modules/useWorkspaceUiState';
+import {
+  MainMenuId,
+  SubMenuId,
+  PageTab,
+  CurrentUser,
+  Customer,
+  Lead,
+  Opportunity,
+  FollowUpRecord,
+  Partner,
+  TenderBidding,
+  BiddingReview,
+  Contract,
+  ProductLine,
+  ProductLineMember,
+  RequirementTask,
+  RequirementEvent,
+  VersionIteration,
+  DefectBug,
+  RequirementPoolItem,
+  RequirementTaskDraft,
+  ApprovalFlow,
+  ProjectRecord,
+  ProjectItem,
+  WinningEngagement,
+  ServerNode,
+  OKRItem,
+  PerformanceReview,
+  KnowledgeDoc,
+  Milestone,
+  Deliverable,
+  ChangeRequest,
+  RiskItem,
+  DevTask,
+  PaymentSchedule,
+  InvoiceRecord,
+  InvoiceApprovalRecord,
+  FinanceStats
+} from '../types';
+import {
+  MOCK_BUGS,
+  MOCK_CONTRACTS,
+  MOCK_CUSTOMERS,
+  MOCK_DESIGN_TASKS,
+  MOCK_DEV_TASKS,
+  MOCK_FOLLOW_UPS,
+  MOCK_LEADS,
+  MOCK_OPPORTUNITIES,
+  MOCK_PRODUCT_LINES,
+  MOCK_REQUIREMENT_TASKS,
+  MOCK_USERS,
+  MOCK_VERSIONS,
+} from '../data/mockSnapshot';
+
+export type ToastItem = WorkspaceToast;
+
+export interface NavigationMenuItem {
+  id: SubMenuId;
+  title: string;
+  mainMenuId: MainMenuId;
+  icon: string;
+  badge?: number | string;
+  badgeType?: 'default' | 'danger' | 'warning' | 'success';
+}
+
+export interface MainMenuGroup {
+  id: MainMenuId;
+  title: string;
+  icon: string;
+  subMenus: NavigationMenuItem[];
+}
+
+export const MENU_GROUPS: MainMenuGroup[] = [
+  {
+    id: 'workbench',
+    title: '工作台',
+    icon: 'LayoutDashboard',
+    subMenus: [
+      { id: 'wb_my_tasks', title: '我的任务', mainMenuId: 'workbench', icon: 'CheckSquare', badge: 4, badgeType: 'danger' },
+      { id: 'wb_okr_perf', title: '目标与总结', mainMenuId: 'workbench', icon: 'Target' },
+      { id: 'wb_work_order', title: '协助事项', mainMenuId: 'workbench', icon: 'Database' }
+    ]
+  },
+  {
+    id: 'product',
+    title: '产研管理',
+    icon: 'Layers',
+    subMenus: [
+      { id: 'prod_lines', title: '产品管理', mainMenuId: 'product', icon: 'Box' },
+      { id: 'prod_versions', title: '版本迭代', mainMenuId: 'product', icon: 'GitBranch' },
+      { id: 'prod_req_tasks', title: '产品任务', mainMenuId: 'product', icon: 'ListTodo', badge: '云效流', badgeType: 'default' },
+      { id: 'prod_design_tasks', title: '设计任务', mainMenuId: 'product', icon: 'Edit' },
+      { id: 'prod_rd_tasks', title: '研发任务', mainMenuId: 'product', icon: 'Code' },
+      { id: 'prod_test_tasks', title: '测试任务', mainMenuId: 'product', icon: 'Beaker' },
+      { id: 'prod_bugs', title: '缺陷管理', mainMenuId: 'product', icon: 'Bug', badge: 3, badgeType: 'danger' },
+      { id: 'prod_version_reviews', title: '版本评审', mainMenuId: 'product', icon: 'FileCheck' }
+    ]
+  },
+  {
+    id: 'system',
+    title: '系统与组织',
+    icon: 'Settings',
+    subMenus: [
+      { id: 'team_org', title: '团队组织', mainMenuId: 'system', icon: 'Users' },
+      { id: 'sys_work_items', title: '产研模板', mainMenuId: 'system', icon: 'Appstore' },
+      { id: 'sys_permission_demo', title: '权限演示', mainMenuId: 'system', icon: 'ShieldCheck' },
+      { id: 'sys_workflow_demo', title: '工作流演示', mainMenuId: 'system', icon: 'GitBranch' },
+      { id: 'sys_settings', title: '系统设置', mainMenuId: 'system', icon: 'Sliders' }
+    ]
+  }
+];
+
+const ALIAS_MAP: Record<string, SubMenuId> = {
+  'approval_center': 'comp_approval',
+  'crm_bid_review': 'crm_bidding_review',
+  'prod_reqs': 'prod_req_tasks',
+  'prod_dev_tasks': 'prod_rd_tasks',
+  'prod_pool': 'wb_work_order',
+  'prod_review': 'prod_reviews',
+  'ops_projects': 'proj_list',
+  'ops_milestones': 'proj_config',
+  'know_base': 'wb_knowledge'
+};
+
+export interface AppContextType {
+  activeTabId: SubMenuId;
+  openTabs: PageTab[];
+  sidebarCollapsed: boolean;
+  mobileSidebarOpen: boolean;
+  currentUser: CurrentUser;
+  theme: 'light' | 'dark';
+  globalSearchOpen: boolean;
+  toasts: ToastItem[];
+  selectedCustomerIdForDetail: string | null;
+  selectedOpportunityIdForDetail: string | null;
+  selectedBiddingIdForDetail: string | null;
+  selectedContractIdForDetail: string | null;
+  selectedApprovalIdForDetail: string | null;
+  selectedProjectIdForDetail: string | null;
+  requirementTaskDraft: RequirementTaskDraft | null;
+
+  // Actions
+  setActiveTabId: (id: SubMenuId) => void;
+  openPageTab: (id: string) => void;
+  closePageTab: (id: SubMenuId) => void;
+  toggleSidebar: () => void;
+  toggleMobileSidebar: () => void;
+  setCurrentUserRole: (user: CurrentUser) => void;
+  setGlobalSearchOpen: (open: boolean) => void;
+  toggleTheme: () => void;
+  addToast: (type: ToastItem['type'], title: string, message?: string) => void;
+  removeToast: (id: string) => void;
+
+  setSelectedCustomerIdForDetail: (id: string | null) => void;
+  setSelectedOpportunityIdForDetail: (id: string | null) => void;
+  setSelectedBiddingIdForDetail: (id: string | null) => void;
+  setSelectedContractIdForDetail: (id: string | null) => void;
+  setSelectedApprovalIdForDetail: (id: string | null) => void;
+  setSelectedProjectIdForDetail: (id: string | null) => void;
+  setRequirementTaskDraft: (draft: RequirementTaskDraft | null) => void;
+
+  // Domain States & Updaters
+  customers: Customer[];
+  setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
+  leads: Lead[];
+  setLeads: React.Dispatch<React.SetStateAction<Lead[]>>;
+  opportunities: Opportunity[];
+  setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>;
+  followUps: FollowUpRecord[];
+  followups: FollowUpRecord[];
+  setFollowUps: React.Dispatch<React.SetStateAction<FollowUpRecord[]>>;
+  partners: Partner[];
+  setPartners: React.Dispatch<React.SetStateAction<Partner[]>>;
+  biddings: TenderBidding[];
+  biddingProjects: TenderBidding[];
+  setBiddings: React.Dispatch<React.SetStateAction<TenderBidding[]>>;
+  biddingReviews: BiddingReview[];
+  winningEngagements: WinningEngagement[];
+  bidReviews: BiddingReview[];
+  setBiddingReviews: React.Dispatch<React.SetStateAction<BiddingReview[]>>;
+  contracts: Contract[];
+  setContracts: React.Dispatch<React.SetStateAction<Contract[]>>;
+  productLines: ProductLine[];
+  setProductLines: React.Dispatch<React.SetStateAction<ProductLine[]>>;
+  requirementTasks: RequirementTask[];
+  setRequirementTasks: React.Dispatch<React.SetStateAction<RequirementTask[]>>;
+  designTasks: RequirementTask[];
+  setDesignTasks: React.Dispatch<React.SetStateAction<RequirementTask[]>>;
+  versions: VersionIteration[];
+  setVersions: React.Dispatch<React.SetStateAction<VersionIteration[]>>;
+  bugs: DefectBug[];
+  setBugs: React.Dispatch<React.SetStateAction<DefectBug[]>>;
+  requirementPool: RequirementPoolItem[];
+  setRequirementPool: React.Dispatch<React.SetStateAction<RequirementPoolItem[]>>;
+  approvals: ApprovalFlow[];
+  setApprovals: React.Dispatch<React.SetStateAction<ApprovalFlow[]>>;
+  projects: ProjectItem[];
+  setProjects: React.Dispatch<React.SetStateAction<ProjectItem[]>>;
+  servers: ServerNode[];
+  setServers: React.Dispatch<React.SetStateAction<ServerNode[]>>;
+  okrs: OKRItem[];
+  setOkrs: React.Dispatch<React.SetStateAction<OKRItem[]>>;
+  performances: PerformanceReview[];
+  setPerformances: React.Dispatch<React.SetStateAction<PerformanceReview[]>>;
+  knowledgeDocs: KnowledgeDoc[];
+  setKnowledgeDocs: React.Dispatch<React.SetStateAction<KnowledgeDoc[]>>;
+  toggleFavoriteDoc: (id: string) => void;
+  deleteKnowledgeDoc: (id: string) => void;
+
+  // Extended Collections for Project & Dev & Finance
+  milestones: Milestone[];
+  setMilestones: React.Dispatch<React.SetStateAction<Milestone[]>>;
+  deliverables: Deliverable[];
+  setDeliverables: React.Dispatch<React.SetStateAction<Deliverable[]>>;
+  changeRequests: ChangeRequest[];
+  setChangeRequests: React.Dispatch<React.SetStateAction<ChangeRequest[]>>;
+  risks: RiskItem[];
+  setRisks: React.Dispatch<React.SetStateAction<RiskItem[]>>;
+  devTasks: DevTask[];
+  setDevTasks: React.Dispatch<React.SetStateAction<DevTask[]>>;
+  paymentSchedules: PaymentSchedule[];
+  setPaymentSchedules: React.Dispatch<React.SetStateAction<PaymentSchedule[]>>;
+  invoices: InvoiceRecord[];
+  setInvoices: React.Dispatch<React.SetStateAction<InvoiceRecord[]>>;
+  invoiceApprovals: InvoiceApprovalRecord[];
+  setInvoiceApprovals: React.Dispatch<React.SetStateAction<InvoiceApprovalRecord[]>>;
+  financeStats: FinanceStats;
+  crmLoading: boolean;
+  crmError: string | null;
+  retryCrm: () => Promise<unknown>;
+
+  // Handlers
+  addCustomer: (cust: Partial<Customer>) => void;
+  updateCustomer: (id: string, updates: Partial<Customer>) => void;
+  addLead: (lead: Partial<Lead>) => void;
+  updateLead: (id: string, updates: Partial<Lead>) => void;
+  convertLeadToOpportunity: (id: string, updates?: Partial<Opportunity>) => void;
+  addOpportunity: (opp: Partial<Opportunity>) => void;
+  updateOpportunity: (id: string, updates: Partial<Opportunity>) => void;
+  advanceOpportunityStage: (id: string) => void;
+  addFollowUp: (rec: Partial<FollowUpRecord>) => void;
+  addFollowup: (rec: Partial<FollowUpRecord>) => void;
+  addPartner: (partner: Partial<Partner>) => void;
+  updatePartner: (id: string, updates: Partial<Partner>) => void;
+  addContract: (contract: Partial<Contract>) => void;
+  updateContract: (id: string, updates: Partial<Contract>) => void;
+  addBidding: (bid: Partial<TenderBidding>) => void;
+  addBiddingProject: (bid: Partial<TenderBidding>) => void;
+  updateBiddingProject: (id: string, updates: Partial<TenderBidding>) => void;
+  updateBiddingLifecycle: (opportunityId: string, updates: Record<string, unknown>) => Promise<void>;
+  addBiddingReview: (rev: Partial<BiddingReview>) => void;
+  addBidReview: (rev: Partial<BiddingReview>) => void;
+  addProductLine: (line: Partial<ProductLine>) => Promise<boolean>;
+  updateProductLine: (id: string, updates: Partial<ProductLine>) => Promise<void>;
+  addProductLineMembers: (id: string, members: ProductLineMember[]) => Promise<void>;
+  updateProductLineMember: (id: string, memberId: string, role: ProductLineMember['role']) => Promise<void>;
+  removeProductLineMember: (id: string, memberId: string) => Promise<void>;
+  addVersion: (v: Partial<VersionIteration>) => Promise<boolean>;
+  updateVersion: (id: string, updates: Partial<VersionIteration>) => Promise<boolean>;
+  deleteVersion: (id: string) => void;
+  assignRequirementToVersion: (requirementId: string, versionId: string) => Promise<boolean>;
+  assignWorkItemToVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string) => Promise<boolean>;
+  unassignWorkItemFromVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string) => Promise<boolean>;
+  addRequirementTask: (task: Partial<RequirementTask>) => Promise<boolean>;
+  updateRequirementTask: (id: string, updates: Partial<RequirementTask>) => void;
+  addDesignTask: (task: Partial<RequirementTask>) => Promise<boolean>;
+  updateDesignTask: (id: string, updates: Partial<RequirementTask>) => void;
+  addRequirementTaskComment: (id: string, content: string) => void;
+  addRequirementToPool: (item: Partial<RequirementPoolItem>) => void;
+  addRequirementPoolItem: (item: Partial<RequirementPoolItem>) => void;
+  updateRequirementPoolItem: (id: string, updates: Partial<RequirementPoolItem>) => void;
+  convertPoolItemToTask: (poolId: string) => void;
+  addBug: (bug: Partial<DefectBug>) => void;
+  updateBug: (id: string, updates: Partial<DefectBug>) => void;
+  approveFlow: (flowId: string, comment?: string) => void;
+  rejectFlow: (flowId: string, comment?: string) => void;
+  addOKR: (okr: Partial<OKRItem>) => void;
+  addPerformanceReview: (perf: Partial<PerformanceReview>) => void;
+  addKnowledgeDoc: (doc: Partial<KnowledgeDoc>) => void;
+
+  // Project handlers
+  addProject: (proj: Partial<ProjectItem>) => void;
+  updateProject: (id: string, updates: Partial<ProjectItem>) => void;
+  advanceProjectStage: (id: string) => void;
+  addMilestone: (ms: Partial<Milestone>) => void;
+  updateMilestone: (id: string, updates: Partial<Milestone>) => void;
+  addDeliverable: (del: Partial<Deliverable>) => void;
+  updateDeliverable: (id: string, updates: Partial<Deliverable>) => void;
+  addChangeRequest: (cr: Partial<ChangeRequest>) => void;
+  updateChangeRequest: (id: string, updates: Partial<ChangeRequest>) => void;
+  addRisk: (r: Partial<RiskItem>) => void;
+  updateRisk: (id: string, updates: Partial<RiskItem>) => void;
+  addDevTask: (dt: Partial<DevTask>) => void;
+  updateDevTask: (id: string, updates: Partial<DevTask>) => void;
+  addPaymentSchedule: (ps: Partial<PaymentSchedule>) => void;
+  updatePaymentSchedule: (id: string, updates: Partial<PaymentSchedule>) => void;
+  addInvoice: (inv: Partial<InvoiceRecord>) => void;
+  updateInvoice: (id: string, updates: Partial<InvoiceRecord>) => void;
+  addInvoiceApproval: (record: Partial<InvoiceApprovalRecord>) => InvoiceApprovalRecord;
+  updateInvoiceApproval: (id: string, updates: Partial<InvoiceApprovalRecord>) => void;
+}
+
+export type AppNavigationContextType = Pick<AppContextType, 'activeTabId' | 'openTabs' | 'sidebarCollapsed' | 'toggleSidebar' | 'openPageTab' | 'closePageTab'>;
+export type AppAuthContextType = Pick<AppContextType, 'currentUser' | 'setCurrentUserRole'>;
+export type AppCrmContextType = Pick<AppContextType, 'customers' | 'leads' | 'opportunities' | 'contracts' | 'followUps' | 'productLines' | 'partners' | 'biddings' | 'biddingReviews' | 'winningEngagements' | 'requirementTasks' | 'addLead' | 'updateLead' | 'convertLeadToOpportunity' | 'addFollowUp' | 'addOpportunity' | 'updateOpportunity' | 'advanceOpportunityStage' | 'addPartner' | 'updatePartner' | 'updateContract' | 'addContract' | 'addBiddingProject' | 'updateBiddingProject' | 'updateBiddingLifecycle' | 'addBidReview' | 'openPageTab' | 'addToast' | 'crmLoading' | 'selectedCustomerIdForDetail' | 'setSelectedCustomerIdForDetail'>;
+
+const AppContext = createContext<AppContextType | null>(null);
+export const AppNavigationContext = createContext<AppNavigationContextType | null>(null);
+export const AppAuthContext = createContext<AppAuthContextType | null>(null);
+export const AppCrmContext = createContext<AppCrmContextType | null>(null);
+
+const normalizeRequirementStatus = (status: RequirementTask['status']): RequirementTask['status'] => {
+  if (['设计中', '研发中', '测试中'].includes(status)) return '处理中';
+  if (status === '已发布') return '已完成';
+  if (status === '已关闭') return '已驳回';
+  return status;
+};
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { activeTabId, setActiveTabId, openTabs, sidebarCollapsed, mobileSidebarOpen, openPageTab, closePageTab, toggleSidebar, toggleMobileSidebar } = useNavigationState(MENU_GROUPS, ALIAS_MAP);
+  const { currentUser, setCurrentUser, sessionToken: crmSessionToken, dataMode } = useSessionState(MOCK_USERS[0]);
+  const { theme, globalSearchOpen, setGlobalSearchOpen, toasts, addToast, removeToast, toggleTheme } = useWorkspaceUiState();
+
+  // Selected for drawers
+  const [selectedCustomerIdForDetail, setSelectedCustomerIdForDetail] = useState<string | null>(null);
+  const [selectedOpportunityIdForDetail, setSelectedOpportunityIdForDetail] = useState<string | null>(null);
+  const [selectedBiddingIdForDetail, setSelectedBiddingIdForDetail] = useState<string | null>(null);
+  const [selectedContractIdForDetail, setSelectedContractIdForDetail] = useState<string | null>(null);
+  const [selectedApprovalIdForDetail, setSelectedApprovalIdForDetail] = useState<string | null>(null);
+  const [selectedProjectIdForDetail, setSelectedProjectIdForDetail] = useState<string | null>(null);
+
+  // Core Data Collections
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [followUps, setFollowUps] = useState<FollowUpRecord[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [biddings, setBiddings] = useState<TenderBidding[]>([]);
+  const [winningEngagements, setWinningEngagements] = useState<WinningEngagement[]>([]);
+  const [biddingReviews, setBiddingReviews] = useState<BiddingReview[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [productLines, setProductLines] = useState<ProductLine[]>(MOCK_PRODUCT_LINES);
+  const [requirementTasks, setRequirementTasks] = useState<RequirementTask[]>(MOCK_REQUIREMENT_TASKS);
+  const [designTasks, setDesignTasks] = useState<RequirementTask[]>(MOCK_DESIGN_TASKS);
+  const [versions, setVersions] = useState<VersionIteration[]>(MOCK_VERSIONS);
+  const [bugs, setBugs] = useState<DefectBug[]>(MOCK_BUGS);
+  const [requirementPool, setRequirementPool] = useState<RequirementPoolItem[]>([]);
+  const [requirementTaskDraft, setRequirementTaskDraft] = useState<RequirementTaskDraft | null>(null);
+  const [approvals, setApprovals] = useState<ApprovalFlow[]>([]);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [servers, setServers] = useState<ServerNode[]>([]);
+  const { okrs, setOkrs, performances, setPerformances } = useOkrState(currentUser, dataMode === 'remote');
+  const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>([]);
+
+  // Operations & Delivery Extensions
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
+  const [risks, setRisks] = useState<RiskItem[]>([]);
+  const [devTasks, setDevTasks] = useState<DevTask[]>(MOCK_DEV_TASKS.map((task) => ({ id: task.id, title: task.title, description: task.description, developer: task.ownerName, status: task.status, priority: task.priority as DevTask['priority'], versionName: task.versionName || '', productLineName: task.productLineName || '', estimatedHours: task.estimatedHours || 0, spentHours: task.actualHours || 0, dueDate: task.dueDate || '' })));
+  const [paymentSchedules, setPaymentSchedules] = useState<PaymentSchedule[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [invoiceApprovals, setInvoiceApprovals] = useState<InvoiceApprovalRecord[]>([]);
+
+  // 所有领域共用同一数据模式，避免本地回退会话误请求后端。
+  const crmEnabled = dataMode === 'remote';
+  const requirementBackendEnabled = dataMode === 'remote';
+  const { leadQuery, customerQuery, opportunityQuery, biddingQuery, engagementQuery, followUpQuery, contractQuery } = useCrmQueries(crmSessionToken, crmEnabled);
+  const { requirementQuery, designQuery, productLineQuery, bugQuery, devTaskQuery } = useProductQueries(crmSessionToken, requirementBackendEnabled);
+
+  // Remote success is authoritative, including an empty result. Demo data is only used in local mode.
+  useEffect(()=>{ if (!crmEnabled) setCustomers(MOCK_CUSTOMERS); else if (customerQuery.isSuccess) setCustomers(customerQuery.data?.items || []); },[crmEnabled,customerQuery.data,customerQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setLeads(MOCK_LEADS); else if (leadQuery.isSuccess) setLeads(leadQuery.data?.items || []); },[crmEnabled,leadQuery.data,leadQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setOpportunities(MOCK_OPPORTUNITIES); else if (opportunityQuery.isSuccess) setOpportunities(opportunityQuery.data?.items || []); },[crmEnabled,opportunityQuery.data,opportunityQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setBiddings([]); else if (biddingQuery.isSuccess) setBiddings((biddingQuery.data?.items || []) as TenderBidding[]); },[crmEnabled,biddingQuery.data,biddingQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setWinningEngagements([]); else if (engagementQuery.isSuccess) setWinningEngagements((engagementQuery.data?.items || []).map((item: any) => ({ ...item, bidCode: item.biddingId || '', projectName: item.name, amount: 0, commRecords: [], timeline: [], relatedFiles: [], createdAt: item.createdAt || '' }))); },[crmEnabled,engagementQuery.data,engagementQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setFollowUps(MOCK_FOLLOW_UPS); else if (followUpQuery.isSuccess) setFollowUps(followUpQuery.data?.items || []); },[crmEnabled,followUpQuery.data,followUpQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setContracts(MOCK_CONTRACTS); else if (contractQuery.isSuccess) setContracts(contractQuery.data?.items || []); },[crmEnabled,contractQuery.data,contractQuery.isSuccess]);
+  useEffect(()=>{
+    if (Array.isArray(requirementQuery.data?.items)) {
+      const remoteTasks = requirementQuery.data.items.map((task) => ({
+        ...task,
+        status: normalizeRequirementStatus(task.status)
+      }));
+      setRequirementTasks(requirementBackendEnabled ? remoteTasks : prev => prev);
+    }
+  },[requirementQuery.data]);
+  useEffect(()=>{ if (designQuery.isSuccess) setDesignTasks((designQuery.data?.items || []).map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: task.versionId || '', versionName: task.versionName || '' }))); },[designQuery.data,designQuery.isSuccess]);
+  useEffect(() => {
+    if (!Array.isArray(productLineQuery.data)) return;
+    setProductLines(productLineQuery.data);
+    const remoteVersions = productLineQuery.data.flatMap((line) => (line.versions || []).map((version) => ({ ...version, productLineId: line.id, productLineName: line.name })));
+    setVersions(remoteVersions);
+  }, [productLineQuery.data]);
+  useEffect(()=>{ if (bugQuery.isSuccess) setBugs((bugQuery.data?.items || []) as DefectBug[]); },[bugQuery.data,bugQuery.isSuccess]);
+  useEffect(()=>{ if (devTaskQuery.isSuccess) setDevTasks((devTaskQuery.data?.items || []) as DevTask[]); },[devTaskQuery.data,devTaskQuery.isSuccess]);
+
+  const refreshCrm = () => Promise.all([customerQuery.refetch(),leadQuery.refetch(),opportunityQuery.refetch(),biddingQuery.refetch(),engagementQuery.refetch(),followUpQuery.refetch(),contractQuery.refetch(),requirementQuery.refetch(),productLineQuery.refetch(),bugQuery.refetch(),devTaskQuery.refetch()]);
+  const crmLoading = customerQuery.isFetching || leadQuery.isFetching || opportunityQuery.isFetching || biddingQuery.isFetching || followUpQuery.isFetching || contractQuery.isFetching;
+  const crmError = [customerQuery.error, leadQuery.error, opportunityQuery.error, followUpQuery.error, contractQuery.error].find(Boolean);
+
+  const setCurrentUserRole = (target: CurrentUser) => {
+    setCurrentUser(target);
+    addToast('info', `已切换身份视角：${target.name}`, `角色权限：${target.roleTitle}`);
+  };
+
+  // Helper Actions
+  const addCustomer = (cust: Partial<Customer>) => {
+    crmRepository.createCustomer(cust).then(result=>refreshCrm().then(()=>addToast('success','客户建档成功',`客户编号：${result.code}`))).catch(error=>addToast('error','客户建档失败',error.message));
+  };
+
+  const addOpportunity = (opp: Partial<Opportunity>) => {
+    if (crmEnabled) {
+      crmRepository.createOpportunity({...opp,ownerName:opp.ownerName||currentUser.name}).then(()=>refreshCrm().then(()=>addToast('success','商机录入成功'))).catch(error=>addToast('error','商机录入失败',error.message));
+      return;
+    }
+    const newOpportunity: Opportunity = {
+      id: opp.id || `opp-${Date.now()}`,
+      name: opp.name || '新建商机',
+      type: opp.type || '定制研发',
+      customerId: opp.customerId || customers[0]?.id || '',
+      customerName: opp.customerName || customers[0]?.name || '未关联客户',
+      leadId: opp.leadId,
+      stage: opp.stage || '需求确认',
+      status: opp.status || '跟进中',
+      amount: opp.amount || 0,
+      relatedProduct: opp.relatedProduct || '待确认产品',
+      isTrial: opp.isTrial || false,
+      deadline: opp.deadline || new Date().toISOString().slice(0, 10),
+      ownerName: opp.ownerName || currentUser.name,
+      collaborators: opp.collaborators || [],
+      source: opp.source || '主动开发',
+      probability: opp.probability || 30,
+      remarks: opp.remarks || '新增商机',
+      createdAt: opp.createdAt || new Date().toISOString().slice(0, 10)
+    };
+    setOpportunities((prev) => [newOpportunity, ...prev]);
+    addToast('success', '商机录入成功');
+  };
+
+  const addFollowUp = (rec: Partial<FollowUpRecord>) => {
+    const record: FollowUpRecord = { id: `follow-${Date.now()}`, customerId: rec.customerId || '', customerName: rec.customerName || '', content: rec.content || '', ...rec, ownerName: rec.ownerName || currentUser.name };
+    if (!crmEnabled) {
+      setFollowUps((prev) => [record, ...prev]);
+      addToast('success', '跟进记录已登记');
+      return;
+    }
+    crmRepository.createFollowUp({...rec,ownerName:currentUser.name}).then(()=>refreshCrm().then(()=>addToast('success','跟进记录已登记'))).catch(error=>addToast('error','跟进记录保存失败',error.message));
+  };
+
+  const addContract = (contract: Partial<Contract>) => {
+    crmRepository.createContract({...contract,ownerName:contract.ownerName||currentUser.name}).then(result=>refreshCrm().then(()=>addToast('success','合同建立成功',`编号：${result.code}`))).catch(error=>addToast('error','合同建立失败',error.message));
+  };
+
+  const addBidding = (bid: Partial<TenderBidding>) => {
+    if (crmEnabled && bid.opportunityId) {
+      crmRepository.updateBidding(bid.opportunityId, bid as Record<string, unknown>).then(() => refreshCrm()).then(() => addToast('success', '��Ͷ���ݼ�ͬ����')).catch(error => addToast('error', '��Ͷ���ݼ�ͬ��ʧ��', error.message));
+      return;
+    }
+    const newBid: TenderBidding = {
+      id: `bid-${Date.now()}`,
+      code: `ZB-2026-NEW${String(biddings.length + 1).padStart(3, '0')}`,
+      name: bid.name || '新建招投标项目',
+      projectName: bid.projectName || '智慧协同工程项目',
+      customerId: bid.customerId || (customers[0]?.id ?? 'c-1'),
+      customerName: bid.customerName || (customers[0]?.name ?? '国家电网华东分部'),
+      type: bid.type || '公开招标',
+      budgetAmount: bid.budgetAmount || 3000000,
+      publishDate: bid.publishDate || '2026-08-31',
+      bidDeadline: bid.bidDeadline || '2026-09-25 10:00',
+      ownerName: bid.ownerName || currentUser.name,
+      opportunityId: bid.opportunityId,
+      status: '制作标书中',
+      remarks: bid.remarks || '通过招投标系统登记',
+      reviewed: false
+    };
+    setBiddings((prev) => [newBid, ...prev]);
+    addToast('success', '招投标项目已立项', `招标编号：${newBid.code}`);
+  };
+
+  const addBiddingReview = (rev: Partial<BiddingReview>) => {
+    const newReview: BiddingReview = {
+      id: `brev-${Date.now()}`,
+      biddingId: rev.biddingId || 'bid-1',
+      biddingName: rev.biddingName || '招投标项目复盘',
+      projectName: rev.projectName || '关联项目名称',
+      customerName: rev.customerName || '客户名称',
+      result: rev.result || '中标',
+      ownerName: currentUser.name,
+      reviewTime: '2026-08-31',
+      scoreAnalysis: rev.scoreAnalysis || {
+        businessScore: 90,
+        techScore: 92,
+        priceScore: 88,
+        competitorName: '行业主要竞品',
+        competitorPrice: 2800000
+      },
+      gapAnalysis: rev.gapAnalysis || '在技术架构与团队交付保障上具备压倒性优势。',
+      keyWinLossFactors: rev.keyWinLossFactors || ['售前方案高度契合', '现场答辩得分第一'],
+      improvementSuggestions: rev.improvementSuggestions || '继续保持方案标准化输出能力。'
+    };
+    setBiddingReviews((prev) => [newReview, ...prev]);
+    if (rev.biddingId) {
+      setBiddings((prev) =>
+        prev.map((b) => (b.id === rev.biddingId ? { ...b, reviewed: true } : b))
+      );
+    }
+    addToast('success', '招投标复盘已提交', '已沉淀至招投标复盘知识库');
+  };
+
+  const addRequirementTask = async (task: Partial<RequirementTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '工单创建失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const selectedProductLine = task.productLineId
+      ? productLines.find((item) => item.id === task.productLineId)
+      : productLines.find((item) => item.name === task.productLineName) || productLines[0];
+    if (!selectedProductLine) {
+      addToast('warning', '工单创建失败', '暂无可用的事项归属范围');
+      return false;
+    }
+    const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    const newTask: RequirementTask = {
+      id: `req-${Date.now()}`,
+      title: task.title || '新产品任务',
+      description: task.description || '任务详细描述',
+      expectedGoal: task.expectedGoal || '交付目标与指标验收标准',
+      status: task.status || '待处理',
+      priority: task.priority || '中',
+      ownerName: task.ownerName || currentUser.name,
+      creatorName: currentUser.name,
+      department: task.department || currentUser.department,
+      versionId: task.versionId || '',
+      versionName: task.versionName || '',
+      productLineId: selectedProductLine.id,
+      productLineName: selectedProductLine.name,
+      customerId: task.customerId,
+      customerName: task.customerName,
+      descriptionHtml: task.descriptionHtml,
+      media: task.media || [],
+      taskType: task.taskType,
+      workOrderType: task.workOrderType,
+      specialFields: task.specialFields,
+      sourceWorkOrderIds: task.sourceWorkOrderIds || [],
+      sourceWorkOrderTitles: task.sourceWorkOrderTitles || [],
+      requirementType: task.requirementType,
+      ccNames: task.ccNames || [],
+      plannedStartDate: task.plannedStartDate,
+      expectedCompleteDate: task.expectedCompleteDate,
+      assignedOwnerName: task.assignedOwnerName,
+      assignedNote: task.assignedNote,
+      estimatedHours: task.estimatedHours || 20,
+      actualHours: 0,
+      dueDate: task.dueDate || '2026-09-20',
+      createdAt,
+      events: [{
+        id: `event-${Date.now()}`,
+        eventType: '提需求',
+        operatorName: currentUser.name,
+        createdAt,
+        metadata: {
+          assigneeName: task.ownerName || currentUser.name
+        }
+      }],
+      category: 'my_responsible',
+      todoList: task.todoList || [
+        { id: `td-1`, text: '完成技术可行性评估与设计', done: false },
+        { id: `td-2`, text: '代码开发与本地单测覆盖', done: false },
+        { id: `td-3`, text: '提交测试环境集成回归', done: false }
+      ]
+    };
+    setRequirementTasks((prev) => [newTask, ...prev]);
+    try {
+      await requirementRepository.create(newTask);
+      await requirementQuery.refetch();
+      addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);
+      return true;
+    } catch (error) {
+      setRequirementTasks((prev) => prev.filter((item) => item.id !== newTask.id));
+      addToast('error', '工单创建失败', error instanceof Error ? error.message : '服务暂不可用，请稍后重试');
+      return false;
+    }
+  };
+
+  const addDesignTask = async (task: Partial<RequirementTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '设计任务保存失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const newTask: RequirementTask = { ...task, id: `design-${Date.now()}`, title: task.title || '新建设计任务', description: task.description || '', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, productLineName: task.productLineName || productLines[0]?.name || '', versionName: task.versionName || '', estimatedHours: task.estimatedHours || 0, dueDate: task.dueDate || '' };
+    try { await productRepository.createDesignTask({ ...newTask, requirementId: task.requirementId || '' }); await designQuery.refetch(); }
+    catch (error) { addToast('error', '设计任务保存失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
+    return true;
+  };
+
+  const addRequirementToPool = (item: Partial<RequirementPoolItem>) => {
+    const newItem: RequirementPoolItem = {
+      id: `pool-${Date.now()}`,
+      code: `POOL-2026-${String(requirementPool.length + 1).padStart(3, '0')}`,
+      title: item.title || '原始业务需求提案',
+      description: item.description || '需求背景与场景说明',
+      expectedGoal: item.expectedGoal || '期望达成的业务价值',
+      productLineName: item.productLineName || productLines[0]?.name || '',
+      customerName: item.customerName,
+      priority: item.priority || '中',
+      submitter: currentUser.name,
+      source: item.source || '内部规划',
+      status: '待评审',
+      createdAt: '2026-08-31'
+    };
+    setRequirementPool((prev) => [newItem, ...prev]);
+    addToast('success', '工单已提交至工单中心', `编号：${newItem.code}，等待产品委员会评审`);
+  };
+
+  const convertPoolItemToTask = (poolId: string) => {
+    const target = requirementPool.find((p) => p.id === poolId);
+    if (!target) return;
+    setRequirementPool((prev) =>
+      prev.map((p) => (p.id === poolId ? { ...p, status: '已转任务' } : p))
+    );
+    addRequirementTask({
+      title: target.title,
+      description: target.description,
+      expectedGoal: target.expectedGoal,
+      productLineName: target.productLineName,
+      customerName: target.customerName,
+      priority: target.priority
+    });
+    addToast('info', '工单中心流转成功', `需求【${target.title}】已转为正式敏捷研发任务`);
+  };
+
+  const addBug = (bug: Partial<DefectBug>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '缺陷保存失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    const newBug: DefectBug = {
+      id: `bug-${Date.now()}`,
+      code: `BUG-2026-${String(bugs.length + 1).padStart(3, '0')}`,
+      title: bug.title || '新建缺陷问题',
+      description: bug.description || '复现步骤与错误堆栈',
+      status: '待修复',
+      severity: bug.severity || '严重',
+      priority: bug.priority || '中',
+      type: bug.type || '功能错误',
+      ownerName: bug.ownerName || currentUser.name,
+      creatorName: currentUser.name,
+      verifierName: currentUser.name,
+      productLineId: bug.productLineId || 'pl-1',
+      productLineName: bug.productLineName || productLines[0]?.name || '',
+      versionName: bug.versionName || versions[0]?.name || '',
+      createdAt: '2026-08-31 10:30'
+      ,sourceWorkOrderIds: bug.sourceWorkOrderIds || []
+      ,sourceWorkOrderTitles: bug.sourceWorkOrderTitles || []
+    };
+    void productRepository.createTask('bug', newBug).then(() => bugQuery.refetch()).then(() => addToast('success', '缺陷已提报', newBug.title)).catch((error) => addToast('error', '缺陷保存失败', error instanceof Error ? error.message : '请稍后重试'));
+  };
+
+  const approveFlow = (flowId: string, comment?: string) => {
+    setApprovals((prev) =>
+      prev.map((flow) => {
+        if (flow.id !== flowId) return flow;
+        const newNodes = flow.nodes.map((node) => {
+          if (node.status === 'current') {
+            return {
+              ...node,
+              status: 'passed' as const,
+              comment: comment || '同意审批，手续合规。',
+              time: '刚刚'
+            };
+          }
+          return node;
+        });
+        const nextWaitingIndex = newNodes.findIndex((n) => n.status === 'waiting');
+        if (nextWaitingIndex !== -1) {
+          newNodes[nextWaitingIndex].status = 'current';
+        }
+        const isAllDone = newNodes.every((n) => n.status === 'passed');
+        return {
+          ...flow,
+          status: isAllDone ? ('已通过' as const) : ('待审批' as const),
+          nodes: newNodes,
+          completedAt: isAllDone ? '刚刚' : undefined
+        };
+      })
+    );
+    addToast('success', '审批通过成功', '流程节点已推进');
+  };
+
+  const rejectFlow = (flowId: string, comment?: string) => {
+    setApprovals((prev) =>
+      prev.map((flow) => {
+        if (flow.id !== flowId) return flow;
+        const newNodes = flow.nodes.map((node) => {
+          if (node.status === 'current') {
+            return {
+              ...node,
+              status: 'rejected' as const,
+              comment: comment || '驳回：相关资料需重新修正完善。',
+              time: '刚刚'
+            };
+          }
+          return node;
+        });
+        return {
+          ...flow,
+          status: '已驳回' as const,
+          nodes: newNodes,
+          completedAt: '刚刚'
+        };
+      })
+    );
+    addToast('warning', '审批已驳回', '流程已退回至申请人修正');
+  };
+
+  const addOKR = (okr: Partial<OKRItem>) => {
+    const newOKR: OKRItem = {
+      id: `okr-${Date.now()}`,
+      cycle: okr.cycle || '2026-09',
+      ownerId: currentUser.id,
+      ownerName: currentUser.name,
+      department: currentUser.department,
+      category: 'my',
+      objective: okr.objective || '新建月度目标',
+      weight: okr.weight || 30,
+      progress: 0,
+      deadline: okr.deadline || '2026-09-30',
+      alignTo: okr.alignTo || '公司年度核心战略',
+      parentObjectiveId: okr.parentObjectiveId,
+      parentKeyResultId: okr.parentKeyResultId,
+      alignmentType: okr.alignmentType || '承接目标',
+      status: okr.status || 'pending_review',
+      keyResults: okr.keyResults || [
+        { id: `kr-${Date.now()}-1`, content: '关键成果 KR 1', progress: 0, weight: 50, deadline: '2026-09-30' },
+        { id: `kr-${Date.now()}-2`, content: '关键成果 KR 2', progress: 0, weight: 50, deadline: '2026-09-30' }
+      ]
+    };
+    setOkrs((prev) => [newOKR, ...prev]);
+    addToast('success', 'OKR目标设定成功', `目标：${newOKR.objective}`);
+  };
+
+  const addPerformanceReview = (perf: Partial<PerformanceReview>) => {
+    const newPerf: PerformanceReview = {
+      id: `perf-${Date.now()}`,
+      type: perf.type || 'week',
+      cycleName: perf.cycleName || '2026年第36周复盘总结',
+      author: currentUser.name,
+      authorDept: currentUser.department,
+      summary: perf.summary || '工作总结内容',
+      uncompletedReason: perf.uncompletedReason || '无',
+      selfScore: perf.selfScore || 90,
+      suggestions: perf.suggestions || '无特别意见',
+      helpNeeded: perf.helpNeeded || '暂无需协助事项',
+      sendTo: perf.sendTo || ['总经办', '直接主管'],
+      createdAt: '刚刚',
+      status: 'submitted',
+      linkedWorkItems: perf.linkedWorkItems || [],
+      outOfPlanWork: perf.outOfPlanWork || []
+    };
+    setPerformances((prev) => [newPerf, ...prev]);
+    addToast('success', '工作复盘总结已提交', `已发送至：${newPerf.sendTo.join(', ')}`);
+  };
+
+  const addKnowledgeDoc = (doc: Partial<KnowledgeDoc>) => {
+    const newDoc: KnowledgeDoc = {
+      id: `doc-${Date.now()}`,
+      title: doc.title || '新建知识文档',
+      category: doc.category || '应知应会',
+      subCategory: doc.subCategory || '通用规范',
+      tags: doc.tags && doc.tags.length > 0 ? doc.tags : ['标准规范'],
+      author: doc.author || currentUser.name,
+      creator: currentUser.name,
+      version: doc.version || 'V1.0.0',
+      updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      timeAgo: '刚刚',
+      views: 1,
+      downloadsCount: 0,
+      isFavorited: false,
+      summary: doc.summary || '文档简述',
+      content: doc.content || `## ${doc.title || '新建知识文档'}\n\n该文档由 ${currentUser.name} 沉淀至公司知识库。`,
+      fileType: doc.fileType || 'doc',
+      dingtalkUrl: doc.dingtalkUrl || 'https://dingtalk.com/doc/new-doc',
+      wecomUrl: doc.wecomUrl || 'https://work.weixin.qq.com/doc/new-doc',
+      fileSize: doc.fileSize || '3.5 MB',
+      isMine: true,
+      isFollowed: true
+    };
+    setKnowledgeDocs((prev) => [newDoc, ...prev]);
+    addToast('success', '知识文档已上传发布', newDoc.title);
+  };
+
+  const toggleFavoriteDoc = (id: string) => {
+    setKnowledgeDocs((prev) =>
+      prev.map((d) => {
+        if (d.id === id) {
+          const nextFav = !d.isFavorited;
+          if (nextFav) {
+            addToast('success', '已加入我的收藏', d.title);
+          } else {
+            addToast('info', '已取消收藏', d.title);
+          }
+          return {
+            ...d,
+            isFavorited: nextFav,
+            favoritedAt: nextFav ? new Date().toISOString().split('T')[0] : undefined
+          };
+        }
+        return d;
+      })
+    );
+  };
+
+  const deleteKnowledgeDoc = (id: string) => {
+    const target = knowledgeDocs.find((d) => d.id === id);
+    setKnowledgeDocs((prev) => prev.filter((d) => d.id !== id));
+    addToast('info', '知识文档已归档删除', target?.title);
+  };
+
+  // Project & Milestone & Ops Handlers
+  const addProject = (proj: Partial<ProjectItem>) => {
+    const newProj: ProjectItem = {
+      id: `proj-${Date.now()}`,
+      code: `PRJ-2026-${String(projects.length + 1).padStart(3, '0')}`,
+      name: proj.name || '新建业务工程项目',
+      customerName: proj.customerName || (customers[0]?.name ?? '国家电网华东分部'),
+      pmName: proj.pmName || currentUser.name,
+      stage: proj.stage || '定制开发',
+      progress: proj.progress || 10,
+      contractAmount: proj.contractAmount || 2000000,
+      spentCost: 0,
+      riskLevel: proj.riskLevel || '低风险',
+      startDate: proj.startDate || '2026-09-01',
+      planOnlineDate: proj.planOnlineDate || '2026-12-31',
+      milestones: [
+        { name: '需求签署', date: '2026-09-15', status: 'completed' },
+        { name: '系统开发', date: '2026-10-31', status: 'ongoing' },
+        { name: '终验交付', date: '2026-12-31', status: 'pending' }
+      ]
+    };
+    setProjects((prev) => [newProj, ...prev]);
+    addToast('success', '项目立项成功', `项目编号：${newProj.code}`);
+  };
+
+  const updateProject = (id: string, updates: Partial<ProjectItem>) => {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+    );
+    addToast('info', '项目状态已更新');
+  };
+
+  const advanceProjectStage = (id: string) => {
+    const stages: ProjectItem['stage'][] = [
+      '项目立项',
+      '需求调研',
+      '系统设计',
+      '定制开发',
+      '用户UAT',
+      '上线交付',
+      '质保运维'
+    ];
+    setProjects((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const currentIdx = stages.indexOf(p.stage);
+        const nextStage = stages[Math.min(stages.length - 1, currentIdx + 1)];
+        return {
+          ...p,
+          stage: nextStage,
+          progress: Math.min(100, p.progress + 15)
+        };
+      })
+    );
+    addToast('success', '项目阶段已成功推进');
+  };
+
+  const addMilestone = (ms: Partial<Milestone>) => {
+    const newMs: Milestone = {
+      id: `ms-${Date.now()}`,
+      projectId: ms.projectId || (projects[0]?.id ?? 'proj-1'),
+      projectName: ms.projectName || (projects[0]?.name ?? '国家电网华东分部项目'),
+      name: ms.name || '新建里程碑',
+      dueDate: ms.dueDate || '2026-10-01',
+      status: ms.status || '未开始',
+      paymentTrigger: ms.paymentTrigger || '触发 20% 节点款',
+      owner: ms.owner || currentUser.name
+    };
+    setMilestones((prev) => [newMs, ...prev]);
+    addToast('success', '里程碑已创建', newMs.name);
+  };
+
+  const updateMilestone = (id: string, updates: Partial<Milestone>) => {
+    setMilestones((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
+    );
+    addToast('info', '里程碑状态已更新');
+  };
+
+  const addDeliverable = (del: Partial<Deliverable>) => {
+    const newDel: Deliverable = {
+      id: `del-${Date.now()}`,
+      projectId: del.projectId || (projects[0]?.id ?? 'proj-1'),
+      projectName: del.projectName || (projects[0]?.name ?? '国家电网华东分部项目'),
+      name: del.name || '新建交付物文件',
+      version: del.version || 'V1.0',
+      status: del.status || '待提交',
+      fileSize: del.fileSize || '10.5 MB',
+      submitter: currentUser.name,
+      uploadDate: '2026-08-31'
+    };
+    setDeliverables((prev) => [newDel, ...prev]);
+    addToast('success', '交付物已归档', newDel.name);
+  };
+
+  const updateDeliverable = (id: string, updates: Partial<Deliverable>) => {
+    setDeliverables((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, ...updates } : d))
+    );
+    addToast('info', '交付物状态已更新');
+  };
+
+  const addChangeRequest = (cr: Partial<ChangeRequest>) => {
+    const newCr: ChangeRequest = {
+      id: `cr-${Date.now()}`,
+      projectId: cr.projectId || (projects[0]?.id ?? 'proj-1'),
+      projectName: cr.projectName || (projects[0]?.name ?? '国家电网华东分部项目'),
+      title: cr.title || '新建变更申请',
+      type: cr.type || '需求范围变更',
+      applicant: currentUser.name,
+      status: '审核中',
+      impactAnalysis: cr.impactAnalysis || '工期后延5个工作日',
+      applyDate: '2026-08-31'
+    };
+    setChangeRequests((prev) => [newCr, ...prev]);
+    addToast('success', '变更申请已提交', newCr.title);
+  };
+
+  const updateChangeRequest = (id: string, updates: Partial<ChangeRequest>) => {
+    setChangeRequests((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+    );
+    addToast('info', '变更申请状态已更新');
+  };
+
+  const addRisk = (r: Partial<RiskItem>) => {
+    const newR: RiskItem = {
+      id: `rk-${Date.now()}`,
+      projectId: r.projectId || (projects[0]?.id ?? 'proj-1'),
+      projectName: r.projectName || (projects[0]?.name ?? '国家电网华东分部项目'),
+      title: r.title || '新建风险预警项',
+      level: r.level || '中危风险',
+      status: '跟进中',
+      mitigationPlan: r.mitigationPlan || '安排专职技术人员现场驻场支持',
+      owner: r.owner || currentUser.name,
+      createdAt: '2026-08-31'
+    };
+    setRisks((prev) => [newR, ...prev]);
+    addToast('warning', '风险预警已登记', newR.title);
+  };
+
+  const updateRisk = (id: string, updates: Partial<RiskItem>) => {
+    setRisks((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...updates } : r))
+    );
+    addToast('info', '风险状态已更新');
+  };
+
+  const addDevTask = (dt: Partial<DevTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '研发任务保存失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    const newDt: DevTask = {
+      id: `dt-${Date.now()}`,
+      title: dt.title || '新建研发任务',
+      description: dt.description || '',
+      developer: dt.developer || currentUser.name,
+      repo: dt.repo || 'shichuang-hub-backend',
+      branch: dt.branch || 'feat/new-task',
+      status: dt.status || '开发中',
+      priority: dt.priority || '中',
+      versionName: dt.versionName || versions[0]?.name || '',
+      productLineName: dt.productLineName || productLines[0]?.name || '',
+      estimatedHours: dt.estimatedHours || 16,
+      spentHours: 0,
+      dueDate: dt.dueDate || '2026-09-10'
+    };
+    void productRepository.createTask('dev', newDt).then(() => devTaskQuery.refetch()).then(() => addToast('success', '研发任务创建成功', newDt.title)).catch((error) => addToast('error', '研发任务保存失败', error instanceof Error ? error.message : '请稍后重试'));
+  };
+
+  const updateDevTask = (id: string, updates: Partial<DevTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '研发任务更新失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    void productRepository.updateTask('dev', id, updates as Record<string, unknown>).then(() => devTaskQuery.refetch()).then(() => addToast('info', '研发任务已更新')).catch((error) => addToast('error', '研发任务更新失败', error instanceof Error ? error.message : '请稍后重试'));
+  };
+
+  const addPaymentSchedule = (ps: Partial<PaymentSchedule>) => {
+    const newPs: PaymentSchedule = {
+      id: `ps-${Date.now()}`,
+      contractId: ps.contractId || (contracts[0]?.id ?? 'ct-1'),
+      contractName: ps.contractName || (contracts[0]?.name ?? '国家电网合同'),
+      customerName: ps.customerName || (customers[0]?.name ?? '国家电网华东分部'),
+      stageName: ps.stageName || '新建回款期次',
+      amount: ps.amount || 500000,
+      dueDate: ps.dueDate || '2026-10-31',
+      status: ps.status || '待付款',
+      isInvoiced: ps.isInvoiced ?? false
+    };
+    setPaymentSchedules((prev) => [newPs, ...prev]);
+    addToast('success', '回款计划已生成', `金额：¥${(newPs.amount / 10000).toFixed(0)}万`);
+  };
+
+  const updatePaymentSchedule = (id: string, updates: Partial<PaymentSchedule>) => {
+    setPaymentSchedules((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+    );
+  };
+
+  const addInvoice = (inv: Partial<InvoiceRecord>) => {
+    const newInv: InvoiceRecord = {
+      id: `inv-${Date.now()}`,
+      invoiceNo: inv.invoiceNo || `FP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      type: inv.type || '销项发票',
+      customerOrSupplier: inv.customerOrSupplier || '国家电网华东分部',
+      amount: inv.amount || 1000000,
+      taxRate: inv.taxRate || '6% 增值税专用发票',
+      issueDate: '2026-08-31',
+      status: inv.status || '已开具',
+      issueStatus: inv.issueStatus || (inv.status === '待审批' ? '待审批' : '已开具'),
+      customerId: inv.customerId,
+      opportunityId: inv.opportunityId,
+      projectId: inv.projectId,
+      paymentScheduleId: inv.paymentScheduleId,
+      approvalRecordId: inv.approvalRecordId,
+      certificationStatus: inv.certificationStatus || '待认证',
+      contractRef: inv.contractRef || 'SC-CT-2026-001'
+    };
+    setInvoices((prev) => [newInv, ...prev]);
+    addToast('success', '发票已开具并归档', `发票号码：${newInv.invoiceNo}`);
+  };
+
+  const updateCustomer = (id: string, updates: Partial<Customer>) => {
+    crmRepository.updateCustomer(id,updates).then(()=>refreshCrm()).then(()=>addToast('info','客户档案已更新')).catch(error=>addToast('error','客户更新失败',error.message));
+  };
+
+  const updateOpportunity = (id: string, updates: Partial<Opportunity>) => {
+    crmRepository.updateOpportunity(id,updates).then(()=>refreshCrm().then(()=>addToast('info','商机信息已更新'))).catch(error=>addToast('error','商机更新失败',error.message));
+  };
+
+  const advanceOpportunityStage = (id: string) => {
+    const stages: Opportunity['stage'][] = ['需求确认', '方案设计', '招投标', '商务谈判', '签约赢单'];
+    const current=opportunities.find(item=>item.id===id); if(!current)return; const currentIdx=stages.indexOf(current.stage); const nextStage=stages[Math.min(stages.length-1,currentIdx+1)];
+    crmRepository.transitionOpportunity(id,nextStage,current.version).then(()=>refreshCrm().then(()=>addToast('success','商机阶段已成功推进'))).catch(error=>addToast('error','阶段推进失败',error.message));
+  };
+
+  const addPartner = (partner: Partial<Partner>) => {
+    const newPartner: Partner = {
+      id: `p-${Date.now()}`,
+      name: partner.name || '新建生态合作伙伴',
+      type: partner.type || '方案系统集成商 (SI)',
+      level: partner.level || '战略核心伙伴',
+      contactName: partner.contactName || '渠道对接人',
+      contactPhone: partner.contactPhone || '13800000000',
+      contactEmail: partner.contactEmail || 'partner@corp.com',
+      commissionRate: partner.commissionRate || 15,
+      rebateRate: partner.rebateRate || '15% - 20%',
+      region: partner.region || '华东大区',
+      coopArea: partner.coopArea || partner.region || '全国区域',
+      internalOwner: partner.internalOwner || currentUser.name,
+      status: partner.status || '合作中',
+      oppsContributed: partner.oppsContributed || 1,
+      projectCount: partner.projectCount || 1,
+      dealsWon: partner.dealsWon || 0,
+      totalAmount: partner.totalAmount || 0,
+      coopDate: partner.coopDate || '2026-08-31',
+      documents: partner.documents || []
+    };
+    setPartners((prev) => [newPartner, ...prev]);
+    addToast('success', '生态伙伴认证签约成功', newPartner.name);
+  };
+  const updatePartner = (id: string, updates: Partial<Partner>) => setPartners((items) => items.map((item) => item.id === id ? { ...item, ...updates } : item));
+
+  const updateContract = (id: string, updates: Partial<Contract>) => {
+    crmRepository.updateContract(id,updates).then(()=>refreshCrm()).then(()=>addToast('info','合同状态已更新')).catch(error=>addToast('error','合同更新失败',error.message));
+  };
+
+  const updateBiddingProject = (id: string, updates: Partial<TenderBidding>) => {
+    if (crmEnabled) {
+      const current = biddings.find((item) => item.id === id);
+      if (current?.opportunityId) {
+        crmRepository.updateBidding(current.opportunityId, updates as Record<string, unknown>).then(() => refreshCrm()).then(() => addToast('info', '��Ͷ���Ŀ�Ѹ���')).catch(error => addToast('error', '��Ͷ���Ŀ����ʧ��', error.message));
+        return;
+      }
+    }
+    setBiddings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...updates } : b))
+    );
+    addToast('info', '招投标项目已更新');
+  };
+
+  const updateBiddingLifecycle = async (opportunityId: string, updates: Record<string, unknown>) => {
+    if (!crmEnabled) return;
+    await crmRepository.updateBidding(opportunityId, updates);
+    await refreshCrm();
+  };
+
+  const addProductLine = async (line: Partial<ProductLine>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '产品保存失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const ownerName = line.ownerName || line.owner || currentUser.name;
+    const newLine: ProductLine = {
+      id: `pl-${Date.now()}`,
+      name: line.name || '新建产品',
+      code: line.code || 'PL-NEW',
+      description: line.description || '该产品还没有任何简介内容。',
+      ownerName,
+      owner: ownerName,
+      ownerUserId: line.ownerUserId,
+      website: line.website,
+      subProducts: line.subProducts || [],
+      productOwner: line.productOwner || '',
+      technicalOwner: line.technicalOwner || '',
+      requirementOwner: line.requirementOwner || '',
+      requirementOwnerUserId: line.requirementOwnerUserId,
+      requirementOwnerSecondary: line.requirementOwnerSecondary || '',
+      requirementOwnerSecondaryUserId: line.requirementOwnerSecondaryUserId,
+      techOwner: line.techOwner || '',
+      techOwnerUserId: line.techOwnerUserId,
+      techOwnerSecondary: line.techOwnerSecondary || '',
+      techOwnerSecondaryUserId: line.techOwnerSecondaryUserId,
+      testOwner: line.testOwner || '',
+      testOwnerUserId: line.testOwnerUserId,
+      testOwnerSecondary: line.testOwnerSecondary || '',
+      testOwnerSecondaryUserId: line.testOwnerSecondaryUserId,
+      visibility: line.visibility || '公开',
+      commercialAvailability: line.commercialAvailability || '不可商用',
+      sort: line.sort ?? 0,
+      coverColor: 'from-blue-600 to-indigo-700',
+      coverUrl: line.coverUrl,
+      members: line.members?.length ? line.members : line.ownerUserId ? [{ id: `mem-${Date.now()}`, userId: line.ownerUserId, name: ownerName, role: '管理员' }] : [],
+      products: line.products || [],
+      currentVersion: line.currentVersion || '',
+      totalRequirements: line.totalRequirements ?? 0,
+      inProgressReqs: line.inProgressReqs ?? 0,
+      activeTasksCount: line.activeTasksCount ?? 0,
+      iterationProgress: line.iterationProgress ?? 0,
+      versionCount: line.versionCount ?? 0,
+      customerCount: line.customerCount ?? 0,
+      health: (line.health as any) || '待规划',
+      initializeWorkItemTemplate: line.initializeWorkItemTemplate,
+      createdAt: '2026-08-31'
+    };
+    try {
+      await productRepository.createProductLine(newLine);
+      await productLineQuery.refetch();
+      addToast('success', '产品创建成功', newLine.name);
+      return true;
+    } catch (error) {
+      addToast('error', '产品保存失败', error instanceof Error ? error.message : '请稍后重试');
+      return false;
+    }
+  };
+
+  const updateProductLine = async (id: string, updates: Partial<ProductLine>) => {
+    if (!requirementBackendEnabled) {
+      throw new Error('当前未连接后端服务，数据未保存');
+    }
+    await productRepository.updateProductLine(id, updates);
+    await productLineQuery.refetch();
+    addToast('success', '产品配置已保存');
+  };
+
+  const addProductLineMembers = async (id: string, members: ProductLineMember[]) => {
+    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    await Promise.all(members.map(({ userId, role }) => productRepository.addProductLineMember(id, { userId, role })));
+    await productLineQuery.refetch();
+  };
+
+  const updateProductLineMember = async (id: string, memberId: string, role: ProductLineMember['role']) => {
+    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    await productRepository.updateProductLineMember(id, memberId, { role });
+    await productLineQuery.refetch();
+  };
+
+  const removeProductLineMember = async (id: string, memberId: string) => {
+    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    await productRepository.removeProductLineMember(id, memberId);
+    await productLineQuery.refetch();
+  };
+
+  const addVersion = async (v: Partial<VersionIteration>): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '版本保存失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const newVer: VersionIteration = {
+      id: `ver-${Date.now()}`,
+      code: v.code || `V${versions.length + 1}.0.0`,
+      name: v.name || '新建迭代版本',
+      productLineId: v.productLineId || (productLines[0]?.id ?? 'pl-1'),
+      productLineName: v.productLineName || (productLines[0]?.name ?? '师创智联协同OS'),
+      ownerName: v.ownerName || productLines.find((line) => line.id === v.productLineId)?.ownerName || productLines.find((line) => line.id === v.productLineId)?.owner || '',
+      startDate: v.startDate || '',
+      endDate: v.endDate || '',
+      releaseDate: v.releaseDate || '',
+      status: v.status || '未开始',
+      requirementsCount: v.reqCount || v.requirementsCount || 0,
+      reqCount: v.reqCount || v.requirementsCount || 0,
+      bugCount: v.bugCount || 0,
+      completedReqCount: 0,
+      changelog: v.changelog || '',
+      content: v.content || v.changelog || '',
+      linkedRequirementIds: v.linkedRequirementIds || [],
+      isReviewed: false
+    };
+    if (newVer.productLineId) {
+      try {
+        await productRepository.createVersion(newVer.productLineId, newVer);
+        await productLineQuery.refetch();
+        addToast('success', '版本规划创建成功', `${newVer.name} (${newVer.code})`);
+        return true;
+      } catch (error) {
+        addToast('error', '版本保存失败', error instanceof Error ? error.message : '请稍后重试');
+        return false;
+      }
+    }
+    addToast('error', '版本保存失败', '请选择有效的产品');
+    return false;
+  };
+
+  const updateVersion = async (id: string, updates: Partial<VersionIteration>): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '版本更新失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const current = versions.find((version) => version.id === id);
+    if (current?.productLineId) {
+      try {
+        await productRepository.updateVersion(current.productLineId, id, updates);
+        await productLineQuery.refetch();
+        addToast('info', '版本迭代状态已更新');
+        return true;
+      } catch (error) {
+        addToast('error', '版本更新失败', error instanceof Error ? error.message : '请稍后重试');
+        return false;
+      }
+    }
+    addToast('error', '版本更新失败', '版本不存在或未绑定产品');
+    return false;
+  };
+
+  const deleteVersion = (id: string) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '迭代删除失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    const current = versions.find((version) => version.id === id);
+    if (current?.productLineId) {
+      void productRepository.deleteVersion(current.productLineId, id).then(() => productLineQuery.refetch()).then(() => addToast('success', '迭代已删除', current.name)).catch((error) => addToast('error', '迭代删除失败', error instanceof Error ? error.message : '请稍后重试'));
+      return;
+    }
+    addToast('error', '迭代删除失败', '版本不存在或未绑定产品');
+  };
+
+  const assignRequirementToVersion = async (requirementId: string, versionId: string): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '工作项规划失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const version = versions.find((item) => item.id === versionId);
+    const requirement = requirementTasks.find((item) => item.id === requirementId);
+    if (!version?.productLineId || !requirement) {
+      addToast('error', '工作项规划失败', '目标迭代或工作项不存在，请刷新后重试');
+      return false;
+    }
+    try {
+      await productRepository.assignRequirementToVersion(version.productLineId, version.id, requirement.id);
+      await Promise.all([requirementQuery.refetch(), productLineQuery.refetch()]);
+      return true;
+    } catch (error) {
+      addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试');
+      return false;
+    }
+  };
+
+  const assignWorkItemToVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '工作项规划失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const version = versions.find((item) => item.id === versionId);
+    if (!version?.productLineId) { addToast('error', '工作项规划失败', '目标迭代不存在，请刷新后重试'); return false; }
+    try { await productRepository.assignWorkItemToVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), requirementQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
+    catch (error) { addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
+    return true;
+  };
+
+  const unassignWorkItemFromVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string): Promise<boolean> => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '移出迭代失败', '当前未连接后端服务，数据未保存');
+      return false;
+    }
+    const version = versions.find((item) => item.id === versionId);
+    if (!version?.productLineId) return false;
+    try { await productRepository.unassignWorkItemFromVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), requirementQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
+    catch (error) { addToast('error', '移出迭代失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
+    return true;
+  };
+
+  const updateBug = (id: string, updates: Partial<DefectBug>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '缺陷更新失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    void productRepository.updateTask('bug', id, updates as Record<string, unknown>).then(() => bugQuery.refetch()).then(() => addToast('info', '缺陷状态已更新')).catch((error) => addToast('error', '缺陷更新失败', error instanceof Error ? error.message : '请稍后重试'));
+  };
+
+  const updateRequirementTask = (id: string, updates: Partial<RequirementTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '需求同步失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    const current = requirementTasks.find((task) => task.id === id);
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    const events: RequirementEvent[] = [];
+    if (current) {
+      if (updates.status && updates.status !== current.status) {
+        events.push({ id: `event-${Date.now()}-status`, eventType: '变更状态', fromStatus: current.status, toStatus: updates.status, operatorName: currentUser.name, createdAt: now });
+      }
+      if (updates.ownerName !== undefined && updates.ownerName !== current.ownerName) {
+        events.push({ id: `event-${Date.now()}-owner`, eventType: '变更负责人', operatorName: currentUser.name, metadata: { from: current.ownerName || '未分配', to: updates.ownerName || '未分配' }, createdAt: now });
+      }
+      if (updates.ccNames && JSON.stringify(updates.ccNames) !== JSON.stringify(current.ccNames || [])) {
+        events.push({ id: `event-${Date.now()}-cc`, eventType: '修改参与人', operatorName: currentUser.name, metadata: { from: current.ccNames || [], to: updates.ccNames }, createdAt: now });
+      }
+      if (updates.sourceWorkOrderIds && JSON.stringify(updates.sourceWorkOrderIds) !== JSON.stringify(current.sourceWorkOrderIds || [])) {
+        events.push({ id: `event-${Date.now()}-work-orders`, eventType: '修改关联工单', operatorName: currentUser.name, metadata: { from: current.sourceWorkOrderTitles || [], to: updates.sourceWorkOrderTitles || [] }, createdAt: now });
+      }
+      const textChanges: Array<[keyof RequirementTask, string]> = [
+        ['title', '修改需求名称'],
+        ['description', '修改任务描述'],
+        ['expectedGoal', '修改验收标准'],
+        ['requirementType', '修改需求类型'],
+        ['priority', '修改优先级'],
+        ['productLineName', '修改所属产品'],
+        ['versionName', '修改迭代版本'],
+        ['customerName', '修改关联客户'],
+        ['plannedStartDate', '修改计划开始时间'],
+        ['dueDate', '修改计划完成时间'],
+        ['expectedCompleteDate', '修改期望完成时间'],
+        ['estimatedHours', '修改预计工时']
+      ];
+      textChanges.forEach(([field, eventType]) => {
+        if (updates[field] !== undefined && updates[field] !== current[field]) {
+          events.push({ id: `event-${Date.now()}-${String(field)}`, eventType, operatorName: currentUser.name, metadata: { from: current[field] ?? '', to: updates[field] ?? '' }, createdAt: now });
+        }
+      });
+    }
+    const nextUpdates = events.length ? { ...updates, events: [...(current?.events || []), ...events] } : updates;
+    if (!current) {
+      addToast('error', '需求同步失败', '工作项不存在，请刷新后重试');
+      return;
+    }
+    setRequirementTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...nextUpdates } : t)));
+    requirementRepository.update(id, { ...updates, version: (current as RequirementTask & { version?: number }).version })
+      .then(() => requirementQuery.refetch())
+      .catch((error) => {
+        setRequirementTasks((prev) => prev.map((task) => task.id === id ? current : task));
+        addToast('error', '需求同步失败', error instanceof Error ? error.message : '请稍后重试');
+      });
+  };
+  const updateDesignTask = (id: string, updates: Partial<RequirementTask>) => {
+    if (!requirementBackendEnabled) {
+      addToast('error', '设计任务同步失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    const current = designTasks.find((task) => task.id === id);
+    setDesignTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
+    void productRepository.updateDesignTask(id, updates as Record<string, unknown>).then(() => designQuery.refetch()).catch((error) => {
+      if (current) setDesignTasks((prev) => prev.map((task) => task.id === id ? current : task));
+      addToast('error', '设计任务同步失败', error instanceof Error ? error.message : '请稍后重试');
+    });
+  };
+
+  const addRequirementTaskComment = (id: string, content: string) => {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    if (!requirementBackendEnabled) {
+      addToast('error', '评论发布失败', '当前未连接后端服务，数据未保存');
+      return;
+    }
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    const event: RequirementEvent = {
+      id: `event-${Date.now()}-comment`,
+      eventType: '评论',
+      operatorName: currentUser.name,
+      metadata: { content: trimmed },
+      createdAt: now
+    };
+    setRequirementTasks((prev) => prev.map((task) => task.id === id ? { ...task, events: [...(task.events || []), event] } : task));
+    requirementRepository.comment(id, trimmed)
+      .then(() => addToast('success', '评论已发布'))
+      .catch((error) => {
+        setRequirementTasks((prev) => prev.map((task) => task.id === id ? { ...task, events: (task.events || []).filter((item) => item.id !== event.id) } : task));
+        addToast('error', '评论同步失败', error instanceof Error ? error.message : '请稍后重试');
+      });
+  };
+
+  const updateRequirementPoolItem = (id: string, updates: Partial<RequirementPoolItem>) => {
+    setRequirementPool((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+    );
+    addToast('info', '工单中心条目已更新');
+  };
+
+  const updateInvoice = (id: string, updates: Partial<InvoiceRecord>) => {
+    setInvoices((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, ...updates } : i))
+    );
+  };
+
+  const addLead = (lead: Partial<Lead>) => {
+    const customer = customers.find((item) => item.id === lead.customerId);
+    if (!customer) {
+      addToast('warning', '请先选择有效客户');
+      return;
+    }
+    const newLead: Lead = {
+      id: `lead-${Date.now()}`,
+      name: lead.name || '新建市场线索',
+      customerId: customer.id,
+      customerName: customer.name,
+      schoolContact: lead.schoolContact || customer.contactName,
+      contactPhone: lead.contactPhone || customer.contactPhone,
+      department: lead.department || currentUser.department,
+      ownerName: lead.ownerName || currentUser.name,
+      source: lead.source || '市场活动',
+      products: lead.products || [],
+      status: lead.status || '待确认',
+      latestFollowUpAt: lead.latestFollowUpAt,
+      createdAt: lead.createdAt || new Date().toISOString().slice(0, 10)
+    };
+    if (crmEnabled) {
+      crmRepository.createLead(newLead).then(() => refreshCrm()).then(() => addToast('success', '线索已创建', newLead.name)).catch((error) => addToast('error', '线索创建失败', error instanceof Error ? error.message : '请稍后重试'));
+    } else {
+      setLeads((prev) => [newLead, ...prev]);
+      addToast('success', '线索已创建', newLead.name);
+    }
+  };
+
+  const updateLead = (id: string, updates: Partial<Lead>) => {
+    if (crmEnabled) {
+      crmRepository.updateLead(id, updates)
+        .then(() => leadQuery.refetch())
+        .then(() => addToast('info', '��������Ѹ���'))
+        .catch((error) => addToast('error', '��������ʧ��', error instanceof Error ? error.message : '���Ժ�����'));
+      return;
+    }
+    setLeads((prev) => prev.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead)));
+  };
+
+  const convertLeadToOpportunity = (id: string, updates: Partial<Opportunity> = {}) => {
+    const lead = leads.find((item) => item.id === id);
+    if (!lead || lead.status === '转商机' || lead.status === '已废弃') return;
+    const customer = customers.find((item) => item.id === lead.customerId);
+    if (!customer) {
+      addToast('error', '线索关联客户不存在');
+      return;
+    }
+    const opportunity: Partial<Opportunity> = {
+      name: updates.name || lead.name,
+      customerId: lead.customerId,
+      customerName: customer.name,
+      leadId: lead.id,
+      type: updates.type || '定制研发',
+      stage: updates.stage || '需求确认',
+      amount: updates.amount || 0,
+      relatedProduct: updates.relatedProduct || lead.products[0] || '待确认产品',
+      ownerName: updates.ownerName || lead.ownerName,
+      source: updates.source || `线索转化:${lead.id}`,
+      probability: updates.probability || 30,
+      winRate: updates.winRate || 30,
+      isTrial: updates.isTrial || false,
+      deadline: updates.deadline || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      collaborators: updates.collaborators || [],
+      remarks: updates.remarks || '由线索转化生成'
+    };
+    const opportunityId = `opp-from-${lead.id}-${Date.now()}`;
+    if (crmEnabled) {
+      crmRepository.convertLead(id, opportunity).then(() => refreshCrm()).then(() => addToast('success', '线索已转为商机', lead.name)).catch((error) => addToast('error', '线索转商机失败', error instanceof Error ? error.message : '请稍后重试'));
+    } else {
+      addOpportunity({ ...opportunity, id: opportunityId });
+      setLeads((prev) => prev.map((item) => (item.id === id ? { ...item, status: '转商机', convertedOpportunityId: opportunityId, convertedAt: new Date().toISOString() } : item)));
+      setCustomers((prev) => prev.map((item) => (item.id === customer.id ? { ...item, status: '有效' } : item)));
+      addToast('success', '线索已转为商机', lead.name);
+    }
+  };
+
+  const addInvoiceApproval = (record: Partial<InvoiceApprovalRecord>) => {
+    const newRecord: InvoiceApprovalRecord = {
+      id: `invoice-approval-${Date.now()}`,
+      invoiceId: record.invoiceId,
+      customerId: record.customerId,
+      opportunityId: record.opportunityId,
+      projectId: record.projectId,
+      contractId: record.contractId,
+      paymentScheduleId: record.paymentScheduleId,
+      customerName: record.customerName || '未关联客户',
+      contractName: record.contractName || '未关联合同',
+      stageName: record.stageName || '未关联付款阶段',
+      requestedAmount: record.requestedAmount || 0,
+      availableAmount: record.availableAmount || 0,
+      overAmount: record.overAmount || 0,
+      reason: record.reason || '',
+      status: record.status || '待审批',
+      applicant: record.applicant || currentUser.name,
+      appliedAt: record.appliedAt || new Date().toISOString().slice(0, 16).replace('T', ' '),
+      approver: record.approver,
+      approvedAt: record.approvedAt,
+      comment: record.comment
+    };
+    setInvoiceApprovals((prev) => [newRecord, ...prev]);
+    return newRecord;
+  };
+
+  const updateInvoiceApproval = (id: string, updates: Partial<InvoiceApprovalRecord>) => {
+    setInvoiceApprovals((prev) => prev.map((record) => (record.id === id ? { ...record, ...updates } : record)));
+  };
+
+  const financeStats: FinanceStats = {
+    totalContractAmount: contracts.reduce((acc, c) => acc + (c.amount || 0), 0) || 12800000,
+    receivedAmount: contracts.reduce((acc, c) => acc + (c.paidAmount || (c.amount ? c.amount * 0.45 : 0)), 0) || 7120000,
+    pendingReceivables: paymentSchedules.filter((p) => p.status !== '已收讫' && p.status !== '已收款').reduce((acc, p) => acc + (p.amount || 0), 0) || 5680000,
+    invoicedAmount: invoices.reduce((acc, i) => acc + (i.amount || 0), 0) || 6850000
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        activeTabId,
+        openTabs,
+        sidebarCollapsed,
+        mobileSidebarOpen,
+        currentUser,
+        theme,
+        globalSearchOpen,
+        toasts,
+        selectedCustomerIdForDetail,
+        selectedOpportunityIdForDetail,
+        selectedBiddingIdForDetail,
+        selectedContractIdForDetail,
+        selectedApprovalIdForDetail,
+        selectedProjectIdForDetail,
+        setActiveTabId,
+        openPageTab,
+        closePageTab,
+        toggleSidebar,
+        toggleMobileSidebar,
+        setCurrentUserRole,
+        setGlobalSearchOpen,
+        toggleTheme,
+        addToast,
+        removeToast,
+        setSelectedCustomerIdForDetail,
+        setSelectedOpportunityIdForDetail,
+        setSelectedBiddingIdForDetail,
+        setSelectedContractIdForDetail,
+        setSelectedApprovalIdForDetail,
+        setSelectedProjectIdForDetail,
+        requirementTaskDraft,
+        setRequirementTaskDraft,
+        customers,
+        setCustomers,
+        leads,
+        setLeads,
+        opportunities,
+        setOpportunities,
+        followUps,
+        followups: followUps,
+        setFollowUps,
+        partners,
+        setPartners,
+        biddings,
+        setBiddings,
+        biddingProjects: biddings,
+        biddingReviews,
+        winningEngagements,
+        bidReviews: biddingReviews,
+        setBiddingReviews,
+        contracts,
+        setContracts,
+        productLines,
+        setProductLines,
+        requirementTasks,
+        setRequirementTasks,
+        designTasks,
+        setDesignTasks,
+        versions,
+        setVersions,
+        bugs,
+        setBugs,
+        requirementPool,
+        setRequirementPool,
+        approvals,
+        setApprovals,
+        projects,
+        setProjects,
+        servers,
+        setServers,
+        okrs,
+        setOkrs,
+        performances,
+        setPerformances,
+        knowledgeDocs,
+        setKnowledgeDocs,
+        milestones,
+        setMilestones,
+        deliverables,
+        setDeliverables,
+        changeRequests,
+        setChangeRequests,
+        risks,
+        setRisks,
+        devTasks,
+        setDevTasks,
+        paymentSchedules,
+        setPaymentSchedules,
+        invoices,
+        setInvoices,
+        invoiceApprovals,
+        setInvoiceApprovals,
+        financeStats,
+        crmLoading,
+        crmError: crmError ? (crmError instanceof Error ? crmError.message : 'CRM 数据加载失败') : null,
+        retryCrm: refreshCrm,
+        addCustomer,
+        updateCustomer,
+        addLead,
+        updateLead,
+        convertLeadToOpportunity,
+        addOpportunity,
+        updateOpportunity,
+        advanceOpportunityStage,
+        addFollowUp,
+        addFollowup: addFollowUp,
+        addPartner,
+        addContract,
+        updateContract,
+        addBidding,
+        addBiddingProject: addBidding,
+        updateBiddingProject,
+        updateBiddingLifecycle,
+        addBiddingReview,
+        addBidReview: addBiddingReview,
+        addProductLine,
+        updateProductLine,
+        addProductLineMembers,
+        updateProductLineMember,
+        removeProductLineMember,
+        addVersion,
+        updateVersion,
+        deleteVersion,
+        assignRequirementToVersion,
+        assignWorkItemToVersion,
+        unassignWorkItemFromVersion,
+        addRequirementTask,
+        updateRequirementTask,
+        addDesignTask,
+        updateDesignTask,
+        addRequirementTaskComment,
+        addRequirementToPool,
+        addRequirementPoolItem: addRequirementToPool,
+        updateRequirementPoolItem,
+        convertPoolItemToTask,
+        addBug,
+        updateBug,
+        approveFlow,
+        rejectFlow,
+        addOKR,
+        addPerformanceReview,
+        addKnowledgeDoc,
+        toggleFavoriteDoc,
+        deleteKnowledgeDoc,
+        addProject,
+        updateProject,
+        advanceProjectStage,
+        addMilestone,
+        updateMilestone,
+        addDeliverable,
+        updateDeliverable,
+        addChangeRequest,
+        updateChangeRequest,
+        addRisk,
+        updateRisk,
+        addDevTask,
+        updateDevTask,
+        addPaymentSchedule,
+        updatePaymentSchedule,
+        addInvoice,
+        updateInvoice,
+        addInvoiceApproval,
+        updateInvoiceApproval
+      }}
+    >
+      <AppNavigationContext.Provider value={{ activeTabId, openTabs, sidebarCollapsed, toggleSidebar, openPageTab, closePageTab }}>
+        <AppAuthContext.Provider value={{ currentUser, setCurrentUserRole }}>
+          <AppCrmContext.Provider value={{ customers, leads, opportunities, contracts, followUps, productLines, partners, biddings, biddingReviews, winningEngagements, requirementTasks, addLead, updateLead, convertLeadToOpportunity, addFollowUp, addOpportunity, updateOpportunity, advanceOpportunityStage, addPartner, updatePartner, updateContract, addContract, addBiddingProject: addBidding, updateBiddingProject, addBidReview: addBiddingReview, openPageTab, addToast, crmLoading, selectedCustomerIdForDetail, setSelectedCustomerIdForDetail }}>
+            {children}
+          </AppCrmContext.Provider>
+        </AppAuthContext.Provider>
+      </AppNavigationContext.Provider>
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};
+
+export const useAppNavigationContext = () => {
+  const context = useContext(AppNavigationContext);
+  if (!context) throw new Error('useAppNavigationContext must be used within an AppProvider');
+  return context;
+};
+
+export const useAppAuthContext = () => {
+  const context = useContext(AppAuthContext);
+  if (!context) throw new Error('useAppAuthContext must be used within an AppProvider');
+  return context;
+};
+
+export const useAppCrmContext = () => {
+  const context = useContext(AppCrmContext);
+  if (!context) throw new Error('useAppCrmContext must be used within an AppProvider');
+  return context;
+};

@@ -1,0 +1,1485 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Input, InputNumber, Select } from "antd";
+import {
+  Inbox,
+  Search,
+  Plus,
+  User,
+  CheckCircle2,
+  Clock,
+  MessageCircle,
+  Sparkles,
+  Paperclip,
+  ArrowRight,
+  X,
+  MessageSquareText,
+  WifiOff,
+  Headphones,
+  Truck,
+  HelpCircle,
+  ListFilter,
+  PenSquare,
+  UserRound,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  Link,
+  List,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Undo2,
+  Redo2,
+} from "../common/octicons-compat";
+import { Pagination } from "../common/Pagination";
+import { useApp } from "../../context/AppContext";
+import { StatCard, StatusTag, Drawer, Modal } from "../common/UIComponents";
+import { normalizeRequirementTask, requirementRepository } from "../../services/requirementRepository";
+import { RequirementActionButtons } from "../product/RequirementActionButtons";
+import { LazyRichTextEditor as RichTextEditor } from "../product/LazyRichTextEditor";
+import type {
+  EmployeeOption,
+  RequirementEvent,
+  RequirementMedia,
+  RequirementTask,
+  RequirementTaskType,
+  RequirementWorkItem,
+  WorkOrderType,
+  AttachmentMetadata,
+} from "../../types";
+import { sanitizeHtml } from "../../utils/sanitizeHtml";
+import { getRejectReasonsForType } from "../../constants/rejectReasons";
+import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
+import { DateField } from "../common";
+import { employeeSelectOptions } from "../common/PersonIdentity";
+
+const statuses: RequirementTask["status"][] = [
+  "待处理",
+  "处理中",
+  "待验收",
+  "待关闭",
+  "已关闭",
+  "已搁置",
+  "已驳回",
+  "已完成",
+];
+const taskTypes: RequirementTaskType[] = [
+  "产品需求",
+  "缺陷管理",
+  "设计任务",
+  "研发任务",
+];
+const opportunityStagesBeforeWin = new Set(["发现商机", "需求确认", "方案设计", "商务谈判", "招投标"]);
+const severityPriorities: Record<string, RequirementTask["priority"]> = {
+  "阻断主流程": "紧急",
+  "功能逻辑异常": "高",
+  "一般缺陷": "中",
+  "轻微缺陷": "低",
+};
+const taskTargetPages: Record<RequirementTaskType, string> = TASK_PAGE_BY_TYPE;
+const formatDateTime = (value?: string) => {
+  if (!value) return "—";
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(date).replace(/\//g, "-");
+};
+const workOrderCards: Array<{ type: WorkOrderType; description: string; icon: React.ReactNode }> = [
+  { type: "客户诉求", description: "收集客户反馈、业务需求与改进建议", icon: <MessageSquareText className="h-6 w-6" /> },
+  { type: "线上问题", description: "记录线上故障、异常现象与影响范围", icon: <WifiOff className="h-6 w-6" /> },
+  { type: "售前支持", description: "处理方案咨询、演示和售前技术支持", icon: <Headphones className="h-6 w-6" /> },
+  { type: "交付支持", description: "跟进项目实施、部署与交付保障事项", icon: <Truck className="h-6 w-6" /> },
+  { type: "其他问题", description: "比如个人记录、公司物料、建议等非业务问题", icon: <HelpCircle className="h-6 w-6" /> },
+];
+
+const specialFieldLabels: Record<string, string> = {
+  projectName: "所属项目", requestType: "诉求类型", requestSource: "诉求来源",
+  productName: "缺陷类型", severity: "严重程度", frequency: "发生频率",
+  opportunityName: "关联线索/商机/投标", opportunityId: "关联线索/商机/投标", leadId: "关联线索/商机/投标", biddingId: "关联线索/商机/投标",
+  supportType: "支持类型", durationDays: "预计时长（天）",
+  progressStage: "项目阶段", other: "项目类型", deliveryType: "交付类型", problemSource: "问题来源",
+  expectedResult: "期望结果", problemType: "协助类型", priority: "优先级",
+};
+const hiddenSpecialFieldKeys = new Set(["opportunityId", "leadId", "biddingId", "relatedType"]);
+
+const normalizeMedia = (value: unknown): RequirementMedia[] => {
+  if (Array.isArray(value)) return value as RequirementMedia[];
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as RequirementMedia[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const samePerson = (value: string | undefined, currentUserName: string) =>
+  Boolean(value?.trim()) && value.trim().toLocaleLowerCase() === currentUserName.trim().toLocaleLowerCase();
+
+const isInitiator = (task: RequirementTask, currentUser: { id: string; name: string }) =>
+  Boolean(task.creatorId && currentUser.id && task.creatorId === currentUser.id) || samePerson(task.creatorName, currentUser.name);
+
+const eventMetadata = (value: unknown): Record<string, unknown> => {
+  if (value && typeof value === "object") return value as Record<string, unknown>;
+  if (typeof value !== "string") return {};
+  try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {}; } catch { return {}; }
+};
+
+const FlowAttachmentPicker: React.FC<{ media: RequirementMedia[]; onChange: React.Dispatch<React.SetStateAction<RequirementMedia[]>>; onPick: (event: React.ChangeEvent<HTMLInputElement>) => void }> = ({ media, onChange, onPick }) => (
+  <div className="space-y-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3">
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-medium text-[var(--text-body)]">附件</span>
+      <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--active-text)] hover:bg-[var(--bg-hover)]">
+        <Paperclip className="h-3.5 w-3.5" /> 添加附件
+        <input type="file" multiple className="sr-only" onChange={onPick} />
+      </label>
+    </div>
+    {media.length ? <div className="flex flex-wrap gap-2">{media.map((item) => <span key={item.id} className="inline-flex items-center gap-1 rounded border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--text-body)]">{item.name}<button type="button" aria-label={`移除${item.name}`} onClick={() => onChange((items) => items.filter((candidate) => candidate.id !== item.id))}><X className="h-3 w-3" /></button></span>)}</div> : <span className="text-[11px] text-[var(--text-muted)]">可上传图片、文档或其他处理材料</span>}
+  </div>
+);
+
+type AssistanceSubTask = {
+  taskType: RequirementTaskType | "";
+  assignee: string;
+  expectedDueDate: string;
+  note: string;
+  media: RequirementMedia[];
+};
+
+
+export const isWorkOrderInScope = (
+  item: Pick<RequirementTask, "ownerName" | "creatorName">,
+  scope: "all" | "mine_created" | "mine_owned",
+  currentUserName: string,
+) => scope === "all"
+  ? samePerson(item.ownerName, currentUserName) || samePerson(item.creatorName, currentUserName)
+  : scope === "mine_created"
+    ? samePerson(item.creatorName, currentUserName)
+    : samePerson(item.ownerName, currentUserName);
+
+const toSelectOptions = (options: string[]) => Array.from(new Set(options.filter(Boolean))).map((item) => ({ label: item, value: item }));
+
+const SearchSelect: React.FC<{ label: string; value: string; options: string[]; placeholder?: string; onChange: (value: string) => void }> = ({ label, value, options, placeholder, onChange }) => (
+  <label className="work-order-field text-xs text-[var(--text-muted)]">
+    {label}
+    <Select
+      aria-label={label}
+      allowClear
+      className="w-full"
+      showSearch
+      optionFilterProp="label"
+      options={toSelectOptions(options)}
+      placeholder={placeholder}
+      size="middle"
+      value={value || undefined}
+      onChange={(nextValue) => onChange(nextValue ?? "")}
+    />
+  </label>
+);
+
+const EmployeeSearchSelect: React.FC<{ label: string; value: string; employees: EmployeeOption[]; placeholder?: string; onChange: (value: string) => void }> = ({ label, value, employees, placeholder, onChange }) => (
+  <label className="work-order-field text-xs text-[var(--text-muted)]">
+    {label}
+    <Select
+      aria-label={label}
+      allowClear
+      className="w-full"
+      showSearch
+      optionFilterProp="label"
+      options={employeeSelectOptions(employees, 'name')}
+      placeholder={placeholder}
+      size="middle"
+      value={value || undefined}
+      onChange={(nextValue) => onChange(nextValue ?? "")}
+    />
+  </label>
+);
+
+const WorkOrderSelect: React.FC<{ label: string; value: string; options: string[]; placeholder: string; onChange: (value: string) => void }> = ({ label, value, options, placeholder, onChange }) => (
+  <label className="work-order-field text-xs text-[var(--text-muted)]">
+    {label}
+    <Select
+      aria-label={label}
+      allowClear
+      className="w-full"
+      options={toSelectOptions(options)}
+      placeholder={placeholder}
+      size="middle"
+      value={value || undefined}
+      onChange={(nextValue) => onChange(nextValue ?? "")}
+    />
+  </label>
+);
+
+const WorkOrderInput: React.FC<{ label: string; value: string; placeholder: string; onChange: (value: string) => void }> = ({ label, value, placeholder, onChange }) => (
+  <label className="work-order-field text-xs text-[var(--text-muted)]">
+    {label}
+    <Input aria-label={label} className="w-full" placeholder={placeholder} size="middle" value={value} onChange={(event) => onChange(event.target.value)} />
+  </label>
+);
+
+
+
+export const RequirementPoolView: React.FC = () => {
+  const {
+    requirementTasks,
+    addRequirementTask,
+    setRequirementTasks,
+    productLines,
+    customers,
+    leads = [],
+    biddings,
+    opportunities,
+    currentUser,
+    addToast,
+    openPageTab,
+  } = useApp();
+  const [tab, setTab] = useState<"create" | "list">("create");
+  const [creating, setCreating] = useState(false);
+  const [workOrderType, setWorkOrderType] = useState<WorkOrderType | null>(null);
+  const [selected, setSelected] = useState<RequirementTask | null>(null);
+  const [detailTab, setDetailTab] = useState<"info" | "history">("info");
+  const [events, setEvents] = useState<RequirementEvent[]>([]);
+  const [workItems, setWorkItems] = useState<RequirementWorkItem[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [query, setQuery] = useState("");
+  const [product, setProduct] = useState("all");
+  const [priority, setPriority] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [scope, setScope] = useState<"all" | "mine_created" | "mine_owned">(
+    "all",
+  );
+  const [typeFilter, setTypeFilter] = useState<WorkOrderType | "all">("all");
+  const [filterMode, setFilterMode] = useState<"type" | "mine">("type");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [title, setTitle] = useState("");
+  const [productLineId, setProductLineId] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [requirementPriority, setRequirementPriority] = useState<
+    RequirementTask["priority"] | ""
+  >("");
+  const [customerId, setCustomerId] = useState("");
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [descriptionHtml, setDescriptionHtml] = useState("");
+  const [media, setMedia] = useState<RequirementMedia[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [workflowSubmitting, setWorkflowSubmitting] = useState(false);
+  const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
+  const [workOpen, setWorkOpen] = useState(false);
+  const [workflowAction, setWorkflowAction] = useState<"" | "convert" | "reassign" | "memo">("");
+  const [subTasks, setSubTasks] = useState<AssistanceSubTask[]>([{ taskType: "", assignee: "", expectedDueDate: "", note: "", media: [] }]);
+  const [reassignAssignee, setReassignAssignee] = useState("");
+  const [reassignReason, setReassignReason] = useState("");
+  const [memoContent, setMemoContent] = useState("");
+  const [flowMedia, setFlowMedia] = useState<RequirementMedia[]>([]);
+  const [reasonType, setReasonType] = useState<"hold" | "reject" | null>(null);
+  const [reason, setReason] = useState("");
+  const [closeSubmitting, setCloseSubmitting] = useState(false);
+  const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false);
+  const [acceptanceWorkItemId, setAcceptanceWorkItemId] = useState("");
+  const [acceptanceReason, setAcceptanceReason] = useState("");
+  const [acceptanceSubmitting, setAcceptanceSubmitting] = useState(false);
+  const [rejectCategory, setRejectCategory] = useState("");
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const [reopenProgress, setReopenProgress] = useState(0);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenSubmitting, setReopenSubmitting] = useState(false);
+  const editor = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const assistanceSearch = sessionStorage.getItem("shichuang.assistance.search");
+    if (!assistanceSearch) return;
+    setQuery(assistanceSearch);
+    setTab("list");
+    sessionStorage.removeItem("shichuang.assistance.search");
+  }, []);
+
+  const currentWorkOrderType = selected?.workOrderType || selected?.taskType || selected?.requirementType || "通用/其他";
+  const availableRejectReasons = useMemo(() => getRejectReasonsForType(currentWorkOrderType), [currentWorkOrderType]);
+
+  useEffect(() => {
+    if (reasonType === "reject") {
+      setRejectCategory("");
+    }
+  }, [reasonType]);
+
+  useEffect(() => {
+    requirementRepository
+      .employees()
+      .then((items) => setEmployees(items.length ? items : fallbackEmployees()))
+      .catch(() => setEmployees(fallbackEmployees()));
+  }, [requirementTasks, currentUser]);
+  const fallbackEmployees = () =>
+    Array.from(
+      new Set([
+        currentUser.name,
+        ...requirementTasks.map((item) => item.ownerName).filter(Boolean),
+      ]),
+    ).map((name) => ({ id: name, name, department: currentUser.department }));
+  const reset = () => {
+    setTitle("");
+    setProductLineId("");
+    setOwnerName("");
+    setRequirementPriority("");
+    setCustomerId("");
+    setCustomerQuery("");
+    setDueDate("");
+    setDescription("");
+    setDescriptionHtml("");
+    setMedia([]);
+    setSpecialFields({});
+    setFlowMedia([]);
+  };
+  const openCreate = (type?: WorkOrderType) => {
+    reset();
+    setWorkOrderType(type || null);
+    setCreating(true);
+    setTab("create");
+  };
+  const openCreateHome = () => {
+    setCreating(false);
+    setWorkOrderType(null);
+    setTab("create");
+  };
+  const onMedia = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []) as File[];
+    const allowed = new Set(["text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/pdf"]);
+    files
+      .filter((file) => allowed.has(file.type) || /\.(txt|doc|docx|xls|xlsx|pdf)$/i.test(file.name))
+      .forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          setMedia((items) => [
+            ...items,
+            {
+              id: `${file.name}-${file.lastModified}`,
+              name: file.name,
+              type: "file",
+              dataUrl: String(reader.result),
+              size: file.size,
+              mimeType: file.type,
+            },
+          ]);
+        reader.readAsDataURL(file);
+      });
+    event.target.value = "";
+  };
+  const stageFlowFiles = async (files: File[]) => {
+    const stagedMedia: RequirementMedia[] = [];
+    for (const file of files) {
+      const localId = `flow-${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2)}`;
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error ?? new Error("附件读取失败"));
+          reader.readAsDataURL(file);
+        });
+        const staged = await requirementRepository.stageAttachment({
+          name: file.name,
+          mimeType: file.type || "application/octet-stream",
+          size: file.size,
+          dataUrl,
+        });
+        stagedMedia.push({ id: staged.id, name: file.name, type: "file", dataUrl, size: file.size, mimeType: file.type });
+      } catch {
+        stagedMedia.push({ id: `unstaged-${localId}`, name: file.name, type: "file", dataUrl: URL.createObjectURL(file), size: file.size, mimeType: file.type });
+        addToast("warning", "附件暂存失败", `${file.name} 已保留在当前操作中，提交时请确认服务可用`);
+      }
+    }
+    return stagedMedia;
+  };
+  const onFlowMedia = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const mediaItems = await stageFlowFiles(Array.from(event.target.files || []) as File[]);
+    setFlowMedia((items) => [...items, ...mediaItems]);
+    event.target.value = "";
+  };
+  const onTaskMedia = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const mediaItems = await stageFlowFiles(Array.from(event.target.files || []) as File[]);
+    setSubTasks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, media: [...item.media, ...mediaItems] } : item));
+    event.target.value = "";
+  };
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const selectedEmployee = employees.find(
+      (item) => item.name === ownerName.trim(),
+    );
+    const selectedProductLine = productLines.find((item) => item.id === productLineId);
+    const descriptionText = description || editor.current?.innerText || "";
+    const requiredParameters = workOrderType === "售前支持" ? ["opportunityName", "supportType", "durationDays"] : workOrderType === "线上问题" ? ["productName", "severity", "frequency"] : workOrderType === "其他问题" ? ["problemSource", "expectedResult", "problemType"] : workOrderType === "交付支持" ? ["projectName", "progressStage", "other", "deliveryType"] : workOrderType === "客户诉求" ? ["projectName", "requestType", "requestSource"] : [];
+    const missingParameter = requiredParameters.some((field) => !String(specialFields[field] ?? "").trim());
+    if (
+      !title.trim() ||
+      !selectedEmployee ||
+      !descriptionText.trim() ||
+      missingParameter
+    ) {
+      addToast("warning", missingParameter ? "请完成所有必填业务参数" : "请补充事项标题、负责人和事项描述");
+      return;
+    }
+    const customer = customers.find((item) => item.id === customerId)
+      || customers.find((item) => item.name.trim().toLocaleLowerCase() === customerQuery.trim().toLocaleLowerCase());
+    setIsSubmitting(true);
+    try {
+      const saved = await addRequirementTask({
+        title: title.trim(),
+        description: descriptionText,
+        descriptionHtml: descriptionHtml || editor.current?.innerHTML || "",
+        media,
+        productLineId: selectedProductLine?.id,
+        productLineName: selectedProductLine?.name || "",
+        ownerName: selectedEmployee.name,
+        department: selectedEmployee.department,
+        customerId: customer?.id || customerId || undefined,
+        customerName: customer?.name,
+        priority: String(specialFields.priority || requirementPriority || "中") as RequirementTask["priority"],
+        workOrderType: workOrderType || "其他问题",
+        specialFields,
+        expectedCompleteDate: dueDate || undefined,
+      });
+      if (!saved) return;
+      setCreating(false);
+      setTypeFilter(workOrderType || "all");
+      setFilterMode("type");
+      setScope("all");
+      setPage(1);
+      setTab("list");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  const openDetail = async (item: RequirementTask) => {
+    setSelected({ ...item, media: normalizeMedia(item.media) });
+    setDetailTab("info");
+    try {
+      const detail = await requirementRepository.detail(item.id);
+      setSelected((current) => ({ ...(current || item), ...normalizeRequirementTask(detail), media: normalizeMedia(detail.media ?? current?.media ?? item.media) }));
+      let nextEvents = Array.isArray(detail.events) ? detail.events : [];
+      let nextWorkItems = Array.isArray(detail.workItems) ? detail.workItems : [];
+      setEvents(nextEvents);
+      setWorkItems(nextWorkItems);
+    } catch {
+      setEvents(Array.isArray(item.events) ? item.events : []);
+      setWorkItems([]);
+    }
+  };
+  const handleWorkflowSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selected) return;
+    if (!workflowAction) {
+      addToast("warning", "请选择流转的任务类型");
+      return;
+    }
+    const now = new Date().toISOString();
+
+    if (workflowAction === "convert") {
+      const invalidTask = subTasks.find((task) => !task.taskType);
+      if (invalidTask) {
+        addToast("warning", "请选择任务类型");
+        return;
+      }
+      const taskInputs = subTasks.map((task) => ({ task, assignee: employees.find((item) => item.name.trim().toLocaleLowerCase() === task.assignee.trim().toLocaleLowerCase()) }));
+      if (taskInputs.some(({ assignee }) => !assignee)) {
+        addToast("warning", "请选择任务负责人", "请输入负责人姓名并从下拉列表中选择");
+        return;
+      }
+      if (subTasks.some((task) => task.media.some((item) => item.id.startsWith("unstaged-")))) {
+        addToast("warning", "仍有附件上传失败", "请移除上传失败的附件或重新选择后再提交");
+        return;
+      }
+      const singleTask = taskInputs[0];
+      let results: Array<{ task: typeof singleTask.task; assignee: NonNullable<typeof singleTask.assignee>; result: Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }>;
+      try {
+        const batch = await requirementRepository.createWorkItemsBatch(selected.id, taskInputs.map(({ task, assignee }) => ({ taskType: task.taskType!, assigneeName: assignee!.name, note: task.note, expectedCompleteDate: task.expectedDueDate, attachmentIds: task.media.map((item) => item.id), blocksClosure: true })));
+        results = taskInputs.map(({ task, assignee }, index) => ({ task, assignee: assignee!, result: batch.items[index] as Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }));
+      } catch {
+        addToast("error", "下游任务创建失败", "本次批量操作未保存，请检查后重试");
+        return;
+      }
+      const localItems: RequirementWorkItem[] = results.map(({ task, assignee, result }) => ({ id: result.id, requirementId: selected.id, taskType: task.taskType!, title: selected.title, assigneeName: assignee.name, note: task.note, status: "待处理", createdAt: now }));
+      const primary = results[0];
+      const next = {
+        ...selected,
+        status: "处理中" as RequirementTask["status"],
+        taskType: primary.task.taskType,
+        assignedOwnerName: primary.assignee.name,
+        assignedNote: primary.task.note,
+        events: [
+          ...(selected.events || []),
+          {
+            id: `event-${Date.now()}`,
+            eventType: "转任务",
+            fromStatus: selected.status,
+            toStatus: "处理中",
+            reason: primary.task.note,
+            operatorName: currentUser.name,
+            createdAt: now,
+          },
+        ],
+      };
+      setRequirementTasks((list) =>
+        list.map((item) => (item.id === selected.id ? next : item)),
+      );
+      setSelected(next);
+      setWorkItems((list) => [...localItems, ...list]);
+      setEvents((list) => [...list, next.events![next.events!.length - 1]]);
+      setWorkOpen(false);
+      addToast("success", "已创建下游事项", `已生成 ${localItems.length} 条任务，关联事项已自动建立`);
+    } else if (workflowAction === "reassign") {
+      if (flowMedia.some((item) => item.id.startsWith("unstaged-"))) {
+        addToast("warning", "仍有附件上传失败", "请移除上传失败的附件或重新选择后再提交");
+        return;
+      }
+      const selectedAssignee = employees.find((item) => item.name.trim().toLocaleLowerCase() === reassignAssignee.trim().toLocaleLowerCase());
+      if (!selectedAssignee) {
+        addToast("warning", "请选择新的转派负责人", "请输入负责人姓名并从下拉列表中选择");
+        return;
+      }
+      if (!reassignReason.trim()) {
+        addToast("warning", "请输入转派原因说明");
+        return;
+      }
+      setWorkflowSubmitting(true);
+      try {
+        const next = await requirementRepository.reassign(selected.id, {
+          assigneeId: selectedAssignee.id,
+          reason: reassignReason.trim(),
+          attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")),
+          revision: selected.revision ?? selected.version ?? 0,
+        });
+        setRequirementTasks((list) => list.map((item) => item.id === selected.id ? { ...item, ...next } : item));
+        setSelected((current) => current ? { ...current, ...next } : current);
+        setEvents(Array.isArray(next.events) ? next.events : []);
+        setWorkOpen(false);
+        setFlowMedia([]);
+        addToast("success", "已发起转派", `已通知 ${selectedAssignee.name} 接受，接受前当前负责人不变`);
+      } catch (error) {
+        addToast("error", "事项转派失败", error instanceof Error ? error.message : "服务未确认本次转派，请稍后重试");
+      } finally {
+        setWorkflowSubmitting(false);
+      }
+    } else if (workflowAction === "memo") {
+      if (!memoContent.trim()) {
+        addToast("warning", "请输入个人备忘录内容");
+        return;
+      }
+      if (flowMedia.some((item) => item.id.startsWith("unstaged-"))) {
+        addToast("warning", "仍有附件上传失败", "请移除上传失败的附件或重新选择后再提交");
+        return;
+      }
+      setWorkflowSubmitting(true);
+      try {
+        const next = await requirementRepository.memo(selected.id, { content: memoContent.trim(), attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")), revision: selected.revision ?? selected.version ?? 0 });
+        setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
+        setSelected(next);
+        setEvents(Array.isArray(next.events) ? next.events : []);
+        setWorkOpen(false);
+        setFlowMedia([]);
+        addToast("success", "个人备忘已保存", "事项状态保持不变，仅本人可见");
+      } catch (error) {
+        addToast("error", "个人备忘录保存失败", error instanceof Error ? error.message : "服务未确认本次保存，请稍后重试");
+      } finally {
+        setWorkflowSubmitting(false);
+      }
+    }
+  };
+  const transition = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selected || !reasonType) return;
+    if (reasonType === "reject" && !rejectCategory) {
+      addToast("warning", "请选择驳回原因");
+      return;
+    }
+    const finalReason = reasonType === "reject"
+      ? `[${rejectCategory}] ${reason.trim()}`
+      : reason.trim();
+    if (!finalReason.trim()) return;
+    const now = new Date().toISOString();
+    const nextStatus = reasonType === "hold" ? "已搁置" : "已驳回";
+    let persisted = true;
+    try {
+      await requirementRepository.transition(
+        selected.id,
+        reasonType,
+        finalReason,
+      );
+    } catch {
+      persisted = false;
+    }
+    if (!persisted) {
+      addToast("error", "事项操作失败", "服务未确认本次流转，请稍后重试");
+      return;
+    }
+    const eventItem: RequirementEvent = {
+      id: `event-${Date.now()}`,
+      eventType: reasonType === "hold" ? "搁置" : "驳回",
+      fromStatus: selected.status,
+      toStatus: nextStatus,
+      reason: finalReason,
+      operatorName: currentUser.name,
+      createdAt: now,
+    };
+    const next = {
+      ...selected,
+      status: nextStatus as RequirementTask["status"],
+      events: [...(selected.events || []), eventItem],
+    };
+    setRequirementTasks((list) =>
+      list.map((item) => (item.id === selected.id ? next : item)),
+    );
+    setSelected(next);
+    setEvents((list) => [...list, eventItem]);
+    setReasonType(null);
+    setReason("");
+    setRejectCategory("");
+    addToast(
+      "success",
+      `事项${nextStatus}`,
+      persisted ? "流转记录已保存" : "后端暂不可用，已在当前会话记录",
+    );
+  };
+  const closeAssistance = async () => {
+    if (!selected) return;
+    setCloseSubmitting(true);
+    try {
+      await requirementRepository.closeByOwner(selected.id, selected.revision ?? selected.version ?? 0);
+      const detail = await requirementRepository.detail(selected.id);
+      const next = { ...selected, ...detail, status: "已关闭" as RequirementTask["status"] };
+      setSelected(next);
+      setEvents(Array.isArray(detail.events) ? detail.events : []);
+      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+      setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
+      addToast("success", "协助已结束", "发起人已确认完成闭环");
+    } catch (error) {
+      addToast("error", "事项关闭失败", error instanceof Error ? error.message : "请刷新后重试");
+    } finally { setCloseSubmitting(false); }
+  };
+  const submitReopen = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selected) return;
+    setReopenSubmitting(true);
+    try {
+      const result = await requirementRepository.reopen(selected.id, {
+        progress: Math.max(0, Math.min(100, Number(reopenProgress))),
+        reason: reopenReason.trim(),
+        revision: selected.revision ?? selected.version ?? 0,
+      });
+      const detail = await requirementRepository.detail(selected.id);
+      const next = { ...selected, ...detail, status: result.status as RequirementTask["status"], progress: result.progress, revision: result.revision };
+      setSelected(next);
+      setRequirementTasks((list) => list.map((item) => (item.id === next.id ? next : item)));
+      setEvents(Array.isArray(detail.events) ? detail.events : []);
+      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+      setReopenModalOpen(false);
+      setReopenReason("");
+      setWorkflowAction("reassign");
+      setReassignAssignee("");
+      setReassignReason(String(reopenReason).trim());
+      setFlowMedia([]);
+      setWorkOpen(true);
+      addToast("success", "事项已重新开启", "请立即选择新的负责人完成责任指派");
+    } catch (error) {
+      addToast("error", "事项重开失败", error instanceof Error ? error.message : "请刷新后重试");
+    } finally {
+      setReopenSubmitting(false);
+    }
+  };
+  const submitAcceptanceFailed = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selected || !acceptanceReason.trim()) {
+      addToast("warning", "请填写验收未通过原因");
+      return;
+    }
+    const target = workItems.find((item) => item.id === acceptanceWorkItemId) || workItems.find((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED");
+    const ownerName = target?.assigneeName || selected.ownerName;
+    const owner = employees.find((item) => item.name.trim().toLocaleLowerCase() === ownerName.trim().toLocaleLowerCase());
+    setAcceptanceSubmitting(true);
+    try {
+      await requirementRepository.acceptanceFailed(selected.id, { workItemId: target?.id, taskOwnerId: owner?.id, reason: acceptanceReason.trim(), attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
+      const next = { ...selected, status: "处理中" as RequirementTask["status"], ownerName: owner?.name || selected.ownerName };
+      setSelected(next);
+      setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
+      setAcceptanceModalOpen(false);
+      setAcceptanceWorkItemId("");
+      setAcceptanceReason("");
+      setFlowMedia([]);
+      addToast("success", "已退回任务负责人", "事项状态已变更为处理中，请负责人重新处理");
+    } catch (error) {
+      addToast("error", "验收操作失败", error instanceof Error ? error.message : "请刷新后重试");
+    } finally {
+      setAcceptanceSubmitting(false);
+    }
+  };
+  const filtered = useMemo(
+    () =>
+      requirementTasks.filter((item) => {
+        const q = query.toLowerCase();
+        const inScope = filterMode !== "mine" || isWorkOrderInScope(item, scope, currentUser.name);
+        return (
+          inScope &&
+          (!q ||
+            [
+              item.title,
+              item.description,
+              item.ownerName,
+              item.productLineName,
+              item.customerName,
+            ].some((value) => value?.toLowerCase().includes(q))) &&
+          (product === "all" || item.productLineName === product) &&
+          (priority === "all" || item.priority === priority) &&
+          (status === "all" || item.status === status) &&
+          (filterMode === "type"
+            ? typeFilter === "all" || (item.workOrderType || "其他问题") === typeFilter
+            : isWorkOrderInScope(item, scope, currentUser.name))
+        );
+      }),
+    [
+      requirementTasks,
+      query,
+      product,
+      priority,
+      status,
+      scope,
+      typeFilter,
+      filterMode,
+      currentUser.name,
+    ],
+  );
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => setPage(1), [query, product, priority, status, scope, typeFilter, filterMode, pageSize]);
+  const pendingCount = requirementTasks.filter(
+    (item) => item.status === "待处理",
+  ).length;
+  const processingCount = requirementTasks.filter(
+    (item) => item.status === "处理中",
+  ).length;
+  const handledCount = requirementTasks.filter((item) =>
+    ["已完成", "已搁置"].includes(item.status),
+  ).length;
+  const rejectedCount = requirementTasks.filter(
+    (item) => item.status === "已驳回",
+  ).length;
+  const typeStats = workOrderCards.map(({ type }) => {
+    const items = requirementTasks.filter((item) => (item.workOrderType || "其他问题") === type);
+    return { type, total: items.length, pending: items.filter((item) => item.status === "待处理").length, processing: items.filter((item) => item.status === "处理中").length, handled: items.filter((item) => ["已完成", "已搁置"].includes(item.status)).length };
+  });
+  const isToday = (value?: string) =>
+    Boolean(
+      value && new Date(value).toDateString() === new Date().toDateString(),
+    );
+  const todayPending = requirementTasks.filter(
+    (item) => isToday(item.createdAt) && item.status === "待处理",
+  ).length;
+  const todayProcessing = requirementTasks.filter(
+    (item) => isToday(item.createdAt) && item.status === "处理中",
+  ).length;
+  const todayHandled = requirementTasks.filter(
+    (item) =>
+      isToday(item.createdAt) && ["已完成", "已搁置"].includes(item.status),
+  ).length;
+  const todayRejected = requirementTasks.filter(
+    (item) => isToday(item.createdAt) && item.status === "已驳回",
+  ).length;
+  const taskLocked = Boolean(
+    selected &&
+    (selected.taskId ||
+      workItems.length > 0 ||
+      ["处理中", "待验收", "待关闭", "已关闭", "已驳回"].includes(selected.status)),
+  );
+  const selectedMedia = normalizeMedia(selected?.media);
+  const cardSubText = (count: number) => `今日新增 +${count}`;
+  const fieldClass =
+    "mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20";
+  const filterClass = "min-w-[130px] shrink-0";
+  const cardIcon = (card: typeof workOrderCards[number]) => (
+    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] text-[var(--active-text)]">
+      {card.icon}
+    </span>
+  );
+  const fields = <div className="work-order-form grid grid-cols-1 gap-4">
+    <WorkOrderInput label="事项标题 *" value={title} onChange={setTitle} placeholder="请输入事项标题，简明描述问题或诉求" />
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <EmployeeSearchSelect label="负责人 *" value={ownerName} employees={employees} placeholder="搜索姓名或职位" onChange={setOwnerName} />
+      <WorkOrderSelect
+        label="所属产品"
+        value={productLines.find((item) => item.id === productLineId)?.name || ""}
+        options={productLines.map((item) => item.name)}
+        placeholder={productLines.length ? "请选择所属产品（选填）" : "暂无可用产品"}
+        onChange={(value) => setProductLineId(productLines.find((item) => item.name === value)?.id || "")}
+      />
+      <SearchSelect label="关联客户" value={customerQuery} options={customers.map((item) => item.name)} placeholder="输入客户名称模糊搜索并选择" onChange={(name) => { setCustomerQuery(name); setCustomerId(customers.find((item) => item.name === name)?.id || ""); }} />
+      <WorkOrderSelect label="优先级" value={requirementPriority} options={["紧急", "高", "中", "低"]} placeholder="请选择优先级" onChange={(value) => setRequirementPriority(value as RequirementTask["priority"])} />
+      <DateField label="期望完成时间" value={dueDate} onChange={setDueDate} />
+    </div>
+    {workOrderType && (
+      <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">业务参数设置</h3>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+          {workOrderType === "客户诉求" && <>
+            <SearchSelect label="所属项目 *" value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入中标项目名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, projectName: value }))} />
+            <WorkOrderSelect label="诉求类型 *" value={specialFields.requestType || ""} options={["新功能", "线上问题", "数据需求", "技术难题", "其他"]} placeholder="请选择诉求类型" onChange={(value) => setSpecialFields((current) => ({ ...current, requestType: value }))} />
+            <WorkOrderInput label="诉求来源 *" value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(value) => setSpecialFields((current) => ({ ...current, requestSource: value }))} />
+          </>}
+          {workOrderType === "线上问题" && <>
+            <WorkOrderSelect label="缺陷类型 *" value={specialFields.productName || ""} options={["系统缺陷", "样式缺陷", "安全漏洞"]} placeholder="请选择缺陷类型" onChange={(value) => setSpecialFields((current) => ({ ...current, productName: value }))} />
+            <WorkOrderSelect label="严重程度 *" value={specialFields.severity || ""} options={Object.keys(severityPriorities)} placeholder="请选择严重程度" onChange={(value) => { setSpecialFields((current) => ({ ...current, severity: value, priority: severityPriorities[value] })); setRequirementPriority(severityPriorities[value]); }} />
+            <WorkOrderSelect label="发生频率 *" value={specialFields.frequency || ""} options={["必现（100%）", "高频发生", "偶现（特点条件）", "环境相关偶发"]} placeholder="请选择发生频率" onChange={(value) => setSpecialFields((current) => ({ ...current, frequency: value }))} />
+          </>}
+          {workOrderType === "售前支持" && <>
+            <SearchSelect label="关联线索/商机/投标 *" value={specialFields.opportunityName || ""} options={[...leads.map((item) => item.name), ...opportunities.filter((item) => opportunityStagesBeforeWin.has(item.stage)).map((item) => item.name), ...biddings.map((item) => item.projectName || item.name || "")].filter(Boolean)} placeholder="输入线索/商机/投标名称" onChange={(value) => { const lead = leads.find((item) => item.name === value); const opportunity = opportunities.find((item) => item.name === value); const bidding = biddings.find((item) => (item.projectName || item.name) === value); setSpecialFields((current) => ({ ...current, opportunityName: value, opportunityId: opportunity?.id || "", leadId: lead?.id || "", biddingId: bidding?.id || "", relatedType: lead ? "lead" : opportunity ? "opportunity" : bidding ? "bidding" : "" })); }} />
+            <WorkOrderSelect label="支持类型 *" value={specialFields.supportType || ""} options={["建设方案", "现场踏勘", "方案汇报", "报价支持", "技术表", "投标答疑", "产品需求", "招投标标书协同"]} placeholder="请选择支持类型" onChange={(value) => setSpecialFields((current) => ({ ...current, supportType: value }))} />
+            <label className="work-order-field text-xs text-[var(--text-muted)]">预计时长（天） *<InputNumber aria-label="预计时长（天） *" className="w-full" min={0} placeholder="请输入预计天数" size="middle" stringMode value={specialFields.durationDays || null} onChange={(value) => setSpecialFields((current) => ({ ...current, durationDays: value ?? "" }))} /></label>
+          </>}
+          {workOrderType === "交付支持" && <>
+            <SearchSelect label="所属项目 *" value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入中标项目名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, projectName: value }))} />
+            <WorkOrderSelect label="项目阶段 *" value={specialFields.progressStage || ""} options={["项目移交", "项目启动", "需求确认", "系统部署", "系统培训", "系统试运行", "项目初验", "项目终验", "运维追踪"]} placeholder="请选择当前阶段" onChange={(value) => setSpecialFields((current) => ({ ...current, progressStage: value }))} />
+            <WorkOrderSelect label="项目类型 *" value={specialFields.other || ""} options={["一般项目", "数据项目", "试用项目"]} placeholder="请选择项目类型" onChange={(value) => setSpecialFields((current) => ({ ...current, other: value }))} />
+            <WorkOrderSelect label="交付类型 *" value={specialFields.deliveryType || ""} options={["自有交付", "代理商交付", "协助代理商交付"]} placeholder="请选择交付类型" onChange={(value) => setSpecialFields((current) => ({ ...current, deliveryType: value }))} />
+          </>}
+          {workOrderType === "其他问题" && <>
+            <WorkOrderInput label="问题来源 *" value={specialFields.problemSource || ""} placeholder="请输入问题来源" onChange={(value) => setSpecialFields((current) => ({ ...current, problemSource: value }))} />
+            <WorkOrderInput label="期望结果 *" value={specialFields.expectedResult || ""} placeholder="请输入期望达到的结果" onChange={(value) => setSpecialFields((current) => ({ ...current, expectedResult: value }))} />
+            <WorkOrderSelect label="协助类型 *" value={specialFields.problemType || ""} options={["方向研讨", "费用缴纳", "开票/邮寄", "资料获取", "物料支持", "意见反馈", "其他"]} placeholder="请选择协助类型" onChange={(value) => setSpecialFields((current) => ({ ...current, problemType: value }))} />
+          </>}
+        </div>
+      </div>
+    )}
+    <div>
+      <span className="text-xs text-[var(--text-muted)]">事项描述 *</span>
+      <RichTextEditor size="work-order" editor={editor} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} />
+      <div className="mt-2 flex items-center gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-body)]">
+          <Paperclip className="h-4 w-4" />
+          添加文档附件（支持 TXT/DOC/EXCEL/PDF 文档）
+          <input type="file" accept=".txt,.doc,.docx,.xls,.xlsx,.pdf" multiple className="sr-only" onChange={onMedia} />
+        </label>
+        {media.length > 0 && <div className="flex flex-wrap gap-2">{media.map((item) => <span key={item.id} className="inline-flex items-center gap-1 rounded border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--text-body)]">{item.name}<button type="button" title="移除附件" aria-label="移除附件" onClick={() => setMedia((items) => items.filter((mediaItem) => mediaItem.id !== item.id))}><X className="h-3 w-3" /></button></span>)}</div>}
+      </div>
+    </div>
+  </div>;
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-150">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
+        <div className="primary-line-tabs flex items-center gap-2" role="tablist" aria-label="协助事项视图">
+          <button
+            role="tab"
+            aria-selected={tab === "create"}
+            onClick={() => setTab("create")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all ${
+              tab === "create"
+                ? "text-[var(--primary)]"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            <PenSquare className="w-4 h-4" />
+            发起协助
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === "list"}
+            onClick={() => setTab("list")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all ${
+              tab === "list"
+                ? "text-[var(--primary)]"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            <ListFilter className="w-4 h-4" />
+            事项列表
+          </button>
+        </div>
+      </div>
+      {tab === "create" && (
+        <section className="dark-panel rounded-xl p-6">
+          {!creating ? (
+            <div className="flex min-h-[560px] flex-col items-center justify-center text-center">
+              <div className="relative flex w-full max-w-xl items-center justify-center pb-2">
+                <div className="relative -top-12 flex flex-col items-center gap-2">
+                  <p className="text-lg font-semibold text-[var(--text-primary)]">
+                    每一处精微调整，都在点亮更广的世界。
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Every subtle adjustment illuminates a wider world.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 grid w-full max-w-5xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {workOrderCards.map((card) => (
+                  <button key={card.type} type="button" onClick={() => openCreate(card.type)} className="group min-h-36 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)] hover:bg-[var(--bg-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30">
+                    <span className="mb-3 inline-flex transition">{cardIcon(card)}</span>
+                    <span className="block text-sm font-semibold text-[var(--text-primary)]">{card.type}</span>
+                    <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{card.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={save} className="space-y-5">
+              <div className="sticky -top-4 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-[var(--text-primary)]">
+                    {workOrderType || "发起协助"}
+                  </h2>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    提交后将会自动通知到负责人
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => setCreating(false)}
+                    className="h-10 rounded-lg border border-[var(--border-main)] px-4 text-sm text-[var(--text-body)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || productLines.length === 0}
+                    className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSubmitting && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
+                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品" : "发起协助"}
+                  </button>
+                </div>
+              </div>
+              {fields}
+            </form>
+          )}
+        </section>
+      )}
+      {tab === "list" && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {typeStats.map((stat) => (
+              <button key={stat.type} type="button" onClick={() => setTypeFilter(stat.type)} className="text-left">
+                <StatCard title={stat.type} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={cardIcon(workOrderCards.find((card) => card.type === stat.type)!)} />
+              </button>
+            ))}
+          </div>
+          <div className="dark-panel rounded-xl p-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-3 pb-1">
+              <div className="inline-flex shrink-0 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1" role="group" aria-label="列表筛选模式">
+                <button type="button" title="按事项类型筛选" aria-label="按事项类型筛选" onClick={() => setFilterMode("type")} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "type" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><ListFilter className="h-4 w-4" /></button>
+                <button type="button" title="查看与我有关" aria-label="查看与我有关" onClick={() => { setFilterMode("mine"); setScope("all"); }} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "mine" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><UserRound className="h-4 w-4" /></button>
+              </div>
+              <div className="inline-flex max-w-full flex-wrap items-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">
+                {(filterMode === "type" ? [{ value: "all", label: "全部" }, ...workOrderCards.map((card) => ({ value: card.type, label: card.type }))] : [{ value: "all", label: "全部" }, { value: "mine_owned", label: "我负责的" }, { value: "mine_created", label: "我创建的" }]).map((item) => <button key={item.value} type="button" onClick={() => filterMode === "type" ? setTypeFilter(item.value as typeof typeFilter) : setScope(item.value as typeof scope)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${(filterMode === "type" ? typeFilter === item.value : scope === item.value) ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{item.label}</button>)}
+              </div>
+            </div>
+            <div className="work-order-list-filters flex flex-wrap items-center gap-3">
+            <div className="relative shrink-0">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="搜索标题/客户/负责人"
+                prefix={<Search className="h-4 w-4 text-[var(--text-muted)]" />}
+                className="w-64"
+              />
+            </div>
+            {filterMode === "mine" && <Select allowClear aria-label="类型" className={filterClass} placeholder="类型" value={typeFilter === "all" ? undefined : typeFilter} onChange={(value) => setTypeFilter(value ?? "all")} options={workOrderCards.map((card) => ({label:card.type,value:card.type}))} />}
+            <Select allowClear aria-label="状态" className={filterClass} placeholder="状态" value={status === "all" ? undefined : status} onChange={(value) => setStatus(value ?? "all")} options={statuses.map((item) => ({label:item,value:item}))} />
+            <Select allowClear aria-label="优先级" className={filterClass} placeholder="优先级" value={priority === "all" ? undefined : priority} onChange={(value) => setPriority(value ?? "all")} options={[{label:"紧急",value:"紧急"},{label:"高",value:"高"},{label:"中",value:"中"},{label:"低",value:"低"}]} />
+            <button
+              type="button"
+              onClick={openCreateHome}
+              className="ml-auto h-10 px-4 shrink-0 rounded-lg bg-[var(--primary)] text-sm font-semibold text-white"
+            >
+              <Plus className="mr-1 inline w-4 h-4" />
+              发起协助
+            </button>
+            </div>
+          </div>
+          <div className="dark-panel rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--border-main)] text-[var(--text-muted)]">
+                    <th className="px-4 py-3">标题</th>
+                    <th className="px-4 py-3">事项类型</th>
+                    <th className="px-4 py-3">优先级</th>
+                    <th className="px-4 py-3">关联客户</th>
+                    <th className="px-4 py-3">负责人</th>
+                    <th className="px-4 py-3">提出人</th>
+                    <th className="px-4 py-3">创建时间</th>
+                    <th className="px-4 py-3">状态</th>
+                    <th className="px-4 py-3 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-b border-[var(--border-main)]"
+                    >
+                      <td className="px-4 py-3 font-semibold">
+                        <div className="flex items-start gap-2">
+                          <Inbox className="mt-0.5 w-4 h-4 text-[var(--active-text)] shrink-0" />
+                          <button type="button" onClick={() => openDetail(item)} className="max-w-[260px] line-clamp-2 text-left text-[var(--active-text)] hover:text-[var(--primary-hover)] hover:underline">
+                            {item.title}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-body)]">
+                        <span>{item.workOrderType || "历史事项"}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusTag status={item.priority} />
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-body)]">
+                        {item.customerName || "未关联"}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-body)]">
+                        {item.ownerName || "未分配"}
+                      </td>
+                    <td className="px-4 py-3 text-[var(--text-muted)]">
+                      {item.creatorName || item.ownerName}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--text-muted)]">{item.createdAt || "-"}</td>
+                      <td className="px-4 py-3">
+                        <StatusTag status={item.status} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openDetail(item)}
+                          className="inline-flex items-center gap-1 text-[var(--active-text)] hover:text-[var(--primary-hover)]"
+                        >
+                          详情
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filtered.length === 0 && (
+                <div className="py-16 text-center text-sm text-[var(--text-muted)]">
+                  暂无符合条件的需求
+                </div>
+              )}
+            </div>
+            <Pagination total={filtered.length} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          </div>
+        </>
+      )}
+      {selected && (
+        <Drawer
+          isOpen={!!selected}
+          onClose={() => setSelected(null)}
+          hideSubtitle
+          title="事项详情"
+          subtitle={`${selected.productLineName} · 负责人：${selected.ownerName || "未分配"}`}
+          footer={
+            <div className="flex w-full justify-between">
+              <RequirementActionButtons
+                status={selected.status}
+                hasWorkItem={taskLocked}
+                onWork={() => { setWorkflowAction(""); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setFlowMedia([]); setWorkOpen(true); }}
+                onHold={() => setReasonType("hold")}
+                onReject={() => setReasonType("reject")}
+              />
+              <div className="flex items-center gap-2">
+                {(["待验收", "待发起人验收"] as string[]).includes(selected.status) && isInitiator(selected, currentUser) && (
+                  <button
+                    type="button"
+                    onClick={() => { const first = workItems.find((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"); setAcceptanceWorkItemId(first?.id || ""); setAcceptanceModalOpen(true); }}
+                    className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]"
+                  >
+                    验收未通过
+                  </button>
+                )}
+                {selected.status === "待关闭" && isInitiator(selected, currentUser) && (
+                  <button
+                    type="button"
+                    onClick={closeAssistance}
+                    disabled={closeSubmitting}
+                    className="h-9 px-3 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {closeSubmitting ? "结束中…" : "确认结束协助"}
+                  </button>
+                )}
+                {["已关闭", "已完成"].includes(selected.status) && isInitiator(selected, currentUser) && (
+                  <button
+                    type="button"
+                    onClick={() => { setReopenProgress(0); setReopenReason(""); setReopenModalOpen(true); }}
+                    className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]"
+                  >
+                    重新开启
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <div className="mb-5 flex items-center gap-1 border-b border-[var(--border-main)]">
+            <button type="button" onClick={() => setDetailTab("info")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "info" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>事项信息</button>
+            <button type="button" onClick={() => setDetailTab("history")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "history" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>事项全历程</button>
+          </div>
+          <div className={`space-y-5 text-sm ${detailTab === "history" ? "hidden" : ""}`}>
+            <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
+              <div className="flex items-start justify-between gap-4"><h2 className="text-lg font-semibold text-[var(--text-primary)]">{selected.title}</h2><StatusTag status={selected.status} /></div>
+              <div className="my-4 border-t border-[var(--border-main)]" />
+              <div className="grid grid-cols-2 gap-4">
+              <div><span className="text-xs text-[var(--text-muted)]">事项类型</span><p className="mt-1 text-[var(--text-primary)]">{selected.workOrderType || "历史事项"}</p></div>
+              <div>
+                <span className="text-xs text-[var(--text-muted)]">优先级</span>
+                <div className="mt-1">
+                  <StatusTag status={selected.priority} />
+                </div>
+              </div>
+              <div>
+                <span className="text-xs text-[var(--text-muted)]">
+                  关联客户
+                </span>
+                <p className="mt-1 text-[var(--text-primary)]">
+                  {selected.customerName || "未关联"}
+                </p>
+              </div>
+              <div>
+                <span className="text-xs text-[var(--text-muted)]">负责人</span>
+                <p className="mt-1 text-[var(--text-primary)]">
+                  {selected.ownerName || "未分配"}
+                </p>
+              </div>
+              <div>
+                <span className="text-xs text-[var(--text-muted)]">提出人</span>
+                <p className="mt-1 text-[var(--text-primary)]">
+                  {selected.creatorName || selected.ownerName}
+                </p>
+              </div>
+              <div>
+                <span className="text-xs text-[var(--text-muted)]">
+                  期望完成时间
+                </span>
+                <p className="mt-1 text-[var(--text-primary)]">
+                  {selected.expectedCompleteDate || "未设置"}
+                </p>
+              </div>
+            </div>
+            {selected.specialFields && typeof selected.specialFields !== "string" && Object.keys(selected.specialFields).length > 0 && <><div className="my-4 border-t border-[var(--border-main)]" /><div className="grid grid-cols-2 gap-3">{Object.entries(selected.specialFields).filter(([key, value]) => value && !hiddenSpecialFieldKeys.has(key)).map(([key, value]) => <div key={key}><span className="text-xs text-[var(--text-muted)]">{specialFieldLabels[key] || key}</span><p className="mt-1 text-[var(--text-primary)]">{String(value)}</p></div>)}</div></>}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">
+                事项详细描述
+              </h3>
+              <div
+                className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-body)]"
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHtml(
+                    selected.descriptionHtml ||
+                      selected.description ||
+                      "暂无描述",
+                  ),
+                }}
+              />
+              {selectedMedia.length ? (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {selectedMedia.map((item) =>
+                    item.type === "image" ? (
+                      <img
+                        key={item.id}
+                        src={item.dataUrl}
+                        alt={item.name}
+                        className="max-h-36 rounded border border-[var(--border-main)]"
+                      />
+                    ) : item.type === "video" ? (
+                      <video
+                        key={item.id}
+                        src={item.dataUrl}
+                        controls
+                        className="max-h-36 rounded border border-[var(--border-main)]"
+                      />
+                    ) : (
+                      <a key={item.id} href={item.dataUrl} download={item.name} className="inline-flex items-center gap-2 rounded border border-[var(--border-main)] px-3 py-2 text-xs text-[var(--active-text)] hover:bg-[var(--bg-surface-soft)]"><Paperclip className="h-3.5 w-3.5" />{item.name}</a>
+                    ),
+                  )}
+                </div>
+              ) : null}
+              {selected.attachments?.length ? (
+                <div className="mt-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3">
+                  <div className="mb-2 text-xs font-medium text-[var(--text-body)]">流转附件</div>
+                  <div className="flex flex-wrap gap-2">
+                    {selected.attachments.map((item: AttachmentMetadata) => (
+                      <a key={item.id} href={item.dataUrl} download={item.name} className="inline-flex items-center gap-1 rounded border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--active-text)] hover:bg-[var(--bg-hover)]">
+                        <Paperclip className="h-3.5 w-3.5" />{item.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className={`space-y-5 text-sm ${detailTab === "info" ? "hidden" : ""}`}>
+            <section>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项全历程</h3>
+              {events.length ? <div className="space-y-3">{[...events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))).map((item) => {
+                const meta = eventMetadata(item.metadata);
+                const targetPage = typeof meta.targetPage === "string" ? meta.targetPage : "";
+                const progressValue = meta.toProgress ?? meta.progress;
+                const progress = typeof progressValue === "number" || typeof progressValue === "string" ? Number(progressValue) : null;
+                const taskTitle = String(meta.taskTitle || "").trim();
+                return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3">
+                  <div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}{meta.isDemo === true && <span className="ml-2 rounded bg-[var(--bg-surface-soft)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">示例历程</span>}</b><span className="text-[11px] text-[var(--text-muted)]">{formatDateTime(item.createdAt)}</span></div>
+                  <div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{item.operatorName || "未知"} · 指派负责人：{String(meta.assigneeName || "未指派")}</div>
+                  {item.reason && <p className="mt-2 text-xs">{item.reason}</p>}
+                  {progress !== null && <div className="mt-2 text-xs text-[var(--text-muted)]">任务进度：{Math.max(0, Math.min(100, progress))}%{meta.overdueRisk === true && <span className="ml-2 text-[var(--danger)]">已逾期</span>}</div>}
+                  {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => {
+                    if (!targetPage) return;
+                    sessionStorage.setItem('shichuang.task.search', JSON.stringify({ targetPage, title: taskTitle }));
+                    openPageTab(targetPage as Parameters<typeof openPageTab>[0]);
+                  }}>{String(meta.taskType)} · {taskTitle || "关联任务"} <ArrowRight className="ml-1 inline h-3.5 w-3.5" /></button></>}
+                </div>;
+              })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无事项流转记录</p>}
+            </section>
+            <section>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">下游任务</h3>
+              {workItems.length ? <div className="space-y-2">{workItems.map((item) => {
+                const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED";
+                const accepted = item.assistanceTaskStatus === "ACCEPTED";
+                const taskTargetPage = TASK_PAGE_BY_TYPE[item.taskType] || "prod_req_tasks";
+                const taskEvents = Array.isArray(item.events) ? [...item.events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))) : [];
+                return <div key={item.id} className="space-y-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-xs">
+                  <div className="flex items-center justify-between gap-3"><button type="button" className="min-w-0 truncate text-left text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => { sessionStorage.setItem('shichuang.task.search', JSON.stringify({ targetPage: taskTargetPage, title: item.title })); openPageTab(taskTargetPage as Parameters<typeof openPageTab>[0]); }}>{item.taskType} · {item.title}</button><span className="flex shrink-0 items-center gap-2">{item.assigneeName}<StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && isInitiator(selected, currentUser) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>
+                  <div className="border-t border-[var(--border-main)]" />
+                  {taskEvents.length > 0 && <div className="space-y-2"><div className="text-[11px] font-semibold text-[var(--text-muted)]">任务变化历程</div>{taskEvents.map((taskEvent) => <div key={taskEvent.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-2"><div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{taskEvent.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{formatDateTime(taskEvent.createdAt)}</span></div><div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{taskEvent.operatorName || "未知"}{taskEvent.fromStatus || taskEvent.toStatus ? ` · ${taskEvent.fromStatus || "—"} → ${taskEvent.toStatus || "—"}` : ""}</div>{taskEvent.reason && <p className="mt-1 text-xs text-[var(--text-body)]">{taskEvent.reason}</p>}</div>)}</div>}
+                </div>;
+              })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无解决过程记录</p>}
+            </section>
+          </div>
+        </Drawer>
+      )}
+      <Modal
+        isOpen={workOpen}
+        onClose={() => setWorkOpen(false)}
+        title="事项流转"
+        maxWidth="4xl"
+      >
+        <form onSubmit={handleWorkflowSubmit} className="work-order-dialog space-y-4">
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+            流转类型 *
+            <Select allowClear aria-label="流转类型 *" className="w-full" value={workflowAction || undefined} onChange={(value) => setWorkflowAction((value ?? "") as typeof workflowAction)} placeholder="选择流转的任务类型" options={[{label:"转任务",value:"convert"},{label:"转派给他人",value:"reassign"},{label:"个人备忘录",value:"memo"}]} />
+          </label>
+
+          {workflowAction === "convert" && (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[var(--text-primary)]">任务配置 ({subTasks.length})</span>
+                <button
+                  type="button"
+                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }])}
+                  className="px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border-main)] text-xs text-[var(--primary)] font-medium hover:bg-[var(--bg-hover)]"
+                >
+                  + 增加任务
+                </button>
+              </div>
+              {subTasks.map((t, idx) => (
+                <div key={idx} className="p-4 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] relative">
+                  <div className="mb-4 flex items-center justify-between border-b border-[var(--border-main)] pb-4">
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)]">任务 #{idx + 1}</span>
+                    {subTasks.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setSubTasks(subTasks.filter((_, i) => i !== idx))}
+                        className="text-[var(--danger)] text-xs hover:underline"
+                      >
+                        删除
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
+                  <label className="work-order-dialog-field block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-3">
+                    任务类型 *
+                      <Select
+                      allowClear
+                      aria-label="任务类型 *"
+                      className="w-full"
+                      value={t.taskType || undefined}
+                      placeholder="选择任务类型"
+                      options={taskTypes.map((item) => ({ label: item, value: item }))}
+                      onChange={(val) => {
+                        setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, taskType: val } : item));
+                      }}
+                    />
+                  </label>
+                  <div className="min-w-0 lg:col-span-3 [&>label]:block">
+                  <EmployeeSearchSelect label="任务负责人 *" value={t.assignee} employees={employees} placeholder="搜索姓名或职位" onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))} />
+                  </div>
+                  <div className="min-w-0 lg:col-span-2"><DateField label="期望完成时间" value={t.expectedDueDate} onChange={(value) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, expectedDueDate: value } : item))} /></div>
+                  <label className="work-order-dialog-field block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-4">
+                    任务描述
+                    <Input
+                      value={t.note}
+                      onChange={(e) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, note: e.target.value } : item))}
+                      placeholder="请输入任务描述说明..."
+                      className="w-full"
+                    />
+                  </label>
+                  </div>
+                  <div className="mt-4">
+                    <FlowAttachmentPicker
+                      media={t.media}
+                      onChange={(updater) => setSubTasks((items) => items.map((item, itemIndex) => itemIndex === idx ? { ...item, media: typeof updater === "function" ? updater(item.media) : updater } : item))}
+                      onPick={(event) => void onTaskMedia(idx, event)}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {workflowAction === "reassign" && (
+            <>
+              <EmployeeSearchSelect label="转派给负责人 *" value={reassignAssignee} employees={employees} placeholder="搜索姓名或职位" onChange={setReassignAssignee} />
+              <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+                转派原因说明 *
+                <Input.TextArea
+                  value={reassignReason}
+                  onChange={(e) => setReassignReason(e.target.value)}
+                  rows={3}
+                  placeholder="请输入转派原因及交接说明..."
+                  required
+                />
+              </label>
+              <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
+            </>
+          )}
+
+          {workflowAction === "memo" && (
+            <>
+              <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+                个人备忘内容 *
+                <Input.TextArea
+                  value={memoContent}
+                  onChange={(e) => setMemoContent(e.target.value)}
+                  rows={4}
+                  placeholder="记录个人备忘信息或处理心得..."
+                  required
+                />
+              </label>
+              <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
+              <p className="text-[11px] text-[var(--text-muted)]">个人备忘仅作者可见，不改变事项状态。</p>
+            </>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-main)]">
+            <button
+              type="button"
+              onClick={() => setWorkOpen(false)}
+              disabled={workflowSubmitting}
+              className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={workflowSubmitting}
+              className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {workflowSubmitting ? "处理中…" : "确认"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+      <Modal
+        isOpen={!!reasonType}
+        onClose={() => setReasonType(null)}
+        title={reasonType === "hold" ? "事项搁置" : "事项驳回"}
+      >
+        <form onSubmit={transition} className="work-order-dialog space-y-4">
+          {reasonType === "reject" && (
+            <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+              驳回原因 *
+              <Select allowClear aria-label="驳回原因 *" className="w-full" value={rejectCategory || undefined} onChange={(value) => setRejectCategory(value ?? "")} placeholder="请选择驳回原因" options={availableRejectReasons.map((reasonOpt) => ({label:reasonOpt,value:reasonOpt}))} />
+            </label>
+          )}
+
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+            {reasonType === "reject" ? "驳回详细说明 *" : "搁置原因说明 *"}
+            <Input.TextArea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={4}
+              placeholder={reasonType === "reject" ? "请输入详细驳回说明或补充建议..." : "请输入搁置原因说明..."}
+              required
+            />
+          </label>
+          <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3">
+            <button
+              type="button"
+              onClick={() => setReasonType(null)}
+              className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white"
+            >
+              确认
+            </button>
+          </div>
+        </form>
+      </Modal>
+      <Modal
+        isOpen={acceptanceModalOpen}
+        onClose={() => setAcceptanceModalOpen(false)}
+        title="验收未通过"
+      >
+        <form onSubmit={submitAcceptanceFailed} className="work-order-dialog space-y-4">
+          <p className="text-xs text-[var(--text-muted)]">事项将退回当前任务负责人，状态变更为“处理中”，负责人重新处理后再次提交验收。</p>
+          {workItems.filter((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED").length > 0 && (
+            <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+              验收任务 *
+              <Select aria-label="验收任务 *" className="w-full" value={acceptanceWorkItemId || undefined} onChange={(value) => setAcceptanceWorkItemId(value)} options={workItems.filter((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED").map((item) => ({ label: `${item.taskType} · ${item.title} · ${item.assigneeName}`, value: item.id }))} placeholder="请选择需要退回的已完成任务" />
+            </label>
+          )}
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+            未通过原因 *
+            <Input.TextArea value={acceptanceReason} onChange={(event) => setAcceptanceReason(event.target.value)} rows={4} placeholder="请说明需要补充或修正的内容" required />
+          </label>
+          <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
+          <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3">
+            <button type="button" onClick={() => setAcceptanceModalOpen(false)} disabled={acceptanceSubmitting} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]">取消</button>
+            <button type="submit" disabled={acceptanceSubmitting} className="h-9 px-4 rounded-lg bg-[var(--danger)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{acceptanceSubmitting ? "提交中…" : "确认退回"}</button>
+          </div>
+        </form>
+      </Modal>
+      <Modal
+        isOpen={reopenModalOpen}
+        onClose={() => { if (!reopenSubmitting) setReopenModalOpen(false); }}
+        title="重新开启事项"
+      >
+        <form onSubmit={submitReopen} className="work-order-dialog space-y-4">
+          <p className="text-xs text-[var(--text-muted)]">历史事项将恢复为处理中，并保留原有历程记录。</p>
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+            当前进度
+            <InputNumber className="w-full" min={0} max={100} value={reopenProgress} onChange={(value) => setReopenProgress(Number(value ?? 0))} addonAfter="%" />
+          </label>
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
+            重开原因
+            <Input.TextArea value={reopenReason} onChange={(event) => setReopenReason(event.target.value)} rows={4} placeholder="请输入重新开启原因" />
+          </label>
+          <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3">
+            <button type="button" onClick={() => setReopenModalOpen(false)} disabled={reopenSubmitting} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)] disabled:opacity-50">取消</button>
+            <button type="submit" disabled={reopenSubmitting} className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{reopenSubmitting ? "提交中…" : "确认重开"}</button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};

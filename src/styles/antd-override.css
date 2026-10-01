@@ -1,0 +1,132 @@
+/* Ant Design 组件样式覆盖 */
+
+/* 平台表单基线：覆盖 legacy tech-shell 的 32px 输入框规则，统一为工单中心的 36px。 */
+.tech-shell .ant-input-affix-wrapper,
+.tech-shell input.ant-input {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
+.tech-shell .ant-input-affix-wrapper > .ant-input {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.tech-shell .ant-input::placeholder,
+.tech-shell .ant-select-selection-placeholder,
+.tech-shell .ant-select-placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1 !important;
+  font-size: 12px !important;
+}
+
+/* 产品设置沿用平台 36px 控件基线；legacy tech-shell 的 32px 规则不应覆盖 Select。 */
+.tech-shell .product-line-settings :where(.ant-select, .ant-select-selector) {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
+.tech-shell .product-line-settings textarea.ant-input {
+  height: auto !important;
+  min-height: 120px !important;
+}
+
+.tech-shell .product-line-switch {
+  height: 24px !important;
+  min-width: 44px !important;
+}
+
+.tech-shell .product-line-switch .ant-switch-handle {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.tech-shell .product-line-switch .ant-switch-inner {
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+/* 规则大盘的单条状态开关不包含文字，使用紧凑宽度；顶部全局开关保持原宽度。 */
+.tech-shell .automation-rule-switch {
+  min-width: 32px !important;
+  width: 32px !important;
+}
+
+.tech-shell .automation-rule-switch .ant-switch-handle {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.product-line-health-enabled {
+  color: var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--border-main)) !important;
+}
+
+.product-line-health-disabled {
+  color: var(--text-muted) !important;
+  background: var(--bg-surface-soft) !important;
+  border-color: var(--border-main) !important;
+}
+
+/* DatePicker 日期选择 */
+.ant-picker {
+  width: 100% !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 6px 12px !important;
+}
+
+.ant-picker-input > input {
+  height: 22px !important;
+  line-height: 22px !important;
+}
+
+/* The DatePicker wrapper owns its border and focus ring, not its inner input. */
+.tech-shell .ant-picker .ant-picker-input > input,
+.tech-shell .ant-picker .ant-picker-input > input:hover,
+.tech-shell .ant-picker .ant-picker-input > input:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  min-height: 0 !important;
+  height: 22px !important;
+}
+
+/* ============================================
+   组件样式优化
+   ============================================ */
+
+/* Segmented 分段控制器 - 选中态蓝色 */
+.ant-segmented .ant-segmented-item-selected {
+  color: #3b82f6 !important;
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+.ant-segmented .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #3b82f6 !important;
+  font-weight: 500;
+}
+
+/* Cascader 下拉框宽度 - 避免被父容器强制拉伸，按菜单内容自适应 */
+.ant-cascader-dropdown {
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: calc(100vw - 32px);
+}
+
+.ant-cascader-menu {
+  min-width: 150px !important;
+}
+
+.ant-cascader-menu-item-content {
+  white-space: nowrap !important;
+}
+
+/* 暗色模式适配 */
+.dark .ant-segmented .ant-segmented-item-selected {
+  color: #60a5fa !important;
+  background-color: rgba(96, 165, 250, 0.15) !important;
+}
