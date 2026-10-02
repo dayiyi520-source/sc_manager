@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const requirementSource = readFileSync(new URL('./RequirementTasksView.tsx', import.meta.url), 'utf8');
 const productLineSource = readFileSync(new URL('./ProductLineDetailView.tsx', import.meta.url), 'utf8');
 const iterationSource = readFileSync(new URL('./VersionIterationView.tsx', import.meta.url), 'utf8');
+const designSource = readFileSync(new URL('./DesignTasksView.tsx', import.meta.url), 'utf8');
 
 describe('requirement task Ant Design contract', () => {
   it('groups by configured subtype names and paginates only the selected root-task group', () => {
@@ -142,5 +143,16 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain("versions.find((version) => version.id === task.versionId)");
     expect(requirementSource).toContain("[task.productLineName, linkedVersion?.code || (task.versionId ? '版本号未设置' : '未关联')].filter(Boolean).join(' / ')");
     expect(requirementSource).toContain('className="work-item-owner-cell"');
+  });
+
+  it('organizes design work by type and uses existing records for the design pool', () => {
+    expect(designSource).toContain('设计任务');
+    expect(designSource).toContain('待办设计');
+    expect(designSource).toContain("['product', '产品']");
+    expect(designSource).toContain("['project', '项目']");
+    expect(designSource).toContain("['other', '其他']");
+    expect(designSource).toContain('designTasks.filter');
+    expect(requirementSource).toContain("taskKind === 'design' ? designOwnershipLabel : '迭代版本'");
+    expect(requirementSource).toContain('designOwnershipLabel');
   });
 });

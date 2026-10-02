@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { productRepository, WorkItemFieldConfiguration, WorkItemFieldScene } from '../../services/productRepository';
 
 export const REQUIRED_WORK_ITEM_FIELDS = ['title', 'status', 'assignee'] as const;
+const DETAIL_SYSTEM_FIELDS = ['creator', 'createdAt', 'updater', 'updatedAt'] as const;
 
 const isRequiredField = (fieldCode: string) => REQUIRED_WORK_ITEM_FIELDS.includes(fieldCode as typeof REQUIRED_WORK_ITEM_FIELDS[number]);
 
@@ -29,9 +30,10 @@ export const useWorkItemFieldConfig = (categoryCode: string, scene: WorkItemFiel
   }, [categoryCode, scene]);
 
   const fieldMap = useMemo(() => new Map(fields.map((field) => [field.fieldCode, field])), [fields]);
-  const visible = (fieldCode: string) => isRequiredField(fieldCode) || fieldMap.get(fieldCode)?.visible !== false;
+  const visible = (fieldCode: string) => isRequiredField(fieldCode) || (scene === 'DETAIL' && DETAIL_SYSTEM_FIELDS.includes(fieldCode as typeof DETAIL_SYSTEM_FIELDS[number])) || fieldMap.get(fieldCode)?.visible !== false;
   const required = (fieldCode: string) => isRequiredField(fieldCode) || Boolean(fieldMap.get(fieldCode)?.required);
-  const editable = (fieldCode: string) => !fieldMap.get(fieldCode)?.locked && fieldMap.get(fieldCode)?.editable !== false;
+  const editable = (fieldCode: string) => !DETAIL_SYSTEM_FIELDS.includes(fieldCode as typeof DETAIL_SYSTEM_FIELDS[number]) && !fieldMap.get(fieldCode)?.locked && fieldMap.get(fieldCode)?.editable !== false;
+  const order = (fieldCode: string) => fieldMap.get(fieldCode)?.sort ?? 999;
 
-  return { fields, loaded, visible, required, editable };
+  return { fields, loaded, visible, required, editable, order };
 };

@@ -53,6 +53,7 @@ rows('t_product_line_version').filter((row) => text(row.tenant_id_) === 'local-t
   const key = text(row.product_line_id_); versionsByProduct.set(key, [...(versionsByProduct.get(key) || []), row]);
 });
 const workItems = rows('t_product_work_item').filter((row) => text(row.tenant_id_) === 'local-tenant' && Number(row.delete_flag_ || 0) === 0);
+const workItemTypeNameById = new Map(rows('t_product_line_work_item_type').map((row) => [text(row.id_), text(row.name_)]));
 const productNameById = new Map(rows('t_product_line').map((row) => [text(row.id_), text(row.name_)]));
 const versionNameById = new Map(rows('t_product_line_version').map((row) => [text(row.id_), text(row.name_)]));
 
@@ -69,8 +70,16 @@ export const MOCK_VERSIONS: VersionIteration[] = rows('t_product_line_version')
   .filter((row) => text(row.tenant_id_) === 'local-tenant' && Number(row.delete_flag_ || 0) === 0)
   .map((row) => ({ id: text(row.id_), code: text(row.code_), name: text(row.name_), ownerName: text(row.owner_name_), productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', startDate: date(row.start_date_), endDate: date(row.end_date_), releaseDate: date(row.release_date_), status: text(row.status_), statusPhase: text(row.status_phase_), requirementsCount: Number(row.requirements_count_ || 0), completedReqCount: Number(row.completed_req_count_ || 0), linkedRequirementIds: json<string[]>(row.linked_requirement_ids_, []) }));
 
+const designVariantFor = (row: Row): RequirementTask['designVariant'] => {
+  const typeName = text(row.task_type_name_) || text(row.requirement_type_) || workItemTypeNameById.get(text(row.task_type_id_)) || '';
+  if (text(row.category_) !== 'design') return undefined;
+  if (typeName.includes('其他')) return 'other';
+  if (typeName.includes('物料') || typeName.includes('项目')) return 'project';
+  return 'product';
+};
+
 const task = (row: Row): RequirementTask => ({
-  id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_), expectedGoal: text(row.expected_goal_), status: text(row.status_name_), priority: text(row.priority_), ownerName: text(row.assignee_name_) || usersById.get(text(row.assignee_id_))?.name || '', assigneeId: text(row.assignee_id_) || undefined, creatorName: text(row.creator_name_), department: text(row.department_), versionId: text(row.version_id_) || undefined, versionName: versionNameById.get(text(row.version_id_)) || '', productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', estimatedHours: Number(row.estimated_hours_ || 0), actualHours: Number(row.actual_hours_ || 0), dueDate: date(row.planned_end_date_ || row.expected_complete_date_), createdAt: date(row.create_time_), category: 'my_dept', requirementType: text(row.task_type_name_) || text(row.requirement_type_) || undefined, revision: Number(row.version_ || 0),
+  id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_), expectedGoal: text(row.expected_goal_), status: text(row.status_name_), priority: text(row.priority_), ownerName: text(row.assignee_name_) || usersById.get(text(row.assignee_id_))?.name || '', assigneeId: text(row.assignee_id_) || undefined, creatorName: text(row.creator_name_), department: text(row.department_), versionId: text(row.version_id_) || undefined, versionName: versionNameById.get(text(row.version_id_)) || '', productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', estimatedHours: Number(row.estimated_hours_ || 0), actualHours: Number(row.actual_hours_ || 0), dueDate: date(row.planned_end_date_ || row.expected_complete_date_), createdAt: date(row.create_time_), category: 'my_dept', requirementType: text(row.task_type_name_) || text(row.requirement_type_) || workItemTypeNameById.get(text(row.task_type_id_)) || undefined, designVariant: designVariantFor(row), designProjectName: text(row.project_name_) || text(row.projectName) || undefined, designSourceDepartment: text(row.source_department_) || text(row.department_) || undefined, revision: Number(row.version_ || 0),
 });
 
 export const MOCK_REQUIREMENT_TASKS = workItems.filter((row) => text(row.category_) === 'requirement').map(task);

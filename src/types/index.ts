@@ -552,6 +552,9 @@ export interface RequirementTask {
   requirementTitle?: string;
   requirementInitiatorName?: string;
   requirementType?: string;
+  designVariant?: 'product' | 'project' | 'other';
+  designProjectName?: string;
+  designSourceDepartment?: string;
   workItemTypeId?: string;
   parentWorkItemId?: string;
   hasChildren?: boolean;
@@ -725,6 +728,7 @@ export interface DefectBug {
   code?: string;
   title: string;
   description?: string;
+  expectedGoal?: string;
   status: '待修复' | '修复中' | '待验证' | '已关闭' | '已拒绝' | string;
   severity: '致命' | '严重' | '一般' | '轻微' | '致命阻断' | '严重缺陷' | '一般问题' | '轻微优化' | string;
   priority?: '紧急' | '高' | '中' | '低' | string;
@@ -770,6 +774,7 @@ export interface DevTask {
   id: string;
   title: string;
   description?: string;
+  expectedGoal?: string;
   developer: string;
   repo?: string;
   branch?: string;

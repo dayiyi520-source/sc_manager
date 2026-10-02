@@ -38,6 +38,33 @@ export const WorkItemDetailHeader: React.FC<{
   </header>;
 };
 
+export const WorkItemAssociationHint: React.FC<{ label: string; description: string }> = ({ label, description }) => (
+  <section className="rounded-lg border border-dashed border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2">
+    <span className="block text-xs font-medium text-[var(--text-primary)]">{label}</span>
+    <span className="mt-1 block text-xs text-[var(--text-muted)]">{description}</span>
+  </section>
+);
+
+export const WorkItemRelationTabs: React.FC<{
+  items: Array<{ key: string; label: string; count?: number; description: string; content?: React.ReactNode }>;
+}> = ({ items }) => {
+  const [activeKey, setActiveKey] = React.useState(items[0]?.key || '');
+  useEffect(() => {
+    if (!items.some((item) => item.key === activeKey)) setActiveKey(items[0]?.key || '');
+  }, [activeKey, items]);
+  const active = items.find((item) => item.key === activeKey) || items[0];
+  if (!items.length || !active) return null;
+  return <section className="mt-5 border-b border-[var(--border-main)]">
+    <div className="flex min-w-0 flex-wrap gap-x-6 border-b border-[var(--border-main)]">
+      {items.map((item) => <button key={item.key} type="button" onClick={() => setActiveKey(item.key)} className={`relative min-h-10 px-1 pb-2 text-xs font-medium transition-colors ${active.key === item.key ? 'text-[var(--primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+        {item.label}{typeof item.count === 'number' ? ` · ${item.count}` : ''}
+        {active.key === item.key && <span className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-[var(--primary)]" />}
+      </button>)}
+    </div>
+    <div className="py-4">{active.content || <WorkItemAssociationHint label={active.label} description={active.description} />}</div>
+  </section>;
+};
+
 export const WorkItemCreatePanel: React.FC<{
   isOpen: boolean;
   onClose: () => void;

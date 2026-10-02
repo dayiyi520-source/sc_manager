@@ -91,7 +91,11 @@ vi.mock('../../context/AppContext', () => ({
 }));
 
 vi.mock('./CreateVersionModal', () => ({ CreateVersionModal: ({ isOpen, productLine }: { isOpen: boolean; productLine?: { id: string } }) => isOpen ? <div role="dialog" aria-label="创建迭代版本">产品：{productLine?.id || '未选择'}</div> : null }));
-vi.mock('./WorkItemCreatePanel', () => ({ WorkItemCreatePanel: ({ isOpen, title, children, footer, properties }: { isOpen: boolean; title: string; children: React.ReactNode; footer: React.ReactNode; properties?: React.ReactNode }) => isOpen ? <div role="dialog" aria-label={title}>{children}{properties}{footer}</div> : null }));
+vi.mock('./WorkItemCreatePanel', () => ({
+  WorkItemCreatePanel: ({ isOpen, title, children, footer, properties }: { isOpen: boolean; title: string; children: React.ReactNode; footer: React.ReactNode; properties?: React.ReactNode }) => isOpen ? <div role="dialog" aria-label={title}>{children}{properties}{footer}</div> : null,
+  WorkItemDetailHeader: () => null,
+  WorkItemRelationTabs: () => null,
+}));
 vi.mock('./VersionTestReportPanel', () => ({ VersionTestReportPanel: () => <div>暂无测试报告</div> }));
 vi.mock('../common/Feedback', () => ({ showDeleteConfirm: appMocks.showDeleteConfirm }));
 

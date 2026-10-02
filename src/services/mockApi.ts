@@ -123,7 +123,7 @@ const templateStatuses = () => read(KEYS.researchStatuses, databaseRows('t_resea
 const DETAIL_FIELD_DEFINITIONS: Record<string, Array<[string, string, string, string, boolean]>> = {
   common: [
     ['title', '标题', 'text', '详情页顶部任务标题，可点击修改', true], ['creator', '创建人', 'user', '任务创建人，只读', false], ['createdAt', '创建时间', 'date', '任务创建时间，只读', false], ['updater', '更新人', 'user', '最近一次修改人，只读', false], ['updatedAt', '更新时间', 'date', '最近一次修改时间，只读', false],
-    ['parent', '主任务', 'relation', '当前任务所属的父任务，只读', false], ['description', '任务描述', 'text', '左侧描述区，可进入富文本编辑', true], ['status', '当前状态', 'select', '右侧基础字段中的任务状态', true], ['assignee', '负责人', 'user', '右侧基础字段中的负责人', true], ['priority', '优先级', 'select', '右侧基础字段中的优先级', true],
+    ['expectedGoal', '期望结果', 'text', '任务完成后预期达到的结果', true], ['parent', '主任务', 'relation', '当前任务所属的父任务，只读', false], ['description', '任务描述', 'text', '左侧描述区，可进入富文本编辑', true], ['status', '当前状态', 'select', '右侧基础字段中的任务状态', true], ['assignee', '负责人', 'user', '右侧基础字段中的负责人', true], ['priority', '优先级', 'select', '右侧基础字段中的优先级', true],
     ['productLine', '归属产品', 'relation', '任务所属产品或产品线', true], ['version', '迭代版本', 'relation', '任务关联的迭代版本', true], ['plannedStartDate', '计划开始时间', 'date', '任务计划开始日期', true], ['dueDate', '计划完成时间', 'date', '任务计划完成日期', true], ['expectedCompleteDate', '期望完成时间', 'date', '业务期望完成日期', true],
     ['customer', '关联客户', 'relation', '任务关联的客户对象', true], ['participants', '参与人', 'user', '需要同步或关注任务的成员', true], ['estimatedHours', '预计工时', 'number', '任务预计投入的小时数', true], ['actualHours', '实际工时', 'number', '任务实际投入的小时数', true], ['relations', '关联对象', 'section', '详情页下方的关联产品任务和协助事项', true], ['children', '子任务', 'section', '详情页下方的子任务列表', true], ['support', '支撑项', 'section', '详情页下方关联的测试计划等支撑事项', true], ['hours', '工时', 'section', '详情页下方的工时汇总和统计', true],
   ],
@@ -139,7 +139,7 @@ const DETAIL_FIELDS = (categoryCode: string) => [...DETAIL_FIELD_DEFINITIONS.com
   required: REQUIRED_FIELD_CODES.has(fieldCode),
   editable: Boolean(editable),
   sort: index + 1,
-  locked: REQUIRED_FIELD_CODES.has(fieldCode),
+  locked: REQUIRED_FIELD_CODES.has(fieldCode) || ['creator', 'createdAt', 'updater', 'updatedAt'].includes(fieldCode),
 }));
 const FIELD_METADATA: Record<string, { label: string; fieldType: string; description: string }> = {
   title: { label: '标题', fieldType: 'text', description: '工作项标题' },
@@ -162,6 +162,10 @@ const FIELD_METADATA: Record<string, { label: string; fieldType: string; descrip
   customer: { label: '关联客户', fieldType: 'relation', description: '任务关联的客户对象' },
   estimatedHours: { label: '预计工时', fieldType: 'number', description: '任务预计投入的小时数' },
   actualHours: { label: '实际工时', fieldType: 'number', description: '任务实际投入的小时数' },
+  relations: { label: '关联对象', fieldType: 'section', description: '关联产品任务和协助事项' },
+  children: { label: '子任务', fieldType: 'section', description: '创建后维护子任务' },
+  support: { label: '支撑项', fieldType: 'section', description: '创建后关联测试计划等支撑事项' },
+  hours: { label: '工时', fieldType: 'section', description: '创建后登记和统计工时' },
   repo: { label: '代码仓库', fieldType: 'text', description: '研发任务关联的代码仓库' },
   branch: { label: '特性分支', fieldType: 'text', description: '研发任务对应的代码分支' },
   commitsCount: { label: '提交数', fieldType: 'number', description: '研发任务关联的代码提交数量' },
@@ -171,9 +175,12 @@ const FIELD_METADATA: Record<string, { label: string; fieldType: string; descrip
   attachments: { label: '附件', fieldType: 'relation', description: '工作项关联的附件' },
 };
 const REQUIRED_FIELD_CODES = new Set(['title', 'status', 'assignee']);
+const DETAIL_SYSTEM_FIELD_CODES = new Set(['creator', 'createdAt', 'updater', 'updatedAt']);
+const CREATE_ASSOCIATION_FIELD_CODES = ['relations', 'children', 'support', 'hours'];
 const normalizeTemplateField = (field: any) => {
   const metadata = FIELD_METADATA[field.fieldCode];
-  const locked = REQUIRED_FIELD_CODES.has(field.fieldCode);
+  const detailSystemField = field.scene === 'DETAIL' && DETAIL_SYSTEM_FIELD_CODES.has(field.fieldCode);
+  const locked = REQUIRED_FIELD_CODES.has(field.fieldCode) || detailSystemField;
   return {
     ...(metadata ? { ...field, ...metadata } : field),
     required: locked ? true : Boolean(field.required),
@@ -185,13 +192,20 @@ const templateFields = () => {
   const stored = read<any[] | null>(KEYS.researchFields, null);
   const base = (stored || databaseRows('t_work_item_field_configuration').map((row) => ({ categoryCode: row.category_code_, scene: row.scene_, fieldCode: row.field_code_, label: row.field_code_, fieldType: 'text', visible: Boolean(row.visible_), required: Boolean(row.required_), editable: true, defaultValue: null, sort: Number(row.sort_ || 0), locked: false }))).map(normalizeTemplateField);
   const categories = ['requirement', 'design', 'dev', 'test', 'bug'];
+  const createScenes = ['CREATE', 'CREATE_CHILD'];
+  const baseWithCreateAssociations = [...base];
+  categories.forEach((categoryCode) => createScenes.forEach((scene) => CREATE_ASSOCIATION_FIELD_CODES.forEach((fieldCode) => {
+    if (baseWithCreateAssociations.some((field) => field.categoryCode === categoryCode && field.scene === scene && field.fieldCode === fieldCode)) return;
+    const metadata = FIELD_METADATA[fieldCode];
+    baseWithCreateAssociations.push({ categoryCode, scene, fieldCode, label: metadata.label, fieldType: metadata.fieldType, description: metadata.description, visible: true, required: false, editable: true, defaultValue: null, sort: baseWithCreateAssociations.filter((field) => field.categoryCode === categoryCode && field.scene === scene).length + 1, locked: false });
+  })));
   const detail = categories.flatMap((categoryCode) => DETAIL_FIELDS(categoryCode).map((field) => ({ ...field, categoryCode, scene: 'DETAIL' })));
   const detailCodes = new Set(detail.map((field) => `${field.categoryCode}:${field.fieldCode}`));
   const detailDefaults = new Map(detail.map((field) => [`${field.categoryCode}:${field.fieldCode}`, field]));
-  const normalizedBase = base.filter((field) => field.scene !== 'DETAIL' || detailCodes.has(`${field.categoryCode}:${field.fieldCode}`)).map((field) => {
+  const normalizedBase = baseWithCreateAssociations.filter((field) => field.scene !== 'DETAIL' || detailCodes.has(`${field.categoryCode}:${field.fieldCode}`)).map((field) => {
     if (field.scene !== 'DETAIL') return normalizeTemplateField(field);
     const defaults = detailDefaults.get(`${field.categoryCode}:${field.fieldCode}`);
-    return defaults ? { ...defaults, ...field, label: defaults.label, fieldType: defaults.fieldType, description: defaults.description } : field;
+    return defaults ? normalizeTemplateField({ ...defaults, ...field, label: defaults.label, fieldType: defaults.fieldType, description: defaults.description }) : normalizeTemplateField(field);
   });
   const existing = new Set(normalizedBase.filter((field) => field.scene === 'DETAIL').map((field) => `${field.categoryCode}:${field.fieldCode}`));
   return [...normalizedBase, ...detail.filter((field) => !existing.has(`${field.categoryCode}:${field.fieldCode}`))];

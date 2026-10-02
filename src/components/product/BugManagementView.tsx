@@ -24,7 +24,7 @@ import { StatCard, StatusTag } from '../common/UIComponents';
 import { SearchableSelect } from '../common';
 import { BugItem } from '../../types';
 import { CollapsibleDescription } from './CollapsibleDescription';
-import { WorkItemCreatePanel, WorkItemDetailHeader } from './WorkItemCreatePanel';
+import { WorkItemCreatePanel, WorkItemDetailHeader, WorkItemRelationTabs } from './WorkItemCreatePanel';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
@@ -75,6 +75,7 @@ export const BugManagementView: React.FC = () => {
 
   // Form Fields: 缺陷名称、所属产品、关联版本、缺陷类型、严重程度、处理人、参与人、预计解决时间、所属环境、缺陷描述、复现步骤
   const [formTitle, setFormTitle] = useState('');
+  const [formTarget, setFormTarget] = useState('');
   const [formProductLine, setFormProductLine] = useState('');
   const [formVersion, setFormVersion] = useState('');
   const [formType, setFormType] = useState('');
@@ -96,6 +97,7 @@ export const BugManagementView: React.FC = () => {
   const openAddModal = () => {
     setEditingBug(null);
     setFormTitle('');
+    setFormTarget('');
     setFormProductLine('');
     setFormVersion('');
     setFormType('');
@@ -118,6 +120,7 @@ export const BugManagementView: React.FC = () => {
     if (e) e.stopPropagation();
     setEditingBug(bug);
     setFormTitle(bug.title);
+    setFormTarget(bug.expectedGoal || '');
     setFormProductLine(bug.productLineName);
     setFormVersion(bug.versionName);
     setFormType(bug.type || '功能缺陷');
@@ -141,6 +144,13 @@ export const BugManagementView: React.FC = () => {
       addToast('warning', '请填写缺陷 Bug 标题');
       return;
     }
+    const requiredFields: Array<[string, string]> = [['productLine', formProductLine], ['version', formVersion], ['severity', formSeverity], ['priority', formPriority], ['assignee', formAssignee]];
+    const missing = requiredFields.find(([field, value]) => createFields.required(field) && !value);
+    if (missing) {
+      const labels: Record<string, string> = { productLine: '所属产品', version: '关联版本', severity: '严重程度', priority: '优先级', assignee: '责任处理人' };
+      addToast('warning', `请填写${labels[missing[0]]}`);
+      return;
+    }
 
     if (editingBug) {
       updateBug(editingBug.id, {
@@ -154,6 +164,7 @@ export const BugManagementView: React.FC = () => {
         status: formStatus,
         env: formEnv,
         description: formDescription
+        ,expectedGoal: formTarget
         ,sourceWorkOrderIds: selectedWorkOrderIds
         ,sourceWorkOrderTitles: availableWorkOrders.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title)
         ,requirementId: selectedRequirementId
@@ -174,6 +185,7 @@ export const BugManagementView: React.FC = () => {
         env: formEnv,
         createdAt: new Date().toISOString().split('T')[0],
         description: formDescription
+        ,expectedGoal: formTarget
         ,sourceWorkOrderIds: selectedWorkOrderIds
         ,sourceWorkOrderTitles: availableWorkOrders.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title)
         ,requirementId: selectedRequirementId
@@ -401,28 +413,28 @@ export const BugManagementView: React.FC = () => {
             <button type="button" onClick={(event) => { const bug = selectedBug; setSelectedBug(null); openEditModal(bug, event); }} className="app-button-secondary h-10 px-4 text-xs font-semibold">编辑缺陷</button>
             <button type="button" onClick={() => setSelectedBug(null)} className="tech-button-primary h-10 rounded-lg px-4 text-xs font-semibold">关闭</button>
           </>}
-          properties={<div className="space-y-6 text-xs">
+          properties={<div className="flex flex-col space-y-6 text-xs">
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
-              {detailVisible('status') && <DetailField label="当前状态"><StatusTag status={selectedBug.status} /></DetailField>}
-              {detailVisible('productLine') && <DetailField label="所属产品">{selectedBug.productLineName || '未设置'}</DetailField>}
-              {detailVisible('version') && <DetailField label="关联版本">{selectedBug.versionName || '未设置'}</DetailField>}
-              {detailVisible('severity') && <DetailField label="严重程度"><StatusTag status={selectedBug.severity} /></DetailField>}
-              {detailVisible('priority') && <DetailField label="优先级"><StatusTag status={selectedBug.priority || '中'} /></DetailField>}
-              {detailVisible('type') && <DetailField label="缺陷类型">{selectedBug.type || '功能缺陷'}</DetailField>}
-              {detailVisible('assignee') && <DetailField label="责任处理人">{selectedBug.assignee || '未设置'}</DetailField>}
-              {detailVisible('participants') && <DetailField label="参与人">{formCc || '未设置'}</DetailField>}
-              {detailVisible('env') && <DetailField label="所属环境">{selectedBug.env || '未设置'}</DetailField>}
-              {detailVisible('creator') && <DetailField label="提报人">{selectedBug.reporter || '未设置'}</DetailField>}
-              {detailVisible('createdAt') && <DetailField label="创建时间"><span className="font-mono">{selectedBug.createdAt || '未设置'}</span></DetailField>}
+              {detailVisible('status') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'status')?.sort ?? 999 }} label="当前状态"><StatusTag status={selectedBug.status} /></DetailField>}
+              {detailVisible('productLine') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'productLine')?.sort ?? 999 }} label="所属产品">{selectedBug.productLineName || '未设置'}</DetailField>}
+              {detailVisible('version') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'version')?.sort ?? 999 }} label="关联版本">{selectedBug.versionName || '未设置'}</DetailField>}
+              {detailVisible('severity') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'severity')?.sort ?? 999 }} label="严重程度"><StatusTag status={selectedBug.severity} /></DetailField>}
+              {detailVisible('priority') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'priority')?.sort ?? 999 }} label="优先级"><StatusTag status={selectedBug.priority || '中'} /></DetailField>}
+              {detailVisible('type') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'type')?.sort ?? 999 }} label="缺陷类型">{selectedBug.type || '功能缺陷'}</DetailField>}
+              {detailVisible('assignee') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'assignee')?.sort ?? 999 }} label="责任处理人">{selectedBug.assignee || '未设置'}</DetailField>}
+              {detailVisible('participants') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'participants')?.sort ?? 999 }} label="参与人">{formCc || '未设置'}</DetailField>}
+              {detailVisible('env') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'env')?.sort ?? 999 }} label="所属环境">{selectedBug.env || '未设置'}</DetailField>}
+              {detailVisible('creator') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'creator')?.sort ?? 999 }} label="提报人">{selectedBug.reporter || '未设置'}</DetailField>}
+              {detailVisible('createdAt') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'createdAt')?.sort ?? 999 }} label="创建时间"><span className="font-mono">{selectedBug.createdAt || '未设置'}</span></DetailField>}
             </section>
           </div>}
         >
           <div className="w-full space-y-5 text-xs">
             <div className="flex items-center gap-5 border-b border-[var(--border-main)]"><button type="button" onClick={() => setDetailTab('overview')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'overview' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>缺陷详情</button><button type="button" onClick={() => setDetailTab('requirement')} className={`border-b-2 px-1 pb-2 text-sm ${detailTab === 'requirement' ? 'border-[var(--primary)] text-[var(--active-text)]' : 'border-transparent text-[var(--text-muted)]'}`}>关联需求</button></div>
             {detailTab === 'requirement' ? <DetailField label="关联需求">{requirementTasks.find((item) => item.id === selectedBug.requirementId)?.title || '未关联需求'}</DetailField> : <>
-            {detailVisible('description') && <DetailField label="复现步骤 / 缺陷描述"><CollapsibleDescription value={selectedBug.description} emptyText="未填写缺陷描述" /></DetailField>}
-            {detailVisible('relations') && <DetailField label="关联事项">
+            {detailVisible('description') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'description')?.sort ?? 999 }} label="复现步骤 / 缺陷描述"><CollapsibleDescription value={selectedBug.description} emptyText="未填写缺陷描述" /></DetailField>}
+            {detailVisible('relations') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'relations')?.sort ?? 999 }} label="关联事项">
               {selectedBug.sourceWorkOrderTitles?.length ? <div className="flex flex-wrap gap-2">{selectedBug.sourceWorkOrderTitles.map((title, index) => <span key={`${title}-${index}`} className="max-w-full truncate rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]">{title}</span>)}</div> : '未关联事项'}
             </DetailField>}
             </>}
@@ -453,10 +465,10 @@ export const BugManagementView: React.FC = () => {
             </button>
           </>
         }
-        properties={<div className="space-y-4 text-xs">
+        properties={<div className="flex flex-col space-y-4 text-xs">
           {createFields.visible('productLine') && <SearchableSelect label="所属产品" required={createFields.required('productLine')} value={formProductLine} options={productLines.map((pl) => pl.name)} onChange={(value) => { setFormProductLine(value); setFormVersion(''); }} placeholder="请选择所属产品" />}
           {createFields.visible('version') && <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[var(--text-primary)]">关联版本 <span className="text-red-500">*</span></label>
+            <label className="text-xs font-medium text-[var(--text-primary)]">关联版本 {createFields.required('version') && <span className="text-red-500">*</span>}</label>
             <Cascader
               showSearch
               value={formVersion ? [formVersion] : undefined}
@@ -467,7 +479,7 @@ export const BugManagementView: React.FC = () => {
             />
           </div>}
           {createFields.visible('severity') && <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[var(--text-primary)]">严重程度 <span className="text-red-500">*</span></label>
+            <label className="text-xs font-medium text-[var(--text-primary)]">严重程度 {createFields.required('severity') && <span className="text-red-500">*</span>}</label>
             <Cascader
               showSearch
               value={formSeverity ? [formSeverity] : undefined}
@@ -478,7 +490,7 @@ export const BugManagementView: React.FC = () => {
             />
           </div>}
           {createFields.visible('priority') && <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[var(--text-primary)]">优先级 <span className="text-red-500">*</span></label>
+            <label className="text-xs font-medium text-[var(--text-primary)]">优先级 {createFields.required('priority') && <span className="text-red-500">*</span>}</label>
             <Cascader
               showSearch
               value={formPriority ? [formPriority] : undefined}
@@ -500,24 +512,13 @@ export const BugManagementView: React.FC = () => {
             />
           </div>}
           {createFields.visible('assignee') && <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[var(--text-primary)]">责任处理人 <span className="text-red-500">*</span></label>
+            <label className="text-xs font-medium text-[var(--text-primary)]">责任处理人 {createFields.required('assignee') && <span className="text-red-500">*</span>}</label>
             <Cascader
               showSearch
               value={formAssignee ? [formAssignee] : undefined}
               onChange={(value) => setFormAssignee(value?.[0])}
               options={employeeOptions}
               placeholder="搜索姓名或职位"
-              className="w-full"
-            />
-          </div>}
-          {createFields.visible('requirement') && <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[var(--text-muted)]">关联需求任务</label>
-            <Cascader
-              showSearch
-              allowClear value={selectedRequirementId ? [selectedRequirementId] : undefined}
-              onChange={(value) => { const title = value?.[0]; setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || ''); }}
-              options={requirementTasks.map((task) => task.title).map((opt: string) => ({ label: opt, value: opt }))}
-              placeholder="请选择关联需求任务"
               className="w-full"
             />
           </div>}
@@ -552,12 +553,19 @@ export const BugManagementView: React.FC = () => {
               />
             </div>}
 
+            {createFields.visible('expectedGoal') && <div><label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">期望结果 {createFields.required('expectedGoal') && '*'}</label><textarea required={createFields.required('expectedGoal')} value={formTarget} onChange={(event) => setFormTarget(event.target.value)} rows={3} placeholder="请填写任务完成后的预期结果" className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" /></div>}
             {createFields.visible('description') && <div>
               <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
                 复现步骤
               </label>
               <RichTextEditor editor={descriptionEditor} value={formDescription || formSteps} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormSteps(text); setFormDescriptionHtml(html); }} placeholder="请详细描述复现步骤、实际结果和期望结果..." />
             </div>}
+            <WorkItemRelationTabs items={[
+              ...((createFields.visible('relations') || createFields.visible('requirement')) ? [{ key: 'relations', label: '关联对象', count: 0, description: '创建后可继续关联产品任务和协助事项。', content: <div><label className="mb-2 block text-xs font-medium text-[var(--text-primary)]">关联需求任务</label><Cascader showSearch allowClear value={selectedRequirementId ? [selectedRequirementId] : undefined} onChange={(value) => { const title = value?.[0]; setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || ''); }} options={requirementTasks.map((task) => task.title).map((opt: string) => ({ label: opt, value: opt }))} placeholder="请选择关联需求任务" className="w-full" /></div> }] : []),
+              ...(createFields.visible('children') ? [{ key: 'children', label: '子任务', count: 0, description: '创建后可在详情页新增或关联子任务。' }] : []),
+              ...(createFields.visible('support') ? [{ key: 'support', label: '支撑项', count: 0, description: '创建后可在详情页关联测试计划等支撑事项。' }] : []),
+              ...(createFields.visible('hours') ? [{ key: 'hours', label: '工时', count: 0, description: '创建后可在详情页登记工时并查看统计。' }] : []),
+            ]} />
           </div>
         </form>
       </WorkItemCreatePanel>
@@ -565,8 +573,8 @@ export const BugManagementView: React.FC = () => {
   );
 };
 
-const DetailField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div>
+const DetailField: React.FC<{ label: string; children: React.ReactNode; style?: React.CSSProperties }> = ({ label, children, style }) => (
+  <div style={style}>
     <span className="block text-[var(--text-muted)]">{label}</span>
     <div className="mt-1 min-h-8 break-words rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 py-2 text-[var(--text-primary)]">{children}</div>
   </div>
