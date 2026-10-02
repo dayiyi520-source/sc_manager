@@ -1675,7 +1675,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
             {renderDetail && taskKind !== 'test' && <section className="test-task-detail-extension">{renderDetail({ task: selectedTask, children: childWorkItems, parent: parentWorkItem, onOpenParent: parentWorkItem ? () => setSelectedTask(storedTask(parentWorkItem, selectedTask)) : undefined, editing: !selectedTask.hasChildren, onUpdate: saveDetailUpdates, employeeNames: employees, employeeOptions: resolvedEmployeeOptions, versions, statusControl: taskStatusControl(selectedTask, true, Boolean(selectedTask.hasChildren)) })}</section>}
             <div className="space-y-5">
               <div className="block text-[var(--text-muted)]">
-                {detailVisible('description') && <div className="flex items-center justify-between gap-3"><span>任务描述</span>{!selectedTask.hasChildren && detailEditable('description') && <Button size="small" type="text" onClick={() => setDetailEditing((value) => !value)}>{detailEditing ? '取消' : '编辑'}</Button>}</div>}
+                {detailVisible('description') && <div className="flex items-center justify-between gap-3"><span>任务描述</span>{!selectedTask.hasChildren && detailEditable('description') && (detailEditing ? <span className="flex items-center gap-2"><Button size="small" onClick={() => { setDetailDescription(selectedTask.description || ''); setDetailDescriptionHtml(selectedTask.descriptionHtml || ''); setDetailEditing(false); }}>取消</Button><Button size="small" type="primary" onClick={() => void saveDetailUpdates({ description: detailDescription, descriptionHtml: detailDescriptionHtml }).then((saved) => { if (saved) { setDetailEditing(false); addToast('success', '描述修改成功', ''); } })}>保存</Button></span> : <Button size="small" type="text" onClick={() => setDetailEditing(true)}>编辑</Button>)}</div>}
                 <div className="mt-1">
                   {detailEditing && detailVisible('description') ? <>
                     <RichTextEditor
@@ -1690,7 +1690,6 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                     }}
                     placeholder="详细记录需求背景、业务场景和实现说明..."
                     />
-                    <div className="mt-2 flex justify-end gap-2"><Button size="small" onClick={() => { setDetailDescription(selectedTask.description || ''); setDetailDescriptionHtml(selectedTask.descriptionHtml || ''); setDetailEditing(false); }}>取消</Button><Button size="small" type="primary" onClick={() => void saveDetailUpdates({ description: detailDescription, descriptionHtml: detailDescriptionHtml }).then((saved) => { if (saved) { setDetailEditing(false); addToast('success', '描述修改成功', ''); } })}>保存</Button></div>
                   </> : detailVisible('description') ? <CollapsibleDescription value={detailDescription} emptyText="未填写任务描述" /> : null}
                 </div>
               </div>
