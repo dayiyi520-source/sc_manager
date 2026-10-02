@@ -6,6 +6,7 @@ import { useQuery,useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useApp } from '../../../context/AppContext';
 import { okrRepository,OkrPayload,OkrPerson,OkrRecord } from '../../../services/okrRepository';
+import { teamRepository } from '../../../services/teamRepository';
 import { ObjectiveEditor } from './ObjectiveEditor';
 import { ReviewEditor } from './ReviewEditor';
 import { WorkLinks } from './WorkLinks';
@@ -23,6 +24,7 @@ function WorkspaceContent(){
  const [editing,setEditing]=useState<OkrRecord|'new'>();const [busy,setBusy]=useState(false);const [evaluation,setEvaluation]=useState<OkrRecord>();
  const [evalForm]=Form.useForm();const [orgPerson,setOrgPerson]=useState<OkrPerson>();const [supervisor,setSupervisor]=useState<string>();
  const people=useQuery({queryKey:['okr',currentUser.id,'people'],queryFn:okrRepository.people});
+ const teamMembers=useQuery({queryKey:['team-member-options'],queryFn:teamRepository.options,retry:false});
  const records=useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:()=>okrRepository.records(currentUser.id)});
  const work=useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>okrRepository.work(currentUser.id)});
  const events=useQuery({queryKey:['okr',currentUser.id,'events',detailId],queryFn:()=>okrRepository.events(detailId!),enabled:!!detailId});
@@ -79,7 +81,7 @@ function WorkspaceContent(){
    </Form>
   </Modal>
   <Modal open={!!orgPerson} title={`${orgPerson?.name||''} · 组织关系`} onCancel={()=>setOrgPerson(undefined)} confirmLoading={busy} onOk={async()=>{if(supervisor&&await run(()=>okrRepository.reporting(orgPerson!,supervisor==='root'?null:supervisor,supervisor==='root')))setOrgPerson(undefined);}}>
-   <Select className="w-full" showSearch optionFilterProp="label" value={supervisor} onChange={setSupervisor} options={[{value:'root',label:'组织根目标负责人'},...(people.data||[]).filter(p=>p.id!==orgPerson?.id).map(p=>({value:p.id,label:p.name}))]}/>
+   <Select className="w-full" showSearch optionFilterProp="label" value={supervisor} onChange={setSupervisor} options={[{value:'root',label:'组织根目标负责人'},...(teamMembers.data||[]).filter(p=>p.id!==orgPerson?.id).map(p=>({value:p.id,label:p.name}))]}/>
   </Modal>
  </div>;
 }

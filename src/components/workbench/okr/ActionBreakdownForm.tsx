@@ -4,6 +4,7 @@ import { GitBranchIcon, GrabberIcon, PlusIcon, TrashIcon } from '@primer/octicon
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState, type Key } from 'react';
 import type { OkrPerson, OkrRecord, OkrSettings } from '../../../services/okrRepository';
+import type { EmployeeOption } from '../../../types';
 
 export type ActionValues = {
   recordId?: string;
@@ -70,7 +71,7 @@ const defaultCommitmentWeight = (parents: OkrRecord[], index: number) => {
   return base + (index < remainder ? 1 : 0);
 };
 
-export function ActionBreakdownForm({ open, cycle, person, parents, actions, people, productLineOptions, projectOptions, businessOptionsLoading = false, businessOptionsError, busy, onClose, onSave, initialActionId, settings }: {
+export function ActionBreakdownForm({ open, cycle, person, parents, actions, people, teamMembers, productLineOptions, projectOptions, businessOptionsLoading = false, businessOptionsError, busy, onClose, onSave, initialActionId, settings }: {
   key?: Key;
   open: boolean;
   cycle: string;
@@ -78,6 +79,7 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
   parents: OkrRecord[];
   actions: OkrRecord[];
   people: OkrPerson[];
+  teamMembers?: EmployeeOption[];
   productLineOptions: string[];
   projectOptions: string[];
   businessOptionsLoading?: boolean;
@@ -99,6 +101,7 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
   const [savingMode, setSavingMode] = useState<'draft' | 'submit'>('submit');
   const groupsValue = Form.useWatch('groups', form) || form.getFieldValue('groups') || {};
   const periods = useMemo(monthOptions, []);
+  const assigneeOptions = (teamMembers ?? people).map(member => ({ value: member.id, label: `${member.name}${member.department ? ` · ${member.department}` : ''}` }));
 
   const draftAction = initialActionId ? actions.find(item => item.id === initialActionId) : undefined;
   const draftParent = draftAction ? parents.find(item => item.id === draftAction.payload.parentActionId && item.payload.parentObjectiveId === draftAction.payload.parentObjectiveId) : undefined;
@@ -236,7 +239,7 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
                 <Form.Item name={[field.name, 'businessObject']} rules={[{ required: true, message: `请选择${config.relationLabel.replace('选择', '')}` }]}><Select aria-label={`A${actionIndex + 1} ${config.relationLabel}`} placeholder={config.relationPlaceholder} loading={businessOptionsLoading && parentIndex < 2} notFoundContent={businessOptionsLoading && parentIndex < 2 ? '正在加载业务数据' : '暂无可选业务数据'} options={config.relationOptions.map(value => ({ value, label: value }))} /></Form.Item>
                 <Form.Item name={[field.name, 'title']} rules={[{ required: true, whitespace: true, message: '请输入动作描述' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 动作描述`} placeholder="输入具体行动" autoSize={{ minRows: 2, maxRows: 4 }} maxLength={2000} /></Form.Item>
                 {config.resultOptions ? <Form.Item name={[field.name, 'milestone']} rules={[{ required: true, message: '请选择节点' }]}><Select aria-label={`A${actionIndex + 1} ${config.resultLabel}`} placeholder={config.resultPlaceholder} options={config.resultOptions.map(value => ({ value, label: value }))} /></Form.Item> : <Form.Item name={[field.name, 'measurableResult']} rules={[{ required: true, whitespace: true, message: '请输入可衡量结果' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 可衡量结果`} placeholder={config.resultPlaceholder} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={1000} /></Form.Item>}
-                <Form.Item name={[field.name, 'assigneeIds']}><Select aria-label={`A${actionIndex + 1} 指定承接人`} mode="multiple" allowClear showSearch optionFilterProp="label" placeholder="选择承接人" maxTagCount="responsive" options={people.map(person => ({ value: person.id, label: `${person.name} · ${person.department}` }))} /></Form.Item>
+                <Form.Item name={[field.name, 'assigneeIds']}><Select aria-label={`A${actionIndex + 1} 指定承接人`} mode="multiple" allowClear showSearch optionFilterProp="label" placeholder="选择承接人" maxTagCount="responsive" options={assigneeOptions} /></Form.Item>
                 <Form.Item name={[field.name, 'deadline']} rules={[{ required: true, message: '请选择完成时间' }]}><DatePicker aria-label={`A${actionIndex + 1} 完成时间`} className="w-full" defaultValue={parent.payload.deadline ? dayjs(parent.payload.deadline) : undefined} maxDate={parent.payload.deadline ? dayjs(parent.payload.deadline) : undefined} disabledDate={date => Boolean(parent.payload.deadline && date.isAfter(dayjs(parent.payload.deadline), 'day'))} /></Form.Item>
                 <Form.Item name={[field.name, 'weight']} rules={[{ required: true, type: 'number', min: 1, max: 100, message: '请输入 1-100 的权重' }]}><InputNumber aria-label={`A${actionIndex + 1} 权重`} min={1} max={100} precision={0} suffix="%" /></Form.Item>
                 <Button danger type="text" aria-label={`删除 A${actionIndex + 1}`} title="删除行动" icon={<TrashIcon />} onClick={() => setParentActions(parent.id, balanceWeights(getParentActions(parent.id).filter((_, index) => index !== actionIndex)))} />

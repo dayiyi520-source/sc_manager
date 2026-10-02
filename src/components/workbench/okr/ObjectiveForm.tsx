@@ -2,7 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } f
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Tooltip } from 'antd';
 import { GrabberIcon, PlusIcon, TrashIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
-import type { OKRItem } from '../../../types';
+import type { EmployeeOption, OKRItem } from '../../../types';
 import type { OkrKr, OkrPayload, OkrPerson } from '../../../services/okrRepository';
 import { periodStatusLabel } from './cycleOptions';
 
@@ -12,6 +12,7 @@ interface Props {
   ownerName: string;
   parents: OKRItem[];
   people?: OkrPerson[];
+  teamMembers?: EmployeeOption[];
   busy: boolean;
   unavailable: boolean;
   root: boolean;
@@ -30,7 +31,7 @@ interface Props {
 export interface ObjectiveFormHandle { submit: () => Promise<boolean>; saveDraft: () => Promise<boolean>; }
 export const calculateKrWeightTotal = (items: Pick<OkrKr, 'weight'>[]) => items.reduce((total, item) => total + item.weight, 0);
 
-export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, people = [], busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false }, ref) {
+export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, people = [], teamMembers, busy, unavailable, root, onCancel, onSave, onSaveDraft, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false }, ref) {
   const [title, setTitle] = useState(initialPayload?.title || '');
   const [krs, setKrs] = useState<OkrKr[]>(() => initialPayload?.keyResults?.length ? initialPayload.keyResults : [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -42,6 +43,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     setKrs(initialPayload?.keyResults?.length ? initialPayload.keyResults : [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
   }, [initialPayload]);
   const krWeightTotal = calculateKrWeightTotal(krs);
+  const assigneeOptions = (teamMembers ?? people).map(person => ({ value: person.id, label: `${person.name}${person.department ? ` · ${person.department}` : ''}` }));
   const changeKr = (id: string, patch: Partial<OkrKr>) => setKrs(items => items.map(kr => kr.id === id ? { ...kr, ...patch } : kr));
   const distribute = (items: OkrKr[]) => items.map((kr, i) => ({ ...kr, weight: Math.floor(100 / items.length) + (i < 100 % items.length ? 1 : 0) }));
   const payload = (): OkrPayload => {
@@ -94,7 +96,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
           <InputNumber aria-label={`A${index + 1} 权重`} min={1} max={100} precision={0} suffix="%" value={kr.weight} onChange={value => changeKr(kr.id, { weight: value ?? 0 })}/>
           <DatePicker aria-label={`A${index + 1} 截止日期`} placeholder="截止日期" value={kr.deadline ? dayjs(kr.deadline) : null} onChange={value => changeKr(kr.id, { deadline: value?.format('YYYY-MM-DD') })}/>
           <Tooltip title="删除动作"><Button aria-label={`删除 A${index + 1}`} type="text" icon={<TrashIcon/>} disabled={busy || krs.length === 1} onClick={() => setKrs(items => distribute(items.filter(item => item.id !== kr.id)))}/></Tooltip>
-          <Select className="okr-action-assignees" aria-label={`A${index + 1} 承接人员`} mode="multiple" allowClear showSearch optionFilterProp="label" maxTagCount="responsive" placeholder="指定承接人员（可选）" value={kr.assigneeIds || []} onChange={assigneeIds => changeKr(kr.id, { assigneeIds })} options={people.map(person => ({value: person.id, label: `${person.name} · ${person.department}`}))}/>
+          <Select className="okr-action-assignees" aria-label={`A${index + 1} 承接人员`} mode="multiple" allowClear showSearch optionFilterProp="label" maxTagCount="responsive" placeholder="指定承接人员（可选）" value={kr.assigneeIds || []} onChange={assigneeIds => changeKr(kr.id, { assigneeIds })} options={assigneeOptions}/>
         </div>)}
       </div>
       <div className="okr-objective-add">{!readOnly && <Button type="text" icon={<PlusIcon/>} disabled={busy || krs.length >= 20} onClick={() => setKrs(items => distribute([...items, { id: crypto.randomUUID(), title: '', weight: 0, progress: 0 }]))}>继续添加</Button>}<span>A 权重合计 {krWeightTotal}%</span></div>

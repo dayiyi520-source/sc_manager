@@ -15,8 +15,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../context/AppContext', () => ({
   useApp: () => ({
     ...mocks,
-    productLines: [{ id: 'line-1', name: '协同产品', code: 'PL-01', ownerName: '林志豪', members: [] }],
+    productLines: [{ id: 'line-1', name: '协同产品', code: 'PL-01', ownerName: '林志豪', members: [{ id: 'member-1', userId: 'user-1', name: '林志豪', role: '管理员' }] }],
   }),
+}));
+
+vi.mock('../../services/teamRepository', () => ({
+  teamRepository: { options: vi.fn().mockResolvedValue([{ id: 'user-1', name: '林志豪', department: '产品研发部', jobTitle: '产品经理' }, { id: 'user-2', name: '不属于产品线成员', department: '产品研发部' }]) },
 }));
 
 describe('CreateVersionModal', () => {
@@ -24,7 +28,9 @@ describe('CreateVersionModal', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={queryClient}><CreateVersionModal isOpen onClose={vi.fn()} /></QueryClientProvider>);
 
-    expect(screen.getByText(/所属产品/)).toHaveTextContent('*');
+    expect(screen.getAllByText(/所属产品/)[0]).toHaveTextContent('*');
+    expect(screen.getByRole('combobox', { name: '版本负责人' })).toBeDisabled();
+    expect(screen.getByText('请先选择所属产品')).toBeInTheDocument();
     expect(document.querySelector('textarea')).toHaveAttribute('placeholder', VERSION_RELEASE_NOTES_PLACEHOLDER);
     fireEvent.submit(document.querySelector('#create-version-form')!);
 
@@ -36,6 +42,15 @@ describe('CreateVersionModal', () => {
     expect(shouldClearEndDate('2026-09-25', '2026-09-20')).toBe(true);
     expect(shouldClearEndDate('2026-09-20', '2026-09-20')).toBe(false);
     expect(shouldClearEndDate('2026-09-01', '')).toBe(false);
+  });
+
+  it('limits version owners to the selected product line members', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><CreateVersionModal isOpen productLine={{ id: 'line-1', name: '协同产品', code: 'PL-01', description: '', ownerName: '林志豪', members: [{ id: 'member-1', userId: 'user-1', name: '林志豪', role: '管理员' }] }} onClose={vi.fn()} /></QueryClientProvider>);
+    const ownerSelect = await screen.findByRole('combobox', { name: '版本负责人' });
+    fireEvent.mouseDown(ownerSelect);
+    await waitFor(() => expect(screen.getByRole('option', { name: '林志豪 · 产品经理' })).toBeInTheDocument());
+    expect(screen.queryByRole('option', { name: '不属于产品线成员' })).not.toBeInTheDocument();
   });
 
   it('disables end dates before the selected start date', () => {

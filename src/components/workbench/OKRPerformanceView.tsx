@@ -323,6 +323,7 @@ const OriginalWorkspace: React.FC = () => {
         ownerName={currentUser.name}
         parents={parents}
         people={people}
+        teamMembers={teamMembers}
         busy={busy}
         unavailable={loading || !!error}
         root={!!me?.rootFlag}
@@ -342,6 +343,7 @@ const OriginalWorkspace: React.FC = () => {
       parents={visibleActionParents}
       actions={[record]}
       people={people}
+      teamMembers={teamMembers}
       productLineOptions={productLineOptions}
       projectOptions={projectOptions}
       businessOptionsLoading={businessOptionsLoading}
@@ -445,7 +447,7 @@ const OriginalWorkspace: React.FC = () => {
             <div className={`okr-objective-form-stack${objectiveBatchAction ? ' is-batching' : ''}`} aria-busy={objectiveBatchAction !== null}>
             <div className="okr-objective-period">{dayjs(targetFormCycle).format('YYYY年MM月')}<span>{periodStatusLabel(targetFormCycle)}</span></div>
               {objectiveForms.map((formId, formIndex) => (
-            <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={targetFormCycle} objectiveIndex={formIndex} ownerName={currentUser.name} parents={parents} people={people} busy={busy} unavailable={loading || !!error}
+            <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={targetFormCycle} objectiveIndex={formIndex} ownerName={currentUser.name} parents={parents} people={people} teamMembers={teamMembers} busy={busy} unavailable={loading || !!error}
               root={!!me?.rootFlag}
               onCancel={() => setObjectiveForms(forms => forms.filter(id => id !== formId))}
               onSave={handleSaveOkr}
@@ -456,7 +458,7 @@ const OriginalWorkspace: React.FC = () => {
             </div>
           )}
 
-          {isMyOkrCategory && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key={`new-action-${targetFormCycle}`} open cycle={targetFormCycle} person={me} parents={visibleActionParents} actions={[]} people={people} productLineOptions={productLineOptions} projectOptions={projectOptions} businessOptionsLoading={businessOptionsLoading} businessOptionsError={businessOptionsError} settings={settings} busy={busy} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={saveDemoBreakdown} />}
+          {isMyOkrCategory && actionFormOpen && !selectedOkrRecord && <ActionBreakdownForm key={`new-action-${targetFormCycle}`} open cycle={targetFormCycle} person={me} parents={visibleActionParents} actions={[]} people={people} teamMembers={teamMembers} productLineOptions={productLineOptions} projectOptions={projectOptions} businessOptionsLoading={businessOptionsLoading} businessOptionsError={businessOptionsError} settings={settings} busy={busy} onClose={() => { setActionFormOpen(false); setEditingActionId(undefined); setSelectedMonthDetail(null); }} onSave={saveDemoBreakdown} />}
 
 
           {/* OKR Cards List */}

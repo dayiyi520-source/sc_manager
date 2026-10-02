@@ -608,17 +608,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const productStatus = productLineDisplayStatus({ ...productLine, versions: lineVersions });
   const onlineVersion = latestReleasedVersion({ versions: lineVersions });
   const onlinePublishedAt = formatVersionPublishedAt(onlineVersion);
-  const memberUserIds = new Set((productLine.members || [])
-    .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId))
-    .map((member) => member.userId));
-  const directoryLeadOptions = employeeSelectOptions((employeesQuery.data || []).filter((employee) => memberUserIds.has(employee.id)));
-  const directoryLeadIds = new Set(directoryLeadOptions.map((option) => option.value));
-  const leadOptions = [
-    ...directoryLeadOptions,
-    ...(productLine.members || [])
-      .filter((member): member is ProductLineMember => typeof member !== 'string' && Boolean(member.userId) && !directoryLeadIds.has(member.userId))
-      .map((member) => ({ value: member.userId, label: `${member.name} · 未设置职位` })),
-  ];
+  const leadOptions = employeeSelectOptions(employeesQuery.data || []);
 
   const navigateWithLine = (menuId: string, tab?: string, applyFilter = true) => {
     if (applyFilter) sessionStorage.setItem('shichuang.productLineFilter', productLine.id);
