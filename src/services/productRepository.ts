@@ -8,8 +8,8 @@ type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
 export type WorkItemCategoryKey = string;
 export type WorkItemCategoryDefinition = { id: string; code: WorkItemCategoryKey; name: string; displayName: string; iconKey: string; capabilityType: 'STANDARD' | 'TEST_CASE'; sort: number; enabled: boolean; builtIn: boolean; revision: number };
-export type WorkItemFieldScene = 'CREATE' | 'CREATE_CHILD' | 'LIST' | 'ITERATION';
-export type WorkItemFieldConfiguration = { fieldCode: string; label: string; fieldType: string; visible: boolean; required: boolean; sort: number; locked: boolean };
+export type WorkItemFieldScene = 'CREATE' | 'CREATE_CHILD' | 'LIST' | 'ITERATION' | 'DETAIL';
+export type WorkItemFieldConfiguration = { fieldCode: string; label: string; description?: string; fieldType: string; visible: boolean; required: boolean; editable?: boolean; sort: number; locked: boolean };
 export type WorkItemFieldConfigurationSet = { categoryCode: string; scenes: Array<{ scene: WorkItemFieldScene; fields: WorkItemFieldConfiguration[] }> };
 export type WorkItemWorkflow = {
   id: string;

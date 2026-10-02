@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DatePicker, Cascader, Segmented } from "antd";
+import { DatePicker, Cascader, Segmented, Button, Select } from "antd";
 import {
   FileCode2,
   GitBranch,
@@ -17,15 +17,22 @@ import {
 import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
 import { DevTask } from '../../types';
-import { WorkItemCreatePanel } from './WorkItemCreatePanel';
+import { WorkItemCreatePanel, WorkItemDetailHeader } from './WorkItemCreatePanel';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
 import { Pagination } from '../common/Pagination';
 import { InlineEditableSelect } from '../common/InlineEditableSelect';
 import { CollapsibleDescription } from './CollapsibleDescription';
+import { useQuery } from '@tanstack/react-query';
+import { teamRepository } from '../../services/teamRepository';
+import { productRepository, type WorkItemFieldConfiguration } from '../../services/productRepository';
+import { useWorkItemFieldConfig } from './useWorkItemFieldConfig';
 
 export const DevTasksView: React.FC = () => {
-  const { devTasks, requirementTasks, addDevTask, updateDevTask, addToast } = useApp();
-  const employees = Array.from(new Set(devTasks.map((task) => task.developer).filter(Boolean)));
+  const { devTasks, requirementTasks, addDevTask, updateDevTask, addToast, currentUser } = useApp();
+  const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
+  const employees = Array.from(new Set((employeesQuery.data || []).map((employee) => employee.name).filter(Boolean)));
+  const createFields = useWorkItemFieldConfig('dev', 'CREATE');
+  const listFields = useWorkItemFieldConfig('dev', 'LIST');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -35,7 +42,15 @@ export const DevTasksView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<DevTask | null>(null);
+  const [detailFields, setDetailFields] = useState<WorkItemFieldConfiguration[]>([]);
+  const [detailConfigLoaded, setDetailConfigLoaded] = useState(false);
+  const detailVisible = (code: string) => !detailConfigLoaded || detailFields.find((field) => field.fieldCode === code)?.visible !== false;
+  const detailEditable = (code: string) => !detailConfigLoaded || detailFields.find((field) => field.fieldCode === code)?.editable !== false;
   const [detailTab, setDetailTab] = useState<'overview' | 'requirement'>('overview');
+  const [detailEditing, setDetailEditing] = useState(false);
+  const [detailTitle, setDetailTitle] = useState('');
+  const [detailDescription, setDetailDescription] = useState('');
+  const detailDescriptionEditor = useRef<HTMLDivElement>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formRepo, setFormRepo] = useState('');
   const [formBranch, setFormBranch] = useState('');
@@ -46,6 +61,26 @@ export const DevTasksView: React.FC = () => {
   const [formDescription, setFormDescription] = useState('');
   const [formDescriptionHtml, setFormDescriptionHtml] = useState('');
   const [formRequirementId, setFormRequirementId] = useState('');
+  useEffect(() => {
+    if (!selectedTask) { setDetailFields([]); setDetailConfigLoaded(false); return; }
+    setDetailConfigLoaded(false);
+    setDetailTitle(selectedTask.title);
+    setDetailDescription(selectedTask.description || '');
+    setDetailEditing(false);
+    const loadConfigurations = productRepository.workItemFieldConfigurations;
+    if (typeof loadConfigurations !== 'function') {
+      setDetailFields([]);
+      setDetailConfigLoaded(true);
+      return;
+    }
+    loadConfigurations('dev').then((result) => { setDetailFields(result.scenes.find((scene) => scene.scene === 'DETAIL')?.fields || []); setDetailConfigLoaded(true); }).catch(() => { setDetailFields([]); setDetailConfigLoaded(true); });
+  }, [selectedTask?.id]);
+  const saveDetailUpdates = async (updates: Partial<DevTask>) => {
+    if (!selectedTask) return false;
+    updateDevTask(selectedTask.id, updates);
+    setSelectedTask((current) => current ? { ...current, ...updates } : current);
+    return true;
+  };
   const openAddModal = () => {
     setFormTitle('');
     setFormRepo('');
@@ -178,13 +213,13 @@ export const DevTasksView: React.FC = () => {
           <thead>
             <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
               <th className="py-3 px-4">研发任务项</th>
-              <th className="py-3 px-4">所属代码仓</th>
-              <th className="py-3 px-4">工作特性分支</th>
-              <th className="py-3 px-4">责任开发者</th>
-              <th className="py-3 px-4">优先级</th>
-              <th className="py-3 px-4">提交数</th>
-              <th className="py-3 px-4">工时进度</th>
-              <th className="py-3 px-4">状态</th>
+              {listFields.visible('repo') && <th className="py-3 px-4">所属代码仓</th>}
+              {listFields.visible('branch') && <th className="py-3 px-4">工作特性分支</th>}
+              {listFields.visible('assignee') && <th className="py-3 px-4">责任开发者</th>}
+              {listFields.visible('priority') && <th className="py-3 px-4">优先级</th>}
+              {listFields.visible('commitsCount') && <th className="py-3 px-4">提交数</th>}
+              {listFields.visible('actualHours') && <th className="py-3 px-4">工时进度</th>}
+              {listFields.visible('status') && <th className="py-3 px-4">状态</th>}
               <th className="py-3 px-4 text-right">操作</th>
             </tr>
           </thead>
@@ -197,27 +232,27 @@ export const DevTasksView: React.FC = () => {
                     <button type="button" onClick={() => { setSelectedTask(task); setDetailTab('overview'); }} className="text-left hover:text-blue-600">{task.title}</button>
                   </div>
                 </td>
-                <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">{task.repo}</td>
-                <td className="py-3.5 px-4 font-mono text-blue-600 dark:text-blue-400">
+                {listFields.visible('repo') && <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">{task.repo}</td>}
+                {listFields.visible('branch') && <td className="py-3.5 px-4 font-mono text-blue-600 dark:text-blue-400">
                   <div className="flex items-center gap-1">
                     <GitBranch className="w-3 h-3 text-slate-400" />
                     <span>{task.branch}</span>
                   </div>
-                </td>
-                <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300"><InlineEditableSelect value={task.developer} options={employees} onChange={(developer) => updateDevTask(task.id, { developer })} /></td>
-                <td className="py-3.5 px-4"><StatusTag status={task.priority.replace(/^P[0123]-(紧急|高优|标准)$/, '$1').replace('高优', '高').replace('标准', '中')} /></td>
-                <td className="py-3.5 px-4 text-slate-600">
+                </td>}
+                {listFields.visible('assignee') && <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300"><InlineEditableSelect value={task.developer} options={employees} onChange={(developer) => updateDevTask(task.id, { developer })} /></td>}
+                {listFields.visible('priority') && <td className="py-3.5 px-4"><StatusTag status={task.priority.replace(/^P[0123]-(紧急|高优|标准)$/, '$1').replace('高优', '高').replace('标准', '中')} /></td>}
+                {listFields.visible('commitsCount') && <td className="py-3.5 px-4 text-slate-600">
                   <div className="flex items-center gap-1">
                     <GitCommit className="w-3 h-3 text-slate-400" />
                     <span>{task.commitsCount} commits</span>
                   </div>
-                </td>
-                <td className="py-3.5 px-4 text-slate-600">
+                </td>}
+                {listFields.visible('actualHours') && <td className="py-3.5 px-4 text-slate-600">
                   {task.spentHours}h / {task.estimatedHours}h
-                </td>
-                <td className="py-3.5 px-4">
+                </td>}
+                {listFields.visible('status') && <td className="py-3.5 px-4">
                   <InlineEditableSelect value={task.status} options={taskStatuses} tone="status" onChange={(status) => updateDevTask(task.id, { status })} />
-                </td>
+                </td>}
                 <td className="py-3.5 px-4 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <button
@@ -253,26 +288,27 @@ export const DevTasksView: React.FC = () => {
         <WorkItemCreatePanel
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
-          title="研发任务详情"
+          title={<span className="flex items-center gap-2"><FileCode2 className="h-4 w-4 text-[var(--primary)]" />研发任务 · <span className="font-mono text-xs">{selectedTask.id}</span></span>}
+          detailHeader={detailVisible('title') ? <WorkItemDetailHeader title={selectedTask.title} titleEditable={detailEditable('title')} creatorName={(selectedTask as DevTask & { creatorName?: string }).creatorName || currentUser.name} createdAt={(selectedTask as DevTask & { createdAt?: string }).createdAt} updaterName={currentUser.name} updatedAt={(selectedTask as DevTask & { updatedAt?: string }).updatedAt || (selectedTask as DevTask & { createdAt?: string }).createdAt} onTitleSave={(title) => { void saveDetailUpdates({ title }).then(() => addToast('success', '标题修改成功')); }} /> : undefined}
           presentation="drawer"
           showContinueOption={false}
           footer={<button type="button" onClick={() => setSelectedTask(null)} className="tech-button-primary h-10 rounded-lg px-4 text-xs font-semibold">关闭</button>}
           properties={<div className="space-y-6 text-xs">
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
-              <DetailField label="当前状态"><StatusTag status={selectedTask.status} /></DetailField>
-              <DetailField label="代码仓库">{selectedTask.repo || '未设置'}</DetailField>
-              <DetailField label="特性分支"><span className="font-mono">{selectedTask.branch || '未设置'}</span></DetailField>
-              <DetailField label="责任开发者">{selectedTask.developer || '未设置'}</DetailField>
-              <DetailField label="优先级"><StatusTag status={selectedTask.priority} /></DetailField>
-              <DetailField label="所属产品">{selectedTask.productLineName || '未设置'}</DetailField>
-              <DetailField label="迭代版本">{selectedTask.versionName || '未设置'}</DetailField>
-              <DetailField label="截止时间"><span className="font-mono">{selectedTask.dueDate || '未设置'}</span></DetailField>
+              {detailVisible('status') && <DetailField label="当前状态"><Select className="w-full" disabled={!detailEditable('status')} value={selectedTask.status} options={taskStatuses.map((value) => ({ label: value, value }))} onChange={(status) => void saveDetailUpdates({ status })} /></DetailField>}
+              {detailVisible('repo') && <DetailField label="代码仓库"><Select className="w-full" disabled={!detailEditable('repo')} value={selectedTask.repo || undefined} options={['shichuang-hub-backend', 'shichuang-crm-frontend', 'shichuang-gateway-core'].map((value) => ({ label: value, value }))} onChange={(repo) => void saveDetailUpdates({ repo })} placeholder="未设置" /></DetailField>}
+              {detailVisible('branch') && <DetailField label="特性分支"><input disabled={!detailEditable('branch')} value={selectedTask.branch || ''} onChange={(event) => setSelectedTask((current) => current ? { ...current, branch: event.target.value } : current)} onBlur={() => void saveDetailUpdates({ branch: selectedTask.branch || '' })} className="app-control w-full font-mono" placeholder="未设置" /></DetailField>}
+              {detailVisible('assignee') && <DetailField label="责任开发者"><Select className="w-full" disabled={!detailEditable('assignee')} showSearch value={selectedTask.developer || undefined} options={employees.map((value) => ({ label: value, value }))} onChange={(developer) => void saveDetailUpdates({ developer })} placeholder="未设置" /></DetailField>}
+              {detailVisible('priority') && <DetailField label="优先级"><Select className="w-full" disabled={!detailEditable('priority')} value={selectedTask.priority} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} onChange={(priority) => void saveDetailUpdates({ priority: priority as DevTask['priority'] })} /></DetailField>}
+              {detailVisible('productLine') && <DetailField label="所属产品"><span>{selectedTask.productLineName || '未设置'}</span></DetailField>}
+              {detailVisible('version') && <DetailField label="迭代版本"><span>{selectedTask.versionName || '未设置'}</span></DetailField>}
+              {detailVisible('dueDate') && <DetailField label="截止时间"><span className="font-mono">{selectedTask.dueDate || '未设置'}</span></DetailField>}
             </section>
             <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
               <h3 className="font-semibold text-[var(--text-primary)]">工时</h3>
-              <DetailField label="预计工时（小时）">{selectedTask.estimatedHours ?? 0}</DetailField>
-              <DetailField label="已投入工时（小时）">{selectedTask.spentHours ?? 0}</DetailField>
+              {detailVisible('estimatedHours') && <DetailField label="预计工时（小时）">{selectedTask.estimatedHours ?? 0}</DetailField>}
+              {detailVisible('actualHours') && <DetailField label="已投入工时（小时）">{selectedTask.spentHours ?? 0}</DetailField>}
             </section>
           </div>}
         >
@@ -288,8 +324,7 @@ export const DevTasksView: React.FC = () => {
               />
             </div>
             {detailTab === 'requirement' ? <DetailField label="关联需求">{requirementTasks.find((item) => item.id === selectedTask.requirementId)?.title || '未关联需求'}</DetailField> : <>
-            <DetailField label="研发任务名称"><span className="font-medium">{selectedTask.title}</span></DetailField>
-            <DetailField label="任务描述"><CollapsibleDescription value={selectedTask.description} emptyText="未填写任务描述" /></DetailField>
+            {detailVisible('description') && <DetailField label="任务描述"><div className="flex items-center justify-between"><span className="text-[var(--text-muted)]">{detailEditing ? '编辑中' : '只读'}</span>{detailEditable('description') && <Button size="small" type="text" onClick={() => setDetailEditing((value) => !value)}>{detailEditing ? '取消' : '编辑'}</Button>}</div>{detailEditing ? <><RichTextEditor editor={detailDescriptionEditor} value={detailDescription} htmlValue="" onInput={(text) => setDetailDescription(text)} /><div className="mt-2 flex justify-end gap-2"><Button size="small" onClick={() => { setDetailDescription(selectedTask.description || ''); setDetailEditing(false); }}>取消</Button><Button size="small" type="primary" onClick={() => void saveDetailUpdates({ description: detailDescription }).then(() => { setDetailEditing(false); addToast('success', '描述修改成功'); })}>保存</Button></div></> : <CollapsibleDescription value={detailDescription} emptyText="未填写任务描述" />}</DetailField>}
             </>}
           </div>
         </WorkItemCreatePanel>
@@ -318,19 +353,20 @@ export const DevTasksView: React.FC = () => {
           </>
         }
         properties={<div className="space-y-4 text-xs">
-          <div className="flex flex-col gap-1.5" required>
+          {createFields.visible('repo') && <div className="flex flex-col gap-1.5" required>
             <label className="text-xs font-medium text-[var(--text-primary)]">目标代码仓 <span className="text-red-500">*</span></label>
             <Cascader
               showSearch
+              disabled={employeesQuery.isLoading || employeesQuery.isError}
               value={formRepo ? [formRepo] : undefined}
               onChange={(value: any) => setFormRepo(value?.[0] || '')}
               options={['shichuang-hub-backend', 'shichuang-crm-frontend', 'shichuang-gateway-core'].map((opt: string) => ({ label: opt, value: opt }))}
               placeholder="请选择目标代码仓"
               className="w-full"
             />
-          </div>
-          <label className="block text-[var(--text-muted)]">特性分支 *<input required value={formBranch} onChange={(e) => setFormBranch(e.target.value)} placeholder="feat/feature-name" className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 font-mono text-[var(--text-primary)]" /></label>
-          <div className="flex flex-col gap-1.5" required>
+          </div>}
+          {createFields.visible('branch') && <label className="block text-[var(--text-muted)]">特性分支 *<input required={createFields.required('branch')} value={formBranch} onChange={(e) => setFormBranch(e.target.value)} placeholder="feat/feature-name" className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 font-mono text-[var(--text-primary)]" /></label>}
+          {createFields.visible('assignee') && <div className="flex flex-col gap-1.5" required>
             <label className="text-xs font-medium text-[var(--text-primary)]">责任开发者 <span className="text-red-500">*</span></label>
             <Cascader
               showSearch
@@ -340,8 +376,8 @@ export const DevTasksView: React.FC = () => {
               placeholder="搜索并选择开发者"
               className="w-full"
             />
-          </div>
-          <div className="flex flex-col gap-1.5" required>
+          </div>}
+          {createFields.visible('priority') && <div className="flex flex-col gap-1.5" required>
             <label className="text-xs font-medium text-[var(--text-primary)]">优先级 <span className="text-red-500">*</span></label>
             <Cascader
               showSearch
@@ -351,12 +387,12 @@ export const DevTasksView: React.FC = () => {
               placeholder="请选择优先级"
               className="w-full"
             />
-          </div>
-          <label className="block text-[var(--text-muted)]">预计工时（小时）<input min="0" type="number" value={formHours} onChange={(e) => setFormHours(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" /></label>
+          </div>}
+          {createFields.visible('estimatedHours') && <label className="block text-[var(--text-muted)]">预计工时（小时）<input min="0" type="number" value={formHours} onChange={(e) => setFormHours(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" /></label>}
         </div>}
       >
         <form onSubmit={handleSaveDevTask} className="w-full space-y-5 text-xs" data-work-item-form>
-          <div className="col-span-2">
+          {createFields.visible('title') && <div className="col-span-2">
             <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">
               研发任务描述 *
             </label>
@@ -368,9 +404,9 @@ export const DevTasksView: React.FC = () => {
               placeholder="如：编写人大金仓 Kingbase 驱动方言转换拦截器"
               className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             />
-          </div>
+          </div>}
 
-          <div className="col-span-2"><label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">任务描述</label><RichTextEditor editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} /></div>
+          {createFields.visible('description') && <div className="col-span-2"><label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">任务描述</label><RichTextEditor editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} /></div>}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-[var(--text-muted)]">关联需求任务</label>
             <Cascader

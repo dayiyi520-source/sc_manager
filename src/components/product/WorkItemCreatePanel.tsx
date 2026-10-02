@@ -1,21 +1,58 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Drawer } from 'antd';
 import { X } from '@/components/common/octicons-compat';
+import { PersonAvatar } from '../common/PersonIdentity';
+
+export const WorkItemDetailHeader: React.FC<{
+  title: string;
+  titleEditable?: boolean;
+  onTitleSave?: (title: string) => void;
+  creatorName?: string;
+  createdAt?: string;
+  updaterName?: string;
+  updatedAt?: string;
+}> = ({ title, titleEditable = false, onTitleSave, creatorName, createdAt, updaterName, updatedAt }) => {
+  const [draft, setDraft] = React.useState(title);
+  const [editing, setEditing] = React.useState(false);
+  const cancelled = useRef(false);
+  useEffect(() => setDraft(title), [title]);
+  const commit = () => {
+    if (cancelled.current) { cancelled.current = false; return; }
+    const next = draft.trim();
+    setEditing(false);
+    if (next && next !== title) onTitleSave?.(next);
+  };
+  const formatDate = (value?: string) => {
+    if (!value) return '未设置';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false });
+  };
+  const creator = creatorName || '未设置';
+  const updater = updaterName || creatorName || '未设置';
+  return <header className="mb-6 border-b border-[var(--border-main)] pb-5">
+    {editing && titleEditable ? <input autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === 'Enter') commit(); if (event.key === 'Escape') { cancelled.current = true; setDraft(title); setEditing(false); } }} className="h-10 w-full rounded-lg border border-[var(--primary)] bg-[var(--bg-surface)] px-3 text-xl font-semibold text-[var(--text-primary)] outline-none ring-2 ring-[var(--primary)]/20" /> : <button type="button" disabled={!titleEditable} onClick={() => titleEditable && setEditing(true)} className={`block w-full text-left text-xl font-semibold leading-8 text-[var(--text-primary)] ${titleEditable ? 'cursor-text rounded-md hover:bg-[var(--bg-surface-soft)]' : 'cursor-default'}`}>{title || '未设置'}</button>}
+    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[var(--text-muted)]">
+      <span className="inline-flex items-center gap-2"><PersonAvatar name={creator} size={24} /><span>{creator}</span><span>{formatDate(createdAt)} 创建</span></span>
+      <span className="inline-flex items-center gap-2"><PersonAvatar name={updater} size={24} /><span>{updater}</span><span>{formatDate(updatedAt || createdAt)} 更新</span></span>
+    </div>
+  </header>;
+};
 
 export const WorkItemCreatePanel: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   properties?: React.ReactNode;
   editor?: React.ReactNode;
   footer?: React.ReactNode;
   secondaryAction?: React.ReactNode;
+  detailHeader?: React.ReactNode;
   showContinueOption?: boolean;
   continueChecked?: boolean;
   onContinueCheckedChange?: (checked: boolean) => void;
   presentation?: 'workspace' | 'drawer';
-}> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, showContinueOption = true, continueChecked, onContinueCheckedChange, presentation = 'workspace' }) => {
+}> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, detailHeader, showContinueOption = true, continueChecked, onContinueCheckedChange, presentation = 'workspace' }) => {
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
@@ -25,7 +62,7 @@ export const WorkItemCreatePanel: React.FC<{
   if (!isOpen) return null;
   if (presentation === 'drawer') {
     return <Drawer open onClose={onClose} title={title} size="min(1200px, 88vw)" destroyOnHidden footer={footer ? <div className="flex items-center gap-3">{secondaryAction}<span className="flex-1" />{footer}</div> : undefined}>
-      <div className={properties ? 'work-item-panel-grid grid min-h-full lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]' : 'min-h-full'}><main className="min-w-0 px-2 py-2">{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-6" aria-label="字段设置">{properties}</aside>}</div>
+      <div className={properties ? 'work-item-panel-grid grid min-h-full lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]' : 'min-h-full'}><main className="min-w-0 px-2 py-2">{detailHeader}{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-6" aria-label="字段设置">{properties}</aside>}</div>
     </Drawer>;
   }
   return (

@@ -515,6 +515,7 @@ export interface RequirementTask {
   status: '待受理' | '待处理' | '处理中' | '待验收' | '验收未通过' | '待负责人关闭' | '已关闭' | '已搁置' | '已驳回' | '已完成' | '设计中' | '研发中' | '测试中' | '已发布' | '已挂起' | string;
   priority: '紧急' | '高' | '中' | '低' | 'P0-紧急阻断' | 'P1-高优' | 'P2-普通' | 'P2-标准' | 'P3-低优' | string;
   ownerName: string;
+  assigneeId?: string;
   creatorName?: string;
   creatorId?: string;
   department?: string;

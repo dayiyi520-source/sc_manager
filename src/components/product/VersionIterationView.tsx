@@ -33,6 +33,7 @@ import { RequirementTasksView } from './RequirementTasksView';
 import { CreateVersionModal } from './CreateVersionModal';
 import { PersonIdentity } from '../common/PersonIdentity';
 import { productRepository, type UnifiedWorkItem } from '../../services/productRepository';
+import { useWorkItemFieldConfig } from './useWorkItemFieldConfig';
 import { teamRepository } from '../../services/teamRepository';
 import { Pagination } from '../common/Pagination';
 import { UnifiedWorkItemControls, type UnifiedFilterState } from './UnifiedWorkItemControls';
@@ -260,7 +261,7 @@ const BugRows: React.FC<{ items: DefectBug[]; onOpen: (item: DefectBug) => void 
   </div>
 );
 
-const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<string, PlanningItem[]>; groupBy: TaskGroupBy; selectedIds: string[]; onSelectionChange: (ids: string[]) => void; onOpen: (item: PlanningItem) => void; onOperation: (key: string, item: PlanningItem) => void; employees: string[]; onUpdated: () => void }> = ({ items, childrenByParent, groupBy, selectedIds, onSelectionChange, onOpen, onOperation, employees, onUpdated }) => {
+const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<string, PlanningItem[]>; groupBy: TaskGroupBy; selectedIds: string[]; onSelectionChange: (ids: string[]) => void; onOpen: (item: PlanningItem) => void; onOperation: (key: string, item: PlanningItem) => void; employees: string[]; onUpdated: () => void; fieldVisible?: (item: PlanningItem, code: string) => boolean }> = ({ items, childrenByParent, groupBy, selectedIds, onSelectionChange, onOpen, onOperation, employees, onUpdated, fieldVisible = (_item: PlanningItem, _code: string) => true }) => {
   const [expanded, setExpanded] = useState<string[]>([]);
   const rows: Array<{ item: PlanningItem; depth: number }> = [];
   const append = (item: PlanningItem, depth = 0) => {
@@ -277,11 +278,11 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<stri
           <th className="px-3 py-2.5 font-medium">标题</th>
           <th className="px-3 py-2.5 font-medium">状态</th>
           <th className="px-3 py-2.5 font-medium">负责人</th>
-          <th className="px-3 py-2.5 font-medium">创建人</th>
-          <th className="px-3 py-2.5 font-medium">创建时间</th>
-          <th className="px-3 py-2.5 font-medium">优先级</th>
-          <th className="px-3 py-2.5 font-medium">预计工时</th>
-          <th className="px-4 py-2.5 font-medium">实际工时</th>
+          {fieldVisible(items[0], 'creator') && <th className="px-3 py-2.5 font-medium">创建人</th>}
+          {fieldVisible(items[0], 'createdAt') && <th className="px-3 py-2.5 font-medium">创建时间</th>}
+          {fieldVisible(items[0], 'priority') && <th className="px-3 py-2.5 font-medium">优先级</th>}
+          {fieldVisible(items[0], 'estimatedHours') && <th className="px-3 py-2.5 font-medium">预计工时</th>}
+          {fieldVisible(items[0], 'actualHours') && <th className="px-4 py-2.5 font-medium">实际工时</th>}
           <th className="sticky right-0 z-10 min-w-16 border-l border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-2.5 text-right font-medium">操作</th>
         </tr>
       </thead>
@@ -304,11 +305,11 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<stri
             </td>
             <td className="px-3 py-3"><VersionWorkItemCell item={item} field="status" onUpdated={onUpdated} employees={employees} /></td>
             <td className="px-3 py-3 text-[var(--text-body)]"><VersionWorkItemCell item={item} field="owner" onUpdated={onUpdated} employees={employees} /></td>
-            <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.creatorName} emptyLabel="未设置" variant="list" /></td>
-            <td className="px-3 py-3 font-mono text-[var(--text-muted)]">{item.createdAt?.slice(0, 10) || '—'}</td>
-            <td className="px-3 py-3"><StatusTag status={item.priority} /></td>
-            <td className="px-3 py-3 text-[var(--text-muted)]">{item.estimatedHours} 小时</td>
-            <td className="px-4 py-3 text-[var(--text-muted)]">{item.actualHours} 小时</td>
+            {fieldVisible(item, 'creator') && <td className="px-3 py-3 text-[var(--text-body)]"><PersonIdentity name={item.creatorName} emptyLabel="未设置" variant="list" /></td>}
+            {fieldVisible(item, 'createdAt') && <td className="px-3 py-3 font-mono text-[var(--text-muted)]">{item.createdAt?.slice(0, 10) || '—'}</td>}
+            {fieldVisible(item, 'priority') && <td className="px-3 py-3"><StatusTag status={item.priority} /></td>}
+            {fieldVisible(item, 'estimatedHours') && <td className="px-3 py-3 text-[var(--text-muted)]">{item.estimatedHours} 小时</td>}
+            {fieldVisible(item, 'actualHours') && <td className="px-4 py-3 text-[var(--text-muted)]">{item.actualHours} 小时</td>}
             <td className="sticky right-0 z-10 min-w-16 border-l border-[var(--border-main)] bg-[var(--bg-surface)] px-4 py-3 text-right"><Dropdown menu={operationMenu} trigger={['click']}><Button type="text" icon={<MoreOutlined />} aria-label={`操作${item.title}`} /></Dropdown></td>
           </tr></React.Fragment>;
         })}
@@ -408,6 +409,14 @@ export const VersionIterationView: React.FC = () => {
     addToast
   } = useApp();
   const iterationStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'ITERATION'], queryFn: () => productRepository.researchStatusTemplates('ITERATION'), retry: false });
+  const iterationFieldConfigs = {
+    requirement: useWorkItemFieldConfig('requirement', 'ITERATION'),
+    design: useWorkItemFieldConfig('design', 'ITERATION'),
+    dev: useWorkItemFieldConfig('dev', 'ITERATION'),
+    test: useWorkItemFieldConfig('test', 'ITERATION'),
+    bug: useWorkItemFieldConfig('bug', 'ITERATION'),
+  };
+  const iterationFieldVisible = (item: PlanningItem, fieldCode: string) => iterationFieldConfigs[item.kind].visible(fieldCode);
   const [mode, setMode] = useState<ViewMode>('list');
   const [showDetail, setShowDetail] = useState(false);
   const [detailSection, setDetailSection] = useState<DetailSection>('workItems');
@@ -1038,7 +1047,7 @@ export const VersionIterationView: React.FC = () => {
       && `${item.title} ${item.ownerName} ${item.creatorName || ''} ${item.status}`.toLowerCase().includes(taskQuery.trim().toLowerCase())
     ).sort((a, b) => taskGroupBy === 'none' ? 0 : normalizedTaskGroupValue(a, taskGroupBy).localeCompare(normalizedTaskGroupValue(b, taskGroupBy), 'zh-CN'));
     const taskStatuses = [...new Set(selectedItems.map((item) => item.status).filter(Boolean))];
-    const taskOwners = [...new Set([...directoryOwnerNames, ...planningItems.flatMap((item) => [item.ownerName, String((item.source as unknown as Record<string, unknown>).assigneeName || ''), String((item.source as unknown as Record<string, unknown>).assignee || ''), String((item.source as unknown as Record<string, unknown>).developer || '')])])].filter(Boolean);
+    const taskOwners = directoryOwnerNames;
     const taskCreators = [...new Set(selectedItems.map((item) => item.creatorName).filter(Boolean))];
     const taskVersions = [...new Set(selectedItems.map((item) => item.versionName).filter(Boolean))];
     const taskGroupOptions: Array<[TaskGroupBy, string]> = [['priority', '优先级'], ['status', '状态'], ['owner', '负责人'], ['creator', '创建者'], ['version', '迭代版本'], ['customer', '关联客户'], ['requirementType', '需求类型']];
@@ -1187,7 +1196,7 @@ export const VersionIterationView: React.FC = () => {
                 </div>}
                 <div ref={setTaskFilterTarget} className="empty:hidden" />
                 {testItemsError && <Alert type="warning" showIcon title="测试任务加载失败，其他任务仍可查看" description="请稍后重试。" action={<Button size="small" onClick={() => setTestItemsReloadKey((value) => value + 1)}>重试</Button>} />}
-                <div className="overflow-hidden rounded-lg border border-[var(--border-main)]"><WorkItemBatchBar targets={selectedItems.filter((item) => selectedTaskIds.includes(`${item.kind}:${item.id}`)).map((item) => ({ id: item.id, category: item.kind, productLineId: item.productLineId, revision: (item.source as RequirementTask).revision }))} versions={versions.map((version) => ({ value: version.id, label: version.name, productLineId: version.productLineId }))} employees={directoryOwnerNames.map((name) => ({ value: name, label: name }))} onCancel={() => setSelectedTaskIds([])} onComplete={() => { setWorkItemsReloadKey((value) => value + 1); setTestItemsReloadKey((value) => value + 1); }} />{filteredItems.length ? <WorkItemRows items={pagedItems} childrenByParent={taskTree.children} groupBy={taskGroupBy} selectedIds={selectedTaskIds} onSelectionChange={setSelectedTaskIds} onOperation={(key, item) => void operatePlanningItem(key, item)} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'test' ? openTestTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} employees={directoryOwnerNames} onUpdated={() => setWorkItemsReloadKey((value) => value + 1)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无匹配工作项" description="当前迭代无对应任务，请调整筛选条件或新建任务。" />}</div>
+                <div className="overflow-hidden rounded-lg border border-[var(--border-main)]"><WorkItemBatchBar targets={selectedItems.filter((item) => selectedTaskIds.includes(`${item.kind}:${item.id}`)).map((item) => ({ id: item.id, category: item.kind, productLineId: item.productLineId, revision: (item.source as RequirementTask).revision }))} versions={versions.map((version) => ({ value: version.id, label: version.name, productLineId: version.productLineId }))} employees={directoryOwnerNames.map((name) => ({ value: name, label: name }))} onCancel={() => setSelectedTaskIds([])} onComplete={() => { setWorkItemsReloadKey((value) => value + 1); setTestItemsReloadKey((value) => value + 1); }} />{filteredItems.length ? <WorkItemRows items={pagedItems} childrenByParent={taskTree.children} groupBy={taskGroupBy} selectedIds={selectedTaskIds} onSelectionChange={setSelectedTaskIds} onOperation={(key, item) => void operatePlanningItem(key, item)} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'test' ? openTestTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} employees={directoryOwnerNames} fieldVisible={iterationFieldVisible} onUpdated={() => setWorkItemsReloadKey((value) => value + 1)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无匹配工作项" description="当前迭代无对应任务，请调整筛选条件或新建任务。" />}</div>
                 <Pagination total={taskTree.roots.length} page={taskPage} pageSize={taskPageSize} onPageChange={setTaskPage} onPageSizeChange={(size) => { setTaskPageSize(size); setTaskPage(1); }} />
               </div>}
             </>
