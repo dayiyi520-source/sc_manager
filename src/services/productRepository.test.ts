@@ -110,21 +110,4 @@ describe('productRepository task API contract', () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ revision: 3, enabled: false });
   });
 
-  it('creates failed-only execution and saves results through stable routes', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: {}, message: '', requestId: 'r' }), { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-    await productRepository.createTestExecution('WI-1', {
-      requestId: 'round-2', planId: 'plan-1', scopeType: 'FAILED_ONLY', testCaseIds: [],
-      name: '第二轮回归', environment: '测试环境', buildVersion: 'V1.2.0-build.38'
-    });
-    await productRepository.saveTestResult('result-1', { result: 'FAILED', actualResult: '响应超时', evidence: [], revision: 1 });
-    await productRepository.linkTestResultDefect('result-1', 'bug-1', 2);
-
-    expect(fetchMock.mock.calls.map((call) => [call[0], call[1].method])).toEqual([
-      ['/api/work-items/WI-1/test-executions', 'POST'],
-      ['/api/test-execution-cases/result-1', 'PUT'],
-      ['/api/test-execution-cases/result-1/defects', 'POST']
-    ]);
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ scopeType: 'FAILED_ONLY', requestId: 'round-2' });
-  });
 });

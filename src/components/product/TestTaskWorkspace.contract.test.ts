@@ -7,8 +7,9 @@ describe('test task detail contract', () => {
   it('keeps case-authoring children on the standard test task detail page', () => {
     expect(source).not.toContain("if (typeName === '用例编写') return");
     expect(source).toContain("{ key: 'basic', label: '基本信息'");
-    expect(source).not.toContain("{ key: 'plan', label: '测试计划'");
-    expect(source).toContain("{ key: 'executions', label: '执行记录'");
+    expect(source).toContain("{ key: 'test-plans', label: '测试计划'");
+    expect(source).toContain('选择关联的测试计划');
+    expect(source).not.toContain("{ key: 'executions', label: '执行记录'");
   });
 
   it('shows the product task title with truncation and puts the parent reference below the metadata row', () => {

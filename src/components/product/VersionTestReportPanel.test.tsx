@@ -46,7 +46,7 @@ describe('VersionTestReportPanel', () => {
     expect(screen.getByLabelText('报告类型')).toBeInTheDocument();
     expect(screen.getByLabelText('选择产品')).toBeInTheDocument();
     expect(screen.getByLabelText('选择迭代')).toBeInTheDocument();
-    expect(screen.getByLabelText('关联计划')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /选择本地文件/ })).toBeInTheDocument();
   });
 
   it('renders report list fields and the top-right create action', async () => {

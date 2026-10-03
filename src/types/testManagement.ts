@@ -1,7 +1,5 @@
 export type TestPriority = 'P0' | 'P1' | 'P2' | 'P3';
 export type TestResultStatus = 'NOT_EXECUTED' | 'PASSED' | 'FAILED';
-export type TestExecutionScope = 'ALL' | 'FAILED_ONLY' | 'CUSTOM';
-export type TestExecutionStatus = 'IN_PROGRESS' | 'ENDED' | 'CANCELLED';
 
 export interface TestCaseStep {
   id?: string;
@@ -164,90 +162,6 @@ export interface SaveVersionTestReportInput {
   reportType: '功能测试' | '安全测试' | '回归测试';
   testPlanIds: string[];
   summary?: string;
+  attachments?: Array<{ name: string; url?: string; size?: number; type?: string }>;
   revision?: number;
-}
-
-export interface TestEvidence {
-  id?: string;
-  name: string;
-  contentType: string;
-  size: number;
-  dataUrl: string;
-}
-
-export interface LinkedTestDefect {
-  id: string;
-  code: string;
-  title: string;
-  status: string;
-  priority: string;
-  assigneeName?: string;
-}
-
-export interface TestExecutionCase {
-  id: string;
-  testCaseId: string;
-  sort: number;
-  code: string;
-  title: string;
-  precondition?: string | null;
-  priority: TestPriority;
-  steps: TestCaseStep[];
-  result: TestResultStatus;
-  actualResult?: string | null;
-  executorName?: string | null;
-  executedAt?: string | null;
-  revision: number;
-  evidence: TestEvidence[];
-  defects: LinkedTestDefect[];
-}
-
-export interface TestExecution {
-  id: string;
-  workItemId: string;
-  testPlanId: string;
-  planName?: string;
-  roundNo: number;
-  name: string;
-  scopeType: TestExecutionScope;
-  environment?: string | null;
-  buildVersion?: string | null;
-  executorName: string;
-  status: TestExecutionStatus;
-  startTime?: string | null;
-  endTime?: string | null;
-  revision: number;
-  total: number;
-  passed: number;
-  failed: number;
-  notExecuted: number;
-  cases: TestExecutionCase[];
-}
-
-export interface CreateTestExecutionInput {
-  requestId: string;
-  planId: string;
-  scopeType: TestExecutionScope;
-  testCaseIds: string[];
-  name: string;
-  environment?: string;
-  buildVersion?: string;
-}
-
-export interface TestTaskOverview {
-  workItemId: string;
-  childCount: number;
-  completedChildCount: number;
-  caseCount: number;
-  executionCount: number;
-  total: number;
-  passed: number;
-  failed: number;
-  notExecuted: number;
-  defectCount: number;
-  blockingDefectCount: number;
-  conclusion: 'NOT_PASSED' | 'PASSED' | 'CONDITIONAL_PASS';
-  blockers: Array<'REQUIRED_CHILD_INCOMPLETE' | 'UNEXECUTED_CASES' | 'OPEN_BLOCKING_DEFECTS'>;
-  defects: LinkedTestDefect[];
-  children: Array<Record<string, unknown>>;
 }

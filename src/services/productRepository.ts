@@ -1,7 +1,7 @@
 import { apiRequest } from './apiClient';
 import type { ProductLine, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, VersionIteration, RequirementTask, RequirementMedia, DefectBug, DevTask } from '../types';
 import type { PageResult } from './apiClient';
-import type { CreateTestExecutionInput, SaveTestCaseInput, SaveTestPlanInput, SaveVersionTestReportInput, TestCase, TestCaseDirectory, TestCasePage, TestEvidence, TestExecution, TestExecutionScope, TestPlan, TestResultStatus, TestTaskOverview, VersionTestReport, VersionTestReportListItem, VersionTestReportPlan } from '../types/testManagement';
+import type { SaveTestCaseInput, SaveTestPlanInput, SaveVersionTestReportInput, TestCase, TestCaseDirectory, TestCasePage, TestPlan, VersionTestReport, VersionTestReportListItem, VersionTestReportPlan } from '../types/testManagement';
 import type { SaveVersionReviewInput, VersionReview, VersionReviewListItem } from '../types/versionReview';
 
 type SpecialTaskKind = 'bug' | 'dev';
@@ -173,17 +173,9 @@ export const productRepository = {
   ,updateTestCase: (lineId: string, caseId: string, body: SaveTestCaseInput) => apiRequest<TestCase>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/${encodeURIComponent(caseId)}`, { method: 'PUT', body: JSON.stringify(body) })
   ,setTestCaseEnabled: (lineId: string, caseId: string, revision: number, enabled: boolean) => apiRequest<TestCase>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/${encodeURIComponent(caseId)}/enabled`, { method: 'PUT', body: JSON.stringify({ revision, enabled }) })
   ,batchUpdateTestCases: (lineId: string, body: { caseIds: string[]; operation: 'MOVE' | 'OWNER' | 'PRIORITY' | 'DELETE' | 'TYPE'; value?: string }) => apiRequest<void>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/batch`, { method: 'POST', body: JSON.stringify(body) })
-  ,testPlan: (workItemId: string) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plan`)
   ,testPlans: (workItemId: string) => apiRequest<TestPlan[]>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans`)
   ,createTestPlan: (workItemId: string, body: SaveTestPlanInput) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans`, { method: 'POST', body: JSON.stringify(body) })
   ,saveTestPlan: (workItemId: string, planId: string, body: SaveTestPlanInput) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans/${encodeURIComponent(planId)}`, { method: 'PUT', body: JSON.stringify(body) })
-  ,testExecutions: (workItemId: string) => apiRequest<TestExecution[]>(`/api/work-items/${encodeURIComponent(workItemId)}/test-executions`)
-  ,createTestExecution: (workItemId: string, body: CreateTestExecutionInput) => apiRequest<TestExecution>(`/api/work-items/${encodeURIComponent(workItemId)}/test-executions`, { method: 'POST', body: JSON.stringify(body) })
-  ,testExecutionDetail: (executionId: string) => apiRequest<TestExecution>(`/api/test-executions/${encodeURIComponent(executionId)}`)
-  ,saveTestResult: (resultId: string, body: { result: Exclude<TestResultStatus, 'NOT_EXECUTED'>; actualResult?: string; evidence: TestEvidence[]; revision: number }) => apiRequest<TestExecution>(`/api/test-execution-cases/${encodeURIComponent(resultId)}`, { method: 'PUT', body: JSON.stringify(body) })
-  ,endTestExecution: (executionId: string, revision: number) => apiRequest<TestExecution>(`/api/test-executions/${encodeURIComponent(executionId)}/end`, { method: 'POST', body: JSON.stringify({ revision }) })
-  ,linkTestResultDefect: (resultId: string, defectWorkItemId: string, revision: number) => apiRequest<TestExecution>(`/api/test-execution-cases/${encodeURIComponent(resultId)}/defects`, { method: 'POST', body: JSON.stringify({ defectWorkItemId, revision }) })
-  ,testTaskOverview: (workItemId: string) => apiRequest<TestTaskOverview>(`/api/work-items/${encodeURIComponent(workItemId)}/test-overview`)
   ,versionTestReports: (lineId: string, versionId: string) => apiRequest<VersionTestReportListItem[]>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports`)
   ,testReports: () => apiRequest<VersionTestReportListItem[]>('/api/test-reports')
   ,versionTestReportPlans: (lineId: string, versionId: string) => apiRequest<VersionTestReportPlan[]>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports/plans`)

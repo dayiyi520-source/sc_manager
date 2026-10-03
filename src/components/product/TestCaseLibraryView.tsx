@@ -134,10 +134,15 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
     const lineIds = [...new Set((directories.data || []).map((item) => item.productLineId).filter(Boolean))] as string[];
     return lineIds.map((lineId) => ({
       key: `product-line:${lineId}`,
-      title: <span className="test-case-directory-title"><span>{directories.data?.find((item) => item.productLineId === lineId)?.productLineName || '未命名产品'}</span><b>{directories.data?.filter((item) => item.productLineId === lineId).reduce((total, item) => total + item.caseCount, 0) || 0}</b></span>,
+      title: <span className="test-case-directory-title"><span>{directories.data?.find((item) => item.productLineId === lineId)?.productLineName || '未命名产品'}</span><b>{(cases.data?.items || []).filter((item) => item.productLineId === lineId).length}</b></span>,
       children: build(null, lineId),
     }));
-  }, [directories.data, productLineFilter]);
+  }, [cases.data?.items, directories.data, productLineFilter]);
+  const allDirectoryNode = useMemo(() => ({
+    key: '__all__',
+    title: <span className="test-case-directory-title"><span>全部</span><b>{cases.data?.total || 0}</b></span>,
+    children: [],
+  }), [cases.data?.total]);
 
   const refresh = () => { void directories.refetch(); void cases.refetch(); };
   const openEditor = (value?: TestCase) => { setEditingCase(value || null); setEditorOpen(true); };
@@ -215,7 +220,7 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
     <div className="test-case-library-grid">
       <aside className="test-case-directory-rail">
         <div className="test-case-panel-heading"><span>功能目录</span><Button type="text" aria-label="新建功能目录" icon={<PlusOutlined />} onClick={() => { setDirectoryId(''); setDirectoryProductLineId(productLineFilter === 'all' ? '' : productLineFilter); setDirectoryModalOpen(true); }} /></div>
-        {directories.isLoading ? <Spin /> : directories.isError ? <Alert type="error" showIcon title="目录加载失败" action={<Button size="small" onClick={() => directories.refetch()}>重试</Button>} /> : <Tree blockNode selectedKeys={directoryId ? [directoryId] : selectedProductLineId ? [`product-line:${selectedProductLineId}`] : []} treeData={productLineFilter === 'all' ? directoryTree : [{ key: '__current-product-line__', title: <span className="test-case-directory-title"><span>{productLines.data?.find((line) => line.id === productLineFilter)?.name || '当前产品'}</span><b>{cases.data?.total || 0}</b></span>, children: directoryTree }]} onSelect={(keys) => { const key = String(keys[0] || ''); if (key === '__current-product-line__') { setDirectoryId(''); setPage(1); return; } if (key.startsWith('product-line:')) { setSelectedProductLineId(key.slice('product-line:'.length)); setDirectoryId(''); setPage(1); return; } setSelectedProductLineId(directories.data?.find((item) => item.id === key)?.productLineId || (productLineFilter === 'all' ? '' : productLineFilter)); setDirectoryId(key); setPage(1); }} />}
+        {directories.isLoading ? <Spin /> : directories.isError ? <Alert type="error" showIcon title="目录加载失败" action={<Button size="small" onClick={() => directories.refetch()}>重试</Button>} /> : <Tree blockNode selectedKeys={directoryId ? [directoryId] : selectedProductLineId ? [`product-line:${selectedProductLineId}`] : ['__all__']} treeData={productLineFilter === 'all' ? [allDirectoryNode, ...directoryTree] : [{ ...allDirectoryNode, children: [{ key: '__current-product-line__', title: <span className="test-case-directory-title"><span>{productLines.data?.find((line) => line.id === productLineFilter)?.name || '当前产品'}</span><b>{cases.data?.total || 0}</b></span>, children: directoryTree }] }]} onSelect={(keys) => { const key = String(keys[0] || ''); if (key === '__all__' || key === '__current-product-line__') { setSelectedProductLineId(''); setDirectoryId(''); setPage(1); return; } if (key.startsWith('product-line:')) { setSelectedProductLineId(key.slice('product-line:'.length)); setDirectoryId(''); setPage(1); return; } setSelectedProductLineId(directories.data?.find((item) => item.id === key)?.productLineId || (productLineFilter === 'all' ? '' : productLineFilter)); setDirectoryId(key); setPage(1); }} />}
       </aside>
       <main className="test-case-data-plane">
         <header className="test-case-library-toolbar" ref={controlsRef}>

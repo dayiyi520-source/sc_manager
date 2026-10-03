@@ -1,5 +1,5 @@
 import type { Contract, CurrentUser, Customer, DefectBug, FollowUpRecord, Lead, Opportunity, ProductLine, RequirementTask, TeamMember, VersionIteration } from '../types';
-import type { LinkedTestDefect, TestCase, TestCaseDirectory, TestExecution, TestPlan } from '../types/testManagement';
+import type { TestCase, TestCaseDirectory, TestPlan } from '../types/testManagement';
 import { MOCK_DATABASE, MOCK_SNAPSHOT_VERSION } from './mockDatabaseSnapshot';
 
 type Row = Record<string, unknown>;
@@ -83,7 +83,39 @@ const task = (row: Row): RequirementTask => ({
 });
 
 export const MOCK_REQUIREMENT_TASKS = workItems.filter((row) => text(row.category_) === 'requirement').map(task);
-export const MOCK_DESIGN_TASKS = workItems.filter((row) => text(row.category_) === 'design').map(task);
+export const MOCK_DESIGN_TASKS = [
+  ...workItems.filter((row) => text(row.category_) === 'design').map(task),
+  {
+    id: 'demo-design-project-exhibition', code: 'DSN-DEMO-001', title: '华东体验中心展厅导视与展板设计',
+    status: '设计中', priority: '中', ownerName: '周明', creatorName: '林晓', versionName: '', productLineId: '', productLineName: '',
+    estimatedHours: 12, dueDate: '2026-10-18', requirementType: '物料设计', designVariant: 'project',
+    designProjectName: '华东体验中心建设项目', createdAt: '2026-09-29'
+  },
+  {
+    id: 'todo-design-project-demo-task', code: 'DSN-DEMO-001-TASK', title: '展厅导视与产品展板设计',
+    status: '设计中', priority: '中', ownerName: '周明', creatorName: '周明', versionName: '', productLineId: '', productLineName: '',
+    estimatedHours: 12, dueDate: '2026-10-18', requirementType: '物料设计', designVariant: 'project',
+    designProjectName: '华东体验中心建设项目', createdAt: '2026-09-29'
+  },
+  {
+    id: 'demo-design-project-packaging', code: 'DSN-DEMO-002', title: '新品发布会产品手册与包装延展',
+    status: '待处理', priority: '高', ownerName: '', creatorName: '周明', versionName: '', productLineId: '', productLineName: '',
+    estimatedHours: 16, dueDate: '2026-10-22', requirementType: '物料设计', designVariant: 'project',
+    designProjectName: '新品发布会筹备', createdAt: '2026-09-30'
+  },
+  {
+    id: 'demo-design-other-event', code: 'DSN-DEMO-003', title: '季度合作伙伴大会主视觉与邀请函',
+    status: '待处理', priority: '中', ownerName: '陈佳', creatorName: '陈佳', versionName: '', productLineId: '', productLineName: '',
+    estimatedHours: 10, dueDate: '2026-10-20', requirementType: '其他设计', designVariant: 'other',
+    designSourceDepartment: '市场部', createdAt: '2026-09-30'
+  },
+  {
+    id: 'demo-design-other-internal', code: 'DSN-DEMO-004', title: '研发中心季度成果展示模板',
+    status: '已完成', priority: '低', ownerName: '许悦', creatorName: '赵宁', versionName: '', productLineId: '', productLineName: '',
+    estimatedHours: 6, dueDate: '2026-10-02', requirementType: '其他设计', designVariant: 'other',
+    designSourceDepartment: '人力资源部', createdAt: '2026-09-27'
+  }
+];
 export const MOCK_DEV_TASKS = workItems.filter((row) => text(row.category_) === 'dev').map(task);
 export const MOCK_TEST_TASKS = workItems.filter((row) => text(row.category_) === 'test').map(task);
 export const MOCK_BUGS: DefectBug[] = workItems.filter((row) => text(row.category_) === 'bug').map((row) => ({ id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_), status: text(row.status_name_), severity: text(row.severity_), type: text(row.task_type_name_) || '缺陷', ownerName: text(row.assignee_name_), creatorName: text(row.creator_name_), verifierName: text(row.verifier_name_), productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', versionName: versionNameById.get(text(row.version_id_)) || '', linkedTaskId: text(row.requirement_id_) || undefined, createdAt: text(row.create_time_) }));
@@ -141,7 +173,6 @@ activeRows('t_product_test_case_step').forEach((row) => {
 export const MOCK_TEST_CASES: TestCase[] = rows('t_product_test_case').filter((row) => Number(row.delete_flag_ || 0) === 0).map((row) => ({ id: text(row.id_), code: text(row.code_), productLineId: text(row.product_line_id_), directoryId: text(row.directory_id_), directoryName: text(row.directory_name_), title: text(row.title_), precondition: text(row.precondition_) || null, priority: (text(row.priority_) || 'P2') as TestCase['priority'], ownerId: text(row.owner_id_), ownerName: text(row.owner_name_), creatorName: text(row.creator_name_), tags: json<string[]>(row.tags_, []), workItemTypeId: text(row.work_item_type_id_), workItemTypeName: text(row.work_item_type_name_), workflowId: text(row.workflow_id_), statusKey: text(row.status_key_), statusName: text(row.status_name_), statusGroup: text(row.status_group_), statusColor: text(row.status_color_), enabled: Boolean(row.enabled_), revision: Number(row.revision_ || 0), referenceCount: Number(row.reference_count_ || 0), latestResult: row.latest_result_ as TestCase['latestResult'], createdAt: text(row.create_time_), updatedAt: text(row.update_time_), steps: testCaseSteps.get(text(row.id_)) || [] }));
 const testCasesById = new Map(MOCK_TEST_CASES.map((item) => [item.id, item]));
 const planCaseRows = activeRows('t_product_test_plan_case');
-const executionCaseRows = activeRows('t_product_test_execution_case');
 const planCasesByPlan = new Map<string, TestPlan['cases']>();
 planCaseRows.forEach((row) => {
   const source = testCasesById.get(text(row.test_case_id_));
@@ -149,19 +180,4 @@ planCaseRows.forEach((row) => {
   const planId = text(row.test_plan_id_);
   planCasesByPlan.set(planId, [...(planCasesByPlan.get(planId) || []), { linkId: text(row.id_), testCaseId: source.id, sort: Number(row.sort_ || 0), code: source.code, title: source.title, priority: source.priority, ownerName: source.ownerName, enabled: source.enabled, latestResult: source.latestResult }]);
 });
-const defectsByExecutionCase = new Map<string, LinkedTestDefect[]>();
-activeRows('t_product_test_execution_defect').forEach((row) => {
-  const defect = MOCK_BUGS.find((item) => item.id === text(row.defect_work_item_id_));
-  if (!defect) return;
-  const key = text(row.execution_case_id_);
-  defectsByExecutionCase.set(key, [...(defectsByExecutionCase.get(key) || []), { id: defect.id, code: defect.code, title: defect.title, status: defect.status, priority: defect.priority || '', assigneeName: defect.ownerName }]);
-});
-const executionCasesByExecution = new Map<string, TestExecution['cases']>();
-executionCaseRows.forEach((row) => {
-  const source = testCasesById.get(text(row.test_case_id_));
-  const steps = json<TestCase['steps']>(row.steps_snapshot_, source?.steps || []);
-  const key = text(row.execution_id_);
-  executionCasesByExecution.set(key, [...(executionCasesByExecution.get(key) || []), { id: text(row.id_), testCaseId: text(row.test_case_id_), sort: Number(row.sort_ || 0), code: text(row.code_snapshot_) || source?.code || '', title: text(row.title_snapshot_) || source?.title || '', precondition: text(row.precondition_snapshot_) || source?.precondition || null, priority: (text(row.priority_snapshot_) || source?.priority || 'P2') as TestCase['priority'], steps, result: (text(row.result_) || 'NOT_EXECUTED') as TestExecution['cases'][number]['result'], actualResult: text(row.actual_result_) || null, executorName: text(row.executor_name_) || null, executedAt: text(row.executed_at_) || null, revision: Number(row.version_ || 0), evidence: [], defects: defectsByExecutionCase.get(text(row.id_)) || [] }]);
-});
 export const MOCK_TEST_PLANS: TestPlan[] = rows('t_product_test_plan').filter((row) => Number(row.delete_flag_ || 0) === 0).map((row) => ({ id: text(row.id_), workItemId: text(row.work_item_id_), name: text(row.name_), environment: text(row.environment_) || null, startDate: date(row.start_date_), endDate: date(row.end_date_), ownerId: text(row.owner_id_), ownerName: text(row.owner_name_), executable: Boolean(row.executable_), revision: Number(row.revision_ || 0), cases: planCasesByPlan.get(text(row.id_)) || [] }));
-export const MOCK_TEST_EXECUTIONS: TestExecution[] = rows('t_product_test_execution').filter((row) => Number(row.delete_flag_ || 0) === 0).map((row) => { const cases = executionCasesByExecution.get(text(row.id_)) || []; return { id: text(row.id_), workItemId: text(row.work_item_id_), testPlanId: text(row.test_plan_id_), planName: text(row.plan_name_), roundNo: Number(row.round_no_ || 1), name: text(row.name_), scopeType: text(row.scope_type_) as TestExecution['scopeType'], environment: text(row.environment_) || null, buildVersion: text(row.build_version_) || null, executorName: text(row.executor_name_), status: text(row.status_) as TestExecution['status'], startTime: text(row.start_time_), endTime: text(row.end_time_) || null, revision: Number(row.version_ || 0), total: Number(row.total_ || cases.length), passed: Number(row.passed_ || cases.filter((item) => item.result === 'PASSED').length), failed: Number(row.failed_ || cases.filter((item) => item.result === 'FAILED').length), notExecuted: Number(row.not_executed_ || cases.filter((item) => item.result === 'NOT_EXECUTED').length), cases }; });

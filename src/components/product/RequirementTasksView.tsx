@@ -145,6 +145,7 @@ type RequirementTasksViewProps = {
   createPolicy?: WorkItemCreatePolicy;
   creationContext?: WorkItemCreationContext;
   designVariant?: DesignTaskVariant;
+  designVariantFilter?: DesignTaskVariant | 'all';
   onDesignVariantChange?: (variant: DesignTaskVariant) => void;
 };
 
@@ -152,7 +153,7 @@ const EMPTY_REQUIREMENT_TASKS: RequirementTask[] = [];
 const EMPTY_BUGS: DefectBug[] = [];
 const EMPTY_DEV_TASKS: DevTask[] = [];
 
-export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, onDetailClose, renderDetail, createPolicy, creationContext, designVariant = 'product', onDesignVariantChange }) => {
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, onDetailClose, renderDetail, createPolicy, creationContext, designVariant = 'product', designVariantFilter = designVariant, onDesignVariantChange }) => {
   const queryClient = useQueryClient();
   const {
     requirementTasks = EMPTY_REQUIREMENT_TASKS,
@@ -365,9 +366,10 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       })) as RequirementTask[];
     }
   });
-  const activeTasks = unifiedCategory && remoteEnabled ? unifiedQuery.data || [] : contextTasks;
+  // 设计任务的数量和分类来自设计任务接口，列表也使用同一份数据，避免与统一工作项接口产生数量不一致。
+  const activeTasks = taskKind === 'design' ? contextTasks : unifiedCategory && remoteEnabled ? unifiedQuery.data || [] : contextTasks;
   const updateTask = async (id: string, updates: Partial<RequirementTask>): Promise<boolean> => {
-    if (unifiedCategory && remoteEnabled) {
+    if (taskKind !== 'design' && unifiedCategory && remoteEnabled) {
       const current = activeTasks.find((task) => task.id === id) || (Object.values(listChildren).flat() as RequirementTask[]).find((task) => task.id === id) || (selectedTask?.id === id ? selectedTask : undefined);
       const productLineId = current?.productLineId || selectedTask?.productLineId;
       if (!productLineId || current?.revision == null) {
@@ -423,6 +425,22 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   };
 
   const [selectedTask, setSelectedTask] = useState<RequirementTask | null>(initialDetail || null);
+  const [selectedTestPlanIds, setSelectedTestPlanIds] = useState<string[]>([]);
+  const testTaskPlansQuery = useQuery({
+    queryKey: ['test-task-plans-count', selectedTask?.id],
+    queryFn: async () => {
+      const lineId = selectedTask!.productLineId;
+      if (!lineId) return [];
+      const result = await productRepository.workItems(lineId, 'test', '', { page: 1, pageSize: 500 });
+      const plans = await Promise.all((result.page.items || []).map((item) => productRepository.testPlans(item.id)));
+      return [...new Map(plans.flat().map((plan) => [String(plan.id), plan])).values()];
+    },
+    enabled: taskKind === 'test' && Boolean(selectedTask?.id),
+    retry: false,
+  });
+  useEffect(() => {
+    setSelectedTestPlanIds((testTaskPlansQuery.data || []).map((plan) => String(plan.id || '')).filter(Boolean));
+  }, [selectedTask?.id, testTaskPlansQuery.data]);
   const [detailWorkItemTypes, setDetailWorkItemTypes] = useState<ProductLineWorkItemType[]>([]);
   const [detailFieldConfig, setDetailFieldConfig] = useState<WorkItemFieldConfiguration[]>([]);
   const [detailConfigLoaded, setDetailConfigLoaded] = useState(false);
@@ -1311,18 +1329,25 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   });
 
   const uniqueValues = (values: Array<string | undefined>) => Array.from(new Set(values.filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'zh-CN'));
-  const designOwnershipLabel = designVariant === 'product' ? '产品 / 迭代版本' : designVariant === 'project' ? '所属项目' : '来源部门';
-  const designOwnershipValue = (task: RequirementTask) => {
-    if (designVariant === 'product') {
+  const designTaskTypeOf = (task: RequirementTask): DesignTaskVariant => {
+    if (task.designVariant) return task.designVariant;
+    const typeName = task.requirementType || '';
+    if (typeName.includes('其他')) return 'other';
+    if (typeName.includes('物料') || typeName.includes('项目')) return 'project';
+    return 'product';
+  };
+  const designSourceOwnershipValue = (task: RequirementTask, variant = designTaskTypeOf(task)) => {
+    if (variant === 'product') {
       const linkedVersion = versions.find((version) => version.id === task.versionId);
       return [task.productLineName, linkedVersion?.code || task.versionName || '未关联'].filter(Boolean).join(' / ') || '未设置';
     }
-    if (designVariant === 'project') return task.designProjectName || (task as RequirementTask & { projectName?: string }).projectName || task.productLineName || '未设置';
+    if (variant === 'project') return task.designProjectName || (task as RequirementTask & { projectName?: string }).projectName || task.productLineName || '未设置';
     return task.designSourceDepartment || task.department || '未设置';
   };
+  const designOwnershipLabel = '来源归属';
   const creatorOptions = uniqueValues(requirementTasks.map((task) => task.creatorName || currentUser.name));
   const customerOptions = uniqueValues(requirementTasks.map((task) => task.customerName));
-  const versionOptions = uniqueValues(requirementTasks.map((task) => taskKind === 'design' ? designOwnershipValue(task) : task.versionName));
+  const versionOptions = uniqueValues(requirementTasks.map((task) => taskKind === 'design' ? designSourceOwnershipValue(task) : task.versionName));
   const ccOptions = uniqueValues(requirementTasks.flatMap((task) => task.ccNames || []));
   const groupOptions: Array<[RequirementGroupKey, string]> = [
     ['priority', '优先级'],
@@ -1367,12 +1392,13 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     matchesMultiFilter([task.ownerName], filters.owner) &&
     matchesMultiFilter([task.creatorName || currentUser.name], filters.creator) &&
     matchesMultiFilter([task.customerName], filters.customer) &&
-    matchesMultiFilter([taskKind === 'design' ? designOwnershipValue(task) : task.versionName], filters.version) &&
+    matchesMultiFilter([taskKind === 'design' ? designSourceOwnershipValue(task) : task.versionName], filters.version) &&
     matchesDateFilter(task.createdAt, filters.createdAt) &&
     matchesDateFilter(task.plannedStartDate, filters.plannedStartDate) &&
     matchesMultiFilter(task.ccNames || [], filters.cc)
   );
-  const productLineTasks = productLineFilter === 'all' ? activeTasks : activeTasks.filter((task) => task.productLineId === productLineFilter || task.productLineName === selectedProductLine?.name);
+  const designVariantTasks = taskKind === 'design' && designVariantFilter !== 'all' ? activeTasks.filter((task) => designTaskTypeOf(task) === designVariantFilter) : activeTasks;
+  const productLineTasks = productLineFilter === 'all' ? designVariantTasks : designVariantTasks.filter((task) => task.productLineId === productLineFilter || task.productLineName === selectedProductLine?.name);
   const baseTasks = remoteEnabled && !unifiedCategory ? productLineTasks : productLineTasks.filter((task) => categoryMatch(task, activeTab));
   const filteredTasks = baseTasks.filter((task) => {
     if (remoteEnabled && !unifiedCategory) return true;
@@ -1393,7 +1419,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       case 'status': return task.status || '未设置';
       case 'owner': return task.ownerName || '未设置';
       case 'creator': return task.creatorName || currentUser.name;
-      case 'version': return taskKind === 'design' ? designOwnershipValue(task) : task.versionName || '未关联';
+      case 'version': return taskKind === 'design' ? designSourceOwnershipValue(task) : task.versionName || '未关联';
       case 'customer': return task.customerName || '未关联';
       case 'requirementType': return task.requirementType || '未设置';
       default: return '';
@@ -1514,7 +1540,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     const expanded = expandedListRows.includes(task.id);
     const isChild = depth > 0;
     const linkedVersion = versions.find((version) => version.id === task.versionId);
-    const productVersion = taskKind === 'design' ? designOwnershipValue(task) : [task.productLineName, linkedVersion?.code || (task.versionId ? '版本号未设置' : '未关联')].filter(Boolean).join(' / ');
+    const designTaskType = taskKind === 'design' ? designTaskTypeOf(task) : undefined;
+    const productVersion = taskKind === 'design' ? designSourceOwnershipValue(task, designTaskType) : [task.productLineName, linkedVersion?.code || (task.versionId ? '版本号未设置' : '未关联')].filter(Boolean).join(' / ');
     return <React.Fragment key={task.id}>
       <tr className={`${isChild ? 'bg-[var(--bg-surface-soft)]/60' : ''} transition-colors hover:bg-[var(--bg-surface-soft)]`}>
         <td className="max-w-[360px] px-4 py-3.5 font-semibold text-[var(--text-primary)]">
@@ -1531,8 +1558,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         <td className="whitespace-nowrap px-4 py-3.5">
           {taskStatusControl(task)}
         </td>
+        {taskKind === 'design' && <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-body)]">{({ product: '产品设计', project: '物料设计', other: '其他设计' } as Record<DesignTaskVariant, string>)[designTaskType || 'product']}</td>}
         {listFields.visible('priority') && <td className="whitespace-nowrap px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>}
-        {listFields.visible('version') && <td className="px-4 py-3.5 text-[var(--text-body)]"><span className="block truncate whitespace-nowrap text-[var(--primary)]" title={productVersion}>{productVersion}</span></td>}
+        {(taskKind === 'design' || listFields.visible('version')) && <td className="px-4 py-3.5 text-[var(--text-body)]"><span className="block truncate whitespace-nowrap text-[var(--primary)]" title={productVersion}>{productVersion}</span></td>}
         {listFields.visible('assignee') && <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-muted)]">
           <div className="work-item-owner-cell">
             {hasChildren ? <PersonIdentity name={task.ownerName} emptyLabel="未设置" variant="list" /> : <Select aria-label={`${task.title}负责人`} variant="borderless" className="work-item-owner-select" style={{ width: 180 }} popupMatchSelectWidth={220} showSearch optionFilterProp="label" value={task.ownerName || undefined} labelRender={({ value }) => <PersonIdentity name={String(value)} variant="list" />} placeholder="未设置" options={employeeNameOptions} onChange={(ownerName) => void updateTask(task.id, { ownerName })} />}
@@ -1637,6 +1665,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               <colgroup>
                 <col className="w-[420px]" />
                 <col className="w-[150px]" />
+                {taskKind === 'design' && <col className="w-[120px]" />}
                 <col className="w-[112px]" />
                 <col className="w-[220px]" />
                 <col className="w-[210px]" />
@@ -1648,8 +1677,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                 <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
                   <th className="py-3 px-4"><span className="inline-flex items-center gap-3"><Checkbox aria-label="全选当前页工作项" checked={pagedTasks.length > 0 && pagedTasks.every((task) => batchIds.includes(task.id))} indeterminate={pagedTasks.some((task) => batchIds.includes(task.id)) && !pagedTasks.every((task) => batchIds.includes(task.id))} onChange={(event) => setBatchIds(event.target.checked ? pagedTasks.map((task) => task.id) : [])} />标题</span></th>
                   <th className="whitespace-nowrap py-3 px-4">状态</th>
+                  {taskKind === 'design' && <th className="whitespace-nowrap py-3 px-4">任务类型</th>}
                   {listFields.visible('priority') && <th className="whitespace-nowrap py-3 px-4">优先级</th>}
-                  {listFields.visible('version') && <th className="whitespace-nowrap py-3 px-4">{taskKind === 'design' ? designOwnershipLabel : '迭代版本'}</th>}
+                  {(taskKind === 'design' || listFields.visible('version')) && <th className="whitespace-nowrap py-3 px-4">{taskKind === 'design' ? designOwnershipLabel : '迭代版本'}</th>}
                   {listFields.visible('assignee') && <th className="whitespace-nowrap py-3 px-4">负责人</th>}
                   {listFields.visible('creator') && <th className="whitespace-nowrap py-3 px-4">创建人</th>}
                   {listFields.visible('createdAt') && <th className="whitespace-nowrap py-3 px-4">创建时间</th>}
@@ -1658,7 +1688,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {pagedTasks.map((task, index) => renderTaskRows(task, 0, index === pagedTasks.length - 1))}
-                {pagedTasks.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">{unifiedCategory && remoteEnabled && unifiedQuery.isPending ? `正在加载${itemLabel}...` : unifiedCategory && remoteEnabled && unifiedQuery.isError ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => unifiedQuery.refetch()}>重试</Button></span> : serverPageQuery.isPending && remoteEnabled && !unifiedCategory ? `正在加载${itemLabel}...` : serverPageQuery.isError && remoteEnabled && !unifiedCategory ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => serverPageQuery.refetch()}>重试</Button></span> : `没有符合当前搜索、过滤或分组条件的${itemLabel === '需求任务' ? '需求' : itemLabel}`}</td></tr>}
+                {pagedTasks.length === 0 && <tr><td colSpan={taskKind === 'design' ? 9 : 8} className="px-4 py-12 text-center text-[var(--text-muted)]">{unifiedCategory && remoteEnabled && unifiedQuery.isPending ? `正在加载${itemLabel}...` : unifiedCategory && remoteEnabled && unifiedQuery.isError ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => unifiedQuery.refetch()}>重试</Button></span> : serverPageQuery.isPending && remoteEnabled && !unifiedCategory ? `正在加载${itemLabel}...` : serverPageQuery.isError && remoteEnabled && !unifiedCategory ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => serverPageQuery.refetch()}>重试</Button></span> : `没有符合当前搜索、过滤或分组条件的${itemLabel === '需求任务' ? '需求' : itemLabel}`}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1746,7 +1776,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                     ...relationTabOrder.map((code) => code === 'relations'
                       ? { label: `关联对象 · ${relatedWorkItems.length + (selectedTask.sourceWorkOrderIds?.length || 0) + (selectedTask.sourceType === 'WORK_ORDER' && selectedTask.requirementId ? 1 : 0)}`, value: 'relations' as const }
                       : code === 'children'
-                        ? { label: taskKind === 'test' ? `测试计划 · ${childWorkItems.length}` : `子任务 · ${childWorkItems.length}`, value: 'children' as const }
+                        ? { label: taskKind === 'test' ? `测试计划 · ${(testTaskPlansQuery.data || []).length}` : `子任务 · ${childWorkItems.length}`, value: 'children' as const }
                         : code === 'support'
                           ? { label: '支撑项 · 0', value: 'support' as const }
                           : { label: '工时', value: 'hours' as const }),
@@ -1804,7 +1834,21 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                 </div>
               ) : detailTab === 'children' ? (
                 <div className="space-y-3">
-                  {taskKind === 'test' ? <div className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">测试计划请在测试计划页面统一维护</div> : <>
+                  {taskKind === 'test' ? <div className="space-y-3">
+                    <Select
+                      mode="multiple"
+                      showSearch
+                      optionFilterProp="label"
+                      value={selectedTestPlanIds}
+                      onChange={setSelectedTestPlanIds}
+                      loading={testTaskPlansQuery.isLoading}
+                      placeholder="选择关联的测试计划"
+                      options={(testTaskPlansQuery.data || []).map((plan) => ({ value: String(plan.id), label: plan.name || '未命名计划' }))}
+                      style={{ width: '100%' }}
+                      notFoundContent={testTaskPlansQuery.isError ? '测试计划加载失败' : '暂无可关联的测试计划'}
+                    />
+                    {testTaskPlansQuery.isError && <div className="flex items-center gap-2 text-xs text-[var(--danger)]"><span>测试计划加载失败</span><Button size="small" onClick={() => void testTaskPlansQuery.refetch()}>重试</Button></div>}
+                  </div> : <>
                   {unifiedCategory !== 'bug' && selectedTask.category !== 'bug' && <div className="flex justify-end"><Button size="small" icon={<PlusOutlined />} onClick={() => openChildModal()}>添加子任务</Button></div>}
                   {childWorkItems.length > 0 ? <div className="overflow-hidden rounded-lg border border-[var(--border-main)]">{childWorkItems.map((child) => <div key={String(child.id)} className="grid grid-cols-[90px_minmax(0,1fr)_100px_120px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0">
                     <span className="text-[var(--text-muted)]">{workItemCategoryLabel[String(child.category)] || String(child.category || '工作项')}</span>

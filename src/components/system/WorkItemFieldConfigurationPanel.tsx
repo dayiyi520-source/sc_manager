@@ -33,7 +33,8 @@ const SCENES: Array<{ key: WorkItemFieldScene; label: string }> = [
 const CATEGORY_ORDER = ['requirement', 'design', 'dev', 'test', 'bug'];
 const CATEGORY_LABELS: Record<string, string> = { requirement: '产品任务', design: '设计任务', dev: '研发任务', test: '测试任务', bug: '缺陷任务' };
 const LEFT_FIXED_FIELDS = new Set(['title', 'creator', 'createdAt', 'updater', 'updatedAt', 'expectedGoal', 'description']);
-const LEFT_RELATION_FIELDS = new Set(['requirement', 'relations', 'children', 'support', 'hours']);
+const LEFT_RELATION_FIELDS = new Set(['relations', 'children', 'support', 'hours']);
+const LEGACY_FIELD_CODES = new Set(['requirement']);
 
 export const WorkItemFieldConfigurationPanel: React.FC<{ categories: WorkItemCategoryDefinition[] }> = ({ categories }) => {
   const enabled = useMemo(() => CATEGORY_ORDER
@@ -48,7 +49,7 @@ export const WorkItemFieldConfigurationPanel: React.FC<{ categories: WorkItemCat
   const [draggingCode, setDraggingCode] = useState<string | null>(null);
   const [dragOverCode, setDragOverCode] = useState<string | null>(null);
   const [employeeOptions, setEmployeeOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const load = async (code = category) => { setLoading(true); try { const result = await productRepository.workItemFieldConfigurations(code); setFields([...(result.scenes.find((item) => item.scene === scene)?.fields || [])].sort((a, b) => a.sort - b.sort)); } catch (error) { message.error(error instanceof Error ? error.message : '字段配置读取失败'); } finally { setLoading(false); } };
+  const load = async (code = category) => { setLoading(true); try { const result = await productRepository.workItemFieldConfigurations(code); setFields([...(result.scenes.find((item) => item.scene === scene)?.fields || [])].filter((field) => !LEGACY_FIELD_CODES.has(field.fieldCode)).sort((a, b) => a.sort - b.sort)); } catch (error) { message.error(error instanceof Error ? error.message : '字段配置读取失败'); } finally { setLoading(false); } };
   useEffect(() => { if (!enabled.some((item) => item.code === category)) setCategory(enabled[0]?.code || 'requirement'); }, [enabled, category]);
   useEffect(() => { void teamRepository.options().then((items) => setEmployeeOptions(items.map((item) => ({ value: item.name, label: item.name })))).catch(() => setEmployeeOptions([])); }, []);
   useEffect(() => { void load(); }, [category, scene]);

@@ -15,6 +15,7 @@ type TestAndDefectViewProps = {
 
 export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ productLineFilter = 'all', productLines = [], onProductLineChange }) => {
   const [activeTab, setActiveTab] = useState('test');
+  const [testPlanDetailOpen, setTestPlanDetailOpen] = useState(false);
   const withProductNavigation = (workspace: React.ReactNode) => (
     <div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3">
       <ProductNavigation productLines={productLines} value={productLineFilter} onChange={onProductLineChange || (() => undefined)} />
@@ -37,7 +38,7 @@ export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ productLin
           {
             key: 'test-plan',
             label: <span className="inline-flex items-center gap-2"><FileText size={16} />测试计划</span>,
-            children: withProductNavigation(<TestPlanWorkspace productLineFilter={productLineFilter} />)
+            children: <div className={testPlanDetailOpen ? 'test-plan-detail-shell' : undefined}>{withProductNavigation(<TestPlanWorkspace productLineFilter={productLineFilter} onDetailChange={setTestPlanDetailOpen} />)}</div>
           },
           {
             key: 'case-library',

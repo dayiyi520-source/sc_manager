@@ -9,7 +9,6 @@ import {
   MOCK_TEAM_MEMBERS,
   MOCK_TEST_CASE_DIRECTORIES,
   MOCK_TEST_CASES,
-  MOCK_TEST_EXECUTIONS,
   MOCK_TEST_PLANS,
   MOCK_TEST_TASKS,
   MOCK_USERS,
@@ -21,11 +20,8 @@ import {
 import type { ProductLine } from '../types';
 import type { CurrentUser, EmployeeOption } from '../types';
 import type {
-  CreateTestExecutionInput,
   SaveTestPlanInput,
   TestCase,
-  TestExecution,
-  TestExecutionCase,
   TestPlan,
   TestPlanCase,
 } from '../types/testManagement';
@@ -34,7 +30,6 @@ const KEYS = {
   snapshot: 'shichuang.frontend.mock.snapshotVersion',
   members: 'shichuang.frontend.mock.teamMembers',
   plans: 'shichuang.frontend.mock.testPlans',
-  executions: 'shichuang.frontend.mock.testExecutions',
   cases: 'shichuang.frontend.mock.testCases',
   okrRecords: 'shichuang.frontend.mock.okrRecords',
   okrPeople: 'shichuang.frontend.mock.okrPeople',
@@ -99,7 +94,6 @@ const defaultCases = (): TestCase[] => MOCK_TEST_CASES.map((item) => ({ ...item,
 
 const getCases = () => read<TestCase[]>(KEYS.cases, defaultCases());
 const getPlans = () => read<TestPlan[]>(KEYS.plans, MOCK_TEST_PLANS.map((item) => ({ ...item, cases: [...item.cases] })));
-const getExecutions = () => read<TestExecution[]>(KEYS.executions, MOCK_TEST_EXECUTIONS.map((item) => ({ ...item, cases: [...item.cases] })));
 const getMembers = () => read(KEYS.members, MOCK_TEAM_MEMBERS.map((item) => ({ ...item })));
 const getProductLines = () => read<ProductLine[]>(KEYS.productLines, MOCK_PRODUCT_LINES.map((item) => ({ ...item, versions: [...(item.versions || [])] })));
 const getOkrPeople = () => {
@@ -113,7 +107,6 @@ const planCases = (caseIds: string[]): TestPlanCase[] => getCases().filter((item
   linkId: id('link'), testCaseId: item.id, sort: index + 1, code: item.code, title: item.title, priority: item.priority,
   ownerName: item.ownerName, enabled: item.enabled, latestResult: item.latestResult,
 }));
-const stats = (cases: TestExecutionCase[]) => ({ total: cases.length, passed: cases.filter((item) => item.result === 'PASSED').length, failed: cases.filter((item) => item.result === 'FAILED').length, notExecuted: cases.filter((item) => item.result === 'NOT_EXECUTED').length });
 
 const databaseRows = (table: keyof typeof MOCK_DATABASE) => (MOCK_DATABASE[table] as unknown as Array<Record<string, any>>).filter((row) => Number(row.delete_flag_ || 0) === 0);
 const categoryCode = (value: string) => ({ 产品: 'requirement', 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' } as Record<string, string>)[value] || value;
@@ -176,6 +169,8 @@ const FIELD_METADATA: Record<string, { label: string; fieldType: string; descrip
 };
 const REQUIRED_FIELD_CODES = new Set(['title', 'status', 'assignee']);
 const DETAIL_SYSTEM_FIELD_CODES = new Set(['creator', 'createdAt', 'updater', 'updatedAt']);
+// 历史配置中曾使用 requirement 作为独立关联字段，现统一由 relations 关系区承载。
+const LEGACY_FIELD_CODES = new Set(['requirement']);
 const CREATE_ASSOCIATION_FIELD_CODES = ['relations', 'children', 'support', 'hours'];
 const normalizeTemplateField = (field: any) => {
   const metadata = FIELD_METADATA[field.fieldCode];
@@ -190,7 +185,9 @@ const normalizeTemplateField = (field: any) => {
 };
 const templateFields = () => {
   const stored = read<any[] | null>(KEYS.researchFields, null);
-  const base = (stored || databaseRows('t_work_item_field_configuration').map((row) => ({ categoryCode: row.category_code_, scene: row.scene_, fieldCode: row.field_code_, label: row.field_code_, fieldType: 'text', visible: Boolean(row.visible_), required: Boolean(row.required_), editable: true, defaultValue: null, sort: Number(row.sort_ || 0), locked: false }))).map(normalizeTemplateField);
+  const base = (stored || databaseRows('t_work_item_field_configuration').map((row) => ({ categoryCode: row.category_code_, scene: row.scene_, fieldCode: row.field_code_, label: row.field_code_, fieldType: 'text', visible: Boolean(row.visible_), required: Boolean(row.required_), editable: true, defaultValue: null, sort: Number(row.sort_ || 0), locked: false })))
+    .filter((field) => !LEGACY_FIELD_CODES.has(field.fieldCode))
+    .map(normalizeTemplateField);
   const categories = ['requirement', 'design', 'dev', 'test', 'bug'];
   const createScenes = ['CREATE', 'CREATE_CHILD'];
   const baseWithCreateAssociations = [...base];
@@ -270,15 +267,6 @@ const myTasks = (viewerId: string) => {
     }));
   return [...workItems, ...assistanceItems];
 };
-
-function makeExecution(plan: TestPlan, input: CreateTestExecutionInput, roundNo: number): TestExecution {
-  const selected = input.scopeType === 'CUSTOM' && input.testCaseIds.length ? input.testCaseIds : plan.cases.map((item) => item.testCaseId);
-  const cases: TestExecutionCase[] = plan.cases.filter((item) => selected.includes(item.testCaseId)).map((item, index) => {
-    const source = getCases().find((value) => value.id === item.testCaseId)!;
-    return { id: id('execution-case'), testCaseId: source.id, sort: index + 1, code: source.code, title: source.title, precondition: source.precondition, priority: source.priority, steps: source.steps, result: 'NOT_EXECUTED', actualResult: null, executorName: null, executedAt: null, revision: 0, evidence: [], defects: [] };
-  });
-  return { id: id('execution'), workItemId: plan.workItemId, testPlanId: plan.id || '', planName: plan.name, roundNo, name: input.name, scopeType: input.scopeType, environment: input.environment || null, buildVersion: input.buildVersion || null, executorName: MOCK_USERS[0]?.name || '', status: 'IN_PROGRESS', startTime: now(), endTime: null, revision: 0, ...stats(cases), cases };
-}
 
 export async function mockApiRequest(path: string, init: RequestInit = {}): Promise<any> {
   const method = (init.method || 'GET').toUpperCase();
@@ -434,23 +422,34 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   if (parts[1] === 'work-items' && parts[2] && parts[3] === 'transitions' && method === 'GET') return { revision: 0, actions: [], statuses: [] };
   if (parts[1] === 'work-items' && parts[2] && parts[3] === 'relations' && method === 'GET') return { relations: [] };
   if (parts[1] === 'requirements' && parts[2] && parts[3] === 'summary' && method === 'GET') { const requirement = [...getWorkItems()].find((item) => item.id === parts[2]); return { requirement: requirement || undefined, linkedItems: [] }; }
-  if (clean.endsWith('/test-case-directories') && method === 'GET') return MOCK_TEST_CASE_DIRECTORIES;
-  if (clean.endsWith('/test-cases') && method === 'GET') { const query = queryOf(path); const items = getCases().filter((item) => !query.get('productLineId') || item.productLineId === query.get('productLineId')); return { items, page: 1, pageSize: items.length || 20, total: items.length }; }
+  if (clean.endsWith('/test-case-directories') && method === 'GET') {
+    const lineId = parts[2] || '';
+    const allCases = getCases();
+    const children = new Map<string, string[]>();
+    MOCK_TEST_CASE_DIRECTORIES.forEach((item) => { if (item.parentId) children.set(item.parentId, [...(children.get(item.parentId) || []), item.id]); });
+    const descendants = (directoryId: string): string[] => [directoryId, ...(children.get(directoryId) || []).flatMap(descendants)];
+    return MOCK_TEST_CASE_DIRECTORIES.filter((item) => !lineId || lineId === 'all' || item.productLineId === lineId).map((item) => ({ ...item, caseCount: allCases.filter((testCase) => testCase.directoryId && descendants(item.id).includes(testCase.directoryId)).length }));
+  }
+  if (clean.endsWith('/test-cases') && method === 'GET') {
+    const query = queryOf(path); const lineId = parts[2] || query.get('productLineId') || ''; let items = getCases().filter((item) => !lineId || lineId === 'all' || item.productLineId === lineId);
+    const directoryId = query.get('directoryId');
+    if (directoryId) {
+      const children = new Map<string, string[]>();
+      MOCK_TEST_CASE_DIRECTORIES.forEach((item) => { if (item.parentId) children.set(item.parentId, [...(children.get(item.parentId) || []), item.id]); });
+      const descendants = (id: string): string[] => [id, ...(children.get(id) || []).flatMap(descendants)];
+      const allowed = query.get('includeDescendants') === 'true' ? descendants(directoryId) : [directoryId];
+      items = items.filter((item) => allowed.includes(item.directoryId));
+    }
+    const keyword = (query.get('keyword') || '').toLowerCase();
+    if (keyword) items = items.filter((item) => item.title.toLowerCase().includes(keyword) || item.code.toLowerCase().includes(keyword));
+    return { items, page: Number(query.get('page') || 1), pageSize: Number(query.get('pageSize') || items.length || 20), total: items.length };
+  }
   if (parts.length >= 4 && parts[1] === 'work-items' && parts[3] === 'test-plans') {
     const workItemId = parts[2]; const plans = getPlans();
     if (method === 'GET') return plans.filter((plan) => plan.workItemId === workItemId);
     if (method === 'POST') { const input = body as SaveTestPlanInput; const plan: TestPlan = { id: id('plan'), workItemId: input.workItemId || workItemId, executable: true, name: input.name, environment: input.environment, startDate: input.startDate, endDate: input.endDate, ownerId: input.ownerId, ownerName: input.ownerName, revision: 0, cases: planCases(input.testCaseIds || []) }; write(KEYS.plans, [...plans, plan]); return plan; }
     if (method === 'PUT' && parts[4]) { const index = plans.findIndex((plan) => plan.id === parts[4]); if (index >= 0) { plans[index] = { ...plans[index], ...body, cases: planCases(body.testCaseIds || []) as any, revision: plans[index].revision + 1 }; write(KEYS.plans, plans); return plans[index]; } }
   }
-  if (parts.length >= 4 && parts[1] === 'work-items' && parts[3] === 'test-executions') {
-    const workItemId = parts[2]; const executions = getExecutions();
-    if (method === 'GET') return executions.filter((item) => item.workItemId === workItemId);
-    if (method === 'POST') { const plan = getPlans().find((item) => item.id === body.planId); if (!plan) return null; const roundNo = executions.filter((item) => item.testPlanId === plan.id).length + 1; const execution = makeExecution(plan, body as CreateTestExecutionInput, roundNo); write(KEYS.executions, [...executions, execution]); return execution; }
-  }
-  if (parts[1] === 'test-executions' && parts[2] && method === 'GET') return getExecutions().find((item) => item.id === parts[2]) || null;
-  if (parts[1] === 'test-executions' && parts[2] && parts[3] === 'end' && method === 'POST') { const executions = getExecutions(); const index = executions.findIndex((item) => item.id === parts[2]); if (index >= 0) { executions[index] = { ...executions[index], status: 'ENDED', endTime: now(), revision: executions[index].revision + 1 }; write(KEYS.executions, executions); return executions[index]; } }
-  if (parts[1] === 'test-execution-cases' && parts[2] && method === 'PUT') { const executions = getExecutions(); const execution = executions.find((item) => item.cases.some((testCase) => testCase.id === parts[2])); if (execution) { const target = execution.cases.find((testCase) => testCase.id === parts[2])!; Object.assign(target, { ...body, executedAt: now(), executorName: MOCK_USERS[0]?.name || '', revision: target.revision + 1 }); Object.assign(execution, stats(execution.cases)); write(KEYS.executions, executions); return execution; } }
-  if (clean.endsWith('/test-overview')) { const workItemId = parts[2]; const executions = getExecutions().filter((item) => item.workItemId === workItemId); const latest = executions[executions.length - 1]; return { workItemId, childCount: 0, completedChildCount: 0, caseCount: latest?.total || 0, executionCount: executions.length, total: latest?.total || 0, passed: latest?.passed || 0, failed: latest?.failed || 0, notExecuted: latest?.notExecuted || 0, defectCount: 0, blockingDefectCount: 0, conclusion: latest && latest.notExecuted === 0 && latest.failed === 0 ? 'PASSED' : 'NOT_PASSED', blockers: [], defects: [], children: [] }; }
   if (method === 'GET') return [];
   if (method === 'POST') return { id: id('mock'), code: `MOCK-${Date.now()}` };
   return null;

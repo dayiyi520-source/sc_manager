@@ -1385,7 +1385,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const updateDesignTask = (id: string, updates: Partial<RequirementTask>) => {
     if (!requirementBackendEnabled) {
-      addToast('error', '设计任务同步失败', '当前未连接后端服务，数据未保存');
+      setDesignTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task));
+      addToast('success', '设计任务已更新', '当前为本地示例数据');
       return;
     }
     const current = designTasks.find((task) => task.id === id);
