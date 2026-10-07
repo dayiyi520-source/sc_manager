@@ -42,7 +42,7 @@ describe('TestCaseLibraryView', () => {
     render(<QueryClientProvider client={client}><TestCaseLibraryView productLineFilter="all" /></QueryClientProvider>);
     expect(await screen.findByText('当前目录暂无测试用例')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '最新执行结果' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /新建用例/ })).toBeInTheDocument();
+    expect(screen.getByText('新建').closest('button')).toBeInTheDocument();
   });
 
   it('uses task-style icon controls and filter fields', async () => {
@@ -53,7 +53,12 @@ describe('TestCaseLibraryView', () => {
     const scopeTabs = screen.getByRole('tablist', { name: '用例范围' });
     expect(scopeTabs.closest('.test-case-data-plane')).not.toBeNull();
     expect(screen.getByRole('button', { name: '搜索' }).closest('.test-case-data-plane')).not.toBeNull();
-    expect(screen.getByText('新建用例').closest('button')?.closest('.test-case-data-plane')).not.toBeNull();
+    expect(screen.getByText('新建').closest('.test-case-data-plane')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '新建更多操作' }));
+    expect(await screen.findByText('导入数据')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('导入数据'));
+    expect(screen.getByRole('dialog', { name: '导入用例' })).toBeInTheDocument();
+    expect(screen.getByText('请选择数据文件导入')).toBeInTheDocument();
     expect(screen.queryByText('测试用例库')).not.toBeInTheDocument();
     expect(screen.queryByText('匹配操作')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('搜索编号或标题')).not.toBeInTheDocument();

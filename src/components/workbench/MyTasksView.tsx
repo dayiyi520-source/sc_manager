@@ -16,8 +16,9 @@ import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
 import { StatusBadge } from '@/components/common';
 import { requirementRepository } from '../../services/requirementRepository';
+import { MOCK_WORKBENCH_FEEDS } from '../../data/mockSnapshot';
 
-const WORKBENCH_FEEDS: Array<{ id: string; type: FeedTabType; time: string; title: string; content: string; customer?: string; author?: string }> = [];
+const WORKBENCH_FEEDS: Array<{ id: string; type: FeedTabType; time: string; title: string; content: string; customer?: string; author?: string }> = MOCK_WORKBENCH_FEEDS;
 
 type MyTaskRecord = {
   id: string;

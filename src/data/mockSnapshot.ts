@@ -1,4 +1,4 @@
-import type { Contract, CurrentUser, Customer, DefectBug, FollowUpRecord, Lead, Opportunity, ProductLine, RequirementTask, TeamMember, VersionIteration } from '../types';
+import type { ApprovalFlow, Contract, CurrentUser, Customer, DefectBug, FollowUpRecord, Lead, Opportunity, ProductLine, RequirementTask, TeamMember, VersionIteration } from '../types';
 import type { TestCase, TestCaseDirectory, TestPlan } from '../types/testManagement';
 import { MOCK_DATABASE, MOCK_SNAPSHOT_VERSION } from './mockDatabaseSnapshot';
 
@@ -23,6 +23,59 @@ const systemRole = (value: unknown): CurrentUser['role'] => systemRoles.includes
 export const MOCK_USERS: CurrentUser[] = rows('t_sys_user')
   .filter((row) => text(row.tenant_id_) === 'local-tenant' && Number(row.delete_flag_ || 0) === 0 && text(row.status_) === 'enabled')
   .map((row) => ({ id: text(row.id_), name: text(row.name_), avatar: text(row.avatar_), role: systemRole(row.role_), roleTitle: text(row.role_title_) || '成员', department: text(row.department_) }));
+
+/** 工作台和审批中心使用的本地演示数据，保持各审批页签都有可验证的样例。 */
+export const MOCK_APPROVALS: ApprovalFlow[] = [
+  {
+    id: 'demo-approval-contract', code: 'APPR-2026-1001', title: '华东分部数智调度中心合同用印申请', type: '合同用印审批',
+    applicantName: '周明', applicantDept: '商务拓展部', status: '待审批', ccNames: ['林志豪'], relatedCustomer: '国家电网华东分部数智调度中心', relatedProduct: '数字化协同管理中枢 V4.2', amount: 1200000, submittedAt: '2026-10-03 09:20',
+    nodes: [
+      { title: '发起申请', approver: '周明', role: '商务经理', status: 'passed', time: '2026-10-03 09:20', comment: '合同已完成商务确认。' },
+      { title: '部门主管审核', approver: '林志豪', role: '超级系统管理员', status: 'current' },
+      { title: '总经理终审', approver: '总经办', role: '总经理', status: 'waiting' },
+    ],
+    contentDetails: { '审批主题': '华东分部数智调度中心合同用印申请', '关联合同/客户': '国家电网华东分部数智调度中心', '涉及金额': '¥ 1,200,000 元', '申请说明': '请审批合同盖章及归档。' },
+  },
+  {
+    id: 'demo-approval-change', code: 'APPR-2026-1002', title: 'V4.2 版本需求重大变更评审', type: '需求重大变更',
+    applicantName: '林志豪', applicantDept: '人力行政部', status: '待审批', ccNames: ['陈佳'], relatedProduct: '数字化协同管理中枢 V4.2', submittedAt: '2026-10-02 15:40',
+    nodes: [
+      { title: '发起申请', approver: '林志豪', role: '超级系统管理员', status: 'passed', time: '2026-10-02 15:40', comment: '补充跨部门影响评估。' },
+      { title: '产品负责人审核', approver: '王芳', role: '产品经理', status: 'current' },
+      { title: '技术负责人确认', approver: '李爱剑', role: '前端开发组长', status: 'waiting' },
+    ],
+    contentDetails: { '审批主题': 'V4.2 版本需求重大变更评审', '关联产品': '数字化协同管理中枢 V4.2', '申请说明': '新增测试计划关联能力，请评估排期影响。' },
+  },
+  {
+    id: 'demo-approval-purchase', code: 'APPR-2026-1003', title: '测试环境设备采购申请', type: '采购与报销审批',
+    applicantName: '赵宁', applicantDept: '研发中心', status: '审批中', ccNames: ['林志豪'], relatedProduct: '智能制造数据平台', amount: 86000, submittedAt: '2026-10-01 11:15',
+    nodes: [
+      { title: '发起申请', approver: '赵宁', role: '研发工程师', status: 'passed', time: '2026-10-01 11:15' },
+      { title: '部门主管审核', approver: '李爱剑', role: '前端开发组长', status: 'current' },
+      { title: '财务审核', approver: '财务部', role: '财务负责人', status: 'waiting' },
+    ],
+    contentDetails: { '审批主题': '测试环境设备采购申请', '关联产品': '智能制造数据平台', '涉及金额': '¥ 86,000 元', '申请说明': '用于新增自动化测试环境。' },
+  },
+  {
+    id: 'demo-approval-passed', code: 'APPR-2026-0998', title: '合作伙伴准入申请', type: '合作伙伴准入',
+    applicantName: '林志豪', applicantDept: '人力行政部', status: '已通过', relatedCustomer: '智行新能源汽车工业互联股份有限公司', submittedAt: '2026-09-28 10:05', completedAt: '2026-09-29 16:30',
+    nodes: [
+      { title: '发起申请', approver: '林志豪', role: '超级系统管理员', status: 'passed', time: '2026-09-28 10:05' },
+      { title: '部门主管审核', approver: '王芳', role: '产品经理', status: 'passed', time: '2026-09-29 09:10', comment: '资料完整。' },
+      { title: '总经理终审', approver: '总经办', role: '总经理', status: 'passed', time: '2026-09-29 16:30', comment: '同意准入。' },
+    ],
+    contentDetails: { '审批主题': '合作伙伴准入申请', '关联合作方': '智行新能源汽车工业互联股份有限公司', '申请说明': '完成资质审核并纳入合作伙伴目录。' },
+  },
+];
+
+export const MOCK_WORKBENCH_FEEDS = [
+  { id: 'feed-product-1', type: 'dynamic' as const, time: '2026-10-03 14:20', title: 'V4.2 版本完成测试计划关联', content: '测试团队已补充回归测试用例，版本评审进入待确认阶段。' },
+  { id: 'feed-product-2', type: 'dynamic' as const, time: '2026-10-02 17:10', title: '产品需求“统一工作项”已发布', content: '需求完成评审并下发设计、研发和测试任务。' },
+  { id: 'feed-feedback-1', type: 'feedback' as const, time: '2026-10-03 10:30', title: '客户反馈：列表筛选响应较慢', content: '国家电网华东分部建议优化大数据量下的筛选体验。', customer: '国家电网华东分部数智调度中心' },
+  { id: 'feed-feedback-2', type: 'feedback' as const, time: '2026-10-01 16:00', title: '内部评价：测试计划入口清晰', content: '测试同学反馈关联测试计划的入口更容易找到。', author: '测试团队' },
+  { id: 'feed-competitor-1', type: 'competitor' as const, time: '2026-10-02 09:15', title: '友商发布新一代项目协同套件', content: '重点宣传版本规划、测试管理和交付协同能力。', author: '行业情报' },
+  { id: 'feed-competitor-2', type: 'competitor' as const, time: '2026-09-30 13:40', title: '竞品新增审批流模板市场', content: '支持合同、采购和需求变更等常见审批场景。', author: '市场部' },
+];
 
 const usersById = new Map(MOCK_USERS.map((user) => [user.id, user]));
 

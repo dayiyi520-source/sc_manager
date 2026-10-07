@@ -24,6 +24,7 @@ describe('design task navigation', () => {
     expect(workbench.find((menu) => menu.id === 'wb_work_order')?.title).toBe('协助事项');
     expect(product).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'prod_test_tasks', title: '测试任务' }),
+      expect.objectContaining({ id: 'prod_test_management', title: '测试管理' }),
       expect.objectContaining({ id: 'prod_bugs', title: '缺陷管理' }),
       expect.objectContaining({ id: 'prod_version_reviews', title: '版本评审' })
     ]));

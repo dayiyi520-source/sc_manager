@@ -71,6 +71,14 @@ describe('TestAndDefectView', () => {
     expect(mocks.renderReportWorkspace).toHaveBeenCalledWith(expect.objectContaining({ productLineFilter: 'line-2' }));
   });
 
+  it('将测试任务与测试管理拆分为两个菜单工作区', () => {
+    const { rerender } = render(<TestAndDefectView mode="tasks" productLineFilter="line-1" />);
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.getByText('测试任务统一工作项页面')).toBeInTheDocument();
+    rerender(<TestAndDefectView mode="management" productLineFilter="line-1" />);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['测试计划', '用例库', '测试报告']);
+  });
+
   it('仅在测试任务和测试报告内容区显示产品导航', () => {
     render(<TestAndDefectView productLineFilter="line-1" productLines={[{ id: 'line-1', name: '核心产品' }]} />);
     expect(screen.getByRole('navigation', { name: '产品导航栏' })).toBeInTheDocument();

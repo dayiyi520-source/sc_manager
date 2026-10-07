@@ -152,7 +152,9 @@ const MainContent: React.FC = () => {
       case 'prod_bugs':
         return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="缺陷管理" taskKind="bug" />;
       case 'prod_test_tasks':
-        return <TestAndDefectView productLineFilter={productLineFilter} productLines={productLines} onProductLineChange={setProductLineFilter} />;
+        return <TestAndDefectView mode="tasks" productLineFilter={productLineFilter} productLines={productLines} onProductLineChange={setProductLineFilter} />;
+      case 'prod_test_management':
+        return <TestAndDefectView mode="management" productLineFilter={productLineFilter} productLines={productLines} onProductLineChange={setProductLineFilter} />;
       case 'prod_version_reviews':
         return <VersionReviewView productLineFilter={productLineFilter} />;
       case 'prod_reviews':

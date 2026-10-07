@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, DatePicker, Input, InputNumber, Select, Tabs } from 'antd';
 import dayjs from 'dayjs';
-import { productRepository } from '../../services/productRepository';
-import { useQuery } from '@tanstack/react-query';
 import { RequirementTasksView, type WorkItemDetailContext } from './RequirementTasksView';
 import { CollapsibleDescription } from './CollapsibleDescription';
 import { LazyRichTextEditor as RichTextEditor } from './LazyRichTextEditor';
@@ -11,27 +9,11 @@ import { employeeSelectOptions } from '../common/PersonIdentity';
 const truncateTitle = (value: string, maxLength = 30) => value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 
 const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, parent, onOpenParent, editing, onUpdate, employeeOptions, versions, statusControl }) => {
-  const plans = useQuery({
-    queryKey: ['test-task-plans', task.productLineId, task.id],
-    queryFn: async () => {
-      if (!task.productLineId) return productRepository.testPlans(task.id);
-      const result = await productRepository.workItems(task.productLineId, 'test', '', { page: 1, pageSize: 500 });
-      const taskIds = [...new Set([task.id, ...(result.page.items || []).map((item) => item.id)])];
-      const values = await Promise.all(taskIds.map((id) => productRepository.testPlans(id)));
-      return [...new Map(values.flat().map((plan) => [String(plan.id), plan])).values()];
-    },
-    enabled: Boolean(task.id),
-    retry: false,
-  });
-  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || '');
   const [descriptionHtml, setDescriptionHtml] = useState(task.descriptionHtml || '');
   const descriptionEditor = useRef<HTMLDivElement | null>(null);
   useEffect(() => { setTitle(task.title); setDescription(task.description || ''); setDescriptionHtml(task.descriptionHtml || ''); }, [task.id, task.title, task.description, task.descriptionHtml]);
-  useEffect(() => {
-    setSelectedPlanIds((plans.data || []).map((plan) => String(plan.id || '')).filter(Boolean));
-  }, [task.id, plans.data]);
   const productTaskTitle = task.requirementTitle || task.sourceWorkOrderTitles?.[0] || '未关联';
   const lineVersions = versions.filter((version) => !version.productLineName || version.productLineName === task.productLineName);
   const basicInfo = <div className="test-task-basic-info">
@@ -48,10 +30,7 @@ const TestTaskDetail: React.FC<WorkItemDetailContext> = ({ task, parent, onOpenP
     </div>
     <section className="test-task-basic-description"><h3>任务描述</h3>{editing ? <RichTextEditor key={`test-detail-${task.id}`} editor={descriptionEditor} value={description} htmlValue={descriptionHtml} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} onBlur={() => onUpdate({ description, descriptionHtml })} placeholder="详细记录测试范围、环境和验收标准..." /> : <CollapsibleDescription value={description} emptyText="未填写任务描述" />}</section>
   </div>;
-  return <div className="test-task-detail-page"><header className="test-task-detail-header">{editing ? <Input className="test-task-detail-title-input" value={title} onChange={(event) => setTitle(event.target.value)} onBlur={() => { const nextTitle = title.trim(); if (nextTitle && nextTitle !== task.title) onUpdate({ title: nextTitle }); else setTitle(task.title); }} /> : <h2 className="test-task-detail-title">{task.title}</h2>}<div className="test-task-detail-meta"><span title={productTaskTitle}>产品任务：{truncateTitle(productTaskTitle)}</span><i /> <span>产品/版本号：{task.productLineName || '未设置'} / {task.versionName || '未设置'}</span><i /> <span>负责人：{task.ownerName || '未设置'}</span></div>{parent && <div className="test-task-parent-reference"><span>父级任务</span><button type="button" onClick={onOpenParent} title={String(parent.title || '')}><span className="test-task-parent-code font-mono">{String(parent.code || '')}</span><span className="test-task-parent-title">{String(parent.title || '')}</span></button></div>}</header><Tabs className="test-task-detail-tabs" items={[
-    { key: 'basic', label: '基本信息', children: basicInfo },
-    { key: 'test-plans', label: '测试计划', children: <Select mode="multiple" showSearch optionFilterProp="label" value={selectedPlanIds} onChange={setSelectedPlanIds} loading={plans.isLoading} placeholder="选择关联的测试计划" options={(plans.data || []).map((plan) => ({ value: plan.id, label: plan.name || '未命名计划' }))} style={{ width: '100%' }} notFoundContent={plans.isError ? '测试计划加载失败' : undefined} /> },
-  ]} /></div>;
+  return <div className="test-task-detail-page"><header className="test-task-detail-header">{editing ? <Input className="test-task-detail-title-input" value={title} onChange={(event) => setTitle(event.target.value)} onBlur={() => { const nextTitle = title.trim(); if (nextTitle && nextTitle !== task.title) onUpdate({ title: nextTitle }); else setTitle(task.title); }} /> : <h2 className="test-task-detail-title">{task.title}</h2>}<div className="test-task-detail-meta"><span title={productTaskTitle}>产品任务：{truncateTitle(productTaskTitle)}</span><i /> <span>产品/版本号：{task.productLineName || '未设置'} / {task.versionName || '未设置'}</span><i /> <span>负责人：{task.ownerName || '未设置'}</span></div>{parent && <div className="test-task-parent-reference"><span>父级任务</span><button type="button" onClick={onOpenParent} title={String(parent.title || '')}><span className="test-task-parent-code font-mono">{String(parent.code || '')}</span><span className="test-task-parent-title">{String(parent.title || '')}</span></button></div>}</header><Tabs className="test-task-detail-tabs" items={[{ key: 'basic', label: '基本信息', children: basicInfo }]} /></div>;
 };
 
 export const TestTaskWorkspace: React.FC<{ productLineFilter?: string }> = ({ productLineFilter = 'all' }) => <RequirementTasksView productLineFilter={productLineFilter} itemLabel="测试任务" taskKind="test" createPolicy={{ allowedChildTypeNames: ['用例编写', '测试任务', '测试验收', '安全测试', '回归测试'] }} renderDetail={(context) => <TestTaskDetail {...context} />} />;
