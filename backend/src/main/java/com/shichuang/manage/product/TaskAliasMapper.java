@@ -53,6 +53,13 @@ public class TaskAliasMapper {
         List<String> rows = jdbc.queryForList("SELECT id_ FROM t_sys_user WHERE tenant_id_=? AND name_=? AND status_='enabled' AND delete_flag_=0 ORDER BY create_time_ LIMIT 1", String.class, RequestContext.tenantId(), name);
         return rows.isEmpty() ? null : rows.get(0);
     }
+    public void activity(String id,String event,Map<String,Object> content) {
+        jdbc.update("INSERT INTO t_product_work_item_activity(id_,tenant_id_,product_line_id_,subject_id_,event_type_,content_,create_by_,create_time_) VALUES(?,?,?,?,?,CAST(? AS JSON),?,NOW(6))",UUID.randomUUID().toString(),RequestContext.tenantId(),"",id,event,jsonValue(Map.of("content",content),"content"),RequestContext.userId());
+    }
+    public String encodeActivity(Map<String,Object> content) { return jsonValue(Map.of("content",content),"content"); }
+    public List<Map<String,Object>> activities(String id) {
+        return jdbc.queryForList("SELECT a.id_ AS id,a.event_type_ AS eventType,a.content_ AS content,COALESCE(u.name_,a.create_by_) AS operatorName,a.create_time_ AS createdAt FROM t_product_work_item_activity a LEFT JOIN t_sys_user u ON u.tenant_id_=a.tenant_id_ AND u.id_=a.create_by_ WHERE a.tenant_id_=? AND a.subject_id_=? AND a.product_line_id_='' ORDER BY a.create_time_,a.id_",RequestContext.tenantId(),id);
+    }
 
     public String defaultProductLine() {
         List<String> rows = jdbc.queryForList("SELECT id_ FROM t_product_line WHERE tenant_id_=? AND status_='启用中' AND delete_flag_=0 ORDER BY create_time_ LIMIT 1", String.class, RequestContext.tenantId());

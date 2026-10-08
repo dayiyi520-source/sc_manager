@@ -19,6 +19,8 @@ public class WorkItemStorageController {
     public ApiResponse<Map<String,Object>> detail(@PathVariable String id,@RequestParam String productLineId) { return ApiResponse.ok(service.detail(productLineId,id)); }
     @GetMapping("/{id}/activities") @Operation(summary="读取工作项活动记录")
     public ApiResponse<List<Map<String,Object>>> activities(@PathVariable String id,@RequestParam String productLineId) { return ApiResponse.ok(service.activities(productLineId,id)); }
+    @PostMapping("/{id}/comments") @Operation(summary="发表评论并记录工作项动态")
+    public ApiResponse<Void> comment(@PathVariable String id,@RequestParam String productLineId,@RequestBody Map<String,String> body) { service.comment(productLineId,id,body.get("content")); return ApiResponse.ok(null); }
     @PutMapping("/{id}") @Operation(summary="更新统一工作项基础字段")
     public ApiResponse<Map<String,Object>> update(@PathVariable String id,@RequestParam String productLineId,
         @RequestBody WorkItemDefinition.UpdateItem body) { return ApiResponse.ok(service.update(productLineId,id,body)); }

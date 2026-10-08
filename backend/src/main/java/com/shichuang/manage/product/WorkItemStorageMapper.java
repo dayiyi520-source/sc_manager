@@ -81,15 +81,19 @@ public class WorkItemStorageMapper {
     public boolean approvalDispatched(String tenant,String line,String id) {
         return one("SELECT id_ FROM t_product_work_item_activity WHERE tenant_id_=? AND product_line_id_=? AND subject_id_=? AND event_type_='REQUIREMENT_TASKS_DISPATCHED' LIMIT 1",tenant,line,id)!=null;
     }
-    public int transition(String tenant,String line,String id,int revision,String from,WorkItemDefinition.State to,String user) {
+    public int transition(String tenant,String line,String id,int revision,String from,WorkItemDefinition.State to,String user,java.math.BigDecimal actualHours) {
         boolean terminal=to.group()==WorkItemStatus.Group.COMPLETED || to.group()==WorkItemStatus.Group.CANCELLED;
         return jdbc.update("""
             UPDATE t_product_work_item SET status_key_=?,status_name_=?,status_group_=?,status_color_=?,successful_=?,progress_=CASE WHEN ?='COMPLETED' THEN 100 WHEN ?='IN_PROGRESS' THEN 50 ELSE 0 END,
               actual_start_at_=CASE WHEN ?='IN_PROGRESS' THEN COALESCE(actual_start_at_,NOW(6)) ELSE actual_start_at_ END,
-              completed_at_=CASE WHEN ? THEN NOW(6) ELSE NULL END,
+              completed_at_=CASE WHEN ? THEN NOW(6) ELSE NULL END,actual_hours_=COALESCE(?,actual_hours_),
               version_=version_+1,update_by_=?,update_time_=NOW(6)
             WHERE tenant_id_=? AND product_line_id_=? AND id_=? AND version_=? AND status_key_=? AND delete_flag_=0
-            """,to.key(),to.name(),to.group().name(),to.color(),to.successful(),to.group().name(),to.group().name(),to.group().name(),terminal,user,tenant,line,id,revision,from);
+            """,to.key(),to.name(),to.group().name(),to.color(),to.successful(),to.group().name(),to.group().name(),to.group().name(),terminal,actualHours,user,tenant,line,id,revision,from);
+    }
+
+    public int transition(String tenant,String line,String id,int revision,String from,WorkItemDefinition.State to,String user) {
+        return transition(tenant,line,id,revision,from,to,user,null);
     }
 
     public int updateProgress(String tenant,String line,String id,int revision,int progress,String user) {
@@ -140,6 +144,6 @@ public class WorkItemStorageMapper {
         jdbc.update("INSERT INTO t_product_work_item_activity(id_,tenant_id_,product_line_id_,subject_id_,event_type_,content_,create_by_,create_time_) VALUES(?,?,?,?,?,CAST(? AS JSON),?,NOW(6))",UUID.randomUUID().toString(),tenant,line,subject,event,json,user);
     }
     public List<Map<String,Object>> activities(String tenant,String line,String id) {
-        return jdbc.queryForList("SELECT id_ AS id,event_type_ AS eventType,content_ AS content,create_by_ AS operatorId,create_time_ AS createdAt FROM t_product_work_item_activity WHERE tenant_id_=? AND product_line_id_=? AND subject_id_=? ORDER BY create_time_ DESC,id_ LIMIT 200",tenant,line,id);
+        return jdbc.queryForList("SELECT a.id_ AS id,a.event_type_ AS eventType,a.content_ AS content,a.create_by_ AS operatorId,COALESCE(u.name_,a.create_by_) AS operatorName,a.create_time_ AS createdAt FROM t_product_work_item_activity a LEFT JOIN t_sys_user u ON u.tenant_id_=a.tenant_id_ AND u.id_=a.create_by_ WHERE a.tenant_id_=? AND a.product_line_id_=? AND a.subject_id_=? ORDER BY a.create_time_,a.id_",tenant,line,id);
     }
 }

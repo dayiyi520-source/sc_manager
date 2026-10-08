@@ -30,7 +30,9 @@ public final class WorkItemDefinition {
         public List<String> effectiveRoles() { return roles == null ? WRITE_ROLES.stream().sorted().toList() : roles; }
         public List<String> effectiveRequiredFields() { return requiredFields == null ? List.of() : requiredFields; }
     }
-    public record Transition(String edgeKey, Integer revision, String reason) {}
+    public record Transition(String edgeKey, Integer revision, String reason, BigDecimal actualHours) {
+        public Transition(String edgeKey,Integer revision,String reason) { this(edgeKey,revision,reason,null); }
+    }
     public record Workflow(List<State> states, List<Edge> transitions) {}
     public record SaveWorkflow(String category, String name, Workflow definition, Integer revision) {}
     public record CreateWorkItemType(String category, String name, String description, Boolean enabled, Boolean isDefault, SaveWorkflow workflow) {

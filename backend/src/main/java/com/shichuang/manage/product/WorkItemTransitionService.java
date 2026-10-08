@@ -60,16 +60,20 @@ public class WorkItemTransitionService {
         Edge edge=workflow.transitions().stream().filter(e -> e.key().equals(input.edgeKey()) && e.from().equals(item.get("statusKey")))
             .findFirst().orElseThrow(() -> conflict("当前状态不允许执行该流转"));
         State target=target(workflow,edge);
+        if (input.actualHours()!=null && (input.actualHours().signum()<0 || input.actualHours().stripTrailingZeros().scale()>2 || input.actualHours().compareTo(new java.math.BigDecimal("99999999.99"))>0))
+            throw new IllegalArgumentException("完成工时必须是非负且最多两位小数的小时数，不能超过99999999.99");
+        if (input.actualHours()!=null && !"已完成".equals(target.name())) throw new IllegalArgumentException("只能在完成任务时填写实际工时");
+        if ("已完成".equals(target.name()) && input.actualHours()==null) throw new IllegalArgumentException("请填写完成工时");
         if (!edge.effectiveRoles().contains(RequestContext.role())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前角色不能执行该流转");
         List<String> reasons=reasons(line,item,edge,target,input.reason(),true);
         if (!reasons.isEmpty()) throw conflict(String.join("；",reasons));
         var blockersBefore=relations.snapshot(line);
         if (edge.approvalTasks()!=null) approvals.dispatch(line,item,edge.approvalTasks());
-        if (mapper.transition(RequestContext.tenantId(),line,id,input.revision(),edge.from(),target,RequestContext.userId())!=1)
+        if (mapper.transition(RequestContext.tenantId(),line,id,input.revision(),edge.from(),target,RequestContext.userId(),input.actualHours())!=1)
             throw conflict("工作项已变化，请刷新后重试");
         mapper.activity(RequestContext.tenantId(),line,id,"WORK_ITEM_TRANSITIONED",configurations.encode(Map.of(
             "edgeKey",edge.key(),"from",edge.from(),"to",edge.to(),"fromName",item.get("statusName"),
-            "toName",target.name(),"reason",Objects.toString(input.reason(),""),"revision",input.revision()+1)),RequestContext.userId());
+            "toName",target.name(),"reason",Objects.toString(input.reason(),""),"actualHours",Objects.toString(input.actualHours(),""),"revision",input.revision()+1)),RequestContext.userId());
         requirements.refreshAssistanceTask(RequestContext.tenantId(), id);
         automations.statusChanged(line,Objects.requireNonNull(mapper.timedItem(RequestContext.tenantId(),line,id)));
         relations.recordChanges(line,blockersBefore);

@@ -40,11 +40,27 @@ public class TaskAliasService {
         if(value==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"工作项不存在");
         return value;
     }
+    public java.util.List<Map<String,Object>> activities(String type,String id) {
+        Map<String,Object> item=detail(type,id);
+        return category(type)==null?mapper.activities(id):storage.activities(item.get("productLineId").toString(),id);
+    }
+    @Transactional public void comment(String type,String id,String content) {
+        AuthorizationService.requireWrite("product");
+        Map<String,Object> item=detail(type,id);
+        String value=Objects.toString(content,"").trim();
+        if(value.isEmpty() || value.length()>10000) throw new IllegalArgumentException("评论内容不能为空且不能超过10000字");
+        if(category(type)==null) mapper.activity(id,"WORK_ITEM_COMMENTED",Map.of("content",value));
+        else storage.comment(item.get("productLineId").toString(),id,value);
+    }
 
     @Transactional public Map<String,Object> create(String type,Map<String,Object> body) {
         AuthorizationService.requireWrite("product");
         String category=category(type);
-        if(category==null) return mapper.createLegacy(type,body);
+        if(category==null) {
+            Map<String,Object> created=mapper.createLegacy(type,body);
+            mapper.activity(created.get("id").toString(),"WORK_ITEM_CREATED",Map.of("title",text(body,"title")));
+            return created;
+        }
         String line=text(body,"productLineId");
         if(line.isBlank()) throw new IllegalArgumentException("请选择所属产品线");
         String taskType=text(body,"workItemTypeId");
@@ -65,7 +81,10 @@ public class TaskAliasService {
         AuthorizationService.requireWrite("product");
         String category=category(type);
         if(category==null) {
+            Map<String,Object> before=detail(type,id);
             if(mapper.updateLegacy(table(type),id,body)==0) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"工作项不存在");
+            var changes=TaskActivityChanges.between(before,detail(type,id));
+            if(!changes.isEmpty()) mapper.activity(id,"WORK_ITEM_UPDATED",Map.of("changes",changes));
             return;
         }
         Map<String,Object> current=mapper.detailUnified(category,id);
@@ -77,8 +96,11 @@ public class TaskAliasService {
             dateNullable(body,"plannedStartDate"),dateNullable(body,"dueDate"),decimalNullable(body,"estimatedHours"),decimalNullable(body,"actualHours"),
             ((Number)current.get("version")).intValue()));
         mapper.updateExtended(id,body);
+        var extendedChanges=TaskActivityChanges.between(current,mapper.detailUnified(category,id)).stream()
+            .filter(change->java.util.Set.of("descriptionHtml","customerId","customerName","ccNames","media","requirementType","specialFields").contains(change.get("field"))).toList();
+        if(!extendedChanges.isEmpty()) storage.activity(com.shichuang.manage.auth.RequestContext.tenantId(),current.get("productLineId").toString(),id,"WORK_ITEM_UPDATED",mapper.encodeActivity(Map.of("changes",extendedChanges)),com.shichuang.manage.auth.RequestContext.userId());
         String target=text(body,"status");
-        if(!target.isBlank()&&!target.equals(current.get("status"))) executeStatus(current.get("productLineId").toString(),id,target);
+        if(!target.isBlank()&&!target.equals(current.get("status"))) executeStatus(current.get("productLineId").toString(),id,target,decimalNullable(body,"actualHours"));
     }
 
     static String table(String type){return switch(type){case "presales"->"t_crm_presales_task";case "delivery"->"t_project_delivery_task";case "ops"->"t_project_ops_task";default->throw new IllegalArgumentException("任务类型无效");};}
@@ -94,5 +116,5 @@ public class TaskAliasService {
     private static LocalDate dateNullable(Map<String,Object>b,String key){return b.containsKey(key)?date(b,key):null;}
     private static BigDecimal decimal(Map<String,Object>b,String key){Object value=b.get(key);return value==null?BigDecimal.ZERO:new BigDecimal(value.toString());}
     private static BigDecimal decimalNullable(Map<String,Object>b,String key){return b.containsKey(key)?decimal(b,key):null;}
-    private void executeStatus(String line,String id,String target){WorkItemTransitionService.Actions available=transitions.available(line,id);WorkItemTransitionService.Action action=available.actions().stream().filter(value->value.to().equals(target)||value.name().equals(target)||available.statuses().stream().anyMatch(option->option.key().equals(value.to())&&option.name().equals(target))).findFirst().orElseThrow(()->new IllegalArgumentException("当前流程不允许流转到该状态"));transitions.execute(line,id,new WorkItemDefinition.Transition(action.edgeKey(),available.revision(),"兼容接口状态变更"));}
+    private void executeStatus(String line,String id,String target,BigDecimal actualHours){WorkItemTransitionService.Actions available=transitions.available(line,id);WorkItemTransitionService.Action action=available.actions().stream().filter(value->value.to().equals(target)||value.name().equals(target)||available.statuses().stream().anyMatch(option->option.key().equals(value.to())&&option.name().equals(target))).findFirst().orElseThrow(()->new IllegalArgumentException("当前流程不允许流转到该状态"));transitions.execute(line,id,new WorkItemDefinition.Transition(action.edgeKey(),available.revision(),"兼容接口状态变更",actualHours));}
 }

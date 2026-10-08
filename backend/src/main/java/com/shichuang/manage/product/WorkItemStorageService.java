@@ -88,6 +88,11 @@ public class WorkItemStorageService {
     }
     public Map<String,Object> detail(String line,String id) { access.check(line,false); requireItem(line,id); return mapper.timedItem(RequestContext.tenantId(),line,id); }
     public List<Map<String,Object>> activities(String line,String id) { access.check(line,false); requireItem(line,id); return mapper.activities(RequestContext.tenantId(),line,id); }
+    @Transactional public void comment(String line,String id,String content) {
+        access.check(line,true); requireItem(line,id);
+        String value=required(content,"评论内容",10000);
+        mapper.activity(RequestContext.tenantId(),line,id,"WORK_ITEM_COMMENTED",configurations.encode(Map.of("content",value)),RequestContext.userId());
+    }
     @Transactional public int updateProgress(String tenant,String line,String id,int revision,int progress,String user) {
         return mapper.updateProgress(tenant,line,id,revision,progress,user);
     }
@@ -119,8 +124,10 @@ public class WorkItemStorageService {
         }
         int updated=mapper.updateItem(RequestContext.tenantId(),line,id,body,versionId,assigneeId,assigneeName,RequestContext.userId());
         if(updated!=1) throw conflict("任务已变化，请刷新后重试");
-        mapper.activity(RequestContext.tenantId(),line,id,"WORK_ITEM_UPDATED",configurations.encode(Map.of("revision",body.revision())),RequestContext.userId());
-        return requireItem(line,id);
+        Map<String,Object> saved=requireItem(line,id);
+        var changes=TaskActivityChanges.between(item,saved);
+        if(!changes.isEmpty()) mapper.activity(RequestContext.tenantId(),line,id,"WORK_ITEM_UPDATED",configurations.encode(Map.of("changes",changes)),RequestContext.userId());
+        return saved;
     }
     @Transactional public void delete(String line,String id,int revision) {
         access.check(line,true);

@@ -7,5 +7,9 @@ import com.shichuang.manage.api.*; import org.springframework.http.HttpStatus; i
  @PostMapping({"/api/presales-tasks","/api/delivery-tasks","/api/ops-tasks"}) @ResponseStatus(HttpStatus.CREATED) public ApiResponse<Map<String,Object>> create(@RequestBody Map<String,Object>b,jakarta.servlet.http.HttpServletRequest r){return ApiResponse.ok(service.create(kind(r),b));}
  @PutMapping({"/api/presales-tasks/{id}","/api/delivery-tasks/{id}","/api/ops-tasks/{id}"}) public ApiResponse<Void> update(@PathVariable String id,@RequestBody Map<String,Object>b,jakarta.servlet.http.HttpServletRequest r){service.update(kind(r),id,b);return ApiResponse.ok(null);}
  private String kind(jakarta.servlet.http.HttpServletRequest r){String u=r.getRequestURI();return u.startsWith("/api/presales")?"presales":u.startsWith("/api/delivery")?"delivery":"ops";}
+ @io.swagger.v3.oas.annotations.Operation(summary="查询业务任务动态")
+ @GetMapping({"/api/presales-tasks/{id}/activities","/api/delivery-tasks/{id}/activities","/api/ops-tasks/{id}/activities"}) public ApiResponse<java.util.List<Map<String,Object>>> activities(@PathVariable String id,jakarta.servlet.http.HttpServletRequest r){return ApiResponse.ok(service.activities(kind(r),id));}
+ @io.swagger.v3.oas.annotations.Operation(summary="发布业务任务评论")
+ @PostMapping({"/api/presales-tasks/{id}/comments","/api/delivery-tasks/{id}/comments","/api/ops-tasks/{id}/comments"}) public ApiResponse<Void> comment(@PathVariable String id,@RequestBody Map<String,String> body,jakarta.servlet.http.HttpServletRequest r){service.comment(kind(r),id,body.get("content"));return ApiResponse.ok(null);}
  private int integer(Map<String,String> values,String key,int fallback){try{return Integer.parseInt(values.getOrDefault(key,String.valueOf(fallback)));}catch(NumberFormatException ignored){return fallback;}}
 }

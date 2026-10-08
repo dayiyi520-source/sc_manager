@@ -148,6 +148,18 @@ public class RequirementService {
         executeStatus(current,target,text(body,"reason"));
     }
 
+    @Transactional public Map<String,Object> reopen(String id,Map<String,Object> body){
+        String reason=text(body,"reason");
+        if(reason.isBlank() || reason.length()>2000) throw new IllegalArgumentException("重开原因必填且不能超过2000字");
+        if(taskMapper.activeUser(text(body,"assigneeId"))==null) throw new IllegalArgumentException("请选择有效处理人");
+        Map<String,Object> current=requirement(id);
+        requireRevision(current,body);
+        Map<String,Object> reopened=assistanceWorkflow.reopen(id,0,((Number)current.get("revision")).intValue(),reason);
+        Map<String,Object> reassignment=new LinkedHashMap<>(body);
+        reassignment.put("revision",reopened.get("revision"));
+        return reassign(id,reassignment);
+    }
+
     @Transactional public Map<String,Object> reassign(String id,Map<String,Object> body){
         AuthorizationService.requireWrite("product");
         Map<String,Object> current=requirement(id);
