@@ -18,11 +18,12 @@ import { teamRepository } from '../../services/teamRepository';
 import { normalizeProductWebsiteUrl } from './productWebsite';
 import { employeeSelectOptions } from '../common/PersonIdentity';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
-import { formatVersionPublishedAt, latestReleasedVersion } from './productLinePresentation';
+import { formatVersionPublishedAt, latestReleasedVersion, productLineDisplayStatus } from './productLinePresentation';
 import { Pagination } from '../common/Pagination';
+import { productRepository } from '../../services/productRepository';
 
 export { normalizeProductWebsiteUrl } from './productWebsite';
-export { formatVersionPublishedAt, latestReleasedVersion } from './productLinePresentation';
+export { formatVersionPublishedAt, latestReleasedVersion, productLineDisplayStatus } from './productLinePresentation';
 
 export const productLineVersionCount = (productLineId: string, items: Array<{ productLineId?: string }>) =>
   items.filter((version) => version.productLineId === productLineId).length;
@@ -87,6 +88,7 @@ export const ProductLinesView: React.FC = () => {
     openPageTab
   } = useApp();
   const employeeOptionsQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
+  const productStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'PRODUCT'], queryFn: () => productRepository.researchStatusTemplates('PRODUCT'), retry: false });
 
   // Active detail view state
   const [selectedProductLineId, setSelectedProductLineId] = useState<string | null>(null);
@@ -136,20 +138,11 @@ export const ProductLinesView: React.FC = () => {
     return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   });
 
-  const latestIteration = (line: ProductLine) => [...(line.versions || [])].sort((a, b) => {
-    const startDiff = String(b.startDate || '').localeCompare(String(a.startDate || ''));
-    if (startDiff !== 0) return startDiff;
-    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
-  })[0];
-
-  const displayStatus = (line: ProductLine) => {
-    if (line.health === '已停用') return '已停用';
-    return latestIteration(line)?.status || '启用中';
-  };
+  const displayStatus = productLineDisplayStatus;
   const filteredLines = sortedProductLines.filter((line) => matchesProductLineFilters(line, searchQuery, ownerFilter, statusFilter, displayStatus(line)));
   const pagedLines = filteredLines.slice((page - 1) * pageSize, page * pageSize);
   const ownerFilterOptions = [...new Set(productLines.map((line) => line.ownerName || line.owner || '').filter(Boolean))].sort().map((name) => ({ label: name, value: name }));
-  const statusFilterOptions = [...new Set(['启用中', '已停用', ...productLines.map(displayStatus)])].sort().map((status) => ({ label: status, value: status }));
+  const statusFilterOptions = (productStatusesQuery.data || []).filter((status) => status.enabled).map((status) => ({ label: status.name, value: status.name }));
 
   const resetCreateForm = () => {
     setFormName('');
@@ -203,20 +196,7 @@ export const ProductLinesView: React.FC = () => {
         name: selectedOwner.name,
         role: '管理员'
       }],
-      products: [
-        {
-          id: `prd-${Date.now()}-1`,
-          name: `${formName.trim()} 核心内核`,
-          code: `${formCode.trim()}-CORE`,
-          version: 'V1.0.0',
-          status: '运营中',
-          description: '产品底层通信驱动与微服务调度组件'
-        }
-      ],
-      currentVersion: 'V1.0.0',
-      versionCount: 1,
       customerCount: 0,
-      health: '启用中',
       initializeWorkItemTemplate
     });
     setIsCreating(false);

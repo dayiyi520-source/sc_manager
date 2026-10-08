@@ -33,7 +33,8 @@ export type UnifiedWorkItem = {
   requirementId?: string | null; requirementTitle?: string | null; requirementInitiatorName?: string | null; customerId?: string | null; customerName?: string | null; assigneeName?: string; sourceType?: string; status?: { name?: string; group?: string; successful?: boolean };
   taskTypeId?: string | null; workflowId?: string | null; statusKey?: string | null; statusColor?: string;
   priority?: string; parentWorkItemId?: string | null; versionId?: string | null; dueDate?: string | null;
-  estimatedHours?: number; actualHours?: number; createdAt?: string; creatorName?: string; revision?: number; potentialBlockingDefect?: boolean; hasChildren?: boolean;
+  plannedStartDate?: string | null; plannedEndDate?: string | null; expectedCompleteDate?: string | null; completedAt?: string | null;
+  estimatedHours?: number; actualHours?: number; createdAt?: string; creatorName?: string; ccNames?: string | string[]; revision?: number; potentialBlockingDefect?: boolean; hasChildren?: boolean;
 };
 export type WorkItemTransitionAction = {
   edgeKey: string; name: string; to: string; requiredFields: string[]; allowed: boolean; reasons: string[];
@@ -51,9 +52,15 @@ export type AutomationRule = {
   actions?: Array<Record<string, unknown>>; actionConfig: Record<string, unknown> | string;
   revision: number; updatedAt?: string;
 };
-export type AutomationLog = { id: string; ruleId: string; workItemId: string; result: string; detail?: string; createdAt: string };
+export type AutomationLog = { id: string; ruleId: string; ruleName?: string; workItemId: string; workItemTitle?: string; result: string; detail?: string; createdAt: string };
 export type NotificationEvent = 'ASSIGNED' | 'STATUS_CHANGED' | 'COMMENTED' | 'DELETED' | 'REPLIED' | 'MENTIONED' | 'CC_ADDED' | 'PARTICIPANT_ADDED';
-export type NotificationSettings = { rules: Array<{ event: NotificationEvent; recipients: string[]; channels: Array<'IN_APP' | 'DINGTALK'> }> };
+export type NotificationRule = { event: NotificationEvent; recipients: string[]; channels: Array<'IN_APP' | 'DINGTALK'> };
+export type NotificationSettings = { categories: Array<{ categoryCode: string; rules: NotificationRule[] }> };
+export type ProductRoleTemplate = { id: string; name: string; responsibility: string; sort: number; revision: number; updatedAt?: string };
+export type ResearchStatusScope = 'PRODUCT' | 'ITERATION';
+export type ResearchStatusTemplate = { id: string; scope: ResearchStatusScope; name: string; phase: '待开始' | '处理中' | '已完成' | '已结束'; color: string; initial: boolean; enabled: boolean; sort: number; revision: number };
+export type ArchivedProductLine = { id: string; name: string; code: string; ownerName?: string; archivedAt: string; archivedByName?: string };
+export type RecycleBinItem = { id: string; category: WorkItemCategoryKey; title: string; code: string; versionId?: string | null; versionName: string; operatorName: string; operatedAt: string; revision: number };
 
 const specialTaskPath = (kind: SpecialTaskKind) => kind === 'bug' ? '/api/bugs' : '/api/dev-tasks';
 const businessTaskPath = (kind: BusinessTaskKind) => `/api/${kind}-tasks`;
@@ -61,6 +68,16 @@ const querySuffix = (values: Record<string,string|number>) => { const value = ne
 const page = <T>(value: PageResult<T> | T[]): PageResult<T> => Array.isArray(value) ? ({ items: value, page: 1, pageSize: value.length || 20, total: value.length }) : value;
 
 export const productRepository = {
+  iterationTimeline: (lineId: string) => apiRequest<UnifiedWorkItem[]>(`/api/product-lines/${encodeURIComponent(lineId)}/iteration-timeline`),
+  productRoleTemplates: () => apiRequest<ProductRoleTemplate[]>('/api/research-template/roles'),
+  createProductRoleTemplate: (body: Pick<ProductRoleTemplate, 'name' | 'responsibility' | 'sort'>) => apiRequest<ProductRoleTemplate>('/api/research-template/roles', { method: 'POST', body: JSON.stringify(body) }),
+  updateProductRoleTemplate: (id: string, body: Pick<ProductRoleTemplate, 'name' | 'responsibility' | 'sort' | 'revision'>) => apiRequest<ProductRoleTemplate>(`/api/research-template/roles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteProductRoleTemplate: (id: string, revision: number) => apiRequest<void>(`/api/research-template/roles/${id}?revision=${revision}`, { method: 'DELETE' }),
+  researchStatusTemplates: (scope: ResearchStatusScope) => apiRequest<ResearchStatusTemplate[]>(`/api/research-template/statuses?scope=${scope}`),
+  saveResearchStatusTemplates: (scope: ResearchStatusScope, body: { originals: Array<{ id: string; revision: number }>; states: Array<Omit<ResearchStatusTemplate, 'scope' | 'revision'> & { revision?: number }> }) => apiRequest<ResearchStatusTemplate[]>(`/api/research-template/statuses?scope=${scope}`, { method: 'PUT', body: JSON.stringify(body) }),
+  createResearchStatusTemplate: (scope: ResearchStatusScope, body: Omit<ResearchStatusTemplate, 'id' | 'scope' | 'revision'>) => apiRequest<ResearchStatusTemplate>(`/api/research-template/statuses?scope=${scope}`, { method: 'POST', body: JSON.stringify(body) }),
+  updateResearchStatusTemplate: (id: string, body: Omit<ResearchStatusTemplate, 'id' | 'scope'>) => apiRequest<ResearchStatusTemplate>(`/api/research-template/statuses/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteResearchStatusTemplate: (id: string, revision: number) => apiRequest<void>(`/api/research-template/statuses/${id}?revision=${revision}`, { method: 'DELETE' }),
   workItemCategories: () => apiRequest<WorkItemCategoryDefinition[]>('/api/work-item-categories'),
   createWorkItemCategory: (body: Pick<WorkItemCategoryDefinition, 'code' | 'name' | 'displayName' | 'iconKey' | 'capabilityType' | 'sort' | 'enabled'>) => apiRequest<{ id: string; code: string }>('/api/work-item-categories', { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItemCategory: (id: string, body: Partial<Pick<WorkItemCategoryDefinition, 'name' | 'displayName' | 'iconKey' | 'capabilityType' | 'sort' | 'enabled'>>) => apiRequest<void>(`/api/work-item-categories/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -77,8 +94,17 @@ export const productRepository = {
   deleteWorkItemTemplateType: (id: string) => apiRequest<void>(`/api/work-item-template/types/${id}`, { method: 'DELETE' }),
   updateWorkItemTemplateWorkflow: (id: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision?: number }) => apiRequest<void>(`/api/work-item-template/types/${id}/workflow`, { method: 'PUT', body: JSON.stringify(body) }),
   productLines: (keyword = '') => apiRequest<ProductLine[]>(`/api/product-lines?keyword=${encodeURIComponent(keyword)}`),
+  archivedProductLines: () => apiRequest<ArchivedProductLine[]>('/api/product-lines/archived'),
   createProductLine: (body: Partial<ProductLine>) => apiRequest<{ id: string; code: string }>('/api/product-lines', { method: 'POST', body: JSON.stringify(body) }),
   updateProductLine: (id: string, body: Partial<ProductLine>) => apiRequest<void>(`/api/product-lines/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  activateProductLine: (id: string) => apiRequest<void>(`/api/product-lines/${id}/activate`, { method: 'POST' }),
+  disableProductLine: (id: string) => apiRequest<void>(`/api/product-lines/${id}/disable`, { method: 'POST' }),
+  archiveProductLine: (id: string) => apiRequest<void>(`/api/product-lines/${id}/archive`, { method: 'POST' }),
+  restoreProductLine: (id: string) => apiRequest<void>(`/api/product-lines/${id}/restore`, { method: 'POST' }),
+  deleteProductLine: (id: string) => apiRequest<void>(`/api/product-lines/${id}`, { method: 'DELETE' }),
+  recycleBin: (id: string) => apiRequest<RecycleBinItem[]>(`/api/product-lines/${id}/recycle-bin`),
+  restoreRecycleBinItem: (lineId: string, id: string, revision: number) => apiRequest<void>(`/api/product-lines/${lineId}/recycle-bin/${id}/restore`, { method: 'POST', body: JSON.stringify({ revision }) }),
+  purgeRecycleBinItem: (lineId: string, id: string, revision: number) => apiRequest<void>(`/api/product-lines/${lineId}/recycle-bin/${id}?revision=${revision}`, { method: 'DELETE' }),
   addProductLineMember: (id: string, body: Pick<ProductLineMember, 'userId' | 'role'>) => apiRequest<void>(`/api/product-lines/${id}/members`, { method: 'POST', body: JSON.stringify(body) }),
   updateProductLineMember: (id: string, memberId: string, body: Pick<ProductLineMember, 'role'>) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(body) }),
   removeProductLineMember: (id: string, memberId: string) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'DELETE' }),
@@ -87,12 +113,9 @@ export const productRepository = {
   createWorkItemType: (id: string, body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'> & { workflow: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> }) => apiRequest<{ id: string; workflowId: string }>(`/api/product-lines/${id}/work-item-types`, { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItemType: (id: string, typeId: string, body: Partial<Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'>>) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteWorkItemType: (id: string, typeId: string) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'DELETE' }),
-  workflows: (id: string) => apiRequest<WorkItemWorkflow[]>(`/api/product-lines/${id}/workflows`),
   typeWorkflows: (id: string, typeId: string) => apiRequest<WorkItemWorkflow[]>(`/api/product-lines/${id}/work-item-types/${typeId}/workflows`),
   createTypeWorkflow: (id: string, typeId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'>) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/work-item-types/${typeId}/workflows`, { method: 'POST', body: JSON.stringify({ ...body, revision: 0 }) }),
   updateTypeWorkflow: (id: string, typeId: string, workflowId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision: number }) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/work-item-types/${typeId}/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(body) }),
-  createWorkflow: (id: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'>) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows`, { method: 'POST', body: JSON.stringify({ ...body, revision: 0 }) }),
-  updateWorkflow: (id: string, workflowId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision: number }) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(body) }),
   publishWorkflow: (id: string, workflowId: string, revision: number) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}/publish`, { method: 'POST', body: JSON.stringify({ revision }) }),
   automationRules: (id: string, keyword = '') => apiRequest<{ enabled: boolean; rules: AutomationRule[] }>(`/api/product-lines/${id}/automation-rules?keyword=${encodeURIComponent(keyword)}`),
   automationTemplate: () => apiRequest<{ enabled: boolean; rules: AutomationRule[] }>('/api/automation-template/rules'),
@@ -106,9 +129,10 @@ export const productRepository = {
   updateAutomationSetting: (id: string, enabled: boolean) => apiRequest<{ enabled: boolean }>(`/api/product-lines/${id}/automation-rules/setting`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
   automationLogs: (id: string) => apiRequest<AutomationLog[]>(`/api/product-lines/${id}/automation-rules/logs`),
   workItemDetail: (lineId: string, id: string) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(lineId)}`),
+  batchWorkItems: (body: { targets: Array<{ productLineId: string; id: string; revision: number }>; operation: string; value?: string; participants?: string[] }) => apiRequest<number>('/api/work-items/batch', { method: 'POST', body: JSON.stringify(body) }),
   workItems: (productLineId: string, category = '', keyword = '', values: { page?: number; pageSize?: number } = {}) => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number; page?: number; pageSize?: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=${values.page || 1}&pageSize=${values.pageSize || 100}`),
-  createWorkItem: (body: { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; requirementId?: string; customerId?: string; customerName?: string; parentWorkItemId?: string; assigneeId?: string; ccNames?: string[]; media?: RequirementMedia[]; priority: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
-  updateWorkItem: (productLineId: string, id: string, body: { title?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; assigneeName?: string; priority?: string; plannedStartDate?: string; plannedEndDate?: string; estimatedHours?: number; actualHours?: number; revision: number }) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  createWorkItem: (body: { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; requirementId?: string; customerId?: string; customerName?: string; parentWorkItemId?: string; assigneeId?: string; ccNames?: string[]; media?: RequirementMedia[]; priority: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
+  updateWorkItem: (productLineId: string, id: string, body: { title?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; assigneeName?: string; priority?: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number; revision: number }) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}`, { method: 'PUT', body: JSON.stringify(body) }),
   workItemTransitions: (productLineId: string, id: string) => apiRequest<WorkItemTransitionOptions>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`),
   transitionWorkItem: (productLineId: string, id: string, body: { edgeKey: string; revision: number; reason?: string }) => apiRequest<Record<string, any>>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`, { method: 'POST', body: JSON.stringify(body) }),
   deleteWorkItem: (productLineId: string, id: string, revision: number) => apiRequest<void>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}&revision=${revision}`, { method: 'DELETE' }),
@@ -120,8 +144,8 @@ export const productRepository = {
   updateVersion: (lineId: string, versionId: string, body: Partial<VersionIteration>) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteVersion: (lineId: string, versionId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}`, { method: 'DELETE' }),
   assignRequirementToVersion: (lineId: string, versionId: string, requirementId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/requirements/${requirementId}`, { method: 'POST' }),
-  assignWorkItemToVersion: (lineId: string, versionId: string, kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/work-items/${kind}/${itemId}`, { method: 'POST' }),
-  unassignWorkItemFromVersion: (lineId: string, versionId: string, kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/work-items/${kind}/${itemId}`, { method: 'DELETE' }),
+  assignWorkItemToVersion: (lineId: string, versionId: string, kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/work-items/${kind}/${itemId}`, { method: 'POST' }),
+  unassignWorkItemFromVersion: (lineId: string, versionId: string, kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string) => apiRequest<void>(`/api/product-lines/${lineId}/versions/${versionId}/work-items/${kind}/${itemId}`, { method: 'DELETE' }),
   tasks: async (taskType: SpecialTaskKind, values: Record<string,string|number> = {}) => page(await apiRequest<PageResult<DefectBug | DevTask> | Array<DefectBug | DevTask>>(`${specialTaskPath(taskType)}${querySuffix(values)}`)),
   task: (taskType: SpecialTaskKind, id: string) => apiRequest<DefectBug | DevTask>(`${specialTaskPath(taskType)}/${id}`),
   createTask: (taskType: SpecialTaskKind, body: Partial<DefectBug> | Partial<DevTask>) => apiRequest<{ id: string; code: string }>(specialTaskPath(taskType), { method: 'POST', body: JSON.stringify(body) }),
@@ -138,7 +162,7 @@ export const productRepository = {
   ,renameTestCaseDirectory: (lineId: string, directoryId: string, name: string) => apiRequest<TestCaseDirectory>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories/${encodeURIComponent(directoryId)}`, { method: 'PUT', body: JSON.stringify({ name }) })
   ,deleteTestCaseDirectory: (lineId: string, directoryId: string) => apiRequest<void>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories/${encodeURIComponent(directoryId)}`, { method: 'DELETE' })
   ,copyTestCaseDirectory: (lineId: string, directoryId: string, body: { parentId?: string | null; name?: string }) => apiRequest<TestCaseDirectory>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories/${encodeURIComponent(directoryId)}/copy`, { method: 'POST', body: JSON.stringify(body) })
-  ,testCases: (lineId: string, filters: { directoryId?: string; includeDescendants?: boolean; keyword?: string; priority?: string; ownerId?: string; creatorName?: string; enabled?: boolean; page?: number; pageSize?: number } = {}) => {
+  ,testCases: (lineId: string, filters: { directoryId?: string; includeDescendants?: boolean; keyword?: string; priority?: string; ownerId?: string; creatorName?: string; participantName?: string; enabled?: boolean; page?: number; pageSize?: number } = {}) => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
     const query = params.toString();

@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../context/AppContext', () => ({
   useApp: () => ({
     ...mocks,
-    productLines: [{ id: 'line-1', name: '协同产品线', code: 'PL-01', ownerName: '林志豪', members: [] }],
+    productLines: [{ id: 'line-1', name: '协同产品', code: 'PL-01', ownerName: '林志豪', members: [] }],
   }),
 }));
 
@@ -24,11 +24,11 @@ describe('CreateVersionModal', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={queryClient}><CreateVersionModal isOpen onClose={vi.fn()} /></QueryClientProvider>);
 
-    expect(screen.getByText(/所属产品线/)).toHaveTextContent('*');
+    expect(screen.getByText(/所属产品/)).toHaveTextContent('*');
     expect(document.querySelector('textarea')).toHaveAttribute('placeholder', VERSION_RELEASE_NOTES_PLACEHOLDER);
     fireEvent.submit(document.querySelector('#create-version-form')!);
 
-    await waitFor(() => expect(mocks.addToast).toHaveBeenCalledWith('warning', '请选择所属产品线'));
+    await waitFor(() => expect(mocks.addToast).toHaveBeenCalledWith('warning', '请选择所属产品'));
     expect(mocks.addVersion).not.toHaveBeenCalled();
   });
 

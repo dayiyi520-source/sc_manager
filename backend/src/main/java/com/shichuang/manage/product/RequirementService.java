@@ -86,6 +86,9 @@ public class RequirementService {
         validateAssistance(body);
         Map<String,Object> created=tasks.create("requirement",body);
         String owner=text(body,"ownerName");
+        if (!text(body,"workOrderType").isBlank() && !owner.isBlank()) {
+            mapper.setAssistanceOwner(RequestContext.tenantId(), created.get("id").toString());
+        }
         if(!owner.isBlank())mapper.notifyOwner(RequestContext.tenantId(),owner,text(body,"title"),created.get("id").toString());
         return created;
     }
@@ -208,7 +211,8 @@ public class RequirementService {
         String line=String.valueOf(current.get("productLineId")),typeId=text(body,"workItemTypeId");if(typeId.isBlank())typeId=taskMapper.defaultType(line,category);
         if(typeId==null||typeId.isBlank())throw new IllegalArgumentException("请先配置并启用目标分类的工作项类型");
         String title=defaultText(body,"title",String.valueOf(current.get("title"))),note=text(body,"note");
-        WorkItemDefinition.CreateItem input=new WorkItemDefinition.CreateItem("work-order-"+UUID.randomUUID(),line,category,typeId,title,note,"",nullable(current.get("versionId")),id,null,assigneeId,priority(current.get("priority")),null,date(current.get("dueDate")),BigDecimal.ZERO,BigDecimal.ZERO);
+        String expectedCompleteDate=body.containsKey("expectedCompleteDate")?text(body,"expectedCompleteDate"):Objects.toString(current.get("expectedCompleteDate"),"");
+        WorkItemDefinition.CreateItem input=new WorkItemDefinition.CreateItem("work-order-"+UUID.randomUUID(),line,category,typeId,title,note,null,"",nullable(current.get("versionId")),id,null,assigneeId,priority(current.get("priority")),date(current.get("plannedStartDate")),date(current.get("dueDate")),BigDecimal.ZERO,BigDecimal.ZERO,null,null,null,null,date(expectedCompleteDate));
         Map<String,Object> created=storage.create(input);
         mapper.markWorkOrder(RequestContext.tenantId(),created.get("id").toString(),taskType,id,String.valueOf(current.get("title")),note,RequestContext.userId());
         mapper.setAssistanceTaskMeta(RequestContext.tenantId(), created.get("id").toString(), Boolean.parseBoolean(String.valueOf(body.getOrDefault("blocksClosure", true))));

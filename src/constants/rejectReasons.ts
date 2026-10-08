@@ -11,7 +11,7 @@ export const REJECT_REASONS_BY_TYPE: Record<string, string[]> = {
     '售前评估信息缺失/标书约束不清',
     '技术可行性评估不通过',
     '交付周期/人员资源冲突',
-    '非产品线承接范围',
+    '非产品承接范围',
     '其他原因'
   ],
   '项目交付': [

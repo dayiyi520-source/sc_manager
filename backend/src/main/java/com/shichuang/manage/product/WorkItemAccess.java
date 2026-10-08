@@ -11,18 +11,26 @@ public class WorkItemAccess {
     private final WorkItemStorageMapper storage;
     private final ProductLineMapper lines;
     private final UnifiedWorkItemMapper reads;
-    public WorkItemAccess(WorkItemStorageMapper storage,ProductLineMapper lines,UnifiedWorkItemMapper reads) {
-        this.storage=storage; this.lines=lines; this.reads=reads;
+    private final ProductLifecyclePolicy lifecycle;
+    public WorkItemAccess(WorkItemStorageMapper storage,ProductLineMapper lines,UnifiedWorkItemMapper reads,ProductLifecyclePolicy lifecycle) {
+        this.storage=storage; this.lines=lines; this.reads=reads; this.lifecycle=lifecycle;
     }
     public void check(String line, boolean write) {
+        checkAccess(line, write);
+        if (write) lifecycle.requireMutable(line);
+    }
+    public void checkLifecycle(String line) {
+        checkAccess(line, true);
+    }
+    private void checkAccess(String line, boolean write) {
         String role=RequestContext.role();
         if (!(write?Set.of("admin","product_manager","tech_lead"):Set.of("admin","product_manager","tech_lead","product","tech")).contains(role))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前角色无权执行该产品操作");
-        if (line == null || line.isBlank()) throw new IllegalArgumentException("产品线不能为空");
+        if (line == null || line.isBlank()) throw new IllegalArgumentException("产品不能为空");
         String tenant=RequestContext.tenantId();
         if (write ? !storage.lockLine(tenant,line) : lines.find(tenant,line)==null)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,"产品线不存在");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,"产品不存在");
         if (!"admin".equals(role) && !reads.canRead(tenant,line,RequestContext.userId()))
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前用户无权访问该产品线");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前用户无权访问该产品");
     }
 }

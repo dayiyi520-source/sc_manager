@@ -34,6 +34,7 @@ export interface TestCase {
   ownerId: string;
   ownerName: string;
   creatorName?: string;
+  participantNames?: string[];
   tags: string[];
   workItemTypeId: string;
   workItemTypeName: string;

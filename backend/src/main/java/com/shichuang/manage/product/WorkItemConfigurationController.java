@@ -13,12 +13,6 @@ import java.util.*;
 public class WorkItemConfigurationController {
     private final WorkItemConfigurationService service;
     public WorkItemConfigurationController(WorkItemConfigurationService service) { this.service=service; }
-    @GetMapping("/workflows") @Operation(summary="查询分类流程版本")
-    public ApiResponse<List<Map<String,Object>>> list(@PathVariable String lineId) { return ApiResponse.ok(service.workflows(lineId)); }
-    @PostMapping("/workflows") @Operation(summary="创建新流程版本草稿")
-    public ApiResponse<Map<String,Object>> create(@PathVariable String lineId,@RequestBody WorkItemDefinition.SaveWorkflow body) { return ApiResponse.ok(service.save(lineId,null,body)); }
-    @PutMapping("/workflows/{id}") @Operation(summary="更新流程草稿")
-    public ApiResponse<Map<String,Object>> update(@PathVariable String lineId,@PathVariable String id,@RequestBody WorkItemDefinition.SaveWorkflow body) { return ApiResponse.ok(service.save(lineId,id,body)); }
     @PostMapping("/workflows/{id}/publish") @Operation(summary="发布不可变流程版本")
     public ApiResponse<Map<String,Object>> publish(@PathVariable String lineId,@PathVariable String id,@RequestBody WorkItemDefinition.Revision body) { return ApiResponse.ok(service.publish(lineId,id,body.revision())); }
     @GetMapping("/work-item-types/{typeId}/workflows") @Operation(summary="查询子类型状态配置版本")

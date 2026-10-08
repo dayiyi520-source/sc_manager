@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { productRepository, type UnifiedWorkItem, type WorkItemCategoryKey } from '../../services/productRepository';
 import type { VersionIteration } from '../../types';
+import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
+import { DAY, taskPlan } from './iterationTimeline';
 
 type BoardCategoryKey = 'assistance' | 'requirement' | 'design' | 'dev' | 'test' | 'bug';
 const categories: Array<{ key: BoardCategoryKey; label: string }> = [
@@ -51,7 +53,8 @@ export const ProductLineBoard: React.FC<{
   items: UnifiedWorkItem[];
   versions?: VersionIteration[];
   onOpenCategory?: (category: Exclude<WorkItemCategoryKey, 'case'>) => void;
-}> = ({ items, versions = [], onOpenCategory }) => {
+  onOpenItem?: (item: UnifiedWorkItem) => void;
+}> = ({ items, versions = [], onOpenItem }) => {
   const [category, setCategory] = useState<BoardCategoryKey>('requirement');
   const itemsForCategory = (key: BoardCategoryKey) => items.filter((item) => key === 'assistance'
     ? item.category === 'requirement' && item.sourceType === 'WORK_ORDER'
@@ -79,7 +82,7 @@ export const ProductLineBoard: React.FC<{
           return <section key={column.key} aria-label={column.label} className="min-w-0">
             <Card size="small" title={<span className="flex items-center justify-between text-xs font-semibold"><span>{column.label}</span><span className="font-mono text-[var(--active-text)]">{columnItems.length}</span></span>} className="product-line-board-status-card h-full">
               <div className="space-y-2">{columnItems.map((item) => <div key={`${item.category}-${item.id}`} className="border-b border-[var(--border-main)] pb-3 text-xs last:border-b-0 last:pb-0">
-                <div className="break-words font-medium text-[var(--text-primary)]">{item.title}</div>
+                <button type="button" onClick={() => onOpenItem?.(item)} className="flex w-full items-start gap-2 text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)] focus-visible:outline-2 focus-visible:outline-[var(--primary)]"><span aria-hidden="true" className="mt-0.5 shrink-0"><WorkItemCategoryIcon category={item.sourceType === 'WORK_ORDER' ? 'assistance' : item.category} /></span><span className="break-words">{item.title}</span></button>
                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
                   <span className="truncate" title={versionCode(item.versionId)}>{versionCode(item.versionId)}</span>
                   <span className="truncate text-right" title={item.status?.name || '状态未设置'}>{item.status?.name || '状态未设置'}</span>
@@ -112,6 +115,18 @@ export const ProductLineHours: React.FC<{ items: UnifiedWorkItem[]; memberCount:
     hours: recorded.filter((item) => item.category === option.key).reduce((sum, item) => sum + Number(item.actualHours || 0), 0),
     color: chartColors[index]
   })).filter((item) => item.hours > 0);
+  const weeklyPlan = Array.from(items.reduce((weeks, item) => {
+    const plan = taskPlan(item);
+    const hours = Number(item.estimatedHours || 0);
+    if (!plan || hours <= 0) return weeks;
+    const dailyHours = hours / ((plan.end - plan.start) / DAY + 1);
+    for (let date = plan.start; date <= plan.end; date += DAY) {
+      const day = new Date(date).getUTCDay();
+      const monday = date - ((day + 6) % 7) * DAY;
+      weeks.set(monday, (weeks.get(monday) || 0) + dailyHours);
+    }
+    return weeks;
+  }, new Map<number, number>()).entries()).sort(([a], [b]) => a - b).map(([date, hours]) => ({ date: new Date(date).toISOString().slice(0, 10), hours: Number(hours.toFixed(2)) }));
   const metrics = [
     { label: '预计工时', value: `${estimated} 小时` },
     { label: '实际工时', value: `${actual} 小时` },
@@ -135,7 +150,10 @@ export const ProductLineHours: React.FC<{ items: UnifiedWorkItem[]; memberCount:
         {distribution.length ? <div className="mt-4 flex flex-wrap items-center justify-center gap-4"><div className="h-56 w-56"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={distribution} dataKey="hours" nameKey="name" innerRadius={62} outerRadius={96} stroke="var(--bg-surface)">{distribution.map((entry) => <Cell key={entry.name} fill={entry.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div><div className="space-y-2 text-xs">{distribution.map((entry) => <div key={entry.name} className="flex items-center gap-2"><span className="h-2 w-2" style={{ backgroundColor: entry.color }} />{entry.name} {entry.hours} 小时 ({Math.round(entry.hours / actual * 100)}%)</div>)}</div></div> : <div className="py-16 text-center text-xs text-[var(--text-muted)]">暂无类别工时</div>}
       </section>
     </div>
-    <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4"><h3 className="text-sm font-bold text-[var(--text-primary)]">工时时间分布</h3><p className="py-12 text-center text-xs text-[var(--text-muted)]">当前仅保存工作项累计工时，尚无按日期登记的明细，无法生成逐日趋势。</p></section>
+    <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4"><h3 className="text-sm font-bold text-[var(--text-primary)]">工时时间分布</h3>
+      {weeklyPlan.length ? <div className="mt-4 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={weeklyPlan} margin={{ left: 8, right: 16, bottom: 8 }}><CartesianGrid stroke="var(--border-main)" vertical={false} /><XAxis dataKey="date" stroke="var(--text-muted)" tickFormatter={(value: string) => value.slice(5)} /><YAxis stroke="var(--text-muted)" /><Tooltip formatter={(value) => [`${Number(value).toFixed(2)} 小时`, '计划工时']} labelFormatter={(value) => `当周 ${value}`} /><Bar dataKey="hours" name="计划工时" fill="var(--primary)" /></BarChart></ResponsiveContainer></div> : <p className="py-12 text-center text-xs text-[var(--text-muted)]">暂无同时设置计划起止日期和预计工时的工作项</p>}
+      <p className="mt-2 text-[11px] text-[var(--text-muted)]">按计划起止日期逐日均摊预计工时，再按周汇总；实际工时仅有累计值，未登记发生日期，不计入此图。</p>
+    </section>
     <Drawer title="工作项工时明细" open={detailsOpen} onClose={() => setDetailsOpen(false)} width={720}>
       <Table rowKey={(item) => `${item.category}-${item.id}`} size="small" pagination={{ pageSize: 10 }} scroll={{ x: 620 }} dataSource={items} columns={[
         { title: '工作项', dataIndex: 'title', ellipsis: true },

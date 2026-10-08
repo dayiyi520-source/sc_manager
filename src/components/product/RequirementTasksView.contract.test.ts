@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const requirementSource = readFileSync(new URL('./RequirementTasksView.tsx', import.meta.url), 'utf8');
 const productLineSource = readFileSync(new URL('./ProductLineDetailView.tsx', import.meta.url), 'utf8');
+const iterationSource = readFileSync(new URL('./VersionIterationView.tsx', import.meta.url), 'utf8');
 
 describe('requirement task Ant Design contract', () => {
   it('uses flat Ant Design controls for list filters and the create form', () => {
@@ -39,13 +40,9 @@ describe('requirement task Ant Design contract', () => {
   });
 
   it('opens a selected version from the weekly fixed-column gantt view', () => {
-    expect(productLineSource).toContain('时间区间（按周）');
+    expect(productLineSource).toContain('<ProductIterationTimeline');
+    expect(productLineSource).toContain('onOpenVersion={openVersionDetail}');
     expect(productLineSource).toContain("sessionStorage.setItem('shichuang.productLineTargetVersionId', versionId)");
-    expect(productLineSource).toContain('product-line-gantt-scroll');
-    expect(productLineSource).toContain('product-line-gantt-time-heading');
-    expect(productLineSource).toContain('product-line-gantt-tick-first');
-    expect(productLineSource).toContain('product-line-gantt-tick-last');
-    expect(productLineSource).toContain("width: `max(100%, ${timelineWidth}px)`");
   });
 
   it('consumes the version task creation context on the target task page', () => {
@@ -67,7 +64,7 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('title="添加子任务"');
     expect(requirementSource).toContain('父级任务');
     expect(requirementSource).toContain('openWorkItemDetail(child, selectedTask)');
-    expect(requirementSource).toContain('label="所属产品线"><Input value={selectedTask?.productLineName || \'未设置\'} disabled');
+    expect(requirementSource).toContain('label="所属产品"><Input value={selectedTask?.productLineName || \'未设置\'} disabled');
     expect(requirementSource).toContain('label="迭代版本"><Input value={selectedTask?.versionName || \'未设置\'} disabled');
     expect(requirementSource).toContain('label="关联客户"><Input value={selectedTask?.customerName || \'未关联\'} disabled');
   });
@@ -105,9 +102,10 @@ describe('requirement task Ant Design contract', () => {
   });
 
   it('puts product line first and uses Ant Design for both hour fields', () => {
-    const properties = requirementSource.slice(requirementSource.indexOf('properties={<Form layout="vertical" className="requirement-create-properties" requiredMark>'));
-    expect(properties.indexOf('label="所属产品线"')).toBeLessThan(properties.indexOf('label={`${itemLabel}类型`}'));
-    expect(requirementSource).toContain('<DetailNumberInput label="预计工时（小时）"');
+    const properties = requirementSource.slice(requirementSource.indexOf('properties={<Form layout="horizontal"'));
+    expect(properties.indexOf('label="所属产品"')).toBeLessThan(properties.indexOf('label={`${itemLabel}类型`}'));
+    expect(requirementSource).toContain('label="预计工时（小时）"><InputNumber');
+    expect(requirementSource).toContain('className="requirement-create-properties requirement-detail-properties"');
     expect(requirementSource).toContain('label="实际工时（小时）"><InputNumber');
     expect(requirementSource).toContain('className="requirement-hours-input w-full"');
     expect(requirementSource).not.toContain('<Form.Item label="验收标准"');
@@ -118,6 +116,23 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('productRepository.transitionWorkItem');
     expect(requirementSource).toContain("if (task.hasChildren) return <WorkItemStatusTag");
     expect(requirementSource).toContain('options.statuses');
-    expect(requirementSource).toContain('disabled={Boolean(selectedTask.hasChildren && !selectedTask.parentWorkItemId)}');
+    expect(requirementSource).toContain("selectedTask.hasChildren ? 'pointer-events-none opacity-80' : ''");
+    expect(requirementSource).toContain('{hasChildren ? <PersonIdentity name={task.ownerName}');
+    expect(requirementSource).toContain('onChange={(ownerName) => void updateTask(task.id, { ownerName })}');
+  });
+
+  it('uses the same configured status candidates and required reason in the iteration list', () => {
+    expect(iterationSource).toContain('result.statuses.map((status) =>');
+    expect(iterationSource).toContain('disabled: !status.current && !status.allowed');
+    expect(iterationSource).toContain("action.requiredFields.includes('reason')");
+    expect(requirementSource).toContain('detailWorkItemTypes.find((item) => item.id === selectedTask.workItemTypeId)?.name');
+  });
+
+  it('shows product and version on the list and aligns editable and read-only owners', () => {
+    expect(requirementSource).toContain("versionName: versions.find((version) => version.id === item.versionId)?.name || ''");
+    expect(requirementSource).toContain("searchQuery, productLineKey, versionKey]");
+    expect(requirementSource).toContain("versions.find((version) => version.id === task.versionId)");
+    expect(requirementSource).toContain("[task.productLineName, linkedVersion?.code || (task.versionId ? '版本号未设置' : '未关联')].filter(Boolean).join(' / ')");
+    expect(requirementSource).toContain('className="work-item-owner-cell"');
   });
 });

@@ -58,7 +58,14 @@ Rules:
 - Load deployment values from `.enterprise-app-factory/secrets/runtime.env` or existing environment variables.
 - After a deployment succeeds, update this runbook with the verified command, required preconditions, rollback notes, and last success date.
 
-Last successful deploy: 2026-09-27
+Last successful deploy: 2026-09-30
+
+Latest complete local-data release:
+
+- Release `20260930022759` deployed commit `cddf849` to the existing `/manage-admin/` and `/manage-admin/api/` routes. Because the local secret file and `sshpass` were unavailable, the verified deployment script's build, backup, upload, switch, and verification sequence was performed manually. Do not interpret this as a successful end-to-end run of `scripts/deploy-production.sh --replace-database`.
+- The complete local `eaf_project_f194fd0628` snapshot was first imported into a temporary database on the MySQL 8.0 server to verify compatibility, then used to replace only `eaf_manage_admin` after the production database, frontend, and JAR were backed up at `/opt/manage-admin/backups/20260930022759/`. The previous frontend directory is also retained at `/opt/manage-admin/frontend/dist.pre-20260930022759/`.
+- After switching, the production database contained 63 tables, 92 successful Flyway migrations with no failed records, 163 work items, 9 products, and 15 versions. The backend health, Nginx configuration, public frontend, direct business route, entry JavaScript, and authentication API were checked. The local data scripts were not rerun during deployment; the published data is the local database snapshot at export time.
+- This replacement intentionally supersedes production changes made after the previous release. To restore the old production data and application, stop `manage-admin.service`, restore the database dump and application artifacts from the backup directory, then restart and recheck the health and dedicated routes. The application database account cannot create a staging database; database replacement requires separately supplied administrator credentials without storing them in the repository.
 
 Latest verified demo release:
 

@@ -144,7 +144,7 @@ export const ApprovalCenterView: React.FC = () => {
       contentDetails: {
         '审批主题': formTitle,
         '关联合同/客户': formCustomer,
-        '关联产品线': formProduct,
+        '关联产品': formProduct,
         '涉及金额': `¥ ${formAmount.toLocaleString()} 元`,
         '申请说明': formReason || '无补充说明'
       }
@@ -570,7 +570,7 @@ export const ApprovalCenterView: React.FC = () => {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[var(--text-muted)]">关联产品线</label>
+              <label className="text-[var(--text-muted)]">关联产品</label>
               <input
                 type="text"
                 value={formProduct}

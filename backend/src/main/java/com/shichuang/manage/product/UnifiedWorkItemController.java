@@ -13,7 +13,7 @@ public class UnifiedWorkItemController {
     public UnifiedWorkItemController(UnifiedWorkItemService service) { this.service = service; }
 
     @GetMapping("/api/work-items")
-    @Operation(summary = "按产品线查询统一工作项")
+    @Operation(summary = "按产品查询统一工作项")
     public ApiResponse<UnifiedWorkItemService.Listing> list(@RequestParam String productLineId,
         @RequestParam(defaultValue = "") String versionId, @RequestParam(defaultValue = "") String category,
         @RequestParam(defaultValue = "") String keyword, @RequestParam(defaultValue = "1") int page,
@@ -25,6 +25,12 @@ public class UnifiedWorkItemController {
     @Operation(summary = "读取版本需求完成度及汇总限制")
     public ApiResponse<UnifiedWorkItemService.VersionSummary> version(@PathVariable String lineId, @PathVariable String versionId) {
         return ApiResponse.ok(service.versionSummary(lineId, versionId));
+    }
+
+    @GetMapping("/api/product-lines/{lineId}/iteration-timeline")
+    @Operation(summary = "读取产品迭代排期，包含阶段子任务")
+    public ApiResponse<java.util.List<UnifiedWorkItem>> timeline(@PathVariable String lineId) {
+        return ApiResponse.ok(service.iterationTimeline(lineId));
     }
 
     @GetMapping("/api/requirements/{id}/summary")

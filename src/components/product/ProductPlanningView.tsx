@@ -95,18 +95,18 @@ export const ProductPlanningView: React.FC = () => {
         </div>
       </div>
 
-      {/* 1. 产品线卡片 (名称、版本号、需求数、进行中需求、迭代进度、负责人) */}
+      {/* 1. 产品卡片 (名称、版本号、需求数、进行中需求、迭代进度、负责人) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm text-slate-900 dark:text-white flex items-center gap-2">
             <Boxes className="w-4 h-4 text-blue-600" />
-            核心产品线迭代概览
+            核心产品迭代概览
           </h3>
           <button
             onClick={() => openPageTab('prod_lines')}
             className="text-xs text-blue-600 hover:text-blue-700 font-medium"
           >
-            产品线管理 &gt;
+            产品管理 &gt;
           </button>
         </div>
 

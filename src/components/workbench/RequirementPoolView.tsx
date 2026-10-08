@@ -478,7 +478,7 @@ export const RequirementPoolView: React.FC = () => {
         priority: String(specialFields.priority || requirementPriority || "中") as RequirementTask["priority"],
         workOrderType: workOrderType || "其他问题",
         specialFields,
-        dueDate: dueDate || undefined,
+        expectedCompleteDate: dueDate || undefined,
       });
       if (!saved) return;
       setCreating(false);
@@ -538,7 +538,7 @@ export const RequirementPoolView: React.FC = () => {
       const singleTask = taskInputs[0];
       let results: Array<{ task: typeof singleTask.task; assignee: NonNullable<typeof singleTask.assignee>; result: Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }>;
       try {
-        const batch = await requirementRepository.createWorkItemsBatch(selected.id, taskInputs.map(({ task, assignee }) => ({ taskType: task.taskType!, assigneeName: assignee!.name, note: task.note, attachmentIds: task.media.map((item) => item.id), blocksClosure: true })));
+        const batch = await requirementRepository.createWorkItemsBatch(selected.id, taskInputs.map(({ task, assignee }) => ({ taskType: task.taskType!, assigneeName: assignee!.name, note: task.note, expectedCompleteDate: task.expectedDueDate, attachmentIds: task.media.map((item) => item.id), blocksClosure: true })));
         results = taskInputs.map(({ task, assignee }, index) => ({ task, assignee: assignee!, result: batch.items[index] as Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }));
       } catch {
         addToast("error", "下游任务创建失败", "本次批量操作未保存，请检查后重试");
@@ -849,10 +849,10 @@ export const RequirementPoolView: React.FC = () => {
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <EmployeeSearchSelect label="负责人 *" value={ownerName} employees={employees} placeholder="搜索姓名或职位" onChange={setOwnerName} />
       <WorkOrderSelect
-        label="所属产品线"
+        label="所属产品"
         value={productLines.find((item) => item.id === productLineId)?.name || ""}
         options={productLines.map((item) => item.name)}
-        placeholder={productLines.length ? "请选择所属产品线（选填）" : "暂无可用产品线"}
+        placeholder={productLines.length ? "请选择所属产品（选填）" : "暂无可用产品"}
         onChange={(value) => setProductLineId(productLines.find((item) => item.name === value)?.id || "")}
       />
       <SearchSelect label="关联客户" value={customerQuery} options={customers.map((item) => item.name)} placeholder="输入客户名称模糊搜索并选择" onChange={(name) => { setCustomerQuery(name); setCustomerId(customers.find((item) => item.name === name)?.id || ""); }} />
@@ -989,7 +989,7 @@ export const RequirementPoolView: React.FC = () => {
                     className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
-                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品线" : "发起协助"}
+                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品" : "发起协助"}
                   </button>
                 </div>
               </div>
@@ -1125,7 +1125,7 @@ export const RequirementPoolView: React.FC = () => {
               <RequirementActionButtons
                 status={selected.status}
                 hasWorkItem={taskLocked}
-                onWork={() => { setWorkflowAction(""); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "", media: [] }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setFlowMedia([]); setWorkOpen(true); }}
+                onWork={() => { setWorkflowAction(""); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setFlowMedia([]); setWorkOpen(true); }}
                 onHold={() => setReasonType("hold")}
                 onReject={() => setReasonType("reject")}
               />
@@ -1210,7 +1210,7 @@ export const RequirementPoolView: React.FC = () => {
                   期望完成时间
                 </span>
                 <p className="mt-1 text-[var(--text-primary)]">
-                  {selected.dueDate || "未设置"}
+                  {selected.expectedCompleteDate || "未设置"}
                 </p>
               </div>
             </div>
@@ -1324,7 +1324,7 @@ export const RequirementPoolView: React.FC = () => {
                 <span className="text-xs font-semibold text-[var(--text-primary)]">任务配置 ({subTasks.length})</span>
                 <button
                   type="button"
-                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "", media: [] }])}
+                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }])}
                   className="px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border-main)] text-xs text-[var(--primary)] font-medium hover:bg-[var(--bg-hover)]"
                 >
                   + 增加任务

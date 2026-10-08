@@ -85,7 +85,7 @@ export const TeamOrgView: React.FC = () => {
   ];
 
   return <div className="space-y-5">
-    <PageHeader title="团队与组织" subtitle="统一维护业务负责人和产品线成员的员工名录" actions={[<Button key="add" type="primary" icon={<PlusOutlined />} onClick={openCreate}>添加成员</Button>]} />
+    <PageHeader title="团队与组织" subtitle="统一维护业务负责人和产品成员的员工名录" actions={[<Button key="add" type="primary" icon={<PlusOutlined />} onClick={openCreate}>添加成员</Button>]} />
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div className="flex items-center gap-3 border-b border-[var(--border-main)] px-1 py-3"><Users className="h-5 w-5 text-[var(--primary)]" /><div><div className="text-xs text-[var(--text-muted)]">团队成员</div><div className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{members.length} 人</div></div></div>
       <div className="flex items-center gap-3 border-b border-[var(--border-main)] px-1 py-3"><UserCheck className="h-5 w-5 text-[var(--success)]" /><div><div className="text-xs text-[var(--text-muted)]">在职人员</div><div className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{activeCount} 人</div></div></div>

@@ -154,7 +154,7 @@ public class VersionReviewService {
         List<Map<String, Object>> people = mapper.activeEmployees(RequestContext.tenantId(), ids);
         if (people.size() != ids.size()) throw new IllegalArgumentException("参与人包含已停用或不存在的员工");
         List<String> taskIds = input.relatedTaskIds() == null ? List.of() : input.relatedTaskIds().stream().filter(Objects::nonNull).map(String::trim).filter(value -> !value.isBlank()).distinct().toList();
-        if (mapper.validWorkItemCount(RequestContext.tenantId(), lineId, taskIds) != taskIds.size()) throw new IllegalArgumentException("关联任务包含其他产品线或不存在的任务");
+        if (mapper.validWorkItemCount(RequestContext.tenantId(), lineId, taskIds) != taskIds.size()) throw new IllegalArgumentException("关联任务包含其他产品或不存在的任务");
         if (input.attachments() != null && input.attachments().size() > 10) throw new IllegalArgumentException("会议附件最多上传10个");
         if (input.attachments() != null && input.attachments().stream().anyMatch(item -> item == null || clean(item.name(), 255, "附件名称").isBlank() || (item.size() != null && item.size() > 10 * 1024 * 1024))) throw new IllegalArgumentException("会议附件名称无效或单个附件超过10MB");
         String conclusion = clean(input.conclusion(), 24, "评审结论");

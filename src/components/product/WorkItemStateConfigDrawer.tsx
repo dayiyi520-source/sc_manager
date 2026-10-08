@@ -96,6 +96,14 @@ export const reorderWorkflowStates = (states: EditableWorkflowState[], sourceKey
 
 export const setDefaultWorkflowState = (states: EditableWorkflowState[], key: string) => states.map((state) => ({ ...state, initial: state.key === key }));
 
+export const saveAndPublishWorkflow = async (productLineId: string, item: ProductLineWorkItemType, category: WorkItemCategoryKey, states: EditableWorkflowState[], current?: WorkItemWorkflow) => {
+  const body = { category, name: `${item.name}状态配置`, definition: buildWorkflowDefinition(states.map((state) => ({ ...state, name: state.name.trim(), stage: stateStage(category) }))) };
+  const saved = current?.status === 'DRAFT'
+    ? await productRepository.updateTypeWorkflow(productLineId, item.id, current.id, { ...body, revision: current.revision })
+    : await productRepository.createTypeWorkflow(productLineId, item.id, body);
+  return productRepository.publishWorkflow(productLineId, saved.id, saved.revision);
+};
+
 export const WorkItemStateEditor: React.FC<{
   states: EditableWorkflowState[];
   category: WorkItemCategoryKey;
@@ -175,15 +183,19 @@ export const WorkItemStateConfigDrawer: React.FC<{
     finally { setSaving(false); }
   };
   const publish = async () => {
-    if (!current || current.status !== 'DRAFT') return;
+    if (!item) return;
+    const invalid = validateWorkflowStates(states); if (invalid) { addToast('warning', invalid); return; }
     setSaving(true);
-    try { await productRepository.publishWorkflow(productLine.id, current.id, current.revision); addToast('success', '状态配置已发布'); await load(); }
-    catch (error) { addToast('error', '状态配置发布失败', error instanceof Error ? error.message : '请稍后重试'); }
+    try {
+      await saveAndPublishWorkflow(productLine.id, item, category, states, current);
+      addToast('success', '状态配置已发布'); await load();
+    }
+    catch (error) { addToast('error', '状态配置发布失败', error instanceof Error ? error.message : '请稍后重试'); await load(); }
     finally { setSaving(false); }
   };
 
   return <Drawer width={840} open={open} onClose={onClose} destroyOnClose title={item ? `配置「${item.name}」状态` : '状态配置'}
-    footer={<div className="flex justify-end gap-2"><Button onClick={onClose}>取消</Button><Button loading={saving} onClick={() => void save()}>保存草稿</Button><Button type="primary" loading={saving} disabled={current?.status !== 'DRAFT'} onClick={() => void publish()}>发布配置</Button></div>}>
+    footer={<div className="flex justify-end gap-2"><Button onClick={onClose}>取消</Button><Button loading={saving} disabled={loading} onClick={() => void save()}>保存草稿</Button><Button type="primary" loading={saving} disabled={loading} onClick={() => void publish()}>发布配置</Button></div>}>
     <div className="space-y-4 text-xs">
       <div className="flex items-start justify-between gap-4 border-b border-[var(--border-main)] pb-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">状态与通用阶段</h3><p className="mt-1 text-[var(--text-muted)]">状态名称可自定义，通用阶段固定为未开始、进行中、已完成和已取消。</p></div><span className="whitespace-nowrap text-[var(--text-muted)]">{loading ? '正在读取...' : current ? `V${current.workflowVersion} · ${current.status === 'PUBLISHED' ? '已发布' : '草稿'}` : '尚未配置'}</span></div>
       <WorkItemStateEditor states={states} category={category} onChange={setStates} />

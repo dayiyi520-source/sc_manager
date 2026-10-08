@@ -40,7 +40,7 @@ export const ProcurementManagementView: React.FC = () => {
   ]);
 
   const [procurementApplies, setProcurementApplies] = useState<ProcurementApply[]>([
-    { id: '1', code: 'PA-20260902-01', title: '研发团队扩容MacBook Pro申请', type: '硬件设备', applicant: '王强', amount: 36000, relatedCustomer: '内部研发', relatedProject: '产品线基座升级', status: '待审批' },
+    { id: '1', code: 'PA-20260902-01', title: '研发团队扩容MacBook Pro申请', type: '硬件设备', applicant: '王强', amount: 36000, relatedCustomer: '内部研发', relatedProject: '产品基座升级', status: '待审批' },
     { id: '2', code: 'PA-20260830-02', title: '苏州市第二中学现场安防摄像头采购', type: '硬件设备', applicant: '张伟', amount: 15400, relatedCustomer: '苏州市第二中学', relatedProject: '平安校园视频监控', status: '已通过' },
   ]);
 

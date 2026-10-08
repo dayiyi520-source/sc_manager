@@ -12,7 +12,7 @@ public class WorkItemFieldConfigurationService {
     private static final List<Field> CATALOG=List.of(
         field("code","编号","TEXT",false,"LIST","ITERATION"), field("title","标题","TEXT",true,"CREATE","CREATE_CHILD","LIST","ITERATION"),
         field("description","任务描述","RICH_TEXT",false,"CREATE","CREATE_CHILD"), field("expectedGoal","验收标准","TEXTAREA",false,"CREATE"),
-        field("productLine","所属产品线","SELECT",false,"CREATE"), field("taskType","工作项类型","SELECT",false,"CREATE","CREATE_CHILD","LIST","ITERATION"),
+        field("productLine","所属产品","SELECT",false,"CREATE"), field("taskType","工作项类型","SELECT",false,"CREATE","CREATE_CHILD","LIST","ITERATION"),
         field("status","状态","SELECT",false,"LIST","ITERATION"), field("assignee","负责人","USER",false,"CREATE","CREATE_CHILD","LIST","ITERATION"),
         field("priority","优先级","SELECT",false,"CREATE","CREATE_CHILD","LIST","ITERATION"), field("plannedStartDate","计划开始时间","DATE",false,"CREATE","CREATE_CHILD","ITERATION"),
         field("plannedEndDate","计划完成时间","DATE",false,"CREATE","CREATE_CHILD","LIST","ITERATION"), field("version","迭代版本","SELECT",false,"CREATE","LIST","ITERATION"),

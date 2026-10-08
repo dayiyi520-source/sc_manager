@@ -55,7 +55,7 @@ export const DefectCreatePanel: React.FC<DefectCreatePanelProps> = ({ open, prod
     showContinueOption={false}
     footer={<><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={() => void submit()}>提交缺陷</Button></>}
     properties={<Form form={form} layout="vertical" requiredMark>
-      <Form.Item label="所属产品线"><Input value={productLineName || '未设置'} disabled /></Form.Item>
+      <Form.Item label="所属产品"><Input value={productLineName || '未设置'} disabled /></Form.Item>
       <Form.Item label="关联版本"><Input value={versionName || '未设置'} disabled /></Form.Item>
       <Form.Item name="severity" label="严重程度" rules={[{ required: true }]}><Select options={['致命阻断', '严重缺陷', '一般问题', '轻微优化'].map((value) => ({ value, label: value }))} /></Form.Item>
       <Form.Item name="priority" label="优先级" rules={[{ required: true }]}><Select options={['紧急', '高', '中', '低'].map((value) => ({ value, label: value }))} /></Form.Item>

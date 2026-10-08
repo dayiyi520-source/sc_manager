@@ -13,6 +13,7 @@ import { clearSession, readSession } from './services/session';
 import { SESSION_CHANGED } from './services/sessionStorage';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select } from 'antd';
+import { ProductNavigation } from './components/product/ProductNavigation';
 
 const lazyNamed = (loader: () => Promise<Record<string, unknown>>, exportName: string) => lazy(async () => {
   const module = await loader();
@@ -76,6 +77,7 @@ const MainContent: React.FC = () => {
   // 标签点击后以 activeTabId 为准；URL 参数只用于首次进入页面
   const routedTabId = activeTabId as typeof activeTabId;
   const [productLineFilter, setProductLineFilter] = useState('all');
+  const taskNavigation = ['prod_req_tasks', 'prod_design_tasks', 'prod_rd_tasks', 'prod_dev_tasks', 'prod_bugs', 'prod_version_reviews'].includes(routedTabId);
   useEffect(() => {
     const pending = sessionStorage.getItem('shichuang.productLineFilter');
     if (pending && routedTabId !== 'prod_versions') {
@@ -133,9 +135,9 @@ const MainContent: React.FC = () => {
         return <ProductPlanningView />;
       case 'prod_req_tasks':
       case 'prod_reqs':
-        return <RequirementTasksView />;
+        return <RequirementTasksView productLineFilter={productLineFilter} />;
       case 'prod_design_tasks':
-        return <RequirementTasksView itemLabel="设计任务" taskKind="design" />;
+        return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="设计任务" taskKind="design" />;
       case 'wb_work_order':
       
         return <RequirementPoolView />;
@@ -149,7 +151,7 @@ const MainContent: React.FC = () => {
       case 'prod_bugs':
         return <RequirementTasksView productLineFilter={productLineFilter} itemLabel="缺陷管理" taskKind="bug" />;
       case 'prod_test_tasks':
-        return <TestAndDefectView productLineFilter={productLineFilter} />;
+        return <TestAndDefectView productLineFilter={productLineFilter} productLines={productLines} onProductLineChange={setProductLineFilter} />;
       case 'prod_version_reviews':
         return <VersionReviewView productLineFilter={productLineFilter} />;
       case 'prod_reviews':
@@ -205,23 +207,7 @@ const MainContent: React.FC = () => {
   return (
     <main className="tech-main flex-1 overflow-y-auto p-4 lg:p-6">
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
-        {/* 产品线范围由任务工作区与测试资产共同复用。 */}
-        {(routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' || routedTabId === 'prod_rd_tasks' || routedTabId === 'prod_dev_tasks' || routedTabId === 'prod_test_tasks' || routedTabId === 'prod_bugs' || routedTabId === 'prod_version_reviews') && (
-          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] pb-4 border-b border-[var(--border-main)]">
-            <span>产品线</span>
-            <Select
-              aria-label="产品线"
-              className="w-44"
-              showSearch
-              optionFilterProp="label"
-              value={productLineFilter}
-              options={[{ label: '全部产品线', value: 'all' }, ...productLines.map((productLine) => ({ label: productLine.name, value: productLine.id }))]}
-              onChange={setProductLineFilter}
-              placeholder="全部产品线"
-            />
-          </div>
-        )}
-
+        {/* 产品范围由任务工作区与测试资产共同复用。 */}
         {/* Dynamic View Component */}
         {String(routedTabId).startsWith('crm_') && (crmLoading || crmError) && (
           <div role={crmError ? 'alert' : 'status'} className={`flex items-center justify-between gap-3 border px-4 py-3 text-xs ${crmError ? 'border-[var(--danger)]/40 bg-[var(--danger)]/10 text-[var(--text-primary)]' : 'border-[var(--warning)]/40 bg-[var(--warning)]/10 text-[var(--text-primary)]'}`}>
@@ -230,8 +216,11 @@ const MainContent: React.FC = () => {
           </div>
         )}
         <Suspense fallback={<div className="dark-panel flex min-h-80 items-center justify-center rounded-lg text-sm text-[var(--text-muted)]">正在加载页面…</div>}>
-          <div className="animate-in fade-in duration-200">
+          <div className={taskNavigation ? 'grid h-[calc(100vh-190px)] min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3 animate-in fade-in duration-200' : 'animate-in fade-in duration-200'}>
+            {taskNavigation && <ProductNavigation productLines={productLines} value={productLineFilter} onChange={setProductLineFilter} />}
+            <div className={taskNavigation ? 'min-h-0 min-w-0 overflow-y-auto' : ''}>
             {routedTabId === 'prod_req_tasks' || routedTabId === 'prod_design_tasks' ? <RequirementTasksView key={routedTabId} productLineFilter={productLineFilter} taskKind={routedTabId === 'prod_design_tasks' ? 'design' : 'requirement'} itemLabel={routedTabId === 'prod_design_tasks' ? '设计任务' : '产品任务'} /> : renderView()}
+            </div>
           </div>
         </Suspense>
       </div>

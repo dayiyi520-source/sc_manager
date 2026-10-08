@@ -119,6 +119,11 @@ public class UnifiedWorkItemService {
         return mapper.byProductLine(RequestContext.tenantId(), lineId).stream().map(row -> map(row, today)).toList();
     }
 
+    public List<UnifiedWorkItem> iterationTimeline(String lineId) {
+        requireLine(lineId);
+        return read(lineId);
+    }
+
     static UnifiedWorkItem map(Map<String, Object> row, LocalDate today) {
         String category = text(row, "category");
         WorkItemStatus status = WorkItemStatus.legacy(category, text(row, "status"));
@@ -142,17 +147,21 @@ public class UnifiedWorkItemService {
             due, decimal(row.get("estimatedHours")), decimal(row.get("actualHours")), created, nullable(row,"creatorName"),
             due != null && due.isBefore(today) && !status.terminal(),
             "bug".equals(category) && ("P0".equals(priority) || "P1".equals(priority)) && !status.terminal(), nullable(row,"parentWorkItemId"), nullable(row,"assigneeId"),
-            WorkItemConfigurationService.enabled(row.get("hasChildren")), ((Number)row.getOrDefault("revision",0)).intValue());
+            WorkItemConfigurationService.enabled(row.get("hasChildren")), ((Number)row.getOrDefault("revision",0)).intValue(),
+            row.get("plannedStartDate") == null ? null : LocalDate.parse(row.get("plannedStartDate").toString()),
+            row.get("completedAt") == null ? null : row.get("completedAt") instanceof java.sql.Timestamp timestamp ? timestamp.toLocalDateTime()
+                : LocalDateTime.parse(row.get("completedAt").toString().replace(' ', 'T')),
+            row.get("expectedCompleteDate") == null ? null : LocalDate.parse(row.get("expectedCompleteDate").toString()), nullable(row,"ccNames"));
     }
 
     private void requireLine(String lineId) {
         if (!Set.of("admin", "product_manager", "tech_lead", "product", "tech").contains(RequestContext.role()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前角色无权访问产品数据");
-        if (lineId == null || lineId.isBlank()) throw new IllegalArgumentException("请选择产品线");
+        if (lineId == null || lineId.isBlank()) throw new IllegalArgumentException("请选择产品");
         if (productLines.find(RequestContext.tenantId(), lineId) == null)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "产品线不存在");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "产品不存在");
         if (!"admin".equals(RequestContext.role()) && !mapper.canRead(RequestContext.tenantId(), lineId, RequestContext.userId()))
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前用户无权访问该产品线");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前用户无权访问该产品");
     }
 
     private void requireVersion(String lineId, String versionId) {

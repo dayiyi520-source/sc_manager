@@ -12,5 +12,5 @@ public record UnifiedWorkItem(
     String priority, String originalPriority, LocalDate plannedEndDate,
     BigDecimal estimatedHours, BigDecimal actualHours, LocalDateTime createdAt, String creatorName,
     boolean overdue, boolean potentialBlockingDefect, String parentWorkItemId, String assigneeId,
-    boolean hasChildren, int revision
+    boolean hasChildren, int revision, LocalDate plannedStartDate, LocalDateTime completedAt, LocalDate expectedCompleteDate, String ccNames
 ) {}

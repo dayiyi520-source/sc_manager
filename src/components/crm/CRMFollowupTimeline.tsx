@@ -21,7 +21,7 @@ export const CRMFollowupTimeline: React.FC<{ records: FollowUpRecord[]; emptyTex
               <time className="ml-auto text-[var(--text-muted)]">{formatTime(record.followTime || record.date)}</time>
             </div>
             <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--text-primary)]">{record.content}</p>
-            {record.productLines?.length ? <p className="mt-1 text-xs text-[var(--text-muted)]">产品线：{record.productLines.join('、')}</p> : null}
+            {record.productLines?.length ? <p className="mt-1 text-xs text-[var(--text-muted)]">产品：{record.productLines.join('、')}</p> : null}
             {record.feedback && <p className="mt-1 text-xs text-[var(--text-body)]">反馈：{record.feedback}</p>}
           </li>
         ))}

@@ -36,7 +36,7 @@ export const directoryOptions = (directories: TestCaseDirectory[]): DirectoryOpt
     const children = build(null).filter((item) => directories.find((directory) => directory.id === item.value)?.productLineId === lineId);
     return {
       value: `product-line:${lineId}`,
-      label: directories.find((item) => item.productLineId === lineId)?.productLineName || '当前产品线',
+      label: directories.find((item) => item.productLineId === lineId)?.productLineName || '当前产品',
       isProductLine: true,
       isLeaf: false,
       ...(children.length ? { children } : {}),
@@ -162,7 +162,7 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
       <Form.Item name="tagsText" label="标签"><Input placeholder="使用逗号或顿号分隔" maxLength={240} /></Form.Item>
       <section className="test-case-attachment-placeholder"><h4>附件</h4><p>暂无附件</p></section>
     </aside>}>
-      {!productLineId && <Alert type="warning" showIcon title="请先选择产品线" />}
+      {!productLineId && <Alert type="warning" showIcon title="请先选择产品" />}
       {employees.isError && <Alert className="mb-4" type="error" showIcon title="负责人加载失败" action={<Button size="small" onClick={() => employees.refetch()}>重试</Button>} />}
       {caseTypes.isError && <Alert className="mb-4" type="error" showIcon title="用例类型加载失败" action={<Button size="small" onClick={() => caseTypes.refetch()}>重试</Button>} />}
       {workflows.isError && <Alert className="mb-4" type="error" showIcon title="用例阶段加载失败" action={<Button size="small" onClick={() => workflows.refetch()}>重试</Button>} />}
@@ -170,7 +170,7 @@ export const TestCaseEditorDrawer: React.FC<TestCaseEditorDrawerProps> = ({ open
       <div className="test-case-editor-main">
         <Form.Item name="title" label="用例标题" rules={[{ required: true, whitespace: true, message: '请填写用例标题' }]}><Input size="large" maxLength={255} showCount placeholder="请输入标题" /></Form.Item>
         <Form.Item name="directoryPath" label="选择目录" rules={[{ required: true, message: '请选择具体目录' }]}>
-          <Cascader className="test-case-directory-cascader" options={directoryOptions(directories)} showSearch changeOnSelect prefix={<FolderOpenOutlined />} placeholder="请选择产品线或目录" />
+          <Cascader className="test-case-directory-cascader" options={directoryOptions(directories)} showSearch changeOnSelect prefix={<FolderOpenOutlined />} placeholder="请选择产品或目录" />
         </Form.Item>
         <Form.Item name="precondition" label="前置条件">
           <RichTextEditor editor={preconditionEditor} value={preconditionValue} onInput={(text) => { setPreconditionValue(text); form.setFieldValue('precondition', text); }} placeholder="请输入前置条件" />

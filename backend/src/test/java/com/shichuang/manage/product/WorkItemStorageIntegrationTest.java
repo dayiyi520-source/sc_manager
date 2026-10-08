@@ -15,6 +15,7 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
     @Autowired WorkItemConfigurationService configurations;
     @Autowired WorkItemStorageService storage;
     @Autowired ProductLineService productLines;
+    @Autowired WorkItemCategoryService categories;
     @Autowired UnifiedWorkItemService unified;
     @Autowired AutomationRuleService automations;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -23,6 +24,7 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
 
     @BeforeEach void fixture() {
         RequestContext.set(Map.of("sub","test-user","tenant",tenant,"role","admin"));
+        categories.list();
         line=UUID.randomUUID().toString();
         jdbc.update("INSERT INTO t_product_line(id_,tenant_id_,code_,name_,create_by_,update_by_,create_time_,update_time_) VALUES(?,?,?,'统一存储测试','test-user','test-user',NOW(),NOW())",line,tenant,"TEST-"+line);
         type=type("test","测试执行");
@@ -47,6 +49,24 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(WorkItemStatus.Group.NOT_STARTED,result.status().group());
         assertEquals("neutral",result.statusColor());
     }
+    @Test void taskMenusExcludeAssistanceSourcesAndOnlyUseLatestPublishedSubtypeInitialState() {
+        for(String category:List.of("requirement","design","dev","test","bug")) {
+            String selectedType=type(category,"子类型默认状态验证");
+            for(String name:List.of("旧默认","待处理")) {
+                var definition=new Workflow(List.of(
+                    new State("pending",name,WorkItemStatus.Group.NOT_STARTED,true,false,true,"bug".equals(category)?"dev":category,"neutral"),
+                    new State("done","完成",WorkItemStatus.Group.COMPLETED,false,true,true,"bug".equals(category)?"dev":category,"green")),
+                    List.of(new Edge("finish","pending","done","完成")));
+                var saved=configurations.save(line,selectedType,null,new SaveWorkflow(category,name,definition,null));
+                configurations.publish(line,saved.get("id").toString(),((Number)saved.get("revision")).intValue());
+            }
+            var created=storage.create(input("subtype-"+category,category,selectedType,null,null,null));
+            assertEquals("待处理",created.get("statusName"));
+            assertEquals(selectedType,created.get("taskTypeId"));
+            jdbc.update("UPDATE t_product_work_item SET source_type_='WORK_ORDER' WHERE id_=?",created.get("id"));
+            assertTrue(unified.list(line,"",category,"",1,100).page().items().stream().noneMatch(item->created.get("id").equals(item.id())));
+        }
+    }
     @Test void createIsIdempotentAndRejectsChangedPayload() {
         var input=input("same-request","test",type,null,null,null);
         var first=storage.create(input);
@@ -62,6 +82,32 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         var created=storage.create(input);
         assertEquals(0,new java.math.BigDecimal("8.50").compareTo((java.math.BigDecimal)created.get("estimatedHours")));
         assertEquals(0,new java.math.BigDecimal("3.25").compareTo((java.math.BigDecimal)created.get("actualHours")));
+    }
+    @Test void expectedCompletionDateIsIndependentAndCanBeCleared() {
+        var start=java.time.LocalDate.of(2026,9,1);
+        var end=start.plusDays(10);
+        var expected=start.plusDays(6);
+        var input=new CreateItem("independent-dates",line,"test",type,"独立日期任务",null,null,null,
+            null,null,null,null,"P2",start,end,null,null,null,null,null,null,expected);
+        var created=storage.create(input);
+        String id=created.get("id").toString();
+        assertEquals(expected.toString(),created.get("expectedCompleteDate").toString());
+        assertEquals(end.toString(),created.get("plannedEndDate").toString());
+        assertEquals(expected,unified.list(line,"","test","",1,20).page().items().get(0).expectedCompleteDate());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.create(new CreateItem(
+            input.requestId(),line,"test",type,input.title(),null,null,null,null,null,null,null,"P2",start,end,
+            null,null,null,null,null,null,expected.plusDays(1)))).getStatusCode().value());
+        var changed=storage.update(line,id,new UpdateItem(null,null,null,null,null,null,null,null,null,null,null,0,expected.plusDays(1).toString()));
+        assertEquals(expected.plusDays(1).toString(),changed.get("expectedCompleteDate").toString());
+        assertEquals(end.toString(),changed.get("plannedEndDate").toString());
+        changed=storage.update(line,id,new UpdateItem("修改标题",null,null,null,null,null,null,null,null,null,null,1));
+        assertEquals(expected.plusDays(1).toString(),changed.get("expectedCompleteDate").toString());
+        changed=storage.update(line,id,new UpdateItem(null,null,null,null,null,null,null,null,null,null,null,2,""));
+        assertNull(changed.get("expectedCompleteDate"));
+        assertEquals(end.toString(),changed.get("plannedEndDate").toString());
+        assertNull(unified.list(line,"","test","",1,20).page().items().get(0).expectedCompleteDate());
+        assertEquals("期望完成时间格式无效，请使用YYYY-MM-DD",assertThrows(IllegalArgumentException.class,()->storage.update(line,id,
+            new UpdateItem(null,null,null,null,null,null,null,null,null,null,null,3,"invalid"))).getMessage());
     }
     @Test void persistsRichTextDescriptionOnCreateAndUpdate() {
         var input=new CreateItem("rich-description",line,"test",type,"富文本任务","加粗内容","<p><strong>加粗内容</strong></p>",
@@ -86,10 +132,10 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         jdbc.update("INSERT INTO t_sys_user(id_,tenant_id_,username_,name_,department_,role_,role_title_,status_,create_by_,update_by_,create_time_,update_time_) VALUES('assignee-user',?,'assignee-user','测试负责人','测试部','product_manager','测试负责人','enabled','test-user','test-user',NOW(),NOW())",tenant);
         var created=storage.create(input("update-fields","test",type,null,null,null));
         var update=new UpdateItem("更新后的统一任务","新描述","新目标",null,"测试负责人","P2",java.time.LocalDate.now(),java.time.LocalDate.now().plusDays(3),new java.math.BigDecimal("12.50"),new java.math.BigDecimal("2.25"),0);
-        assertThrows(IllegalArgumentException.class,()->storage.update(line,created.get("id").toString(),update));
-        var changed=storage.update(line,created.get("id").toString(),new UpdateItem("更新后的统一任务","新描述","新目标",null,null,"P2",java.time.LocalDate.now(),java.time.LocalDate.now().plusDays(3),new java.math.BigDecimal("12.50"),new java.math.BigDecimal("2.25"),0));
+        var changed=storage.update(line,created.get("id").toString(),update);
         assertEquals("更新后的统一任务",changed.get("title"));
         assertEquals("P2",changed.get("priority"));
+        assertEquals("测试负责人",changed.get("assigneeName"));
         assertEquals(1,((Number)changed.get("revision")).intValue());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.update(line,created.get("id").toString(),update)).getStatusCode().value());
     }
@@ -166,6 +212,34 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(parent.get("id"),child.get("parentWorkItemId"));
         assertThrows(IllegalArgumentException.class,()->storage.create(input("wrong-version","test",childType,parent.get("id").toString(),UUID.randomUUID().toString(),null)));
     }
+    @Test void defectCannotHaveChildrenEvenWhenAChildRuleExists() {
+        String bugType=type("bug","缺陷任务"); publish("bug");
+        configurations.childRule(line,new ChildRule(bugType,bugType,true));
+        String parent=storage.create(input("bug-parent","bug",bugType,null,null,null)).get("id").toString();
+        assertEquals("缺陷任务不支持子任务",assertThrows(IllegalArgumentException.class,()->storage.create(input("bug-child","bug",bugType,parent,null,null))).getMessage());
+        assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE tenant_id_=? AND parent_work_item_id_=?",Integer.class,tenant,parent));
+    }
+    @Test void planningRootMovesItsEntireTreeAndRejectsIndependentChildPlanning() {
+        configurations.childRule(line,new ChildRule(type,type,true));
+        String root=storage.create(input("plan-root","test",type,null,null,null)).get("id").toString();
+        String child=storage.create(input("plan-child","test",type,root,null,null)).get("id").toString();
+        String grandchild=storage.create(input("plan-grandchild","test",type,child,null,null)).get("id").toString();
+        String independent=storage.create(input("plan-independent","test",type,null,null,null)).get("id").toString();
+        var timeline=unified.iterationTimeline(line);
+        assertEquals(Set.of(root,child,grandchild,independent),timeline.stream().map(UnifiedWorkItem::id).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(root,timeline.stream().filter(item->child.equals(item.id())).findFirst().orElseThrow().parentWorkItemId());
+        assertEquals(2,unified.list(line,"","test","",1,20).page().total());
+        String version=version("待开始"),otherVersion=version("待开始");
+        productLines.assignWorkItem(line,version,"test",root);
+        for(String id:List.of(root,child,grandchild)) assertEquals(version,storage.detail(line,id).get("versionId"));
+        assertNull(storage.detail(line,independent).get("versionId"));
+        assertThrows(IllegalArgumentException.class,()->productLines.assignWorkItem(line,otherVersion,"test",child));
+        productLines.assignWorkItem(line,otherVersion,"test",root);
+        assertThrows(IllegalArgumentException.class,()->productLines.unassignWorkItem(line,version,"test",root));
+        for(String id:List.of(root,child,grandchild)) assertEquals(otherVersion,storage.detail(line,id).get("versionId"));
+        productLines.unassignWorkItem(line,otherVersion,"test",root);
+        for(String id:List.of(root,child,grandchild)) assertNull(storage.detail(line,id).get("versionId"));
+    }
     @Test void childMustUseTheSameCategoryAsItsParent() {
         var parent=storage.create(input("same-category-parent","test",type,null,null,null));
         String devType=type("dev","研发子任务");
@@ -189,6 +263,8 @@ class WorkItemStorageIntegrationTest extends AbstractApiIntegrationTest {
         assertEquals(parent.get("id"),topLevel.items().get(0).id());
         assertTrue(topLevel.items().get(0).hasChildren());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.delete(line,parent.get("id").toString(),((Number)parent.get("revision")).intValue())).getStatusCode().value());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.update(line,parent.get("id").toString(),
+            new UpdateItem(null,null,null,null,"测试负责人",null,null,null,null,null,((Number)parent.get("revision")).intValue()))).getStatusCode().value());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->storage.delete(line,child.get("id").toString(),99)).getStatusCode().value());
 
         storage.delete(line,child.get("id").toString(),((Number)child.get("revision")).intValue());

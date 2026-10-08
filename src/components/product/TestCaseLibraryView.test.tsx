@@ -74,7 +74,7 @@ describe('TestCaseLibraryView', () => {
   });
 
   it('reads type options from configured case subtypes instead of the current list', async () => {
-    mocks.productLines.mockResolvedValue([{ id: 'line-1', name: '产品线', workItemTypes: [{ id: 'case-type', name: '接口测试', category: '用例', enabled: true }, { id: 'task-type', name: '测试任务', category: '测试', enabled: true }] }]);
+    mocks.productLines.mockResolvedValue([{ id: 'line-1', name: '产品', workItemTypes: [{ id: 'case-type', name: '接口测试', category: '用例', enabled: true }, { id: 'task-type', name: '测试任务', category: '测试', enabled: true }] }]);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><TestCaseLibraryView productLineFilter="all" /></QueryClientProvider>);
 

@@ -43,7 +43,7 @@ describe('VersionReviewView', () => {
     renderView();
     expect(await screen.findByText('星河平台')).toBeInTheDocument();
     expect(screen.getByText('秋季迭代')).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '产品线' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '产品' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '迭代版本' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '会议主题' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '评审类型' })).toBeInTheDocument();
@@ -68,11 +68,11 @@ describe('VersionReviewView', () => {
   it('moves product and version selection into the create form', async () => {
     renderView();
     await screen.findByText('星河平台');
-    expect(screen.queryByLabelText('评审产品线')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('评审产品')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /新建评审/ }));
     expect(await screen.findByLabelText('会议主题')).toBeInTheDocument();
     expect(screen.getByLabelText('会议类型')).toBeInTheDocument();
-    expect(screen.getByLabelText('所属产品线')).toBeInTheDocument();
+    expect(screen.getByLabelText('所属产品')).toBeInTheDocument();
     expect(screen.getByLabelText('所属版本')).toBeInTheDocument();
     expect(screen.getByLabelText('会议时间')).toBeInTheDocument();
     expect(screen.getByLabelText('参与人')).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe('VersionReviewView', () => {
     renderView('line-1');
     await screen.findByText('秋季版本评审会');
     fireEvent.click(screen.getByRole('button', { name: /新建评审/ }));
-    expect(await screen.findByLabelText('所属产品线')).toHaveAttribute('disabled');
+    expect(await screen.findByLabelText('所属产品')).toHaveAttribute('disabled');
     expect(screen.getByText('星河平台')).toBeInTheDocument();
   });
 });

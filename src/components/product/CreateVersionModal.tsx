@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Calendar, Check, Clock, FileText, Layers } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { ProductLine, VersionIteration } from '../../types';
+import { productRepository } from '../../services/productRepository';
 import { teamRepository } from '../../services/teamRepository';
 import { employeeSelectOptions } from '../common/PersonIdentity';
 
@@ -41,6 +42,7 @@ export const shouldClearEndDate = (nextStartDate: string, endDate: string) => Bo
 export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, onClose, productLine, editingVersion = null, onSuccess }) => {
   const { addVersion, updateVersion, addToast, productLines } = useApp();
   const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: isOpen, retry: false });
+  const iterationStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'ITERATION'], queryFn: () => productRepository.researchStatusTemplates('ITERATION'), enabled: isOpen, retry: false });
   const [selectedProductLineId, setSelectedProductLineId] = useState(productLine?.id || '');
   const [versionName, setVersionName] = useState(editingVersion?.name || '');
   const [versionCode, setVersionCode] = useState(editingVersion?.code || '');
@@ -49,7 +51,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
   const [endDate, setEndDate] = useState(editingVersion?.endDate || '');
   const [content, setContent] = useState(editingVersion?.content || editingVersion?.changelog || '');
   const [productLinePickerOpen, setProductLinePickerOpen] = useState(false);
-  const versionStatus = editingVersion?.status || '未开始';
+  const versionStatus = editingVersion?.status || iterationStatusesQuery.data?.find((item) => item.initial && item.enabled)?.name || iterationStatusesQuery.data?.find((item) => item.enabled)?.name || '未开始';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,7 +70,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
     event.preventDefault();
     const selectedProductLine = productLines.find((line) => line.id === selectedProductLineId);
     if (!selectedProductLine) {
-      addToast('warning', '请选择所属产品线');
+      addToast('warning', '请选择所属产品');
       return;
     }
     if (!versionName.trim() || !versionCode.trim() || !versionOwner.trim()) {
@@ -120,8 +122,8 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
       <div className="bg-[var(--bg-surface)] text-[var(--text-body)] border border-[var(--border-main)] rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]">
-          <div className="flex items-center gap-2.5"><div className="p-2 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><Layers className="w-5 h-5" /></div><div><h3 className="text-base font-bold text-[var(--text-primary)]">{editingVersion ? '修改迭代版本' : '创建迭代版本'}</h3><div className="mt-2 flex items-center gap-[5px] text-xs"><span className="text-[var(--text-muted)]">所属产品线 <span className="text-[var(--danger)]">*</span>：</span>{(productLine || editingVersion?.productLineId) ? <div className="flex items-center gap-2 font-semibold text-[var(--active-text)]"><span>{activeProductLine?.name || productLine?.name || editingVersion?.productLineName || '未关联产品线'}</span><span className="font-mono text-[var(--primary)]">{activeProductLine?.code || productLine?.code || '—'}</span></div> : <Cascader
-            aria-label="选择所属产品线"
+          <div className="flex items-center gap-2.5"><div className="p-2 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><Layers className="w-5 h-5" /></div><div><h3 className="text-base font-bold text-[var(--text-primary)]">{editingVersion ? '修改迭代版本' : '创建迭代版本'}</h3><div className="mt-2 flex items-center gap-[5px] text-xs"><span className="text-[var(--text-muted)]">所属产品 <span className="text-[var(--danger)]">*</span>：</span>{(productLine || editingVersion?.productLineId) ? <div className="flex items-center gap-2 font-semibold text-[var(--active-text)]"><span>{activeProductLine?.name || productLine?.name || editingVersion?.productLineName || '未关联产品'}</span><span className="font-mono text-[var(--primary)]">{activeProductLine?.code || productLine?.code || '—'}</span></div> : <Cascader
+            aria-label="选择所属产品"
             options={productLineOptions}
             value={selectedProductLineId ? [selectedProductLineId] : undefined}
             open={productLinePickerOpen}
@@ -134,9 +136,9 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
               setSelectedProductLineId(line.id);
               if (!editingVersion) setVersionOwner(line.ownerName || line.owner || '');
             }}
-            displayRender={() => activeProductLine ? `${activeProductLine.name}${activeProductLine.code ? ` (${activeProductLine.code})` : ''}` : '未选择产品线'}
+            displayRender={() => activeProductLine ? `${activeProductLine.name}${activeProductLine.code ? ` (${activeProductLine.code})` : ''}` : '未选择产品'}
             showSearch
-            placeholder="未选择产品线"
+            placeholder="未选择产品"
             variant="borderless"
             suffixIcon={null}
             className={`version-product-line-cascader ${activeProductLine ? '' : 'is-empty'}`}

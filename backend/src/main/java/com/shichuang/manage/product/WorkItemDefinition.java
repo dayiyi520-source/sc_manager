@@ -46,7 +46,16 @@ public final class WorkItemDefinition {
         String title, String description, String descriptionHtml, String expectedGoal, String versionId, String requirementId,
         String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
         LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours, String customerId, String customerName,
-        List<String> ccNames, List<Map<String,Object>> media) {
+        List<String> ccNames, List<Map<String,Object>> media, LocalDate expectedCompleteDate) {
+        public CreateItem(String requestId, String productLineId, String category, String taskTypeId,
+            String title, String description, String descriptionHtml, String expectedGoal, String versionId, String requirementId,
+            String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
+            LocalDate plannedEndDate, BigDecimal estimatedHours, BigDecimal actualHours, String customerId, String customerName,
+            List<String> ccNames, List<Map<String,Object>> media) {
+            this(requestId, productLineId, category, taskTypeId, title, description, descriptionHtml, expectedGoal, versionId,
+                requirementId, parentWorkItemId, assigneeId, priority, plannedStartDate, plannedEndDate, estimatedHours, actualHours,
+                customerId, customerName, ccNames, media, null);
+        }
         public CreateItem(String requestId, String productLineId, String category, String taskTypeId,
             String title, String description, String descriptionHtml, String expectedGoal, String versionId, String requirementId,
             String parentWorkItemId, String assigneeId, String priority, LocalDate plannedStartDate,
@@ -66,7 +75,13 @@ public final class WorkItemDefinition {
     }
     public record UpdateItem(String title, String description, String descriptionHtml, String expectedGoal, String versionId,
         String assigneeName, String priority, LocalDate plannedStartDate, LocalDate plannedEndDate,
-        BigDecimal estimatedHours, BigDecimal actualHours, Integer revision) {
+        BigDecimal estimatedHours, BigDecimal actualHours, Integer revision, String expectedCompleteDate) {
+        public UpdateItem(String title, String description, String descriptionHtml, String expectedGoal, String versionId,
+            String assigneeName, String priority, LocalDate plannedStartDate, LocalDate plannedEndDate,
+            BigDecimal estimatedHours, BigDecimal actualHours, Integer revision) {
+            this(title, description, descriptionHtml, expectedGoal, versionId, assigneeName, priority, plannedStartDate,
+                plannedEndDate, estimatedHours, actualHours, revision, null);
+        }
         public UpdateItem(String title, String description, String expectedGoal, String versionId,
             String assigneeName, String priority, LocalDate plannedStartDate, LocalDate plannedEndDate,
             BigDecimal estimatedHours, BigDecimal actualHours, Integer revision) {

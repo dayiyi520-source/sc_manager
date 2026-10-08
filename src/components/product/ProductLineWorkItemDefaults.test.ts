@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { formatVersionPublishedAt, latestReleasedVersion, matchesProductLineFilters, normalizeProductWebsiteUrl, productLineMemberCount, productLineVersionCount } from './ProductLinesView';
 import type { ProductLine } from '../../types';
 import { preferredWorkItemTypeName } from './workItemTypeDefaults';
+import { productLineDisplayStatus } from './productLinePresentation';
 
 const productLinesSource = readFileSync(new URL('./ProductLinesView.tsx', import.meta.url), 'utf8');
 const settingsSource = readFileSync(new URL('./ProductLineDetailView.tsx', import.meta.url), 'utf8');
@@ -103,7 +104,7 @@ describe('product line work item defaults', () => {
     expect(productLinesSource).toContain("fixed: 'right' as const");
     expect(productLinesSource).toContain('搜索产品名称/编码...');
     expect(productLinesSource).toContain('<Pagination total={filteredLines.length}');
-    expect(productLinesSource).toContain("['启用中', '已停用'");
+    expect(productLinesSource).toContain("['待规划', '迭代中', '已归档', '已停用'");
   });
 
   it('edits and labels the default work item type', () => {
@@ -130,5 +131,20 @@ describe('product line work item defaults', () => {
     expect(datePickerStyles).toContain('.tech-shell .ant-picker .ant-picker-input > input');
     expect(datePickerStyles).not.toContain('.task-page .work-item-panel .ant-picker .ant-picker-input');
     expect(datePickerStyles).not.toContain('.ant-picker-cell-inner');
+  });
+});
+
+describe('产品展示状态按版本和终态计算', () => {
+  it('无版本时显示待规划', () => {
+    expect(productLineDisplayStatus({ health: '待规划', versions: [] })).toBe('待规划');
+  });
+
+  it('存在版本时显示迭代中', () => {
+    expect(productLineDisplayStatus({ health: '待规划', versions: [{ id: 'version-1' }] as never[] })).toBe('迭代中');
+  });
+
+  it('已归档和已停用优先于版本状态', () => {
+    expect(productLineDisplayStatus({ health: '已归档', versions: [{ id: 'version-1' }] as never[] })).toBe('已归档');
+    expect(productLineDisplayStatus({ health: '已停用', versions: [{ id: 'version-1' }] as never[] })).toBe('已停用');
   });
 });

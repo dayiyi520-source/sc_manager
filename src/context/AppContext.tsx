@@ -278,8 +278,8 @@ export interface AppContextType {
   updateVersion: (id: string, updates: Partial<VersionIteration>) => Promise<boolean>;
   deleteVersion: (id: string) => void;
   assignRequirementToVersion: (requirementId: string, versionId: string) => Promise<boolean>;
-  assignWorkItemToVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string) => Promise<boolean>;
-  unassignWorkItemFromVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string) => Promise<boolean>;
+  assignWorkItemToVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string) => Promise<boolean>;
+  unassignWorkItemFromVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string) => Promise<boolean>;
   addRequirementTask: (task: Partial<RequirementTask>) => Promise<boolean>;
   updateRequirementTask: (id: string, updates: Partial<RequirementTask>) => void;
   addDesignTask: (task: Partial<RequirementTask>) => Promise<boolean>;
@@ -1161,14 +1161,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       coverUrl: line.coverUrl,
       members: line.members?.length ? line.members : line.ownerUserId ? [{ id: `mem-${Date.now()}`, userId: line.ownerUserId, name: ownerName, role: '管理员' }] : [],
       products: line.products || [],
-      currentVersion: 'V1.0.0',
+      currentVersion: line.currentVersion || '',
       totalRequirements: line.totalRequirements ?? 0,
       inProgressReqs: line.inProgressReqs ?? 0,
       activeTasksCount: line.activeTasksCount ?? 0,
       iterationProgress: line.iterationProgress ?? 0,
-      versionCount: line.versionCount ?? 1,
+      versionCount: line.versionCount ?? 0,
       customerCount: line.customerCount ?? 0,
-      health: (line.health as any) || '健康',
+      health: (line.health as any) || '待规划',
       initializeWorkItemTemplate: line.initializeWorkItemTemplate,
       createdAt: '2026-08-31'
     };
@@ -1246,7 +1246,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
     }
-    addToast('error', '版本保存失败', '请选择有效的产品线');
+    addToast('error', '版本保存失败', '请选择有效的产品');
     return false;
   };
 
@@ -1267,7 +1267,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
     }
-    addToast('error', '版本更新失败', '版本不存在或未绑定产品线');
+    addToast('error', '版本更新失败', '版本不存在或未绑定产品');
     return false;
   };
 
@@ -1281,7 +1281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       void productRepository.deleteVersion(current.productLineId, id).then(() => productLineQuery.refetch()).then(() => addToast('success', '迭代已删除', current.name)).catch((error) => addToast('error', '迭代删除失败', error instanceof Error ? error.message : '请稍后重试'));
       return;
     }
-    addToast('error', '迭代删除失败', '版本不存在或未绑定产品线');
+    addToast('error', '迭代删除失败', '版本不存在或未绑定产品');
   };
 
   const assignRequirementToVersion = async (requirementId: string, versionId: string): Promise<boolean> => {
@@ -1305,23 +1305,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const assignWorkItemToVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string): Promise<boolean> => {
+  const assignWorkItemToVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string): Promise<boolean> => {
     if (!requirementBackendEnabled) {
       addToast('error', '工作项规划失败', '当前未连接后端服务，数据未保存');
       return false;
     }
     const version = versions.find((item) => item.id === versionId);
     if (!version?.productLineId) { addToast('error', '工作项规划失败', '目标迭代不存在，请刷新后重试'); return false; }
-    const collection = kind === 'requirement' ? requirementTasks : kind === 'design' ? designTasks : kind === 'bug' ? bugs : devTasks;
-    const item = collection.find((candidate) => candidate.id === itemId);
-    if (!item) { addToast('error', '工作项规划失败', '工作项不存在，请刷新后重试'); return false; }
-    if (kind === 'requirement') return assignRequirementToVersion(itemId, versionId);
-    try { await productRepository.assignWorkItemToVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
+    try { await productRepository.assignWorkItemToVersion(version.productLineId, version.id, kind, itemId); await Promise.all([productLineQuery.refetch(), requirementQuery.refetch(), designQuery.refetch(), bugQuery.refetch(), devTaskQuery.refetch()]); }
     catch (error) { addToast('error', '工作项规划失败', error instanceof Error ? error.message : '请稍后重试'); return false; }
     return true;
   };
 
-  const unassignWorkItemFromVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev', itemId: string, versionId: string): Promise<boolean> => {
+  const unassignWorkItemFromVersion = async (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string): Promise<boolean> => {
     if (!requirementBackendEnabled) {
       addToast('error', '移出迭代失败', '当前未连接后端服务，数据未保存');
       return false;
@@ -1368,7 +1364,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ['expectedGoal', '修改验收标准'],
         ['requirementType', '修改需求类型'],
         ['priority', '修改优先级'],
-        ['productLineName', '修改所属产品线'],
+        ['productLineName', '修改所属产品'],
         ['versionName', '修改迭代版本'],
         ['customerName', '修改关联客户'],
         ['plannedStartDate', '修改计划开始时间'],

@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { buildWorkflowDefinition, createDefaultWorkItemStates, reorderWorkflowStates, setDefaultWorkflowState, validateWorkflowStates } from './WorkItemStateConfigDrawer';
+import { describe, expect, it, vi } from 'vitest';
+import { productRepository, type WorkItemWorkflow } from '../../services/productRepository';
+import type { ProductLineWorkItemType } from '../../types';
+import { buildWorkflowDefinition, createDefaultWorkItemStates, reorderWorkflowStates, saveAndPublishWorkflow, setDefaultWorkflowState, validateWorkflowStates } from './WorkItemStateConfigDrawer';
 
 describe('工作项状态配置', () => {
   it('拖拽只改变顺序，不改变默认状态', () => {
@@ -45,5 +47,24 @@ describe('工作项状态配置', () => {
     ]);
     expect(states.every((state) => state.stage === 'test')).toBe(true);
     expect(definition.transitions).toHaveLength(5);
+  });
+
+  it('发布前保存当前编辑内容，并使用保存后的修订号', async () => {
+    const item = { id: 'type-1', name: '产品类型需求', category: '需求', enabled: true } as ProductLineWorkItemType;
+    const states = createDefaultWorkItemStates('requirement').map((state) => state.initial ? { ...state, name: '待规划' } : state);
+    const current = { id: 'draft-1', status: 'DRAFT', revision: 2 } as WorkItemWorkflow;
+    const saved = { id: 'draft-1', revision: 3 } as WorkItemWorkflow;
+    const update = vi.spyOn(productRepository, 'updateTypeWorkflow').mockResolvedValue(saved);
+    const publish = vi.spyOn(productRepository, 'publishWorkflow').mockResolvedValue(saved);
+    try {
+      await saveAndPublishWorkflow('line-1', item, 'requirement', states, current);
+      expect(update).toHaveBeenCalledWith('line-1', 'type-1', 'draft-1', expect.objectContaining({
+        revision: 2, definition: expect.objectContaining({ states: expect.arrayContaining([expect.objectContaining({ name: '待规划', initial: true })]) })
+      }));
+      expect(publish).toHaveBeenCalledWith('line-1', 'draft-1', 3);
+      expect(update.mock.invocationCallOrder[0]).toBeLessThan(publish.mock.invocationCallOrder[0]);
+    } finally {
+      update.mockRestore(); publish.mockRestore();
+    }
   });
 });

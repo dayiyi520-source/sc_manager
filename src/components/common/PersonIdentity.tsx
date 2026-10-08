@@ -25,7 +25,7 @@ export const formatEmployeeOptionLabel = (employee: Pick<EmployeeOption, 'name'>
 export const employeeSelectOptions = (
   employees: EmployeeOption[],
   valueField: 'id' | 'name' = 'id',
-) => employees.map((employee) => ({
+) => employees.filter((employee, index) => employees.findIndex((item) => item[valueField] === employee[valueField]) === index).map((employee) => ({
   value: employee[valueField],
   label: formatEmployeeOptionLabel(employee),
 }));
