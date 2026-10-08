@@ -192,9 +192,9 @@ export function WeeklyReviewEditor({
 
   const [assistance, setAssistance] = useState<AssistanceDraft[]>(() => {
     const rows = initialPayload?.assistance || [];
-    if (!rows.length && initialPayload?.helpNeeded) return [{ subject: '需要协助事项', result: initialPayload.helpNeeded, assistanceType: '', expectedAssignee: '', content: initialPayload.helpNeeded, expectedDueDate: '' }];
+    if (!rows.length && initialPayload?.helpNeeded) return [{ subject: '需要协同事项', result: initialPayload.helpNeeded, assistanceType: '', expectedAssignee: '', content: initialPayload.helpNeeded, expectedDueDate: '' }];
     return rows.map(row => ({
-      subject: row.subject || '需要协助事项',
+      subject: row.subject || '需要协同事项',
       result: row.result || row.content || '',
       assistanceType: row.assistanceType || '',
       expectedAssignee: row.expectedAssignee || '',
@@ -286,7 +286,7 @@ export function WeeklyReviewEditor({
         .join('；') || kr.evidenceNote
     })),
     helpNeeded: assistance.map(row => row.content.trim()).filter(Boolean).join('；'),
-    assistance: assistance.filter(row => row.content.trim()).map(row => ({ ...row, subject: '需要协助事项', result: row.content.trim() })),
+    assistance: assistance.filter(row => row.content.trim()).map(row => ({ ...row, subject: '需要协同事项', result: row.content.trim() })),
     extraWork: {
       ...extra,
       description: manualWorks.length ? JSON.stringify(manualWorks) : extra.description
@@ -868,14 +868,14 @@ export function WeeklyReviewEditor({
           <div className="space-y-3">
             {assistance.map((row, index) => (
               <div key={`assistance-${index}`} className="grid grid-cols-1 gap-2 rounded border border-[var(--border-main)] p-3 md:grid-cols-[160px_180px_160px_1fr_auto]">
-                <Select value={row.assistanceType || undefined} placeholder="请选择协助类型" options={assistanceTypes.map(value => ({ value, label: value }))} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, assistanceType: value } : item))} />
+                <Select value={row.assistanceType || undefined} placeholder="请选择协助类型" options={assistanceTypes.map(value => ({ value, label: value === '客户诉求' ? '产品需求' : value }))} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, assistanceType: value } : item))} />
                 <Select showSearch allowClear optionFilterProp="label" value={row.expectedAssignee || undefined} placeholder="请选择期望协助人" options={teamMembers.map(member => ({ value: member.name, label: `${member.name} · ${member.jobTitle || member.roleTitle || '未设置职位'}` }))} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, expectedAssignee: value || '' } : item))} />
                 <DatePicker value={row.expectedDueDate ? dayjs(row.expectedDueDate) : null} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, expectedDueDate: value?.format('YYYY-MM-DD') || '' } : item))} placeholder="期望完成日期" />
                 <Input value={row.content} onChange={event => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, content: event.target.value, result: event.target.value } : item))} placeholder="说明需要的协助、资源和反馈" />
-                <Button type="text" danger aria-label="移除协助事项" onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>移除</Button>
+                <Button type="text" danger aria-label="移除协同事项" onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>移除</Button>
               </div>
             ))}
-            <Button icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setAssistance(rows => [...rows, { subject: '需要协助事项', result: '', assistanceType: '', expectedAssignee: '', content: '', expectedDueDate: '' }])}>添加协助事项</Button>
+            <Button icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setAssistance(rows => [...rows, { subject: '需要协同事项', result: '', assistanceType: '', expectedAssignee: '', content: '', expectedDueDate: '' }])}>添加协同事项</Button>
           </div>
         </div>
       </section>

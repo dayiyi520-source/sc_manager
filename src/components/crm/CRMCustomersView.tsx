@@ -602,7 +602,7 @@ export const CRMCustomersView: React.FC = () => {
             {detailTab === 'demands' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">客户专属需求与协助事项</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">客户专属需求与协同事项</span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {

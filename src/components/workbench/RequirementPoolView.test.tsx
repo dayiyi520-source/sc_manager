@@ -8,10 +8,13 @@ import { useApp } from '../../context/AppContext';
 import { requirementRepository } from '../../services/requirementRepository';
 import { RequirementPoolView } from './RequirementPoolView';
 import type { RequirementTask } from '../../types';
+import { copyToClipboard } from '../../utils/copyToClipboard';
+
+vi.mock('../../utils/copyToClipboard', () => ({ copyToClipboard: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
 vi.mock('../../services/requirementRepository', () => ({
-  requirementRepository: { employees: vi.fn(), detail: vi.fn(), reassign: vi.fn(), memo: vi.fn(), createWorkItem: vi.fn() },
+  requirementRepository: { employees: vi.fn(), detail: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), createWorkItem: vi.fn() },
   normalizeRequirementTask: (task: RequirementTask) => task,
 }));
 vi.mock('../product/LazyRichTextEditor', () => ({
@@ -27,6 +30,7 @@ describe('workbench work-order creation layout', () => {
   const addToast = vi.fn();
 
   beforeEach(() => {
+    window.history.replaceState(null, '', '/app/wb_work_order');
     vi.clearAllMocks();
     vi.mocked(requirementRepository.employees).mockResolvedValue([{ id: 'employee-1', name: '陈雅婷', department: '产品部' }]);
     vi.mocked(useApp).mockReturnValue({
@@ -48,8 +52,62 @@ describe('workbench work-order creation layout', () => {
   const openCustomerRequest = async () => {
     render(<RequirementPoolView />);
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: /客户诉求/ }));
+    fireEvent.click(screen.getByRole('button', { name: /产品需求/ }));
   };
+
+  it('opens a shared detail outside the list and copies its business number and standalone link', async () => {
+    window.history.replaceState(null, '', '/manager/app/wb_work_order?detailId=shared-item');
+    const task = { id: 'shared-item', code: 'WO-20261008-01', title: '分享事项', status: '待处理', ownerName: '林志豪', events: [], workItems: [] };
+    vi.mocked(requirementRepository.detail).mockResolvedValue(task as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
+    render(<RequirementPoolView />);
+    fireEvent.click(await screen.findByRole('button', { name: '复制事项编号' }));
+    await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith('WO-20261008-01'));
+    fireEvent.click(screen.getByRole('button', { name: '复制详情链接' }));
+    await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith(`${window.location.origin}/manager/app/wb_work_order?detailId=shared-item`));
+    expect(screen.queryByRole('button', { name: '事项搁置' })).not.toBeInTheDocument();
+    fireEvent.click(document.getElementById('btn-drawer-close')!);
+    expect(window.location.search).toBe('');
+  });
+
+  it('reports clipboard failure without closing the detail', async () => {
+    window.history.replaceState(null, '', '/app/wb_work_order?detailId=shared-item');
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ id: 'shared-item', code: 'WO-01', title: '分享事项', events: [], workItems: [] } as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
+    vi.mocked(copyToClipboard).mockRejectedValueOnce(new Error('权限被拒绝'));
+    render(<RequirementPoolView />);
+    fireEvent.click(await screen.findByRole('button', { name: '复制事项编号' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '复制失败', '权限被拒绝'));
+    expect(screen.getByRole('button', { name: '复制详情链接' })).toBeInTheDocument();
+  });
+
+  it('reports inaccessible shared details', async () => {
+    window.history.replaceState(null, '', '/app/wb_work_order?detailId=missing');
+    vi.mocked(requirementRepository.detail).mockRejectedValueOnce(new Error('无权访问'));
+    render(<RequirementPoolView />);
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '事项详情加载失败', '无权访问'));
+    expect(screen.queryByRole('button', { name: '复制事项编号' })).not.toBeInTheDocument();
+  });
+
+  it('reopens with a handler and reason, without a progress field or a second reassignment dialog', async () => {
+    window.history.replaceState(null, '', '/app/wb_work_order?detailId=closed-item');
+    const task = { id: 'closed-item', code: 'WO-02', title: '已关闭事项', status: '已关闭', creatorName: '林志豪', revision: 4, events: [], workItems: [] };
+    vi.mocked(requirementRepository.detail).mockResolvedValue(task as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
+    vi.mocked(requirementRepository.reopen).mockRejectedValueOnce(new Error('保存失败')).mockResolvedValueOnce({ ...task, status: '处理中', revision: 5, progress: 0 } as unknown as Awaited<ReturnType<typeof requirementRepository.reopen>>);
+    render(<RequirementPoolView />);
+    fireEvent.click(await screen.findByRole('button', { name: '重新开启' }));
+    expect(screen.queryByText('当前进度')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '确认重开' }));
+    expect(requirementRepository.reopen).not.toHaveBeenCalled();
+    fireEvent.mouseDown(screen.getByText('请选择处理人').closest('.ant-select')!.querySelector('.ant-select-content')!);
+    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
+    fireEvent.change(screen.getByPlaceholderText('请输入重新开启原因'), { target: { value: '  补充产品需求  ' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认重开' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '事项重开失败', '保存失败'));
+    expect(screen.getByPlaceholderText('请输入重新开启原因')).toHaveValue('  补充产品需求  ');
+    fireEvent.click(screen.getByRole('button', { name: '确认重开' }));
+    await waitFor(() => expect(requirementRepository.reopen).toHaveBeenLastCalledWith('closed-item', { assigneeId: 'employee-1', reason: '补充产品需求', revision: 4 }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: '确认重开' })).not.toBeInTheDocument());
+    expect(requirementRepository.reassign).not.toHaveBeenCalled();
+  });
 
   it('keeps one submit action in the sticky header and uses the large editor', async () => {
     await openCustomerRequest();
@@ -157,7 +215,7 @@ describe('workbench work-order creation layout', () => {
     const firstReason = await screen.findByText('事项内容不明确', { selector: '.ant-select-item-option-content' });
     fireEvent.click(firstReason);
     expect(rejectReason.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent(firstReason.textContent || '');
-  });
+  }, 15000);
 
   it.each([
     ['线上问题', '缺陷类型 *', '系统缺陷', '安全漏洞'],

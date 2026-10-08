@@ -27,6 +27,7 @@ const DesignTasksView = lazyNamed(() => import('./components/product/DesignTasks
 const TestAndDefectView = lazyNamed(() => import('./components/product/TestAndDefectView'), 'TestAndDefectView');
 const RequirementPoolView = lazyNamed(() => import('./components/workbench/RequirementPoolView'), 'RequirementPoolView');
 const OKRPerformanceView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'OKRPerformanceView');
+const ReviewSummaryView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'ReviewSummaryView');
 
 // CRM Views
 const CRMCustomersView = lazyNamed(() => import('./components/crm/CRMCustomersView'), 'CRMCustomersView');
@@ -94,6 +95,8 @@ const MainContent: React.FC = () => {
         return <MyTasksView />;
       case 'wb_okr_perf':
         return <OKRPerformanceView />;
+      case 'wb_reviews':
+        return <ReviewSummaryView />;
       case 'wb_knowledge':
       case 'wb_knowledge_center':
       case 'know_base':

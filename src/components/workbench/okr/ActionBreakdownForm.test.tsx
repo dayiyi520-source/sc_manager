@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ActionBreakdownForm } from './ActionBreakdownForm';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
+import type { OkrSettings } from '../../../services/okrRepository';
 
 const people: OkrPerson[] = [
   { id: 'boss', name: '张总', department: '管理层', supervisorId: null, rootFlag: 1, version: 0 },
@@ -22,11 +23,39 @@ const parents: OkrRecord[] = titles.map((title, index) => ({
   payload: { title, parentObjectiveId: `objective-${index + 1}`, parentActionId: `parent-${index + 1}` },
 }));
 
-const renderForm = () => render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[]} people={people} productLineOptions={['真实产品']} projectOptions={['真实交付项目']} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
+const settings: OkrSettings = {
+  defaultView: 'list',
+  timeRules: [],
+  validation: { actionWeightTotal: 100, maxActions: 8, assigneeMultiple: true, keyNodeMultiple: true, resultRequired: true },
+  dictionaries: { productNodes: ['上线验收'], deliveryNodes: ['项目验收'], presalesNodes: ['投标完成'], supportTypes: ['运营支持'] },
+  templates: [],
+};
+const renderForm = () => render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[]} people={people} settings={settings} productLineOptions={['真实产品']} projectOptions={['真实交付项目']} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
 
 describe('ActionBreakdownForm', () => {
+  it.each(['title', 'deadline', 'weight', 'milestone'] as const)('blocks missing %s even after the action editor is collapsed', async missing => {
+    const onSave = vi.fn(async () => true);
+    const payload = { title: '有效动作', parentObjectiveId: 'objective-1', parentActionId: 'parent-1', businessObject: '真实产品', milestone: '上线验收', deadline: '2026-10-31', weight: 100, [missing]: undefined };
+    const action: OkrRecord = { id: 'draft-a', kind: 'action', ownerId: 'me', periodKey: dayjs().format('YYYY-MM'), status: 'draft', version: 0, payload };
+    render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[action]} initialActionId="draft-a" people={people} settings={settings} productLineOptions={['真实产品']} projectOptions={[]} busy={false} onClose={vi.fn()} onSave={onSave} />);
+    fireEvent.click(screen.getByRole('button', { name: '收起 O1 拆解' }));
+    fireEvent.click(screen.getByRole('button', { name: /提\s*交/ }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('submits preserved valid actions when their editor is collapsed', async () => {
+    const onSave = vi.fn(async () => true);
+    const action: OkrRecord = { id: 'draft-a', kind: 'action', ownerId: 'me', periodKey: dayjs().format('YYYY-MM'), status: 'draft', version: 0, payload: { title: '有效动作', parentObjectiveId: 'objective-1', parentActionId: 'parent-1', businessObject: '真实产品', milestone: '上线验收', deadline: '2026-10-31', weight: 40 } };
+    render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[action]} initialActionId="draft-a" people={people} settings={settings} productLineOptions={['真实产品']} projectOptions={[]} busy={false} onClose={vi.fn()} onSave={onSave} />);
+    fireEvent.click(screen.getByRole('button', { name: '收起 O1 拆解' }));
+    fireEvent.click(screen.getByRole('button', { name: /提\s*交/ }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(onSave).toHaveBeenCalledWith(dayjs().format('YYYY-MM'), [expect.objectContaining({ actions: [expect.objectContaining({ title: '有效动作' })] })], 'submit');
+  });
+
   it('shows dynamic month choices, three untouched parent targets, and source names', () => {
-    renderForm();
+    render(<ActionBreakdownForm open cycle={dayjs().format('YYYY-MM')} person={people[1]} parents={parents} actions={[]} people={people} settings={settings} productLineOptions={['真实产品']} projectOptions={['真实交付项目']} busy={false} onClose={vi.fn()} onSave={vi.fn(async () => true)} />);
 
     expect(screen.getByTitle(dayjs().format('YYYY年MM月'))).toBeInTheDocument();
     expect(screen.queryByText('进行中')).not.toBeInTheDocument();

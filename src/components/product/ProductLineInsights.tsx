@@ -10,7 +10,7 @@ import { DAY, taskPlan } from './iterationTimeline';
 
 type BoardCategoryKey = 'assistance' | 'requirement' | 'design' | 'dev' | 'test' | 'bug';
 const categories: Array<{ key: BoardCategoryKey; label: string }> = [
-  { key: 'assistance', label: '协助事项' },
+  { key: 'assistance', label: '协同事项' },
   { key: 'requirement', label: '产品任务' },
   { key: 'design', label: '设计任务' },
   { key: 'dev', label: '研发任务' },

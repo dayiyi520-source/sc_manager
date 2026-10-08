@@ -22,6 +22,7 @@ export type SubMenuId =
   // 工作台
   | 'wb_my_tasks'
   | 'wb_okr_perf'
+  | 'wb_reviews'
   | 'wb_knowledge'
   | 'wb_knowledge_center'
   // 客户与商机

@@ -150,7 +150,7 @@ export const WorkItemStateConfigDrawer: React.FC<{
   productLine: ProductLine; item: ProductLineWorkItemType | null; open: boolean; onClose: () => void;
 }> = ({ productLine, item, open, onClose }) => {
   const { addToast } = useApp();
-  const category = item ? CATEGORY_KEYS[item.category] : 'requirement';
+  const category = item ? CATEGORY_KEYS[item.category] || item.category : 'requirement';
   const [workflows, setWorkflows] = useState<WorkItemWorkflow[]>([]);
   const [states, setStates] = useState<EditableWorkflowState[]>(createDefaultWorkItemStates(category));
   const [loading, setLoading] = useState(false);

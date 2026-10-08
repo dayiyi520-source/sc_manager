@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import type { EmployeeOption, OKRItem } from '../../../types';
 import type { OkrKr, OkrPayload, OkrPerson } from '../../../services/okrRepository';
 import { periodStatusLabel } from './cycleOptions';
+import { isSubmissionDeadline, isSubmissionWeight } from './submissionValidation';
 
 interface Props {
   cycle: string;
@@ -59,9 +60,10 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     };
   };
   const submit = async (fromBatch = false): Promise<boolean> => {
-    if ((!fromBatch && busy) || unavailable) return false;
-    if (!title.trim() || krs.some(kr => !kr.title.trim())) { setError('请填写目标名称和每条 A 动作。'); return false; }
-    if (krs.some(kr => kr.weight <= 0) || krWeightTotal !== 100) { setError('A 权重须大于 0，合计为 100%。'); return false; }
+    if ((!fromBatch && busy) || unavailable || readOnly) return false;
+    if (!title.trim() || krs.length === 0 || krs.some(kr => !kr.title.trim())) { setError('请填写目标名称和每条 A 动作。'); return false; }
+    if (krs.some(kr => !isSubmissionDeadline(kr.deadline))) { setError('请设置每条 A 动作的有效截止日期。'); return false; }
+    if (krs.some(kr => !isSubmissionWeight(kr.weight)) || krWeightTotal !== 100) { setError('A 权重须为 1-100 的整数，合计为 100%。'); return false; }
     setError('');
     return onSave(payload());
   };

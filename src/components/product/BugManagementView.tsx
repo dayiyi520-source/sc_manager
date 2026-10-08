@@ -33,9 +33,19 @@ import { teamRepository } from '../../services/teamRepository';
 import { employeeSelectOptions } from '../common/PersonIdentity';
 import { productRepository, type WorkItemFieldConfiguration } from '../../services/productRepository';
 import { useWorkItemFieldConfig } from './useWorkItemFieldConfig';
+import { openTaskCompletionDialog } from './TaskCompletionDialog';
 
 export const BugManagementView: React.FC = () => {
   const { bugs, addBug, updateBug, productLines, versions, currentUser, addToast, requirementTasks } = useApp();
+  const { setBugs } = useApp();
+  const changeStatus = (bug: BugItem, status: string) => {
+    if (status !== '已完成') { updateBug(bug.id, { status }); return; }
+    openTaskCompletionDialog(async (actualHours) => {
+      await productRepository.updateTask('bug', bug.id, { status, actualHours });
+      setBugs((items) => items.map((item) => item.id === bug.id ? { ...item, status, actualHours } : item));
+      setSelectedBug((current) => current?.id === bug.id ? { ...current, status, actualHours } : current);
+    });
+  };
   const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
   const employeeDirectory = employeesQuery.data || [];
   const employees = Array.from(new Set(employeeDirectory.map((employee) => employee.name).filter(Boolean)));
@@ -380,7 +390,7 @@ export const BugManagementView: React.FC = () => {
                     <InlineEditableSelect value={bug.assignee || ''} options={employees} onChange={(assignee) => updateBug(bug.id, { assignee, ownerName: assignee })} />
                   </td>}
                   {listFields.visible('status') && <td className="py-3.5 px-4">
-                    <InlineEditableSelect value={bug.status} options={bugStatuses} tone="status" onChange={(status) => updateBug(bug.id, { status })} />
+                    <InlineEditableSelect value={bug.status} options={bugStatuses} tone="status" onChange={(status) => changeStatus(bug, status)} />
                   </td>}
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -534,7 +544,7 @@ export const BugManagementView: React.FC = () => {
             />
           </div>}
           {createFields.visible('env') && <label className="block text-[var(--text-muted)]">所属环境<input value={formEnv} onChange={(e) => setFormEnv(e.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" /></label>}
-          <div className="border-t border-[var(--border-main)] pt-4"><label className="block text-[var(--text-muted)]">关联协助事项（线上问题）</label><input value={workOrderQuery} onChange={(e) => setWorkOrderQuery(e.target.value)} placeholder="搜索线上问题事项" className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" />{workOrderQuery.trim() && <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">{filteredWorkOrders.filter((item) => !selectedWorkOrderIds.includes(item.id)).map((item) => <button type="button" key={item.id} onClick={() => { setSelectedWorkOrderIds((ids) => [...ids, item.id]); setWorkOrderQuery(''); }} className="block w-full rounded p-2 text-left text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)]">{item.title}</button>)}</div>}<div className="mt-2 flex flex-wrap gap-1">{selectedWorkOrderIds.map((id) => { const item = availableWorkOrders.find((candidate) => candidate.id === id); return <span key={id} className="inline-flex items-center gap-1 rounded bg-[var(--bg-surface-soft)] px-2 py-1 text-[11px]">{item?.title || id}<button type="button" aria-label={`移除关联事项${item?.title || id}`} onClick={() => setSelectedWorkOrderIds((ids) => ids.filter((value) => value !== id))}>×</button></span>; })}</div></div>
+          <div className="border-t border-[var(--border-main)] pt-4"><label className="block text-[var(--text-muted)]">关联协同事项（线上问题）</label><input value={workOrderQuery} onChange={(e) => setWorkOrderQuery(e.target.value)} placeholder="搜索线上问题事项" className="mt-1 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2.5 text-[var(--text-primary)]" />{workOrderQuery.trim() && <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">{filteredWorkOrders.filter((item) => !selectedWorkOrderIds.includes(item.id)).map((item) => <button type="button" key={item.id} onClick={() => { setSelectedWorkOrderIds((ids) => [...ids, item.id]); setWorkOrderQuery(''); }} className="block w-full rounded p-2 text-left text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)]">{item.title}</button>)}</div>}<div className="mt-2 flex flex-wrap gap-1">{selectedWorkOrderIds.map((id) => { const item = availableWorkOrders.find((candidate) => candidate.id === id); return <span key={id} className="inline-flex items-center gap-1 rounded bg-[var(--bg-surface-soft)] px-2 py-1 text-[11px]">{item?.title || id}<button type="button" aria-label={`移除关联事项${item?.title || id}`} onClick={() => setSelectedWorkOrderIds((ids) => ids.filter((value) => value !== id))}>×</button></span>; })}</div></div>
         </div>}
       >
         <form onSubmit={handleSaveBug} className="w-full space-y-5 text-xs" data-work-item-form>
@@ -561,7 +571,7 @@ export const BugManagementView: React.FC = () => {
               <RichTextEditor editor={descriptionEditor} value={formDescription || formSteps} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormSteps(text); setFormDescriptionHtml(html); }} placeholder="请详细描述复现步骤、实际结果和期望结果..." />
             </div>}
             <WorkItemRelationTabs items={[
-              ...((createFields.visible('relations') || createFields.visible('requirement')) ? [{ key: 'relations', label: '关联对象', count: 0, description: '创建后可继续关联产品任务和协助事项。', content: <div><label className="mb-2 block text-xs font-medium text-[var(--text-primary)]">关联需求任务</label><Cascader showSearch allowClear value={selectedRequirementId ? [selectedRequirementId] : undefined} onChange={(value) => { const title = value?.[0]; setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || ''); }} options={requirementTasks.map((task) => task.title).map((opt: string) => ({ label: opt, value: opt }))} placeholder="请选择关联需求任务" className="w-full" /></div> }] : []),
+              ...((createFields.visible('relations') || createFields.visible('requirement')) ? [{ key: 'relations', label: '关联对象', count: 0, description: '创建后可继续关联产品任务和协同事项。', content: <div><label className="mb-2 block text-xs font-medium text-[var(--text-primary)]">关联需求任务</label><Cascader showSearch allowClear value={selectedRequirementId ? [selectedRequirementId] : undefined} onChange={(value) => { const title = value?.[0]; setSelectedRequirementId(requirementTasks.find((task) => task.title === title)?.id || ''); }} options={requirementTasks.map((task) => task.title).map((opt: string) => ({ label: opt, value: opt }))} placeholder="请选择关联需求任务" className="w-full" /></div> }] : []),
               ...(createFields.visible('children') ? [{ key: 'children', label: '子任务', count: 0, description: '创建后可在详情页新增或关联子任务。' }] : []),
               ...(createFields.visible('support') ? [{ key: 'support', label: '支撑项', count: 0, description: '创建后可在详情页关联测试计划等支撑事项。' }] : []),
               ...(createFields.visible('hours') ? [{ key: 'hours', label: '工时', count: 0, description: '创建后可在详情页登记工时并查看统计。' }] : []),

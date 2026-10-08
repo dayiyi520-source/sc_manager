@@ -269,7 +269,7 @@ export const ProductLinesView: React.FC = () => {
       title: '待办统计',
       key: 'pending',
       children: [
-        { title: '协助事项', key: 'assistance', width: 88, align: 'center' as const, render: (_: unknown, pl: ProductLine) => <span className="text-[var(--text-primary)]">{getLineStats(pl).assistance}</span> },
+        { title: '协同事项', key: 'assistance', width: 88, align: 'center' as const, render: (_: unknown, pl: ProductLine) => <span className="text-[var(--text-primary)]">{getLineStats(pl).assistance}</span> },
         { title: '产品任务', key: 'productTasks', width: 88, align: 'center' as const, render: (_: unknown, pl: ProductLine) => <span className="text-[var(--text-primary)]">{getLineStats(pl).pendingReqs}</span> },
         { title: '设计任务', key: 'designTasks', width: 88, align: 'center' as const, render: (_: unknown, pl: ProductLine) => <span className="text-[var(--text-primary)]">{getLineStats(pl).designTasks}</span> },
         { title: '研发任务', key: 'devTasks', width: 88, align: 'center' as const, render: (_: unknown, pl: ProductLine) => <span className="text-[var(--text-primary)]">{getLineStats(pl).activeTasks}</span> },
@@ -315,7 +315,7 @@ export const ProductLinesView: React.FC = () => {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3"><div className="text-[11px] text-[var(--text-muted)]">产品</div><div className="mt-1 font-mono text-xl font-bold text-[var(--primary)]">{allStats.products}</div></div>
         {[
-          ['协助事项', allStats.assistance, 'prod_req_tasks', 'text-[var(--text-primary)]'],
+          ['协同事项', allStats.assistance, 'prod_req_tasks', 'text-[var(--text-primary)]'],
           ['产品任务', allStats.productTasks, 'prod_req_tasks', 'text-[var(--text-primary)]'],
           ['设计任务', allStats.designTasks, 'prod_design_tasks', 'text-[var(--text-primary)]'],
           ['研发任务', allStats.devTasks, 'prod_dev_tasks', 'text-[var(--text-primary)]'],
@@ -413,7 +413,7 @@ export const ProductLinesView: React.FC = () => {
                   >
                     <div className="flex items-center justify-center gap-1 text-[var(--text-primary)] text-[10px] font-medium mb-0.5">
                       <WorkItemCategoryIcon category="assistance" className="w-3 h-3 text-purple-400" />
-                      <span>协助事项</span>
+                      <span>协同事项</span>
                     </div>
                     <span className="product-line-pending-req text-sm font-bold font-mono text-[var(--text-primary)]">
                       {stats.assistance}

@@ -38,7 +38,7 @@ export const DefectCreatePanel: React.FC<DefectCreatePanelProps> = ({ open, prod
 
   useEffect(() => {
     if (!open) return;
-    form.setFieldsValue({ title: initialTitle, severity: '严重缺陷', priority: '高', type: '功能缺陷', assignee: employeeNames[0] || '', env: '测试环境' });
+    form.setFieldsValue({ title: initialTitle, severity: '严重缺陷', priority: '中', type: '功能缺陷', assignee: employeeNames[0] || '', env: '测试环境' });
     setDescription(initialDescription);
     setDescriptionHtml('');
   }, [employeeNames, form, initialDescription, initialTitle, open]);

@@ -88,8 +88,9 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     icon: 'LayoutDashboard',
     subMenus: [
       { id: 'wb_my_tasks', title: '我的任务', mainMenuId: 'workbench', icon: 'CheckSquare', badge: 4, badgeType: 'danger' },
-      { id: 'wb_okr_perf', title: '目标与总结', mainMenuId: 'workbench', icon: 'Target' },
-      { id: 'wb_work_order', title: '协助事项', mainMenuId: 'workbench', icon: 'Database' }
+      { id: 'wb_okr_perf', title: '月度目标', mainMenuId: 'workbench', icon: 'Target' },
+      { id: 'wb_reviews', title: '复盘总结', mainMenuId: 'workbench', icon: 'FileText' },
+      { id: 'wb_work_order', title: '协同事项', mainMenuId: 'workbench', icon: 'Database' }
     ]
   },
   {
@@ -105,6 +106,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'prod_test_tasks', title: '测试任务', mainMenuId: 'product', icon: 'Beaker' },
       { id: 'prod_test_management', title: '测试管理', mainMenuId: 'product', icon: 'FolderKanban' },
       { id: 'prod_bugs', title: '缺陷管理', mainMenuId: 'product', icon: 'Bug', badge: 3, badgeType: 'danger' },
+      { id: 'proj_ops_tasks', title: '运维任务', mainMenuId: 'product', icon: 'Settings' },
       { id: 'prod_version_reviews', title: '版本评审', mainMenuId: 'product', icon: 'FileCheck' }
     ]
   },
@@ -763,7 +765,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       uncompletedReason: perf.uncompletedReason || '无',
       selfScore: perf.selfScore || 90,
       suggestions: perf.suggestions || '无特别意见',
-      helpNeeded: perf.helpNeeded || '暂无需协助事项',
+      helpNeeded: perf.helpNeeded || '暂无需协同事项',
       sendTo: perf.sendTo || ['总经办', '直接主管'],
       createdAt: '刚刚',
       status: 'submitted',

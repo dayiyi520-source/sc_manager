@@ -26,9 +26,19 @@ import { useQuery } from '@tanstack/react-query';
 import { teamRepository } from '../../services/teamRepository';
 import { productRepository, type WorkItemFieldConfiguration } from '../../services/productRepository';
 import { useWorkItemFieldConfig } from './useWorkItemFieldConfig';
+import { openTaskCompletionDialog } from './TaskCompletionDialog';
 
 export const DevTasksView: React.FC = () => {
   const { devTasks, requirementTasks, addDevTask, updateDevTask, addToast, currentUser } = useApp();
+  const { setDevTasks } = useApp();
+  const changeStatus = (task: DevTask, status: string) => {
+    if (status !== '已完成') { updateDevTask(task.id, { status }); return; }
+    openTaskCompletionDialog(async (actualHours) => {
+      await productRepository.updateTask('dev', task.id, { status, actualHours, spentHours: actualHours });
+      setDevTasks((items) => items.map((item) => item.id === task.id ? { ...item, status, spentHours: actualHours } : item));
+      setSelectedTask((current) => current?.id === task.id ? { ...current, status, spentHours: actualHours } : current);
+    });
+  };
   const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
   const employees = Array.from(new Set((employeesQuery.data || []).map((employee) => employee.name).filter(Boolean)));
   const createFields = useWorkItemFieldConfig('dev', 'CREATE');
@@ -56,7 +66,7 @@ export const DevTasksView: React.FC = () => {
   const [formRepo, setFormRepo] = useState('');
   const [formBranch, setFormBranch] = useState('');
   const [formDeveloper, setFormDeveloper] = useState('');
-  const [formPriority, setFormPriority] = useState<DevTask['priority']>('');
+  const [formPriority, setFormPriority] = useState<DevTask['priority']>('中');
   const [formHours, setFormHours] = useState<number | ''>('');
   const descriptionEditor = useRef<HTMLDivElement>(null);
   const [formDescription, setFormDescription] = useState('');
@@ -88,7 +98,7 @@ export const DevTasksView: React.FC = () => {
     setFormRepo('');
     setFormBranch('');
     setFormDeveloper('');
-    setFormPriority('');
+    setFormPriority('中');
     setFormHours('');
     setFormDescription('');
     setFormDescriptionHtml('');
@@ -132,7 +142,7 @@ export const DevTasksView: React.FC = () => {
       priority: formPriority,
       status: '进行中',
       commitsCount: 3,
-      spentHours: 4,
+      spentHours: 0,
       estimatedHours: Number(formHours)
       ,requirementId: formRequirementId
     });
@@ -260,7 +270,7 @@ export const DevTasksView: React.FC = () => {
                   {task.spentHours}h / {task.estimatedHours}h
                 </td>}
                 {listFields.visible('status') && <td className="py-3.5 px-4">
-                  <InlineEditableSelect value={task.status} options={taskStatuses} tone="status" onChange={(status) => updateDevTask(task.id, { status })} />
+                  <InlineEditableSelect value={task.status} options={taskStatuses} tone="status" onChange={(status) => changeStatus(task, status)} />
                 </td>}
                 <td className="py-3.5 px-4 text-right">
                   <div className="flex items-center justify-end gap-2">
@@ -305,7 +315,7 @@ export const DevTasksView: React.FC = () => {
           properties={<div className="flex flex-col space-y-6 text-xs">
             <section className="space-y-3">
               <h3 className="font-semibold text-[var(--text-primary)]">基础字段</h3>
-              {detailVisible('status') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'status')?.sort ?? 999 }} label="当前状态"><Select className="w-full" disabled={!detailEditable('status')} value={selectedTask.status} options={taskStatuses.map((value) => ({ label: value, value }))} onChange={(status) => void saveDetailUpdates({ status })} /></DetailField>}
+              {detailVisible('status') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'status')?.sort ?? 999 }} label="当前状态"><Select className="w-full" disabled={!detailEditable('status')} value={selectedTask.status} options={taskStatuses.map((value) => ({ label: value, value }))} onChange={(status) => changeStatus(selectedTask, status)} /></DetailField>}
               {detailVisible('repo') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'repo')?.sort ?? 999 }} label="代码仓库"><Select className="w-full" disabled={!detailEditable('repo')} value={selectedTask.repo || undefined} options={['shichuang-hub-backend', 'shichuang-crm-frontend', 'shichuang-gateway-core'].map((value) => ({ label: value, value }))} onChange={(repo) => void saveDetailUpdates({ repo })} placeholder="未设置" /></DetailField>}
               {detailVisible('branch') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'branch')?.sort ?? 999 }} label="特性分支"><input disabled={!detailEditable('branch')} value={selectedTask.branch || ''} onChange={(event) => setSelectedTask((current) => current ? { ...current, branch: event.target.value } : current)} onBlur={() => void saveDetailUpdates({ branch: selectedTask.branch || '' })} className="app-control w-full font-mono" placeholder="未设置" /></DetailField>}
               {detailVisible('assignee') && <DetailField style={{ order: detailFields.find((field) => field.fieldCode === 'assignee')?.sort ?? 999 }} label="责任开发者"><Select className="w-full" disabled={!detailEditable('assignee')} showSearch value={selectedTask.developer || undefined} options={employees.map((value) => ({ label: value, value }))} onChange={(developer) => void saveDetailUpdates({ developer })} placeholder="未设置" /></DetailField>}
@@ -418,7 +428,7 @@ export const DevTasksView: React.FC = () => {
           {createFields.visible('expectedGoal') && <div className="col-span-2"><label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">期望结果 {createFields.required('expectedGoal') && '*'}</label><textarea required={createFields.required('expectedGoal')} value={formTarget} onChange={(event) => setFormTarget(event.target.value)} rows={3} placeholder="请填写任务完成后的预期结果" className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" /></div>}
           {createFields.visible('description') && <div className="col-span-2"><label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">任务描述</label><RichTextEditor editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} /></div>}
           <WorkItemRelationTabs items={[
-            ...((createFields.visible('relations') || createFields.visible('requirement')) ? [{ key: 'relations', label: '关联对象', count: 0, description: '创建后可继续关联产品任务和协助事项。', content: <div><label className="mb-2 block text-xs font-medium text-[var(--text-primary)]">关联需求任务</label><Cascader showSearch allowClear value={formRequirementId ? [formRequirementId] : undefined} onChange={(value: any) => (title) => setFormRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')(value?.[0] || '')} options={requirementTasks.map((task) => task.title).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)} placeholder="请选择关联需求任务" className="w-full" /></div> }] : []),
+            ...((createFields.visible('relations') || createFields.visible('requirement')) ? [{ key: 'relations', label: '关联对象', count: 0, description: '创建后可继续关联产品任务和协同事项。', content: <div><label className="mb-2 block text-xs font-medium text-[var(--text-primary)]">关联需求任务</label><Cascader showSearch allowClear value={formRequirementId ? [formRequirementId] : undefined} onChange={(value: any) => (title) => setFormRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')(value?.[0] || '')} options={requirementTasks.map((task) => task.title).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)} placeholder="请选择关联需求任务" className="w-full" /></div> }] : []),
             ...(createFields.visible('children') ? [{ key: 'children', label: '子任务', count: 0, description: '创建后可在详情页新增或关联子任务。' }] : []),
             ...(createFields.visible('support') ? [{ key: 'support', label: '支撑项', count: 0, description: '创建后可在详情页关联测试计划等支撑事项。' }] : []),
             ...(createFields.visible('hours') ? [{ key: 'hours', label: '工时', count: 0, description: '创建后可在详情页登记工时并查看统计。' }] : []),

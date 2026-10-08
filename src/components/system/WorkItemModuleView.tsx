@@ -4,8 +4,8 @@ import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@
 import { ProductLineWorkItemCategory } from '../../types';
 import { productRepository, WorkItemCategoryKey, WorkItemTemplateType, type WorkItemCategoryDefinition } from '../../services/productRepository';
 import { CATEGORY_KEYS, buildWorkflowDefinition, createDefaultWorkItemStates, EditableWorkflowState, validateWorkflowStates, WorkItemStateEditor } from '../product/WorkItemStateConfigDrawer';
+import { categoryValue, enabledCategoryOptions } from '../../utils/workItemCategories';
 
-const CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '测试', '缺陷', '用例'];
 const CATEGORY_CODE: Record<ProductLineWorkItemCategory, WorkItemCategoryKey> = { 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' };
 const categoryKey = (category: ProductLineWorkItemCategory) => CATEGORY_KEYS[category] || CATEGORY_CODE[category as keyof typeof CATEGORY_CODE] || category;
 const normalizeStates = (item: WorkItemTemplateType | null): EditableWorkflowState[] => {
@@ -31,13 +31,13 @@ export const WorkItemModuleView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const categoryOptions = useMemo(() => { const builtIns = CATEGORIES.map((value) => ({ value, label: categories.find((item) => item.code === CATEGORY_CODE[value])?.displayName || value, enabled: categories.find((item) => item.code === CATEGORY_CODE[value])?.enabled !== false })); const custom = categories.filter((item) => !Object.values(CATEGORY_CODE).includes(item.code)).map((item) => ({ value: item.code as ProductLineWorkItemCategory, label: item.displayName, enabled: item.enabled })); return [...builtIns, ...custom]; }, [categories]);
+  const categoryOptions = useMemo(() => categories.slice().sort((a, b) => a.sort - b.sort).map((item) => ({ value: categoryValue(item.code), label: item.displayName, enabled: item.enabled })), [categories]);
   const selectedDefinition = categories.find((item) => item.code === category || item.name === category || item.displayName === category);
   const categoryCode = selectedDefinition?.code || CATEGORY_CODE[category as keyof typeof CATEGORY_CODE] || category;
   const visible = useMemo(() => items.filter((item) => item.category === category || item.category === selectedDefinition?.name || item.category === selectedDefinition?.displayName || item.category === categoryCode), [items, category, selectedDefinition, categoryCode]);
   const load = async () => {
     setLoading(true);
-    try { const [nextItems, nextCategories] = await Promise.all([productRepository.workItemTemplate(), productRepository.workItemCategories()]); setItems(nextItems); setCategories(nextCategories); if (!categoryOptions.some((item) => item.value === category && item.enabled)) setCategory((nextCategories.find((item) => item.enabled)?.code || 'requirement') as ProductLineWorkItemCategory); setLoadError(false); }
+    try { const [nextItems, nextCategories] = await Promise.all([productRepository.workItemTemplate(), productRepository.workItemCategories()]); setItems(nextItems); setCategories(nextCategories); const options = enabledCategoryOptions(nextCategories); if (!options.some((item) => item.value === category)) setCategory(options[0]?.value || '需求'); setLoadError(false); }
     catch (error) { setLoadError(true); message.error(error instanceof Error ? error.message : '工作项模板读取失败'); }
     finally { setLoading(false); }
   };

@@ -75,11 +75,12 @@ export const WorkItemCreatePanel: React.FC<{
   footer?: React.ReactNode;
   secondaryAction?: React.ReactNode;
   detailHeader?: React.ReactNode;
+  headerActions?: React.ReactNode;
   showContinueOption?: boolean;
   continueChecked?: boolean;
   onContinueCheckedChange?: (checked: boolean) => void;
   presentation?: 'workspace' | 'drawer';
-}> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, detailHeader, showContinueOption = true, continueChecked, onContinueCheckedChange, presentation = 'workspace' }) => {
+}> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, detailHeader, headerActions, showContinueOption = true, continueChecked, onContinueCheckedChange, presentation = 'workspace' }) => {
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
@@ -88,7 +89,7 @@ export const WorkItemCreatePanel: React.FC<{
   }, [isOpen, onClose]);
   if (!isOpen) return null;
   if (presentation === 'drawer') {
-    return <Drawer open onClose={onClose} title={title} size="min(1200px, 88vw)" destroyOnHidden footer={footer ? <div className="flex items-center gap-3">{secondaryAction}<span className="flex-1" />{footer}</div> : undefined}>
+    return <Drawer open onClose={onClose} closable={{ placement: 'end' }} title={title} extra={headerActions} size="min(1200px, 88vw)" destroyOnHidden footer={footer ? <div className="flex items-center gap-3">{secondaryAction}<span className="flex-1" />{footer}</div> : undefined}>
       <div className={properties ? 'work-item-panel-grid grid min-h-full lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]' : 'min-h-full'}><main className="min-w-0 px-2 py-2">{detailHeader}{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-6" aria-label="字段设置">{properties}</aside>}</div>
     </Drawer>;
   }

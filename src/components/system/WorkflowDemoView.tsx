@@ -18,23 +18,23 @@ interface DemoStep {
 
 const SCENARIOS: Record<ScenarioId, { label: string; steps: DemoStep[] }> = {
   assistance: {
-    label: '协助事项转产研任务并闭环',
+    label: '协同事项转产研任务并闭环',
     steps: [
-      { title: '发起协助事项', detail: '事项进入待处理，同时负责人可在工作台看到协助事项待办。', active: ['a-pending', 'm-assist'], complete: [] },
-      { title: '创建并指派下游任务', detail: '协助事项可创建产品、设计、研发或缺陷任务；任务指派给本人时，我的任务会新增一条产研任务待办。', active: ['a-processing', 'w-pending', 'm-task', 'm-assist'], complete: ['a-pending'] },
-      { title: '负责人处理任务', detail: '下游任务从待处理进入处理中，任务和协助事项继续显示在对应负责人的待办中。', active: ['a-processing', 'w-processing', 'm-task', 'm-assist'], complete: ['a-pending', 'w-pending'] },
-      { title: '下游任务全部完成', detail: '任务进入已完成并移出任务待办；所有阻断任务完成后，协助事项进入待验收。', active: ['a-review', 'w-completed', 'm-assist'], complete: ['a-pending', 'a-processing', 'w-pending', 'w-processing', 'm-task'] },
-      { title: '发起人验收通过', detail: '全部下游任务验收通过后，协助事项进入待关闭。', active: ['a-close', 'w-completed', 'm-assist'], complete: ['a-pending', 'a-processing', 'a-review', 'w-pending', 'w-processing', 'm-task'] },
-      { title: '发起人关闭事项', detail: '协助事项进入已关闭，协助事项待办也从工作台移出。', active: ['a-closed', 'w-completed', 'm-done'], complete: ['a-pending', 'a-processing', 'a-review', 'a-close', 'w-pending', 'w-processing', 'm-task', 'm-assist'] }
+      { title: '发起协同事项', detail: '事项进入待处理，同时负责人可在工作台看到协同事项待办。', active: ['a-pending', 'm-assist'], complete: [] },
+      { title: '创建并指派下游任务', detail: '协同事项可创建产品、设计、研发或缺陷任务；任务指派给本人时，我的任务会新增一条产研任务待办。', active: ['a-processing', 'w-pending', 'm-task', 'm-assist'], complete: ['a-pending'] },
+      { title: '负责人处理任务', detail: '下游任务从待处理进入处理中，任务和协同事项继续显示在对应负责人的待办中。', active: ['a-processing', 'w-processing', 'm-task', 'm-assist'], complete: ['a-pending', 'w-pending'] },
+      { title: '下游任务全部完成', detail: '任务进入已完成并移出任务待办；所有阻断任务完成后，协同事项进入待验收。', active: ['a-review', 'w-completed', 'm-assist'], complete: ['a-pending', 'a-processing', 'w-pending', 'w-processing', 'm-task'] },
+      { title: '发起人验收通过', detail: '全部下游任务验收通过后，协同事项进入待关闭。', active: ['a-close', 'w-completed', 'm-assist'], complete: ['a-pending', 'a-processing', 'a-review', 'w-pending', 'w-processing', 'm-task'] },
+      { title: '发起人关闭事项', detail: '协同事项进入已关闭，协同事项待办也从工作台移出。', active: ['a-closed', 'w-completed', 'm-done'], complete: ['a-pending', 'a-processing', 'a-review', 'a-close', 'w-pending', 'w-processing', 'm-task', 'm-assist'] }
     ]
   },
   reject: {
-    label: '协助事项验收未通过',
+    label: '协同事项验收未通过',
     steps: [
-      { title: '等待发起人验收', detail: '下游任务已经完成，协助事项处于待验收。', active: ['a-review', 'w-completed', 'm-assist'], complete: ['a-pending', 'a-processing', 'w-pending', 'w-processing', 'm-task'] },
-      { title: '验收未通过', detail: '发起人填写未通过原因，协助事项退回处理中，下游任务重新交回负责人。', active: ['a-processing', 'w-processing', 'm-task', 'm-assist'], complete: ['a-pending', 'w-pending'] },
+      { title: '等待发起人验收', detail: '下游任务已经完成，协同事项处于待验收。', active: ['a-review', 'w-completed', 'm-assist'], complete: ['a-pending', 'a-processing', 'w-pending', 'w-processing', 'm-task'] },
+      { title: '验收未通过', detail: '发起人填写未通过原因，协同事项退回处理中，下游任务重新交回负责人。', active: ['a-processing', 'w-processing', 'm-task', 'm-assist'], complete: ['a-pending', 'w-pending'] },
       { title: '负责人重新处理', detail: '任务保持在个人待办中，负责人修正处理结果。', active: ['a-processing', 'w-processing', 'm-task', 'm-assist'], complete: ['a-pending', 'w-pending'] },
-      { title: '再次提交验收', detail: '任务再次完成后移出任务待办，协助事项重新进入待验收。', active: ['a-review', 'w-completed', 'm-assist'], complete: ['a-pending', 'a-processing', 'w-pending', 'w-processing', 'm-task'] }
+      { title: '再次提交验收', detail: '任务再次完成后移出任务待办，协同事项重新进入待验收。', active: ['a-review', 'w-completed', 'm-assist'], complete: ['a-pending', 'a-processing', 'w-pending', 'w-processing', 'm-task'] }
     ]
   },
   direct: {
@@ -105,8 +105,8 @@ export const WorkflowDemoView: React.FC = () => {
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-main)] pb-3">
         <div>
           <div className="text-[11px] text-[var(--primary)]">系统与组织 / 工作流演示</div>
-          <h1 className="mt-1 text-lg font-bold text-[var(--text-primary)]">产研任务、协助事项与我的任务如何流转</h1>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">“我的任务”是个人待办聚合入口，状态始终以产研任务或协助事项的源数据为准。</p>
+          <h1 className="mt-1 text-lg font-bold text-[var(--text-primary)]">产研任务、协同事项与我的任务如何流转</h1>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">“我的任务”是个人待办聚合入口，状态始终以产研任务或协同事项的源数据为准。</p>
         </div>
         <Tag color="success" icon={<CheckCircleOutlined />}>业务关系演示</Tag>
       </header>
@@ -133,7 +133,7 @@ export const WorkflowDemoView: React.FC = () => {
 
       <div className="space-y-2">
         <Card className={`border-[var(--border-main)] bg-[var(--bg-surface)] transition-opacity ${scenario === 'direct' ? 'opacity-45' : ''}`} styles={{ body: { padding: 16 } }}>
-          <div className="mb-3 flex flex-wrap items-baseline gap-2"><strong className="text-sm font-semibold text-[var(--text-primary)]">协助事项</strong><span className="text-[11px] text-[var(--text-muted)]">跨部门问题与诉求入口</span></div>
+          <div className="mb-3 flex flex-wrap items-baseline gap-2"><strong className="text-sm font-semibold text-[var(--text-primary)]">协同事项</strong><span className="text-[11px] text-[var(--text-muted)]">跨部门问题与诉求入口</span></div>
           <FlowStates states={ASSISTANCE_STATES} active={current.active} complete={current.complete} />
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-muted)]">
             <span>可创建下游：</span><Tag>产品需求</Tag><Tag>设计任务</Tag><Tag>研发任务</Tag><Tag>缺陷管理</Tag>
@@ -141,7 +141,7 @@ export const WorkflowDemoView: React.FC = () => {
           </div>
         </Card>
 
-        <div className="flex h-8 items-center justify-center gap-3 text-[10px] text-[var(--text-muted)]"><span>创建并关联下游任务</span><ArrowDownOutlined className="text-[var(--primary)]" /><span>任务完成结果回写协助事项</span></div>
+        <div className="flex h-8 items-center justify-center gap-3 text-[10px] text-[var(--text-muted)]"><span>创建并关联下游任务</span><ArrowDownOutlined className="text-[var(--primary)]" /><span>任务完成结果回写协同事项</span></div>
 
         <Card className="border-[var(--border-main)] bg-[var(--bg-surface)]" styles={{ body: { padding: 16 } }}>
           <div className="mb-3 flex flex-wrap items-baseline gap-2"><strong className="text-sm font-semibold text-[var(--text-primary)]">产研管理各任务</strong><span className="text-[11px] text-[var(--text-muted)]">产品、设计、研发、测试、缺陷</span></div>
@@ -166,13 +166,13 @@ export const WorkflowDemoView: React.FC = () => {
           <div className="mb-3 flex flex-wrap items-baseline gap-2"><strong className="text-sm font-semibold text-[var(--text-primary)]">工作台 · 我的任务</strong><span className="text-[11px] text-[var(--text-muted)]">个人待办聚合，不产生第三套状态</span></div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <MyTaskCard id="m-task" label="任务" title="产研任务待办" detail="点击进入对应产品、设计、研发、测试或缺陷页面" active={current.active} complete={current.complete} />
-            <MyTaskCard id="m-assist" label="协助事项" title="协助事项待办" detail="点击进入协助事项，查看关联任务和验收进度" active={current.active} complete={current.complete} />
-            <MyTaskCard id="m-done" label="结束" title="移出我的待办" detail="源任务完成、取消，或协助事项关闭后不再展示" active={current.active} complete={current.complete} done />
+            <MyTaskCard id="m-assist" label="协同事项" title="协同事项待办" detail="点击进入协同事项，查看关联任务和验收进度" active={current.active} complete={current.complete} />
+            <MyTaskCard id="m-done" label="结束" title="移出我的待办" detail="源任务完成、取消，或协同事项关闭后不再展示" active={current.active} complete={current.complete} done />
           </div>
         </Card>
       </div>
 
-      <div className="flex flex-col gap-1 border-t border-[var(--border-main)] pt-3 text-[11px] text-[var(--text-muted)] md:flex-row md:gap-3"><strong className="shrink-0 font-medium text-[var(--warning)]">核心规则</strong><span>我的任务聚合当前负责人相关且未结束的记录；协助事项可拆成多条下游任务，下游任务指派给本人时会形成独立任务待办，全部阻断任务完成并验收后才可关闭协助事项。</span></div>
+      <div className="flex flex-col gap-1 border-t border-[var(--border-main)] pt-3 text-[11px] text-[var(--text-muted)] md:flex-row md:gap-3"><strong className="shrink-0 font-medium text-[var(--warning)]">核心规则</strong><span>我的任务聚合当前负责人相关且未结束的记录；协同事项可拆成多条下游任务，下游任务指派给本人时会形成独立任务待办，全部阻断任务完成并验收后才可关闭协同事项。</span></div>
     </div>
   );
 };

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Input, InputNumber, Select } from "antd";
+import { workOrderDisplayName } from '../../utils/workOrderDisplay';
+import { DetailCopyButton } from '../common/DetailCopyButton';
 import {
   Inbox,
   Search,
@@ -53,6 +55,7 @@ import { sanitizeHtml } from "../../utils/sanitizeHtml";
 import { getRejectReasonsForType } from "../../constants/rejectReasons";
 import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
 import { DateField } from "../common";
+import { copyToClipboard } from '../../utils/copyToClipboard';
 import { employeeSelectOptions } from "../common/PersonIdentity";
 
 const statuses: RequirementTask["status"][] = [
@@ -223,6 +226,7 @@ const WorkOrderInput: React.FC<{ label: string; value: string; placeholder: stri
 
 
 export const RequirementPoolView: React.FC = () => {
+  const [detailSearch] = useState(() => window.location.search);
   const {
     requirementTasks,
     addRequirementTask,
@@ -286,7 +290,7 @@ export const RequirementPoolView: React.FC = () => {
   const [acceptanceSubmitting, setAcceptanceSubmitting] = useState(false);
   const [rejectCategory, setRejectCategory] = useState("");
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
-  const [reopenProgress, setReopenProgress] = useState(0);
+  const [reopenAssigneeId, setReopenAssigneeId] = useState('');
   const [reopenReason, setReopenReason] = useState("");
   const [reopenSubmitting, setReopenSubmitting] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
@@ -466,6 +470,47 @@ export const RequirementPoolView: React.FC = () => {
     } catch {
       setEvents(Array.isArray(item.events) ? item.events : []);
       setWorkItems([]);
+    }
+  };
+  useEffect(() => {
+    const detailId = new URLSearchParams(detailSearch).get('detailId') || '';
+    if (!detailId) return;
+    setTab('list');
+    let active = true;
+    requirementRepository.detail(detailId).then((detail) => {
+      if (!active) return;
+      setSelected(normalizeRequirementTask(detail));
+      setEvents(Array.isArray(detail.events) ? detail.events : []);
+      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+    }).catch((error) => { if (active) addToast('error', '事项详情加载失败', error instanceof Error ? error.message : '事项不存在或无权访问'); });
+    return () => { active = false; };
+  }, [detailSearch]);
+  const closeDetail = () => {
+    setSelected(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('detailId');
+    window.history.replaceState(null, '', url);
+  };
+  const copyDetailLink = async () => {
+    if (!selected) return;
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set('detailId', selected.id);
+    url.pathname = url.pathname.replace(/\/app\/[^/]+$/, '/app/wb_work_order');
+    try {
+      await copyToClipboard(url.toString());
+      addToast('success', '详情链接已复制');
+    } catch (error) {
+      addToast('error', '复制失败', error instanceof Error ? error.message : '请检查浏览器剪贴板权限');
+    }
+  };
+  const copyDetailId = async () => {
+    if (!selected) return;
+    try {
+      await copyToClipboard(selected.code || selected.id);
+      addToast('success', '事项编号已复制');
+    } catch (error) {
+      addToast('error', '复制失败', error instanceof Error ? error.message : '请检查浏览器剪贴板权限');
     }
   };
   const handleWorkflowSubmit = async (event: React.FormEvent) => {
@@ -662,27 +707,23 @@ export const RequirementPoolView: React.FC = () => {
   const submitReopen = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selected) return;
+    if (!reopenAssigneeId || !reopenReason.trim()) { addToast('warning', '请选择处理人并填写重开原因'); return; }
     setReopenSubmitting(true);
     try {
       const result = await requirementRepository.reopen(selected.id, {
-        progress: Math.max(0, Math.min(100, Number(reopenProgress))),
+        assigneeId: reopenAssigneeId,
         reason: reopenReason.trim(),
         revision: selected.revision ?? selected.version ?? 0,
       });
-      const detail = await requirementRepository.detail(selected.id);
-      const next = { ...selected, ...detail, status: result.status as RequirementTask["status"], progress: result.progress, revision: result.revision };
+      const detail = result;
+      const next = { ...selected, ...detail };
       setSelected(next);
       setRequirementTasks((list) => list.map((item) => (item.id === next.id ? next : item)));
       setEvents(Array.isArray(detail.events) ? detail.events : []);
       setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
       setReopenModalOpen(false);
       setReopenReason("");
-      setWorkflowAction("reassign");
-      setReassignAssignee("");
-      setReassignReason(String(reopenReason).trim());
-      setFlowMedia([]);
-      setWorkOpen(true);
-      addToast("success", "事项已重新开启", "请立即选择新的负责人完成责任指派");
+      addToast("success", "事项已重新开启", "已提交所选处理人受理");
     } catch (error) {
       addToast("error", "事项重开失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally {
@@ -867,7 +908,7 @@ export const RequirementPoolView: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-150">
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
-        <div className="primary-line-tabs flex items-center gap-2" role="tablist" aria-label="协助事项视图">
+        <div className="primary-line-tabs flex items-center gap-2" role="tablist" aria-label="协同事项视图">
           <button
             role="tab"
             aria-selected={tab === "create"}
@@ -912,9 +953,9 @@ export const RequirementPoolView: React.FC = () => {
               </div>
               <div className="mt-3 grid w-full max-w-5xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {workOrderCards.map((card) => (
-                  <button key={card.type} type="button" onClick={() => openCreate(card.type)} className="group min-h-36 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)] hover:bg-[var(--bg-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30">
+                  <button key={workOrderDisplayName(card.type)} type="button" onClick={() => openCreate(card.type)} className="group min-h-36 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)] hover:bg-[var(--bg-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30">
                     <span className="mb-3 inline-flex transition">{cardIcon(card)}</span>
-                    <span className="block text-sm font-semibold text-[var(--text-primary)]">{card.type}</span>
+                    <span className="block text-sm font-semibold text-[var(--text-primary)]">{workOrderDisplayName(card.type)}</span>
                     <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{card.description}</span>
                   </button>
                 ))}
@@ -925,7 +966,7 @@ export const RequirementPoolView: React.FC = () => {
               <div className="sticky -top-4 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                    {workOrderType || "发起协助"}
+                    {workOrderDisplayName(workOrderType) || "发起协助"}
                   </h2>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     提交后将会自动通知到负责人
@@ -960,7 +1001,7 @@ export const RequirementPoolView: React.FC = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {typeStats.map((stat) => (
               <button key={stat.type} type="button" onClick={() => setTypeFilter(stat.type)} className="text-left">
-                <StatCard title={stat.type} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={cardIcon(workOrderCards.find((card) => card.type === stat.type)!)} />
+                <StatCard title={workOrderDisplayName(stat.type)} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={cardIcon(workOrderCards.find((card) => card.type === stat.type)!)} />
               </button>
             ))}
           </div>
@@ -971,7 +1012,7 @@ export const RequirementPoolView: React.FC = () => {
                 <button type="button" title="查看与我有关" aria-label="查看与我有关" onClick={() => { setFilterMode("mine"); setScope("all"); }} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "mine" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><UserRound className="h-4 w-4" /></button>
               </div>
               <div className="inline-flex max-w-full flex-wrap items-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">
-                {(filterMode === "type" ? [{ value: "all", label: "全部" }, ...workOrderCards.map((card) => ({ value: card.type, label: card.type }))] : [{ value: "all", label: "全部" }, { value: "mine_owned", label: "我负责的" }, { value: "mine_created", label: "我创建的" }]).map((item) => <button key={item.value} type="button" onClick={() => filterMode === "type" ? setTypeFilter(item.value as typeof typeFilter) : setScope(item.value as typeof scope)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${(filterMode === "type" ? typeFilter === item.value : scope === item.value) ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{item.label}</button>)}
+                {(filterMode === "type" ? [{ value: "all", label: "全部" }, ...workOrderCards.map((card) => ({ value: card.type, label: workOrderDisplayName(card.type) }))] : [{ value: "all", label: "全部" }, { value: "mine_owned", label: "我负责的" }, { value: "mine_created", label: "我创建的" }]).map((item) => <button key={item.value} type="button" onClick={() => filterMode === "type" ? setTypeFilter(item.value as typeof typeFilter) : setScope(item.value as typeof scope)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${(filterMode === "type" ? typeFilter === item.value : scope === item.value) ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{item.label}</button>)}
               </div>
             </div>
             <div className="work-order-list-filters flex flex-wrap items-center gap-3">
@@ -984,7 +1025,7 @@ export const RequirementPoolView: React.FC = () => {
                 className="w-64"
               />
             </div>
-            {filterMode === "mine" && <Select allowClear aria-label="类型" className={filterClass} placeholder="类型" value={typeFilter === "all" ? undefined : typeFilter} onChange={(value) => setTypeFilter(value ?? "all")} options={workOrderCards.map((card) => ({label:card.type,value:card.type}))} />}
+            {filterMode === "mine" && <Select allowClear aria-label="类型" className={filterClass} placeholder="类型" value={typeFilter === "all" ? undefined : typeFilter} onChange={(value) => setTypeFilter(value ?? "all")} options={workOrderCards.map((card) => ({label:workOrderDisplayName(card.type),value:card.type}))} />}
             <Select allowClear aria-label="状态" className={filterClass} placeholder="状态" value={status === "all" ? undefined : status} onChange={(value) => setStatus(value ?? "all")} options={statuses.map((item) => ({label:item,value:item}))} />
             <Select allowClear aria-label="优先级" className={filterClass} placeholder="优先级" value={priority === "all" ? undefined : priority} onChange={(value) => setPriority(value ?? "all")} options={[{label:"紧急",value:"紧急"},{label:"高",value:"高"},{label:"中",value:"中"},{label:"低",value:"低"}]} />
             <button
@@ -1028,7 +1069,7 @@ export const RequirementPoolView: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-[var(--text-body)]">
-                        <span>{item.workOrderType || "历史事项"}</span>
+                        <span>{workOrderDisplayName(item.workOrderType) || "历史事项"}</span>
                       </td>
                       <td className="px-4 py-3">
                         <StatusTag status={item.priority} />
@@ -1073,9 +1114,10 @@ export const RequirementPoolView: React.FC = () => {
       {selected && (
         <Drawer
           isOpen={!!selected}
-          onClose={() => setSelected(null)}
+          onClose={closeDetail}
           hideSubtitle
-          title="事项详情"
+          title={<span className="flex min-w-0 items-center gap-2"><span className="shrink-0">事项编号</span><span className="truncate font-mono">{selected.code || selected.id}</span><DetailCopyButton label="复制事项编号" onCopy={copyDetailId} /></span>}
+          headerActions={<DetailCopyButton label="复制详情链接" link onCopy={copyDetailLink} />}
           subtitle={`${selected.productLineName} · 负责人：${selected.ownerName || "未分配"}`}
           footer={
             <div className="flex w-full justify-between">
@@ -1109,7 +1151,7 @@ export const RequirementPoolView: React.FC = () => {
                 {["已关闭", "已完成"].includes(selected.status) && isInitiator(selected, currentUser) && (
                   <button
                     type="button"
-                    onClick={() => { setReopenProgress(0); setReopenReason(""); setReopenModalOpen(true); }}
+                    onClick={() => { setReopenAssigneeId(''); setReopenReason(""); setReopenModalOpen(true); }}
                     className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]"
                   >
                     重新开启
@@ -1117,7 +1159,7 @@ export const RequirementPoolView: React.FC = () => {
                 )}
                 <button
                   type="button"
-                  onClick={() => setSelected(null)}
+                  onClick={closeDetail}
                   className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]"
                 >
                   关闭
@@ -1135,7 +1177,7 @@ export const RequirementPoolView: React.FC = () => {
               <div className="flex items-start justify-between gap-4"><h2 className="text-lg font-semibold text-[var(--text-primary)]">{selected.title}</h2><StatusTag status={selected.status} /></div>
               <div className="my-4 border-t border-[var(--border-main)]" />
               <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-[var(--text-muted)]">事项类型</span><p className="mt-1 text-[var(--text-primary)]">{selected.workOrderType || "历史事项"}</p></div>
+              <div><span className="text-xs text-[var(--text-muted)]">事项类型</span><p className="mt-1 text-[var(--text-primary)]">{workOrderDisplayName(selected.workOrderType) || "历史事项"}</p></div>
               <div>
                 <span className="text-xs text-[var(--text-muted)]">优先级</span>
                 <div className="mt-1">
@@ -1467,12 +1509,12 @@ export const RequirementPoolView: React.FC = () => {
         <form onSubmit={submitReopen} className="work-order-dialog space-y-4">
           <p className="text-xs text-[var(--text-muted)]">历史事项将恢复为处理中，并保留原有历程记录。</p>
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-            当前进度
-            <InputNumber className="w-full" min={0} max={100} value={reopenProgress} onChange={(value) => setReopenProgress(Number(value ?? 0))} addonAfter="%" />
+            处理人
+            <Select className="w-full" showSearch optionFilterProp="label" value={reopenAssigneeId || undefined} options={employeeSelectOptions(employees, 'id')} onChange={setReopenAssigneeId} disabled={reopenSubmitting} placeholder="请选择处理人" />
           </label>
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
             重开原因
-            <Input.TextArea value={reopenReason} onChange={(event) => setReopenReason(event.target.value)} rows={4} placeholder="请输入重新开启原因" />
+            <Input.TextArea value={reopenReason} disabled={reopenSubmitting} maxLength={2000} onChange={(event) => setReopenReason(event.target.value)} rows={4} placeholder="请输入重新开启原因" />
           </label>
           <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3">
             <button type="button" onClick={() => setReopenModalOpen(false)} disabled={reopenSubmitting} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)] disabled:opacity-50">取消</button>

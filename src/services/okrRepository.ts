@@ -41,7 +41,16 @@ export interface OkrActionPayload {
 }
 export interface OkrRecord { id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload & Partial<OkrActionPayload> }
 export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; creatorName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
-export interface OkrSettings { version?: number; defaultView: 'list'|'card'; timeRules: Array<{key:string;label:string;startDay:number;endDay:number}>; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: Array<{department:string;type:string;fields:string[]}> }
+export type OkrTimeRule = {
+  key: 'addObjective' | 'breakdown' | 'weeklyReview' | 'monthlyReview' | string;
+  label: string;
+  startDay: number;
+  endDay: number;
+  shortMonthRule?: 'clamp' | 'reject';
+  allowBackfill?: boolean;
+};
+export type OkrTemplate = { department: string; type: string; fields: string[] };
+export interface OkrSettings { version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
 const base = '/api/okr';
 export const okrRepository = {
   people: () => apiRequest<OkrPerson[]>(`${base}/people`),

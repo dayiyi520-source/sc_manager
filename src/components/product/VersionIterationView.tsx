@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { openTaskCompletionDialog } from './TaskCompletionDialog';
 import {
   Bug,
   Beaker,
@@ -337,7 +338,7 @@ const VersionWorkItemCell: React.FC<{ item: PlanningItem; field: 'status' | 'own
     } catch (error) { messageApi.error(error instanceof Error ? error.message : '状态加载失败'); }
     finally { setBusy(false); }
   };
-  const change = async (value: string, reason = '') => {
+  const change = async (value: string, reason = '', actualHours?: number) => {
     if (field === 'status' && value === source.statusKey) { setEditing(false); return; }
     setBusy(true);
     try {
@@ -346,6 +347,10 @@ const VersionWorkItemCell: React.FC<{ item: PlanningItem; field: 'status' | 'own
         const result = await productRepository.workItemTransitions(item.productLineId!, item.id);
         const action = result.actions.find((entry) => entry.to === value && entry.allowed);
         if (!action) throw new Error('当前状态不可流转到所选状态');
+        if (result.statuses.find((status) => status.key === value)?.name === '已完成' && actualHours === undefined) {
+          openTaskCompletionDialog((hours, text) => change(value, text, hours), action.requiredFields.includes('reason'));
+          return;
+        }
         if (action.requiredFields.includes('reason') && !reason.trim()) {
           let enteredReason = '';
           setBusy(false);
@@ -360,11 +365,11 @@ const VersionWorkItemCell: React.FC<{ item: PlanningItem; field: 'status' | 'own
           });
           return;
         }
-        await productRepository.transitionWorkItem(item.productLineId!, item.id, { edgeKey: action.edgeKey, revision: result.revision, reason });
+        await productRepository.transitionWorkItem(item.productLineId!, item.id, { edgeKey: action.edgeKey, revision: result.revision, reason, actualHours });
       }
       setEditing(false);
       onUpdated();
-    } catch (error) { messageApi.error(error instanceof Error ? error.message : '修改失败'); }
+    } catch (error) { messageApi.error(error instanceof Error ? error.message : '修改失败'); if (actualHours !== undefined || reason) throw error; }
     finally { setBusy(false); }
   };
   return <>{contextHolder}{editing ? <Select autoFocus showSearch optionFilterProp="label" aria-label={`${item.title}${field === 'status' ? '状态' : '负责人'}`} className="min-w-32" placeholder="请选择" options={options} onChange={(value) => void change(value)} onBlur={() => setEditing(false)} loading={busy} /> : <button type="button" onClick={() => void open()} disabled={!editable || busy} title={editable ? `修改${field === 'status' ? '状态' : '负责人'}` : '当前任务不可编辑'} className="inline-flex min-h-8 items-center text-left disabled:cursor-default">{field === 'status' ? <StatusTag status={item.status} /> : <PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" />}</button>}</>;

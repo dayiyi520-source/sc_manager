@@ -30,7 +30,7 @@ describe('work-order workflow form regression', () => {
     fireEvent.click(screen.getByRole('tab', { name: '工单列表' }));
     fireEvent.click(screen.getByRole('button', { name: '详情' }));
     await waitFor(() => expect(requirementRepository.detail).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '工单流转' }));
+    fireEvent.click(screen.getByRole('button', { name: '事项流转' }));
   };
   const switchAction = (action: string) => fireEvent.change(screen.getByLabelText('流转类型 *'), { target: { value: action } });
   const selectAssignee = (label: string) => {
@@ -106,7 +106,7 @@ describe('work-order workflow form regression', () => {
     switchAction('reassign');
     fireEvent.change(screen.getByLabelText('转派原因说明 *'), { target: { value: '不应残留' } });
     fireEvent.click(screen.getByRole('button', { name: '取消' }));
-    fireEvent.click(screen.getByRole('button', { name: '工单流转' }));
+    fireEvent.click(screen.getByRole('button', { name: '事项流转' }));
     expect(screen.getAllByLabelText('任务描述')).toHaveLength(1);
     switchAction('reassign');
     expect(screen.getByLabelText('转派原因说明 *')).toHaveValue('');
@@ -154,21 +154,21 @@ describe('RequirementPoolView action interactions', () => {
     const onHold = vi.fn();
     const onReject = vi.fn();
     const { rerender } = render(<RequirementActionButtons status="待处理" hasWorkItem={false} onWork={onWork} onHold={onHold} onReject={onReject} />);
-    fireEvent.click(screen.getByRole('button', { name: '工单流转' }));
-    fireEvent.click(screen.getByRole('button', { name: '工单搁置' }));
-    fireEvent.click(screen.getByRole('button', { name: '工单驳回' }));
+    fireEvent.click(screen.getByRole('button', { name: '事项流转' }));
+    expect(screen.queryByRole('button', { name: '事项搁置' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '事项驳回' }));
     expect(onWork).toHaveBeenCalledOnce();
-    expect(onHold).toHaveBeenCalledOnce();
+    expect(onHold).not.toHaveBeenCalled();
     expect(onReject).toHaveBeenCalledOnce();
 
     rerender(<RequirementActionButtons status="已搁置" hasWorkItem={false} onWork={onWork} onHold={onHold} onReject={onReject} />);
-    expect(screen.getByRole('button', { name: '工单流转' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '工单驳回' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '工单搁置' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '事项流转' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '事项驳回' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '事项搁置' })).not.toBeInTheDocument();
 
     rerender(<RequirementActionButtons status="处理中" hasWorkItem onWork={onWork} onHold={onHold} onReject={onReject} />);
-    expect(screen.queryByRole('button', { name: '工单流转' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '工单驳回' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '事项流转' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '事项驳回' })).not.toBeInTheDocument();
   });
 
   it('keeps mine-all as a base filter and matches names robustly', () => {

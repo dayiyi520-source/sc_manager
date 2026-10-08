@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Button, Dropdown, Modal, Select, message } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { Button, Dropdown, Input, InputNumber, Modal, Select, message } from 'antd';
+import { validCompletionHours } from './TaskCompletionDialog';
 import { productRepository } from '../../services/productRepository';
 
 export type BatchTarget = { id: string; category: string; productLineId?: string; revision?: number };
@@ -17,6 +18,9 @@ export const WorkItemBatchBar: React.FC<{
   const [statuses, setStatuses] = useState<Option[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [completionHours, setCompletionHours] = useState<Record<string, number | null>>({});
+  const [completionReason, setCompletionReason] = useState('');
+  const completed = useRef(new Set<string>());
   const [messageApi, contextHolder] = message.useMessage();
   const categories = new Set(targets.map((target) => target.category));
   const lines = new Set(targets.map((target) => target.productLineId));
@@ -50,19 +54,35 @@ export const WorkItemBatchBar: React.FC<{
     if (!valid) { messageApi.warning('只能选择同类型且有版本信息的工作项'); return; }
     setLoading(true);
     try {
+      if (operation === 'status' && statuses.find((status) => status.value === value)?.label === '已完成') {
+        const remaining = targets.filter((target) => !completed.current.has(target.id));
+        if (remaining.some((target) => !validCompletionHours(completionHours[target.id] ?? null))) throw new Error('请为每条任务填写非负且最多两位小数的完成工时');
+        const transitions = await Promise.all(remaining.map(async (target) => {
+          const options = await productRepository.workItemTransitions(target.productLineId!, target.id);
+          const action = options.actions.find((item) => item.to === value && item.allowed);
+          if (!action) throw new Error(`任务 ${target.id} 当前不能完成，请刷新后重试`);
+          if (action.requiredFields.includes('reason') && !completionReason.trim()) throw new Error('请填写状态变更原因');
+          return { target, options, action };
+        }));
+        for (const { target, options, action } of transitions) {
+          await productRepository.transitionWorkItem(target.productLineId!, target.id, { edgeKey: action.edgeKey, revision: options.revision, actualHours: completionHours[target.id]!, reason: completionReason.trim() });
+          completed.current.add(target.id);
+        }
+      } else {
       await productRepository.batchWorkItems({
         targets: targets.map(({ id, productLineId, revision }) => ({ id, productLineId: productLineId!, revision: revision! })),
         operation,
         value: typeof value === 'string' ? value : undefined,
         participants: operation === 'participants' ? value as string[] : undefined
       });
+      }
       messageApi.success(`已处理 ${targets.length} 条工作项`);
       setOperation('');
       setValue([]);
       onCancel();
       await onComplete();
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : '批量操作失败，请刷新后重试');
+      messageApi.error(`${error instanceof Error ? error.message : '批量操作失败，请刷新后重试'}${completed.current.size ? `；已完成 ${completed.current.size} 条，重试只处理剩余任务` : ''}`);
     } finally { setLoading(false); }
   };
   const open = (key: string) => {
@@ -81,6 +101,9 @@ export const WorkItemBatchBar: React.FC<{
       return;
     }
     setOperation(key);
+    completed.current.clear();
+    setCompletionHours({});
+    setCompletionReason('');
     setValue(key === 'participants' ? [] : '');
   };
   return <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-primary)]">
@@ -89,12 +112,16 @@ export const WorkItemBatchBar: React.FC<{
     <Dropdown menu={{ items: Object.entries(labels).map(([key, label]) => ({ key, label, danger: key === 'delete', onClick: () => open(key) })) }}>
       <Button disabled={loading}>批量操作 {targets.length} 条</Button>
     </Dropdown>
-    <Button onClick={onCancel}>取消选择</Button>
-    <Modal className="work-item-batch-modal" title={labels[operation]} open={Boolean(operation)} onCancel={() => setOperation('')} cancelText="取消" okText="保存" onOk={() => void execute()} okButtonProps={{ disabled: (operation !== 'participants' && !value) || !valid, loading }} destroyOnHidden>
+    <Button disabled={loading} onClick={onCancel}>取消选择</Button>
+    <Modal className="work-item-batch-modal" title={labels[operation]} open={Boolean(operation)} onCancel={() => { if (!loading) { setOperation(''); if (completed.current.size) void onComplete(); } }} cancelButtonProps={{ disabled: loading }} closable={!loading} maskClosable={!loading} cancelText="取消" okText="保存" onOk={() => void execute()} okButtonProps={{ disabled: (operation !== 'participants' && !value) || !valid, loading }} destroyOnHidden>
       <div className="space-y-6 pt-2">
+        {operation === 'status' && statuses.find((status) => status.value === value)?.label === '已完成' && <div className="space-y-3">
+          {targets.map((target) => <label key={target.id} className="block text-xs">任务 {target.id} 完成工时（小时）<InputNumber className="w-full" min={0} disabled={loading || completed.current.has(target.id)} value={completionHours[target.id] ?? null} placeholder="请输入完成工时" onChange={(hours) => setCompletionHours((current) => ({ ...current, [target.id]: hours }))} /></label>)}
+          <Input.TextArea value={completionReason} disabled={loading} maxLength={2000} placeholder="状态变更原因（流程要求时必填）" onChange={(event) => setCompletionReason(event.target.value)} />
+        </div>}
         <div className="space-y-2">
           <span className="block text-xs font-normal text-[var(--text-primary)]">{labels[operation]}</span>
-          <Select className="w-full text-xs font-normal" mode={operation === 'participants' ? 'multiple' : undefined} showSearch optionFilterProp="label" placeholder={operation === 'participants' ? '请选择参与人' : `请选择${labels[operation] || ''}`} value={value || undefined} onChange={setValue} options={choices[operation] || []} loading={statusLoading} notFoundContent={operation === 'version' && lines.size !== 1 ? '请选择同一产品下的工作项' : undefined} />
+          <Select disabled={loading || completed.current.size > 0} className="w-full text-xs font-normal" mode={operation === 'participants' ? 'multiple' : undefined} showSearch optionFilterProp="label" placeholder={operation === 'participants' ? '请选择参与人' : `请选择${labels[operation] || ''}`} value={value || undefined} onChange={setValue} options={choices[operation] || []} loading={statusLoading} notFoundContent={operation === 'version' && lines.size !== 1 ? '请选择同一产品下的工作项' : undefined} />
         </div>
       </div>
     </Modal>

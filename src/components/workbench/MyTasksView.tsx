@@ -60,7 +60,7 @@ export const MyTasksView: React.FC = () => {
     setTaskError(null);
     requirementRepository.myTasks(currentUser.id)
       .then((items) => { if (active) setRealTasks(Array.isArray(items) ? items : []); })
-      .catch((error) => { if (active) { setRealTasks([]); setTaskError(error instanceof Error ? error.message : '产品任务和协助事项服务暂不可用'); } })
+      .catch((error) => { if (active) { setRealTasks([]); setTaskError(error instanceof Error ? error.message : '产品任务和协同事项服务暂不可用'); } })
       .finally(() => { if (active) setTaskLoading(false); });
     return () => { active = false; };
   }, [currentUser.id]);
@@ -152,7 +152,7 @@ export const MyTasksView: React.FC = () => {
               <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5">
                 <TabButton active={todoTab === 'all'} onClick={() => setTodoTab('all')}>全部 ({pendingTodos.length})</TabButton>
                 <TabButton active={todoTab === 'mine'} onClick={() => setTodoTab('mine')}>任务 ({realTasks.filter((task) => task.taskGroup === 'mine').length})</TabButton>
-                <TabButton active={todoTab === 'assist'} onClick={() => setTodoTab('assist')}>协助事项 ({realTasks.filter((task) => task.taskGroup === 'assist').length})</TabButton>
+                <TabButton active={todoTab === 'assist'} onClick={() => setTodoTab('assist')}>协同事项 ({realTasks.filter((task) => task.taskGroup === 'assist').length})</TabButton>
               </div>
             </div>
           </div>

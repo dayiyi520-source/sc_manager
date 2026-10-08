@@ -78,6 +78,7 @@ describe('ObjectiveForm objective numbering', () => {
       root: false,
       onCancel: vi.fn(),
       onSave,
+      initialPayload: { title: '第二个目标', keyResults: [{ id: 'a1', title: '关键动作', deadline: '2026-09-30', weight: 100, progress: 0 }] },
     };
     const view = render(<ObjectiveForm ref={ref} {...props} busy={false} />);
     fireEvent.change(screen.getByLabelText('目标名称'), { target: { value: '第二个目标' } });
@@ -87,6 +88,32 @@ describe('ObjectiveForm objective numbering', () => {
     await act(async () => expect(await ref.current?.submit()).toBe(true));
 
     expect(onSave).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ObjectiveForm submission requirements', () => {
+  it.each([
+    { title: '   ', actionTitle: '动作', deadline: '2026-09-30', weight: 100 },
+    { title: '目标', actionTitle: '   ', deadline: '2026-09-30', weight: 100 },
+    { title: '目标', actionTitle: '动作', deadline: undefined, weight: 100 },
+    { title: '目标', actionTitle: '动作', deadline: '2026-02-30', weight: 100 },
+    { title: '目标', actionTitle: '动作', deadline: '2026-09-30', weight: 0 },
+    { title: '目标', actionTitle: '动作', deadline: '2026-09-30', weight: 99.5 },
+  ])('blocks incomplete or invalid submissions: %j', async ({ title, actionTitle, deadline, weight }) => {
+    const ref = createRef<ObjectiveFormHandle>();
+    const onSave = vi.fn(async () => true);
+    render(<ObjectiveForm ref={ref} cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={onSave} initialPayload={{ title, keyResults: [{ id: 'a1', title: actionTitle, deadline, weight, progress: 0 }] }} />);
+    await act(async () => expect(await ref.current?.submit()).toBe(false));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('keeps draft saving available without a deadline', async () => {
+    const ref = createRef<ObjectiveFormHandle>();
+    const onSaveDraft = vi.fn(async () => true);
+    render(<ObjectiveForm ref={ref} cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn()} onSaveDraft={onSaveDraft} initialPayload={{ title: '草稿目标', keyResults: [{ id: 'a1', title: '', weight: 100, progress: 0 }] }} />);
+    await act(async () => expect(await ref.current?.saveDraft()).toBe(true));
+    expect(onSaveDraft).toHaveBeenCalledOnce();
   });
 });
 

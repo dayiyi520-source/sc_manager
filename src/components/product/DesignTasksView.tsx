@@ -16,7 +16,7 @@ const TODO_VARIANT_LABEL: Record<DesignTaskVariant, string> = { product: '产品
 const INITIAL_TODOS: TodoDesign[] = [
   { id: 'todo-design-product-demo', title: '会员中心等级权益页视觉优化', variant: 'product', ownership: '客户运营平台 / V2.6', creator: '林晓', createdAt: '2026-09-28', status: '待设计', sourceTitle: '会员等级与权益升级' },
   { id: 'todo-design-project-demo', title: '展厅导视与产品展板设计', variant: 'project', ownership: '华东体验中心建设项目', creator: '周明', createdAt: '2026-09-29', status: '设计中', sourceTitle: '展厅物料设计协助' },
-  { id: 'todo-design-other-demo', title: '季度合作伙伴大会主视觉支持', variant: 'other', ownership: '市场部', creator: '陈佳', createdAt: '2026-09-30', status: '待设计', sourceTitle: '大会视觉协助事项' }
+  { id: 'todo-design-other-demo', title: '季度合作伙伴大会主视觉支持', variant: 'other', ownership: '市场部', creator: '陈佳', createdAt: '2026-09-30', status: '待设计', sourceTitle: '大会视觉协同事项' }
 ];
 const variantOf = (task: RequirementTask): DesignTaskVariant => {
   if (task.designVariant) return task.designVariant;

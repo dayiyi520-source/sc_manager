@@ -5,6 +5,7 @@ import {
   MOCK_DEV_TASKS,
   MOCK_PRODUCT_LINES,
   MOCK_REQUIREMENT_TASKS,
+  MOCK_OPS_TASKS,
   MOCK_SNAPSHOT_VERSION,
   MOCK_TEAM_MEMBERS,
   MOCK_TEST_CASE_DIRECTORIES,
@@ -17,7 +18,7 @@ import {
   MOCK_OKR_RECORDS,
   MOCK_OKR_SETTINGS,
 } from '../data/mockSnapshot';
-import type { ProductLine } from '../types';
+import type { ProductLine, RequirementTask } from '../types';
 import type { CurrentUser, EmployeeOption } from '../types';
 import type {
   SaveTestPlanInput,
@@ -44,6 +45,8 @@ const KEYS = {
   researchAutomation: 'shichuang.frontend.mock.researchAutomation',
   researchAutomationSetting: 'shichuang.frontend.mock.researchAutomationSetting',
   workItems: 'shichuang.frontend.mock.workItems',
+  opsTasks: 'shichuang.frontend.mock.opsTasks',
+  taskActivities: 'shichuang.frontend.mock.taskActivities',
 };
 
 // 每次导入新数据库快照时，淘汰浏览器里由旧演示数据留下的本地状态。
@@ -109,6 +112,15 @@ const planCases = (caseIds: string[]): TestPlanCase[] => getCases().filter((item
 }));
 
 const databaseRows = (table: keyof typeof MOCK_DATABASE) => (MOCK_DATABASE[table] as unknown as Array<Record<string, any>>).filter((row) => Number(row.delete_flag_ || 0) === 0);
+const taskActivities = () => read<any[]>(KEYS.taskActivities, databaseRows('t_product_work_item_activity').map((row) => ({ id: row.id_, subjectId: row.subject_id_, productLineId: row.product_line_id_, eventType: row.event_type_, content: row.content_, operatorName: MOCK_USERS.find((user) => user.id === row.create_by_)?.name || row.create_by_, createdAt: row.create_time_ })));
+const recordTaskActivity = (subjectId: string, productLineId: string, eventType: string, content: Record<string, unknown>) => {
+  write(KEYS.taskActivities, [...taskActivities(), { id: id('activity'), subjectId, productLineId, eventType, content, operatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now() }]);
+};
+const recordTaskChanges = (before: Record<string, any>, after: Record<string, any>) => {
+  const codes = ['title', 'description', 'descriptionHtml', 'expectedGoal', 'priority', 'assigneeName', 'ownerName', 'versionId', 'customerName', 'plannedStartDate', 'plannedEndDate', 'dueDate', 'estimatedHours', 'actualHours', 'status'];
+  const changes = codes.filter((field) => JSON.stringify(before[field] ?? '') !== JSON.stringify(after[field] ?? '')).map((field) => ({ field, from: before[field] ?? '', to: after[field] ?? '' }));
+  if (changes.length) recordTaskActivity(String(after.id), String(after.productLineId || ''), 'WORK_ITEM_UPDATED', { changes });
+};
 const categoryCode = (value: string) => ({ 产品: 'requirement', 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' } as Record<string, string>)[value] || value;
 const templateCategories = () => read(KEYS.researchCategories, databaseRows('t_work_item_category_dictionary').map((row) => ({ id: row.id_, code: row.code_, name: row.name_, displayName: row.display_name_ || row.name_, iconKey: row.icon_key_ || row.code_, capabilityType: row.capability_type_ || 'STANDARD', sort: Number(row.sort_ || 0), enabled: Boolean(row.enabled_), builtIn: Boolean(row.built_in_), revision: Number(row.version_ || 0) })));
 const templateRoles = () => read(KEYS.researchRoles, databaseRows('t_product_role_template').map((row) => ({ id: row.id_, name: row.name_, responsibility: row.responsibility_ || '', sort: Number(row.sort_ || 0), revision: Number(row.version_ || 0), updatedAt: row.update_time_ })));
@@ -118,7 +130,7 @@ const DETAIL_FIELD_DEFINITIONS: Record<string, Array<[string, string, string, st
     ['title', '标题', 'text', '详情页顶部任务标题，可点击修改', true], ['creator', '创建人', 'user', '任务创建人，只读', false], ['createdAt', '创建时间', 'date', '任务创建时间，只读', false], ['updater', '更新人', 'user', '最近一次修改人，只读', false], ['updatedAt', '更新时间', 'date', '最近一次修改时间，只读', false],
     ['expectedGoal', '期望结果', 'text', '任务完成后预期达到的结果', true], ['parent', '主任务', 'relation', '当前任务所属的父任务，只读', false], ['description', '任务描述', 'text', '左侧描述区，可进入富文本编辑', true], ['status', '当前状态', 'select', '右侧基础字段中的任务状态', true], ['assignee', '负责人', 'user', '右侧基础字段中的负责人', true], ['priority', '优先级', 'select', '右侧基础字段中的优先级', true],
     ['productLine', '归属产品', 'relation', '任务所属产品或产品线', true], ['version', '迭代版本', 'relation', '任务关联的迭代版本', true], ['plannedStartDate', '计划开始时间', 'date', '任务计划开始日期', true], ['dueDate', '计划完成时间', 'date', '任务计划完成日期', true], ['expectedCompleteDate', '期望完成时间', 'date', '业务期望完成日期', true],
-    ['customer', '关联客户', 'relation', '任务关联的客户对象', true], ['participants', '参与人', 'user', '需要同步或关注任务的成员', true], ['estimatedHours', '预计工时', 'number', '任务预计投入的小时数', true], ['actualHours', '实际工时', 'number', '任务实际投入的小时数', true], ['relations', '关联对象', 'section', '详情页下方的关联产品任务和协助事项', true], ['children', '子任务', 'section', '详情页下方的子任务列表', true], ['support', '支撑项', 'section', '详情页下方关联的测试计划等支撑事项', true], ['hours', '工时', 'section', '详情页下方的工时汇总和统计', true],
+    ['customer', '关联客户', 'relation', '任务关联的客户对象', true], ['participants', '参与人', 'user', '需要同步或关注任务的成员', true], ['estimatedHours', '预计工时', 'number', '任务预计投入的小时数', true], ['actualHours', '实际工时', 'number', '任务实际投入的小时数', true], ['relations', '关联对象', 'section', '详情页下方的关联产品任务和协同事项', true], ['children', '子任务', 'section', '详情页下方的子任务列表', true], ['support', '支撑项', 'section', '详情页下方关联的测试计划等支撑事项', true], ['hours', '工时', 'section', '详情页下方的工时汇总和统计', true],
   ],
   dev: [['repo', '代码仓库', 'text', '研发任务关联的代码仓库地址或名称', true], ['branch', '特性分支', 'text', '研发任务对应的代码分支', true]],
   bug: [['severity', '严重程度', 'select', '缺陷影响范围和紧急程度', true], ['type', '缺陷类型', 'select', '缺陷所属的问题类型', true], ['env', '所属环境', 'select', '缺陷出现或验证的运行环境', true]],
@@ -155,7 +167,7 @@ const FIELD_METADATA: Record<string, { label: string; fieldType: string; descrip
   customer: { label: '关联客户', fieldType: 'relation', description: '任务关联的客户对象' },
   estimatedHours: { label: '预计工时', fieldType: 'number', description: '任务预计投入的小时数' },
   actualHours: { label: '实际工时', fieldType: 'number', description: '任务实际投入的小时数' },
-  relations: { label: '关联对象', fieldType: 'section', description: '关联产品任务和协助事项' },
+  relations: { label: '关联对象', fieldType: 'section', description: '关联产品任务和协同事项' },
   children: { label: '子任务', fieldType: 'section', description: '创建后维护子任务' },
   support: { label: '支撑项', fieldType: 'section', description: '创建后关联测试计划等支撑事项' },
   hours: { label: '工时', fieldType: 'section', description: '创建后登记和统计工时' },
@@ -172,6 +184,7 @@ const DETAIL_SYSTEM_FIELD_CODES = new Set(['creator', 'createdAt', 'updater', 'u
 // 历史配置中曾使用 requirement 作为独立关联字段，现统一由 relations 关系区承载。
 const LEGACY_FIELD_CODES = new Set(['requirement']);
 const CREATE_ASSOCIATION_FIELD_CODES = ['relations', 'children', 'support', 'hours'];
+const CREATE_COMMON_FIELD_CODES = ['title', 'expectedGoal', 'description', 'productLine', 'taskType', 'assignee', 'priority', 'plannedStartDate', 'plannedEndDate', 'version', 'customer', 'cc', 'estimatedHours', 'actualHours', 'attachments'];
 const normalizeTemplateField = (field: any) => {
   const metadata = FIELD_METADATA[field.fieldCode];
   const detailSystemField = field.scene === 'DETAIL' && DETAIL_SYSTEM_FIELD_CODES.has(field.fieldCode);
@@ -188,9 +201,25 @@ const templateFields = () => {
   const base = (stored || databaseRows('t_work_item_field_configuration').map((row) => ({ categoryCode: row.category_code_, scene: row.scene_, fieldCode: row.field_code_, label: row.field_code_, fieldType: 'text', visible: Boolean(row.visible_), required: Boolean(row.required_), editable: true, defaultValue: null, sort: Number(row.sort_ || 0), locked: false })))
     .filter((field) => !LEGACY_FIELD_CODES.has(field.fieldCode))
     .map(normalizeTemplateField);
-  const categories = ['requirement', 'design', 'dev', 'test', 'bug'];
+  const categories = [...new Set(['requirement', 'design', 'dev', 'test', 'bug', ...templateCategories().map((item: any) => item.code)])];
+  // New categories inherit the common field contract until customized independently.
+  categories.forEach((code) => {
+    ['CREATE', 'CREATE_CHILD', 'LIST', 'ITERATION'].forEach((scene) => {
+      if (base.some((field) => field.categoryCode === code && field.scene === scene)) return;
+      base.push(...base.filter((field) => field.categoryCode === 'requirement' && field.scene === scene).map((field) => ({ ...field, categoryCode: code })));
+    });
+  });
   const createScenes = ['CREATE', 'CREATE_CHILD'];
   const baseWithCreateAssociations = [...base];
+  // Sparse historical scenes must retain overrides while receiving missing common controls.
+  categories.forEach((categoryCode) => createScenes.forEach((scene) => {
+    CREATE_COMMON_FIELD_CODES.filter((fieldCode) => scene === 'CREATE' || fieldCode !== 'expectedGoal').forEach((fieldCode) => {
+      if (baseWithCreateAssociations.some((field) => field.categoryCode === categoryCode && field.scene === scene && field.fieldCode === fieldCode)) return;
+      const metadata = FIELD_METADATA[fieldCode];
+      const sort = Math.max(0, ...baseWithCreateAssociations.filter((field) => field.categoryCode === categoryCode && field.scene === scene).map((field) => field.sort)) + 1;
+      baseWithCreateAssociations.push(normalizeTemplateField({ categoryCode, scene, fieldCode, ...metadata, visible: true, required: false, editable: fieldCode !== 'actualHours', defaultValue: fieldCode === 'priority' ? '中' : null, sort, locked: false }));
+    });
+  }));
   categories.forEach((categoryCode) => createScenes.forEach((scene) => CREATE_ASSOCIATION_FIELD_CODES.forEach((fieldCode) => {
     if (baseWithCreateAssociations.some((field) => field.categoryCode === categoryCode && field.scene === scene && field.fieldCode === fieldCode)) return;
     const metadata = FIELD_METADATA[fieldCode];
@@ -273,6 +302,64 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   const clean = path.split('?')[0];
   const parts = clean.split('/').filter(Boolean);
   const body = bodyOf(init);
+
+  if (parts[1] === 'work-items' && parts[2] && ['activities', 'comments'].includes(parts[3])) {
+    const item = [...getWorkItems(), ...MOCK_BUGS].find((task) => task.id === parts[2]);
+    const line = queryOf(path).get('productLineId') || '';
+    if (!item || String(item.productLineId || '') !== line) throw new Error('工作项不存在');
+    if (parts[3] === 'activities' && method === 'GET') return taskActivities().filter((event) => event.subjectId === item.id && event.productLineId === line);
+    if (parts[3] === 'comments' && method === 'POST') {
+      const content = text(body.content).trim();
+      if (!content || content.length > 10000) throw new Error('评论内容不能为空且不能超过10000字');
+      recordTaskActivity(item.id, line, 'WORK_ITEM_COMMENTED', { content });
+      return null;
+    }
+  }
+
+  if (parts[0] === 'api' && parts[1] === 'ops-tasks') {
+    const tasks = read<RequirementTask[]>(KEYS.opsTasks, MOCK_OPS_TASKS.map(item => ({ ...item })));
+    const taskId = parts[2] ? decodeURIComponent(parts[2]) : undefined;
+    if (taskId && ['activities', 'comments'].includes(parts[3])) {
+      const task = tasks.find((item) => item.id === taskId);
+      if (!task) throw new Error('运维任务不存在');
+      if (parts[3] === 'activities' && method === 'GET') return taskActivities().filter((event) => event.subjectId === taskId);
+      if (parts[3] === 'comments' && method === 'POST') {
+        const content = text(body.content).trim();
+        if (!content || content.length > 10000) throw new Error('评论内容不能为空且不能超过10000字');
+        recordTaskActivity(taskId, String(task.productLineId || ''), 'WORK_ITEM_COMMENTED', { content });
+        return null;
+      }
+    }
+    if (method === 'GET') {
+      if (!taskId) return { items: tasks, total: tasks.length };
+      const task = tasks.find(item => item.id === taskId);
+      if (!task) throw new Error('运维任务不存在');
+      return task;
+    }
+    if (method === 'POST' && !taskId) {
+      if (!text(body.title).trim()) throw new Error('任务标题不能为空');
+      const task: RequirementTask = {
+        ...body, id: id('ops'), code: `OPS-${Date.now()}`,
+        title: text(body.title).trim(), status: text(body.status) || '待处理',
+        priority: text(body.priority) || '中', ownerName: text(body.ownerName),
+        productLineName: text(body.productLineName), versionName: text(body.versionName),
+        estimatedHours: Number(body.estimatedHours) || 0, dueDate: text(body.dueDate), createdAt: now(),
+      };
+      write(KEYS.opsTasks, [task, ...tasks]);
+      recordTaskActivity(task.id, String(task.productLineId || ''), 'WORK_ITEM_CREATED', { title: task.title });
+      return { id: task.id, code: task.code };
+    }
+    if (method === 'PUT' && taskId) {
+      const task = tasks.find(item => item.id === taskId);
+      if (!task) throw new Error('运维任务不存在');
+      if (body.title !== undefined && !text(body.title).trim()) throw new Error('任务标题不能为空');
+      const updated = { ...task, ...body, id: task.id, code: task.code };
+      write(KEYS.opsTasks, tasks.map(item => item.id === taskId ? updated : item));
+      recordTaskChanges(task, updated);
+      return null;
+    }
+    throw new Error('不支持的运维任务操作');
+  }
 
   if (clean === '/api/auth/dev-login' && method === 'POST') {
     const user = MOCK_USERS.find((item) => item.role === body.username || (body.username === 'admin' && item.role === 'admin')) || MOCK_USERS[0];
@@ -397,8 +484,9 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
       const bug = MOCK_BUGS[bugIndex];
       const revision = Number((bug as any).revision || 0);
       if (body.revision != null && Number(body.revision) !== revision) throw new Error('工作项已被其他人更新，请刷新后重试');
-      const updatedBug = { ...bug, ownerName: String(body.assigneeName ?? bug.ownerName ?? ''), revision: revision + 1 };
+      const updatedBug = { ...bug, ...body, ownerName: String(body.assigneeName ?? bug.ownerName ?? ''), revision: revision + 1 };
       MOCK_BUGS[bugIndex] = updatedBug;
+      recordTaskChanges(bug, updatedBug);
       return unifiedWorkItem({ ...updatedBug, category: 'bug', assigneeName: updatedBug.ownerName });
     }
     const current = items[index];
@@ -407,6 +495,7 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     const updated = { ...current, ...body, ownerName: body.assigneeName ?? current.ownerName, assigneeName: body.assigneeName ?? current.assigneeName ?? current.ownerName, revision: revision + 1 };
     items[index] = updated;
     write(KEYS.workItems, items);
+    recordTaskChanges(current, updated);
     return unifiedWorkItem(updated);
   }
   if (clean === '/api/work-items' && method === 'GET') {

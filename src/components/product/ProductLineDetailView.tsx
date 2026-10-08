@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Input, Select, Button, Switch, Drawer, Tag, Dropdown, Popconfirm, Spin } from 'antd';
+import { Alert, Input, Select, Button, Switch, Drawer, Tag, Dropdown, Popconfirm, Spin } from 'antd';
 import Card from 'antd/es/card/Card';
 import { useQuery } from '@tanstack/react-query';
+import { categoryCode, enabledCategoryOptions } from '../../utils/workItemCategories';
 import { ApartmentOutlined, DeleteOutlined, DownOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined, UndoOutlined } from '@ant-design/icons';
 import {
   ArrowLeft,
@@ -37,7 +38,6 @@ import { CreateVersionModal } from './CreateVersionModal';
 import { ManageMembersModal } from './ManageMembersModal';
 import {
   buildWorkflowDefinition,
-  CATEGORY_KEYS,
   createDefaultWorkItemStates,
   EditableWorkflowState,
   validateWorkflowStates,
@@ -68,7 +68,7 @@ const normalizeProductVisibility = (value?: ProductLine['visibility']): '公开'
   value === '私密' || value === '部门可见' || value === '保密' || value === '仅创建者可见' ? '私密' : '公开';
 
 const productLineStatCards = [
-  { label: '协助事项', category: 'assistance' as const, tone: 'text-purple-400' },
+  { label: '协同事项', category: 'assistance' as const, tone: 'text-purple-400' },
   { label: '产品任务', category: 'requirement' as const, tone: 'text-cyan-400' },
   { label: '设计任务', category: 'design' as const, tone: 'text-pink-400' },
   { label: '研发任务', category: 'dev' as const, tone: 'text-emerald-400' },
@@ -310,14 +310,18 @@ const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({
   <div className="max-w-2xl space-y-2 text-xs"><h3 className="text-sm font-bold text-[var(--text-primary)]">{title}</h3><p className="text-[var(--text-muted)]">{description}</p><div className="mt-5 border border-dashed border-[var(--border-main)] p-5 text-[var(--text-muted)]">暂无可配置项</div></div>
 );
 
-const WORK_ITEM_CATEGORIES: ProductLineWorkItemCategory[] = ['需求', '设计', '研发', '测试', '缺陷', '用例'];
-const workItemCategoryLabel = (category: ProductLineWorkItemCategory) => ({ 需求: '产品任务', 设计: '设计任务', 研发: '研发任务', 测试: '测试任务', 缺陷: '缺陷任务', 用例: '测试用例' }[category]);
-
 const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
   const { addToast, setProductLines } = useApp();
+  const categoryQuery = useQuery({ queryKey: ['work-item-categories'], queryFn: productRepository.workItemCategories, retry: false });
+  const categoryOptions = enabledCategoryOptions(categoryQuery.data || []);
+  const workItemCategoryLabel = (value: string) => categoryQuery.data?.find((item) => item.code === categoryCode(value))?.displayName || value;
   const [activeCategory, setActiveCategory] = useState<ProductLineWorkItemCategory>('需求');
   const normalizeItems = (nextItems: ProductLineWorkItemType[]) => nextItems.map((item) => ({ ...item, enabled: Boolean(item.enabled), isDefault: Boolean(item.isDefault) }));
   const [items, setItems] = useState<ProductLineWorkItemType[]>(normalizeItems(productLine.workItemTypes || []));
+  const displayedCategories = [...new Set([...categoryOptions.map((item) => item.value), ...items.map((item) => item.category)])];
+  useEffect(() => {
+    if (displayedCategories.length && !displayedCategories.includes(activeCategory)) setActiveCategory(displayedCategories[0]);
+  }, [categoryQuery.data, items, activeCategory]);
   const [editingItem, setEditingItem] = useState<ProductLineWorkItemType | null>(null);
   const [itemToDelete, setItemToDelete] = useState<ProductLineWorkItemType | null>(null);
   const [stateConfigItem, setStateConfigItem] = useState<ProductLineWorkItemType | null>(null);
@@ -343,7 +347,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
   const openCreate = () => {
     setEditingItem(null);
     setForm({ category: activeCategory, name: '', description: '', enabled: true, isDefault: false });
-    setInitialWorkflowStates(createDefaultWorkItemStates(CATEGORY_KEYS[activeCategory]));
+    setInitialWorkflowStates(createDefaultWorkItemStates(categoryCode(activeCategory)));
     setIsEditorOpen(true);
   };
   const openEdit = (item: ProductLineWorkItemType) => {
@@ -363,6 +367,10 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
       addToast('warning', '请输入工作项类型名称');
       return;
     }
+    if (!editingItem && (categoryQuery.isError || !categoryOptions.some((item) => item.value === form.category))) {
+      addToast('warning', '分类不可用，请同步分类后重试');
+      return;
+    }
     if (!editingItem) {
       const invalid = validateWorkflowStates(initialWorkflowStates);
       if (invalid) {
@@ -375,7 +383,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
       if (isRemote()) {
         if (editingItem) await productRepository.updateWorkItemType(productLine.id, editingItem.id, { ...form, name, description: form.description.trim() });
         else {
-          const category = CATEGORY_KEYS[form.category];
+          const category = categoryCode(form.category);
           const states = initialWorkflowStates.map((state) => ({ ...state, name: state.name.trim(), stage: category === 'bug' ? 'dev' : category === 'case' ? 'test' : category }));
           await productRepository.createWorkItemType(productLine.id, {
             ...form,
@@ -437,14 +445,15 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
     <div className="mx-auto w-full max-w-4xl space-y-4 text-xs">
       <div className="flex items-start justify-between gap-4">
         <div><h3 className="text-sm font-bold text-[var(--text-primary)]">工作项设置</h3><p className="mt-1 text-[var(--text-muted)]">按工作项分类维护类型名称、描述和启用状态。</p></div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增类型</Button>
+        <div className="flex gap-2"><Button loading={categoryQuery.isFetching} onClick={() => void categoryQuery.refetch()}>同步分类</Button><Button type="primary" icon={<PlusOutlined />} disabled={categoryQuery.isPending || categoryQuery.isError || !categoryOptions.some((item) => item.value === activeCategory)} onClick={openCreate}>新增类型</Button></div>
       </div>
       <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">
-        {WORK_ITEM_CATEGORIES.map((category) => {
+        {displayedCategories.map((category) => {
           const count = items.filter((item) => item.category === category).length;
           return <button key={category} type="button" onClick={() => setActiveCategory(category)} className={`h-10 px-4 text-xs font-normal border-b-2 transition-colors ${activeCategory === category ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{workItemCategoryLabel(category)}</span><span className="ml-1 font-normal text-[var(--primary)]">{count}</span></button>;
         })}
       </div>
+      {categoryQuery.isError && <Alert type="error" showIcon message="工作项分类读取失败，请点击同步分类重试" />}
       <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
         <div className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>类型名称</span><span>描述</span><span>添加人</span><span>添加时间</span><span>是否启用</span><span className="text-right">操作</span></div>
         {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]" title={item.name}><span className="truncate">{item.name}</span>{item.isDefault && <Tag color="blue">默认</Tag>}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}状态`} title="状态配置" icon={<ApartmentOutlined />} onClick={() => setStateConfigItem(item)} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{workItemCategoryLabel(activeCategory)}工作项类型，点击右上角“新增类型”添加</div>}
@@ -460,7 +469,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
         <form id="work-item-type-form" onSubmit={saveItem} className="space-y-5 text-xs">
           <section className="space-y-4">
             <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">设置子类型的名称、分类和启用状态。</p></div>
-            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型分类</span><Select value={form.category} onChange={(category) => { setForm((previous) => ({ ...previous, category })); if (!editingItem) setInitialWorkflowStates(createDefaultWorkItemStates(CATEGORY_KEYS[category])); }} options={WORK_ITEM_CATEGORIES.map((category) => ({ value: category, label: workItemCategoryLabel(category) }))} /></label>
+            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型分类</span><Select value={form.category} disabled={Boolean(editingItem) || categoryQuery.isError} onChange={(category) => { setForm((previous) => ({ ...previous, category })); setInitialWorkflowStates(createDefaultWorkItemStates(categoryCode(category))); }} options={categoryOptions.map((item) => ({ value: item.value, label: <span className="inline-flex items-center gap-2"><WorkItemCategoryIcon category={item.iconKey} />{item.label}</span> }))} /></label>
             <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型名称 *</span><Input maxLength={128} value={form.name} onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))} placeholder="请输入类型名称" /></label>
             <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>描述</span><Input.TextArea rows={3} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} placeholder="请输入类型描述" /></label>
             <div className="flex items-center justify-between"><div><div className="font-medium text-[var(--text-body)]">是否启用</div><p className="mt-1 text-[11px] text-[var(--text-muted)]">停用后不能新建该类型的工作项。</p></div><Switch className="product-line-switch" checked={form.enabled} onChange={(enabled) => setForm((previous) => ({ ...previous, enabled }))} /></div>
@@ -468,7 +477,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
           </section>
           {!editingItem && <section className="space-y-4 border-t border-[var(--border-main)] pt-5">
             <div><h3 className="text-sm font-bold text-[var(--text-primary)]">初始化状态</h3><p className="mt-1 text-[var(--text-muted)]">状态名称可自定义，每个状态必须归属未开始、进行中、已完成或已取消。</p></div>
-            <WorkItemStateEditor states={initialWorkflowStates} category={CATEGORY_KEYS[form.category]} onChange={setInitialWorkflowStates} />
+            <WorkItemStateEditor states={initialWorkflowStates} category={categoryCode(form.category)} onChange={setInitialWorkflowStates} />
           </section>}
         </form>
       </Drawer>

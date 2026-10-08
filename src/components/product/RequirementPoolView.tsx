@@ -53,6 +53,9 @@ import type {
   WorkOrderType,
 } from "../../types";
 import { sanitizeHtml } from "../../utils/sanitizeHtml";
+import { workOrderDisplayName } from '../../utils/workOrderDisplay';
+import { copyToClipboard } from '../../utils/copyToClipboard';
+import { DetailCopyButton } from '../common/DetailCopyButton';
 import { getRejectReasonsForType } from "../../constants/rejectReasons";
 import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
 
@@ -148,6 +151,19 @@ export const RequirementPoolView: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [workOrderType, setWorkOrderType] = useState<WorkOrderType | null>(null);
   const [selected, setSelected] = useState<RequirementTask | null>(null);
+  const copyDetailValue = async (link: boolean) => {
+    if (!selected) return;
+    const url = new URL(window.location.href);
+    url.pathname = url.pathname.replace(/\/app\/[^/]+$/, '/app/wb_work_order');
+    url.search = '';
+    url.searchParams.set('detailId', selected.id);
+    try {
+      await copyToClipboard(link ? url.toString() : selected.code || selected.id);
+      addToast('success', link ? '详情链接已复制' : '事项编号已复制');
+    } catch (error) {
+      addToast('error', '复制失败', error instanceof Error ? error.message : '请检查浏览器剪贴板权限');
+    }
+  };
   const [detailTab, setDetailTab] = useState<"info" | "history">("info");
   const [events, setEvents] = useState<RequirementEvent[]>([]);
   const [workItems, setWorkItems] = useState<RequirementWorkItem[]>([]);
@@ -753,9 +769,9 @@ export const RequirementPoolView: React.FC = () => {
               </div>
               <div className="mt-3 grid w-full max-w-5xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {workOrderCards.map((card) => (
-                  <button key={card.type} type="button" onClick={() => openCreate(card.type)} className="group min-h-36 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)] hover:bg-[var(--bg-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30">
+                  <button key={workOrderDisplayName(card.type)} type="button" onClick={() => openCreate(card.type)} className="group min-h-36 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)] hover:bg-[var(--bg-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30">
                     <span className="mb-3 inline-flex items-center justify-center text-blue-600 dark:text-blue-400 transition">{card.icon}</span>
-                    <span className="block text-sm font-semibold text-[var(--text-primary)]">{card.type}</span>
+                    <span className="block text-sm font-semibold text-[var(--text-primary)]">{workOrderDisplayName(card.type)}</span>
                     <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{card.description}</span>
                   </button>
                 ))}
@@ -765,7 +781,7 @@ export const RequirementPoolView: React.FC = () => {
             <form onSubmit={save} className="space-y-5">
               <div>
                 <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                  {workOrderType || "提工单"}
+                  {workOrderDisplayName(workOrderType) || "提工单"}
                 </h2>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
                   提交后将会自动通知到负责人
@@ -796,7 +812,7 @@ export const RequirementPoolView: React.FC = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {typeStats.map((stat) => (
               <button key={stat.type} type="button" onClick={() => setTypeFilter(stat.type)} className="text-left">
-                <StatCard title={stat.type} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={<Inbox className="w-5 h-5" />} />
+                <StatCard title={workOrderDisplayName(stat.type)} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={<Inbox className="w-5 h-5" />} />
               </button>
             ))}
           </div>
@@ -807,7 +823,7 @@ export const RequirementPoolView: React.FC = () => {
                 <button type="button" title="查看与我有关" aria-label="查看与我有关" onClick={() => { setFilterMode("mine"); setScope("all"); }} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "mine" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><UserRound className="h-4 w-4" /></button>
               </div>
               <div className="inline-flex max-w-full flex-wrap items-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">
-                {(filterMode === "type" ? [{ value: "all", label: "全部" }, ...workOrderCards.map((card) => ({ value: card.type, label: card.type }))] : [{ value: "all", label: "全部" }, { value: "mine_owned", label: "我负责的" }, { value: "mine_created", label: "我创建的" }]).map((item) => <button key={item.value} type="button" onClick={() => filterMode === "type" ? setTypeFilter(item.value as typeof typeFilter) : setScope(item.value as typeof scope)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${(filterMode === "type" ? typeFilter === item.value : scope === item.value) ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{item.label}</button>)}
+                {(filterMode === "type" ? [{ value: "all", label: "全部" }, ...workOrderCards.map((card) => ({ value: card.type, label: workOrderDisplayName(card.type) }))] : [{ value: "all", label: "全部" }, { value: "mine_owned", label: "我负责的" }, { value: "mine_created", label: "我创建的" }]).map((item) => <button key={item.value} type="button" onClick={() => filterMode === "type" ? setTypeFilter(item.value as typeof typeFilter) : setScope(item.value as typeof scope)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${(filterMode === "type" ? typeFilter === item.value : scope === item.value) ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{item.label}</button>)}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -820,7 +836,7 @@ export const RequirementPoolView: React.FC = () => {
                 className="h-10 w-64 pl-9 pr-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-sm text-[var(--text-primary)]"
               />
             </div>
-            {filterMode === "mine" && <select aria-label="类型" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)} className={`${filterClass} min-w-[130px] shrink-0`}><option value="all">类型</option>{workOrderCards.map((card) => <option key={card.type} value={card.type}>{card.type}</option>)}</select>}
+            {filterMode === "mine" && <select aria-label="类型" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)} className={`${filterClass} min-w-[130px] shrink-0`}><option value="all">类型</option>{workOrderCards.map((card) => <option key={workOrderDisplayName(card.type)} value={card.type}>{card.type}</option>)}</select>}
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
@@ -873,7 +889,7 @@ export const RequirementPoolView: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-[var(--text-body)]">
-                        {item.workOrderType || "历史工单"}
+                        {workOrderDisplayName(item.workOrderType) || "历史工单"}
                       </td>
                       <td className="px-4 py-3">
                         <StatusTag status={item.priority} />
@@ -920,7 +936,8 @@ export const RequirementPoolView: React.FC = () => {
           isOpen={!!selected}
           onClose={() => setSelected(null)}
           hideSubtitle
-          title="工单详情"
+          title={<span className="flex min-w-0 items-center gap-2"><span className="shrink-0">事项编号</span><span className="truncate font-mono">{selected.code || selected.id}</span><DetailCopyButton label="复制事项编号" onCopy={() => copyDetailValue(false)} /></span>}
+          headerActions={<DetailCopyButton label="复制详情链接" link onCopy={() => copyDetailValue(true)} />}
           subtitle={`${selected.productLineName} · 负责人：${selected.ownerName || "未分配"}`}
           footer={
             <div className="flex w-full justify-between">
@@ -956,7 +973,7 @@ export const RequirementPoolView: React.FC = () => {
               <div className="flex items-start justify-between gap-4"><h2 className="text-lg font-semibold text-[var(--text-primary)]">{selected.title}</h2><StatusTag status={selected.status} /></div>
               <div className="my-4 border-t border-[var(--border-main)]" />
               <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-[var(--text-muted)]">工单类型</span><p className="mt-1 text-[var(--text-primary)]">{selected.workOrderType || "历史工单"}</p></div>
+              <div><span className="text-xs text-[var(--text-muted)]">工单类型</span><p className="mt-1 text-[var(--text-primary)]">{workOrderDisplayName(selected.workOrderType) || "历史工单"}</p></div>
               <div>
                 <span className="text-xs text-[var(--text-muted)]">优先级</span>
                 <div className="mt-1">

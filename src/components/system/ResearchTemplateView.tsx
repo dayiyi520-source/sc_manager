@@ -54,11 +54,13 @@ const ArchivePanel = () => {
 };
 const DictionaryPanel = () => {
   const [tab, setTab] = useState<'fields' | 'categories'>('fields');
-  const [categories, setCategories] = useState<WorkItemCategoryDefinition[]>([]);
-  useEffect(() => { void productRepository.workItemCategories().then(setCategories).catch(() => undefined); }, []);
+  const queryClient = useQueryClient();
+  const categoryQuery = useQuery({ queryKey: ['work-item-categories'], queryFn: productRepository.workItemCategories, retry: false });
+  const categories = categoryQuery.data || [];
   return <div className="mx-auto w-full max-w-5xl space-y-5 text-xs">
-    <div><h3 className="text-sm font-bold text-[var(--text-primary)]">产研字典</h3><p className="mt-1 text-[var(--text-muted)]">字段结构为只读概览；工作项分类可统一维护显示名称、图标和启用状态。</p></div>
-    <Tabs activeKey={tab} onChange={(key) => setTab(key as 'fields' | 'categories')} items={[{ key: 'fields', label: '工作项字段', children: <WorkItemFieldConfigurationPanel categories={categories} /> }, { key: 'categories', label: '工作项分类', children: <WorkItemCategoryPanel /> }]} />
+    <div><h3 className="text-sm font-bold text-[var(--text-primary)]">产研字典</h3><p className="mt-1 text-[var(--text-muted)]">统一维护分类、显示名称和图标，并按分类配置工作项字段。启用分类同步用于全局模板和产品配置。</p></div>
+    {categoryQuery.isError && <Alert type="error" showIcon message="工作项分类读取失败" action={<Button onClick={() => void categoryQuery.refetch()}>重试</Button>} />}
+    <Tabs activeKey={tab} onChange={(key) => setTab(key as 'fields' | 'categories')} items={[{ key: 'fields', label: '工作项字段', children: <WorkItemFieldConfigurationPanel categories={categories} /> }, { key: 'categories', label: '工作项分类', children: <WorkItemCategoryPanel onChanged={() => queryClient.invalidateQueries({ queryKey: ['work-item-categories'] })} /> }]} />
   </div>;
 };
 const RolesPanel = () => {

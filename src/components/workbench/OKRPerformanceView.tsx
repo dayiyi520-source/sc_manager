@@ -24,7 +24,9 @@ import { OkrSettingsView } from './okr/OkrSettingsView';
 import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewMode } from './okr/MyTargetMonthSection';
 import type { OkrRecord } from '../../services/okrRepository';
 
-export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace/></OkrProvider>;
+export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace mainTab="okrs"/></OkrProvider>;
+export const ReviewSummaryView: React.FC = () => <OkrProvider><OriginalWorkspace mainTab="reviews"/></OkrProvider>;
+const ADD_OBJECTIVE_INTENT = 'shichuang.okr.addObjective';
 
 type StoredExtraWork = {
   source?: string;
@@ -61,12 +63,12 @@ const impactLabel = (value?: string) => ({
   support: '支持 KR',
 }[value || ''] || value || '无明显影响');
 
-const OriginalWorkspace: React.FC = () => {
+const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab }) => {
   const { currentUser, addToast } = useApp();
   const { openPageTab } = useAppNavigationContext();
   const { records, okrs, reviewableOkrs, performances, people, work, teamMembers, actionParents, productLineOptions, projectOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, busy, settings, saveSettings } = useOriginalOkr();
 
-  const [mainTab, setMainTab] = useState<'okrs' | 'reviews'>('okrs');
+  const pageTitle = mainTab === 'okrs' ? '月度目标' : '复盘总结';
 
   // OKR Sub Tabs: 我的OKR、直属上级、直属下级、我部门的、其他部门
   const [scopeSelection, setScopeSelection] = useState<OkrScopeSelection>({ scope: 'my' });
@@ -113,6 +115,12 @@ const OriginalWorkspace: React.FC = () => {
     setSelectedMonthTargetId(undefined);
     setOkrDraftToSubmit(null);
   }, [currentUser.id]);
+  useEffect(() => {
+    if (mainTab === 'okrs' && sessionStorage.getItem(ADD_OBJECTIVE_INTENT) === currentUser.id) {
+      sessionStorage.removeItem(ADD_OBJECTIVE_INTENT);
+      setObjectiveForms([crypto.randomUUID()]);
+    }
+  }, [mainTab, currentUser.id]);
   useEffect(() => { if (settings?.defaultView) setTargetViewMode(settings.defaultView); }, [settings?.defaultView]);
 
   // Write Review Form State
@@ -285,13 +293,13 @@ const OriginalWorkspace: React.FC = () => {
         parentObjectiveId,
         parentActionId,
         parentKeyResultId,
-        assigneeIds: action.assigneeIds || [],
-        assigneeName: (action.assigneeIds || []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'),
+        assigneeIds: (Array.isArray(action.assigneeIds) ? action.assigneeIds : action.assigneeIds ? [action.assigneeIds] : []),
+        assigneeName: (Array.isArray(action.assigneeIds) ? action.assigneeIds : action.assigneeIds ? [action.assigneeIds] : []).map(id => people.find(person => person.id === id)?.name).filter(Boolean).join('、'),
         structureType: structureTypeForDepartment(me?.department),
         businessObject: action.businessObject,
         acceptanceStandard: action.measurableResult || action.businessObject,
         productLine: action.businessObject,
-        milestone: action.milestone,
+        milestone: Array.isArray(action.milestone) ? action.milestone.join('、') : action.milestone,
         deadline: action.deadline?.format('YYYY-MM-DD') || '',
         weight: Number(action.weight || 0),
         objectiveType: action.objectiveType || 'target',
@@ -354,7 +362,7 @@ const OriginalWorkspace: React.FC = () => {
       onClose={() => setSelectedOkrRecordId(null)}
       onSave={async (periodKey, groups, mode) => {
         const payloads = groups.flatMap(group => group.actions.map(value => {
-          const assigneeIds = value.assigneeIds || [];
+          const assigneeIds = (Array.isArray(value.assigneeIds) ? value.assigneeIds : value.assigneeIds ? [value.assigneeIds] : []);
           return {
             recordId: value.recordId,
             version: value.version,
@@ -369,7 +377,7 @@ const OriginalWorkspace: React.FC = () => {
             productLine: value.businessObject,
             businessObject: value.businessObject,
             acceptanceStandard: value.measurableResult || value.businessObject,
-            milestone: value.milestone,
+            milestone: Array.isArray(value.milestone) ? value.milestone.join('、') : value.milestone,
             deadline: value.deadline?.format('YYYY-MM-DD') || '',
             weight: Number(value.weight || 0),
             objectiveType: value.objectiveType || 'target',
@@ -388,16 +396,8 @@ const OriginalWorkspace: React.FC = () => {
 
   return (
     <div className="original-okr space-y-6 animate-in fade-in duration-150">
-      {loading && <div className="okr-loading-state" role="status" aria-live="polite"><Spin size="small"/> 正在加载目标与总结…</div>}
-      {error && <Alert type="error" title="目标与总结加载失败" description="服务暂不可用，请重试。已填写的内容仍保留。" action={<Button onClick={refresh}>重试</Button>}/>}
-      {/* Top Main Navigation Tabs */}
-      <div className="okr-page-toolbar">
-        <div className="okr-primary-tabs primary-line-tabs" role="tablist" aria-label="目标与总结视图">
-          <Button id="tab-okrs" role="tab" aria-selected={mainTab === 'okrs'} type="text" icon={<Target/>} onClick={()=>setMainTab('okrs')}>月度目标</Button>
-          <Button id="tab-reviews" role="tab" aria-selected={mainTab === 'reviews'} type="text" icon={<FileSpreadsheet/>} onClick={()=>{setMainTab('reviews');setIsReviewFormOpen(false);}}>复盘总结</Button>
-        </div>
-
-      </div>
+      {loading && <div className="okr-loading-state" role="status" aria-live="polite"><Spin size="small"/> 正在加载{pageTitle}…</div>}
+      {error && <Alert type="error" title={`${pageTitle}加载失败`} description="服务暂不可用，请重试。已填写的内容仍保留。" action={<Button onClick={refresh}>重试</Button>}/>}
 
       {/* Main Tab 1: OKRs */}
       {mainTab === 'okrs' && (
@@ -561,7 +561,7 @@ const OriginalWorkspace: React.FC = () => {
 
           {reviewSubTab === 'write' && isReviewFormOpen && (
  reviewType === 'week' ? (
-              <WeeklyReviewEditor key={`weekly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={reviewableOkrs} work={work} teamMembers={teamMembers} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onAddObjective={()=>{setReviewSubTab('okrs' as typeof reviewSubTab);setMainTab('okrs');setScopeSelection({scope:'my'});setObjectiveForms(forms=>[...forms,crypto.randomUUID()]);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
+              <WeeklyReviewEditor key={`weekly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={reviewableOkrs} work={work} teamMembers={teamMembers} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onAddObjective={()=>{sessionStorage.setItem(ADD_OBJECTIVE_INTENT, currentUser.id);openPageTab('wb_okr_perf');}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
             ) : (
               <MonthlyReviewEditor key={`monthly-review-${copiedReviewId || 'new'}`} initialPayload={copiedInitialPayload} okrs={reviewableOkrs} records={records} currentUserId={currentUser.id} busy={busy} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}}/>
             )

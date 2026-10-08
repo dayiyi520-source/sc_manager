@@ -1,21 +1,22 @@
-import { Button, DatePicker, Empty, Flex, Form, Input, InputNumber, Select, Typography } from 'antd';
+import { Alert, Button, DatePicker, Empty, Flex, Form, Input, InputNumber, Select, Typography } from 'antd';
 import Card from 'antd/es/card/Card';
 import { GitBranchIcon, GrabberIcon, PlusIcon, TrashIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState, type Key } from 'react';
 import type { OkrPerson, OkrRecord, OkrSettings } from '../../../services/okrRepository';
 import type { EmployeeOption } from '../../../types';
+import { isSubmissionDeadline, isSubmissionWeight } from './submissionValidation';
 
 export type ActionValues = {
   recordId?: string;
   version?: number;
   title?: string;
   businessObject?: string;
-  milestone?: string;
+  milestone?: string | string[];
   measurableResult?: string;
   deadline?: dayjs.Dayjs;
   weight?: number;
-  assigneeIds?: string[];
+  assigneeIds?: string[] | string;
   objectiveType?: 'target' | 'challenge';
 };
 
@@ -46,6 +47,7 @@ const fieldConfig = (index: number, productLineOptions: string[], projectOptions
   if (type === 'presales') return { relationLabel: '关联线索/商机/投标', relationPlaceholder: '选择线索/商机/投标', relationOptions: settings?.dictionaries.supportTypes || CUSTOMER_CATEGORIES, resultLabel: '需要达成的关键节点', resultPlaceholder: '选择关键节点', resultOptions: settings?.dictionaries.presalesNodes || MILESTONES };
   return { relationLabel: '类型', relationPlaceholder: '选择类型', relationOptions: settings?.dictionaries.supportTypes || CUSTOMER_CATEGORIES, resultLabel: '预期结果', resultPlaceholder: '填写预期结果' };
 };
+const resultValueFilled = (value: string | string[] | undefined) => Array.isArray(value) ? value.length > 0 : Boolean(value?.trim());
 
 const monthOptions = () => {
   const current = dayjs().startOf('month');
@@ -99,7 +101,8 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
   const [dragOverAction, setDragOverAction] = useState<{ parentId: string; index: number } | null>(null);
   const dragHandleRef = useRef<{ parentId: string; index: number } | null>(null);
   const [savingMode, setSavingMode] = useState<'draft' | 'submit'>('submit');
-  const groupsValue = Form.useWatch('groups', form) || form.getFieldValue('groups') || {};
+  const [submissionError, setSubmissionError] = useState('');
+  const groupsValue = Form.useWatch('groups', { form, preserve: true }) || form.getFieldValue('groups') || {};
   const periods = useMemo(monthOptions, []);
   const assigneeOptions = (teamMembers ?? people).map(member => ({ value: member.id, label: `${member.name}${member.department ? ` · ${member.department}` : ''}` }));
 
@@ -122,6 +125,7 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
 
   useEffect(() => {
     if (!open) return;
+    setSubmissionError('');
     setPeriodKey(initialActionId && draftAction ? draftAction.periodKey : cycle);
     if (draftAction && draftParent) {
       setActionTypeOverrides({ [draftAction.id]: draftAction.payload.objectiveType || 'target' });
@@ -135,7 +139,7 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
         deadline: draftAction.payload.deadline ? dayjs(draftAction.payload.deadline) : undefined,
         weight: draftAction.payload.weight,
         objectiveType: draftAction.payload.objectiveType || 'target',
-        assigneeIds: draftAction.payload.assigneeIds || [],
+        assigneeIds: Array.isArray(draftAction.payload.assigneeIds) ? draftAction.payload.assigneeIds : draftAction.payload.assigneeIds ? [draftAction.payload.assigneeIds] : [],
       }] } } });
       setEditingParentIds(new Set([draftParent.id]));
       return;
@@ -182,6 +186,7 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
     });
   };
   const changePeriod = (value: string) => {
+    setSubmissionError('');
     setPeriodKey(value);
     form.resetFields();
     form.setFieldsValue({ groups: balanceCommitmentWeights(parents.filter(parent => parent.periodKey === value).slice(0, 3)) });
@@ -189,9 +194,44 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
     setCollapsedParents(new Set());
   };
   const submit = async (mode: 'draft' | 'submit') => {
+    if (busy) return;
     setSavingMode(mode);
+    setSubmissionError('');
     try {
-      const values = await form.validateFields();
+      if (mode === 'submit') {
+        const snapshot = form.getFieldsValue(true);
+        const allGroups = visibleParents.map((parent, index) => ({ parent, index, ...snapshot.groups?.[parent.id] }));
+        if (!allGroups.some(group => group.actions?.length)) {
+          setSubmissionError('请至少添加一条动作。'); return;
+        }
+        if (allGroups.some(group => !isSubmissionWeight(group.commitmentWeight)) || (!initialActionId && allGroups.reduce((sum, group) => sum + (group.commitmentWeight || 0), 0) !== 100)) {
+          setSubmissionError('来源承接权重须为 1-100 的整数，合计为 100%。'); return;
+        }
+        for (const group of allGroups) {
+          const config = fieldConfig(group.index, productLineOptions, projectOptions, settings, person?.department);
+          for (const [index, action] of (group.actions || []).entries()) {
+            const prefix = `O${group.index + 1} 的 A${index + 1}：`;
+            const resultRequired = settings?.validation.resultRequired !== false;
+            if (!group.parent.payload.title?.trim() || !action.title?.trim() || !action.businessObject?.trim() || (resultRequired && !(config.resultOptions ? resultValueFilled(action.milestone) : action.measurableResult?.trim()))) {
+              setSubmissionError(`${prefix}请填写完整的目标与动作内容、关联对象及${config.resultLabel}。`); return;
+            }
+            if (!isSubmissionDeadline(action.deadline)) {
+              setSubmissionError(`${prefix}请选择有效的完成时间。`); return;
+            }
+            if (group.parent.payload.deadline && action.deadline!.isAfter(dayjs(group.parent.payload.deadline), 'day')) {
+              setSubmissionError(`${prefix}完成时间不得晚于上级截止时间。`); return;
+            }
+            if (!isSubmissionWeight(action.weight)) {
+              setSubmissionError(`${prefix}权重须为 1-100 的整数。`); return;
+            }
+          }
+          if (!initialActionId && group.actions?.length && group.actions.reduce((sum, action) => sum + (action.weight || 0), 0) !== 100) {
+            setSubmissionError(`O${group.index + 1} 的动作权重合计须为 100%。`); return;
+          }
+        }
+      }
+      await form.validateFields();
+      const values = form.getFieldsValue(true);
       const groups = visibleParents.map((parent, index) => ({ parent, commitmentWeight: Number(values.groups?.[parent.id]?.commitmentWeight ?? defaultCommitmentWeight(visibleParents, index)), actions: values.groups?.[parent.id]?.actions || [] })).filter(group => group.actions.length > 0);
       if (groups.length > 0) await onSave(periodKey, groups, mode);
     } catch {
@@ -204,6 +244,7 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
       <div className="okr-action-period-control"><Typography.Text>目标归属周期</Typography.Text><Select aria-label="目标归属周期" value={periodKey} options={periods} onChange={changePeriod} disabled={busy || Boolean(initialActionId)} /></div>
       <Flex className="okr-action-period-actions" gap="small" align="center"><Button onClick={onClose} disabled={busy}>取消</Button><Button onClick={() => void submit('draft')} loading={busy && savingMode === 'draft'} disabled={busy || actionCount === 0 || !weightsValid || !commitmentWeightsValid}>存草稿</Button><Button type="primary" onClick={() => void submit('submit')} loading={busy && savingMode === 'submit'} disabled={busy || actionCount === 0 || !weightsValid || !commitmentWeightsValid}>提交</Button></Flex>
     </div>
+    {submissionError && <Alert type="warning" title={submissionError} showIcon />}
     {visibleParents.length > 1 && <div className={`okr-action-commitment-summary ${commitmentWeightsValid ? 'is-valid' : 'is-error'}`}>来源承接权重合计 {commitmentWeightTotal}%{commitmentWeightsValid ? '' : '，需为 100%'}</div>}
     {businessOptionsError && <Typography.Text type="danger">{businessOptionsError}</Typography.Text>}
     {visibleParents.length === 0 ? <Card><Empty description="暂无指定给你的承接目标" /></Card> : <Form form={form} component={false} disabled={busy}><Flex vertical gap="middle">{visibleParents.map((parent, parentIndex) => {
@@ -238,9 +279,9 @@ export function ActionBreakdownForm({ open, cycle, person, parents, actions, peo
                 <Form.Item name={[field.name, 'objectiveType']} hidden><Input /></Form.Item>
                 <Form.Item name={[field.name, 'businessObject']} rules={[{ required: true, message: `请选择${config.relationLabel.replace('选择', '')}` }]}><Select aria-label={`A${actionIndex + 1} ${config.relationLabel}`} placeholder={config.relationPlaceholder} loading={businessOptionsLoading && parentIndex < 2} notFoundContent={businessOptionsLoading && parentIndex < 2 ? '正在加载业务数据' : '暂无可选业务数据'} options={config.relationOptions.map(value => ({ value, label: value }))} /></Form.Item>
                 <Form.Item name={[field.name, 'title']} rules={[{ required: true, whitespace: true, message: '请输入动作描述' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 动作描述`} placeholder="输入具体行动" autoSize={{ minRows: 2, maxRows: 4 }} maxLength={2000} /></Form.Item>
-                {config.resultOptions ? <Form.Item name={[field.name, 'milestone']} rules={[{ required: true, message: '请选择节点' }]}><Select aria-label={`A${actionIndex + 1} ${config.resultLabel}`} placeholder={config.resultPlaceholder} options={config.resultOptions.map(value => ({ value, label: value }))} /></Form.Item> : <Form.Item name={[field.name, 'measurableResult']} rules={[{ required: true, whitespace: true, message: '请输入可衡量结果' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 可衡量结果`} placeholder={config.resultPlaceholder} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={1000} /></Form.Item>}
-                <Form.Item name={[field.name, 'assigneeIds']}><Select aria-label={`A${actionIndex + 1} 指定承接人`} mode="multiple" allowClear showSearch optionFilterProp="label" placeholder="选择承接人" maxTagCount="responsive" options={assigneeOptions} /></Form.Item>
-                <Form.Item name={[field.name, 'deadline']} rules={[{ required: true, message: '请选择完成时间' }]}><DatePicker aria-label={`A${actionIndex + 1} 完成时间`} className="w-full" defaultValue={parent.payload.deadline ? dayjs(parent.payload.deadline) : undefined} maxDate={parent.payload.deadline ? dayjs(parent.payload.deadline) : undefined} disabledDate={date => Boolean(parent.payload.deadline && date.isAfter(dayjs(parent.payload.deadline), 'day'))} /></Form.Item>
+                {config.resultOptions ? <Form.Item name={[field.name, 'milestone']} rules={[{ required: settings?.validation.resultRequired !== false, message: '请选择节点' }]}><Select aria-label={`A${actionIndex + 1} ${config.resultLabel}`} mode={settings?.validation.keyNodeMultiple ? 'multiple' : undefined} placeholder={config.resultPlaceholder} options={config.resultOptions.map(value => ({ value, label: value }))} /></Form.Item> : <Form.Item name={[field.name, 'measurableResult']} rules={[{ required: settings?.validation.resultRequired !== false, whitespace: true, message: '请输入可衡量结果' }]}><Input.TextArea aria-label={`A${actionIndex + 1} 可衡量结果`} placeholder={config.resultPlaceholder} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={1000} /></Form.Item>}
+                <Form.Item name={[field.name, 'assigneeIds']}><Select aria-label={`A${actionIndex + 1} 指定承接人`} mode={settings?.validation.assigneeMultiple ? 'multiple' : undefined} allowClear showSearch optionFilterProp="label" placeholder="选择承接人" maxTagCount="responsive" options={assigneeOptions} /></Form.Item>
+                <Form.Item name={[field.name, 'deadline']} rules={[{ required: true, message: '请选择完成时间' }]}><DatePicker aria-label={`A${actionIndex + 1} 完成时间`} className="w-full" maxDate={parent.payload.deadline ? dayjs(parent.payload.deadline) : undefined} disabledDate={date => Boolean(parent.payload.deadline && date.isAfter(dayjs(parent.payload.deadline), 'day'))} /></Form.Item>
                 <Form.Item name={[field.name, 'weight']} rules={[{ required: true, type: 'number', min: 1, max: 100, message: '请输入 1-100 的权重' }]}><InputNumber aria-label={`A${actionIndex + 1} 权重`} min={1} max={100} precision={0} suffix="%" /></Form.Item>
                 <Button danger type="text" aria-label={`删除 A${actionIndex + 1}`} title="删除行动" icon={<TrashIcon />} onClick={() => setParentActions(parent.id, balanceWeights(getParentActions(parent.id).filter((_, index) => index !== actionIndex)))} />
               </div>;

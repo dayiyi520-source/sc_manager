@@ -115,13 +115,14 @@ vi.mock('../../context/AppContext', () => ({
   useAppNavigationContext: () => ({ openPageTab: vi.fn() }),
 }));
 
-import { appendDemoBreakdown, filterVisibleDemoBreakdowns, includeSelectedCycle, OKRPerformanceView } from './OKRPerformanceView';
+import { appendDemoBreakdown, filterVisibleDemoBreakdowns, includeSelectedCycle, OKRPerformanceView, ReviewSummaryView } from './OKRPerformanceView';
 
 describe('OKRPerformanceView target navigation', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-15T12:00:00+08:00'));
     vi.clearAllMocks();
+    sessionStorage.clear();
     okrState.records = [objectiveRecord];
     okrState.okrs = [okr];
     okrState.reviewableOkrs = [okr];
@@ -130,10 +131,27 @@ describe('OKRPerformanceView target navigation', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it('opens reviews directly without the former primary tabs or goal sidebar', () => {
+    render(<ReviewSummaryView />);
+    expect(screen.getByRole('tab', { name: '写复盘总结' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /^复盘总结$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /月度目标/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: '目标范围导航' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /写周报/ })).toBeInTheDocument();
+  });
+
+  it('opens the requested goal editor once when navigating from reviews', () => {
+    sessionStorage.setItem('shichuang.okr.addObjective', 'boss');
+    render(<OKRPerformanceView />);
+    expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
+    expect(sessionStorage.getItem('shichuang.okr.addObjective')).toBeNull();
+  });
+
   it('uses the scope sidebar and clears detail or breakdown state when switching scopes', async () => {
     const { container } = render(<OKRPerformanceView />);
 
-    expect(screen.getByRole('tab', { name: /月度目标/ })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /月度目标/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /^复盘总结$/ })).not.toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: '目标范围导航' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '我的目标' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('button', { name: /拆解目标/ })).not.toBeInTheDocument();

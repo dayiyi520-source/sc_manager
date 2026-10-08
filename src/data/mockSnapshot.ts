@@ -47,7 +47,7 @@ export const MOCK_APPROVALS: ApprovalFlow[] = [
     contentDetails: { '审批主题': 'V4.2 版本需求重大变更评审', '关联产品': '数字化协同管理中枢 V4.2', '申请说明': '新增测试计划关联能力，请评估排期影响。' },
   },
   {
-    id: 'demo-approval-purchase', code: 'APPR-2026-1003', title: '测试环境设备采购申请', type: '采购与报销审批',
+    id: 'demo-approval-purchase', code: 'APPR-2026-1003', title: '测试环境设备采购申请', type: '采购与报销',
     applicantName: '赵宁', applicantDept: '研发中心', status: '审批中', ccNames: ['林志豪'], relatedProduct: '智能制造数据平台', amount: 86000, submittedAt: '2026-10-01 11:15',
     nodes: [
       { title: '发起申请', approver: '赵宁', role: '研发工程师', status: 'passed', time: '2026-10-01 11:15' },
@@ -98,7 +98,21 @@ export const MOCK_OKR_RECORDS = rows('t_okr_record').filter((row) => Number(row.
   id: text(row.id_), kind: text(row.kind_) as 'objective' | 'review' | 'action', ownerId: text(row.owner_id_), periodKey: text(row.period_key_), status: text(row.status_), version: Number(row.version_ || 0), createdAt: text(row.create_time_), payload: (typeof row.payload_ === 'object' && row.payload_ !== null ? row.payload_ : {})
 }));
 export const MOCK_OKR_SETTINGS = rows('t_okr_setting').find((row) => Number(row.delete_flag_ || 0) === 0)?.config_ || {
-  defaultView: 'list', timeRules: [], validation: { actionWeightTotal: 100, maxActions: 10, assigneeMultiple: true, keyNodeMultiple: true, resultRequired: false }, dictionaries: { productNodes: [], deliveryNodes: [], presalesNodes: [], supportTypes: [] }, templates: []
+  defaultView: 'list',
+  timeRules: [
+    { key: 'addObjective', label: '添加目标', startDay: 1, endDay: 31, shortMonthRule: 'clamp', allowBackfill: false },
+    { key: 'breakdown', label: '拆解目标', startDay: 1, endDay: 31, shortMonthRule: 'clamp', allowBackfill: true },
+    { key: 'weeklyReview', label: '周总结', startDay: 1, endDay: 31, shortMonthRule: 'clamp', allowBackfill: true },
+    { key: 'monthlyReview', label: '月总结', startDay: 1, endDay: 31, shortMonthRule: 'clamp', allowBackfill: true }
+  ],
+  validation: { actionWeightTotal: 100, maxActions: 8, assigneeMultiple: true, keyNodeMultiple: true, resultRequired: true },
+  dictionaries: { productNodes: [], deliveryNodes: [], presalesNodes: [], supportTypes: [] },
+  templates: [
+    { department: '产研部门', type: 'product', fields: ['目标内容', '关联产品', '关键节点', '动作', '截止日期', '权重'] },
+    { department: '项目交付部门', type: 'delivery', fields: ['目标内容', '关联项目', '关键节点', '动作', '截止日期', '权重'] },
+    { department: '售前支持部门', type: 'presales', fields: ['目标内容', '关联线索/商机/投标', '关键节点', '动作', '截止日期', '权重'] },
+    { department: '其他支撑部门', type: 'support', fields: ['目标内容', '类型', '动作', '预期结果', '截止日期', '权重'] }
+  ]
 };
 
 const versionsByProduct = new Map<string, Row[]>();
@@ -136,6 +150,22 @@ const task = (row: Row): RequirementTask => ({
 });
 
 export const MOCK_REQUIREMENT_TASKS = workItems.filter((row) => text(row.category_) === 'requirement').map(task);
+export const MOCK_OPS_TASKS: RequirementTask[] = [
+  { title: '生产监控告警规则优化', description: '梳理接口延迟与错误率告警，合并重复通知并验证值班通知链路。', expectedGoal: '关键告警能够及时通知，重复告警明显减少。', status: '处理中', priority: '高', estimatedHours: 8, actualHours: 3, progress: 40 },
+  { title: '数据库备份恢复演练', description: '使用最近一次备份在隔离环境完成恢复，记录恢复耗时和数据核验结果。', expectedGoal: '完成恢复验证并形成演练记录。', status: '待处理', priority: '高', estimatedHours: 12, actualHours: 0, progress: 0 },
+  { title: '服务证书到期巡检与续期', description: '检查服务证书有效期，完成即将到期证书的续期和访问验证。', expectedGoal: '所有服务证书有效且访问正常。', status: '待验收', priority: '中', estimatedHours: 4, actualHours: 4, progress: 100 },
+  { title: '日志存储清理策略配置', description: '配置日志保留期限与归档策略，检查磁盘占用及查询可用性。', expectedGoal: '归档策略生效，日志查询正常。', status: '已完成', priority: '低', estimatedHours: 6, actualHours: 5, progress: 100 },
+].map((item, index) => {
+  const owner = MOCK_USERS[index % MOCK_USERS.length];
+  const product = MOCK_PRODUCT_LINES[index % MOCK_PRODUCT_LINES.length];
+  return {
+    ...item, id: `demo-ops-${index + 1}`, code: `OPS-DEMO-00${index + 1}`,
+    ownerName: owner?.name || '', assigneeId: owner?.id, department: owner?.department,
+    creatorName: MOCK_USERS[0]?.name || '', creatorId: MOCK_USERS[0]?.id,
+    productLineId: product?.id, productLineName: product?.name || '', versionName: '',
+    createdAt: '2026-10-08', dueDate: `2026-10-${12 + index * 3}`, events: [],
+  };
+});
 export const MOCK_DESIGN_TASKS = [
   ...workItems.filter((row) => text(row.category_) === 'design').map(task),
   {

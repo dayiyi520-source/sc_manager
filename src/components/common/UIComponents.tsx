@@ -209,13 +209,14 @@ export const Modal: React.FC<{
 export const Drawer: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   subtitle?: string;
   hideSubtitle?: boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: string;
-}> = ({ isOpen, onClose, title, subtitle, hideSubtitle, children, footer, width = 'max-w-2xl' }) => {
+  headerActions?: React.ReactNode;
+}> = ({ isOpen, onClose, title, subtitle, hideSubtitle, children, footer, width = 'max-w-2xl', headerActions }) => {
   if (!isOpen) return null;
 
   return (
@@ -226,17 +227,22 @@ export const Drawer: React.FC<{
         className={`w-screen ${width} bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl border-l border-[var(--border-main)] flex flex-col`}
         >
           <div className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]">
-            <div>
+            <div className="min-w-0 flex-1 mr-4">
               <h2 className="text-base font-semibold text-[var(--text-primary)] font-serif tracking-wide">{title}</h2>
               {subtitle && !hideSubtitle && <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
             </div>
-            <button
-              id="btn-drawer-close"
-              onClick={onClose}
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1.5 rounded hover:bg-[var(--bg-elevated)] transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {headerActions}
+              <button
+                id="btn-drawer-close"
+                onClick={onClose}
+                aria-label="关闭"
+                title="关闭"
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1.5 rounded hover:bg-[var(--bg-elevated)] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
           {footer && (
