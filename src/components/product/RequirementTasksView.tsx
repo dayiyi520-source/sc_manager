@@ -985,16 +985,17 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const creationIntentKey = `${taskKind}:${creationContext?.productLineId || ''}:${creationContext?.versionId || ''}:${creationContext?.parent?.id || ''}`;
   const consumedCreationIntent = useRef('');
   useEffect(() => {
-    if (!creationContext || !creationContext.productLineId || consumedCreationIntent.current === creationIntentKey) return;
+    if (!creationContext || consumedCreationIntent.current === creationIntentKey) return;
     const line = productLines.find((item) => item.id === creationContext.productLineId);
-    if (!line) return;
+    if (!line && !creationContext.sourceWorkOrder) return;
     consumedCreationIntent.current = creationIntentKey;
     if (creationContext.parent) {
       openChildModal(creationContext.parent);
       return;
     }
     openAddModal();
-    setFormProductLineName(line.name);
+    setFormProductLineName(line?.name || '');
+    if (creationContext.sourceWorkOrder) setSelectedWorkOrderIds([creationContext.sourceWorkOrder.id]);
     const version = versions.find((item) => item.id === creationContext.versionId);
     setFormVersionName(version?.name || '');
   }, [creationContext, creationIntentKey, productLines, versions]);
@@ -1116,7 +1117,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     }
     const selectedVersion = versions.find((version) => version.name === formVersionName);
     const projectName = projects.find((project) => project.id === formCustomerName)?.name || '';
-    const associationValues = { projectId: formCustomerName, projectName, needsCollaboration: taskKind === 'requirement' ? needsCollaboration : undefined, relatedTaskIds: selectedRequirementTaskIds, sourceWorkOrderIds: selectedWorkOrderIds, sourceWorkOrderTitles: collaborationCandidates.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title) };
+    const associationValues = { projectId: formCustomerName, projectName, needsCollaboration: taskKind === 'requirement' ? needsCollaboration : undefined, relatedTaskIds: selectedRequirementTaskIds, sourceWorkOrderIds: selectedWorkOrderIds, sourceWorkOrderTitles: selectedWorkOrderIds.map((id) => collaborationCandidates.find((item) => item.id === id)?.title || (creationContext?.sourceWorkOrder?.id === id ? creationContext.sourceWorkOrder.title : id)), ...(creationContext?.sourceWorkOrder ? { requirementId: creationContext.sourceWorkOrder.id, sourceType: 'WORK_ORDER' } : {}) };
     const requiredValues: Record<string, unknown> = { assignee: formOwnerName, priority: formPriority, project: formCustomerName, expectedGoal: formTarget, description: formDescription, plannedStartDate: formPlannedStartDate, plannedEndDate: formDueDate, expectedCompleteDate: formExpectedCompleteDate, version: formVersionName, cc: formCcNames, attachments: formMedia, estimatedHours: formEstimatedHours, collaborationItems: selectedWorkOrderIds, relatedTasks: selectedRequirementTaskIds, needsCollaboration };
     const missingField = createFields.fields.find((field) => field.visible && field.required && field.fieldCode in requiredValues && (Array.isArray(requiredValues[field.fieldCode]) ? !(requiredValues[field.fieldCode] as unknown[]).length : requiredValues[field.fieldCode] == null || requiredValues[field.fieldCode] === ''));
     if (missingField) { addToast('warning', `请填写${missingField.label}`); return false; }
@@ -1171,7 +1172,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           expectedCompleteDate: formExpectedCompleteDate || undefined,
           estimatedHours: Number(formEstimatedHours) || 0,
           actualHours: Number(formActualHours) || 0
-          , requirementId: allocationParent?.id || creationContext?.parent?.id
+          , requirementId: creationContext?.sourceWorkOrder?.id || allocationParent?.id || creationContext?.parent?.id
         });
         await unifiedQuery.refetch();
         window.dispatchEvent(new CustomEvent('product-task-created', { detail: { source: 'product-task', productLineId: selectedProductLine.id, needsCollaboration: needsCollaboration || [] } }));
@@ -2093,13 +2094,13 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       {/* Add / Edit Task Modal (云效风格: 任务名称、任务描述、期望目标、完成时间、分配负责人、紧急程度、关联版本、关联客户、关联产品、预计工时) */}
       <WorkItemCreatePanel
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); creationContext?.onClose?.(); }}
         title={editingTask ? `编辑${itemLabel}` : `新建${itemLabel}`}
-        showContinueOption={!editingTask}
-        secondaryAction={!editingTask ? <Button loading={taskSaving} onClick={handleSaveAndContinue}>保存并继续</Button> : undefined}
+        showContinueOption={!editingTask && !creationContext}
+        secondaryAction={!editingTask && !creationContext ? <Button loading={taskSaving} onClick={handleSaveAndContinue}>保存并继续</Button> : undefined}
         footer={
           <>
-            <Button onClick={() => setIsModalOpen(false)}>取消</Button>
+            <Button onClick={() => { setIsModalOpen(false); creationContext?.onClose?.(); }}>取消</Button>
             <Button type="primary" loading={taskSaving} onClick={() => void handleSaveTask()}>保存</Button>
           </>
         }
