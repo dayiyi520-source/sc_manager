@@ -13,6 +13,9 @@ import { copyToClipboard } from '../../utils/copyToClipboard';
 vi.mock('../../utils/copyToClipboard', () => ({ copyToClipboard: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
+vi.mock('../product/RequirementTasksView', () => ({
+  RequirementTasksView: ({ taskKind, itemLabel, creationContext }: { taskKind: string; itemLabel: string; creationContext: { sourceWorkOrder?: RequirementTask; onClose?: () => void; onCreated?: () => void } }) => <section aria-label={`新建${itemLabel}`} data-testid="embedded-task-create" data-kind={taskKind} data-source={creationContext.sourceWorkOrder?.id}><h2>新建{itemLabel}</h2><button onClick={creationContext.onClose}>取消任务新建</button><button onClick={() => { creationContext.onCreated?.(); creationContext.onClose?.(); }}>模拟任务保存</button></section>,
+}));
 vi.mock('../../services/requirementRepository', () => ({
   requirementRepository: { allForScope: vi.fn(), transferredBy: vi.fn(), employees: vi.fn(), detail: vi.fn(), receive: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), createWorkItem: vi.fn() },
   normalizeRequirementTask: (task: RequirementTask) => task,
@@ -108,7 +111,9 @@ describe('workbench work-order creation layout', () => {
     expect(screen.getByRole('button', { name: '新增任务' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: '事项接收' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '新增任务' }));
-    expect(screen.getByLabelText('任务类型 *')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('menuitem', { name: '产品' }));
+    expect(screen.getByRole('heading', { name: '新建产品任务' })).toBeVisible();
+    expect(useApp().openPageTab).not.toHaveBeenCalled();
   });
 
   it('keeps pending status and task lock when reception fails', async () => {
@@ -118,6 +123,41 @@ describe('workbench work-order creation layout', () => {
     await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '事项接收失败', '状态已变化'));
     expect(screen.getByRole('button', { name: '新增任务' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '事项接收' })).toBeEnabled();
+  });
+
+  it('restores the left-side fields, description and attachment empty state', async () => {
+    await renderDetail({ descriptionHtml: '<p>必须恢复的事项描述</p>' });
+    expect(screen.getByRole('region', { name: '基础字段' })).toHaveTextContent('协同产品');
+    expect(screen.getByRole('region', { name: '基础字段' })).toHaveTextContent('项目甲');
+    expect(screen.getByRole('region', { name: '事项描述' })).toHaveTextContent('必须恢复的事项描述');
+    expect(screen.getByRole('region', { name: '附件' })).toHaveTextContent('暂无附件');
+    expect(screen.getByRole('heading', { name: '事项全历程' })).toBeVisible();
+  });
+
+  it.each([
+    ['产品', 'requirement', '产品任务'], ['设计', 'design', '设计任务'], ['缺陷', 'bug', '缺陷'],
+    ['售前', 'presales', '售前任务'], ['交付', 'delivery', '交付任务'],
+  ])('opens %s creation inside the matter detail without list navigation', async (label, kind, itemLabel) => {
+    await renderDetail({ status: '处理中', productLineId: 'line-1' });
+    fireEvent.click(screen.getByRole('button', { name: '新增任务' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: label }));
+    expect(screen.getByRole('heading', { name: `新建${itemLabel}` })).toBeVisible();
+    expect(screen.getByTestId('embedded-task-create')).toHaveAttribute('data-kind', kind);
+    expect(screen.getByTestId('embedded-task-create')).toHaveAttribute('data-source', 'receive-1');
+    expect(useApp().openPageTab).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '取消任务新建' }));
+    expect(screen.queryByTestId('embedded-task-create')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '接收协同事项' })).toBeVisible();
+  });
+
+  it('refreshes associated tasks after the embedded form saves', async () => {
+    await renderDetail({ status: '处理中', productLineId: 'line-1' });
+    fireEvent.click(screen.getByRole('button', { name: '新增第一个任务' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '产品' }));
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ id: 'receive-1', title: '接收协同事项', status: '处理中', events: [], workItems: [{ id: 'new-task', taskType: '产品需求', title: '已保存任务', status: '待处理' }] } as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
+    fireEvent.click(screen.getByRole('button', { name: '模拟任务保存' }));
+    expect(await screen.findByText('产品需求 · 已保存任务')).toBeVisible();
+    expect(screen.queryByTestId('embedded-task-create')).not.toBeInTheDocument();
   });
 
   it('does not grant owner actions using a matching name when owner ids differ', async () => {
@@ -180,7 +220,7 @@ describe('workbench work-order creation layout', () => {
 
   it('reopens with a handler and reason, without a progress field or a second reassignment dialog', async () => {
     window.history.replaceState(null, '', '/app/wb_work_order?detailId=closed-item');
-    const task = { id: 'closed-item', code: 'WO-02', title: '已关闭事项', status: '已关闭', creatorName: '林志豪', revision: 4, events: [], workItems: [] };
+    const task = { id: 'closed-item', code: 'WO-02', title: '已完成事项', status: '已完成', creatorName: '林志豪', revision: 4, events: [], workItems: [] };
     vi.mocked(requirementRepository.detail).mockResolvedValue(task as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
     vi.mocked(requirementRepository.reopen).mockRejectedValueOnce(new Error('保存失败')).mockResolvedValueOnce({ ...task, status: '处理中', revision: 5, progress: 0 } as unknown as Awaited<ReturnType<typeof requirementRepository.reopen>>);
     render(<RequirementPoolView />);

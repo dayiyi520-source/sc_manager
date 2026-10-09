@@ -32,6 +32,24 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+it.each([
+  ['requirement', '产品任务'], ['design', '设计任务'], ['bug', '缺陷'], ['presales', '售前任务'], ['delivery', '交付任务'],
+] as const)('opens the real %s creation form over a collaboration detail and closes without navigation', async (kind, label) => {
+  window.history.replaceState(null, '', '/app/wb_work_order?detailId=assistance-1');
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '协同产品' }] } as unknown as ReturnType<typeof useApp>);
+  const onClose = vi.fn();
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={client}><RequirementTasksView taskKind={kind} itemLabel={label} creationContext={{ productLineId: 'line-1', sourceWorkOrder: { id: 'assistance-1', title: '来源事项' } as import('../../types').RequirementTask, onClose }} /></QueryClientProvider>);
+  expect(await screen.findByText(`新建${label}`)).toBeVisible();
+  expect(productRepository.businessTask).not.toHaveBeenCalled();
+  expect(productRepository.workItemDetail).not.toHaveBeenCalled();
+  expect(screen.queryByText('我负责的')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '关闭分享详情' }));
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(window.location.pathname).toBe('/app/wb_work_order');
+  expect(window.location.search).toBe('?detailId=assistance-1');
+});
+
 const renderTasks = (kind: 'presales' | 'dev' = 'presales') => render(<React.StrictMode><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} /></QueryClientProvider></React.StrictMode>);
 
 it('loads business task shares independently of the list and copies the business number', async () => {

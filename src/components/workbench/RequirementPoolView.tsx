@@ -494,6 +494,7 @@ export const RequirementPoolView: React.FC = () => {
     return () => { active = false; };
   }, [detailSearch]);
   const closeDetail = () => {
+    setTaskCreationKind(null);
     setSelected(null);
     const url = new URL(window.location.href);
     url.searchParams.delete('detailId');
@@ -1150,7 +1151,7 @@ export const RequirementPoolView: React.FC = () => {
             </div>
             <div className="min-w-0 space-y-5 text-sm">
             <section>
-              <div className="mb-4 flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-[var(--text-primary)]">关联任务（{workItems.length}）</h3><Dropdown trigger={["click"]} disabled={!canAddTask || receiving} menu={taskCreationMenu}><Button type="primary" disabled={!canAddTask || receiving}>新增任务 <ChevronDown className="ml-1 inline h-3.5 w-3.5" /></Button></Dropdown></div>
+              <div className="mb-4 flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-[var(--text-primary)]">关联任务（{workItems.length}）</h3><Dropdown key={canAddTask && !receiving ? 'enabled' : 'disabled'} trigger={["click"]} disabled={!canAddTask || receiving} menu={taskCreationMenu}><Button type="primary" disabled={!canAddTask || receiving}>新增任务 <ChevronDown className="ml-1 inline h-3.5 w-3.5" /></Button></Dropdown></div>
               {workItems.length ? <div className="space-y-2">{workItems.map((item) => {
                 const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED";
                 const accepted = item.assistanceTaskStatus === "ACCEPTED";

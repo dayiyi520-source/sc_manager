@@ -164,7 +164,7 @@ const EMPTY_DEV_TASKS: DevTask[] = [];
 
 export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, onDetailClose, renderDetail, createPolicy, creationContext, designVariant = 'product', designVariantFilter = designVariant, onDesignVariantChange, designExtras = [] }) => {
   const queryClient = useQueryClient();
-  const [detailSearch] = useState(() => window.location.search);
+  const [detailSearch] = useState(() => creationContext ? '' : window.location.search);
   const {
     requirementTasks = EMPTY_REQUIREMENT_TASKS,
     designTasks = EMPTY_REQUIREMENT_TASKS,
@@ -241,6 +241,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
   useEffect(() => {
     const raw = sessionStorage.getItem('shichuang.task.search');
+    if (creationContext) return;
     if (!raw) return;
     try {
       const payload = JSON.parse(raw) as { targetPage?: string; title?: string; itemId?: string; productLineId?: string };
@@ -1002,6 +1003,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
   useEffect(() => {
     const raw = sessionStorage.getItem('shichuang.iterationTaskCreate');
+    if (creationContext) return;
     if (!raw) return;
     let intent: { kind?: string; productLineId?: string; versionId?: string };
     try { intent = JSON.parse(raw); } catch { sessionStorage.removeItem('shichuang.iterationTaskCreate'); return; }
@@ -1019,6 +1021,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
   useEffect(() => {
     const raw = sessionStorage.getItem('shichuang.productTaskCreate');
+    if (creationContext) return;
     if (!raw) return;
     let intent: { kind?: string; productLineId?: string };
     try { intent = JSON.parse(raw); } catch { sessionStorage.removeItem('shichuang.productTaskCreate'); return; }
@@ -1031,7 +1034,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   }, [taskKind, productLines]);
 
   useEffect(() => {
-    if (!requirementTaskDraft) return;
+    if (!requirementTaskDraft || creationContext) return;
     setEditingTask(null);
     setFormTitle(requirementTaskDraft.title || '');
     setFormDescription(requirementTaskDraft.description || '');
@@ -1146,7 +1149,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         plannedStartDate: formPlannedStartDate,
         expectedCompleteDate: formExpectedCompleteDate,
         sourceWorkOrderIds: selectedWorkOrderIds,
-        sourceWorkOrderTitles: candidateOptions.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title),
+        sourceWorkOrderTitles: associationValues.sourceWorkOrderTitles,
         requirementId: editingTask.requirementId,
         media: formMedia
       });
@@ -1204,7 +1207,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         plannedStartDate: formPlannedStartDate,
         expectedCompleteDate: formExpectedCompleteDate,
         sourceWorkOrderIds: selectedWorkOrderIds,
-        sourceWorkOrderTitles: candidateOptions.filter((item) => selectedWorkOrderIds.includes(item.id)).map((item) => item.title),
+        sourceWorkOrderTitles: associationValues.sourceWorkOrderTitles,
         media: formMedia
       });
       saveSucceeded = saved !== false;
