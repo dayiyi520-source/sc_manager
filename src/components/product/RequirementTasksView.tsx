@@ -108,15 +108,19 @@ const WorkOrderPicker: React.FC<{
   const filtered = safeCandidates.filter((item) => (type === 'all' || item.type === type) && (!keyword.trim() || [item.title, item.code, item.ownerName, item.summary].filter(Boolean).join(' ').toLowerCase().includes(keyword.trim().toLowerCase())));
   const selected = safeSelectedIds.map((id) => safeCandidates.find((item) => item.id === id) || { id, title: id, typeLabel: '事项' } as RequirementWorkOrderCandidate);
   const toggle = (id: string) => { if (!disabled) onChange(safeSelectedIds.includes(id) ? safeSelectedIds.filter((item) => item !== id) : [...safeSelectedIds, id]); };
+  const iconCategory = (item: RequirementWorkOrderCandidate) => item.type === 'requirement' ? 'requirement' : item.type === 'bug' ? 'bug' : 'assistance';
   return <div className="space-y-2">
     <button type="button" disabled={disabled} onClick={() => setOpen((value) => !value)} className="flex h-9 w-full items-center justify-between rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] px-3 text-left text-[var(--text-body)] hover:border-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50">
       <span>{selected.length ? `已关联 ${selected.length} 条事项` : placeholder}</span><span className="text-[var(--text-muted)]">{open ? '收起' : '选择'}</span>
     </button>
-    {selected.length > 0 && <div className="flex flex-wrap gap-1.5">{selected.map((item) => <span key={item.id} className="inline-flex max-w-full items-center gap-1 rounded-md bg-[var(--bg-surface-soft)] px-2 py-1 text-[var(--text-body)]"><button type="button" className="max-w-48 truncate text-left text-[var(--primary)] hover:text-[var(--primary-hover)]" onClick={() => onNavigate?.(item)}>{item.title}</button><button type="button" onClick={() => toggle(item.id)} aria-label={`移除${item.title}`}><X className="h-3 w-3" /></button></span>)}</div>}
+    {selected.length > 0 && <div className="space-y-2">{selected.map((item) => <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 py-2.5">
+      <div className="flex min-w-0 items-center gap-2"><WorkItemCategoryIcon category={iconCategory(item)} className="h-4 w-4 shrink-0 text-[var(--primary)]" /><button type="button" className="min-w-0 flex-1 truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]" onClick={() => onNavigate?.(item)}>{item.title}</button><button type="button" className="shrink-0 text-[var(--text-muted)] hover:text-[var(--danger)]" onClick={() => toggle(item.id)} aria-label={`移除${item.title}`}><X className="h-3 w-3" /></button></div>
+      <div className="mt-2 grid gap-1 text-xs text-[var(--text-muted)] sm:grid-cols-2"><span>创建人：{item.creatorName || item.ownerName || '未设置'}</span><span>期望完成时间：{item.expectedCompleteDate || '未设置'}</span></div>
+    </div>)}</div>}
     {open && <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-3 shadow-sm">
       <div className="flex items-center gap-2"><input autoFocus value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索标题、编号、负责人" className="h-8 min-w-0 flex-1 rounded-md border border-[var(--border-main)] bg-transparent px-2 text-xs outline-none focus:border-[var(--primary)]" /><button type="button" onClick={() => setOpen(false)} className="text-xs text-[var(--text-muted)]">关闭</button></div>
       <div className="mt-3 flex flex-wrap gap-1.5">{[{ key: 'all' as const, label: '全部' }, ...WORK_ORDER_TYPES].map((item) => <button type="button" key={item.key} onClick={() => setType(item.key)} className={`rounded-md px-2 py-1 text-[11px] ${type === item.key ? 'bg-[var(--primary)] text-white' : 'bg-[var(--bg-surface-soft)] text-[var(--text-muted)]'}`}>{item.label} {item.key !== 'all' && <span>({safeCandidates.filter((candidate) => candidate.type === item.key).length})</span>}</button>)}</div>
-      <div className="mt-3 max-h-56 space-y-1 overflow-auto">{filtered.length ? filtered.map((item) => <button type="button" key={item.id} onClick={() => toggle(item.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--bg-surface-soft)]"><span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${safeSelectedIds.includes(item.id) ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border-main)]'}`}>{safeSelectedIds.includes(item.id) && <Check className="h-3 w-3" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs text-[var(--text-primary)]">{item.title}</span><span className="block truncate text-[11px] text-[var(--text-muted)]">{item.typeLabel}{item.code ? ` · ${item.code}` : ''}{item.ownerName ? ` · ${item.ownerName}` : ''}{item.productLineName ? ` · ${item.productLineName}` : ''}</span></span></button>) : <p className="py-6 text-center text-xs text-[var(--text-muted)]">暂无匹配事项</p>}</div>
+      <div className="mt-3 max-h-56 space-y-1 overflow-auto">{filtered.length ? filtered.map((item) => <button type="button" key={item.id} onClick={() => toggle(item.id)} className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--bg-surface-soft)]"><span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${safeSelectedIds.includes(item.id) ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border-main)]'}`}>{safeSelectedIds.includes(item.id) && <Check className="h-3 w-3" />}</span><WorkItemCategoryIcon category={item.category || (item.sourceType === 'WORK_ORDER' ? 'assistance' : item.type === 'bug' ? 'bug' : 'requirement')} className="mt-0.5 shrink-0 text-[var(--primary)]" /><span className="min-w-0 flex-1"><span className="block truncate text-xs text-[var(--text-primary)]">{item.title}</span><span className="block truncate text-[11px] text-[var(--text-muted)]">{item.typeLabel}{item.ownerName ? ` · 负责人：${item.ownerName}` : ' · 负责人：未分配'}{item.status ? ` · 状态：${item.status}` : ''}</span></span></button>) : <p className="py-6 text-center text-xs text-[var(--text-muted)]">暂无匹配事项</p>}</div>
     </div>}
   </div>;
 };
@@ -744,7 +748,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   };
 
   const localCandidates = useMemo<RequirementWorkOrderCandidate[]>(() => [
-    ...requirementTasks.map((item) => ({ id: item.id, type: 'requirement' as const, typeLabel: '需求', title: item.title, code: item.code, ownerName: item.ownerName, productLineName: item.productLineName, status: item.status, summary: item.description })),
+    ...requirementTasks.map((item) => ({ id: item.id, type: 'requirement' as const, typeLabel: '需求', title: item.title, code: item.code, ownerName: item.ownerName, creatorName: item.creatorName, expectedCompleteDate: item.expectedCompleteDate, productLineName: item.productLineName, status: item.status, summary: item.description })),
     ...requirementTasks.filter((item) => item.id !== selectedTask?.id).flatMap((item) => (item.events || []).filter((event) => event.eventType === '转任务').map((event) => ({ id: String(event.metadata?.taskId || `${item.id}-task`), type: 'task' as const, typeLabel: '任务', title: String(event.metadata?.taskTitle || item.title), ownerName: String(event.metadata?.assigneeName || item.ownerName), productLineName: item.productLineName, status: item.status }))),
     ...bugs.map((item: DefectBug) => ({ id: item.id, type: 'bug' as const, typeLabel: '缺陷', title: item.title, code: item.code, ownerName: item.ownerName || item.assignee, productLineName: item.productLineName, status: item.status, summary: item.description })),
     ...devTasks.map((item: DevTask) => ({ id: item.id, type: 'task' as const, typeLabel: '任务', title: item.title, ownerName: item.developer, productLineName: item.productLineName, status: item.status, summary: item.description })),
@@ -753,13 +757,20 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   ].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index && item.id !== selectedTask?.id), [requirementTasks, bugs, devTasks, requirementPool, risks, selectedTask?.id]);
 
   const candidateOptions = remoteCandidates.length ? remoteCandidates.filter((item) => item.id !== selectedTask?.id) : localCandidates;
-  const collaborationCandidates = candidateOptions.filter((item) => item.sourceType === 'WORK_ORDER' || (item.type === 'requirement' && requirementTasks.some((task) => task.id === item.id && Boolean(task.workOrderType)))).map((item) => ({ ...item, sourceType: 'WORK_ORDER' }));
+  const collaborationCandidates = candidateOptions.filter((item) => item.sourceType === 'WORK_ORDER' || (item.type === 'requirement' && requirementTasks.some((task) => task.id === item.id && Boolean(task.workOrderType)))).map((item) => ({ ...item, sourceType: 'WORK_ORDER', category: 'assistance' }));
   const linkedTaskQuery = useQuery({ queryKey: ['task-association-options', productLineKey], queryFn: async () => (await Promise.all(productLines.map(async (line) => {
     const items: UnifiedWorkItem[] = [];
     for (let page = 1; ; page++) { const result = await productRepository.workItems(line.id, '', '', { page }); items.push(...result.page.items); if (!result.page.items.length || items.length >= result.page.total) break; }
     return items;
   }))).flat() });
-  const taskCandidates: RequirementWorkOrderCandidate[] = (linkedTaskQuery.data || []).filter((item) => item.category !== taskKind && item.id !== selectedTask?.id).map((item) => ({ id: item.id, title: item.title, code: item.code, type: item.category === 'bug' ? 'bug' : 'task', typeLabel: workItemCategoryLabel[item.category] || '任务', ownerName: item.assigneeName, productLineName: productLines.find((line) => line.id === item.productLineId)?.name, status: item.status?.name }));
+  const taskCandidates: RequirementWorkOrderCandidate[] = (linkedTaskQuery.data || []).filter((item) => {
+    if (item.id === selectedTask?.id) return false;
+    if (taskKind === 'design' || taskKind === 'dev' || taskKind === 'test') {
+      const status = item.status?.name || '';
+      return item.category === 'requirement' && !['已完成', '已取消'].includes(status);
+    }
+    return item.category !== taskKind;
+  }).map((item) => ({ id: item.id, title: item.title, code: item.code, type: item.category === 'bug' ? 'bug' : 'task', category: item.category, typeLabel: workItemCategoryLabel[item.category] || '任务', ownerName: item.assigneeName, productLineName: productLines.find((line) => line.id === item.productLineId)?.name, status: item.status?.name }));
   useEffect(() => {
     requirementRepository.workOrderCandidates({ requirementId: selectedTask?.id || '', limit: 200 }).then((items) => setRemoteCandidates(Array.isArray(items) ? items : [])).catch(() => setRemoteCandidates([]));
   }, [selectedTask?.id]);
@@ -1985,15 +1996,14 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                     <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-sm">
                       <div className="mb-1 text-xs text-[var(--text-muted)]">来源协同事项（系统固定关联）</div>
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-semibold text-white">1</span>
+                        <WorkItemCategoryIcon category="assistance" className="shrink-0 text-[var(--primary)]" />
                         <button type="button" className="truncate text-left text-[var(--primary)] hover:text-[var(--primary-hover)]" onClick={() => {
                           const title = selectedTask.requirementTitle || selectedTask.sourceWorkOrderTitles?.[0] || '';
                           if (title) sessionStorage.setItem('shichuang.assistance.search', title);
                           openPageTab('wb_work_order');
                         }}>{selectedTask.requirementTitle || selectedTask.sourceWorkOrderTitles?.[0] || selectedTask.requirementId || '关联协同事项'}</button>
                       </div>
-                      <div className="mt-2 text-xs text-[var(--text-muted)]">发起人：{selectedTask.requirementInitiatorName || '未知'}</div>
-                      <div className="mt-1 text-xs text-[var(--text-muted)]">该关联由协同事项转任务时自动建立，不可修改或新增。</div>
+                      <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-[var(--text-muted)] sm:grid-cols-2"><span>创建人：{selectedTask.requirementInitiatorName || selectedTask.creatorName || '未知'}</span><span>期望完成时间：{selectedTask.expectedCompleteDate || selectedTask.dueDate || '未设置'}</span></div>
                     </div>
                   ) : <WorkOrderPicker disabled={!detailEditable('collaborationItems')} candidates={collaborationCandidates} selectedIds={selectedTask.sourceWorkOrderIds || []} onChange={updateLinkedWorkOrders} onNavigate={navigateWorkOrderCandidate} placeholder="请选择协同事项" />}
                   {!relatedWorkItems.length && !(selectedTask.sourceWorkOrderIds || []).length && !(selectedTask.sourceType === 'WORK_ORDER' && selectedTask.requirementId) && <p className="rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-[var(--text-muted)]">暂无关联对象</p>}

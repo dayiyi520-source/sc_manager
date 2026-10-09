@@ -78,6 +78,38 @@ const initialWorkItems = [
   ...MOCK_BUGS.map((bug) => ({ ...bug, category: 'bug', assigneeName: bug.ownerName })),
 ];
 const getWorkItems = () => read<any[]>(KEYS.workItems, initialWorkItems.map((item) => ({ ...item })));
+const workItemSummary = (task: Record<string, any>, taskType?: string): RequirementWorkItem => ({
+  id: String(task.id),
+  requirementId: String(task.requirementId),
+  taskType: String(taskType || task.requirementType || task.taskType || '产品需求') as RequirementWorkItem['taskType'],
+  title: String(task.title || ''),
+  assigneeName: String(task.assigneeName || task.ownerName || ''),
+  status: String(task.status || '待处理'),
+  revision: Number(task.revision || 0),
+  createdAt: task.createdAt || now(),
+});
+const attachWorkItemToRequirement = (task: Record<string, any>, taskType?: string) => {
+  if (!task.requirementId) return;
+  const items = getWorkItems();
+  const index = items.findIndex((item) => item.id === task.requirementId);
+  if (index < 0) return;
+  const current = items[index];
+  const summaries = Array.isArray(current.workItems) ? current.workItems : [];
+  const summary = workItemSummary(task, taskType);
+  items[index] = { ...current, workItems: [...summaries.filter((item: RequirementWorkItem) => item.id !== summary.id), summary] };
+  write(KEYS.workItems, items);
+};
+const syncAttachedWorkItem = (task: Record<string, any>) => {
+  if (!task.requirementId) return;
+  const items = getWorkItems();
+  const index = items.findIndex((item) => item.id === task.requirementId);
+  if (index < 0) return;
+  const current = items[index];
+  const summaries = Array.isArray(current.workItems) ? current.workItems : [];
+  const summary = workItemSummary(task);
+  items[index] = { ...current, workItems: summaries.map((item: RequirementWorkItem) => item.id === summary.id ? { ...item, ...summary } : item) };
+  write(KEYS.workItems, items);
+};
 const testTasks = MOCK_TEST_TASKS.map((task) => ({
   id: task.id,
   code: task.code || task.id,
@@ -129,7 +161,9 @@ const recordTaskChanges = (before: Record<string, any>, after: Record<string, an
   if (changes.length) recordTaskActivity(String(after.id), String(after.productLineId || ''), 'WORK_ITEM_UPDATED', { changes });
 };
 const categoryCode = (value: string) => ({ 产品: 'requirement', 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' } as Record<string, string>)[value] || value;
-const templateCategories = () => read(KEYS.researchCategories, databaseRows('t_work_item_category_dictionary').map((row) => ({ id: row.id_, code: row.code_, name: row.name_, displayName: row.display_name_ || row.name_, iconKey: row.icon_key_ || row.code_, capabilityType: row.capability_type_ || 'STANDARD', sort: Number(row.sort_ || 0), enabled: Boolean(row.enabled_), builtIn: Boolean(row.built_in_), revision: Number(row.version_ || 0) })));
+const isTestCaseCategory = (value: any) => String(value?.code || value?.category || value?.name || '').toLowerCase() === 'case' || value?.capabilityType === 'TEST_CASE';
+const templateCategories = () => read(KEYS.researchCategories, databaseRows('t_work_item_category_dictionary').map((row) => ({ id: row.id_, code: row.code_, name: row.name_, displayName: row.display_name_ || row.name_, iconKey: row.icon_key_ || row.code_, capabilityType: row.capability_type_ || 'STANDARD', sort: Number(row.sort_ || 0), enabled: Boolean(row.enabled_), builtIn: Boolean(row.built_in_), revision: Number(row.version_ || 0) }))).filter((item: any) => !isTestCaseCategory(item));
+const filteredTemplateCategories = () => templateCategories().filter((item: any) => !isTestCaseCategory(item));
 const templateRoles = () => read(KEYS.researchRoles, databaseRows('t_product_role_template').map((row) => ({ id: row.id_, name: row.name_, responsibility: row.responsibility_ || '', sort: Number(row.sort_ || 0), revision: Number(row.version_ || 0), updatedAt: row.update_time_ })));
 const templateStatuses = () => read(KEYS.researchStatuses, databaseRows('t_research_status_template').map((row) => ({ id: row.id_, scope: row.scope_, name: row.name_, phase: row.phase_, color: row.color_ || 'neutral', initial: Boolean(row.initial_), enabled: Boolean(row.enabled_), sort: Number(row.sort_ || 0), revision: Number(row.version_ || 0) })));
 const DETAIL_FIELD_DEFINITIONS: Record<string, Array<[string, string, string, string, boolean]>> = {
@@ -137,7 +171,7 @@ const DETAIL_FIELD_DEFINITIONS: Record<string, Array<[string, string, string, st
     ['title', '标题', 'text', '详情页顶部任务标题，可点击修改', true], ['creator', '创建人', 'user', '任务创建人，只读', false], ['createdAt', '创建时间', 'date', '任务创建时间，只读', false], ['updater', '更新人', 'user', '最近一次修改人，只读', false], ['updatedAt', '更新时间', 'date', '最近一次修改时间，只读', false],
     ['expectedGoal', '期望结果', 'text', '任务完成后预期达到的结果', true], ['parent', '主任务', 'relation', '当前任务所属的父任务，只读', false], ['description', '任务描述', 'text', '左侧描述区，可进入富文本编辑', true], ['status', '当前状态', 'select', '右侧基础字段中的任务状态', true], ['assignee', '负责人', 'user', '右侧基础字段中的负责人', true], ['priority', '优先级', 'select', '右侧基础字段中的优先级', true],
     ['productLine', '归属产品', 'relation', '任务所属产品或产品线', true], ['version', '迭代版本', 'relation', '任务关联的迭代版本', true], ['plannedStartDate', '计划开始时间', 'date', '任务计划开始日期', true], ['dueDate', '计划完成时间', 'date', '任务计划完成日期', true], ['expectedCompleteDate', '期望完成时间', 'date', '业务期望完成日期', true],
-    ['customer', '关联客户', 'relation', '任务关联的客户对象', true], ['participants', '参与人', 'user', '需要同步或关注任务的成员', true], ['estimatedHours', '预计工时', 'number', '任务预计投入的小时数', true], ['actualHours', '实际工时', 'number', '任务实际投入的小时数', true], ['relations', '关联对象', 'section', '详情页下方的关联产品任务和协同事项', true], ['children', '子任务', 'section', '详情页下方的子任务列表', true], ['support', '支撑项', 'section', '详情页下方关联的测试计划等支撑事项', true], ['hours', '工时', 'section', '详情页下方的工时汇总和统计', true],
+    ['customer', '关联客户', 'relation', '任务关联的客户对象', true], ['participants', '参与人', 'user', '需要同步或关注任务的成员', true], ['estimatedHours', '预计工时', 'number', '任务预计投入的小时数', true], ['actualHours', '实际工时', 'number', '任务实际投入的小时数', true], ['taskType', '任务类型', 'select', '工作项所属类型', true], ['relations', '关联对象', 'section', '详情页下方的关联产品任务和协同事项', true], ['children', '子任务', 'section', '详情页下方的子任务列表', true], ['support', '支撑项', 'section', '详情页下方关联的测试计划等支撑事项', true], ['hours', '工时', 'section', '详情页下方的工时汇总和统计', true],
   ],
   dev: [['repo', '代码仓库', 'text', '研发任务关联的代码仓库地址或名称', true], ['branch', '特性分支', 'text', '研发任务对应的代码分支', true]],
   bug: [['severity', '严重程度', 'select', '缺陷影响范围和紧急程度', true], ['type', '缺陷类型', 'select', '缺陷所属的问题类型', true], ['env', '所属环境', 'select', '缺陷出现或验证的运行环境', true]],
@@ -196,6 +230,11 @@ const DETAIL_SYSTEM_FIELD_CODES = new Set(['creator', 'createdAt', 'updater', 'u
 const LEGACY_FIELD_CODES = new Set(['requirement']);
 const CREATE_ASSOCIATION_FIELD_CODES = ['collaborationItems', 'relatedTasks', 'children', 'support', 'hours'];
 const CREATE_COMMON_FIELD_CODES = ['title', 'expectedGoal', 'description', 'productLine', 'taskType', 'assignee', 'priority', 'plannedStartDate', 'plannedEndDate', 'version', 'project', 'cc', 'estimatedHours', 'actualHours', 'attachments'];
+const DEFAULT_HIDDEN_CREATE_FIELD_CODES = new Set(['expectedGoal', 'hours', 'collaborationItems', 'children', 'cc']);
+const DEFAULT_HIDDEN_DETAIL_FIELD_CODES = new Set(['support', 'participants', 'taskType']);
+const defaultFieldVisible = (scene: string, fieldCode: string) => scene === 'CREATE'
+  ? !DEFAULT_HIDDEN_CREATE_FIELD_CODES.has(fieldCode)
+  : scene === 'DETAIL' ? !DEFAULT_HIDDEN_DETAIL_FIELD_CODES.has(fieldCode) : true;
 const normalizeTemplateField = (field: any) => {
   const metadata = FIELD_METADATA[field.fieldCode];
   const detailSystemField = field.scene === 'DETAIL' && DETAIL_SYSTEM_FIELD_CODES.has(field.fieldCode);
@@ -209,11 +248,11 @@ const normalizeTemplateField = (field: any) => {
 };
 const templateFields = () => {
   const stored = read<any[] | null>(KEYS.researchFields, null);
-  const base = (stored || databaseRows('t_work_item_field_configuration').map((row) => ({ categoryCode: row.category_code_, scene: row.scene_, fieldCode: row.field_code_, label: row.field_code_, fieldType: 'text', visible: Boolean(row.visible_), required: Boolean(row.required_), editable: true, defaultValue: null, sort: Number(row.sort_ || 0), locked: false })))
+  const base = (stored || databaseRows('t_work_item_field_configuration').map((row) => ({ categoryCode: row.category_code_, scene: row.scene_, fieldCode: row.field_code_, label: row.field_code_, fieldType: 'text', visible: defaultFieldVisible(row.scene_, row.field_code_) && Boolean(row.visible_), required: Boolean(row.required_), editable: true, defaultValue: null, sort: Number(row.sort_ || 0), locked: false })))
     .flatMap((field) => field.fieldCode === 'relations' ? ['collaborationItems', 'relatedTasks'].filter((code) => !stored?.some((existing) => existing.categoryCode === field.categoryCode && existing.scene === field.scene && existing.fieldCode === code)).map((code) => ({ ...field, fieldCode: code })) : [{ ...field, fieldCode: field.fieldCode === 'customer' ? 'project' : field.fieldCode }])
     .filter((field, index, all) => !LEGACY_FIELD_CODES.has(field.fieldCode) && all.findIndex((other) => other.categoryCode === field.categoryCode && other.scene === field.scene && other.fieldCode === field.fieldCode) === index)
     .map(normalizeTemplateField);
-  const categories = [...new Set(['requirement', 'design', 'dev', 'test', 'bug', ...templateCategories().map((item: any) => item.code)])];
+  const categories = [...new Set(['requirement', 'design', 'dev', 'test', 'bug', ...templateCategories().map((item: any) => item.code)])].filter((code) => code !== 'case');
   // New categories inherit the common field contract until customized independently.
   categories.forEach((code) => {
     ['CREATE', 'CREATE_CHILD', 'LIST', 'ITERATION'].forEach((scene) => {
@@ -232,15 +271,15 @@ const templateFields = () => {
       if (baseWithCreateAssociations.some((field) => field.categoryCode === categoryCode && field.scene === scene && field.fieldCode === fieldCode)) return;
       const metadata = FIELD_METADATA[fieldCode];
       const sort = Math.max(0, ...baseWithCreateAssociations.filter((field) => field.categoryCode === categoryCode && field.scene === scene).map((field) => field.sort)) + 1;
-      baseWithCreateAssociations.push(normalizeTemplateField({ categoryCode, scene, fieldCode, ...metadata, visible: true, required: false, editable: fieldCode !== 'actualHours', defaultValue: fieldCode === 'priority' ? '中' : null, sort, locked: false }));
+      baseWithCreateAssociations.push(normalizeTemplateField({ categoryCode, scene, fieldCode, ...metadata, visible: defaultFieldVisible(scene, fieldCode), required: false, editable: fieldCode !== 'actualHours', defaultValue: fieldCode === 'priority' ? '中' : null, sort, locked: false }));
     });
   }));
   categories.forEach((categoryCode) => createScenes.forEach((scene) => CREATE_ASSOCIATION_FIELD_CODES.forEach((fieldCode) => {
     if (baseWithCreateAssociations.some((field) => field.categoryCode === categoryCode && field.scene === scene && field.fieldCode === fieldCode)) return;
     const metadata = FIELD_METADATA[fieldCode];
-    baseWithCreateAssociations.push({ categoryCode, scene, fieldCode, label: metadata.label, fieldType: metadata.fieldType, description: metadata.description, visible: true, required: false, editable: true, defaultValue: null, sort: baseWithCreateAssociations.filter((field) => field.categoryCode === categoryCode && field.scene === scene).length + 1, locked: false });
+    baseWithCreateAssociations.push({ categoryCode, scene, fieldCode, label: metadata.label, fieldType: metadata.fieldType, description: metadata.description, visible: defaultFieldVisible(scene, fieldCode), required: false, editable: true, defaultValue: null, sort: baseWithCreateAssociations.filter((field) => field.categoryCode === categoryCode && field.scene === scene).length + 1, locked: false });
   })));
-  const detail = categories.flatMap((categoryCode) => DETAIL_FIELDS(categoryCode).map((field) => ({ ...field, categoryCode, scene: 'DETAIL' })));
+  const detail = categories.flatMap((categoryCode) => DETAIL_FIELDS(categoryCode).map((field) => ({ ...field, visible: defaultFieldVisible('DETAIL', field.fieldCode), categoryCode, scene: 'DETAIL' })));
   const detailCodes = new Set(detail.map((field) => `${field.categoryCode}:${field.fieldCode}`));
   const detailDefaults = new Map(detail.map((field) => [`${field.categoryCode}:${field.fieldCode}`, field]));
   const normalizedBase = baseWithCreateAssociations.filter((field) => field.scene !== 'DETAIL' || detailCodes.has(`${field.categoryCode}:${field.fieldCode}`)).map((field) => {
@@ -629,6 +668,7 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     const updated = { ...current, ...body, ownerName: body.assigneeName ?? current.ownerName, assigneeName: body.assigneeName ?? current.assigneeName ?? current.ownerName, revision: revision + 1 };
     items[index] = updated;
     write(KEYS.workItems, items);
+    syncAttachedWorkItem(updated);
     recordTaskChanges(current, updated);
     return unifiedWorkItem(updated);
   }
@@ -641,8 +681,38 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     if (existing) return unifiedWorkItem(existing);
     const owner = getEmployeeOptions().find((employee) => employee.id === body.assigneeId);
     const task = { ...body, id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: '待处理', statusKey: 'pending', revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
-    write(KEYS.workItems, [task, ...items]); recordTaskActivity(task.id, product.id, 'WORK_ITEM_CREATED', { title: task.title });
+    write(KEYS.workItems, [task, ...items]);
+    attachWorkItemToRequirement(task, type.name);
+    recordTaskActivity(task.id, product.id, 'WORK_ITEM_CREATED', { title: task.title });
     return unifiedWorkItem(task);
+  }
+  if (parts[1] === 'requirements' && parts[2] && parts[3] === 'work-items' && parts[4] === 'batch' && method === 'POST') {
+    const items = getWorkItems();
+    const requirementIndex = items.findIndex((item) => item.id === parts[2]);
+    if (requirementIndex < 0) throw new Error('事项不存在');
+    const tasks = Array.isArray(body.tasks) ? body.tasks : [];
+    if (!tasks.length) throw new Error('至少创建一个任务');
+    const requirement = items[requirementIndex];
+    const created = tasks.map((input: Record<string, any>) => {
+      if (!String(input.taskType || '').trim()) throw new Error('任务类型不能为空');
+      if (!String(input.assigneeName || '').trim()) throw new Error('任务负责人不能为空');
+      return { id: id('assist'), requirementId: requirement.id, taskType: input.taskType, title: String(input.title || requirement.title).trim(), assigneeName: String(input.assigneeName).trim(), note: input.note || '', status: '待处理', assistanceTaskStatus: 'PENDING', createdAt: now(), blocksClosure: input.blocksClosure ?? true };
+    });
+    items[requirementIndex] = { ...requirement, status: requirement.status === '待处理' ? '处理中' : requirement.status, workItems: [...(Array.isArray(requirement.workItems) ? requirement.workItems : []), ...created] };
+    write(KEYS.workItems, [ ...items.slice(0, requirementIndex), items[requirementIndex], ...items.slice(requirementIndex + 1) ]);
+    return { items: created, count: created.length };
+  }
+  if (parts[1] === 'requirements' && parts[2] && parts[3] === 'work-items' && parts[4] && ['status', 'progress'].includes(parts[5]) && ['PATCH', 'PUT'].includes(method)) {
+    const items = getWorkItems();
+    const requirementIndex = items.findIndex((item) => Array.isArray(item.workItems) && item.workItems.some((child: RequirementWorkItem) => child.id === parts[4]));
+    if (requirementIndex < 0) throw new Error('关联任务不存在');
+    const requirement = items[requirementIndex];
+    const children = requirement.workItems.map((child: RequirementWorkItem) => child.id === parts[4]
+      ? { ...child, ...(parts[5] === 'status' ? { status: String(body.status || child.status), assistanceTaskStatus: body.status === '已完成' ? 'COMPLETED' : child.assistanceTaskStatus } : { progress: Number(body.progress || 0) }), revision: Number(child.revision || 0) + 1 }
+      : child);
+    items[requirementIndex] = { ...requirement, workItems: children };
+    write(KEYS.workItems, items);
+    return children.find((child: RequirementWorkItem) => child.id === parts[4]);
   }
   if (clean === '/api/work-items' && method === 'GET') {
     const query = queryOf(path); const productLineId = query.get('productLineId'); const category = query.get('category'); const keyword = (query.get('keyword') || '').toLowerCase();

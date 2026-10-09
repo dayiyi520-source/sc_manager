@@ -595,10 +595,13 @@ export interface RequirementWorkOrderCandidate {
   title: string;
   code?: string;
   ownerName?: string;
+  creatorName?: string;
+  expectedCompleteDate?: string;
   productLineName?: string;
   status?: string;
   summary?: string;
   sourceType?: string;
+  category?: string;
 }
 
 export interface RequirementTaskDraft {

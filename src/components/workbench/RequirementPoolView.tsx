@@ -51,6 +51,7 @@ import { DateField } from "../common";
 import { copyToClipboard } from '../../utils/copyToClipboard';
 import { employeeSelectOptions } from "../common/PersonIdentity";
 import { isWorkOrderInScope, ownerDepartment, REQUIREMENT_SCOPES, type RequirementScope } from './requirementScope';
+import { WorkItemCategoryIcon } from '../product/WorkItemCategoryIcon';
 export { isWorkOrderInScope } from './requirementScope';
 
 const statuses: RequirementTask["status"][] = [
@@ -73,6 +74,7 @@ const severityPriorities: Record<string, RequirementTask["priority"]> = {
   "轻微缺陷": "低",
 };
 const taskTargetPages: Record<RequirementTaskType, string> = TASK_PAGE_BY_TYPE;
+const taskIconCategory = (taskType?: string) => taskType === '设计任务' ? 'design' : taskType === '研发任务' ? 'dev' : taskType === '缺陷管理' ? 'bug' : taskType === '测试任务' ? 'test' : 'requirement';
 const formatDateTime = (value?: string) => {
   if (!value) return "—";
   const normalized = value.includes("T") ? value : value.replace(" ", "T");
@@ -1158,7 +1160,10 @@ export const RequirementPoolView: React.FC = () => {
                 const taskTargetPage = TASK_PAGE_BY_TYPE[item.taskType] || "prod_req_tasks";
                 const taskEvents = Array.isArray(item.events) ? [...item.events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))) : [];
                 return <div key={item.id} className="space-y-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-xs">
-                  <div className="flex items-center justify-between gap-3"><button type="button" className="min-w-0 truncate text-left text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => { sessionStorage.setItem('shichuang.task.search', JSON.stringify({ targetPage: taskTargetPage, title: item.title })); openPageTab(taskTargetPage as Parameters<typeof openPageTab>[0]); }}>{item.taskType} · {item.title}</button><span className="flex shrink-0 items-center gap-2">{item.assigneeName}<StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && isInitiator(selected, currentUser) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>
+                  <div className="space-y-2">
+                    <div className="flex min-w-0 items-center gap-2"><WorkItemCategoryIcon category={taskIconCategory(item.taskType)} className="h-4 w-4 shrink-0 text-[var(--primary)]" /><button type="button" className="min-w-0 flex-1 truncate text-left font-semibold text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => { sessionStorage.setItem('shichuang.task.search', JSON.stringify({ targetPage: taskTargetPage, title: item.title })); openPageTab(taskTargetPage as Parameters<typeof openPageTab>[0]); }}><span className="sr-only">{item.taskType} · {item.title}</span><span aria-hidden="true">{item.title}</span></button></div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[var(--text-muted)]"><span>{item.assigneeName || '未分配'}</span><StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && isInitiator(selected, currentUser) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</div>
+                  </div>
                   <div className="border-t border-[var(--border-main)]" />
                   {taskEvents.length > 0 && <div className="space-y-2"><div className="text-[11px] font-semibold text-[var(--text-muted)]">任务变化历程</div>{taskEvents.map((taskEvent) => <div key={taskEvent.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-2"><div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{taskEvent.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{formatDateTime(taskEvent.createdAt)}</span></div><div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{taskEvent.operatorName || "未知"}{taskEvent.fromStatus || taskEvent.toStatus ? ` · ${taskEvent.fromStatus || "—"} → ${taskEvent.toStatus || "—"}` : ""}</div>{taskEvent.reason && <p className="mt-1 text-xs text-[var(--text-body)]">{taskEvent.reason}</p>}</div>)}</div>}
                 </div>;
