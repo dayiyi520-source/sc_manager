@@ -18,7 +18,8 @@ import {
   MOCK_OKR_RECORDS,
   MOCK_OKR_SETTINGS,
 } from '../data/mockSnapshot';
-import type { ProductLine, RequirementTask } from '../types';
+import type { ProductLine, RequirementTask, RequirementWorkItem, VersionIteration } from '../types';
+import { normalizeVersionStatus } from '../components/product/productLinePresentation';
 import type { CurrentUser, EmployeeOption } from '../types';
 import type {
   SaveTestPlanInput,
@@ -98,7 +99,13 @@ const defaultCases = (): TestCase[] => MOCK_TEST_CASES.map((item) => ({ ...item,
 const getCases = () => read<TestCase[]>(KEYS.cases, defaultCases());
 const getPlans = () => read<TestPlan[]>(KEYS.plans, MOCK_TEST_PLANS.map((item) => ({ ...item, cases: [...item.cases] })));
 const getMembers = () => read(KEYS.members, MOCK_TEAM_MEMBERS.map((item) => ({ ...item })));
-const getProductLines = () => read<ProductLine[]>(KEYS.productLines, MOCK_PRODUCT_LINES.map((item) => ({ ...item, versions: [...(item.versions || [])] })));
+const getProductLines = (): ProductLine[] => read<ProductLine[]>(KEYS.productLines, MOCK_PRODUCT_LINES.map((item) => ({ ...item, versions: [...(item.versions || [])] }))).map((product) => {
+  const snapshotVersions = MOCK_PRODUCT_LINES.find((item) => item.id === product.id)?.versions || [];
+  return { ...product, versions: product.versions?.map((version) => ({
+    ...version,
+    releaseDate: version.releaseDate || snapshotVersions.find((item) => item.id === version.id)?.releaseDate || '',
+  })) };
+});
 const getOkrPeople = () => {
   const cached = read(KEYS.okrPeople, MOCK_OKR_PEOPLE);
   return MOCK_OKR_PEOPLE.map((person) => {
@@ -375,6 +382,30 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   }
   if (clean === '/api/auth/dev-accounts') return MOCK_USERS.map((user) => ({ username: user.role === 'admin' ? 'admin' : user.role.replace('_', '-'), name: user.name, role: user.roleTitle }));
   if (clean === '/api/product-lines' && method === 'GET') return getProductLines();
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'versions' && parts.length <= 5 && ['POST', 'PUT'].includes(method)) {
+    const products = getProductLines();
+    const product = products.find((item) => item.id === parts[2]);
+    if (!product) throw new Error('产品不存在');
+    const versions = product.versions || [];
+    if (method === 'POST' && !parts[4]) {
+      if (!text(body.name).trim() || !text(body.code).trim() || !text(body.ownerName).trim()) throw new Error('请填写版本名称、版本号和版本负责人');
+      if (versions.some((item) => item.code === text(body.code).trim())) throw new Error('版本号已存在');
+      const version: VersionIteration = { ...body, id: id('ver'), name: text(body.name).trim(), code: text(body.code).trim(), productLineId: product.id, productLineName: product.name, status: '待开始', statusPhase: '待开始', releaseDate: '', createdAt: now() };
+      product.versions = [...versions, version];
+      write(KEYS.productLines, products);
+      return version;
+    }
+    const current = versions.find((item) => item.id === parts[4]);
+    if (!current) throw new Error('版本不存在');
+    if (body.status !== undefined) {
+      const previousStatus = normalizeVersionStatus(current.status, current.statusPhase);
+      if (body.status !== previousStatus && !((previousStatus === '待开始' && body.status === '进行中') || (previousStatus === '进行中' && body.status === '已完成'))) throw new Error('迭代状态已变化，请刷新后重试');
+    }
+    Object.assign(current, body, { id: current.id, productLineId: product.id, productLineName: product.name });
+    if (body.status !== undefined) current.statusPhase = body.status === '进行中' ? '处理中' : body.status;
+    write(KEYS.productLines, products);
+    return current;
+  }
   if (clean === '/api/product-lines' && method === 'POST') {
     const input = body as Partial<ProductLine>;
     const product: ProductLine = { ...input, id: id('pl'), name: input.name || '新建产品', code: input.code || 'PL-NEW', description: input.description || '', ownerName: input.ownerName || '', visibility: input.visibility || '公开', commercialAvailability: input.commercialAvailability || '不可商用', sort: Number(input.sort || 0), status: '待规划', createdAt: now(), versions: [] };
@@ -413,7 +444,49 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     write(KEYS.members, members); return members[index];
   }
   if (clean === '/api/requirements/departments' && method === 'GET') return getEmployeeOptions().map((item) => ({ id: item.id, name: item.department || '产品研发部', managerName: item.name }));
-  if (clean === '/api/requirements' && method === 'GET') return { items: MOCK_REQUIREMENT_TASKS, page: 1, pageSize: 100, total: MOCK_REQUIREMENT_TASKS.length };
+  if (clean === '/api/requirements' && method === 'GET') {
+    const items = getWorkItems().filter((item) => item.category === 'requirement');
+    const page = Math.max(1, Number(queryOf(path).get('page') || 1));
+    const pageSize = Math.min(100, Math.max(1, Number(queryOf(path).get('pageSize') || 100)));
+    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
+  }
+  if (clean === '/api/requirements/audit-events' && method === 'GET') {
+    const query = queryOf(path);
+    const items = getWorkItems().filter((item) => item.category === 'requirement').flatMap((item) => (item.events || []).map((event) => ({ ...event, requirementId: item.id }))).filter((event) => (!query.get('eventType') || event.eventType === query.get('eventType')) && (!query.get('operatorName') || event.operatorName === query.get('operatorName')));
+    const page = Math.max(1, Number(query.get('page') || 1));
+    const pageSize = Math.min(100, Math.max(1, Number(query.get('pageSize') || 100)));
+    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
+  }
+  if (parts[1] === 'requirements' && parts[2] && parts.length === 3 && method === 'GET') {
+    const item = getWorkItems().find((candidate) => candidate.id === parts[2]);
+    if (!item) throw new Error('事项不存在');
+    return { ...item, events: item.events || [], workItems: item.workItems || [] };
+  }
+  if (parts[1] === 'requirements' && parts[2] && parts[3] === 'transition' && method === 'POST') {
+    const items = getWorkItems();
+    const index = items.findIndex((candidate) => candidate.id === parts[2]);
+    if (index < 0) throw new Error('事项不存在');
+    const current = items[index];
+    const status = body.action === 'reject' ? '已驳回' : body.action === 'hold' ? '已搁置' : body.status;
+    if (!['处理中', '已驳回', '已搁置'].includes(status)) throw new Error('不支持的事项状态');
+    if (status === '处理中' && current.status !== '待处理') throw new Error('事项状态已变化，请刷新');
+    const event = { id: id('event'), eventType: status === '处理中' ? '事项接收' : body.action === 'reject' ? '驳回' : '搁置', fromStatus: current.status, toStatus: status, reason: text(body.reason), operatorName: current.ownerName, createdAt: now() };
+    items[index] = { ...current, status, revision: Number(current.revision || current.version || 0) + 1, events: [...(current.events || []), event] };
+    write(KEYS.workItems, items);
+    return null;
+  }
+  if (parts[1] === 'requirements' && parts[2] && ['complete', 'acceptance-passed', 'acceptance-failed'].includes(parts[3]) && method === 'POST') {
+    const items = getWorkItems(); const index = items.findIndex((candidate) => candidate.id === parts[2]);
+    if (index < 0) throw new Error('事项不存在');
+    const current = items[index]; const revision = Number(current.revision || current.version || 0);
+    if (body.revision != null && Number(body.revision) !== revision) throw new Error('事项已被其他人更新，请刷新后重试');
+    const nextStatus = parts[3] === 'complete' ? '待验收' : parts[3] === 'acceptance-passed' ? '已完成' : '处理中';
+    if ((parts[3] === 'complete' && current.status !== '处理中') || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
+    if (parts[3] === 'complete' && (current.workItems || []).some((item: RequirementWorkItem) => item.status !== '已完成' && item.assistanceTaskStatus !== 'COMPLETED')) throw new Error('存在未完成的关联任务');
+    const event = { id: id('event'), eventType: parts[3] === 'complete' ? '事项完成' : parts[3] === 'acceptance-passed' ? '验收通过' : '验收未通过', fromStatus: current.status, toStatus: nextStatus, reason: text(body.note || body.reason), operatorName: current.ownerName, createdAt: now() };
+    items[index] = { ...current, status: nextStatus, revision: revision + 1, events: [...(current.events || []), event] };
+    write(KEYS.workItems, items); return { id: current.id, status: nextStatus };
+  }
   if (clean === '/api/design-tasks' && method === 'GET') return { items: MOCK_DESIGN_TASKS, page: 1, pageSize: 100, total: MOCK_DESIGN_TASKS.length };
   if (clean === '/api/bugs' && method === 'GET') return { items: MOCK_BUGS, page: 1, pageSize: 100, total: MOCK_BUGS.length };
   if (clean === '/api/dev-tasks' && method === 'GET') return { items: MOCK_DEV_TASKS, page: 1, pageSize: 100, total: MOCK_DEV_TASKS.length };

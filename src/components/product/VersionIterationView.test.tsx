@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import React from 'react';
-import { fireEvent, render as testingLibraryRender, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render as testingLibraryRender, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VersionIterationView } from './VersionIterationView';
@@ -201,16 +201,47 @@ describe('VersionIterationView', () => {
     fireEvent.click(screen.getByRole('tab', { name: '迭代信息' }));
     expect(screen.getByText('版本工时')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '完成迭代' }));
-    await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '已完成' }));
+    await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '已完成', statusPhase: '已完成' }));
   });
 
   it('opens an iteration through the real update path', async () => {
     appMocks.versions[0].status = '未开始';
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
-    await waitFor(() => expect(appMocks.researchStatusTemplates).toHaveBeenCalledWith('ITERATION'));
+    expect(appMocks.researchStatusTemplates).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '开启迭代' }));
-    await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '进行中' }));
+    await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '进行中', statusPhase: '处理中' }));
+  });
+
+  it('completes a running iteration through the update path', async () => {
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    fireEvent.click(screen.getByRole('button', { name: '完成迭代' }));
+    await waitFor(() => expect(appMocks.updateVersion).toHaveBeenCalledWith('version-1', { status: '已完成', statusPhase: '已完成' }));
+  });
+
+  it('does not offer another lifecycle action for a completed iteration', async () => {
+    appMocks.versions[0].status = '已完成';
+    await act(async () => {
+      render(<VersionIterationView />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    });
+    expect(screen.queryByRole('button', { name: '重开迭代' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '开启迭代' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '完成迭代' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the original state after a failed save and permits retry', async () => {
+    appMocks.versions[0].status = '待开始';
+    appMocks.updateVersion.mockResolvedValueOnce(false);
+    render(<VersionIterationView />);
+    fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
+    fireEvent.click(screen.getByRole('button', { name: '开启迭代' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '开启迭代' })).toBeEnabled());
+    expect(appMocks.versions[0].status).toBe('待开始');
+    expect(appMocks.addToast).not.toHaveBeenCalledWith('success', expect.anything(), expect.anything());
   });
   it('collapses version task descendants and excludes child creation for defects', async () => {
     sessionStorage.setItem('shichuang.session.token', 'test');

@@ -18,7 +18,6 @@ import {
   Plus,
   Play,
   CheckCircle,
-  RotateCcw,
   Search,
   Trash2,
   Undo2,
@@ -41,7 +40,7 @@ import { UnifiedWorkItemControls, type UnifiedFilterState } from './UnifiedWorkI
 import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { WorkItemBatchBar } from './WorkItemBatchBar';
 import { ProductNavigation } from './ProductNavigation';
-import { useQuery } from '@tanstack/react-query';
+import { ITERATION_STATUSES, normalizeVersionStatus } from './productLinePresentation';
 import { parentWorkItemId, workItemHierarchy, workItemKey } from './workItemHierarchy';
 
 type ViewMode = 'list' | 'planning';
@@ -103,13 +102,6 @@ const versionMatches = (version: VersionIteration, value?: string) => {
 };
 
 const completedWorkItemStatuses = new Set(['已完成', '已发布', '已验收', '已关闭', '已合并上线']);
-const normalizeVersionStatus = (status?: string, phase?: string) => {
-  if (phase === '已完成') return '已完成';
-  if (phase === '处理中') return '进行中';
-  if (phase === '已结束') return '已结束';
-  if (phase === '待开始') return '未开始';
-  return status || '未配置';
-};
 
 const workItemStats = (items: PlanningItem[]) => ({
   completed: items.filter((item) => completedWorkItemStatuses.has(item.status)).length,
@@ -413,7 +405,6 @@ export const VersionIterationView: React.FC = () => {
     updateVersion,
     addToast
   } = useApp();
-  const iterationStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'ITERATION'], queryFn: () => productRepository.researchStatusTemplates('ITERATION'), retry: false });
   const iterationFieldConfigs = {
     requirement: useWorkItemFieldConfig('requirement', 'ITERATION'),
     design: useWorkItemFieldConfig('design', 'ITERATION'),
@@ -488,8 +479,7 @@ export const VersionIterationView: React.FC = () => {
   const [draggedWorkItem, setDraggedWorkItem] = useState<PlanningItem | null>(null);
   const [selectedPlanningItemIds, setSelectedPlanningItemIds] = useState<string[]>([]);
   const [directWorkItem, setDirectWorkItem] = useState<Record<string, unknown> | null>(null);
-  const enabledIterationStatuses = (iterationStatusesQuery.data || []).filter((item) => item.enabled);
-  const iterationStatusForPhase = (phase: '待开始' | '处理中' | '已完成' | '已结束') => enabledIterationStatuses.find((item) => item.phase === phase)?.name || '';
+  const [changingVersionStatus, setChangingVersionStatus] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -767,11 +757,15 @@ export const VersionIterationView: React.FC = () => {
   const openDevTask = (item: DevTask) => { const target = planningItems.find((candidate) => candidate.kind === 'dev' && candidate.id === item.id); if (target) openWorkItemDetail(target); };
   const openBug = (item: DefectBug) => { const target = planningItems.find((candidate) => candidate.kind === 'bug' && candidate.id === item.id); if (target) openWorkItemDetail(target); };
 
-  const changeVersionStatus = async (nextStatus: string) => {
-    if (!nextStatus) { addToast('error', '迭代状态未配置', '请先在系统与组织-产研模板中配置对应阶段的启用状态'); return; }
-    if (!selectedVersion) return;
-    const saved = await updateVersion(selectedVersion.id, { status: nextStatus });
-    if (saved) addToast('success', '迭代状态已更新', `${selectedVersion.name}：${nextStatus}`);
+  const changeVersionStatus = async (nextStatus: '进行中' | '已完成') => {
+    if (!selectedVersion || changingVersionStatus) return;
+    setChangingVersionStatus(true);
+    try {
+      const saved = await updateVersion(selectedVersion.id, { status: nextStatus, statusPhase: nextStatus === '进行中' ? '处理中' : '已完成' });
+      if (saved) addToast('success', '迭代状态已更新', `${selectedVersion.name}：${nextStatus}`);
+    } finally {
+      setChangingVersionStatus(false);
+    }
   };
 
   const renderProductNavigation = () => <ProductNavigation productLines={productLines} value={productLineFilter} onChange={setProductLineFilter} />;
@@ -1028,11 +1022,9 @@ export const VersionIterationView: React.FC = () => {
     const normalizedStatus = normalizeVersionStatus(selectedVersion?.status, selectedVersion?.statusPhase);
     const isCompleted = normalizedStatus === '已完成';
     const isRunning = normalizedStatus === '进行中';
-    const statusAction = isCompleted
-      ? { label: '重开迭代', nextStatus: iterationStatusForPhase('处理中'), icon: <RotateCcw className="h-4 w-4" /> }
-      : isRunning
-        ? { label: '完成迭代', nextStatus: iterationStatusForPhase('已完成'), icon: <CheckCircle className="h-4 w-4" /> }
-        : { label: '开启迭代', nextStatus: iterationStatusForPhase('处理中'), icon: <Play className="h-4 w-4" /> };
+    const statusAction = isCompleted ? null : isRunning
+      ? { label: '完成迭代', nextStatus: '已完成' as const, icon: <CheckCircle className="h-4 w-4" /> }
+      : { label: '开启迭代', nextStatus: '进行中' as const, icon: <Play className="h-4 w-4" /> };
     const filteredItems = selectedItems.filter((item) =>
       taskKinds.includes(item.kind)
       && (taskStatus === 'all' || item.status === taskStatus)
@@ -1152,7 +1144,7 @@ export const VersionIterationView: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex min-w-0 flex-wrap items-center gap-3"><h2 className="max-w-80 truncate text-lg font-bold text-[var(--text-primary)]" title={selectedVersion.name}>{selectedVersion.name}</h2><span className="text-[var(--text-muted)]">|</span><div role="tablist" aria-label="迭代详情分类" className="inline-flex rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">{([['info', '迭代信息'], ['workItems', '迭代任务']] as const).map(([key, label]) => <button type="button" role="tab" aria-selected={detailSection === key} key={key} onClick={() => setDetailSection(key)} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${detailSection === key ? 'bg-[var(--bg-surface)] text-[var(--active-text)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{label}</button>)}</div><StatusTag status={normalizedStatus} /></div>
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => void changeVersionStatus(statusAction.nextStatus)} className={secondaryButton}>{statusAction.icon}{statusAction.label}</button>
+                    {statusAction && <button type="button" disabled={changingVersionStatus} onClick={() => void changeVersionStatus(statusAction.nextStatus)} className={`${secondaryButton} disabled:cursor-not-allowed disabled:opacity-50`}>{statusAction.icon}{changingVersionStatus ? '保存中…' : statusAction.label}</button>}
                   </div>
                 </div>
               </div>
@@ -1273,7 +1265,7 @@ export const VersionIterationView: React.FC = () => {
           <div className="version-toolbar flex w-full flex-nowrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <Input aria-label="搜索迭代" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索迭代" prefix={<Search className="h-3.5 w-3.5 text-[var(--text-muted)]" />} className="w-80 max-w-[min(320px,45vw)]" />
-              <Select aria-label="状态筛选" value={status} onChange={setStatus} options={[{ value: 'all', label: '全部状态' }, ...enabledIterationStatuses.map((item) => ({ value: item.name, label: item.name }))]} className="w-28" getPopupContainer={(trigger) => trigger.parentElement || document.body} />
+              <Select aria-label="状态筛选" value={status} onChange={setStatus} options={[{ value: 'all', label: '全部状态' }, ...ITERATION_STATUSES.map((value) => ({ value, label: value }))]} className="w-28" getPopupContainer={(trigger) => trigger.parentElement || document.body} />
               <Select aria-label="负责人筛选" value={ownerFilter} onChange={setOwnerFilter} options={[{ value: 'all', label: '全部负责人' }, ...Array.from(new Set(visibleVersions.map((version) => version.ownerName || '未分配'))).map((owner) => ({ value: owner, label: owner }))]} className="w-32" getPopupContainer={(trigger) => trigger.parentElement || document.body} />
             </div>
             <button type="button" onClick={openCreateVersion} className={`${primaryButton} h-8 shrink-0 whitespace-nowrap`}><Plus className="h-3.5 w-3.5" />新建</button>

@@ -7,14 +7,18 @@ import { loadProductTaskAllocation } from './ProductTaskAllocationView';
 import { productRepository } from '../../services/productRepository';
 import { mockApiRequest } from '../../services/mockApi';
 import type { ProductLine } from '../../types';
+import { responsibilitySummary, normalizeResponsibilityNames } from './productResponsibilityPresentation';
 
 describe('product workspace business rules', () => {
   beforeEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
-  it('requires all three primary owners, permits empty secondary owners, rejects duplicates', () => {
+  it('requires all three primary owners, permits multiple secondary owners, rejects duplicates', () => {
     const valid = { requirementOwnerUserId: 'a', techOwnerUserId: 'b', testOwnerUserId: 'c' };
     expect(validateResponsibilities(valid)).toBe('');
     expect(validateResponsibilities({ ...valid, testOwnerUserId: '' })).toContain('测试责任人');
     expect(validateResponsibilities({ ...valid, techOwnerSecondaryUserId: 'b' })).toContain('不能相同');
+    expect(validateResponsibilities({ ...valid, techOwnerSecondaryUserId: ['d', 'e'] })).toBe('');
+    expect(normalizeResponsibilityNames('张三、李四')).toEqual(['张三', '李四']);
+    expect(responsibilitySummary(['张三', '李四', '王五'])).toEqual({ label: '张三 +2', title: '张三、李四、王五' });
   });
   it('rejects empty document names and content while preserving safe tables and images', () => {
     expect(validateProductDocument('', '<p>正文</p>')).toContain('名称');

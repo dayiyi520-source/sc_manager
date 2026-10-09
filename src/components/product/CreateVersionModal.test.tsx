@@ -24,6 +24,16 @@ vi.mock('../../services/teamRepository', () => ({
 }));
 
 describe('CreateVersionModal', () => {
+  it('creates a pending iteration without a publication date', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><CreateVersionModal isOpen productLine={{ id: 'line-1', name: '协同产品', ownerName: '林志豪' }} onClose={vi.fn()} /></QueryClientProvider>);
+    fireEvent.change(screen.getByPlaceholderText('请输入版本名称'), { target: { value: '新迭代' } });
+    fireEvent.change(screen.getByPlaceholderText('请输入版本号'), { target: { value: 'V2.0.0' } });
+    fireEvent.submit(document.querySelector('#create-version-form')!);
+    await waitFor(() => expect(mocks.addVersion).toHaveBeenCalledWith(expect.objectContaining({ status: '待开始', statusPhase: '待开始' })));
+    expect(mocks.addVersion.mock.lastCall![0]).not.toHaveProperty('releaseDate');
+    mocks.addVersion.mockClear();
+  });
   it('requires a product line and exposes the agreed release-note example', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={queryClient}><CreateVersionModal isOpen onClose={vi.fn()} /></QueryClientProvider>);

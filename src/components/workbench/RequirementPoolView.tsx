@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Input, Select } from "antd";
+import { Button, Dropdown, Input, Select } from "antd";
 import { workOrderDisplayName } from '../../utils/workOrderDisplay';
 import { DetailCopyButton } from '../common/DetailCopyButton';
 import {
@@ -14,13 +14,7 @@ import {
   Paperclip,
   ArrowRight,
   X,
-  MessageSquareText,
-  WifiOff,
-  Headphones,
-  Truck,
-  HelpCircle,
-  ListFilter,
-  PenSquare,
+  ChevronDown,
   Bold,
   Italic,
   Underline,
@@ -36,10 +30,10 @@ import {
 } from "../common/octicons-compat";
 import { Pagination } from "../common/Pagination";
 import { useApp } from "../../context/AppContext";
-import { StatCard, StatusTag, Drawer, Modal } from "../common/UIComponents";
+import { StatusTag, Drawer, Modal } from "../common/UIComponents";
 import { normalizeRequirementTask, requirementRepository } from "../../services/requirementRepository";
-import { RequirementActionButtons } from "../product/RequirementActionButtons";
 import { LazyRichTextEditor as RichTextEditor } from "../product/LazyRichTextEditor";
+import { RequirementTasksView } from "../product/RequirementTasksView";
 import type {
   EmployeeOption,
   RequirementEvent,
@@ -56,15 +50,15 @@ import { TASK_PAGE_BY_TYPE } from "../../constants/taskTypes";
 import { DateField } from "../common";
 import { copyToClipboard } from '../../utils/copyToClipboard';
 import { employeeSelectOptions } from "../common/PersonIdentity";
+import { isWorkOrderInScope, ownerDepartment, REQUIREMENT_SCOPES, type RequirementScope } from './requirementScope';
+export { isWorkOrderInScope } from './requirementScope';
 
 const statuses: RequirementTask["status"][] = [
   "待处理",
   "处理中",
   "待验收",
-  "待关闭",
-  "已关闭",
-  "已驳回",
   "已完成",
+  "已退回",
 ];
 const taskTypes: RequirementTaskType[] = [
   "产品需求",
@@ -72,7 +66,6 @@ const taskTypes: RequirementTaskType[] = [
   "设计任务",
   "研发任务",
 ];
-const opportunityStagesBeforeWin = new Set(["发现商机", "需求确认", "方案设计", "商务谈判", "招投标"]);
 const severityPriorities: Record<string, RequirementTask["priority"]> = {
   "阻断主流程": "紧急",
   "功能逻辑异常": "高",
@@ -87,23 +80,9 @@ const formatDateTime = (value?: string) => {
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(date).replace(/\//g, "-");
 };
-const workOrderCards: Array<{ type: WorkOrderType; description: string; icon: React.ReactNode }> = [
-  { type: "客户诉求", description: "收集客户反馈、业务需求与改进建议", icon: <MessageSquareText className="h-6 w-6" /> },
-  { type: "线上问题", description: "记录线上故障、异常现象与影响范围", icon: <WifiOff className="h-6 w-6" /> },
-  { type: "售前支持", description: "处理方案咨询、演示和售前技术支持", icon: <Headphones className="h-6 w-6" /> },
-  { type: "交付支持", description: "跟进项目实施、部署与交付保障事项", icon: <Truck className="h-6 w-6" /> },
-  { type: "其他问题", description: "处理其他协同事项与非业务问题", icon: <HelpCircle className="h-6 w-6" /> },
-];
+const workOrderTypes: WorkOrderType[] = ["客户诉求", "线上问题", "售前支持", "交付支持", "其他问题"];
 
-const specialFieldLabels: Record<string, string> = {
-  projectName: "所属项目", requestType: "诉求类型", requestSource: "诉求来源",
-  productName: "缺陷类型", severity: "严重程度", frequency: "发生频率",
-  opportunityName: "所属线索/商机/投标", opportunityId: "所属线索/商机/投标", leadId: "所属线索/商机/投标", biddingId: "所属线索/商机/投标",
-  supportType: "支持类型", durationDays: "预计时长（天）",
-  progressStage: "项目阶段", other: "项目类型", deliveryType: "交付类型", problemSource: "问题来源",
-  expectedResult: "期望结果", problemType: "协助类型", priority: "优先级",
-};
-const hiddenSpecialFieldKeys = new Set(["opportunityId", "leadId", "biddingId", "relatedType"]);
+
 
 const normalizeMedia = (value: unknown): RequirementMedia[] => {
   if (Array.isArray(value)) return value as RequirementMedia[];
@@ -149,18 +128,6 @@ type AssistanceSubTask = {
   media: RequirementMedia[];
 };
 
-
-export const isWorkOrderInScope = (
-  item: Pick<RequirementTask, "ownerName" | "creatorName" | "ccNames">,
-  scope: "all" | "mine_created" | "mine_owned" | "mine_participating",
-  currentUserName: string,
-) => scope === "all"
-  ? samePerson(item.creatorName, currentUserName) || samePerson(item.ownerName, currentUserName) || Boolean(item.ccNames?.some((name) => samePerson(name, currentUserName)))
-  : scope === "mine_created"
-    ? samePerson(item.creatorName, currentUserName)
-    : scope === "mine_owned"
-      ? samePerson(item.ownerName, currentUserName)
-      : Boolean(item.ccNames?.some((name) => samePerson(name, currentUserName)));
 
 const toSelectOptions = (options: string[]) => Array.from(new Set(options.filter(Boolean))).map((item) => ({ label: item, value: item }));
 
@@ -234,18 +201,18 @@ export const RequirementPoolView: React.FC = () => {
     setRequirementTasks,
     productLines,
     customers,
-    leads = [],
     biddings,
     opportunities,
     currentUser,
     addToast,
     openPageTab,
   } = useApp();
-  const [tab, setTab] = useState<"create" | "list">("create");
   const [creating, setCreating] = useState(false);
   const [workOrderType, setWorkOrderType] = useState<WorkOrderType | null>(null);
   const [selected, setSelected] = useState<RequirementTask | null>(null);
-  const [detailTab, setDetailTab] = useState<"info" | "history">("info");
+  const [taskCreationKind, setTaskCreationKind] = useState<'requirement' | 'design' | 'bug' | 'presales' | 'delivery' | null>(null);
+  const [receiving, setReceiving] = useState(false);
+  const receiveInFlight = useRef(false);
   const [events, setEvents] = useState<RequirementEvent[]>([]);
   const [workItems, setWorkItems] = useState<RequirementWorkItem[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -253,9 +220,25 @@ export const RequirementPoolView: React.FC = () => {
   const [product, setProduct] = useState("all");
   const [priority, setPriority] = useState("all");
   const [status, setStatus] = useState("all");
-  const [scope, setScope] = useState<"all" | "mine_created" | "mine_owned" | "mine_participating">(
-    "all",
-  );
+  const [scope, setScope] = useState<RequirementScope>('mine_created');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [scopeItems, setScopeItems] = useState<RequirementTask[] | null>(null);
+  const [transferredIds, setTransferredIds] = useState<Set<string>>(new Set());
+  const [scopeLoading, setScopeLoading] = useState(false);
+  const [scopeError, setScopeError] = useState('');
+  const [scopeReload, setScopeReload] = useState(0);
+  const [organizationEmployees, setOrganizationEmployees] = useState<EmployeeOption[]>([]);
+  const listItems = scopeItems || requirementTasks;
+  useEffect(() => {
+    let active = true;
+    setScopeLoading(true);
+    setScopeError('');
+    Promise.all([requirementRepository.allForScope(), requirementRepository.transferredBy(currentUser.name), requirementRepository.employees()])
+      .then(([items, ids, people]) => { if (active) { setScopeItems(items); setTransferredIds(ids); setOrganizationEmployees(people); } })
+      .catch((error) => { if (active) { setScopeItems([]); setOrganizationEmployees([]); setTransferredIds(new Set()); setScopeError(error instanceof Error ? error.message : '事项范围加载失败'); } })
+      .finally(() => { if (active) setScopeLoading(false); });
+    return () => { active = false; };
+  }, [currentUser.name, currentUser.id, requirementTasks, scopeReload]);
   const [typeFilter, setTypeFilter] = useState<WorkOrderType | "all">("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -264,7 +247,7 @@ export const RequirementPoolView: React.FC = () => {
   const [ownerName, setOwnerName] = useState("");
   const [requirementPriority, setRequirementPriority] = useState<
     RequirementTask["priority"] | ""
-  >("");
+  >("中");
   const [customerId, setCustomerId] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -283,9 +266,10 @@ export const RequirementPoolView: React.FC = () => {
   const [flowMedia, setFlowMedia] = useState<RequirementMedia[]>([]);
   const [reasonType, setReasonType] = useState<"hold" | "reject" | null>(null);
   const [reason, setReason] = useState("");
-  const [closeSubmitting, setCloseSubmitting] = useState(false);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [completeNote, setCompleteNote] = useState("");
+  const [completeSubmitting, setCompleteSubmitting] = useState(false);
   const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false);
-  const [acceptanceWorkItemId, setAcceptanceWorkItemId] = useState("");
   const [acceptanceReason, setAcceptanceReason] = useState("");
   const [acceptanceSubmitting, setAcceptanceSubmitting] = useState(false);
   const [rejectCategory, setRejectCategory] = useState("");
@@ -294,26 +278,36 @@ export const RequirementPoolView: React.FC = () => {
   const [reopenReason, setReopenReason] = useState("");
   const [reopenSubmitting, setReopenSubmitting] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
+  const ownerManuallyChanged = useRef(false);
 
   useEffect(() => {
     const assistanceSearch = sessionStorage.getItem("shichuang.assistance.search");
     if (!assistanceSearch) return;
     setQuery(assistanceSearch);
-    setTab("list");
     sessionStorage.removeItem("shichuang.assistance.search");
   }, []);
 
   const currentWorkOrderType = selected?.workOrderType || selected?.taskType || selected?.requirementType || "通用/其他";
   const selectedProject = biddings.find((item) => (item.projectName || item.name) === specialFields.projectName);
   const selectedRelatedOpportunity = opportunities.find((item) => item.id === (workOrderType === "售前支持" ? specialFields.opportunityId : selectedProject?.opportunityId));
-  const selectedRelatedBidding = workOrderType === "售前支持" ? biddings.find((item) => item.id === specialFields.biddingId) : selectedProject;
-  const biddingOpportunity = opportunities.find((item) => item.id === selectedRelatedBidding?.opportunityId);
-  const selectedRelatedLead = leads.find((item) => item.id === specialFields.leadId);
-  const relatedProducts = workOrderType === "售前支持" && selectedRelatedLead
-    ? selectedRelatedLead.products
-    : [selectedRelatedOpportunity?.relatedProduct || biddingOpportunity?.relatedProduct || ""];
-  const hasProductSource = workOrderType === "售前支持" ? Boolean(specialFields.opportunityName) : Boolean(selectedProject);
+  const relatedProducts = [selectedRelatedOpportunity?.relatedProduct || ""];
+  const hasProductSource = workOrderType === "售前支持" ? Boolean(selectedRelatedOpportunity) : Boolean(selectedProject);
   const availableProductLines = hasProductSource ? productLines.filter((line) => relatedProducts.some((value) => value === line.id || value === line.name || line.products?.some((item) => item.id === value || item.name === value))) : [];
+  const creationProduct = availableProductLines.find((line) => line.id === productLineId);
+  const primaryOwnerId = creationProduct?.requirementOwnerUserId;
+  const primaryOwnerName = creationProduct?.requirementOwner;
+  const changeCreationProduct = (id: string) => {
+    ownerManuallyChanged.current = false;
+    setOwnerName("");
+    setProductLineId(id);
+  };
+  useEffect(() => {
+    if (!productLineId || ownerManuallyChanged.current) return;
+    const primaryOwner = employees.find((employee) => primaryOwnerId
+      ? employee.id === primaryOwnerId
+      : Boolean(primaryOwnerName) && employee.name === primaryOwnerName);
+    setOwnerName(primaryOwner?.name || "");
+  }, [productLineId, primaryOwnerId, primaryOwnerName, employees]);
   const availableRejectReasons = useMemo(() => getRejectReasonsForType(currentWorkOrderType), [currentWorkOrderType]);
 
   useEffect(() => {
@@ -339,7 +333,8 @@ export const RequirementPoolView: React.FC = () => {
     setTitle("");
     setProductLineId("");
     setOwnerName("");
-    setRequirementPriority("");
+    ownerManuallyChanged.current = false;
+    setRequirementPriority("中");
     setCustomerId("");
     setCustomerQuery("");
     setDueDate("");
@@ -353,12 +348,6 @@ export const RequirementPoolView: React.FC = () => {
     reset();
     setWorkOrderType(type || null);
     setCreating(true);
-    setTab("create");
-  };
-  const openCreateHome = () => {
-    setCreating(false);
-    setWorkOrderType(null);
-    setTab("create");
   };
   const onMedia = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []) as File[];
@@ -426,17 +415,17 @@ export const RequirementPoolView: React.FC = () => {
     const selectedProductLine = availableProductLines.find((item) => item.id === productLineId);
     const descriptionText = description || editor.current?.innerText || "";
     const requiredParameters = workOrderType === "售前支持"
-      ? ["opportunityName", "supportType"]
+      ? ["opportunityId", "supportType"]
       : workOrderType === "线上问题"
-        ? ["projectName", "severity"]
+        ? ["projectName"]
         : workOrderType === "其他问题"
-          ? ["problemType", "expectedResult"]
+          ? ["problemType"]
           : workOrderType === "交付支持"
-            ? ["projectName", "progressStage", "other", "deliveryType"]
+            ? ["projectName"]
             : workOrderType === "客户诉求"
               ? ["projectName", "requestSource"]
               : [];
-    const missingParameter = requiredParameters.some((field) => !String(specialFields[field] ?? "").trim());
+    const missingParameter = requiredParameters.some((field) => !String(specialFields[field] ?? "").trim()) || (workOrderType === "售前支持" && !selectedRelatedOpportunity);
     const requiresProduct = workOrderType !== "其他问题";
     if (
       !title.trim() ||
@@ -472,16 +461,14 @@ export const RequirementPoolView: React.FC = () => {
       if (!saved) return;
       setCreating(false);
       setTypeFilter("all");
-      setScope("all");
+      setScope("mine_created");
       setPage(1);
-      setTab("list");
     } finally {
       setIsSubmitting(false);
     }
   };
   const openDetail = async (item: RequirementTask) => {
     setSelected({ ...item, media: normalizeMedia(item.media) });
-    setDetailTab("info");
     try {
       const detail = await requirementRepository.detail(item.id);
       setSelected((current) => ({ ...(current || item), ...normalizeRequirementTask(detail), media: normalizeMedia(detail.media ?? current?.media ?? item.media) }));
@@ -497,7 +484,6 @@ export const RequirementPoolView: React.FC = () => {
   useEffect(() => {
     const detailId = new URLSearchParams(detailSearch).get('detailId') || '';
     if (!detailId) return;
-    setTab('list');
     let active = true;
     requirementRepository.detail(detailId).then((detail) => {
       if (!active) return;
@@ -537,7 +523,8 @@ export const RequirementPoolView: React.FC = () => {
   };
   const handleWorkflowSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selected) return;
+    if (!selected || workflowSubmitting) return;
+    if ((workflowAction === "convert" && !canAddTask) || (workflowAction === "reassign" && !canReceive)) return;
     if (!workflowAction) {
       addToast("warning", "请选择流转的任务类型");
       return;
@@ -561,12 +548,15 @@ export const RequirementPoolView: React.FC = () => {
       }
       const singleTask = taskInputs[0];
       let results: Array<{ task: typeof singleTask.task; assignee: NonNullable<typeof singleTask.assignee>; result: Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }>;
+      setWorkflowSubmitting(true);
       try {
         const batch = await requirementRepository.createWorkItemsBatch(selected.id, taskInputs.map(({ task, assignee }) => ({ taskType: task.taskType!, assigneeName: assignee!.name, note: task.note, expectedCompleteDate: task.expectedDueDate, attachmentIds: task.media.map((item) => item.id), blocksClosure: true })));
         results = taskInputs.map(({ task, assignee }, index) => ({ task, assignee: assignee!, result: batch.items[index] as Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }));
       } catch {
         addToast("error", "下游任务创建失败", "本次批量操作未保存，请检查后重试");
         return;
+      } finally {
+        setWorkflowSubmitting(false);
       }
       const localItems: RequirementWorkItem[] = results.map(({ task, assignee, result }) => ({ id: result.id, requirementId: selected.id, taskType: task.taskType!, title: selected.title, assigneeName: assignee.name, note: task.note, status: "待处理", createdAt: now }));
       const primary = results[0];
@@ -710,21 +700,25 @@ export const RequirementPoolView: React.FC = () => {
       persisted ? "流转记录已保存" : "后端暂不可用，已在当前会话记录",
     );
   };
-  const closeAssistance = async () => {
+  const submitComplete = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!selected) return;
-    setCloseSubmitting(true);
+    setCompleteSubmitting(true);
     try {
-      await requirementRepository.closeByOwner(selected.id, selected.revision ?? selected.version ?? 0);
+      await requirementRepository.complete(selected.id, { revision: selected.revision ?? selected.version ?? 0, note: completeNote.trim(), attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
       const detail = await requirementRepository.detail(selected.id);
-      const next = { ...selected, ...detail, status: "已关闭" as RequirementTask["status"] };
+      const next = { ...selected, ...detail, status: "待验收" as RequirementTask["status"] };
       setSelected(next);
       setEvents(Array.isArray(detail.events) ? detail.events : []);
       setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
       setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
-      addToast("success", "协助已结束", "发起人已确认完成闭环");
+      setCompleteModalOpen(false);
+      setCompleteNote("");
+      setFlowMedia([]);
+      addToast("success", "事项已提交验收", "事项状态已变更为待验收");
     } catch (error) {
-      addToast("error", "事项关闭失败", error instanceof Error ? error.message : "请刷新后重试");
-    } finally { setCloseSubmitting(false); }
+      addToast("error", "事项完成失败", error instanceof Error ? error.message : "请刷新后重试");
+    } finally { setCompleteSubmitting(false); }
   };
   const submitReopen = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -758,17 +752,13 @@ export const RequirementPoolView: React.FC = () => {
       addToast("warning", "请填写验收未通过原因");
       return;
     }
-    const target = workItems.find((item) => item.id === acceptanceWorkItemId) || workItems.find((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED");
-    const ownerName = target?.assigneeName || selected.ownerName;
-    const owner = employees.find((item) => item.name.trim().toLocaleLowerCase() === ownerName.trim().toLocaleLowerCase());
     setAcceptanceSubmitting(true);
     try {
-      await requirementRepository.acceptanceFailed(selected.id, { workItemId: target?.id, taskOwnerId: owner?.id, reason: acceptanceReason.trim(), attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
-      const next = { ...selected, status: "处理中" as RequirementTask["status"], ownerName: owner?.name || selected.ownerName };
+      await requirementRepository.acceptanceFailed(selected.id, { reason: acceptanceReason.trim(), revision: selected.revision ?? selected.version ?? 0, attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
+      const next = { ...selected, status: "处理中" as RequirementTask["status"] };
       setSelected(next);
       setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
       setAcceptanceModalOpen(false);
-      setAcceptanceWorkItemId("");
       setAcceptanceReason("");
       setFlowMedia([]);
       addToast("success", "已退回任务负责人", "事项状态已变更为处理中，请负责人重新处理");
@@ -778,12 +768,25 @@ export const RequirementPoolView: React.FC = () => {
       setAcceptanceSubmitting(false);
     }
   };
+  const passAcceptance = async () => {
+    if (!selected) return;
+    setAcceptanceSubmitting(true);
+    try {
+      await requirementRepository.acceptancePassed(selected.id, selected.revision ?? selected.version ?? 0);
+      const detail = await requirementRepository.detail(selected.id);
+      const next = { ...selected, ...detail, status: "已完成" as RequirementTask["status"] };
+      setSelected(next); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+      addToast("success", "验收通过", "事项已完成");
+    } catch (error) { addToast("error", "验收操作失败", error instanceof Error ? error.message : "请刷新后重试"); }
+    finally { setAcceptanceSubmitting(false); }
+  };
   const filtered = useMemo(
     () =>
-      requirementTasks.filter((item) => {
+      listItems.filter((item) => {
         const q = query.toLowerCase();
         return (
-          isWorkOrderInScope(item, scope, currentUser.name) &&
+          isWorkOrderInScope(item, scope, currentUser, organizationEmployees, transferredIds) &&
+          (scope !== 'all' || !departmentFilter || ownerDepartment(item, organizationEmployees) === departmentFilter) &&
           (!q ||
             [
               item.title,
@@ -799,18 +802,18 @@ export const RequirementPoolView: React.FC = () => {
         );
       }),
     [
-      requirementTasks,
+      listItems,
       query,
       product,
       priority,
       status,
       scope,
       typeFilter,
-      currentUser.name,
+      currentUser, organizationEmployees, transferredIds, departmentFilter,
     ],
   );
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
-  useEffect(() => setPage(1), [query, product, priority, status, scope, typeFilter, pageSize]);
+  useEffect(() => setPage(1), [query, product, priority, status, scope, typeFilter, pageSize, departmentFilter]);
   const pendingCount = requirementTasks.filter(
     (item) => item.status === "待处理",
   ).length;
@@ -823,16 +826,7 @@ export const RequirementPoolView: React.FC = () => {
   const rejectedCount = requirementTasks.filter(
     (item) => item.status === "已驳回",
   ).length;
-  const scopeCounts = {
-    all: requirementTasks.filter((item) => isWorkOrderInScope(item, "all", currentUser.name)).length,
-    mine_created: requirementTasks.filter((item) => isWorkOrderInScope(item, "mine_created", currentUser.name)).length,
-    mine_owned: requirementTasks.filter((item) => isWorkOrderInScope(item, "mine_owned", currentUser.name)).length,
-    mine_participating: requirementTasks.filter((item) => isWorkOrderInScope(item, "mine_participating", currentUser.name)).length,
-  };
-  const typeStats = workOrderCards.map(({ type }) => {
-    const items = requirementTasks.filter((item) => (item.workOrderType || "其他问题") === type);
-    return { type, total: items.length, pending: items.filter((item) => item.status === "待处理").length, processing: items.filter((item) => item.status === "处理中").length, handled: items.filter((item) => ["已完成", "已搁置"].includes(item.status)).length };
-  });
+  const scopeCounts = Object.fromEntries(REQUIREMENT_SCOPES.map(([value]) => [value, listItems.filter((item) => isWorkOrderInScope(item, value, currentUser, organizationEmployees, transferredIds)).length]));
   const isToday = (value?: string) =>
     Boolean(
       value && new Date(value).toDateString() === new Date().toDateString(),
@@ -850,47 +844,82 @@ export const RequirementPoolView: React.FC = () => {
   const todayRejected = requirementTasks.filter(
     (item) => isToday(item.createdAt) && item.status === "已驳回",
   ).length;
-  const taskLocked = Boolean(
-    selected &&
-    (selected.taskId ||
-      workItems.length > 0 ||
-      ["处理中", "待验收", "待关闭", "已关闭", "已驳回"].includes(selected.status)),
-  );
+  const ownsSelected = Boolean(selected && (selected.assigneeId && currentUser.id
+    ? selected.assigneeId === currentUser.id : samePerson(selected.ownerName, currentUser.name)));
+  const canReceive = ownsSelected && selected?.status === "待处理";
+  const canAddTask = ownsSelected && selected?.status === "处理中";
+  const openTaskCreation = (taskType: string) => {
+    if (!selected || !canAddTask || receiving) return;
+    setTaskCreationKind(({ "产品需求": "requirement", "设计任务": "design", "缺陷管理": "bug", "售前任务": "presales", "交付任务": "delivery" } as const)[taskType as "产品需求" | "设计任务" | "缺陷管理" | "售前任务" | "交付任务"] || null);
+  };
+  const taskCreationMenu = {
+    items: ["产品", "设计", "缺陷", "售前", "交付"].map((label) => ({ key: label, label })),
+    onClick: ({ key }: { key: string }) => openTaskCreation(({ 产品: "产品需求", 设计: "设计任务", 缺陷: "缺陷管理", 售前: "售前任务", 交付: "交付任务" } as Record<string, string>)[key]),
+  };
+  const openWorkflow = (action: "convert" | "reassign") => {
+    if ((action === "convert" && !canAddTask) || (action === "reassign" && !canReceive)) return;
+    setWorkflowAction(action);
+    setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }]);
+    setReassignAssignee(""); setReassignReason(""); setFlowMedia([]);
+    setWorkOpen(true);
+  };
+  const receiveMatter = async () => {
+    if (!selected || !canReceive || receiveInFlight.current) return;
+    receiveInFlight.current = true;
+    setReceiving(true);
+    try {
+      const next = await requirementRepository.receive(selected.id);
+      setSelected((current) => current?.id === selected.id ? { ...current, ...next } : current);
+      setRequirementTasks((list) => list.map((item) => item.id === selected.id ? { ...item, ...next } : item));
+      setEvents(Array.isArray(next.events) ? next.events : []);
+      addToast("success", "事项已接收");
+    } catch (error) {
+      addToast("error", "事项接收失败", error instanceof Error ? error.message : "请刷新后重试");
+    } finally {
+      receiveInFlight.current = false;
+      setReceiving(false);
+    }
+  };
+  const detailSpecial = selected?.specialFields && typeof selected.specialFields === "object" ? selected.specialFields : {};
+  const detailFields: Array<[string, unknown]> = selected ? [
+    ...(selected.workOrderType === "其他问题" ? [["协助类型", detailSpecial.problemType], ["负责人", selected.ownerName]] as Array<[string, unknown]> : []),
+    [selected.workOrderType === "售前支持" ? "所属商机" : "所属项目",
+      selected.workOrderType === "售前支持" ? detailSpecial.opportunityName : detailSpecial.projectName || selected.projectName],
+    ["所属产品", selected.productLineName],
+    ...(selected.workOrderType !== "其他问题" ? [["负责人", selected.ownerName]] as Array<[string, unknown]> : []),
+    ["优先级", selected.priority], ["期望完成时间", selected.expectedCompleteDate || selected.dueDate],
+    ...(selected.workOrderType === "客户诉求" ? [["诉求来源", detailSpecial.requestSource]] as Array<[string, unknown]> : []),
+    ...(selected.workOrderType === "线上问题" ? [["严重程度", detailSpecial.severity], ["发生频率", detailSpecial.frequency]] as Array<[string, unknown]> : []),
+    ...(selected.workOrderType === "售前支持" ? [["支持类型", detailSpecial.supportType]] as Array<[string, unknown]> : []),
+    ...(selected.workOrderType === "其他问题" ? [["问题来源", detailSpecial.problemSource]] as Array<[string, unknown]> : []),
+  ] : [];
   const selectedMedia = normalizeMedia(selected?.media);
   const cardSubText = (count: number) => `今日新增 +${count}`;
   const fieldClass =
     "mt-1 w-full h-10 px-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20";
   const filterClass = "min-w-[130px] shrink-0";
-  const cardIcon = (card: typeof workOrderCards[number]) => (
-    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] text-[var(--active-text)]">
-      {card.icon}
-    </span>
-  );
+  const creationOwnerField = <EmployeeSearchSelect label="负责人 *" value={ownerName} employees={employees} placeholder="请选择负责人" onChange={(value) => { ownerManuallyChanged.current = true; setOwnerName(value); }} />;
   const fields = <div className="work-order-form grid grid-cols-1 gap-4">
     <WorkOrderInput label="事项标题 *" value={title} onChange={setTitle} placeholder="请输入事项标题，简明描述问题或诉求" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      <EmployeeSearchSelect label="负责人 *" value={ownerName} employees={employees} placeholder="搜索姓名或职位" onChange={setOwnerName} />
       {workOrderType === "其他问题" && <WorkOrderSelect label="协助类型 *" value={specialFields.problemType || ""} options={["方向研讨", "费用缴纳", "开票/邮寄", "资料获取", "物料支持", "意见反馈", "其他"]} placeholder="请选择协助类型" onChange={(value) => setSpecialFields((current) => ({ ...current, problemType: value }))} />}
-      {(workOrderType === "客户诉求" || workOrderType === "线上问题" || workOrderType === "交付支持" || workOrderType === "其他问题") && <SearchSelect label={`所属项目${workOrderType === "其他问题" ? "" : " *"}`} value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入项目名称搜索并选择" onChange={(value) => { setSpecialFields((current) => ({ ...current, projectName: value })); setProductLineId(""); }} />}
-      {workOrderType === "售前支持" && <SearchSelect label="所属线索/商机/投标 *" value={specialFields.opportunityName || ""} options={[...leads.map((item) => item.name), ...opportunities.filter((item) => opportunityStagesBeforeWin.has(item.stage)).map((item) => item.name), ...biddings.map((item) => item.projectName || item.name || "")].filter(Boolean)} placeholder="输入线索/商机/投标名称" onChange={(value) => { const lead = leads.find((item) => item.name === value); const opportunity = opportunities.find((item) => item.name === value); const bidding = biddings.find((item) => (item.projectName || item.name) === value); setSpecialFields((current) => ({ ...current, opportunityName: value, opportunityId: opportunity?.id || "", leadId: lead?.id || "", biddingId: bidding?.id || "", relatedType: lead ? "lead" : opportunity ? "opportunity" : bidding ? "bidding" : "" })); setProductLineId(""); }} />}
-      <WorkOrderSelect label={`所属产品${workOrderType === "其他问题" ? "" : " *"}`} value={availableProductLines.find((item) => item.id === productLineId)?.name || ""} options={availableProductLines.map((item) => item.name)} disabled={!hasProductSource || availableProductLines.length === 0} placeholder={!hasProductSource ? workOrderType === "售前支持" ? "请先选择线索/商机/投标" : "请先选择所属项目" : availableProductLines.length ? "请选择所属产品" : "所选项目或关联对象暂无产品"} onChange={(value) => setProductLineId(availableProductLines.find((item) => item.name === value)?.id || "")} />
+      {workOrderType === "其他问题" && creationOwnerField}
+      {(workOrderType === "客户诉求" || workOrderType === "线上问题" || workOrderType === "交付支持" || workOrderType === "其他问题") && <SearchSelect label={`所属项目${workOrderType === "其他问题" ? "" : " *"}`} value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入项目名称搜索并选择" onChange={(value) => { setSpecialFields((current) => ({ ...current, projectName: value })); changeCreationProduct(""); }} />}
+      {workOrderType === "售前支持" && <label className="work-order-field text-xs text-[var(--text-muted)]">
+        所属商机 *
+        <Select aria-label="所属商机 *" allowClear showSearch optionFilterProp="label" className="w-full" placeholder="输入商机名称" value={specialFields.opportunityId || undefined} options={opportunities.map((item) => ({ label: item.name, value: item.id }))} onChange={(id) => { const opportunity = opportunities.find((item) => item.id === id); setSpecialFields((current) => ({ ...current, opportunityName: opportunity?.name || "", opportunityId: opportunity?.id || "", relatedType: opportunity ? "opportunity" : "" })); changeCreationProduct(""); }} />
+      </label>}
+      <WorkOrderSelect label={`所属产品${workOrderType === "其他问题" ? "" : " *"}`} value={creationProduct?.name || ""} options={availableProductLines.map((item) => item.name)} disabled={!hasProductSource || availableProductLines.length === 0} placeholder={!hasProductSource ? workOrderType === "售前支持" ? "请先选择所属商机" : "请先选择所属项目" : availableProductLines.length ? "请选择所属产品" : "所选项目或关联对象暂无产品"} onChange={(value) => changeCreationProduct(availableProductLines.find((item) => item.name === value)?.id || "")} />
+      {workOrderType !== "其他问题" && creationOwnerField}
       <WorkOrderSelect label="优先级" value={requirementPriority} options={["紧急", "高", "中", "低"]} placeholder="请选择优先级" onChange={(value) => setRequirementPriority(value as RequirementTask["priority"])} />
       <DateField label="期望完成时间 *" value={dueDate} onChange={setDueDate} />
       {workOrderType === "客户诉求" && <WorkOrderInput label="诉求来源 *" value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(value) => setSpecialFields((current) => ({ ...current, requestSource: value }))} />}
       {workOrderType === "线上问题" && <>
-        <WorkOrderSelect label="严重程度 *" value={specialFields.severity || ""} options={Object.keys(severityPriorities)} placeholder="请选择严重程度" onChange={(value) => { setSpecialFields((current) => ({ ...current, severity: value, priority: severityPriorities[value] })); setRequirementPriority(severityPriorities[value]); }} />
+        <WorkOrderSelect label="严重程度" value={specialFields.severity || ""} options={Object.keys(severityPriorities)} placeholder="请选择严重程度（选填）" onChange={(value) => { const priority = severityPriorities[value]; setSpecialFields((current) => ({ ...current, severity: value, ...(priority ? { priority } : {}) })); if (priority) setRequirementPriority(priority); }} />
         <WorkOrderSelect label="发生频率" value={specialFields.frequency || ""} options={["必现（100%）", "高频发生", "偶现（特点条件）", "环境相关偶发"]} placeholder="请选择发生频率" onChange={(value) => setSpecialFields((current) => ({ ...current, frequency: value }))} />
       </>}
       {workOrderType === "售前支持" && <WorkOrderSelect label="支持类型 *" value={specialFields.supportType || ""} options={["建设方案", "现场踏勘", "方案汇报", "报价支持", "技术表", "投标答疑", "产品需求", "招投标标书协同"]} placeholder="请选择支持类型" onChange={(value) => setSpecialFields((current) => ({ ...current, supportType: value }))} />}
-      {workOrderType === "交付支持" && <>
-        <WorkOrderSelect label="项目阶段 *" value={specialFields.progressStage || ""} options={["项目移交", "项目启动", "需求确认", "系统部署", "系统培训", "系统试运行", "项目初验", "项目终验", "运维追踪"]} placeholder="请选择当前阶段" onChange={(value) => setSpecialFields((current) => ({ ...current, progressStage: value }))} />
-        <WorkOrderSelect label="项目类型 *" value={specialFields.other || ""} options={["一般项目", "数据项目", "试用项目"]} placeholder="请选择项目类型" onChange={(value) => setSpecialFields((current) => ({ ...current, other: value }))} />
-        <WorkOrderSelect label="交付类型 *" value={specialFields.deliveryType || ""} options={["自有交付", "代理商交付", "协助代理商交付"]} placeholder="请选择交付类型" onChange={(value) => setSpecialFields((current) => ({ ...current, deliveryType: value }))} />
-      </>}
-      {workOrderType === "其他问题" && <>
-        <WorkOrderInput label="期望结果 *" value={specialFields.expectedResult || ""} placeholder="请输入期望达到的结果" onChange={(value) => setSpecialFields((current) => ({ ...current, expectedResult: value }))} />
-        <WorkOrderInput label="问题来源" value={specialFields.problemSource || ""} placeholder="请输入问题来源" onChange={(value) => setSpecialFields((current) => ({ ...current, problemSource: value }))} />
-      </>}
+      {workOrderType === "其他问题" && <WorkOrderInput label="问题来源" value={specialFields.problemSource || ""} placeholder="请输入问题来源" onChange={(value) => setSpecialFields((current) => ({ ...current, problemSource: value }))} />}
     </div>
     <div>
       <span className="text-xs text-[var(--text-muted)]">事项描述 *</span>
@@ -908,62 +937,8 @@ export const RequirementPoolView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
-      {/* Top Navigation Bar */}
-      <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
-        <div className="primary-line-tabs flex items-center gap-2" role="tablist" aria-label="协同事项视图">
-          <button
-            role="tab"
-            aria-selected={tab === "create"}
-            onClick={() => setTab("create")}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all ${
-              tab === "create"
-                ? "text-[var(--primary)]"
-                : "text-slate-600 dark:text-slate-400"
-            }`}
-          >
-            <PenSquare className="w-4 h-4" />
-            发起协同
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === "list"}
-            onClick={() => setTab("list")}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all ${
-              tab === "list"
-                ? "text-[var(--primary)]"
-                : "text-slate-600 dark:text-slate-400"
-            }`}
-          >
-            <ListFilter className="w-4 h-4" />
-            事项列表
-          </button>
-        </div>
-      </div>
-      {tab === "create" && (
+      {creating && (
         <section className="dark-panel rounded-xl p-6">
-          {!creating ? (
-            <div className="flex min-h-[560px] flex-col items-center justify-center text-center">
-              <div className="relative flex w-full max-w-xl items-center justify-center pb-2">
-                <div className="relative -top-12 flex flex-col items-center gap-2">
-                  <p className="text-lg font-semibold text-[var(--text-primary)]">
-                    每一处精微调整，都在点亮更广的世界。
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Every subtle adjustment illuminates a wider world.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3 grid w-full max-w-5xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                {workOrderCards.map((card) => (
-                  <button key={workOrderDisplayName(card.type)} type="button" onClick={() => openCreate(card.type)} className="group min-h-36 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)] hover:bg-[var(--bg-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30">
-                    <span className="mb-3 inline-flex transition">{cardIcon(card)}</span>
-                    <span className="block text-sm font-semibold text-[var(--text-primary)]">{workOrderDisplayName(card.type)}</span>
-                    <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{card.description}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
             <form onSubmit={save} className="space-y-5">
               <div className="sticky -top-4 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
                 <div className="min-w-0">
@@ -995,27 +970,14 @@ export const RequirementPoolView: React.FC = () => {
               </div>
               {fields}
             </form>
-          )}
         </section>
       )}
-      {tab === "list" && (
+      {!creating && (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {typeStats.map((stat) => (
-              <button key={stat.type} type="button" onClick={() => setTypeFilter(stat.type)} className="rounded-xl text-left transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] active:opacity-80">
-                <StatCard title={workOrderDisplayName(stat.type)} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={cardIcon(workOrderCards.find((card) => card.type === stat.type)!)} />
-              </button>
-            ))}
-          </div>
           <div className="dark-panel rounded-xl p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3 pb-1">
               <div className="inline-flex max-w-full flex-wrap items-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">
-                {([
-                  ["all", "全部"],
-                  ["mine_created", "我创建的"],
-                  ["mine_owned", "我负责的"],
-                  ["mine_participating", "我参与的"],
-                ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setScope(value)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${scope === value ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{label} ({scopeCounts[value]})</button>)}
+                {REQUIREMENT_SCOPES.map(([value, label]) => <button key={value} type="button" aria-pressed={scope === value} onClick={() => { setScope(value); setDepartmentFilter(''); }} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition focus-visible:outline focus-visible:outline-[var(--primary)] ${scope === value ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{label} ({scopeLoading ? '…' : scopeCounts[value]})</button>)}
               </div>
             </div>
             <div className="work-order-list-filters flex flex-wrap items-center gap-3">
@@ -1028,19 +990,19 @@ export const RequirementPoolView: React.FC = () => {
                 className="w-64"
               />
             </div>
-            <Select allowClear aria-label="事项类型" className={filterClass} placeholder="类型" value={typeFilter === "all" ? undefined : typeFilter} onChange={(value) => setTypeFilter(value ?? "all")} options={workOrderCards.map((card) => ({label:workOrderDisplayName(card.type),value:card.type}))} />
+            <Select allowClear aria-label="事项类型" className={filterClass} placeholder="类型" value={typeFilter === "all" ? undefined : typeFilter} onChange={(value) => setTypeFilter(value ?? "all")} options={workOrderTypes.map((type) => ({ label: workOrderDisplayName(type), value: type }))} />
             <Select allowClear aria-label="状态" className={filterClass} placeholder="状态" value={status === "all" ? undefined : status} onChange={(value) => setStatus(value ?? "all")} options={statuses.map((item) => ({label:item,value:item}))} />
             <Select allowClear aria-label="优先级" className={filterClass} placeholder="优先级" value={priority === "all" ? undefined : priority} onChange={(value) => setPriority(value ?? "all")} options={[{label:"紧急",value:"紧急"},{label:"高",value:"高"},{label:"中",value:"中"},{label:"低",value:"低"}]} />
-            <button
-              type="button"
-              onClick={openCreateHome}
-              className="ml-auto h-10 px-4 shrink-0 rounded-lg bg-[var(--primary)] text-sm font-semibold text-white"
-            >
-              <Plus className="mr-1 inline w-4 h-4" />
-              发起协同
-            </button>
+            {scope === 'all' && <Select allowClear showSearch optionFilterProp="label" aria-label="所属部门" className={filterClass} placeholder="所属部门" disabled={scopeLoading || Boolean(scopeError)} value={departmentFilter || undefined} onChange={(value) => setDepartmentFilter(value || '')} options={toSelectOptions(organizationEmployees.map((person) => person.department || ''))} />}
+            <Dropdown trigger={["click"]} placement="bottomRight" menu={{ items: workOrderTypes.map((type) => ({ key: type, label: workOrderDisplayName(type) })), onClick: ({ key }) => openCreate(key as WorkOrderType) }}>
+              <Button type="primary" className="ml-auto" icon={<Plus size={16} />}>
+                发起协同 <ChevronDown size={16} />
+              </Button>
+            </Dropdown>
             </div>
           </div>
+          {scopeLoading && <p role="status" className="text-xs text-[var(--text-muted)]">正在加载事项范围…</p>}
+          {scopeError && <div role="alert" className="text-xs text-[var(--danger)]">事项范围加载失败：{scopeError} <Button size="small" onClick={() => setScopeReload((value) => value + 1)}>重试</Button></div>}
           <div className="dark-panel rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -1117,6 +1079,7 @@ export const RequirementPoolView: React.FC = () => {
       {selected && (
         <Drawer
           isOpen={!!selected}
+          width="max-w-6xl"
           onClose={closeDetail}
           hideSubtitle
           title={<span className="flex min-w-0 items-center gap-2"><span className="shrink-0">事项编号</span><span className="truncate font-mono">{selected.code || selected.id}</span><DetailCopyButton label="复制事项编号" onCopy={copyDetailId} /></span>}
@@ -1124,114 +1087,30 @@ export const RequirementPoolView: React.FC = () => {
           subtitle={`${selected.productLineName} · 负责人：${selected.ownerName || "未分配"}`}
           footer={
             <div className="flex w-full justify-between">
-              <RequirementActionButtons
-                status={selected.status}
-                hasWorkItem={taskLocked}
-                onWork={() => { setWorkflowAction(""); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setFlowMedia([]); setWorkOpen(true); }}
-                onHold={() => setReasonType("hold")}
-                onReject={() => setReasonType("reject")}
-              />
               <div className="flex items-center gap-2">
-                {(["待验收", "待发起人验收"] as string[]).includes(selected.status) && isInitiator(selected, currentUser) && (
-                  <button
-                    type="button"
-                    onClick={() => { const first = workItems.find((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"); setAcceptanceWorkItemId(first?.id || ""); setAcceptanceModalOpen(true); }}
-                    className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]"
-                  >
-                    验收未通过
-                  </button>
-                )}
-                {selected.status === "待关闭" && isInitiator(selected, currentUser) && (
-                  <button
-                    type="button"
-                    onClick={closeAssistance}
-                    disabled={closeSubmitting}
-                    className="h-9 px-3 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {closeSubmitting ? "结束中…" : "确认结束协助"}
-                  </button>
-                )}
-                {["已关闭", "已完成"].includes(selected.status) && isInitiator(selected, currentUser) && (
-                  <button
-                    type="button"
-                    onClick={() => { setReopenAssigneeId(''); setReopenReason(""); setReopenModalOpen(true); }}
-                    className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]"
-                  >
-                    重新开启
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={closeDetail}
-                  className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]"
-                >
-                  关闭
-                </button>
+                {canReceive && <><Button aria-label="事项接收" type="primary" loading={receiving} disabled={receiving} onClick={() => void receiveMatter()}>事项接收</Button><Button disabled={receiving} onClick={() => openWorkflow("reassign")}>事项转交</Button><Button danger disabled={receiving} onClick={() => setReasonType("reject")}>事项退回</Button></>}
+                {selected.status === "处理中" && ownsSelected && <Button type="primary" disabled={completeSubmitting || workItems.some((item) => !(item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"))} onClick={() => setCompleteModalOpen(true)}>事项完成</Button>}
+                {selected.status === "待验收" && isInitiator(selected, currentUser) && <><Button type="primary" loading={acceptanceSubmitting} disabled={acceptanceSubmitting} onClick={() => void passAcceptance()}>验收通过</Button><button type="button" onClick={() => setAcceptanceModalOpen(true)} className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]">验收未通过</button></>}
+                {selected.status === "已完成" && isInitiator(selected, currentUser) && <button type="button" onClick={() => { setReopenAssigneeId(""); setReopenReason(""); setReopenModalOpen(true); }} className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]">重新开启</button>}
               </div>
+              <button type="button" onClick={closeDetail} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]">关闭</button>
             </div>
           }
         >
-          <div className="mb-5 flex items-center gap-1 border-b border-[var(--border-main)]">
-            <button type="button" onClick={() => setDetailTab("info")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "info" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>事项信息</button>
-            <button type="button" onClick={() => setDetailTab("history")} className={`border-b-2 px-3 py-2 text-sm ${detailTab === "history" ? "border-[var(--primary)] text-[var(--active-text)]" : "border-transparent text-[var(--text-muted)]"}`}>事项全历程</button>
-          </div>
-          <div className={`space-y-5 text-sm ${detailTab === "history" ? "hidden" : ""}`}>
-            <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
-              <div className="flex items-start justify-between gap-4"><h2 className="text-lg font-semibold text-[var(--text-primary)]">{selected.title}</h2><StatusTag status={selected.status} /></div>
-              <div className="my-4 border-t border-[var(--border-main)]" />
-              <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-[var(--text-muted)]">事项类型</span><p className="mt-1 text-[var(--text-primary)]">{workOrderDisplayName(selected.workOrderType) || "历史事项"}</p></div>
-              <div>
-                <span className="text-xs text-[var(--text-muted)]">优先级</span>
-                <div className="mt-1">
-                  <StatusTag status={selected.priority} />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="min-w-0 space-y-5 text-sm lg:col-span-2">
+              <section aria-label="基础字段" className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
+                <div className="flex items-start justify-between gap-4"><h2 className="break-words text-lg font-semibold text-[var(--text-primary)]">{selected.title}</h2><StatusTag status={selected.status} /></div>
+                <h3 className="my-4 text-sm font-semibold text-[var(--text-primary)]">基础字段</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {detailFields.map(([label, value]) => <div key={label}><span className="text-xs text-[var(--text-muted)]">{label}</span><p className="mt-1 break-words text-[var(--text-primary)]">{String(value || "未设置")}</p></div>)}
+                  <div><span className="text-xs text-[var(--text-muted)]">创建人</span><p className="mt-1 text-[var(--text-primary)]">{selected.creatorName || "未记录"}</p></div>
                 </div>
-              </div>
-              <div>
-                <span className="text-xs text-[var(--text-muted)]">
-                  关联客户
-                </span>
-                <p className="mt-1 text-[var(--text-primary)]">
-                  {selected.customerName || "未关联"}
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-[var(--text-muted)]">负责人</span>
-                <p className="mt-1 text-[var(--text-primary)]">
-                  {selected.ownerName || "未分配"}
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-[var(--text-muted)]">提出人</span>
-                <p className="mt-1 text-[var(--text-primary)]">
-                  {selected.creatorName || selected.ownerName}
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-[var(--text-muted)]">
-                  期望完成时间
-                </span>
-                <p className="mt-1 text-[var(--text-primary)]">
-                  {selected.expectedCompleteDate || "未设置"}
-                </p>
-              </div>
-            </div>
-            {selected.specialFields && typeof selected.specialFields !== "string" && Object.keys(selected.specialFields).length > 0 && <><div className="my-4 border-t border-[var(--border-main)]" /><div className="grid grid-cols-2 gap-3">{Object.entries(selected.specialFields).filter(([key, value]) => value && !hiddenSpecialFieldKeys.has(key)).map(([key, value]) => <div key={key}><span className="text-xs text-[var(--text-muted)]">{specialFieldLabels[key] || key}</span><p className="mt-1 text-[var(--text-primary)]">{String(value)}</p></div>)}</div></>}
-            </div>
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">
-                事项详细描述
-              </h3>
-              <div
-                className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-body)]"
-                dangerouslySetInnerHTML={{
-                  __html: sanitizeHtml(
-                    selected.descriptionHtml ||
-                      selected.description ||
-                      "暂无描述",
-                  ),
-                }}
-              />
+                {Object.entries(detailSpecial).some(([key, value]) => value && ["progressStage", "other", "deliveryType", "expectedResult", "leadName", "biddingName"].includes(key)) && <details className="mt-4 border-t border-[var(--border-main)] pt-3"><summary className="cursor-pointer text-xs text-[var(--text-muted)]">历史字段（仅查看）</summary><div className="mt-3 grid grid-cols-2 gap-3">{Object.entries(detailSpecial).filter(([key, value]) => value && ["progressStage", "other", "deliveryType", "expectedResult", "leadName", "biddingName"].includes(key)).map(([key, value]) => <div key={key}><span className="text-xs text-[var(--text-muted)]">{({ progressStage: "项目阶段", other: "项目类型", deliveryType: "交付类型", expectedResult: "期望结果", leadName: "所属线索", biddingName: "所属投标" } as Record<string, string>)[key]}</span><p className="mt-1 break-words">{String(value)}</p></div>)}</div></details>}
+              </section>
+              <section aria-label="事项描述"><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项描述</h3><div className="break-words rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-body)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(selected.descriptionHtml || selected.description || "暂无描述") }} /></section>
+              <section aria-label="附件"><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">附件</h3>
+                {!selectedMedia.length && !selected.attachments?.length && <p className="text-xs text-[var(--text-muted)]">暂无附件</p>}
               {selectedMedia.length ? (
                 <div className="mt-3 flex flex-wrap gap-3">
                   {selectedMedia.map((item) =>
@@ -1267,9 +1146,23 @@ export const RequirementPoolView: React.FC = () => {
                   </div>
                 </div>
               ) : null}
+              </section>
             </div>
-          </div>
-          <div className={`space-y-5 text-sm ${detailTab === "info" ? "hidden" : ""}`}>
+            <div className="min-w-0 space-y-5 text-sm">
+            <section>
+              <div className="mb-4 flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-[var(--text-primary)]">关联任务（{workItems.length}）</h3><Dropdown trigger={["click"]} disabled={!canAddTask || receiving} menu={taskCreationMenu}><Button type="primary" disabled={!canAddTask || receiving}>新增任务 <ChevronDown className="ml-1 inline h-3.5 w-3.5" /></Button></Dropdown></div>
+              {workItems.length ? <div className="space-y-2">{workItems.map((item) => {
+                const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED";
+                const accepted = item.assistanceTaskStatus === "ACCEPTED";
+                const taskTargetPage = TASK_PAGE_BY_TYPE[item.taskType] || "prod_req_tasks";
+                const taskEvents = Array.isArray(item.events) ? [...item.events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))) : [];
+                return <div key={item.id} className="space-y-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-xs">
+                  <div className="flex items-center justify-between gap-3"><button type="button" className="min-w-0 truncate text-left text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => { sessionStorage.setItem('shichuang.task.search', JSON.stringify({ targetPage: taskTargetPage, title: item.title })); openPageTab(taskTargetPage as Parameters<typeof openPageTab>[0]); }}>{item.taskType} · {item.title}</button><span className="flex shrink-0 items-center gap-2">{item.assigneeName}<StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && isInitiator(selected, currentUser) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>
+                  <div className="border-t border-[var(--border-main)]" />
+                  {taskEvents.length > 0 && <div className="space-y-2"><div className="text-[11px] font-semibold text-[var(--text-muted)]">任务变化历程</div>{taskEvents.map((taskEvent) => <div key={taskEvent.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-2"><div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{taskEvent.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{formatDateTime(taskEvent.createdAt)}</span></div><div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{taskEvent.operatorName || "未知"}{taskEvent.fromStatus || taskEvent.toStatus ? ` · ${taskEvent.fromStatus || "—"} → ${taskEvent.toStatus || "—"}` : ""}</div>{taskEvent.reason && <p className="mt-1 text-xs text-[var(--text-body)]">{taskEvent.reason}</p>}</div>)}</div>}
+                </div>;
+              })}</div> : <div className="flex min-h-44 flex-col items-center justify-center rounded-lg border border-dashed border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-center"><p className="text-sm text-[var(--text-muted)]">暂无关联任务</p><Dropdown trigger={["click"]} disabled={!canAddTask || receiving} menu={taskCreationMenu}><Button className="mt-3" disabled={!canAddTask || receiving}>新增第一个任务</Button></Dropdown></div>}
+            </section>
             <section>
               <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项全历程</h3>
               {events.length ? <div className="space-y-3">{[...events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))).map((item) => {
@@ -1291,34 +1184,32 @@ export const RequirementPoolView: React.FC = () => {
                 </div>;
               })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无事项流转记录</p>}
             </section>
-            <section>
-              <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">下游任务</h3>
-              {workItems.length ? <div className="space-y-2">{workItems.map((item) => {
-                const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED";
-                const accepted = item.assistanceTaskStatus === "ACCEPTED";
-                const taskTargetPage = TASK_PAGE_BY_TYPE[item.taskType] || "prod_req_tasks";
-                const taskEvents = Array.isArray(item.events) ? [...item.events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))) : [];
-                return <div key={item.id} className="space-y-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-xs">
-                  <div className="flex items-center justify-between gap-3"><button type="button" className="min-w-0 truncate text-left text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => { sessionStorage.setItem('shichuang.task.search', JSON.stringify({ targetPage: taskTargetPage, title: item.title })); openPageTab(taskTargetPage as Parameters<typeof openPageTab>[0]); }}>{item.taskType} · {item.title}</button><span className="flex shrink-0 items-center gap-2">{item.assigneeName}<StatusTag status={accepted ? "已验收" : done ? "待发起人验收" : item.status} />{item.overdueRisk && <span className="text-[var(--danger)]">已逾期</span>}{done && !accepted && isInitiator(selected, currentUser) && <button type="button" onClick={async () => { try { await requirementRepository.acceptWorkItem(selected.id, item.id); const detail = await requirementRepository.detail(selected.id); setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []); addToast("success", "任务验收通过", "该任务已计入事项验收进度"); } catch (error) { addToast("error", "任务验收失败", error instanceof Error ? error.message : "请刷新后重试"); } }} className="text-[var(--active-text)] hover:text-[var(--primary-hover)]">验收通过</button>}</span></div>
-                  <div className="border-t border-[var(--border-main)]" />
-                  {taskEvents.length > 0 && <div className="space-y-2"><div className="text-[11px] font-semibold text-[var(--text-muted)]">任务变化历程</div>{taskEvents.map((taskEvent) => <div key={taskEvent.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-2"><div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{taskEvent.eventType}</b><span className="text-[11px] text-[var(--text-muted)]">{formatDateTime(taskEvent.createdAt)}</span></div><div className="mt-1 text-[11px] text-[var(--text-muted)]">操作人：{taskEvent.operatorName || "未知"}{taskEvent.fromStatus || taskEvent.toStatus ? ` · ${taskEvent.fromStatus || "—"} → ${taskEvent.toStatus || "—"}` : ""}</div>{taskEvent.reason && <p className="mt-1 text-xs text-[var(--text-body)]">{taskEvent.reason}</p>}</div>)}</div>}
-                </div>;
-              })}</div> : <p className="text-xs text-[var(--text-muted)]">暂无解决过程记录</p>}
-            </section>
+            </div>
           </div>
         </Drawer>
       )}
+      {taskCreationKind && selected && <RequirementTasksView
+        key={taskCreationKind}
+        taskKind={taskCreationKind}
+        itemLabel={{ requirement: "产品任务", design: "设计任务", bug: "缺陷", presales: "售前任务", delivery: "交付任务" }[taskCreationKind]}
+        creationContext={{
+          productLineId: selected.productLineId || productLines.find((line) => line.name === selected.productLineName)?.id || '',
+          sourceWorkOrder: selected,
+          onClose: () => setTaskCreationKind(null),
+          onCreated: () => { void requirementRepository.detail(selected.id).then((detail) => {
+            setSelected(detail); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+            setRequirementTasks((items) => items.map((item) => item.id === detail.id ? { ...item, ...detail } : item));
+          }).catch((error) => addToast("error", "事项详情刷新失败", error instanceof Error ? error.message : "请重新打开详情")); },
+        }}
+      />}
       <Modal
         isOpen={workOpen}
         onClose={() => setWorkOpen(false)}
-        title="事项流转"
+        title={workflowAction === "reassign" ? "转交他人" : "新增任务"}
         maxWidth="4xl"
       >
         <form onSubmit={handleWorkflowSubmit} className="work-order-dialog space-y-4">
-          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-            流转类型 *
-            <Select allowClear aria-label="流转类型 *" className="w-full" value={workflowAction || undefined} onChange={(value) => setWorkflowAction((value ?? "") as typeof workflowAction)} placeholder="选择流转的任务类型" options={[{label:"转任务",value:"convert"},{label:"转派给他人",value:"reassign"},{label:"个人备忘录",value:"memo"}]} />
-          </label>
+
 
           {workflowAction === "convert" && (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
@@ -1389,14 +1280,14 @@ export const RequirementPoolView: React.FC = () => {
 
           {workflowAction === "reassign" && (
             <>
-              <EmployeeSearchSelect label="转派给负责人 *" value={reassignAssignee} employees={employees} placeholder="搜索姓名或职位" onChange={setReassignAssignee} />
+              <EmployeeSearchSelect label="指定负责人 *" value={reassignAssignee} employees={employees} placeholder="搜索姓名或职位" onChange={setReassignAssignee} />
               <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-                转派原因说明 *
+                转交原因 *
                 <Input.TextArea
                   value={reassignReason}
                   onChange={(e) => setReassignReason(e.target.value)}
                   rows={3}
-                  placeholder="请输入转派原因及交接说明..."
+                  placeholder="请输入转交原因及交接说明..."
                   required
                 />
               </label>
@@ -1438,6 +1329,14 @@ export const RequirementPoolView: React.FC = () => {
               {workflowSubmitting ? "处理中…" : "确认"}
             </button>
           </div>
+        </form>
+      </Modal>
+      <Modal isOpen={completeModalOpen} onClose={() => { if (!completeSubmitting) setCompleteModalOpen(false); }} title="事项完成">
+        <form onSubmit={submitComplete} className="work-order-dialog space-y-4">
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">指定负责人<input aria-label="指定负责人" className="mt-1 w-full rounded border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-sm" value={selected?.creatorName || "未记录"} readOnly /></label>
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">事项备注<Input.TextArea value={completeNote} onChange={(event) => setCompleteNote(event.target.value)} rows={4} placeholder="请输入事项完成备注" /></label>
+          <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
+          <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3"><button type="button" onClick={() => setCompleteModalOpen(false)} disabled={completeSubmitting} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs">取消</button><button type="submit" disabled={completeSubmitting} className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:opacity-60">{completeSubmitting ? "提交中…" : "确认完成"}</button></div>
         </form>
       </Modal>
       <Modal
@@ -1487,12 +1386,6 @@ export const RequirementPoolView: React.FC = () => {
       >
         <form onSubmit={submitAcceptanceFailed} className="work-order-dialog space-y-4">
           <p className="text-xs text-[var(--text-muted)]">事项将退回当前任务负责人，状态变更为“处理中”，负责人重新处理后再次提交验收。</p>
-          {workItems.filter((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED").length > 0 && (
-            <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-              验收任务 *
-              <Select aria-label="验收任务 *" className="w-full" value={acceptanceWorkItemId || undefined} onChange={(value) => setAcceptanceWorkItemId(value)} options={workItems.filter((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED").map((item) => ({ label: `${item.taskType} · ${item.title} · ${item.assigneeName}`, value: item.id }))} placeholder="请选择需要退回的已完成任务" />
-            </label>
-          )}
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
             未通过原因 *
             <Input.TextArea value={acceptanceReason} onChange={(event) => setAcceptanceReason(event.target.value)} rows={4} placeholder="请说明需要补充或修正的内容" required />

@@ -525,8 +525,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addRequirementTask = async (task: Partial<RequirementTask>) => {
     if (!requirementBackendEnabled) {
-      addToast('error', '工单创建失败', '当前未连接后端服务，数据未保存');
-      return false;
+      const selectedLocalProduct = task.productLineId ? productLines.find((item) => item.id === task.productLineId) : productLines.find((item) => item.name === task.productLineName) || productLines[0];
+      if (!selectedLocalProduct) { addToast('warning', '工单创建失败', '暂无可用的事项归属范围'); return false; }
+      const localTask = { ...task, id: task.id || `req-${Date.now()}`, title: task.title || '新产品任务', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, department: task.department || currentUser.department, productLineId: selectedLocalProduct.id, productLineName: selectedLocalProduct.name, versionName: task.versionName || '', needsCollaboration: task.needsCollaboration || [] } as RequirementTask;
+      setRequirementTasks((prev) => [localTask, ...prev]);
+      window.dispatchEvent(new CustomEvent('product-task-created', { detail: { source: 'product-task', productLineId: localTask.productLineId, needsCollaboration: localTask.needsCollaboration } }));
+      addToast('success', '工单创建成功');
+      return true;
     }
     const selectedProductLine = task.productLineId
       ? productLines.find((item) => item.id === task.productLineId)
@@ -539,6 +544,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newTask: RequirementTask = {
       id: `req-${Date.now()}`,
       title: task.title || '新产品任务',
+      needsCollaboration: task.needsCollaboration || [],
       description: task.description || '任务详细描述',
       expectedGoal: task.expectedGoal || '交付目标与指标验收标准',
       status: task.status || '待处理',
@@ -1182,7 +1188,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateProductLine = async (id: string, updates: Partial<ProductLine>) => {
     if (!requirementBackendEnabled) {
-      throw new Error('当前未连接后端服务，数据未保存');
+      setProductLines((lines) => lines.map((line) => line.id === id ? { ...line, ...updates } : line));
+      addToast('success', '产品配置已保存');
+      return;
     }
     await productRepository.updateProductLine(id, updates);
     await productLineQuery.refetch();
@@ -1225,7 +1233,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       startDate: v.startDate || '',
       endDate: v.endDate || '',
       releaseDate: v.releaseDate || '',
-      status: v.status || '未开始',
+      status: '待开始',
+      statusPhase: '待开始',
       requirementsCount: v.reqCount || v.requirementsCount || 0,
       reqCount: v.reqCount || v.requirementsCount || 0,
       bugCount: v.bugCount || 0,

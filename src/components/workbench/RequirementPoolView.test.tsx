@@ -14,7 +14,7 @@ vi.mock('../../utils/copyToClipboard', () => ({ copyToClipboard: vi.fn().mockRes
 
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
 vi.mock('../../services/requirementRepository', () => ({
-  requirementRepository: { employees: vi.fn(), detail: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), createWorkItem: vi.fn() },
+  requirementRepository: { allForScope: vi.fn(), transferredBy: vi.fn(), employees: vi.fn(), detail: vi.fn(), receive: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), createWorkItem: vi.fn() },
   normalizeRequirementTask: (task: RequirementTask) => task,
 }));
 vi.mock('../product/LazyRichTextEditor', () => ({
@@ -26,11 +26,8 @@ vi.mock('../product/LazyRichTextEditor', () => ({
 }));
 
 describe('workbench work-order creation layout', () => {
-  it('limits all to created, owned or participating matters', () => {
-    expect(isWorkOrderInScope({ creatorName: '林志豪', ownerName: '陈雅婷' }, 'all', '林志豪')).toBe(true);
-    expect(isWorkOrderInScope({ creatorName: '陈雅婷', ownerName: '林志豪' }, 'all', '林志豪')).toBe(true);
-    expect(isWorkOrderInScope({ creatorName: '陈雅婷', ownerName: '陈雅婷', ccNames: ['林志豪'] }, 'all', '林志豪')).toBe(true);
-    expect(isWorkOrderInScope({ creatorName: '陈雅婷', ownerName: '陈雅婷' }, 'all', '林志豪')).toBe(false);
+  it('includes unrelated matters in company scope', () => {
+    expect(isWorkOrderInScope({ creatorName: '陈雅婷', ownerName: '陈雅婷' } as RequirementTask, 'all', { name: '林志豪' })).toBe(true);
   });
   const addRequirementTask = vi.fn();
   const addToast = vi.fn();
@@ -38,6 +35,8 @@ describe('workbench work-order creation layout', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/app/wb_work_order');
     vi.clearAllMocks();
+    vi.mocked(requirementRepository.allForScope).mockImplementation(async () => useApp().requirementTasks);
+    vi.mocked(requirementRepository.transferredBy).mockResolvedValue(new Set());
     vi.mocked(requirementRepository.employees).mockResolvedValue([{ id: 'employee-1', name: '陈雅婷', department: '产品部' }]);
     vi.mocked(useApp).mockReturnValue({
       requirementTasks: [],
@@ -55,11 +54,97 @@ describe('workbench work-order creation layout', () => {
     } as unknown as ReturnType<typeof useApp>);
   });
 
+  const openType = async (type: string) => {
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: type }));
+  };
+
+  it('defaults to created scope and only shows the department selector in company scope', async () => {
+    const app = useApp();
+    vi.mocked(useApp).mockReturnValue({ ...app, requirementTasks: [
+      { id: 'mine', title: '本人创建事项', creatorName: '林志豪', ownerName: '陈雅婷' },
+      { id: 'other', title: '全公司其他事项', creatorName: '陈雅婷', ownerName: '陈雅婷' },
+    ] } as unknown as ReturnType<typeof useApp>);
+    render(<RequirementPoolView />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '我创建的 (1)' })).toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.queryByText('全公司其他事项')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('所属部门')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '全公司的 (2)' }));
+    expect(screen.getByText('全公司其他事项')).toBeInTheDocument();
+    expect(screen.getByLabelText('所属部门')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '我部门的 (0)' }));
+    expect(screen.queryByLabelText('所属部门')).not.toBeInTheDocument();
+  });
+
   const openCustomerRequest = async () => {
     render(<RequirementPoolView />);
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: /产品需求/ }));
+    await openType('产品需求');
   };
+
+  const renderDetail = async (overrides: Partial<RequirementTask> = {}) => {
+    const task = { id: 'receive-1', title: '接收协同事项', status: '待处理', ownerName: '林志豪', creatorName: '林志豪', workOrderType: '客户诉求', productLineName: '协同产品', specialFields: { projectName: '项目甲', requestSource: '客户访谈' }, ...overrides } as RequirementTask;
+    window.history.replaceState(null, '', '/app/wb_work_order?detailId=receive-1');
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ ...task, events: [], workItems: [] });
+    render(<RequirementPoolView />);
+    await screen.findByRole('heading', { name: task.title });
+    return task;
+  };
+
+  it('only enables tasks after reception is persisted and blocks duplicate reception', async () => {
+    const task = await renderDetail();
+    let resolve!: (value: Awaited<ReturnType<typeof requirementRepository.receive>>) => void;
+    vi.mocked(requirementRepository.receive).mockReturnValue(new Promise((done) => { resolve = done; }));
+    expect(screen.getByRole('button', { name: '新增任务' })).toBeDisabled();
+    expect(screen.getByRole('heading', { name: '事项全历程' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '基础字段' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '附件' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '事项接收' }));
+    fireEvent.click(screen.getByRole('button', { name: '事项接收' }));
+    expect(requirementRepository.receive).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: '事项转交' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '新增任务' })).toBeDisabled();
+    await act(async () => resolve({ ...task, status: '处理中', events: [] }));
+    expect(screen.getByRole('button', { name: '新增任务' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '事项接收' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '新增任务' }));
+    expect(screen.getByLabelText('任务类型 *')).toBeInTheDocument();
+  });
+
+  it('keeps pending status and task lock when reception fails', async () => {
+    await renderDetail();
+    vi.mocked(requirementRepository.receive).mockRejectedValueOnce(new Error('状态已变化'));
+    fireEvent.click(screen.getByRole('button', { name: '事项接收' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '事项接收失败', '状态已变化'));
+    expect(screen.getByRole('button', { name: '新增任务' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '事项接收' })).toBeEnabled();
+  });
+
+  it('does not grant owner actions using a matching name when owner ids differ', async () => {
+    const app = vi.mocked(useApp)();
+    vi.mocked(useApp).mockReturnValue({ ...app, currentUser: { ...app.currentUser, id: 'user-1' } });
+    await renderDetail({ assigneeId: 'user-2' });
+    expect(screen.queryByRole('button', { name: '事项接收' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '事项转交' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '事项退回' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '新增任务' })).toBeDisabled();
+  });
+
+  it('keeps task creation available in processing even with an existing task', async () => {
+    await renderDetail({ status: '处理中', taskId: 'existing-task' });
+    expect(screen.getByRole('button', { name: '新增任务' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '事项接收' })).not.toBeInTheDocument();
+  });
+
+  it('shows presales creation fields and keeps removed historical values folded', async () => {
+    await renderDetail({ workOrderType: '售前支持', specialFields: { opportunityName: '业务商机', supportType: '建设方案' } });
+    expect(screen.getByText('所属商机')).toBeVisible();
+    expect(screen.getByText('业务商机')).toBeVisible();
+    expect(screen.getByText('支持类型')).toBeVisible();
+    expect(screen.queryByText('关联客户', { selector: 'span' })).not.toBeInTheDocument();
+    expect(screen.queryByText('所属线索/商机/投标')).not.toBeInTheDocument();
+    expect(screen.queryByText('项目阶段')).not.toBeInTheDocument();
+  });
 
   it('opens a shared detail outside the list and copies its business number and standalone link', async () => {
     window.history.replaceState(null, '', '/manager/app/wb_work_order?detailId=shared-item');
@@ -121,7 +206,7 @@ describe('workbench work-order creation layout', () => {
     expect(screen.getByLabelText('事项标题 *')).toHaveClass('ant-input');
     expect(screen.getByLabelText('所属产品 *').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('负责人 *').closest('.ant-select')).not.toBeNull();
-    expect(screen.getByLabelText('负责人 *').compareDocumentPosition(screen.getByLabelText('所属产品 *')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByLabelText('所属产品 *').closest('label')?.nextElementSibling).toBe(screen.getByLabelText('负责人 *').closest('label'));
     expect(screen.getByLabelText('优先级').closest('.ant-select')).not.toBeNull();
     expect(screen.getByLabelText('期望完成时间 *').closest('.ant-picker')).not.toBeNull();
     expect(screen.getByLabelText('诉求来源 *')).toHaveClass('ant-input');
@@ -135,12 +220,12 @@ describe('workbench work-order creation layout', () => {
   });
 
   it.each([
-    ['交付支持', ['项目阶段 *', '项目类型 *', '交付类型 *']],
+    ['交付支持', ['所属项目 *', '所属产品 *']],
     ['其他协同', ['协助类型 *']],
   ])('uses Ant Design inputs for %s fields', async (type, labels) => {
     render(<RequirementPoolView />);
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(type) }));
+    await openType(type);
 
     expect(screen.getByLabelText('事项标题 *')).toHaveClass('ant-input');
     labels.forEach((label) => expect(screen.getByLabelText(label).closest('.ant-select')).not.toBeNull());
@@ -152,12 +237,12 @@ describe('workbench work-order creation layout', () => {
     await openCustomerRequest();
 
     fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '客户反馈事项' } });
-    fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
-    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('所属项目 *'));
     fireEvent.click(await screen.findByText('中标项目甲', { selector: '.ant-select-item-option-content' }));
     fireEvent.mouseDown(screen.getByLabelText('所属产品 *'));
     fireEvent.click(await screen.findByText('协同产品', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
+    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
     fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-09' } });
     fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
     fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
@@ -167,6 +252,7 @@ describe('workbench work-order creation layout', () => {
 
     expect(screen.getByRole('button', { name: '提交中…' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '取消' })).toBeDisabled();
+    expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '陈雅婷', priority: '中' }));
 
     await act(async () => complete?.(true));
   });
@@ -184,7 +270,7 @@ describe('workbench work-order creation layout', () => {
     await openCustomerRequest();
     expect(screen.getByLabelText('所属产品 *')).toBeDisabled();
     expect(screen.getByLabelText('所属项目 *').compareDocumentPosition(screen.getByLabelText('所属产品 *')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByLabelText('优先级').closest('.ant-select')).toHaveTextContent('请选择优先级');
+    expect(screen.getByLabelText('优先级').closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('中');
     fireEvent.mouseDown(screen.getByLabelText('所属项目 *'));
     fireEvent.click(await screen.findByText('中标项目甲', { selector: '.ant-select-item-option-content' }));
     expect(screen.getByLabelText('所属产品 *')).not.toBeDisabled();
@@ -199,15 +285,142 @@ describe('workbench work-order creation layout', () => {
   it('places the other collaboration fields in the requested order', async () => {
     render(<RequirementPoolView />);
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: /其他协同/ }));
-    const labels = ['负责人 *', '协助类型 *', '所属项目', '所属产品'];
+    await openType('其他协同');
+    const labels = ['协助类型 *', '负责人 *', '所属项目', '所属产品'];
     labels.slice(0, -1).forEach((label, index) => expect(screen.getByLabelText(label).compareDocumentPosition(screen.getByLabelText(labels[index + 1])) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
+    expect(screen.getByLabelText('协助类型 *').closest('label')?.nextElementSibling).toBe(screen.getByLabelText('负责人 *').closest('label'));
+    expect(screen.getAllByLabelText('负责人 *')).toHaveLength(1);
+    expect(screen.queryByLabelText(/期望结果/)).not.toBeInTheDocument();
   });
 
-  it('restores five metric cards and offers a clearable type filter without held status', async () => {
+  const choose = async (label: string, option: string) => {
+    fireEvent.mouseDown(screen.getByLabelText(label));
+    fireEvent.click(await screen.findByText(option, { selector: '.ant-select-item-option-content' }));
+  };
+
+  it('creates other collaboration without an expected result and still requires the assistance type', async () => {
+    addRequirementTask.mockResolvedValue(true);
     render(<RequirementPoolView />);
-    fireEvent.click(screen.getByRole('tab', { name: '事项列表' }));
-    expect(screen.getAllByText(/待处理 0 · 处理中 0 · 已处理 0/)).toHaveLength(5);
+    await openType('其他协同');
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '资料获取协同' } });
+    fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
+    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
+    fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-09' } });
+    fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
+    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    expect(addRequirementTask).not.toHaveBeenCalled();
+    expect(addToast).toHaveBeenCalledWith('warning', '请完成所有必填业务参数');
+    await choose('协助类型 *', '资料获取');
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('陈雅婷');
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({
+      workOrderType: '其他问题', ownerName: '陈雅婷', priority: '中', specialFields: { problemType: '资料获取' },
+    })));
+    expect(addRequirementTask.mock.calls[0][0].specialFields).not.toHaveProperty('expectedResult');
+  });
+
+  it.each(['产品需求', '线上问题', '售前支持', '交付支持', '其他协同'])('defaults %s priority to medium on every new form', async (type) => {
+    render(<RequirementPoolView />);
+    await openType(type);
+    expect(screen.getByLabelText('优先级').closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('中');
+    await choose('优先级', '高');
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    await openType(type);
+    expect(screen.getByLabelText('优先级').closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('中');
+  });
+
+  it.each([
+    [{ requirementOwnerUserId: 'employee-1', requirementOwner: '旧姓名' }, '陈雅婷'],
+    [{ requirementOwner: '陈雅婷' }, '陈雅婷'],
+    [{ ownerName: '陈雅婷', productOwner: '陈雅婷', requirementOwnerSecondary: '陈雅婷' }, '请选择负责人'],
+    [{ requirementOwnerUserId: 'inactive', requirementOwner: '陈雅婷' }, '请选择负责人'],
+  ])('uses only the configured active product primary owner: %j', async (configuration, expected) => {
+    const context = vi.mocked(useApp)();
+    vi.mocked(useApp).mockReturnValue({ ...context, productLines: [{ ...context.productLines[0], ...configuration }] });
+    await openCustomerRequest();
+    await choose('所属项目 *', '中标项目甲');
+    await choose('所属产品 *', '协同产品');
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent(expected);
+  });
+
+  it('saves a manually changed owner and priority instead of the product defaults', async () => {
+    const context = vi.mocked(useApp)();
+    vi.mocked(useApp).mockReturnValue({ ...context, productLines: [{ ...context.productLines[0], requirementOwnerUserId: 'employee-1' }] });
+    vi.mocked(requirementRepository.employees).mockResolvedValue([
+      { id: 'employee-1', name: '陈雅婷', department: '产品部' },
+      { id: 'employee-2', name: '林志豪', department: '管理部' },
+    ]);
+    addRequirementTask.mockResolvedValue(true);
+    await openCustomerRequest();
+    await choose('所属项目 *', '中标项目甲');
+    await choose('所属产品 *', '协同产品');
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('陈雅婷');
+    fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
+    fireEvent.click(await screen.findByText(/林志豪/, { selector: '.ant-select-item-option-content' }));
+    await choose('优先级', '高');
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '负责人调整' } });
+    fireEvent.change(screen.getByLabelText('诉求来源 *'), { target: { value: '客户反馈' } });
+    fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-09' } });
+    fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
+    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '林志豪', priority: '高' })));
+  });
+
+  it('updates the owner on product changes and clears it when the source changes', async () => {
+    const context = vi.mocked(useApp)();
+    vi.mocked(useApp).mockReturnValue({ ...context,
+      opportunities: [{ id: 'opp-1', name: '多产品商机', relatedProduct: '共享产品' }] as typeof context.opportunities,
+      productLines: [
+        { ...context.productLines[0], requirementOwnerUserId: 'employee-1', products: [{ id: 'shared', name: '共享产品' }] },
+        { ...context.productLines[0], id: 'line-2', name: '另一产品', requirementOwnerUserId: 'employee-2', products: [{ id: 'shared', name: '共享产品' }] },
+        { ...context.productLines[0], id: 'line-3', name: '无责任人产品', products: [{ id: 'shared', name: '共享产品' }] },
+      ],
+    });
+    vi.mocked(requirementRepository.employees).mockResolvedValue([
+      { id: 'employee-1', name: '陈雅婷' }, { id: 'employee-2', name: '林志豪' },
+    ]);
+    render(<RequirementPoolView />);
+    await openType('售前支持');
+    await choose('所属商机 *', '多产品商机');
+    await choose('所属产品 *', '协同产品');
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('陈雅婷');
+    await choose('所属产品 *', '另一产品');
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('林志豪');
+    await choose('所属产品 *', '无责任人产品');
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('请选择负责人');
+    await choose('所属产品 *', '协同产品');
+    fireEvent.click(screen.getByLabelText('所属商机 *').closest('.ant-select')!.querySelector('.ant-select-clear')!);
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('请选择负责人');
+    expect(screen.getByLabelText('所属产品 *')).toBeDisabled();
+  });
+
+  it('fills the primary owner when the employee directory arrives after product selection', async () => {
+    const context = vi.mocked(useApp)();
+    vi.mocked(useApp).mockReturnValue({ ...context, productLines: [{ ...context.productLines[0], requirementOwnerUserId: 'employee-1' }] });
+    let resolveEmployees: (items: Awaited<ReturnType<typeof requirementRepository.employees>>) => void;
+    vi.mocked(requirementRepository.employees).mockReturnValue(new Promise((resolve) => { resolveEmployees = resolve; }));
+    await openCustomerRequest();
+    await choose('所属项目 *', '中标项目甲');
+    await choose('所属产品 *', '协同产品');
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('请选择负责人');
+    await act(async () => resolveEmployees!([{ id: 'employee-1', name: '陈雅婷' }]));
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('陈雅婷');
+    fireEvent.click(screen.getByLabelText('负责人 *').closest('.ant-select')!.querySelector('.ant-select-clear')!);
+    vi.mocked(useApp).mockReturnValue({ ...context, productLines: [{ ...context.productLines[0], requirementOwnerUserId: 'employee-1', requirementOwner: '陈雅婷' }] });
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '保留手动清除' } });
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('请选择负责人');
+  });
+
+  it('opens the list directly without metric cards or primary tabs and keeps the type filter', async () => {
+    render(<RequirementPoolView />);
+    expect(screen.queryByRole('tablist', { name: '协同事项视图' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/待处理 0 · 处理中 0 · 已处理 0/)).not.toBeInTheDocument();
+    expect(screen.queryByText('每一处精微调整，都在点亮更广的世界。')).not.toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
     const type = screen.getByLabelText('事项类型');
     expect(type.closest('.ant-select')).toHaveTextContent('类型');
     fireEvent.mouseDown(type);
@@ -238,24 +451,17 @@ describe('workbench work-order creation layout', () => {
     } as unknown as ReturnType<typeof useApp>);
 
     render(<RequirementPoolView />);
-    fireEvent.click(screen.getByRole('tab', { name: '事项列表' }));
     fireEvent.click(screen.getByRole('button', { name: '详情' }));
     await waitFor(() => expect(requirementRepository.detail).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '事项流转' }));
-    const workflowType = screen.getByLabelText('流转类型 *');
-    fireEvent.mouseDown(workflowType);
-    fireEvent.click(await screen.findByText('转任务', { selector: '.ant-select-item-option-content' }));
-    fireEvent.mouseDown(screen.getByLabelText('任务类型 *'));
-    const productOption = await screen.findByText('产品需求', { selector: '.ant-select-item-option-content' });
-    expect(Array.from(productOption.closest('.ant-select-dropdown')?.querySelectorAll('.ant-select-item-option-content') || []).map((item) => item.textContent)).toEqual(['产品需求', '缺陷管理', '设计任务', '研发任务']);
-    fireEvent.keyDown(document, { key: 'Escape' });
-    fireEvent.mouseDown(workflowType);
-    fireEvent.click(await screen.findByText('转派给他人', { selector: '.ant-select-item-option-content' }));
-    expect(workflowType.closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('转派给他人');
+    expect(screen.getByRole('button', { name: '新增任务' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '事项转交' }));
+    expect(screen.queryByLabelText('流转类型 *')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('指定负责人 *')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('请输入转交原因及交接说明...')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '取消' }));
 
-    fireEvent.click(screen.getByRole('button', { name: '事项驳回' }));
+    fireEvent.click(screen.getByRole('button', { name: '事项退回' }));
     const rejectReason = screen.getByLabelText('驳回原因 *');
     fireEvent.mouseDown(rejectReason);
     const firstReason = await screen.findByText('事项内容不明确', { selector: '.ant-select-item-option-content' });
@@ -264,23 +470,104 @@ describe('workbench work-order creation layout', () => {
   }, 15000);
 
   it.each([
-    ['线上问题', '严重程度 *', '阻断主流程', '轻微缺陷'],
+    ['线上问题', '严重程度', '阻断主流程', '轻微缺陷'],
     ['售前支持', '支持类型 *', '建设方案', '招投标标书协同'],
-    ['交付支持', '项目阶段 *', '项目移交', '运维追踪'],
     ['其他协同', '协助类型 *', '方向研讨', '其他'],
   ])('provides the configured %s business options', async (type, label, firstOption, lastOption) => {
     render(<RequirementPoolView />);
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(type) }));
+    await openType(type);
     fireEvent.mouseDown(screen.getByLabelText(label));
     expect(await screen.findByText(firstOption, { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
     expect(await screen.findByText(lastOption, { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
   });
 
-  it('blocks submission when a visible business parameter is missing', async () => {
+  it.each(['untouched', 'selected', 'cleared'] as const)('submits an online issue with optional severity %s', async (state) => {
+    addRequirementTask.mockResolvedValue(true);
+    render(<RequirementPoolView />);
+    await openType('线上问题');
+    expect(screen.queryByLabelText('严重程度 *')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('严重程度').closest('.ant-select')).toHaveTextContent('请选择严重程度（选填）');
+    await choose('所属项目 *', '中标项目甲');
+    await choose('所属产品 *', '协同产品');
+    fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
+    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '线上异常' } });
+    fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-09' } });
+    fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
+    if (state !== 'untouched') {
+      await choose('严重程度', '阻断主流程');
+      expect(screen.getByLabelText('优先级').closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('紧急');
+    }
+    if (state === 'cleared') {
+      await choose('优先级', '高');
+      fireEvent.click(screen.getByLabelText('严重程度').closest('.ant-select')!.querySelector('.ant-select-clear')!);
+      expect(screen.getByLabelText('严重程度').closest('.ant-select')).toHaveTextContent('请选择严重程度（选填）');
+      expect(screen.getByLabelText('优先级').closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('高');
+    }
+    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({
+      workOrderType: '线上问题',
+      priority: state === 'untouched' ? '中' : state === 'selected' ? '紧急' : '高',
+    })));
+    expect(addRequirementTask.mock.calls[0][0].specialFields.severity).toBe(state === 'untouched' ? undefined : state === 'selected' ? '阻断主流程' : '');
+    expect(addToast).not.toHaveBeenCalledWith('warning', '请完成所有必填业务参数');
+  });
+
+  it.each(['交付支持', '售前支持'])('submits %s with the simplified business fields', async (type) => {
+    addRequirementTask.mockResolvedValue(true);
+    render(<RequirementPoolView />);
+    await openType(type);
+    if (type === '交付支持') {
+      for (const label of ['项目阶段', '项目类型', '交付类型']) {
+        expect(screen.queryByLabelText(`${label} *`)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+      }
+      await choose('所属项目 *', '中标项目甲');
+    } else {
+      expect(screen.getByLabelText('所属商机 *').closest('.ant-select')).toHaveTextContent('输入商机名称');
+      expect(screen.queryByLabelText('所属线索/商机/投标 *')).not.toBeInTheDocument();
+      await choose('所属商机 *', '商机甲');
+      await choose('支持类型 *', '建设方案');
+    }
+    await choose('所属产品 *', '协同产品');
+    fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
+    fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '简化表单提交' } });
+    fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-09' } });
+    fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
+    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({ workOrderType: type })));
+    const fields = addRequirementTask.mock.calls[0][0].specialFields;
+    if (type === '售前支持') {
+      expect(fields).toMatchObject({ opportunityId: 'opp-1', opportunityName: '商机甲', relatedType: 'opportunity' });
+    } else {
+      for (const key of ['progressStage', 'other', 'deliveryType']) expect(fields[key]).toBeUndefined();
+    }
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
+  it('offers all five creation types and only real opportunities for presales', async () => {
+    const context = vi.mocked(useApp)();
+    vi.mocked(useApp).mockReturnValue({ ...context, leads: [{ id: 'lead-only', name: '仅线索候选' }] } as unknown as ReturnType<typeof useApp>);
+    render(<RequirementPoolView />);
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual(['产品需求', '线上问题', '售前支持', '交付支持', '其他协同']);
+    fireEvent.click(screen.getByRole('menuitem', { name: '售前支持' }));
+    fireEvent.mouseDown(screen.getByLabelText('所属商机 *'));
+    expect(await screen.findByText('商机甲', { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
+    expect(screen.queryByText('仅线索候选')).not.toBeInTheDocument();
+    expect(screen.queryByText('中标项目甲', { selector: '.ant-select-item-option-content' })).not.toBeInTheDocument();
+  });
+
+  it('blocks submission when a required project is missing', async () => {
     render(<RequirementPoolView />);
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: /线上问题/ }));
+    await openType('线上问题');
     fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '线上异常' } });
     fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
     fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
@@ -303,19 +590,16 @@ describe('workbench work-order creation layout', () => {
     } as unknown as ReturnType<typeof useApp>);
 
     render(<RequirementPoolView />);
-    fireEvent.click(screen.getByRole('tab', { name: '事项列表' }));
     fireEvent.click(screen.getByRole('button', { name: '详情' }));
     await waitFor(() => expect(requirementRepository.detail).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '事项流转' }));
-    fireEvent.mouseDown(screen.getByLabelText('流转类型 *'));
-    fireEvent.click(await screen.findByText('转派给他人', { selector: '.ant-select-item-option-content' }));
-    fireEvent.mouseDown(screen.getByLabelText('转派给负责人 *'));
+    fireEvent.click(screen.getByRole('button', { name: '事项转交' }));
+    fireEvent.mouseDown(screen.getByLabelText('指定负责人 *'));
     fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
-    fireEvent.change(screen.getByPlaceholderText('请输入转派原因及交接说明...'), { target: { value: '工作调整' } });
+    fireEvent.change(screen.getByPlaceholderText('请输入转交原因及交接说明...'), { target: { value: '工作调整' } });
     fireEvent.click(screen.getByRole('button', { name: '确认' }));
 
     await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '事项转派失败', '工单已变化，请刷新后重试'));
-    expect(screen.getByLabelText('转派给负责人 *')).toBeInTheDocument();
+    expect(screen.getByLabelText('指定负责人 *')).toBeInTheDocument();
     expect(setRequirementTasks).not.toHaveBeenCalled();
   });
 });

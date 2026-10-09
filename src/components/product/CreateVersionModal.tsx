@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Calendar, Check, Clock, FileText, Layers } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { ProductLine, VersionIteration } from '../../types';
-import { productRepository } from '../../services/productRepository';
 import { teamRepository } from '../../services/teamRepository';
 import { employeeSelectOptions } from '../common/PersonIdentity';
 
@@ -42,7 +41,6 @@ export const shouldClearEndDate = (nextStartDate: string, endDate: string) => Bo
 export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, onClose, productLine, editingVersion = null, onSuccess }) => {
   const { addVersion, updateVersion, addToast, productLines } = useApp();
   const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: isOpen, retry: false });
-  const iterationStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'ITERATION'], queryFn: () => productRepository.researchStatusTemplates('ITERATION'), enabled: isOpen, retry: false });
   const [selectedProductLineId, setSelectedProductLineId] = useState(productLine?.id || '');
   const [versionName, setVersionName] = useState(editingVersion?.name || '');
   const [versionCode, setVersionCode] = useState(editingVersion?.code || '');
@@ -51,7 +49,6 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
   const [endDate, setEndDate] = useState(editingVersion?.endDate || '');
   const [content, setContent] = useState(editingVersion?.content || editingVersion?.changelog || '');
   const [productLinePickerOpen, setProductLinePickerOpen] = useState(false);
-  const versionStatus = editingVersion?.status || iterationStatusesQuery.data?.find((item) => item.initial && item.enabled)?.name || iterationStatusesQuery.data?.find((item) => item.enabled)?.name || '未开始';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -80,8 +77,8 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
     const nextVersion: Partial<VersionIteration> = {
       name: versionName.trim(), code: versionCode.trim(), ownerName: versionOwner.trim(),
       productLineId: selectedProductLine.id, productLineName: selectedProductLine.name,
-      startDate, endDate, releaseDate: endDate || undefined,
-      status: versionStatus, content: content.trim(), changelog: content.trim(),
+      startDate, endDate,
+      ...(editingVersion ? {} : { status: '待开始', statusPhase: '待开始' }), content: content.trim(), changelog: content.trim(),
       requirementsCount: 0, reqCount: 0, linkedRequirementIds: []
     };
     const saved = editingVersion

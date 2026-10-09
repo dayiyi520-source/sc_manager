@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Button, Input, InputNumber, Modal, Popconfirm, Select, Spin, Tabs } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, UndoOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,14 +7,12 @@ import { NotificationSettingsPanel } from '../product/NotificationSettingsPanel'
 import { AutomationRulesPanel } from '../product/AutomationRulesPanel';
 import { WorkItemCategoryPanel } from './WorkItemCategoryPanel';
 import { WorkItemFieldConfigurationPanel } from './WorkItemFieldConfigurationPanel';
-import { productRepository, type ArchivedProductLine, type ProductRoleTemplate, type ResearchStatusScope, type ResearchStatusTemplate, type WorkItemCategoryDefinition } from '../../services/productRepository';
+import { productRepository, type ArchivedProductLine, type ProductRoleTemplate } from '../../services/productRepository';
 import { useApp } from '../../context/AppContext';
-import { WorkItemStateEditor, validateWorkflowStates, type EditableWorkflowState, type StateGroup } from '../product/WorkItemStateConfigDrawer';
 
-type Section = 'dictionary' | 'work-items' | 'roles' | 'statuses' | 'notifications' | 'automation' | 'archive';
+type Section = 'dictionary' | 'work-items' | 'roles' | 'notifications' | 'automation' | 'archive';
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'dictionary', label: '产研字典' }, { id: 'work-items', label: '工作项模板' },
-  { id: 'statuses', label: '产品与迭代状态' },
   { id: 'roles', label: '角色与职责' }, { id: 'notifications', label: '通知与提醒' },
   { id: 'automation', label: '自动化配置' },
   { id: 'archive', label: '归档' }
@@ -130,40 +128,6 @@ const RolesPanel = () => {
   </div>;
 };
 
-const PHASE_TO_GROUP: Record<ResearchStatusTemplate['phase'], StateGroup> = { 待开始: 'NOT_STARTED', 处理中: 'IN_PROGRESS', 已完成: 'COMPLETED', 已结束: 'CANCELLED' };
-const GROUP_TO_PHASE: Record<StateGroup, ResearchStatusTemplate['phase']> = { NOT_STARTED: '待开始', IN_PROGRESS: '处理中', COMPLETED: '已完成', CANCELLED: '已结束' };
-const statusStates = (items: ResearchStatusTemplate[]): EditableWorkflowState[] => items.map((item) => ({ key: item.id, name: item.name, group: PHASE_TO_GROUP[item.phase], initial: item.initial, successful: item.phase === '已完成', enabled: item.enabled, stage: 'product', color: item.color as EditableWorkflowState['color'] }));
-const StatusesPanel = () => {
-  const { addToast } = useApp();
-  const queryClient = useQueryClient();
-  const [scope, setScope] = useState<ResearchStatusScope>('PRODUCT');
-  const statusesQuery = useQuery({ queryKey: ['research-status-templates', scope], queryFn: () => productRepository.researchStatusTemplates(scope), retry: false });
-  const [states, setStates] = useState<EditableWorkflowState[]>([]);
-  const [saving, setSaving] = useState(false);
-  useEffect(() => { if (statusesQuery.data) setStates(statusStates(statusesQuery.data)); }, [statusesQuery.data]);
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['research-status-templates', scope] });
-  const save = async () => {
-    const invalid = validateWorkflowStates(states); if (invalid) { addToast('warning', invalid); return; }
-    if (Object.keys(GROUP_TO_PHASE).some((group) => !states.some((state) => state.group === group))) { addToast('warning', '每个阶段至少保留一个启用状态'); return; }
-    setSaving(true);
-    try {
-      const originals = statusesQuery.data || [];
-      await productRepository.saveResearchStatusTemplates(scope, {
-        originals: originals.map(({ id, revision }) => ({ id, revision })),
-        states: states.map((state, index) => ({ id: state.key, revision: originals.find((item) => item.id === state.key)?.revision, name: state.name.trim(), phase: GROUP_TO_PHASE[state.group], color: state.color, initial: state.initial, enabled: true, sort: index + 1 }))
-      });
-      await refresh(); addToast('success', '状态配置已保存');
-    } catch (error) { addToast('error', '状态配置保存失败', error instanceof Error ? error.message : '请稍后重试'); }
-    finally { setSaving(false); }
-  };
-  return <div className="mx-auto w-full max-w-5xl space-y-4 text-xs">
-    <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品与迭代状态</h3><p className="mt-1 text-[var(--text-muted)]">状态名称可自定义，通用阶段固定为未开始、进行中、已完成和已取消。</p></div><Button type="primary" className="!h-9" loading={saving} onClick={() => void save()}>保存配置</Button></div>
-    <Tabs activeKey={scope} onChange={(key) => { if (!saving) { setStates([]); setScope(key as ResearchStatusScope); } }} items={[{ key: 'PRODUCT', label: '产品状态', disabled: saving }, { key: 'ITERATION', label: '迭代状态', disabled: saving }]} />
-    {statusesQuery.isError && <Alert type="error" showIcon message="状态加载失败" action={<Button onClick={() => statusesQuery.refetch()}>重试</Button>} />}
-    {statusesQuery.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : !statusesQuery.isError && <WorkItemStateEditor states={states} category="requirement" onChange={setStates} />}
-  </div>;
-};
-
 export const ResearchTemplateView: React.FC = () => {
   const [section, setSection] = useState<Section>('work-items');
   return <div className="research-template-view space-y-5 animate-in fade-in duration-200">
@@ -177,7 +141,6 @@ export const ResearchTemplateView: React.FC = () => {
         {section === 'dictionary' && <DictionaryPanel />}
         {section === 'work-items' && <WorkItemModuleView />}
         {section === 'roles' && <RolesPanel />}
-        {section === 'statuses' && <StatusesPanel />}
         {section === 'notifications' && <NotificationSettingsPanel scope="template" />}
         {section === 'automation' && <AutomationRulesPanel scope="template" />}
         {section === 'archive' && <ArchivePanel />}

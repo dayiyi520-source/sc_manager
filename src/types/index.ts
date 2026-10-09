@@ -443,7 +443,10 @@ export interface ProductLineActivity {
   action: string;
   detail?: string;
   operatorName?: string;
-  createdAt: string;
+  createdAt?: string;
+  timestamp?: string;
+  createdTime?: string;
+  updatedAt?: string;
 }
 
 export interface ProductItemInLine {
@@ -502,16 +505,16 @@ export interface ProductLine {
   coverImage?: string;
   requirementOwner?: string;
   requirementOwnerUserId?: string;
-  requirementOwnerSecondary?: string;
-  requirementOwnerSecondaryUserId?: string;
+  requirementOwnerSecondary?: string | string[];
+  requirementOwnerSecondaryUserId?: string | string[];
   techOwner?: string;
   techOwnerUserId?: string;
-  techOwnerSecondary?: string;
-  techOwnerSecondaryUserId?: string;
+  techOwnerSecondary?: string | string[];
+  techOwnerSecondaryUserId?: string | string[];
   testOwner?: string;
   testOwnerUserId?: string;
-  testOwnerSecondary?: string;
-  testOwnerSecondaryUserId?: string;
+  testOwnerSecondary?: string | string[];
+  testOwnerSecondaryUserId?: string | string[];
   products?: ProductItemInLine[];
   pendingReqCount?: number;
   pendingRequirementCount?: number;
@@ -531,7 +534,7 @@ export interface RequirementTask {
   title: string;
   description?: string;
   expectedGoal?: string;
-  status: '待受理' | '待处理' | '处理中' | '待验收' | '验收未通过' | '待负责人关闭' | '已关闭' | '已搁置' | '已驳回' | '已完成' | '设计中' | '研发中' | '测试中' | '已发布' | '已挂起' | string;
+  status: '待受理' | '待处理' | '处理中' | '待验收' | '已退回' | '已完成' | '已关闭' | '已搁置' | '已驳回' | '设计中' | '研发中' | '测试中' | '已发布' | '已挂起' | string;
   priority: '紧急' | '高' | '中' | '低' | 'P0-紧急阻断' | 'P1-高优' | 'P2-普通' | 'P2-标准' | 'P3-低优' | string;
   ownerName: string;
   assigneeId?: string;

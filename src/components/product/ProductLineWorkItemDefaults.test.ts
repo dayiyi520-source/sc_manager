@@ -21,11 +21,13 @@ describe('product line work item defaults', () => {
     expect(preferredWorkItemTypeName([{ name: '其他需求' }], '')).toBe('');
   });
 
-  it('creates product lines with the template enabled by default', () => {
-    expect(productLinesSource).toContain('useState(true)');
-    expect(productLinesSource).toContain('initializeWorkItemTemplate');
-    expect(productLinesSource).toContain('aria-label="工作项设置模板"');
-    expect(productLinesSource).toContain('if (!saved) return');
+  it('removes creation entries and product-owner display while preserving responsibilities', () => {
+    expect(productLinesSource).not.toContain('新建产品');
+    expect(productLinesSource).not.toContain("title: '负责人'");
+    expect(productLinesSource).not.toContain('<span>负责人</span>');
+    expect(productLinesSource).toContain('ResponsibilitySummary');
+    expect(settingsSource).not.toContain('产品负责人 *');
+    expect(settingsSource).not.toContain('!ownerUserId');
   });
 
   it('shows the actual product-line version count in the card action', () => {
@@ -126,8 +128,7 @@ describe('product line work item defaults', () => {
     expect(settingsSource).toContain('选择主负责人');
     expect(settingsSource).not.toContain('- 主责任人');
     expect(settingsSource).toContain('text-[var(--primary)]');
-    expect(productLinesSource).toContain('maxLength={1000}');
-    expect(productLinesSource).toContain('showCount');
+    expect(settingsSource).toContain('maxLength={1000}');
   });
 
   it('keeps planned completion optional and lets Ant Design own DatePicker internals', () => {

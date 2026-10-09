@@ -55,6 +55,39 @@ describe('requirementRepository', () => {
     await expect(requirementRepository.transition('req-1', 'hold', '')).rejects.toMatchObject({ status: 400, code: 'VALIDATION_ERROR', message: '请输入原因' });
   });
 
+  it('loads all pages for company scope and transfer history', async () => {
+    const response = (data: unknown) => new Response(JSON.stringify({ code: 'OK', data }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ items: [{ id: 'first' }], page: 1, pageSize: 100, total: 2 }))
+      .mockResolvedValueOnce(response({ items: [{ id: 'second' }], page: 2, pageSize: 100, total: 2 }))
+      .mockResolvedValueOnce(response({ items: [{ requirementId: 'first' }], page: 1, pageSize: 100, total: 101 }))
+      .mockResolvedValueOnce(response({ items: [{ requirementId: 'second' }], page: 2, pageSize: 100, total: 101 }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await requirementRepository.allForScope()).map((item) => item.id)).toEqual(['first', 'second']);
+    expect([...await requirementRepository.transferredBy('本人')]).toEqual(['first', 'second']);
+    expect(fetchMock.mock.calls[1][0]).toContain('page=2');
+    expect(fetchMock.mock.calls[2][0]).toContain('operatorName=%E6%9C%AC%E4%BA%BA');
+    expect(fetchMock.mock.calls[3][0]).toContain('page=2');
+  });
+
+  it('receives through the existing transition contract and reloads persisted status', async () => {
+    const response = (data: unknown) => new Response(JSON.stringify({ code: 'OK', data }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = vi.fn().mockResolvedValueOnce(response(null)).mockResolvedValueOnce(response({ id: 'req-1', status: '处理中', version: 4, events: [{ id: 'event-1' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await requirementRepository.receive('req-1');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/requirements/req-1/transition');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ status: '处理中', reason: '事项接收' });
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/requirements/req-1');
+    expect(result).toMatchObject({ status: '处理中', revision: 4 });
+  });
+
+  it('does not reload or report reception when the server rejects it', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'CONFLICT', message: '状态已变化' }), { status: 409, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(requirementRepository.receive('req-1')).rejects.toMatchObject({ status: 409 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('posts persisted reassignment with employee id and revision', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', message: '', data: { id: 'req-1', ownerName: '张瑞', version: 3 }, requestId: 'r-reassign' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);

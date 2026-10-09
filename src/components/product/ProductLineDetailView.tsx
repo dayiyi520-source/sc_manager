@@ -31,6 +31,7 @@ import {
 } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { ProductLine, ProductLineActivity, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, RequirementTask, VersionIteration } from '../../types';
+import { responsibilitySummary } from './productResponsibilityPresentation';
 import { productRepository, type UnifiedWorkItem } from '../../services/productRepository';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { CreateVersionModal } from './CreateVersionModal';
@@ -88,29 +89,24 @@ const ProductLineSettingsPanel: React.FC<{
   const [name, setName] = useState(productLine.name);
   const [code, setCode] = useState(productLine.code);
   const [website, setWebsite] = useState(productLine.website || '');
-  const [ownerUserId, setOwnerUserId] = useState(productLine.ownerUserId || '');
   const [sort, setSort] = useState(productLine.sort ?? 0);
   const [websiteError, setWebsiteError] = useState('');
   const [isSavingBasic, setIsSavingBasic] = useState(false);
   const [description, setDescription] = useState(productLine.description);
   const [commercialAvailability, setCommercialAvailability] = useState<ProductLine['commercialAvailability']>(productLine.commercialAvailability || '不可商用');
   const [visibility, setVisibility] = useState<'公开' | '私密'>(normalizeProductVisibility(productLine.visibility));
-  const [pendingOperation, setPendingOperation] = useState<'activate' | 'disable' | 'archive' | 'delete' | null>(null);
+  const [pendingOperation, setPendingOperation] = useState<'archive' | 'delete' | null>(null);
   const [isOperating, setIsOperating] = useState(false);
   const [memberTab, setMemberTab] = useState('全部');
   const [memberToRemove, setMemberToRemove] = useState<ProductLineMember | null>(null);
   const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
   const roleTemplatesQuery = useQuery({ queryKey: ['product-role-templates'], queryFn: productRepository.productRoleTemplates, retry: false });
-  const productStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'PRODUCT'], queryFn: () => productRepository.researchStatusTemplates('PRODUCT'), retry: false });
-  const enabledProductStatuses = (productStatusesQuery.data || []).filter((item) => item.enabled);
-  const productStatusForPhase = (phase: '待开始' | '处理中' | '已完成' | '已结束') => enabledProductStatuses.find((item) => item.phase === phase)?.name || '';
   const employeesById = new Map((employeesQuery.data || []).map((employee) => [employee.id, employee]));
 
   useEffect(() => {
     setName(productLine.name);
     setCode(productLine.code);
     setWebsite(productLine.website || '');
-    setOwnerUserId(productLine.ownerUserId || '');
     setSort(productLine.sort ?? 0);
     setWebsiteError('');
     setDescription(productLine.description);
@@ -124,8 +120,8 @@ const ProductLineSettingsPanel: React.FC<{
 
   const saveBasicInfo = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!name.trim() || !productLine.code.trim() || !ownerUserId) {
-      addToast('warning', '请填写产品名称并选择负责人');
+    if (!name.trim() || !productLine.code.trim()) {
+      addToast('warning', '请填写产品名称');
       return;
     }
     if (!Number.isInteger(sort) || sort < 0 || sort > 999) {
@@ -145,7 +141,6 @@ const ProductLineSettingsPanel: React.FC<{
         name: name.trim(),
         description: description.trim() || '该产品还没有任何简介内容。',
         website: normalizedWebsite || '',
-        ownerUserId,
         sort,
         visibility,
         commercialAvailability
@@ -167,12 +162,7 @@ const ProductLineSettingsPanel: React.FC<{
     { id: 'recycle-bin', label: '回收站' }
   ];
 
-  const currentStatus = productLine.status || productLine.health || '';
-  const disabledStatus = productStatusForPhase('已结束');
-  const isEnabled = currentStatus !== disabledStatus;
   const operationCopy = {
-    activate: { title: '启用产品', description: '启用后，产品恢复正常维护和新建操作。', confirm: '确认启用' },
-    disable: { title: '停用产品', description: '停用后，产品保留历史数据，但不再允许新建业务数据。', confirm: '确认停用' },
     archive: { title: '归档产品', description: '归档后，产品将从产品管理列表移至产研模板的归档列表。', confirm: '确认归档' },
     delete: { title: '删除产品', description: '删除后，产品将不再展示。此操作不可在界面中恢复。', confirm: '确认删除' }
   } as const;
@@ -180,8 +170,6 @@ const ProductLineSettingsPanel: React.FC<{
     if (!pendingOperation) return;
     setIsOperating(true);
     try {
-      if (pendingOperation === 'activate') await productRepository.activateProductLine(productLine.id);
-      if (pendingOperation === 'disable') await productRepository.disableProductLine(productLine.id);
       if (pendingOperation === 'archive') await productRepository.archiveProductLine(productLine.id);
       if (pendingOperation === 'delete') await productRepository.deleteProductLine(productLine.id);
       const refreshedProductLines = await productRepository.productLines();
@@ -192,8 +180,6 @@ const ProductLineSettingsPanel: React.FC<{
         onProductRemoved();
         return;
       }
-      addToast('success', pendingOperation === 'activate' ? '产品已启用' : '产品已停用');
-      setPendingOperation(null);
     } catch (error) {
       addToast('error', `${operationCopy[pendingOperation].title}失败`, error instanceof Error ? error.message : '请稍后重试');
     } finally {
@@ -233,7 +219,6 @@ const ProductLineSettingsPanel: React.FC<{
                 <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品名称 *</span><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="请输入产品名称" /></label>
                 <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品编码</span><Input value={code} disabled readOnly /></label>
               </div>
-              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品负责人 *</span><Select showSearch allowClear className="w-full" value={ownerUserId || undefined} onChange={(value) => setOwnerUserId(value || '')} options={(employeesQuery.data || []).map((employee) => ({ value: employee.id, label: `${employee.name} · ${employeeJobTitle(employee) || '未设置职位'}` }))} optionFilterProp="label" placeholder="请选择产品负责人" /></label>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品网址</span><Input value={website} status={websiteError ? 'error' : undefined} aria-invalid={Boolean(websiteError)} onChange={(event) => { setWebsite(event.target.value); if (websiteError) setWebsiteError(''); }} placeholder="https://example.com" />{websiteError && <span className="text-[11px] font-normal text-[var(--danger)]">{websiteError}</span>}</label>
               <div>
                 <label className="mb-1 block font-medium text-[var(--text-body)]">可见范围 *</label>
@@ -273,11 +258,11 @@ const ProductLineSettingsPanel: React.FC<{
             </div>
           )}
           {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
-          {section === 'other' && <div className="w-full space-y-5 px-0 text-xs sm:px-2 lg:px-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品操作</h3><p className="mt-1 text-[var(--text-muted)]">集中管理产品的启停、归档和删除。</p></div><div className="space-y-3"><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">是否启用</h4><p className="mt-1 text-[var(--text-muted)]">停用后保留历史数据，产品内不再支持新建操作。</p></div><Switch className="product-operation-switch" checked={isEnabled} checkedChildren="启用" unCheckedChildren="停用" onChange={(checked) => setPendingOperation(checked ? 'activate' : 'disable')} /></div><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">产品归档</h4><p className="mt-1 text-[var(--text-muted)]">产品完成后可归档，归档产品统一在产研模板中管理。</p></div><Button className="!h-9" type="primary" onClick={() => setPendingOperation('archive')}>归档</Button></div><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">删除产品</h4><p className="mt-1 text-[var(--text-muted)]">删除后产品不再展示，关联历史数据不支持从界面恢复。</p></div><Button className="!h-9" danger onClick={() => setPendingOperation('delete')}>删除</Button></div></div></div>}
+          {section === 'other' && <div className="w-full space-y-5 px-0 text-xs sm:px-2 lg:px-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品操作</h3><p className="mt-1 text-[var(--text-muted)]">集中管理产品的归档和删除。</p></div><div className="space-y-3"><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">产品归档</h4><p className="mt-1 text-[var(--text-muted)]">产品完成后可归档，归档产品统一在产研模板中管理。</p></div><Button className="!h-9" type="primary" onClick={() => setPendingOperation('archive')}>归档</Button></div><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">删除产品</h4><p className="mt-1 text-[var(--text-muted)]">删除后产品不再展示，关联历史数据不支持从界面恢复。</p></div><Button className="!h-9" danger onClick={() => setPendingOperation('delete')}>删除</Button></div></div></div>}
           {section === 'recycle-bin' && <ProductRecycleBin productLineId={productLine.id} />}
         </section>
       </div>
-      <Modal isOpen={Boolean(pendingOperation)} onClose={() => !isOperating && setPendingOperation(null)} title={pendingOperation ? operationCopy[pendingOperation].title : ''} footer={<><Button disabled={isOperating} onClick={() => setPendingOperation(null)}>取消</Button><Button type="primary" danger={pendingOperation !== 'activate'} loading={isOperating} onClick={() => void executeOperation()}>{pendingOperation ? operationCopy[pendingOperation].confirm : '确认'}</Button></>}><p className="text-sm text-[var(--text-body)]">{pendingOperation ? operationCopy[pendingOperation].description : ''}</p></Modal>
+      <Modal isOpen={Boolean(pendingOperation)} onClose={() => !isOperating && setPendingOperation(null)} title={pendingOperation ? operationCopy[pendingOperation].title : ''} footer={<><Button disabled={isOperating} onClick={() => setPendingOperation(null)}>取消</Button><Button type="primary" danger loading={isOperating} onClick={() => void executeOperation()}>{pendingOperation ? operationCopy[pendingOperation].confirm : '确认'}</Button></>}><p className="text-sm text-[var(--text-body)]">{pendingOperation ? operationCopy[pendingOperation].description : ''}</p></Modal>
     </div>
   );
 };
@@ -677,8 +662,10 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const activityItems: ProductLineActivity[] = productLine.activities?.length
     ? productLine.activities
     : lineVersions.map((version) => ({ id: version.id, action: '创建了版本', detail: version.code || version.name, operatorName: currentUser.name, createdAt: version.createdAt || version.releaseDate || '' }));
+  const activityTimestamp = (activity: ProductLineActivity) => activity.createdAt || activity.timestamp || activity.createdTime || activity.updatedAt || '';
   const activityGroups = Object.entries(activityItems.reduce<Record<string, ProductLineActivity[]>>((groups, activity) => {
-    const dateKey = activity.createdAt ? activity.createdAt.slice(0, 10) : '暂无日期';
+    const timestamp = activityTimestamp(activity);
+    const dateKey = timestamp ? timestamp.slice(0, 10) : '暂无日期';
     (groups[dateKey] ||= []).push(activity);
     return groups;
   }, {})).sort(([left], [right]) => right.localeCompare(left));
@@ -772,13 +759,12 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
           <div className="min-w-0">
               <div className="flex min-w-0 items-start justify-between gap-4">
                 <h2 className="min-w-0 truncate text-2xl font-bold text-[var(--text-primary)]">{productLine.name}</h2>
-                <StatusTag type={productStatus === '已停用' ? 'default' : 'info'} status={productStatus} />
+                <StatusTag type={productStatus === '空闲中' ? 'default' : 'info'} status={productStatus} />
               </div>
               <div className="mt-1 flex items-start justify-between gap-6">
                 <p className="min-w-0 max-w-3xl text-xs leading-relaxed text-[var(--text-body)]">
                   {productLine.description}
                 </p>
-                <div className="shrink-0 max-w-48 truncate text-right text-xs text-[var(--primary)]" title={productLine.owner || productLine.ownerName || '暂无'}>负责人：{productLine.owner || productLine.ownerName || '暂无'}</div>
               </div>
               <div className="mt-4 flex min-w-0 items-center justify-between gap-4 border-t border-[var(--border-main)] pt-3 text-xs">
                 <span className="font-mono font-medium text-[var(--text-body)]">线上版本：{onlineVersion?.code || onlineVersion?.name || '暂无发布'}</span>
@@ -797,10 +783,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 <div className="min-w-0">
                   <div className="text-[11px] text-[var(--text-muted)]">产品责任人 (Product Owner)</div>
                   <div className="mt-0.5 truncate text-sm font-bold">
-                    <span className="text-[var(--primary)]">主：{productLine.requirementOwner || '暂无'}</span>{productLine.requirementOwnerSecondary && <span className="text-[var(--text-body)]"> · 次：{productLine.requirementOwnerSecondary}</span>}
-                  </div>
-                  <div className="text-[10px] text-purple-400/90 font-medium mt-0.5">
-                    负责产品矩阵定位、需求全生命周期规划
+                    <span className="text-[var(--primary)]">主：{productLine.requirementOwner || '暂无'}</span>{responsibilitySummary(productLine.requirementOwnerSecondary).label && <span className="text-[var(--text-body)]" title={responsibilitySummary(productLine.requirementOwnerSecondary).title}> · 次：{responsibilitySummary(productLine.requirementOwnerSecondary).label}</span>}
                   </div>
                 </div>
               </div>
@@ -813,10 +796,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 <div className="min-w-0">
                   <div className="text-[11px] text-[var(--text-muted)]">研发责任人 (Tech Lead)</div>
                   <div className="mt-0.5 truncate text-sm font-bold">
-                    <span className="text-[var(--primary)]">主：{productLine.techOwner || '暂无'}</span>{productLine.techOwnerSecondary && <span className="text-[var(--text-body)]"> · 次：{productLine.techOwnerSecondary}</span>}
-                  </div>
-                  <div className="text-[10px] text-[var(--active-text)]/90 font-medium mt-0.5">
-                    把控系统架构演进、技术选型与高可用交付
+                    <span className="text-[var(--primary)]">主：{productLine.techOwner || '暂无'}</span>{responsibilitySummary(productLine.techOwnerSecondary).label && <span className="text-[var(--text-body)]" title={responsibilitySummary(productLine.techOwnerSecondary).title}> · 次：{responsibilitySummary(productLine.techOwnerSecondary).label}</span>}
                   </div>
                 </div>
               </div>
@@ -829,10 +809,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 <div className="min-w-0">
                   <div className="text-[11px] text-[var(--text-muted)]">测试责任人 (QA Lead)</div>
                   <div className="mt-0.5 truncate text-sm font-bold">
-                    <span className="text-[var(--primary)]">主：{productLine.testOwner || '暂无'}</span>{productLine.testOwnerSecondary && <span className="text-[var(--text-body)]"> · 次：{productLine.testOwnerSecondary}</span>}
-                  </div>
-                  <div className="text-[10px] text-emerald-400/90 font-medium mt-0.5">
-                    负责封版验收、自动化回归与质量基线
+                    <span className="text-[var(--primary)]">主：{productLine.testOwner || '暂无'}</span>{responsibilitySummary(productLine.testOwnerSecondary).label && <span className="text-[var(--text-body)]" title={responsibilitySummary(productLine.testOwnerSecondary).title}> · 次：{responsibilitySummary(productLine.testOwnerSecondary).label}</span>}
                   </div>
                 </div>
               </div>
@@ -846,7 +823,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         <div className="space-y-4">
           <h3 className="font-bold text-sm text-[var(--text-primary)]">产品动态</h3>
           <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
-            {activityGroups.map(([date, activities]) => <section key={date} className="space-y-2"><div className="inline-flex rounded-md bg-[var(--bg-surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">{date === '暂无日期' ? date : `${date} ${new Date(`${date}T00:00:00`).toLocaleDateString('zh-CN', { weekday: 'short' })}`}</div><div className="space-y-1">{[...activities].sort((left, right) => String(right.createdAt || '').localeCompare(String(left.createdAt || ''))).map((activity) => <div key={activity.id} className="flex min-w-0 items-center gap-3 py-3 text-xs"><PersonAvatar name={activity.operatorName || currentUser.name || '系'} size={32} /><span className="w-16 shrink-0 font-mono text-sm font-semibold text-[var(--text-muted)]">{activity.createdAt ? activity.createdAt.slice(11, 16) : '--:--'}</span><span className="min-w-0 flex-1 break-words text-sm text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span></div>)}</div></section>)}
+            {activityGroups.map(([date, activities]) => <section key={date} className="space-y-2"><div className="inline-flex rounded-md bg-[var(--bg-surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">{date === '暂无日期' ? date : `${date} ${new Date(`${date}T00:00:00`).toLocaleDateString('zh-CN', { weekday: 'short' })}`}</div><div className="space-y-1">{[...activities].sort((left, right) => activityTimestamp(right).localeCompare(activityTimestamp(left))).map((activity) => { const timestamp = activityTimestamp(activity); return <div key={activity.id} className="flex min-w-0 items-center gap-3 py-3 text-xs"><PersonAvatar name={activity.operatorName || currentUser.name || '系'} size={32} /><span className="w-16 shrink-0 font-mono text-sm font-semibold text-[var(--text-muted)]">{timestamp ? timestamp.slice(11, 16) : '--:--'}</span><span className="min-w-0 flex-1 break-words text-sm text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span></div>; })}</div></section>)}
             {activityItems.length === 0 && <div className="py-12 text-center text-sm text-[var(--text-muted)]">暂无产品动态</div>}
           </div>
         </div>

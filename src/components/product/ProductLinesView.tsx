@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Input, Button, Select, Switch, Table } from "antd";
-import { SearchOutlined, PlusOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { Input, Button, Select, Table } from "antd";
+import { SearchOutlined } from '@ant-design/icons';
 import {
   Boxes,
   Layers,
@@ -10,17 +9,15 @@ import {
 } from '../common/octicons-compat';
 import { ViewModeSwitch } from '../common/ViewModeSwitch';
 import { useApp } from '../../context/AppContext';
-import { StatusTag, Modal } from '../common/UIComponents';
+import { StatusTag } from '../common/UIComponents';
 import { EmptyState } from '../common/Data/EmptyState';
 import { ProductLine } from '../../types';
 import { ProductLineDetailView, type ProductLineSettingsSection } from './ProductLineDetailView';
-import { teamRepository } from '../../services/teamRepository';
 import { normalizeProductWebsiteUrl } from './productWebsite';
-import { employeeSelectOptions } from '../common/PersonIdentity';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
 import { formatVersionPublishedAt, latestReleasedVersion, productLineDisplayStatus } from './productLinePresentation';
 import { Pagination } from '../common/Pagination';
-import { productRepository } from '../../services/productRepository';
+import { normalizeResponsibilityNames, responsibilitySummary } from './productResponsibilityPresentation';
 
 export { normalizeProductWebsiteUrl } from './productWebsite';
 export { formatVersionPublishedAt, latestReleasedVersion, productLineDisplayStatus } from './productLinePresentation';
@@ -33,11 +30,11 @@ export const productLineMemberCount = (productLine: ProductLine) => new Set([
   productLine.owner,
   productLine.ownerName,
   productLine.requirementOwner,
-  productLine.requirementOwnerSecondary,
+  ...normalizeResponsibilityNames(productLine.requirementOwnerSecondary),
   productLine.techOwner,
-  productLine.techOwnerSecondary,
+  ...normalizeResponsibilityNames(productLine.techOwnerSecondary),
   productLine.testOwner,
-  productLine.testOwnerSecondary,
+  ...normalizeResponsibilityNames(productLine.testOwnerSecondary),
 ].filter(Boolean)).size;
 
 export const matchesProductLineFilters = (line: ProductLine, query: string, owner: string, status: string, displayedStatus: string) => {
@@ -53,7 +50,7 @@ const ResponsibilitySummary: React.FC<{ productLine: ProductLine; compact?: bool
     ['研发', productLine.techOwner, productLine.techOwnerSecondary],
     ['测试', productLine.testOwner, productLine.testOwnerSecondary],
   ] as const;
-  const longestName = Math.max(2, ...groups.flatMap(([, primary, secondary]) => [primary || '未设置', secondary || '未设置'].map((name) => Array.from(name).length)));
+  const longestName = Math.max(2, ...groups.flatMap(([, primary, secondary]) => [primary || '未设置', responsibilitySummary(secondary).label || '未设置'].map((name) => Array.from(name).length)));
   const badgeWidth = longestName * 12 + 34;
 
   return (
@@ -65,9 +62,9 @@ const ResponsibilitySummary: React.FC<{ productLine: ProductLine; compact?: bool
               <span className="responsibility-role">主</span>
               <span className="responsibility-name responsibility-name-primary truncate">{primary || '未设置'}</span>
           </span>
-          <span className="responsibility-person responsibility-person-secondary w-full" title={secondary || '未设置'}>
+          <span className="responsibility-person responsibility-person-secondary w-full" title={responsibilitySummary(secondary).title || '未设置'}>
               <span className="responsibility-role">次</span>
-              <span className="responsibility-name responsibility-name-secondary truncate">{secondary || '未设置'}</span>
+              <span className="responsibility-name responsibility-name-secondary truncate">{responsibilitySummary(secondary).label || '未设置'}</span>
           </span>
         </React.Fragment>
       ))}
@@ -78,17 +75,13 @@ const ResponsibilitySummary: React.FC<{ productLine: ProductLine; compact?: bool
 export const ProductLinesView: React.FC = () => {
   const {
     productLines,
-    addProductLine,
     versions,
     requirementTasks,
     designTasks,
     bugs,
     devTasks,
-    addToast,
     openPageTab
   } = useApp();
-  const employeeOptionsQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
-  const productStatusesQuery = useQuery({ queryKey: ['research-status-templates', 'PRODUCT'], queryFn: () => productRepository.researchStatusTemplates('PRODUCT'), retry: false });
 
   // Active detail view state
   const [selectedProductLineId, setSelectedProductLineId] = useState<string | null>(null);
@@ -105,19 +98,6 @@ export const ProductLinesView: React.FC = () => {
   useEffect(() => {
     setPage(1);
   }, [searchQuery, ownerFilter, statusFilter, pageSize]);
-
-  // New Product Line Form State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formName, setFormName] = useState('');
-  const [formCode, setFormCode] = useState('');
-  const [formOwnerUserId, setFormOwnerUserId] = useState('');
-  const [formDescription, setFormDescription] = useState('');
-  const [formCommercialAvailability, setFormCommercialAvailability] = useState<ProductLine['commercialAvailability']>('不可商用');
-  const [formVisibility, setFormVisibility] = useState<ProductLine['visibility']>('公开');
-  const [formSort, setFormSort] = useState(0);
-  const [formWebsite, setFormWebsite] = useState('');
-  const [initializeWorkItemTemplate, setInitializeWorkItemTemplate] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
 
   // If a product line is selected, show its full detail view
   if (selectedProductLineId) {
@@ -143,70 +123,7 @@ export const ProductLinesView: React.FC = () => {
   const filteredLines = sortedProductLines.filter((line) => matchesProductLineFilters(line, searchQuery, ownerFilter, statusFilter, displayStatus(line)));
   const pagedLines = filteredLines.slice((page - 1) * pageSize, page * pageSize);
   const ownerFilterOptions = [...new Set(productLines.map((line) => line.ownerName || line.owner || '').filter(Boolean))].sort().map((name) => ({ label: name, value: name }));
-  const statusFilterOptions = (productStatusesQuery.data || []).filter((status) => status.enabled).map((status) => ({ label: status.name, value: status.name }));
-
-  const resetCreateForm = () => {
-    setFormName('');
-    setFormCode('');
-    setFormOwnerUserId('');
-    setFormDescription('');
-    setFormCommercialAvailability('不可商用');
-    setFormVisibility('公开');
-    setFormSort(0);
-    setFormWebsite('');
-    setInitializeWorkItemTemplate(true);
-  };
-
-  // Submit new product line
-  const handleSaveLine = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formName.trim() || !formCode.trim() || !formOwnerUserId || !formVisibility) {
-      addToast('warning', '请填写产品名称、编码并选择负责人');
-      return;
-    }
-    if (!Number.isInteger(formSort) || formSort < 0 || formSort > 999) {
-      addToast('warning', '排序必须是 0-999 的整数');
-      return;
-    }
-    const normalizedWebsite = normalizeProductWebsiteUrl(formWebsite);
-    if (formWebsite.trim() && !normalizedWebsite) {
-      addToast('warning', '请输入有效的产品网址', '网址须以 http:// 或 https:// 开头');
-      return;
-    }
-    const selectedOwner = employeeOptionsQuery.data?.find((employee) => employee.id === formOwnerUserId);
-    if (!selectedOwner) {
-      addToast('error', '负责人不可用', '请刷新团队组织后重新选择');
-      return;
-    }
-
-    setIsCreating(true);
-    const saved = await addProductLine({
-      name: formName.trim(),
-      code: formCode.trim(),
-      ownerUserId: selectedOwner.id,
-      ownerName: selectedOwner.name,
-      visibility: formVisibility,
-      sort: formSort,
-      description: formDescription.trim() || '该产品还没有任何简介内容。',
-      commercialAvailability: formCommercialAvailability,
-      website: normalizedWebsite || undefined,
-      requirementOwner: '',
-      techOwner: '',
-      testOwner: '',
-      members: [{
-        id: `mem-${Date.now()}`,
-        userId: selectedOwner.id,
-        name: selectedOwner.name,
-        role: '管理员'
-      }],
-      customerCount: 0,
-      initializeWorkItemTemplate
-    });
-    setIsCreating(false);
-    if (!saved) return;
-    setIsModalOpen(false);
-    resetCreateForm();
-  };
+  const statusFilterOptions = ['空闲中', '迭代中'].map((status) => ({ label: status, value: status }));
 
   // Helper to compute statistics for each card
   const getLineStats = (line: ProductLine) => {
@@ -230,7 +147,6 @@ export const ProductLinesView: React.FC = () => {
     return { products: total.products + 1, assistance: total.assistance + stats.assistance, productTasks: total.productTasks + stats.pendingReqs, designTasks: total.designTasks + stats.designTasks, devTasks: total.devTasks + stats.activeTasks, testTasks: total.testTasks + stats.testTasks, bugs: total.bugs + stats.pendingBugs };
   }, { products: 0, assistance: 0, productTasks: 0, designTasks: 0, devTasks: 0, testTasks: 0, bugs: 0 });
 
-  const ownerOptions = employeeSelectOptions(employeeOptionsQuery.data || []);
   const openLineTaskPage = (line: ProductLine, menuId: string) => {
     sessionStorage.setItem('shichuang.productLineFilter', line.id);
     openPageTab(menuId);
@@ -253,8 +169,7 @@ export const ProductLinesView: React.FC = () => {
         </button>
       ),
     },
-    { title: '状态', key: 'status', width: 110, render: (_: unknown, pl: ProductLine) => <StatusTag type={displayStatus(pl) === '已停用' ? 'default' : 'info'} status={displayStatus(pl)} /> },
-    { title: '负责人', key: 'owner', width: 120, render: (_: unknown, pl: ProductLine) => <span className="truncate text-[var(--text-body)]" title={pl.ownerName || pl.owner || '未设置'}>{pl.ownerName || pl.owner || '未设置'}</span> },
+    { title: '状态', key: 'status', width: 110, render: (_: unknown, pl: ProductLine) => <StatusTag type={displayStatus(pl) === '空闲中' ? 'default' : 'info'} status={displayStatus(pl)} /> },
     { title: '责任人', key: 'responsibility', width: 300, render: (_: unknown, pl: ProductLine) => <ResponsibilitySummary productLine={pl} compact /> },
     {
       title: '线上版本', key: 'version', width: 150,
@@ -308,7 +223,6 @@ export const ProductLinesView: React.FC = () => {
 
         <div className="flex items-center gap-2 shrink-0">
           <ViewModeSwitch value={viewMode} onChange={setViewMode} ariaLabel="产品视图" />
-          <Button type="primary" icon={<PlusOutlined />} id="btn-add-product-line" onClick={() => { resetCreateForm(); setIsModalOpen(true); }}>新建产品</Button>
         </div>
       </div>
 
@@ -343,10 +257,8 @@ export const ProductLinesView: React.FC = () => {
         <div className="product-lines-empty rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)]">
           <EmptyState
             title={productLines.length === 0 ? '暂无产品' : '未找到匹配产品'}
-            description={productLines.length === 0 ? '创建第一个产品，开始管理产品迭代和工作项' : '请调整搜索条件后重试'}
-            action={productLines.length === 0 ? (
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => { resetCreateForm(); setIsModalOpen(true); }}>新建产品</Button>
-            ) : (
+            description={productLines.length === 0 ? '暂无可查看的产品' : '请调整搜索条件后重试'}
+            action={productLines.length === 0 ? undefined : (
               <Button onClick={() => { setSearchQuery(''); setOwnerFilter(''); setStatusFilter(''); }}>清除筛选</Button>
             )}
           />
@@ -378,7 +290,7 @@ export const ProductLinesView: React.FC = () => {
                       <h4 className="truncate text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--active-text)] transition-colors">
                         {pl.name}
                       </h4>
-                      <StatusTag type={displayStatus(pl) === '已停用' ? 'default' : 'info'} className={displayStatus(pl) === '已停用' ? 'product-line-health-disabled' : 'product-line-health-enabled'} status={displayStatus(pl)} />
+                      <StatusTag type={displayStatus(pl) === '空闲中' ? 'default' : 'info'} className={displayStatus(pl) === '空闲中' ? 'product-line-health-disabled' : 'product-line-health-enabled'} status={displayStatus(pl)} />
                     </div>
                   </div>
                 </div>
@@ -386,9 +298,8 @@ export const ProductLinesView: React.FC = () => {
 
               {/* Card Body */}
               <div onClick={() => setSelectedProductLineId(pl.id)} className="product-line-body flex flex-1 flex-col justify-between space-y-3 p-4 text-xs cursor-pointer">
-                {/* Meta info row: Owner & Website */}
+                {/* Responsibility and online version information */}
                   <div className="space-y-2 text-[11px] text-[var(--text-muted)]">
-                  <div className="flex items-center justify-between gap-3"><span>负责人</span><strong className="truncate font-medium text-[var(--text-body)]">{pl.owner || pl.ownerName || '未设置'}</strong></div>
                   <div className="space-y-1.5 text-left"><span className="block">责任人</span><div className="flex min-w-0 justify-end font-medium text-[var(--text-body)]"><ResponsibilitySummary productLine={pl} compact /></div></div>
                   <div className="flex min-w-0 items-center justify-between gap-4 border-t border-[var(--border-main)] pt-3 text-left">
                     <span className="min-w-0 truncate font-mono font-semibold text-[var(--text-body)]">线上版本：{onlineVersion?.code || onlineVersion?.name || '暂无发布'}</span>
@@ -491,114 +402,6 @@ export const ProductLinesView: React.FC = () => {
         })}
       </div>
       )}
-
-      {/* Modal: 新建产品 */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => { resetCreateForm(); setIsModalOpen(false); }}
-        title="新建产品"
-        footer={
-          <>
-            <Button
-              onClick={() => { resetCreateForm(); setIsModalOpen(false); }}
-            >
-              取消
-            </Button>
-            <Button
-              type="primary"
-              htmlType="submit"
-              form="create-product-line-form"
-              loading={isCreating}
-            >
-              保存
-            </Button>
-          </>
-        }
-      >
-        <form
-          id="create-product-line-form"
-          onSubmit={handleSaveLine}
-          className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-[var(--text-body)] mb-1">产品名称 *</label>
-              <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="请输入产品名称" />
-            </div>
-            <div>
-              <label className="block font-semibold text-[var(--text-body)] mb-1">产品编码 *</label>
-              <Input value={formCode} onChange={(e) => setFormCode(e.target.value)} placeholder={'请输入小写字母和“_”组成的产品代码，如stu、ai_stu。'} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col" required>
-            <label className="text-xs font-semibold text-[var(--text-body)] mb-1">产品负责人 <span className="text-[var(--danger)]">*</span></label>
-            <Select
-              showSearch
-              allowClear
-              value={formOwnerUserId || undefined}
-              onChange={(value) => setFormOwnerUserId(value || '')}
-              options={ownerOptions}
-              placeholder="搜索并选择负责人"
-              className="w-full"
-              optionFilterProp="label"
-              loading={employeeOptionsQuery.isLoading}
-              disabled={employeeOptionsQuery.isLoading || employeeOptionsQuery.isError}
-              status={employeeOptionsQuery.isError ? 'error' : undefined}
-            />
-            {employeeOptionsQuery.isError && <p className="mt-1 text-[11px] text-[var(--danger)]">有效员工加载失败，请先检查团队组织数据</p>}
-          </div>
-            <div>
-              <label className="block font-semibold text-[var(--text-body)] mb-1 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-[var(--primary)]" />
-                产品网址
-              </label>
-            <Input
-              type="url"
-              value={formWebsite}
-              onChange={(e) => setFormWebsite(e.target.value)}
-              placeholder="请输入产品网址"
-              prefix={<Globe className="w-3.5 h-3.5 text-[var(--primary)]" />}
-            />
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-[var(--text-body)] mb-1">可见范围 <span className="text-[var(--danger)]">*</span></label>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {(['公开', '私密'] as const).map((value) => (
-                <button type="button" key={value} onClick={() => setFormVisibility(value)} className={`rounded-md border p-3 text-left transition-colors ${formVisibility === value ? 'border-[var(--primary)] bg-[var(--primary)]/10' : 'border-[var(--border-main)] bg-[var(--bg-surface-soft)] hover:border-[var(--primary)]/60'}`}>
-                  <span className="block font-semibold text-[var(--text-body)]">{value}</span>
-                  <span className="mt-1 block text-[11px] text-[var(--text-muted)]">{value === '公开' ? '组织全员可访问' : '仅产品成员可见'}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block font-semibold text-[var(--text-body)] mb-1">排序</label>
-            <Input type="number" min={0} max={999} step={1} value={formSort} onChange={(e) => setFormSort(Number(e.target.value))} />
-          </div>
-
-          {/* 4. 产品描述 */}
-          <div>
-            <label className="block font-semibold text-[var(--text-body)] mb-1">
-              产品描述
-            </label>
-            <div className="relative"><Input.TextArea rows={2} maxLength={1000} value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="请输入产品的简介或者业务范围..." style={{ paddingBottom: 22 }} /><span className="pointer-events-none absolute bottom-1.5 right-2 text-[11px] text-[var(--text-muted)]">{formDescription.length} / 1000</span></div>
-          </div>
-
-          <div><label className="mb-1 block font-semibold text-[var(--text-body)]">是否商用</label><Select value={formCommercialAvailability} onChange={setFormCommercialAvailability} options={[{ value: '可商用', label: '可商用' }, { value: '不可商用', label: '不可商用' }]} className="w-full" /></div>
-
-          <div className="flex items-center justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3">
-            <div>
-              <div className="font-semibold text-[var(--text-body)]">工作项设置模板</div>
-              <p className="mt-1 text-[11px] text-[var(--text-muted)]">自动创建需求、设计、研发、测试、缺陷和用例类型及基础状态。</p>
-            </div>
-            <Switch aria-label="工作项设置模板" checked={initializeWorkItemTemplate} disabled={isCreating} onChange={setInitializeWorkItemTemplate} />
-          </div>
-
-        </form>
-      </Modal>
 
     </div>
   );

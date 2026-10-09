@@ -33,7 +33,7 @@ export type UnifiedWorkItem = {
   projectId?: string; projectName?: string; needsCollaboration?: Array<'design' | 'dev' | 'test'>; relatedTaskIds?: string[]; sourceWorkOrderIds?: string[]; sourceWorkOrderTitles?: string[];
   id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;
   requirementId?: string | null; requirementTitle?: string | null; requirementInitiatorName?: string | null; customerId?: string | null; customerName?: string | null; assigneeName?: string; sourceType?: string; status?: { name?: string; group?: string; successful?: boolean };
-  taskTypeId?: string | null; workflowId?: string | null; statusKey?: string | null; statusColor?: string;
+  versionName?: string; taskTypeId?: string | null; workflowId?: string | null; statusKey?: string | null; statusColor?: string;
   priority?: string; severity?: string | null; parentWorkItemId?: string | null; versionId?: string | null; dueDate?: string | null;
   plannedStartDate?: string | null; plannedEndDate?: string | null; expectedCompleteDate?: string | null; completedAt?: string | null;
   estimatedHours?: number; actualHours?: number; createdAt?: string; creatorName?: string; ccNames?: string | string[]; revision?: number; potentialBlockingDefect?: boolean; hasChildren?: boolean;
