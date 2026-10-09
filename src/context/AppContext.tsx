@@ -1195,7 +1195,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateProductLineMember = async (id: string, memberId: string, role: ProductLineMember['role']) => {
-    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    if (!requirementBackendEnabled) {
+      setProductLines((lines) => lines.map((line) => line.id === id ? { ...line, members: (line.members || []).map((member) => typeof member !== 'string' && member.id === memberId ? { ...member, role } : member) } : line));
+      return;
+    }
     await productRepository.updateProductLineMember(id, memberId, { role });
     await productLineQuery.refetch();
   };

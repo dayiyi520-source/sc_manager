@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Input, InputNumber, Select } from "antd";
+import { Input, Select } from "antd";
 import { workOrderDisplayName } from '../../utils/workOrderDisplay';
 import { DetailCopyButton } from '../common/DetailCopyButton';
 import {
@@ -21,7 +21,6 @@ import {
   HelpCircle,
   ListFilter,
   PenSquare,
-  UserRound,
   Bold,
   Italic,
   Underline,
@@ -64,7 +63,6 @@ const statuses: RequirementTask["status"][] = [
   "待验收",
   "待关闭",
   "已关闭",
-  "已搁置",
   "已驳回",
   "已完成",
 ];
@@ -94,13 +92,13 @@ const workOrderCards: Array<{ type: WorkOrderType; description: string; icon: Re
   { type: "线上问题", description: "记录线上故障、异常现象与影响范围", icon: <WifiOff className="h-6 w-6" /> },
   { type: "售前支持", description: "处理方案咨询、演示和售前技术支持", icon: <Headphones className="h-6 w-6" /> },
   { type: "交付支持", description: "跟进项目实施、部署与交付保障事项", icon: <Truck className="h-6 w-6" /> },
-  { type: "其他问题", description: "比如个人记录、公司物料、建议等非业务问题", icon: <HelpCircle className="h-6 w-6" /> },
+  { type: "其他问题", description: "处理其他协同事项与非业务问题", icon: <HelpCircle className="h-6 w-6" /> },
 ];
 
 const specialFieldLabels: Record<string, string> = {
   projectName: "所属项目", requestType: "诉求类型", requestSource: "诉求来源",
   productName: "缺陷类型", severity: "严重程度", frequency: "发生频率",
-  opportunityName: "关联线索/商机/投标", opportunityId: "关联线索/商机/投标", leadId: "关联线索/商机/投标", biddingId: "关联线索/商机/投标",
+  opportunityName: "所属线索/商机/投标", opportunityId: "所属线索/商机/投标", leadId: "所属线索/商机/投标", biddingId: "所属线索/商机/投标",
   supportType: "支持类型", durationDays: "预计时长（天）",
   progressStage: "项目阶段", other: "项目类型", deliveryType: "交付类型", problemSource: "问题来源",
   expectedResult: "期望结果", problemType: "协助类型", priority: "优先级",
@@ -153,14 +151,16 @@ type AssistanceSubTask = {
 
 
 export const isWorkOrderInScope = (
-  item: Pick<RequirementTask, "ownerName" | "creatorName">,
-  scope: "all" | "mine_created" | "mine_owned",
+  item: Pick<RequirementTask, "ownerName" | "creatorName" | "ccNames">,
+  scope: "all" | "mine_created" | "mine_owned" | "mine_participating",
   currentUserName: string,
 ) => scope === "all"
-  ? samePerson(item.ownerName, currentUserName) || samePerson(item.creatorName, currentUserName)
+  ? samePerson(item.creatorName, currentUserName) || samePerson(item.ownerName, currentUserName) || Boolean(item.ccNames?.some((name) => samePerson(name, currentUserName)))
   : scope === "mine_created"
     ? samePerson(item.creatorName, currentUserName)
-    : samePerson(item.ownerName, currentUserName);
+    : scope === "mine_owned"
+      ? samePerson(item.ownerName, currentUserName)
+      : Boolean(item.ccNames?.some((name) => samePerson(name, currentUserName)));
 
 const toSelectOptions = (options: string[]) => Array.from(new Set(options.filter(Boolean))).map((item) => ({ label: item, value: item }));
 
@@ -200,12 +200,13 @@ const EmployeeSearchSelect: React.FC<{ label: string; value: string; employees: 
   </label>
 );
 
-const WorkOrderSelect: React.FC<{ label: string; value: string; options: string[]; placeholder: string; onChange: (value: string) => void }> = ({ label, value, options, placeholder, onChange }) => (
+const WorkOrderSelect: React.FC<{ label: string; value: string; options: string[]; placeholder: string; disabled?: boolean; onChange: (value: string) => void }> = ({ label, value, options, placeholder, disabled, onChange }) => (
   <label className="work-order-field text-xs text-[var(--text-muted)]">
     {label}
     <Select
       aria-label={label}
       allowClear
+      disabled={disabled}
       className="w-full"
       options={toSelectOptions(options)}
       placeholder={placeholder}
@@ -252,11 +253,10 @@ export const RequirementPoolView: React.FC = () => {
   const [product, setProduct] = useState("all");
   const [priority, setPriority] = useState("all");
   const [status, setStatus] = useState("all");
-  const [scope, setScope] = useState<"all" | "mine_created" | "mine_owned">(
+  const [scope, setScope] = useState<"all" | "mine_created" | "mine_owned" | "mine_participating">(
     "all",
   );
   const [typeFilter, setTypeFilter] = useState<WorkOrderType | "all">("all");
-  const [filterMode, setFilterMode] = useState<"type" | "mine">("type");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [title, setTitle] = useState("");
@@ -304,6 +304,16 @@ export const RequirementPoolView: React.FC = () => {
   }, []);
 
   const currentWorkOrderType = selected?.workOrderType || selected?.taskType || selected?.requirementType || "通用/其他";
+  const selectedProject = biddings.find((item) => (item.projectName || item.name) === specialFields.projectName);
+  const selectedRelatedOpportunity = opportunities.find((item) => item.id === (workOrderType === "售前支持" ? specialFields.opportunityId : selectedProject?.opportunityId));
+  const selectedRelatedBidding = workOrderType === "售前支持" ? biddings.find((item) => item.id === specialFields.biddingId) : selectedProject;
+  const biddingOpportunity = opportunities.find((item) => item.id === selectedRelatedBidding?.opportunityId);
+  const selectedRelatedLead = leads.find((item) => item.id === specialFields.leadId);
+  const relatedProducts = workOrderType === "售前支持" && selectedRelatedLead
+    ? selectedRelatedLead.products
+    : [selectedRelatedOpportunity?.relatedProduct || biddingOpportunity?.relatedProduct || ""];
+  const hasProductSource = workOrderType === "售前支持" ? Boolean(specialFields.opportunityName) : Boolean(selectedProject);
+  const availableProductLines = hasProductSource ? productLines.filter((line) => relatedProducts.some((value) => value === line.id || value === line.name || line.products?.some((item) => item.id === value || item.name === value))) : [];
   const availableRejectReasons = useMemo(() => getRejectReasonsForType(currentWorkOrderType), [currentWorkOrderType]);
 
   useEffect(() => {
@@ -413,17 +423,30 @@ export const RequirementPoolView: React.FC = () => {
     const selectedEmployee = employees.find(
       (item) => item.name === ownerName.trim(),
     );
-    const selectedProductLine = productLines.find((item) => item.id === productLineId);
+    const selectedProductLine = availableProductLines.find((item) => item.id === productLineId);
     const descriptionText = description || editor.current?.innerText || "";
-    const requiredParameters = workOrderType === "售前支持" ? ["opportunityName", "supportType", "durationDays"] : workOrderType === "线上问题" ? ["productName", "severity", "frequency"] : workOrderType === "其他问题" ? ["problemSource", "expectedResult", "problemType"] : workOrderType === "交付支持" ? ["projectName", "progressStage", "other", "deliveryType"] : workOrderType === "客户诉求" ? ["projectName", "requestType", "requestSource"] : [];
+    const requiredParameters = workOrderType === "售前支持"
+      ? ["opportunityName", "supportType"]
+      : workOrderType === "线上问题"
+        ? ["projectName", "severity"]
+        : workOrderType === "其他问题"
+          ? ["problemType", "expectedResult"]
+          : workOrderType === "交付支持"
+            ? ["projectName", "progressStage", "other", "deliveryType"]
+            : workOrderType === "客户诉求"
+              ? ["projectName", "requestSource"]
+              : [];
     const missingParameter = requiredParameters.some((field) => !String(specialFields[field] ?? "").trim());
+    const requiresProduct = workOrderType !== "其他问题";
     if (
       !title.trim() ||
       !selectedEmployee ||
+      !dueDate.trim() ||
+      (requiresProduct && !selectedProductLine) ||
       !descriptionText.trim() ||
       missingParameter
     ) {
-      addToast("warning", missingParameter ? "请完成所有必填业务参数" : "请补充事项标题、负责人和事项描述");
+      addToast("warning", missingParameter ? "请完成所有必填业务参数" : `请补充标题、负责人、${requiresProduct ? "所属产品、" : ""}期望完成时间和事项描述`);
       return;
     }
     const customer = customers.find((item) => item.id === customerId)
@@ -441,15 +464,14 @@ export const RequirementPoolView: React.FC = () => {
         department: selectedEmployee.department,
         customerId: customer?.id || customerId || undefined,
         customerName: customer?.name,
-        priority: String(specialFields.priority || requirementPriority || "中") as RequirementTask["priority"],
+        priority: (requirementPriority || "中") as RequirementTask["priority"],
         workOrderType: workOrderType || "其他问题",
         specialFields,
         expectedCompleteDate: dueDate || undefined,
       });
       if (!saved) return;
       setCreating(false);
-      setTypeFilter(workOrderType || "all");
-      setFilterMode("type");
+      setTypeFilter("all");
       setScope("all");
       setPage(1);
       setTab("list");
@@ -760,9 +782,8 @@ export const RequirementPoolView: React.FC = () => {
     () =>
       requirementTasks.filter((item) => {
         const q = query.toLowerCase();
-        const inScope = filterMode !== "mine" || isWorkOrderInScope(item, scope, currentUser.name);
         return (
-          inScope &&
+          isWorkOrderInScope(item, scope, currentUser.name) &&
           (!q ||
             [
               item.title,
@@ -774,9 +795,7 @@ export const RequirementPoolView: React.FC = () => {
           (product === "all" || item.productLineName === product) &&
           (priority === "all" || item.priority === priority) &&
           (status === "all" || item.status === status) &&
-          (filterMode === "type"
-            ? typeFilter === "all" || (item.workOrderType || "其他问题") === typeFilter
-            : isWorkOrderInScope(item, scope, currentUser.name))
+          (typeFilter === "all" || (item.workOrderType || "其他问题") === typeFilter)
         );
       }),
     [
@@ -787,12 +806,11 @@ export const RequirementPoolView: React.FC = () => {
       status,
       scope,
       typeFilter,
-      filterMode,
       currentUser.name,
     ],
   );
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
-  useEffect(() => setPage(1), [query, product, priority, status, scope, typeFilter, filterMode, pageSize]);
+  useEffect(() => setPage(1), [query, product, priority, status, scope, typeFilter, pageSize]);
   const pendingCount = requirementTasks.filter(
     (item) => item.status === "待处理",
   ).length;
@@ -805,6 +823,12 @@ export const RequirementPoolView: React.FC = () => {
   const rejectedCount = requirementTasks.filter(
     (item) => item.status === "已驳回",
   ).length;
+  const scopeCounts = {
+    all: requirementTasks.filter((item) => isWorkOrderInScope(item, "all", currentUser.name)).length,
+    mine_created: requirementTasks.filter((item) => isWorkOrderInScope(item, "mine_created", currentUser.name)).length,
+    mine_owned: requirementTasks.filter((item) => isWorkOrderInScope(item, "mine_owned", currentUser.name)).length,
+    mine_participating: requirementTasks.filter((item) => isWorkOrderInScope(item, "mine_participating", currentUser.name)).length,
+  };
   const typeStats = workOrderCards.map(({ type }) => {
     const items = requirementTasks.filter((item) => (item.workOrderType || "其他问题") === type);
     return { type, total: items.length, pending: items.filter((item) => item.status === "待处理").length, processing: items.filter((item) => item.status === "处理中").length, handled: items.filter((item) => ["已完成", "已搁置"].includes(item.status)).length };
@@ -846,50 +870,28 @@ export const RequirementPoolView: React.FC = () => {
     <WorkOrderInput label="事项标题 *" value={title} onChange={setTitle} placeholder="请输入事项标题，简明描述问题或诉求" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <EmployeeSearchSelect label="负责人 *" value={ownerName} employees={employees} placeholder="搜索姓名或职位" onChange={setOwnerName} />
-      <WorkOrderSelect
-        label="所属产品"
-        value={productLines.find((item) => item.id === productLineId)?.name || ""}
-        options={productLines.map((item) => item.name)}
-        placeholder={productLines.length ? "请选择所属产品（选填）" : "暂无可用产品"}
-        onChange={(value) => setProductLineId(productLines.find((item) => item.name === value)?.id || "")}
-      />
-      <SearchSelect label="关联客户" value={customerQuery} options={customers.map((item) => item.name)} placeholder="输入客户名称模糊搜索并选择" onChange={(name) => { setCustomerQuery(name); setCustomerId(customers.find((item) => item.name === name)?.id || ""); }} />
+      {workOrderType === "其他问题" && <WorkOrderSelect label="协助类型 *" value={specialFields.problemType || ""} options={["方向研讨", "费用缴纳", "开票/邮寄", "资料获取", "物料支持", "意见反馈", "其他"]} placeholder="请选择协助类型" onChange={(value) => setSpecialFields((current) => ({ ...current, problemType: value }))} />}
+      {(workOrderType === "客户诉求" || workOrderType === "线上问题" || workOrderType === "交付支持" || workOrderType === "其他问题") && <SearchSelect label={`所属项目${workOrderType === "其他问题" ? "" : " *"}`} value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入项目名称搜索并选择" onChange={(value) => { setSpecialFields((current) => ({ ...current, projectName: value })); setProductLineId(""); }} />}
+      {workOrderType === "售前支持" && <SearchSelect label="所属线索/商机/投标 *" value={specialFields.opportunityName || ""} options={[...leads.map((item) => item.name), ...opportunities.filter((item) => opportunityStagesBeforeWin.has(item.stage)).map((item) => item.name), ...biddings.map((item) => item.projectName || item.name || "")].filter(Boolean)} placeholder="输入线索/商机/投标名称" onChange={(value) => { const lead = leads.find((item) => item.name === value); const opportunity = opportunities.find((item) => item.name === value); const bidding = biddings.find((item) => (item.projectName || item.name) === value); setSpecialFields((current) => ({ ...current, opportunityName: value, opportunityId: opportunity?.id || "", leadId: lead?.id || "", biddingId: bidding?.id || "", relatedType: lead ? "lead" : opportunity ? "opportunity" : bidding ? "bidding" : "" })); setProductLineId(""); }} />}
+      <WorkOrderSelect label={`所属产品${workOrderType === "其他问题" ? "" : " *"}`} value={availableProductLines.find((item) => item.id === productLineId)?.name || ""} options={availableProductLines.map((item) => item.name)} disabled={!hasProductSource || availableProductLines.length === 0} placeholder={!hasProductSource ? workOrderType === "售前支持" ? "请先选择线索/商机/投标" : "请先选择所属项目" : availableProductLines.length ? "请选择所属产品" : "所选项目或关联对象暂无产品"} onChange={(value) => setProductLineId(availableProductLines.find((item) => item.name === value)?.id || "")} />
       <WorkOrderSelect label="优先级" value={requirementPriority} options={["紧急", "高", "中", "低"]} placeholder="请选择优先级" onChange={(value) => setRequirementPriority(value as RequirementTask["priority"])} />
-      <DateField label="期望完成时间" value={dueDate} onChange={setDueDate} />
+      <DateField label="期望完成时间 *" value={dueDate} onChange={setDueDate} />
+      {workOrderType === "客户诉求" && <WorkOrderInput label="诉求来源 *" value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(value) => setSpecialFields((current) => ({ ...current, requestSource: value }))} />}
+      {workOrderType === "线上问题" && <>
+        <WorkOrderSelect label="严重程度 *" value={specialFields.severity || ""} options={Object.keys(severityPriorities)} placeholder="请选择严重程度" onChange={(value) => { setSpecialFields((current) => ({ ...current, severity: value, priority: severityPriorities[value] })); setRequirementPriority(severityPriorities[value]); }} />
+        <WorkOrderSelect label="发生频率" value={specialFields.frequency || ""} options={["必现（100%）", "高频发生", "偶现（特点条件）", "环境相关偶发"]} placeholder="请选择发生频率" onChange={(value) => setSpecialFields((current) => ({ ...current, frequency: value }))} />
+      </>}
+      {workOrderType === "售前支持" && <WorkOrderSelect label="支持类型 *" value={specialFields.supportType || ""} options={["建设方案", "现场踏勘", "方案汇报", "报价支持", "技术表", "投标答疑", "产品需求", "招投标标书协同"]} placeholder="请选择支持类型" onChange={(value) => setSpecialFields((current) => ({ ...current, supportType: value }))} />}
+      {workOrderType === "交付支持" && <>
+        <WorkOrderSelect label="项目阶段 *" value={specialFields.progressStage || ""} options={["项目移交", "项目启动", "需求确认", "系统部署", "系统培训", "系统试运行", "项目初验", "项目终验", "运维追踪"]} placeholder="请选择当前阶段" onChange={(value) => setSpecialFields((current) => ({ ...current, progressStage: value }))} />
+        <WorkOrderSelect label="项目类型 *" value={specialFields.other || ""} options={["一般项目", "数据项目", "试用项目"]} placeholder="请选择项目类型" onChange={(value) => setSpecialFields((current) => ({ ...current, other: value }))} />
+        <WorkOrderSelect label="交付类型 *" value={specialFields.deliveryType || ""} options={["自有交付", "代理商交付", "协助代理商交付"]} placeholder="请选择交付类型" onChange={(value) => setSpecialFields((current) => ({ ...current, deliveryType: value }))} />
+      </>}
+      {workOrderType === "其他问题" && <>
+        <WorkOrderInput label="期望结果 *" value={specialFields.expectedResult || ""} placeholder="请输入期望达到的结果" onChange={(value) => setSpecialFields((current) => ({ ...current, expectedResult: value }))} />
+        <WorkOrderInput label="问题来源" value={specialFields.problemSource || ""} placeholder="请输入问题来源" onChange={(value) => setSpecialFields((current) => ({ ...current, problemSource: value }))} />
+      </>}
     </div>
-    {workOrderType && (
-      <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">业务参数设置</h3>
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-          {workOrderType === "客户诉求" && <>
-            <SearchSelect label="所属项目 *" value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入中标项目名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, projectName: value }))} />
-            <WorkOrderSelect label="诉求类型 *" value={specialFields.requestType || ""} options={["新功能", "线上问题", "数据需求", "技术难题", "其他"]} placeholder="请选择诉求类型" onChange={(value) => setSpecialFields((current) => ({ ...current, requestType: value }))} />
-            <WorkOrderInput label="诉求来源 *" value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(value) => setSpecialFields((current) => ({ ...current, requestSource: value }))} />
-          </>}
-          {workOrderType === "线上问题" && <>
-            <WorkOrderSelect label="缺陷类型 *" value={specialFields.productName || ""} options={["系统缺陷", "样式缺陷", "安全漏洞"]} placeholder="请选择缺陷类型" onChange={(value) => setSpecialFields((current) => ({ ...current, productName: value }))} />
-            <WorkOrderSelect label="严重程度 *" value={specialFields.severity || ""} options={Object.keys(severityPriorities)} placeholder="请选择严重程度" onChange={(value) => { setSpecialFields((current) => ({ ...current, severity: value, priority: severityPriorities[value] })); setRequirementPriority(severityPriorities[value]); }} />
-            <WorkOrderSelect label="发生频率 *" value={specialFields.frequency || ""} options={["必现（100%）", "高频发生", "偶现（特点条件）", "环境相关偶发"]} placeholder="请选择发生频率" onChange={(value) => setSpecialFields((current) => ({ ...current, frequency: value }))} />
-          </>}
-          {workOrderType === "售前支持" && <>
-            <SearchSelect label="关联线索/商机/投标 *" value={specialFields.opportunityName || ""} options={[...leads.map((item) => item.name), ...opportunities.filter((item) => opportunityStagesBeforeWin.has(item.stage)).map((item) => item.name), ...biddings.map((item) => item.projectName || item.name || "")].filter(Boolean)} placeholder="输入线索/商机/投标名称" onChange={(value) => { const lead = leads.find((item) => item.name === value); const opportunity = opportunities.find((item) => item.name === value); const bidding = biddings.find((item) => (item.projectName || item.name) === value); setSpecialFields((current) => ({ ...current, opportunityName: value, opportunityId: opportunity?.id || "", leadId: lead?.id || "", biddingId: bidding?.id || "", relatedType: lead ? "lead" : opportunity ? "opportunity" : bidding ? "bidding" : "" })); }} />
-            <WorkOrderSelect label="支持类型 *" value={specialFields.supportType || ""} options={["建设方案", "现场踏勘", "方案汇报", "报价支持", "技术表", "投标答疑", "产品需求", "招投标标书协同"]} placeholder="请选择支持类型" onChange={(value) => setSpecialFields((current) => ({ ...current, supportType: value }))} />
-            <label className="work-order-field text-xs text-[var(--text-muted)]">预计时长（天） *<InputNumber aria-label="预计时长（天） *" className="w-full" min={0} placeholder="请输入预计天数" size="middle" stringMode value={specialFields.durationDays || null} onChange={(value) => setSpecialFields((current) => ({ ...current, durationDays: value ?? "" }))} /></label>
-          </>}
-          {workOrderType === "交付支持" && <>
-            <SearchSelect label="所属项目 *" value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入中标项目名称搜索并选择" onChange={(value) => setSpecialFields((current) => ({ ...current, projectName: value }))} />
-            <WorkOrderSelect label="项目阶段 *" value={specialFields.progressStage || ""} options={["项目移交", "项目启动", "需求确认", "系统部署", "系统培训", "系统试运行", "项目初验", "项目终验", "运维追踪"]} placeholder="请选择当前阶段" onChange={(value) => setSpecialFields((current) => ({ ...current, progressStage: value }))} />
-            <WorkOrderSelect label="项目类型 *" value={specialFields.other || ""} options={["一般项目", "数据项目", "试用项目"]} placeholder="请选择项目类型" onChange={(value) => setSpecialFields((current) => ({ ...current, other: value }))} />
-            <WorkOrderSelect label="交付类型 *" value={specialFields.deliveryType || ""} options={["自有交付", "代理商交付", "协助代理商交付"]} placeholder="请选择交付类型" onChange={(value) => setSpecialFields((current) => ({ ...current, deliveryType: value }))} />
-          </>}
-          {workOrderType === "其他问题" && <>
-            <WorkOrderInput label="问题来源 *" value={specialFields.problemSource || ""} placeholder="请输入问题来源" onChange={(value) => setSpecialFields((current) => ({ ...current, problemSource: value }))} />
-            <WorkOrderInput label="期望结果 *" value={specialFields.expectedResult || ""} placeholder="请输入期望达到的结果" onChange={(value) => setSpecialFields((current) => ({ ...current, expectedResult: value }))} />
-            <WorkOrderSelect label="协助类型 *" value={specialFields.problemType || ""} options={["方向研讨", "费用缴纳", "开票/邮寄", "资料获取", "物料支持", "意见反馈", "其他"]} placeholder="请选择协助类型" onChange={(value) => setSpecialFields((current) => ({ ...current, problemType: value }))} />
-          </>}
-        </div>
-      </div>
-    )}
     <div>
       <span className="text-xs text-[var(--text-muted)]">事项描述 *</span>
       <RichTextEditor size="work-order" editor={editor} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} />
@@ -920,7 +922,7 @@ export const RequirementPoolView: React.FC = () => {
             }`}
           >
             <PenSquare className="w-4 h-4" />
-            发起协助
+            发起协同
           </button>
           <button
             role="tab"
@@ -966,7 +968,7 @@ export const RequirementPoolView: React.FC = () => {
               <div className="sticky -top-4 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                    {workOrderDisplayName(workOrderType) || "发起协助"}
+                    {workOrderDisplayName(workOrderType) || "发起协同"}
                   </h2>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     提交后将会自动通知到负责人
@@ -983,11 +985,11 @@ export const RequirementPoolView: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting || productLines.length === 0}
+                    disabled={isSubmitting || (productLines.length === 0 && workOrderType !== "其他问题")}
                     className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
-                    {isSubmitting ? "提交中…" : productLines.length === 0 ? "暂无可用产品" : "发起协助"}
+                    {isSubmitting ? "提交中…" : productLines.length === 0 && workOrderType !== "其他问题" ? "暂无可用产品" : "发起协同"}
                   </button>
                 </div>
               </div>
@@ -1000,19 +1002,20 @@ export const RequirementPoolView: React.FC = () => {
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {typeStats.map((stat) => (
-              <button key={stat.type} type="button" onClick={() => setTypeFilter(stat.type)} className="text-left">
+              <button key={stat.type} type="button" onClick={() => setTypeFilter(stat.type)} className="rounded-xl text-left transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] active:opacity-80">
                 <StatCard title={workOrderDisplayName(stat.type)} value={stat.total} unit="个" subText={`待处理 ${stat.pending} · 处理中 ${stat.processing} · 已处理 ${stat.handled}`} icon={cardIcon(workOrderCards.find((card) => card.type === stat.type)!)} />
               </button>
             ))}
           </div>
           <div className="dark-panel rounded-xl p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3 pb-1">
-              <div className="inline-flex shrink-0 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1" role="group" aria-label="列表筛选模式">
-                <button type="button" title="按事项类型筛选" aria-label="按事项类型筛选" onClick={() => setFilterMode("type")} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "type" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><ListFilter className="h-4 w-4" /></button>
-                <button type="button" title="查看与我有关" aria-label="查看与我有关" onClick={() => { setFilterMode("mine"); setScope("all"); }} className={`flex h-8 w-9 items-center justify-center rounded-md transition ${filterMode === "mine" ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><UserRound className="h-4 w-4" /></button>
-              </div>
               <div className="inline-flex max-w-full flex-wrap items-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-1">
-                {(filterMode === "type" ? [{ value: "all", label: "全部" }, ...workOrderCards.map((card) => ({ value: card.type, label: workOrderDisplayName(card.type) }))] : [{ value: "all", label: "全部" }, { value: "mine_owned", label: "我负责的" }, { value: "mine_created", label: "我创建的" }]).map((item) => <button key={item.value} type="button" onClick={() => filterMode === "type" ? setTypeFilter(item.value as typeof typeFilter) : setScope(item.value as typeof scope)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${(filterMode === "type" ? typeFilter === item.value : scope === item.value) ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{item.label}</button>)}
+                {([
+                  ["all", "全部"],
+                  ["mine_created", "我创建的"],
+                  ["mine_owned", "我负责的"],
+                  ["mine_participating", "我参与的"],
+                ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setScope(value)} className={`h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap transition ${scope === value ? "bg-[var(--bg-surface-soft)] text-[var(--active-text)] shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"}`}>{label} ({scopeCounts[value]})</button>)}
               </div>
             </div>
             <div className="work-order-list-filters flex flex-wrap items-center gap-3">
@@ -1025,7 +1028,7 @@ export const RequirementPoolView: React.FC = () => {
                 className="w-64"
               />
             </div>
-            {filterMode === "mine" && <Select allowClear aria-label="类型" className={filterClass} placeholder="类型" value={typeFilter === "all" ? undefined : typeFilter} onChange={(value) => setTypeFilter(value ?? "all")} options={workOrderCards.map((card) => ({label:workOrderDisplayName(card.type),value:card.type}))} />}
+            <Select allowClear aria-label="事项类型" className={filterClass} placeholder="类型" value={typeFilter === "all" ? undefined : typeFilter} onChange={(value) => setTypeFilter(value ?? "all")} options={workOrderCards.map((card) => ({label:workOrderDisplayName(card.type),value:card.type}))} />
             <Select allowClear aria-label="状态" className={filterClass} placeholder="状态" value={status === "all" ? undefined : status} onChange={(value) => setStatus(value ?? "all")} options={statuses.map((item) => ({label:item,value:item}))} />
             <Select allowClear aria-label="优先级" className={filterClass} placeholder="优先级" value={priority === "all" ? undefined : priority} onChange={(value) => setPriority(value ?? "all")} options={[{label:"紧急",value:"紧急"},{label:"高",value:"高"},{label:"中",value:"中"},{label:"低",value:"低"}]} />
             <button
@@ -1034,7 +1037,7 @@ export const RequirementPoolView: React.FC = () => {
               className="ml-auto h-10 px-4 shrink-0 rounded-lg bg-[var(--primary)] text-sm font-semibold text-white"
             >
               <Plus className="mr-1 inline w-4 h-4" />
-              发起协助
+              发起协同
             </button>
             </div>
           </div>

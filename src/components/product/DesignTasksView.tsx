@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Empty, Input, Modal, Select, Tabs, message } from 'antd';
-import { Layers, ListTodo, Search } from '@/components/common/octicons-compat';
+import { Button, Empty, Input, Modal, Select, message } from 'antd';
+import { Search } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import type { RequirementTask } from '../../types';
 import { RequirementTasksView } from './RequirementTasksView';
+import type { DesignAllocationExtra } from './ProductTaskAllocationView';
 
 type DesignTasksViewProps = { productLineFilter?: string; productLines?: Array<{ id: string; name: string; code?: string }>; onProductLineChange?: (value: string) => void };
 export type DesignTaskVariant = 'product' | 'project' | 'other';
@@ -37,17 +38,15 @@ const DesignPoolList: React.FC<{ variant: PoolVariant }> = ({ variant }) => {
   const [keyword, setKeyword] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [status, setStatus] = useState<string>();
-  const [creator, setCreator] = useState<string>();
   const [taskType, setTaskType] = useState<DesignTaskVariant>();
   const [activeTodo, setActiveTodo] = useState<TodoDesign>();
   const [reason, setReason] = useState<string>();
   const [reasonNote, setReasonNote] = useState('');
   const [reasonOpen, setReasonOpen] = useState(false);
-  const creators = useMemo(() => Array.from(new Set(todos.map((item) => item.creator))), [todos]);
   const filtered = useMemo(() => todos.filter((item) => (variant === 'all' || item.variant === variant)
     && (!taskType || item.variant === taskType)
-    && (!status || item.status === status) && (!creator || item.creator === creator)
-    && (!keyword.trim() || `${item.title} ${item.ownership}`.toLowerCase().includes(keyword.trim().toLowerCase()))), [todos, variant, taskType, status, creator, keyword]);
+    && (!status || item.status === status)
+    && (!keyword.trim() || `${item.title} ${item.ownership}`.toLowerCase().includes(keyword.trim().toLowerCase()))), [todos, variant, taskType, status, keyword]);
   const completeWithoutDesign = () => {
     if (!activeTodo || !reason || (reason === '其他' && !reasonNote.trim())) return;
     setTodos((items) => items.map((item) => item.id === activeTodo.id ? { ...item, status: '已取消', reason: reason === '其他' ? `其他：${reasonNote.trim()}` : reason } : item));
@@ -67,24 +66,31 @@ const DesignPoolList: React.FC<{ variant: PoolVariant }> = ({ variant }) => {
       </div>
       <Select allowClear aria-label="任务类型筛选" placeholder="全部任务类型" value={taskType} onChange={setTaskType} style={{ width: 128, flex: '0 0 128px' }} options={(Object.entries(TODO_VARIANT_LABEL) as Array<[DesignTaskVariant, string]>).map(([value, label]) => ({ label, value }))} />
       <Select allowClear aria-label="状态筛选" placeholder="全部状态" value={status} onChange={setStatus} style={{ width: 112, flex: '0 0 112px' }} options={['待设计', '设计中', '已设计', '已取消'].map((item) => ({ label: item, value: item }))} />
-      <Select allowClear aria-label="创建人筛选" placeholder="全部创建人" value={creator} onChange={setCreator} style={{ width: 128, flex: '0 0 128px' }} options={creators.map((item) => ({ label: item, value: item }))} />
     </div>
-    {filtered.length === 0 ? <div className="flex min-h-[360px] items-center justify-center"><Empty description="没有符合条件的待办设计" /></div> : <div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-left text-xs"><thead><tr className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-muted)]"><th className="px-4 py-3">标题</th><th className="px-4 py-3">任务类型</th><th className="px-4 py-3">来源归属</th><th className="px-4 py-3">状态</th><th className="px-4 py-3">创建人</th><th className="px-4 py-3">创建时间</th><th className="px-4 py-3">结束原因</th><th className="px-4 py-3">操作</th></tr></thead><tbody className="divide-y divide-[var(--border-main)]">{filtered.map((item) => <tr key={item.id} className="hover:bg-[var(--bg-surface-soft)]"><td className="max-w-[280px] truncate px-4 py-3"><button type="button" className="block max-w-full truncate text-left font-medium text-[var(--primary)] hover:underline" title={`${item.title} · 来源：${item.sourceTitle}`} onClick={() => message.warning('来源任务已删除或暂无查看权限')}>{item.title}</button></td><td className="px-4 py-3 text-[var(--text-body)]">{TODO_VARIANT_LABEL[item.variant]}</td><td className="px-4 py-3 text-[var(--text-body)]">{item.ownership}</td><td className={`px-4 py-3 ${statusColor[item.status]}`}>{item.status}</td><td className="px-4 py-3 text-[var(--text-muted)]">{item.creator}</td><td className="px-4 py-3 font-mono text-[var(--text-muted)]">{item.createdAt}</td><td className="max-w-[180px] truncate px-4 py-3 text-[var(--text-muted)]" title={item.reason}>{item.reason || '—'}</td><td className="px-4 py-3"><div className="flex items-center gap-2">{item.status === '待设计' && <><Button size="small" type="link" onClick={() => message.info('关联设计任务创建流程尚未接入待办设计数据')}>转任务</Button><Button size="small" type="link" onClick={() => { setActiveTodo(item); setReasonOpen(true); }}>无需设计</Button></>}{['设计中', '已设计'].includes(item.status) && <Button size="small" type="link" onClick={() => message.info('此示例尚未关联已保存的设计任务')}>查看设计任务</Button>}</div></td></tr>)}</tbody></table></div>}
+    {filtered.length === 0 ? <div className="flex min-h-[360px] items-center justify-center"><Empty description="没有符合条件的待办设计" /></div> : <div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-left text-xs"><thead><tr className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] text-[var(--text-muted)]"><th className="px-4 py-3">标题</th><th className="px-4 py-3">任务类型</th><th className="px-4 py-3">来源归属</th><th className="px-4 py-3">前置任务状态</th><th className="px-4 py-3">分配状态</th><th className="px-4 py-3">结束原因</th><th className="px-4 py-3">操作</th></tr></thead><tbody className="divide-y divide-[var(--border-main)]">{filtered.map((item) => <tr key={item.id} className="hover:bg-[var(--bg-surface-soft)]"><td className="max-w-[280px] truncate px-4 py-3">{item.title}</td><td className="px-4 py-3">{TODO_VARIANT_LABEL[item.variant]}</td><td className="px-4 py-3">{item.ownership}</td><td className="px-4 py-3">{item.variant === 'product' ? item.status : '—'}</td><td className="px-4 py-3">{item.status === '已设计' ? '已分配' : '待分配'}</td><td className="px-4 py-3">{item.reason || '—'}</td><td className="px-4 py-3"><div className="flex items-center gap-2">{item.status === '待设计' && <><Button size="small" type="link" onClick={() => message.info('请通过转任务创建设计任务')}>转任务</Button><Button size="small" type="link" onClick={() => { setActiveTodo(item); setReasonOpen(true); }}>无需设计</Button></>}{['设计中', '已设计'].includes(item.status) && <Button size="small" type="link">查看设计任务</Button>}</div></td></tr>)}</tbody></table></div>}
     <Modal title="无需设计" open={reasonOpen} okText="确认结束" cancelText="取消" onCancel={() => { setReasonOpen(false); setReason(undefined); setReasonNote(''); }} onOk={completeWithoutDesign} okButtonProps={{ disabled: !reason || (reason === '其他' && !reasonNote.trim()) }}><div className="space-y-3"><p className="text-sm text-[var(--text-muted)]">请选择结束原因，所有来源类型均可使用。</p><Select className="w-full" placeholder="请选择原因" value={reason} onChange={setReason} options={['产品需求不需要设计', '使用现有设计', '由其他任务覆盖', '其他'].map((item) => ({ label: item, value: item }))} />{reason === '其他' && <Input.TextArea rows={3} maxLength={200} showCount placeholder="请补充说明" value={reasonNote} onChange={(event) => setReasonNote(event.target.value)} />}</div></Modal>
   </section>;
 };
 
 export const DesignTasksView: React.FC<DesignTasksViewProps> = () => {
-  const [activeTab, setActiveTab] = useState('design');
   const [designVariant, setDesignVariant] = useState<DesignTaskVariant>('product');
   const [designVariantFilter, setDesignVariantFilter] = useState<DesignTaskVariant | 'all'>('all');
-  const [poolVariant, setPoolVariant] = useState<PoolVariant>('all');
   const { designTasks = [] } = useApp();
   const designCounts = useMemo(() => ({ all: designTasks.length, product: designTasks.filter((task) => variantOf(task) === 'product').length, project: designTasks.filter((task) => variantOf(task) === 'project').length, other: designTasks.filter((task) => variantOf(task) === 'other').length }), [designTasks]);
-  const poolCounts = useMemo(() => ({ all: INITIAL_TODOS.length, product: INITIAL_TODOS.filter((item) => item.variant === 'product').length, project: INITIAL_TODOS.filter((item) => item.variant === 'project').length, other: INITIAL_TODOS.filter((item) => item.variant === 'other').length }), []);
-  return <div className="design-tasks-view"><Tabs className="test-and-defect-tabs" activeKey={activeTab} onChange={setActiveTab} items={[
-    { key: 'design', label: <span className="inline-flex items-center gap-2"><Layers size={16} />设计任务</span>, children: <div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3"><Navigation title="设计类型" value={designVariantFilter} items={[[ 'all', '全部'], ...DESIGN_VARIANTS.map(({ key, label }) => [key, label] as [string, string])]} counts={designCounts} onChange={(value) => { const next = value as DesignTaskVariant | 'all'; setDesignVariantFilter(next); if (next !== 'all') setDesignVariant(next); }} /><div className="min-w-0"><RequirementTasksView key={designVariantFilter} productLineFilter="all" itemLabel="设计任务" taskKind="design" designVariant={designVariant} designVariantFilter={designVariantFilter} onDesignVariantChange={setDesignVariant} /></div></div> },
-    { key: 'todo-design', label: <span className="inline-flex items-center gap-2"><ListTodo size={16} />待办设计</span>, children: <div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3"><Navigation title="任务类型" value={poolVariant} items={[[ 'all', '全部'], ['product', '产品设计'], ['project', '物料设计'], ['other', '其他设计']]} counts={poolCounts} onChange={(value) => setPoolVariant(value as PoolVariant)} /><DesignPoolList variant={poolVariant} /></div> }
-  ]} /></div>;
+  const designExtras = useMemo<DesignAllocationExtra[]>(() => INITIAL_TODOS.map((item) => ({
+    id: item.id,
+    code: item.id,
+    category: 'requirement',
+    title: item.title,
+    productLineId: '',
+    productName: item.ownership,
+    allocated: item.status === '设计中' || item.status === '已设计',
+    designVariant: item.variant,
+    designStatus: item.variant === 'product' ? item.status : undefined,
+    reason: item.reason,
+    sourceTitle: item.sourceTitle,
+    status: { name: item.status, successful: item.status === '已设计' },
+  } as DesignAllocationExtra)), []);
+  return <div className="design-tasks-view"><div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3"><Navigation title="设计类型" value={designVariantFilter} items={[[ 'all', '全部'], ...DESIGN_VARIANTS.map(({ key, label }) => [key, label] as [string, string])]} counts={designCounts} onChange={(value) => { const next = value as DesignTaskVariant | 'all'; setDesignVariantFilter(next); if (next !== 'all') setDesignVariant(next); }} /><div className="min-w-0"><RequirementTasksView key={designVariantFilter} productLineFilter="all" itemLabel="设计任务" taskKind="design" designVariant={designVariant} designVariantFilter={designVariantFilter} onDesignVariantChange={setDesignVariant} designExtras={designExtras} /></div></div></div>;
 };
 export default DesignTasksView;

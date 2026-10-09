@@ -454,7 +454,19 @@ export interface ProductItemInLine {
   description?: string;
 }
 
+export interface ProductDocument {
+  name: string;
+  source: 'online' | 'upload';
+  html?: string;
+  dataUrl?: string;
+  mimeType?: string;
+  size: number;
+  operatorName: string;
+  updatedAt: string;
+}
+
 export interface ProductLine {
+  documents?: Partial<Record<'introduction' | 'manual' | 'features', ProductDocument | null>>;
   id: string;
   name: string;
   code: string;
@@ -509,6 +521,10 @@ export interface ProductLine {
 }
 
 export interface RequirementTask {
+  projectId?: string;
+  projectName?: string;
+  needsCollaboration?: Array<'design' | 'dev' | 'test'>;
+  relatedTaskIds?: string[];
   id: string;
   code?: string;
   title: string;

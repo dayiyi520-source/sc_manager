@@ -31,7 +31,7 @@ const SCENES: Array<{ key: WorkItemFieldScene; label: string }> = [
   { key: 'LIST', label: '列表字段' }, { key: 'ITERATION', label: '迭代任务字段' }, { key: 'DETAIL', label: '详情页字段' }
 ];
 const LEFT_FIXED_FIELDS = new Set(['title', 'creator', 'createdAt', 'updater', 'updatedAt', 'expectedGoal', 'description']);
-const LEFT_RELATION_FIELDS = new Set(['relations', 'children', 'support', 'hours']);
+const LEFT_RELATION_FIELDS = new Set(['relations', 'collaborationItems', 'relatedTasks', 'children', 'support', 'hours']);
 const LEGACY_FIELD_CODES = new Set(['requirement']);
 
 export const WorkItemFieldConfigurationPanel: React.FC<{ categories: WorkItemCategoryDefinition[] }> = ({ categories }) => {
@@ -94,6 +94,8 @@ export const WorkItemFieldConfigurationPanel: React.FC<{ categories: WorkItemCat
     if (scene === 'DETAIL' || field.locked || field.editable === false) return <span className="text-[var(--text-muted)]">--</span>;
     const value = field.defaultValue == null ? undefined : field.defaultValue;
     switch (fieldControlType(field)) {
+      case 'multiSelect':
+        return <Select size="small" className="w-36" mode="multiple" allowClear value={Array.isArray(value) ? value : []} options={[{ label: '设计', value: 'design' }, { label: '开发', value: 'dev' }, { label: '测试', value: 'test' }]} onChange={(next) => update(field.fieldCode, { defaultValue: next })} placeholder="请选择协同类型" />;
       case 'select':
       case 'relation':
         return <Select size="small" className="w-36" allowClear value={typeof value === 'string' ? value : undefined} options={DEFAULT_SELECT_OPTIONS[field.fieldCode] || []} onChange={(next) => update(field.fieldCode, { defaultValue: next ?? null })} placeholder="请选择" />;

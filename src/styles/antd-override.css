@@ -20,6 +20,31 @@
   font-size: 12px !important;
 }
 
+/* 待分配任务筛选栏：Input 的 allowClear 形态由 affix wrapper 承载宽度。
+ * 同时锁定 wrapper 的 flex 基准，避免列表容器或通用表单规则将搜索框拉伸。 */
+.allocation-keyword,
+.allocation-keyword .ant-input-affix-wrapper {
+  box-sizing: border-box !important;
+  width: 250px !important;
+  min-width: 250px !important;
+  max-width: 250px !important;
+}
+
+.allocation-keyword {
+  flex: 0 0 250px !important;
+}
+
+.allocation-keyword .ant-input-affix-wrapper {
+  flex: 0 0 250px !important;
+}
+
+.allocation-keyword .ant-input-affix-wrapper > .ant-input {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+}
+
 /* 产品设置沿用平台 36px 控件基线；legacy tech-shell 的 32px 规则不应覆盖 Select。 */
 .tech-shell .product-line-settings :where(.ant-select, .ant-select-selector) {
   height: 36px !important;

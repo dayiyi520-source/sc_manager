@@ -135,7 +135,7 @@ const DETAIL_FIELD_DEFINITIONS: Record<string, Array<[string, string, string, st
   dev: [['repo', '代码仓库', 'text', '研发任务关联的代码仓库地址或名称', true], ['branch', '特性分支', 'text', '研发任务对应的代码分支', true]],
   bug: [['severity', '严重程度', 'select', '缺陷影响范围和紧急程度', true], ['type', '缺陷类型', 'select', '缺陷所属的问题类型', true], ['env', '所属环境', 'select', '缺陷出现或验证的运行环境', true]],
 };
-const DETAIL_FIELDS = (categoryCode: string) => [...DETAIL_FIELD_DEFINITIONS.common, ...(categoryCode === 'dev' ? DETAIL_FIELD_DEFINITIONS.dev : []), ...(categoryCode === 'bug' ? DETAIL_FIELD_DEFINITIONS.bug : [])].map(([fieldCode, label, fieldType, description, editable], index) => ({
+const DETAIL_FIELDS = (categoryCode: string) => [...DETAIL_FIELD_DEFINITIONS.common.flatMap((field): Array<[string, string, string, string, boolean]> => field[0] === 'relations' ? [['collaborationItems', '协同事项', 'section', '关联工作台中的协同事项', true], ['relatedTasks', '关联任务', 'section', '关联其他类型任务', true]] : field[0] === 'customer' ? [['project', '关联项目', 'relation', '任务关联的项目对象', true]] : [field]), ...(categoryCode === 'dev' ? DETAIL_FIELD_DEFINITIONS.dev : []), ...(categoryCode === 'bug' ? DETAIL_FIELD_DEFINITIONS.bug : [])].map(([fieldCode, label, fieldType, description, editable], index) => ({
   fieldCode,
   label,
   fieldType,
@@ -164,7 +164,11 @@ const FIELD_METADATA: Record<string, { label: string; fieldType: string; descrip
   updatedAt: { label: '更新时间', fieldType: 'date', description: '工作项最近更新时间' },
   version: { label: '迭代版本', fieldType: 'relation', description: '任务关联的迭代版本' },
   requirement: { label: '关联对象', fieldType: 'relation', description: '任务关联的需求或其他工作项' },
-  customer: { label: '关联客户', fieldType: 'relation', description: '任务关联的客户对象' },
+  customer: { label: '关联项目', fieldType: 'relation', description: '任务关联的项目对象' },
+  collaborationItems: { label: '协同事项', fieldType: 'relation', description: '关联工作台中的协同事项' },
+  relatedTasks: { label: '关联任务', fieldType: 'relation', description: '关联其他类型任务' },
+  project: { label: '关联项目', fieldType: 'relation', description: '任务关联的项目对象' },
+  needsCollaboration: { label: '需要协同', fieldType: 'multiSelect', description: '创建后下发到设计、开发或测试待分配任务' },
   estimatedHours: { label: '预计工时', fieldType: 'number', description: '任务预计投入的小时数' },
   actualHours: { label: '实际工时', fieldType: 'number', description: '任务实际投入的小时数' },
   relations: { label: '关联对象', fieldType: 'section', description: '关联产品任务和协同事项' },
@@ -183,8 +187,8 @@ const REQUIRED_FIELD_CODES = new Set(['title', 'status', 'assignee']);
 const DETAIL_SYSTEM_FIELD_CODES = new Set(['creator', 'createdAt', 'updater', 'updatedAt']);
 // 历史配置中曾使用 requirement 作为独立关联字段，现统一由 relations 关系区承载。
 const LEGACY_FIELD_CODES = new Set(['requirement']);
-const CREATE_ASSOCIATION_FIELD_CODES = ['relations', 'children', 'support', 'hours'];
-const CREATE_COMMON_FIELD_CODES = ['title', 'expectedGoal', 'description', 'productLine', 'taskType', 'assignee', 'priority', 'plannedStartDate', 'plannedEndDate', 'version', 'customer', 'cc', 'estimatedHours', 'actualHours', 'attachments'];
+const CREATE_ASSOCIATION_FIELD_CODES = ['collaborationItems', 'relatedTasks', 'children', 'support', 'hours'];
+const CREATE_COMMON_FIELD_CODES = ['title', 'expectedGoal', 'description', 'productLine', 'taskType', 'assignee', 'priority', 'plannedStartDate', 'plannedEndDate', 'version', 'project', 'cc', 'estimatedHours', 'actualHours', 'attachments'];
 const normalizeTemplateField = (field: any) => {
   const metadata = FIELD_METADATA[field.fieldCode];
   const detailSystemField = field.scene === 'DETAIL' && DETAIL_SYSTEM_FIELD_CODES.has(field.fieldCode);
@@ -199,7 +203,8 @@ const normalizeTemplateField = (field: any) => {
 const templateFields = () => {
   const stored = read<any[] | null>(KEYS.researchFields, null);
   const base = (stored || databaseRows('t_work_item_field_configuration').map((row) => ({ categoryCode: row.category_code_, scene: row.scene_, fieldCode: row.field_code_, label: row.field_code_, fieldType: 'text', visible: Boolean(row.visible_), required: Boolean(row.required_), editable: true, defaultValue: null, sort: Number(row.sort_ || 0), locked: false })))
-    .filter((field) => !LEGACY_FIELD_CODES.has(field.fieldCode))
+    .flatMap((field) => field.fieldCode === 'relations' ? ['collaborationItems', 'relatedTasks'].filter((code) => !stored?.some((existing) => existing.categoryCode === field.categoryCode && existing.scene === field.scene && existing.fieldCode === code)).map((code) => ({ ...field, fieldCode: code })) : [{ ...field, fieldCode: field.fieldCode === 'customer' ? 'project' : field.fieldCode }])
+    .filter((field, index, all) => !LEGACY_FIELD_CODES.has(field.fieldCode) && all.findIndex((other) => other.categoryCode === field.categoryCode && other.scene === field.scene && other.fieldCode === field.fieldCode) === index)
     .map(normalizeTemplateField);
   const categories = [...new Set(['requirement', 'design', 'dev', 'test', 'bug', ...templateCategories().map((item: any) => item.code)])];
   // New categories inherit the common field contract until customized independently.
@@ -211,6 +216,9 @@ const templateFields = () => {
   });
   const createScenes = ['CREATE', 'CREATE_CHILD'];
   const baseWithCreateAssociations = [...base];
+  createScenes.forEach((scene) => {
+    if (!baseWithCreateAssociations.some((field) => field.categoryCode === 'requirement' && field.scene === scene && field.fieldCode === 'needsCollaboration')) baseWithCreateAssociations.push({ categoryCode: 'requirement', scene, fieldCode: 'needsCollaboration', ...FIELD_METADATA.needsCollaboration, visible: true, required: false, editable: true, defaultValue: ['dev', 'test'], sort: 12, locked: false });
+  });
   // Sparse historical scenes must retain overrides while receiving missing common controls.
   categories.forEach((categoryCode) => createScenes.forEach((scene) => {
     CREATE_COMMON_FIELD_CODES.filter((fieldCode) => scene === 'CREATE' || fieldCode !== 'expectedGoal').forEach((fieldCode) => {
@@ -372,7 +380,15 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     const product: ProductLine = { ...input, id: id('pl'), name: input.name || '新建产品', code: input.code || 'PL-NEW', description: input.description || '', ownerName: input.ownerName || '', visibility: input.visibility || '公开', commercialAvailability: input.commercialAvailability || '不可商用', sort: Number(input.sort || 0), status: '待规划', createdAt: now(), versions: [] };
     const products = [...getProductLines(), product]; write(KEYS.productLines, products); return product;
   }
-  if (parts[1] === 'product-lines' && parts[2] && method === 'PUT') {
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'members' && parts[4] && method === 'PUT') {
+    const products = getProductLines(); const product = products.find((item) => item.id === parts[2]);
+    if (!product) throw new Error('产品不存在');
+    const member = (product.members || []).find((item) => typeof item !== 'string' && item.id === parts[4]);
+    if (!member || typeof member === 'string') throw new Error('产品成员不存在');
+    if (!templateRoles().some((role: any) => role.name === body.role)) throw new Error('所属角色不可用');
+    member.role = body.role; write(KEYS.productLines, products); return null;
+  }
+  if (parts[1] === 'product-lines' && parts[2] && !parts[3] && method === 'PUT') {
     const products = getProductLines(); const index = products.findIndex((item) => item.id === parts[2]);
     if (index >= 0) { products[index] = { ...products[index], ...body }; write(KEYS.productLines, products); return products[index]; }
   }
@@ -460,10 +476,30 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   // 产品级配置在真实系统中由全局产研模板继承；纯前端演示保持同样的读取关系。
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && method === 'GET') {
     const category = queryOf(path).get('category') || '';
-    const inherited = templateTypes().filter((item: any) => !category || item.category === category || categoryCode(item.category) === category);
+    const product = getProductLines().find((item) => item.id === parts[2]);
+    const inherited = (product?.workItemTypes ?? templateTypes()).filter((item: any) => !category || item.category === category || categoryCode(item.category) === category);
     return inherited.map((item: any) => ({ ...item, productLineId: parts[2] }));
   }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'child-type-rules' && method === 'GET') return [];
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && ['POST', 'PUT', 'DELETE'].includes(method)) {
+    const products = getProductLines();
+    const product = products.find((item) => item.id === parts[2]);
+    if (!product) throw new Error('产品不存在');
+    let types = [...(product.workItemTypes ?? templateTypes())];
+    let createdId = parts[4];
+    if (method === 'POST') {
+      createdId = id('type');
+      types.push({ ...body, id: createdId, creatorName: '当前用户', createdAt: now() } as any);
+    } else if (method === 'DELETE') types = types.filter((item) => item.id !== parts[4]);
+    else {
+      if (!types.some((item) => item.id === parts[4])) throw new Error('工作项类型不存在');
+      types = types.map((item) => item.id === parts[4] ? { ...item, ...body } : item);
+    }
+    if (body.isDefault) types = types.map((item) => item.id !== createdId && categoryCode(item.category) === categoryCode(body.category || types.find((type) => type.id === createdId)?.category) ? { ...item, isDefault: false } : item);
+    product.workItemTypes = types;
+    write(KEYS.productLines, products);
+    return { id: createdId };
+  }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'notification-settings' && method === 'GET') return templateNotifications();
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'notification-settings' && method === 'PUT') { write(KEYS.researchNotifications, body); return body; }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'activities' && method === 'GET') return [];
@@ -498,18 +534,40 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     recordTaskChanges(current, updated);
     return unifiedWorkItem(updated);
   }
+  if (clean === '/api/work-items' && method === 'POST') {
+    if (!String(body.title || '').trim()) throw new Error('任务标题不能为空');
+    const product = getProductLines().find((line) => line.id === body.productLineId);
+    const type = (product?.workItemTypes ?? templateTypes()).find((item: any) => item.id === body.taskTypeId);
+    if (!product || !type || !type.enabled || categoryCode(type.category) !== body.category) throw new Error('产品或工作项类型不可用，请刷新后重试');
+    const items = getWorkItems(); const existing = items.find((item) => item.requestId && item.requestId === body.requestId);
+    if (existing) return unifiedWorkItem(existing);
+    const owner = getEmployeeOptions().find((employee) => employee.id === body.assigneeId);
+    const task = { ...body, id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: '待处理', statusKey: 'pending', revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
+    write(KEYS.workItems, [task, ...items]); recordTaskActivity(task.id, product.id, 'WORK_ITEM_CREATED', { title: task.title });
+    return unifiedWorkItem(task);
+  }
   if (clean === '/api/work-items' && method === 'GET') {
     const query = queryOf(path); const productLineId = query.get('productLineId'); const category = query.get('category'); const keyword = (query.get('keyword') || '').toLowerCase();
     let items = getWorkItems().filter((item) => (!productLineId || item.productLineId === productLineId) && (!category || category === item.category) && (!keyword || item.title.toLowerCase().includes(keyword) || String(item.code || '').toLowerCase().includes(keyword)));
     items = items.map((item) => unifiedWorkItem(item)) as any;
-    return { page: { items, page: Number(query.get('page') || 1), pageSize: Number(query.get('pageSize') || 100), total: items.length } };
+    const page = Math.max(1, Number(query.get('page') || 1)); const pageSize = Math.max(1, Number(query.get('pageSize') || 100));
+    return { page: { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length } };
   }
   if (clean === '/api/requirements/my-tasks' && method === 'GET') {
     const viewerId = queryOf(path).get('viewerId') || '';
     return viewerId ? myTasks(viewerId) : [];
   }
   if (parts[1] === 'work-items' && parts[2] && parts[3] === 'transitions' && method === 'GET') return { revision: 0, actions: [], statuses: [] };
-  if (parts[1] === 'work-items' && parts[2] && parts[3] === 'relations' && method === 'GET') return { relations: [] };
+  if (parts[1] === 'work-items' && parts[2] && parts[3] === 'relations' && method === 'GET') {
+    const item = getWorkItems().find((candidate) => candidate.id === parts[2]);
+    const ids = [...(item?.relatedTaskIds || []), ...(item?.sourceWorkOrderIds || [])];
+    return { relations: ids.map((targetId) => ({ id: `${parts[2]}-${targetId}`, sourceId: parts[2], targetId, type: 'RELATES_TO', scope: 'FINISH', revision: 0 })) };
+  }
+  if (parts[1] === 'work-items' && parts[2] && parts[3] === 'relations' && method === 'POST') {
+    const items = getWorkItems(); const index = items.findIndex((candidate) => candidate.id === parts[2]);
+    if (index >= 0) { const current = items[index]; const relatedTaskIds = Array.from(new Set([...(current.relatedTaskIds || []), String(body.targetId || '')].filter(Boolean))); items[index] = { ...current, relatedTaskIds }; write(KEYS.workItems, items); return { id: `${parts[2]}-${body.targetId}`, sourceId: parts[2], targetId: body.targetId, type: 'RELATES_TO', scope: 'FINISH', revision: 0 }; }
+    return { id: id('relation'), sourceId: parts[2], targetId: body.targetId, type: 'RELATES_TO', scope: 'FINISH', revision: 0 };
+  }
   if (parts[1] === 'requirements' && parts[2] && parts[3] === 'summary' && method === 'GET') { const requirement = [...getWorkItems()].find((item) => item.id === parts[2]); return { requirement: requirement || undefined, linkedItems: [] }; }
   if (clean.endsWith('/test-case-directories') && method === 'GET') {
     const lineId = parts[2] || '';

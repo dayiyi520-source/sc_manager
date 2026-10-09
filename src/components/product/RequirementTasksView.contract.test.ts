@@ -68,14 +68,15 @@ describe('requirement task Ant Design contract', () => {
   });
 
   it('keeps children and relations in dedicated detail tabs', () => {
-    expect(requirementSource).toContain("value: 'relations'");
+    expect(requirementSource).toContain("value: 'collaborationItems'");
+    expect(requirementSource).toContain("value: 'relatedTasks'");
     expect(requirementSource).toContain("value: 'children'");
     expect(requirementSource).toContain('title="添加子任务"');
     expect(requirementSource).toContain('父级任务');
     expect(requirementSource).toContain('openWorkItemDetail(child, selectedTask)');
     expect(requirementSource).toContain('label="所属产品"><Input value={selectedTask?.productLineName || \'未设置\'} disabled');
     expect(requirementSource).toContain('label="迭代版本"><Input value={selectedTask?.versionName || \'未设置\'} disabled');
-    expect(requirementSource).toContain('label="关联客户"><Input value={selectedTask?.customerName || \'未关联\'} disabled');
+    expect(requirementSource).toContain('label="关联项目"><Input value={selectedTask?.projectName || \'未关联\'} disabled');
   });
 
   it('consumes an iteration work-item target and opens the persisted real detail', () => {
