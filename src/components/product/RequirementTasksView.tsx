@@ -757,7 +757,22 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   ].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index && item.id !== selectedTask?.id), [requirementTasks, bugs, devTasks, requirementPool, risks, selectedTask?.id]);
 
   const candidateOptions = remoteCandidates.length ? remoteCandidates.filter((item) => item.id !== selectedTask?.id) : localCandidates;
-  const collaborationCandidates = candidateOptions.filter((item) => item.sourceType === 'WORK_ORDER' || (item.type === 'requirement' && requirementTasks.some((task) => task.id === item.id && Boolean(task.workOrderType)))).map((item) => ({ ...item, sourceType: 'WORK_ORDER', category: 'assistance' }));
+  const collaborationCandidates = [...candidateOptions, ...(creationContext?.sourceWorkOrder ? [{
+    id: creationContext.sourceWorkOrder.id,
+    type: 'requirement' as const,
+    typeLabel: '协同事项',
+    title: creationContext.sourceWorkOrder.title,
+    ownerName: creationContext.sourceWorkOrder.ownerName,
+    creatorName: creationContext.sourceWorkOrder.creatorName,
+    expectedCompleteDate: creationContext.sourceWorkOrder.expectedCompleteDate,
+    productLineName: creationContext.sourceWorkOrder.productLineName,
+    status: creationContext.sourceWorkOrder.status,
+    sourceType: 'WORK_ORDER',
+    category: 'assistance'
+  } as RequirementWorkOrderCandidate] : [])]
+    .filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index)
+    .filter((item) => item.sourceType === 'WORK_ORDER' || (item.type === 'requirement' && requirementTasks.some((task) => task.id === item.id && Boolean(task.workOrderType))))
+    .map((item) => ({ ...item, sourceType: 'WORK_ORDER', category: 'assistance' }));
   const linkedTaskQuery = useQuery({ queryKey: ['task-association-options', productLineKey], queryFn: async () => (await Promise.all(productLines.map(async (line) => {
     const items: UnifiedWorkItem[] = [];
     for (let page = 1; ; page++) { const result = await productRepository.workItems(line.id, '', '', { page }); items.push(...result.page.items); if (!result.page.items.length || items.length >= result.page.total) break; }
@@ -1994,7 +2009,6 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                 <div className="space-y-4">
                   {selectedTask.sourceType === 'WORK_ORDER' && selectedTask.requirementId ? (
                     <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-sm">
-                      <div className="mb-1 text-xs text-[var(--text-muted)]">来源协同事项（系统固定关联）</div>
                       <div className="flex items-center gap-2">
                         <WorkItemCategoryIcon category="assistance" className="shrink-0 text-[var(--primary)]" />
                         <button type="button" className="truncate text-left text-[var(--primary)] hover:text-[var(--primary-hover)]" onClick={() => {
