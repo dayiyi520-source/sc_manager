@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateKrWeightTotal } from './ObjectiveForm';
 
 describe('ObjectiveForm weight rules', () => {
-  it('derives objective weight from all KR weights', () => {
+  it('sums A weights within their parent objective', () => {
     expect(calculateKrWeightTotal([{ weight: 40 }, { weight: 35 }, { weight: 25 }])).toBe(100);
   });
 

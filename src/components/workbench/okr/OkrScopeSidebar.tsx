@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Plus,
   Search,
-  Settings,
   PanelLeftClose,
   PanelLeftOpen,
   Target,
@@ -65,12 +64,11 @@ type Props = {
   onSelect: (selection: OkrScopeSelection) => void;
   onAddTarget: () => void;
   addTargetDisabled?: boolean;
-  onOpenSettings: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 };
 
-export function OkrScopeSidebar({ people, currentUserId, selection, defaultExpandMembers = false, onSelect, onAddTarget, addTargetDisabled = false, onOpenSettings, collapsed = false, onToggleCollapse }: Props) {
+export function OkrScopeSidebar({ people, currentUserId, selection, defaultExpandMembers = false, onSelect, onAddTarget, addTargetDisabled = false, collapsed = false, onToggleCollapse }: Props) {
   const groups = useMemo(() => buildOkrScopeGroups(people, currentUserId), [people, currentUserId]);
   const currentUser = people.find(person => person.id === currentUserId);
   const primaryActionLabel = !currentUser ? '组织信息加载中' : currentUser.rootFlag === 1 ? '添加目标' : '拆解目标';
@@ -143,7 +141,6 @@ export function OkrScopeSidebar({ people, currentUserId, selection, defaultExpan
       })}
     </nav>
     <div className="okr-scope-settings">
-      <Button type="text" block icon={<Settings />} aria-label="目标设置" onClick={onOpenSettings}>设置</Button>
       {onToggleCollapse && <Tooltip title={collapsed ? '展开左侧导航' : '收起左侧导航'}><Button type="text" icon={collapsed ? <PanelLeftOpen /> : <PanelLeftClose />} aria-label={collapsed ? '展开左侧导航' : '收起左侧导航'} onClick={onToggleCollapse} /></Tooltip>}
     </div>
   </aside>;

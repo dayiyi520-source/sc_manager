@@ -85,12 +85,9 @@
 .okr-scope-members p { margin: 4px 10px 8px; color: var(--text-muted); font-size: 12px; }
 .okr-scope-settings { display:flex; align-items:center; gap:4px; padding:8px; border-top:1px solid var(--border-main); }
 .okr-scope-settings .ant-btn { justify-content:flex-start; color:var(--text-secondary); }
-.okr-scope-settings .ant-btn:first-child { min-width:0; flex:1; }
-.okr-scope-settings .ant-btn:last-child { width:32px; flex:none; justify-content:center; padding-inline:0; }
+.okr-scope-settings .ant-btn { width:32px; flex:none; justify-content:center; padding-inline:0; }
 .okr-scope-sidebar.is-collapsed .okr-scope-settings { margin-top:auto; }
-.okr-scope-sidebar.is-collapsed .okr-scope-settings .ant-btn:first-child { display:none; }
 .okr-scope-sidebar.is-collapsed .okr-scope-settings .ant-btn { justify-content:center; padding-inline:0; }
-.okr-scope-sidebar.is-collapsed .okr-scope-settings .ant-btn:first-child > span:not(.ant-btn-icon) { display:none; }
 .okr-workspace-main { display: grid; width: 100%; height: 100%; min-width: 0; min-height: 0; grid-template-columns: minmax(0,1fr); align-content: start; gap: 16px; padding: 24px; overflow-y: auto; overscroll-behavior: contain; }
 .okr-context-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
 .okr-context-heading h2 { min-width: 0; margin: 0; color: var(--text-primary); font-size: 18px; line-height: 26px; }

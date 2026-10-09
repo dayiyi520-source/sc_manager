@@ -434,13 +434,38 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   if (clean === '/api/okr/settings' && method === 'PUT') { write(KEYS.okrSettings, body); return body; }
   if (clean === '/api/okr/records' && method === 'GET') {
     const viewerId = queryOf(path).get('viewerId');
-    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => !viewerId || record.ownerId === viewerId || record.payload?.keyResults?.some((keyResult: any) => keyResult.assigneeIds?.includes(viewerId)));
+    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => record.status !== 'deleted' && (!viewerId || record.ownerId === viewerId || record.payload?.keyResults?.some((keyResult: any) => keyResult.assigneeIds?.includes(viewerId))));
   }
   if (clean === '/api/okr/records' && method === 'POST') { const record = { id: id('okr'), kind: body.kind, ownerId: body.viewerId || MOCK_USERS[0]?.id, periodKey: body.periodKey, status: body.submit === false ? 'draft' : 'active', version: 0, createdAt: now(), payload: body.payload || {} }; const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS); write(KEYS.okrRecords, [...records, record]); return { id: record.id }; }
-  if (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH') { const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS); const index = records.findIndex((record) => record.id === parts[3]); if (index < 0) throw new Error('目标记录不存在'); records[index] = { ...records[index], ...(body.payload ? { payload: body.payload } : {}), status: body.action === 'submit' ? 'active' : records[index].status, version: records[index].version + 1 }; write(KEYS.okrRecords, records); return records[index]; }
+  if (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH') {
+    const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS);
+    const index = records.findIndex(record => record.id === parts[3]);
+    if (index < 0) throw new Error('目标记录不存在');
+    const record = records[index];
+    if (record.kind === 'objective') {
+      if (!body.viewerId || record.ownerId !== body.viewerId) throw new Error('只能修改或删除本人制定的目标');
+      if (record.status === 'deleted' && body.action === 'delete') return record;
+      if (record.status === 'deleted') throw new Error('目标已删除');
+      if (body.version !== record.version) throw new Error('目标已被更新，请刷新后重试');
+      const dependents = records.filter(item => item.status !== 'deleted' && item.kind !== 'review' && (item.payload?.parentObjectiveId === record.id || item.payload?.alignments?.some((alignment: any) => alignment.parentObjectiveId === record.id)));
+      if (body.action === 'delete') {
+        if (dependents.length) throw new Error('目标已有下级对齐，不能直接删除');
+        records[index] = { ...record, status: 'deleted', version: record.version + 1, deletedAt: now(), deletedBy: body.viewerId };
+        write(KEYS.okrRecords, records);
+        return records[index];
+      }
+      if (body.payload) {
+        const retainedIds = new Set((body.payload.keyResults || []).map((item: any) => item.id));
+        if (dependents.some(item => (item.payload.parentObjectiveId === record.id && (item.payload.parentActionId || item.payload.parentKeyResultId) && !retainedIds.has(item.payload.parentActionId || item.payload.parentKeyResultId)) || item.payload.alignments?.some((alignment: any) => alignment.parentObjectiveId === record.id && alignment.parentKeyResultId && !retainedIds.has(alignment.parentKeyResultId)))) throw new Error('已被下级对齐的动作不能移除');
+      }
+    }
+    records[index] = { ...record, ...(body.payload ? { payload: body.payload } : {}), status: body.action === 'submit' ? 'active' : record.status, version: record.version + 1 };
+    write(KEYS.okrRecords, records);
+    return records[index];
+  }
   if (parts[1] === 'okr' && parts[2] === 'people' && parts[3] && method === 'PUT') { const people = getOkrPeople(); const index = people.findIndex((person) => person.id === parts[3]); if (index < 0) throw new Error('组织成员不存在'); people[index] = { ...people[index], supervisorId: body.supervisorId || null, rootFlag: body.root ? 1 : 0, version: people[index].version + 1 }; write(KEYS.okrPeople, people); return people[index]; }
   if (clean === '/api/okr/work' && method === 'GET') return [];
-  if (clean === '/api/okr/actions/parents' && method === 'GET') { const periodKey = queryOf(path).get('periodKey'); return read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record) => record.kind === 'objective' && (!periodKey || record.periodKey === periodKey)); }
+  if (clean === '/api/okr/actions/parents' && method === 'GET') { const periodKey = queryOf(path).get('periodKey'); return read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record) => record.kind === 'objective' && record.status !== 'deleted' && (!periodKey || record.periodKey === periodKey)); }
   if (clean === '/api/okr/actions' && method === 'POST') { const record = { id: id('okr-action'), kind: 'action', ownerId: body.viewerId || MOCK_USERS[0]?.id, periodKey: body.periodKey, status: body.submit === false ? 'draft' : 'active', version: 0, createdAt: now(), payload: body.payload || {} }; const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS); write(KEYS.okrRecords, [...records, record]); return { id: record.id }; }
   if (parts[1] === 'okr' && parts[2] && parts[3] === 'events' && method === 'GET') return [];
 

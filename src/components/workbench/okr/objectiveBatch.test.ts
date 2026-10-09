@@ -5,6 +5,7 @@ import { runObjectiveBatch } from './objectiveBatch';
 const form = (result: boolean): ObjectiveFormHandle => ({
   submit: vi.fn().mockResolvedValue(result),
   saveDraft: vi.fn().mockResolvedValue(result),
+  snapshot: vi.fn(),
 });
 
 describe('runObjectiveBatch', () => {

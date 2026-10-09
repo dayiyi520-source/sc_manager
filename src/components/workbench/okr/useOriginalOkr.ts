@@ -136,7 +136,8 @@ export function useOriginalOkr() {
   };
   const submitOkrDraft = async (id: string) => {
     const record = all.find(item => item.id === id && (item.kind === 'objective' || item.kind === 'action'));
-    if (!record) { addToast('error', '目标记录不存在或已刷新'); return false; }
+    if (!record || record.ownerId !== currentUser.id) { addToast('error', '目标不存在或无修改权限'); return false; }
+    if (record.ownerId !== currentUser.id) { addToast('error', '只能修改本人制定的目标'); return false; }
     if (record.status !== 'draft') { addToast('error', '只有草稿可以提交'); return false; }
     setBusy(true);
     try {
@@ -178,8 +179,17 @@ export function useOriginalOkr() {
     const record = all.find(item => item.id === recordId && item.kind === 'objective');
     if (!record) { addToast('error', '目标记录不存在或已刷新'); return false; }
     setBusy(true);
-    try { await okrRepository.update(record, submit ? 'submit' : 'save', { payload }, currentUser.id); await refresh(); addToast('success', submit ? '目标已提交' : '目标草稿已保存'); return true; }
+    try { await okrRepository.update(record, submit ? 'submit' : 'save', { payload: { ...record.payload, ...payload } }, currentUser.id); await refresh(); addToast('success', submit ? '目标已提交' : record.status === 'draft' ? '目标草稿已保存' : '目标修改已保存'); return true; }
     catch(error) { addToast('error', error instanceof Error ? error.message : '目标保存失败'); return false; }
+    finally { setBusy(false); }
+  };
+  const deleteOkr = async (recordId: string) => {
+    const record = all.find(item => item.id === recordId && item.kind === 'objective');
+    if (!record || record.ownerId !== currentUser.id) { addToast('error', '目标不存在或无删除权限'); return false; }
+    if (all.some(item => item.kind !== 'review' && (item.payload.parentObjectiveId === recordId || item.payload.alignments?.some(alignment => alignment.parentObjectiveId === recordId)))) { addToast('error', '目标已有下级对齐，不能直接删除'); return false; }
+    setBusy(true);
+    try { await okrRepository.update(record, 'delete', {}, currentUser.id); await refresh(); addToast('success', '目标已删除'); return true; }
+    catch (error) { addToast('error', error instanceof Error ? error.message : '删除失败，请重试'); return false; }
     finally { setBusy(false); }
   };
   const saveSettings = async (settings: OkrSettings) => { setBusy(true); try { await okrRepository.saveSettings(settings); await client.invalidateQueries({queryKey:['okr','settings']}); addToast('success','OKR 配置已保存'); return true; } catch(error) { addToast('error',error instanceof Error ? error.message : '配置保存失败'); return false; } finally { setBusy(false); } };
@@ -192,7 +202,7 @@ export function useOriginalOkr() {
     saveObjectiveDraft:(period:string,payload:OkrPayload)=>save('objective',period,payload,false),
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
     saveReviewDraft:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload,false),
-    submitReviewDraft,submitOkrDraft,updateOkr,
+    submitReviewDraft,submitOkrDraft,updateOkr,deleteOkr,
     settings: settingsQuery.data, settingsLoading: settingsQuery.isPending, saveSettings, teamMembers: teamMembersQuery.data || [],
   };
 }

@@ -73,6 +73,7 @@ export type SubMenuId =
   | 'know_base'
   | 'team_org'
   | 'sys_work_items'
+  | 'sys_okr_settings'
   | 'sys_permission_demo'
   | 'sys_workflow_demo'
   | 'sys_settings'

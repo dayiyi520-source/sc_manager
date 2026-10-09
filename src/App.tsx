@@ -66,6 +66,7 @@ const MilestoneScheduleView = lazyNamed(() => import('./components/project/Miles
 // Knowledge, Team & System Views
 const TeamOrgView = lazyNamed(() => import('./components/team/TeamOrgView'), 'TeamOrgView');
 const SystemSettingsView = lazyNamed(() => import('./components/system/SystemSettingsView'), 'SystemSettingsView');
+const GoalSummarySettingsView = lazyNamed(() => import('./components/system/GoalSummarySettingsView'), 'GoalSummarySettingsView');
 const ResearchTemplateView = lazyNamed(() => import('./components/system/ResearchTemplateView'), 'ResearchTemplateView');
 const PermissionDemoView = lazyNamed(() => import('./components/system/PermissionDemoView'), 'PermissionDemoView');
 const WorkflowDemoView = lazyNamed(() => import('./components/system/WorkflowDemoView'), 'WorkflowDemoView');
@@ -194,6 +195,8 @@ const MainContent: React.FC = () => {
       // Team & System
       case 'team_org':
         return <TeamOrgView />;
+      case 'sys_okr_settings':
+        return <GoalSummarySettingsView />;
       case 'sys_work_items':
         return <ResearchTemplateView />;
       case 'sys_permission_demo':

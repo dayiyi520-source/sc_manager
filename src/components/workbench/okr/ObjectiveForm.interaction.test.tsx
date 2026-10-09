@@ -8,7 +8,7 @@ describe('ObjectiveForm A dragging', () => {
   it('starts dragging only after pressing the handle and moves the whole row', () => {
     render(<ObjectiveForm cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn(async () => true)}/>);
     fireEvent.change(screen.getByLabelText('A1 名称'), { target: { value: '第一条' } });
-    fireEvent.click(screen.getByRole('button', { name: '继续添加' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加动作' }));
     fireEvent.change(screen.getByLabelText('A2 名称'), { target: { value: '第二条' } });
     const firstRow = screen.getByLabelText('拖动 A1');
     const secondRow = screen.getByLabelText('拖动 A2');
@@ -35,17 +35,21 @@ describe('ObjectiveForm objective numbering', () => {
     expect(screen.getByText('2026年08月').parentElement).toHaveTextContent('已结束');
   });
 
-  it('shows the simplified target-and-action fields without alignment metadata', () => {
+  it('shows company metadata and defaults to a committed objective aligned to the period', () => {
     render(<ObjectiveForm cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn(async () => true)}/>);
 
     expect(screen.getByLabelText('目标编号 O1')).toBeInTheDocument();
-    expect(screen.getByLabelText('A1 名称')).toHaveAttribute('placeholder', '输入动作名称');
-    expect(screen.getByRole('button', { name: '继续添加' })).toBeEnabled();
+    expect(screen.getByLabelText('A1 名称')).toHaveAttribute('placeholder', '输入动作名称：要写工作结果（做到什么），不能只写动作描述（做什么）');
+    expect(screen.getByRole('button', { name: '添加动作' })).toBeEnabled();
     expect(screen.getByRole('button', { name: /添加目标/ })).toBeEnabled();
     expect(screen.queryByRole('button', { name: '对齐目标' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('目标备注')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('目标名称')).toHaveAttribute('placeholder', '输入目标名称：明确你要达成什么，不写含糊概括的目标');
+    expect(screen.getByText('2026年09月目标')).toBeInTheDocument();
+    expect(screen.getByText('公司级')).toBeInTheDocument();
+    expect(screen.getByText('测试...')).toBeInTheDocument();
+    expect(screen.getByLabelText('目标编号 O1')).toHaveTextContent('CO1');
     expect(screen.queryByText('个人级')).not.toBeInTheDocument();
-    expect(screen.queryByText('测试用户')).not.toBeInTheDocument();
     expect(screen.queryByText('目标型')).not.toBeInTheDocument();
   });
 
@@ -106,6 +110,39 @@ describe('ObjectiveForm submission requirements', () => {
     await act(async () => expect(await ref.current?.submit()).toBe(false));
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('defaults appended company objectives to TO and preserves independent O weight on submission', async () => {
+    const ref = createRef<ObjectiveFormHandle>();
+    const onSave = vi.fn(async () => true);
+    render(<ObjectiveForm ref={ref} cycle="2026-10" objectiveIndex={1} ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={onSave}/>);
+    expect(screen.getByLabelText('目标编号 O2')).toHaveTextContent('TO2');
+    fireEvent.change(screen.getByLabelText('目标名称'), {target:{value:'挑战目标'}});
+    fireEvent.change(screen.getByLabelText('A1 名称'), {target:{value:'交付成果'}});
+    fireEvent.change(screen.getByLabelText('目标权重'), {target:{value:'35'}});
+    fireEvent.change(screen.getByLabelText('A1 截止日期'), {target:{value:'2026-10-31'}});
+    fireEvent.keyDown(screen.getByLabelText('A1 截止日期'), {key:'Enter',code:'Enter'});
+    await act(async () => { await ref.current?.submit(); });
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({objectiveType:'challenge',weight:35,keyResults:[expect.objectContaining({weight:100})]}));
+  });
+
+  it('retains a saved TO type, note and O weight when editing a draft', async () => {
+    const ref = createRef<ObjectiveFormHandle>();
+    const onSaveDraft = vi.fn(async () => true);
+    render(<ObjectiveForm ref={ref} cycle="2026-10" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn()} onSaveDraft={onSaveDraft} initialPayload={{title:'已有目标',objectiveType:'challenge',weight:40,note:'已有说明',keyResults:[{id:'a',title:'成果',weight:100,progress:60}]}}/>);
+    await act(async () => { await ref.current?.saveDraft(); });
+    expect(onSaveDraft).toHaveBeenCalledWith(expect.objectContaining({objectiveType:'challenge',weight:40,note:'已有说明',keyResults:[expect.objectContaining({progress:60})]}));
+  });
+
+  it('clears the derived O deadline when the last A deadline is removed from a draft', async () => {
+    const ref = createRef<ObjectiveFormHandle>();
+    const onSaveDraft = vi.fn(async () => true);
+    render(<ObjectiveForm ref={ref} cycle="2026-10" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn()} onSaveDraft={onSaveDraft} initialPayload={{title:'草稿目标',deadline:'2026-10-31',keyResults:[{id:'a',title:'成果',deadline:'2026-10-31',weight:100,progress:0}]}}/>);
+    const clear = screen.getByLabelText('A1 截止日期').closest('.ant-picker')?.querySelector('.ant-picker-clear');
+    expect(clear).not.toBeNull();
+    fireEvent.click(clear!);
+    await act(async () => { await ref.current?.saveDraft(); });
+    expect(onSaveDraft).toHaveBeenCalledWith(expect.objectContaining({deadline:undefined,keyResults:[expect.objectContaining({deadline:undefined})]}));
   });
 
   it('keeps draft saving available without a deadline', async () => {

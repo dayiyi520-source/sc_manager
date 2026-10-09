@@ -21,7 +21,7 @@ describe('OkrScopeSidebar', () => {
   });
 
   it('shows expand controls only for populated groups and filters members by name', () => {
-    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} onOpenSettings={vi.fn()} defaultExpandMembers />);
+    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} defaultExpandMembers />);
 
     expect(screen.getByRole('button', { name: '收起直属上级成员' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /其他部门成员/ })).toBeInTheDocument();
@@ -33,8 +33,7 @@ describe('OkrScopeSidebar', () => {
   it('delegates group, person, add-target, and settings actions', () => {
     const onSelect = vi.fn();
     const onAddTarget = vi.fn();
-    const onOpenSettings = vi.fn();
-    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={onSelect} onAddTarget={onAddTarget} onOpenSettings={onOpenSettings} />);
+    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={onSelect} onAddTarget={onAddTarget} />);
 
     fireEvent.click(screen.getByRole('button', { name: '直属下级' }));
     expect(onSelect).toHaveBeenCalledWith({ scope: 'subordinate' });
@@ -42,25 +41,23 @@ describe('OkrScopeSidebar', () => {
     fireEvent.click(within(subordinateGroup).getByRole('button', { name: '刘员工' }));
     expect(onSelect).toHaveBeenCalledWith({ scope: 'subordinate', personId: 'staff' });
     fireEvent.click(screen.getByRole('button', { name: '拆解目标' }));
-    fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
     expect(onAddTarget).toHaveBeenCalledTimes(1);
-    expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
   it('provides a side navigation collapse control beside settings', () => {
     const onToggleCollapse = vi.fn();
-    const { rerender } = render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} onOpenSettings={vi.fn()} onToggleCollapse={onToggleCollapse} />);
+    const { rerender } = render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} onToggleCollapse={onToggleCollapse} />);
 
     fireEvent.click(screen.getByRole('button', { name: '收起左侧导航' }));
     expect(onToggleCollapse).toHaveBeenCalledTimes(1);
-    rerender(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} onOpenSettings={vi.fn()} onToggleCollapse={onToggleCollapse} collapsed />);
+    rerender(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} onToggleCollapse={onToggleCollapse} collapsed />);
     expect(screen.getByRole('button', { name: '展开左侧导航' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: '目标范围导航' })).toHaveClass('is-collapsed');
   });
 
   it('opens members when the group label is clicked and toggles them from the row or arrow', () => {
     const onSelect = vi.fn();
-    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={onSelect} onAddTarget={vi.fn()} onOpenSettings={vi.fn()} />);
+    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={onSelect} onAddTarget={vi.fn()} />);
 
     const subordinateGroup = screen.getByLabelText('直属下级分组');
     expect(within(subordinateGroup).queryByRole('button', { name: '刘员工' })).not.toBeInTheDocument();
@@ -91,7 +88,6 @@ describe('OkrScopeSidebar', () => {
       selection: { scope: 'supervisor' as const },
       onSelect: vi.fn(),
       onAddTarget: vi.fn(),
-      onOpenSettings: vi.fn(),
     };
     const view = render(<OkrScopeSidebar {...props} currentUserId="manager" />);
     fireEvent.click(screen.getByRole('button', { name: '直属上级' }));
@@ -104,3 +100,7 @@ describe('OkrScopeSidebar', () => {
     expect(screen.queryByRole('button', { name: '陈总' })).not.toBeInTheDocument();
   });
 });
+  it('does not show the former settings entry', () => {
+    render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: '目标设置' })).not.toBeInTheDocument();
+  });

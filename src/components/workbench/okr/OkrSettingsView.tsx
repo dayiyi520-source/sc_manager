@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ArrowLeft } from '@/components/common/octicons-compat';
 import type { OkrSettings, OkrTemplate, OkrTimeRule } from '../../../services/okrRepository';
 
-type Props = { settings: OkrSettings; busy?: boolean; onSave: (settings: OkrSettings) => Promise<boolean>; onClose: () => void };
+type Props = { settings: OkrSettings; busy?: boolean; onSave: (settings: OkrSettings) => Promise<boolean>; onClose?: () => void };
 const labels: Record<string, string> = { templates: '拆解模板', dictionaries: '业务字段', timeRules: '开放时间', validation: '权重与必填校验', defaultView: '默认视图' };
 const listValue = (value: string[]) => value.join('、');
 const listParse = (value: string) => value.split(/[、,，\n]/).map(item => item.trim()).filter(Boolean);
@@ -52,14 +52,14 @@ export function OkrSettingsView({ settings, busy = false, onSave, onClose }: Pro
   const [active, setActive] = useState<keyof typeof labels>('templates');
   const [draft, setDraft] = useState(() => normalizeSettings(settings));
   const updateDictionary = (key: keyof OkrSettings['dictionaries'], value: string) => setDraft(current => ({ ...current, dictionaries: { ...current.dictionaries, [key]: listParse(value) } }));
-  const save = async () => { const error = validateSettings(draft); if (error) { message.warning(error); return; } if (await onSave(draft)) onClose(); };
+  const save = async () => { const error = validateSettings(draft); if (error) { message.warning(error); return; } if (await onSave(draft)) onClose?.(); };
   const updateTemplate = (index: number, patch: Partial<OkrTemplate>) => setDraft(current => ({ ...current, templates: current.templates.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) }));
   const updateTimeRule = (index: number, patch: Partial<OkrTimeRule>) => setDraft(current => ({ ...current, timeRules: current.timeRules.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) }));
   return <section className="okr-settings-page" aria-label="OKR 设置">
     <aside className="okr-settings-sidebar">
       <div className="okr-settings-sidebar-title"><h2>设置</h2><span>OKR</span></div>
       <nav className="okr-settings-nav" aria-label="设置导航">{(Object.keys(labels) as Array<keyof typeof labels>).map(key => <button type="button" className={active === key ? 'is-active' : ''} key={key} onClick={() => setActive(key)}>{labels[key]}</button>)}</nav>
-      <div className="okr-settings-sidebar-footer"><Button type="text" block icon={<ArrowLeft />} onClick={onClose}>返回目标页</Button></div>
+      {onClose && <div className="okr-settings-sidebar-footer"><Button type="text" block icon={<ArrowLeft />} onClick={onClose}>返回目标页</Button></div>}
     </aside>
     <main className="okr-settings-content">
       <header className="okr-settings-page-head"><div><h2>{labels[active]}</h2><p>配置拆解模板、业务字段、开放时间与校验规则。</p></div><Space><Button type="primary" loading={busy} onClick={() => void save()}>保存配置</Button></Space></header>
