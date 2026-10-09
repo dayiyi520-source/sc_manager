@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 import { workOrderDisplayName } from '../../utils/workOrderDisplay';
+import { collaborationCandidatesFor } from '../../utils/collaborationCandidates';
 import { normalizeTaskActivity, taskActivitySummary } from '../../utils/taskActivity';
 import { DetailCopyButton } from '../common/DetailCopyButton';
 import { Badge, Button, Checkbox, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popover, Segmented, Select, Tag, Tooltip, Upload } from 'antd';
@@ -757,22 +758,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   ].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index && item.id !== selectedTask?.id), [requirementTasks, bugs, devTasks, requirementPool, risks, selectedTask?.id]);
 
   const candidateOptions = remoteCandidates.length ? remoteCandidates.filter((item) => item.id !== selectedTask?.id) : localCandidates;
-  const collaborationCandidates = [...candidateOptions, ...(creationContext?.sourceWorkOrder ? [{
-    id: creationContext.sourceWorkOrder.id,
-    type: 'requirement' as const,
-    typeLabel: '协同事项',
-    title: creationContext.sourceWorkOrder.title,
-    ownerName: creationContext.sourceWorkOrder.ownerName,
-    creatorName: creationContext.sourceWorkOrder.creatorName,
-    expectedCompleteDate: creationContext.sourceWorkOrder.expectedCompleteDate,
-    productLineName: creationContext.sourceWorkOrder.productLineName,
-    status: creationContext.sourceWorkOrder.status,
-    sourceType: 'WORK_ORDER',
-    category: 'assistance'
-  } as RequirementWorkOrderCandidate] : [])]
-    .filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index)
-    .filter((item) => item.sourceType === 'WORK_ORDER' || (item.type === 'requirement' && requirementTasks.some((task) => task.id === item.id && Boolean(task.workOrderType))))
-    .map((item) => ({ ...item, sourceType: 'WORK_ORDER', category: 'assistance' }));
+  const collaborationCandidates = collaborationCandidatesFor(candidateOptions, requirementTasks, creationContext?.sourceWorkOrder);
   const linkedTaskQuery = useQuery({ queryKey: ['task-association-options', productLineKey], queryFn: async () => (await Promise.all(productLines.map(async (line) => {
     const items: UnifiedWorkItem[] = [];
     for (let page = 1; ; page++) { const result = await productRepository.workItems(line.id, '', '', { page }); items.push(...result.page.items); if (!result.page.items.length || items.length >= result.page.total) break; }
