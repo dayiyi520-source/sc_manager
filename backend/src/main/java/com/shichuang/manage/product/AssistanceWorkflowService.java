@@ -32,6 +32,7 @@ public class AssistanceWorkflowService {
 
     AssistanceStatus derive(String status) {
         if (Set.of("已关闭").contains(status)) return AssistanceStatus.CLOSED;
+        if ("已完成".equals(status)) return AssistanceStatus.COMPLETED;
         if ("已搁置".equals(status)) return AssistanceStatus.ON_HOLD;
         if ("已驳回".equals(status)) return AssistanceStatus.REJECTED;
         if ("待处理".equals(status) || "待受理".equals(status) || status.isBlank()) return AssistanceStatus.PENDING;
@@ -64,23 +65,43 @@ public class AssistanceWorkflowService {
         return Map.of("id", assistanceId, "statusUnchanged", true);
     }
 
-    @Transactional Map<String,Object> markAcceptanceFailed(String assistanceId, String workItemId, String taskOwnerId, String reason, Object attachmentIds) {
+    @Transactional Map<String,Object> markAcceptanceFailed(String assistanceId, String reason, int revision, Object attachmentIds) {
         AuthorizationService.requireWrite("product");
         if (reason == null || reason.isBlank()) throw new IllegalArgumentException("验收未通过原因不能为空");
-        Map<String,Object> assistance = jdbc.queryForMap("SELECT create_by_ AS initiatorId,assistance_status_ AS status FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", RequestContext.tenantId(), assistanceId);
+        Map<String,Object> assistance = jdbc.queryForMap("SELECT create_by_ AS initiatorId,assistance_status_ AS status,version_ AS revision FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", RequestContext.tenantId(), assistanceId);
         if (!RequestContext.userId().equals(Objects.toString(assistance.get("initiatorId"), ""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅事项发起人可以验收");
-        if (workItemId == null || workItemId.isBlank()) throw new IllegalArgumentException("请选择验收未通过的任务");
-        Map<String,Object> task = jdbc.queryForMap("SELECT assignee_id_ AS ownerId,assignee_name_ AS ownerName FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND assistance_task_status_='COMPLETED' AND delete_flag_=0", RequestContext.tenantId(), workItemId, assistanceId);
-        String ownerId = Objects.toString(task.get("ownerId"), "");
-        String ownerName = Objects.toString(task.get("ownerName"), "");
-        if (ownerId.isBlank()) throw new IllegalArgumentException("任务负责人不存在，无法退回");
-        if (jdbc.update("UPDATE t_product_work_item SET assistance_task_status_='PROCESSING',update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND assistance_task_status_='COMPLETED' AND delete_flag_=0", RequestContext.userId(), RequestContext.tenantId(), workItemId, assistanceId) != 1) throw conflict();
-        String from = Objects.toString(assistance.get("status"), "处理中");
-        int updated = jdbc.update("UPDATE t_product_work_item SET assistance_status_='处理中',assignee_id_=?,assignee_name_=?,assistance_owner_id_=?,version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0 AND assistance_status_ IN ('待验收','处理中')", ownerId, ownerName, ownerId, RequestContext.userId(), RequestContext.tenantId(), assistanceId);
+        if (((Number) assistance.get("revision")).intValue() != revision) throw conflict();
+        String from = Objects.toString(assistance.get("status"), "待验收");
+        int updated = jdbc.update("UPDATE t_product_work_item SET assistance_status_='处理中',version_=version_+1,update_by_= ?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0 AND version_=? AND assistance_status_='待验收'", RequestContext.userId(), RequestContext.tenantId(), assistanceId, revision);
         if (updated != 1) throw conflict();
         attachments.bindAll(attachmentIds, "ASSISTANCE_ACCEPTANCE", assistanceId, "PARTICIPANTS");
         event(assistanceId, "验收未通过", from, "处理中", reason);
-        return Map.of("id", assistanceId, "status", "处理中", "reason", reason == null ? "" : reason);
+        return Map.of("id", assistanceId, "status", "处理中", "reason", reason);
+    }
+
+    @Transactional Map<String,Object> complete(String assistanceId, int revision, String note, Object attachmentIds) {
+        AuthorizationService.requireWrite("product");
+        Map<String,Object> row = jdbc.queryForMap("SELECT assistance_status_ AS status,assignee_id_ AS ownerId,create_by_ AS creatorId,version_ AS revision FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", RequestContext.tenantId(), assistanceId);
+        if (!RequestContext.userId().equals(Objects.toString(row.get("ownerId"), ""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅当前负责人可以完成事项");
+        if (!"处理中".equals(row.get("status"))) throw new IllegalArgumentException("当前事项不可完成");
+        if (((Number) row.get("revision")).intValue() != revision) throw conflict();
+        Number pending = jdbc.queryForObject("SELECT COUNT(*) FROM t_product_work_item WHERE tenant_id_=? AND requirement_id_=? AND source_type_='WORK_ORDER' AND delete_flag_=0 AND assistance_task_status_ NOT IN ('COMPLETED','ACCEPTED')", Number.class, RequestContext.tenantId(), assistanceId);
+        if (pending != null && pending.intValue() > 0) throw new IllegalArgumentException("存在未完成的关联任务");
+        if (jdbc.update("UPDATE t_product_work_item SET assistance_status_='待验收',version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=? AND assistance_status_='处理中'", RequestContext.userId(), RequestContext.tenantId(), assistanceId, revision) != 1) throw conflict();
+        attachments.bindAll(attachmentIds, "ASSISTANCE_COMPLETE", assistanceId, "PARTICIPANTS");
+        event(assistanceId, "事项完成", "处理中", "待验收", note == null ? "" : note);
+        return Map.of("id", assistanceId, "status", "待验收");
+    }
+
+    @Transactional Map<String,Object> acceptancePassed(String assistanceId, int revision) {
+        AuthorizationService.requireWrite("product");
+        Map<String,Object> row = jdbc.queryForMap("SELECT assistance_status_ AS status,create_by_ AS initiatorId,version_ AS revision FROM t_product_work_item WHERE tenant_id_=? AND id_=? AND category_='requirement' AND delete_flag_=0", RequestContext.tenantId(), assistanceId);
+        if (!RequestContext.userId().equals(Objects.toString(row.get("initiatorId"), ""))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅事项发起人可以验收");
+        if (!"待验收".equals(row.get("status"))) throw new IllegalArgumentException("当前事项不可验收");
+        if (((Number) row.get("revision")).intValue() != revision) throw conflict();
+        if (jdbc.update("UPDATE t_product_work_item SET assistance_status_='已完成',status_name_='已完成',successful_=1,progress_=100,version_=version_+1,update_by_=?,update_time_=NOW(6) WHERE tenant_id_=? AND id_=? AND version_=? AND assistance_status_='待验收'", RequestContext.userId(), RequestContext.tenantId(), assistanceId, revision) != 1) throw conflict();
+        event(assistanceId, "验收通过", "待验收", "已完成", "事项验收通过");
+        return Map.of("id", assistanceId, "status", "已完成");
     }
 
     @Transactional Map<String,Object> closeByOwner(String assistanceId, int revision) {

@@ -1,17 +1,19 @@
 package com.shichuang.manage.product;
 
 public enum AssistanceStatus {
-    PENDING("待处理"), PROCESSING("处理中"), PENDING_REVIEW("待验收"), PENDING_CLOSE("待关闭"), CLOSED("已关闭"), ON_HOLD("已搁置"), REJECTED("已驳回");
+    PENDING("待处理"), PROCESSING("处理中"), PENDING_REVIEW("待验收"), COMPLETED("已完成"), RETURNED("已退回"), PENDING_CLOSE("待关闭"), CLOSED("已关闭"), ON_HOLD("已搁置"), REJECTED("已驳回");
     private final String label;
     AssistanceStatus(String label) { this.label = label; }
     public String label() { return label; }
-    public boolean isTerminal() { return this == CLOSED || this == REJECTED; }
+    public boolean isTerminal() { return this == COMPLETED || this == CLOSED || this == REJECTED; }
     public boolean canReopen() { return this == CLOSED || this == REJECTED || this == ON_HOLD; }
     public static AssistanceStatus from(String value) {
         if ("待受理".equals(value)) return PENDING;
         if ("验收未通过".equals(value)) return PROCESSING;
+        if ("已退回".equals(value)) return RETURNED;
+        if ("待验收".equals(value)) return PENDING_REVIEW;
         if ("待负责人关闭".equals(value)) return PENDING_CLOSE;
-        if ("已完成".equals(value)) return CLOSED;
+        if ("已完成".equals(value)) return COMPLETED;
         for (AssistanceStatus status : values()) if (status.label.equals(value) || status.name().equals(value)) return status;
         return PROCESSING;
     }

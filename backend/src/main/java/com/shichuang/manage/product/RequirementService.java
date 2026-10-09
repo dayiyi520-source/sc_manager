@@ -99,10 +99,10 @@ public class RequirementService {
         Map<String,Object> fields=specialFields(body.get("specialFields"));
         List<String> required=switch(type){
             case "客户诉求"->List.of("projectName","requestType","requestSource");
-            case "线上问题"->List.of("productName","severity","frequency");
-            case "售前支持"->List.of("opportunityName","supportType","durationDays");
-            case "交付支持"->List.of("projectName","progressStage","other","deliveryType");
-            case "其他问题"->List.of("problemSource","expectedResult","problemType");
+            case "线上问题"->List.of("productName","frequency");
+            case "售前支持"->List.of("opportunityId","supportType","durationDays");
+            case "交付支持"->List.of("projectName");
+            case "其他问题"->List.of("problemType");
             default->throw new IllegalArgumentException("协助事项类型无效");
         };
         if(required.stream().anyMatch(key->Objects.toString(fields.get(key),"").trim().isBlank()))throw new IllegalArgumentException("请完成所有必填业务参数");
@@ -110,16 +110,11 @@ public class RequirementService {
             requireOption(fields,"productName",Set.of("系统缺陷","样式缺陷","安全漏洞"),"缺陷类型");
             Map<String,String> priorities=Map.of("阻断主流程","P0","功能逻辑异常","P1","一般缺陷","P2","轻微缺陷","P3");
             String severity=Objects.toString(fields.get("severity"),"");
-            if(!priorities.containsKey(severity))throw new IllegalArgumentException("严重程度无效");
-            body.put("priority",priorities.get(severity));
+            if(!severity.isBlank()&&!priorities.containsKey(severity))throw new IllegalArgumentException("严重程度无效");
+            if(!severity.isBlank())body.put("priority",priorities.get(severity));
         }
         if("售前支持".equals(type))requireOption(fields,"supportType",Set.of("建设方案","现场踏勘","方案汇报","报价支持","技术表","投标答疑","产品需求","招投标标书协同"),"支持类型");
         if("其他问题".equals(type))requireOption(fields,"problemType",Set.of("方向研讨","费用缴纳","开票/邮寄","资料获取","物料支持","意见反馈","其他"),"协助类型");
-        if("交付支持".equals(type)){
-            requireOption(fields,"progressStage",Set.of("项目移交","项目启动","需求确认","系统部署","系统培训","系统试运行","项目初验","项目终验","运维追踪"),"项目阶段");
-            requireOption(fields,"other",Set.of("一般项目","数据项目","试用项目"),"项目类型");
-            requireOption(fields,"deliveryType",Set.of("自有交付","代理商交付","协助代理商交付"),"交付类型");
-        }
         if(text(body,"productLineId").isBlank()){
             String line=taskMapper.defaultProductLine();
             if(line==null)throw new IllegalArgumentException("暂无可用的事项归属范围");
@@ -175,10 +170,7 @@ public class RequirementService {
         if(employee==null)throw new IllegalArgumentException("负责人不存在或已停用");
         String oldOwner=Objects.toString(current.get("ownerName"),"");
         String from=Objects.toString(current.get("status"),"");
-        if(!"处理中".equals(from)){
-            executeStatus(current,"处理中",reason);
-            current=requirement(id);
-        }
+        // 转交只改变责任人，待处理事项仍须由新负责人主动接收后才进入处理中。
         int currentRevision=((Number)current.get("revision")).intValue();
         String assigneeName=Objects.toString(employee.get("name"),"");
         String pendingId=UUID.randomUUID().toString();
