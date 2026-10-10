@@ -159,7 +159,7 @@ const ProductLineSettingsPanel: React.FC<{
     { id: 'members', label: '产品成员' },
     { id: 'work-items', label: '工作项设置' },
     { id: 'other', label: '其他' },
-    { id: 'recycle-bin', label: '回收站' }
+    { id: 'recycle-bin', label: '归档任务' }
   ];
 
   const operationCopy = {
@@ -268,12 +268,13 @@ const ProductLineSettingsPanel: React.FC<{
 };
 
 const ProductRecycleBin: React.FC<{ productLineId: string }> = ({ productLineId }) => {
+  const queryClient = useQueryClient();
   const { addToast } = useApp();
   const query = useQuery({ queryKey: ['product-recycle-bin', productLineId], queryFn: () => productRepository.recycleBin(productLineId), retry: false });
   const [operatingId, setOperatingId] = useState('');
   const restore = async (id: string, revision: number) => {
     setOperatingId(id);
-    try { await productRepository.restoreRecycleBinItem(productLineId, id, revision); await query.refetch(); addToast('success', '任务已恢复'); }
+    try { await productRepository.restoreRecycleBinItem(productLineId, id, revision); await Promise.all([query.refetch(), ...['unified-task-page', 'requirements', 'design-tasks', 'product-dev-tasks', 'product-bugs'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))]); addToast('success', '任务已恢复'); }
     catch (error) { addToast('error', '恢复失败', error instanceof Error ? error.message : '请稍后重试'); }
     finally { setOperatingId(''); }
   };
@@ -284,8 +285,8 @@ const ProductRecycleBin: React.FC<{ productLineId: string }> = ({ productLineId 
     finally { setOperatingId(''); }
   };
   return <div className="w-full space-y-5 text-xs">
-    <div><h3 className="text-sm font-bold text-[var(--text-primary)]">回收站</h3><p className="mt-1 text-[var(--text-muted)]">查看当前产品已删除的产品、设计、研发、测试和缺陷任务。</p></div>
-    {query.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : query.isError ? <div role="alert" className="py-8 text-center text-[var(--danger)]">回收站加载失败<Button type="link" onClick={() => query.refetch()}>重试</Button></div> : <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[820px]"><div className="grid grid-cols-[minmax(260px,1.6fr)_160px_130px_180px_150px] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-3 text-[var(--text-muted)]"><span>标题</span><span>所属版本</span><span>操作人</span><span>操作时间</span><span className="text-right">操作</span></div>{(query.data || []).map((item) => <div key={item.id} className="grid grid-cols-[minmax(260px,1.6fr)_160px_130px_180px_150px] items-center gap-3 border-b border-[var(--border-main)] px-4 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]"><WorkItemCategoryIcon category={item.category} className="shrink-0 text-[var(--primary)]" /><span className="truncate" title={item.title}>{item.title}</span></span><span className="truncate text-[var(--text-body)]" title={item.versionName}>{item.versionName}</span><span className="truncate text-[var(--text-body)]">{item.operatorName || '未记录'}</span><span className="text-[var(--text-muted)]">{item.operatedAt ? new Date(item.operatedAt).toLocaleString('zh-CN', { hour12: false }) : '未记录'}</span><span className="flex justify-end gap-1"><Popconfirm title="恢复任务" description={`确定恢复“${item.title}”吗？`} okText="恢复" cancelText="取消" onConfirm={() => restore(item.id, item.revision)}><Button type="link" size="small" loading={operatingId === item.id} icon={<UndoOutlined />}>恢复</Button></Popconfirm><Popconfirm title="彻底删除" description={`确定彻底删除“${item.title}”吗？此操作不可恢复。`} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => purge(item.id, item.revision)}><Button type="link" danger size="small" loading={operatingId === item.id} icon={<DeleteOutlined />}>删除</Button></Popconfirm></span></div>)}{!query.data?.length && <div className="px-4 py-12 text-center text-[var(--text-muted)]">回收站为空</div>}</div></div>}
+    <div><h3 className="text-sm font-bold text-[var(--text-primary)]">归档任务</h3><p className="mt-1 text-[var(--text-muted)]">查看当前产品已归档的产品、设计、研发、测试和缺陷任务。</p></div>
+    {query.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : query.isError ? <div role="alert" className="py-8 text-center text-[var(--danger)]">归档任务加载失败<Button type="link" onClick={() => query.refetch()}>重试</Button></div> : <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[820px]"><div className="grid grid-cols-[minmax(260px,1.6fr)_160px_130px_180px_150px] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-3 text-[var(--text-muted)]"><span>标题</span><span>所属版本</span><span>操作人</span><span>操作时间</span><span className="text-right">操作</span></div>{(query.data || []).map((item) => <div key={item.id} className="grid grid-cols-[minmax(260px,1.6fr)_160px_130px_180px_150px] items-center gap-3 border-b border-[var(--border-main)] px-4 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]"><WorkItemCategoryIcon category={item.category} className="shrink-0 text-[var(--primary)]" /><span className="truncate" title={item.title}>{item.title}</span></span><span className="truncate text-[var(--text-body)]" title={item.versionName}>{item.versionName}</span><span className="truncate text-[var(--text-body)]">{item.operatorName || '未记录'}</span><span className="text-[var(--text-muted)]">{item.operatedAt ? new Date(item.operatedAt).toLocaleString('zh-CN', { hour12: false }) : '未记录'}</span><span className="flex justify-end gap-1"><Popconfirm title="恢复任务" description={`确定恢复“${item.title}”吗？`} okText="恢复" cancelText="取消" onConfirm={() => restore(item.id, item.revision)}><Button type="link" size="small" loading={operatingId === item.id} icon={<UndoOutlined />}>恢复</Button></Popconfirm><Popconfirm title="彻底删除" description={`确定彻底删除“${item.title}”吗？此操作不可恢复。`} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => purge(item.id, item.revision)}><Button type="link" danger size="small" loading={operatingId === item.id} icon={<DeleteOutlined />}>删除</Button></Popconfirm></span></div>)}{!query.data?.length && <div className="px-4 py-12 text-center text-[var(--text-muted)]">归档任务为空</div>}</div></div>}
   </div>;
 };
 

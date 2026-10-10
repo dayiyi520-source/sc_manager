@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { TaskReviewDialog, type TaskReviewTarget } from './TaskReviewDialog';
 import { openTaskCompletionDialog } from './TaskCompletionDialog';
 import {
   Bug,
@@ -24,7 +25,7 @@ import {
   UserRound
 } from '@/components/common/octicons-compat';
 import { Alert, Button, Dropdown, Input, Modal, Select, message } from 'antd';
-import { ApartmentOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
+import { FileTextOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { useApp } from '../../context/AppContext';
 import { StatusTag } from '../common/UIComponents';
 import { showDeleteConfirm } from '../common/Feedback';
@@ -286,7 +287,7 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<stri
           const previousGroup = previous && normalizedTaskGroupValue(previous, groupBy);
           const children = childrenByParent.get(workItemKey(item)) || [];
           const open = expanded.includes(workItemKey(item));
-          const operationMenu = { items: [...(item.kind === 'bug' ? [] : [{ key: 'child', icon: <PlusOutlined />, label: '添加子任务' }]), { key: 'copy', icon: <CopyOutlined />, label: '复制任务' }, { key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' }, { type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true }], onClick: ({ key }: { key: string }) => onOperation(key, item) };
+          const operationMenu = { items: [...(['requirement', 'design', 'dev', 'test'].includes(item.kind) ? [{ key: 'review', icon: <FileTextOutlined />, label: '复盘总结' }] : []), { key: 'copy', icon: <CopyOutlined />, label: '复制任务' }, ...(item.kind === 'bug' ? [{ key: 'copy-link', icon: <CopyOutlined />, label: '复制并关联' }] : []), { type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: '归档', danger: true }], onClick: ({ key }: { key: string }) => onOperation(key, item) };
           return <React.Fragment key={workItemKey(item)}>{depth === 0 && groupBy !== 'none' && (index === 0 || group !== previousGroup) && <tr className="bg-[var(--bg-surface-soft)]"><td colSpan={10} className="px-4 py-2 font-semibold text-[var(--text-body)]">{group} · {items.filter((entry) => normalizedTaskGroupValue(entry, groupBy) === group).length}</td></tr>}
           <tr className="hover:bg-[var(--bg-surface-soft)]">
             <td className="px-4 py-3"><input type="checkbox" aria-label={`选择迭代任务：${item.title}`} checked={selectedIds.includes(`${item.kind}:${item.id}`)} onChange={(event) => onSelectionChange(event.target.checked ? [...selectedIds, `${item.kind}:${item.id}`] : selectedIds.filter((id) => id !== `${item.kind}:${item.id}`))} className="h-4 w-4 accent-[var(--primary)]" /></td>
@@ -425,6 +426,7 @@ export const VersionIterationView: React.FC = () => {
   const [taskGroupBy, setTaskGroupBy] = useState<TaskGroupBy>('none');
   const [taskGroupSelection, setTaskGroupSelection] = useState('');
   const [taskGroupQuery, setTaskGroupQuery] = useState('');
+  const [reviewTask, setReviewTask] = useState<TaskReviewTarget | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [removedTaskIds, setRemovedTaskIds] = useState<string[]>([]);
   const [directoryCollapsed, setDirectoryCollapsed] = useState(false);
@@ -863,15 +865,11 @@ export const VersionIterationView: React.FC = () => {
     const persisted = recentItems.find((candidate) => candidate.id === item.id && candidate.category === item.kind);
     const source = { ...(item.source as PlanningItem['source'] & Record<string, unknown>), ...(persisted || {}) } as PlanningItem['source'] & Record<string, unknown>;
     const productLineId = item.productLineId || selectedVersionProductLineId;
-    if (key === 'child') {
-      if (item.kind === 'requirement' || item.kind === 'dev' || item.kind === 'test') createIterationTask(item.kind, item);
-      else addToast('warning', '该工作项类型暂不支持直接添加子任务');
-      return;
-    }
     if (!productLineId) {
       addToast('warning', '工作项缺少产品，无法操作');
       return;
     }
+    if (key === 'review') { setReviewTask({ id: item.id, productLineId, title: item.title }); return; }
     if (key === 'copy' || key === 'copy-link') {
       const category = item.kind === 'requirement' || item.kind === 'design' || item.kind === 'dev' || item.kind === 'test' || item.kind === 'bug' ? item.kind : undefined;
       const taskTypeId = String(source.workItemTypeId || source.taskTypeId || '');
@@ -893,22 +891,22 @@ export const VersionIterationView: React.FC = () => {
         if (key === 'copy-link') await productRepository.createWorkItemRelation(productLineId, item.id, String(created.id));
         const createdItem = { ...created, category, productLineId, taskTypeId, versionId: item.versionId || selectedVersion?.id, title: `${item.title} - 副本`, status: created.status || { name: item.status }, priority: item.priority, assigneeName: item.ownerName, creatorName: item.creatorName, estimatedHours: 0, actualHours: 0 } as UnifiedWorkItem;
         setRecentItems((current) => [createdItem, ...current]);
-        addToast('success', key === 'copy-link' ? '任务已复制并建立关联' : '任务已复制');
+        addToast('success', '任务已复制');
       } catch (error) {
-        addToast('error', key === 'copy-link' ? '复制并关联失败' : '复制任务失败', error instanceof Error ? error.message : '请稍后重试');
+        addToast('error', '复制任务失败', error instanceof Error ? error.message : '请稍后重试');
       }
       return;
     }
     if (key === 'delete') {
       const revision = Number(source.revision);
       if (!Number.isFinite(revision)) {
-        addToast('warning', '该任务缺少版本信息，无法删除');
+        addToast('warning', '该任务缺少版本信息，无法归档');
         return;
       }
       Modal.confirm({
-        title: `删除任务“${item.title}”？`,
-        content: '任务将被软删除；存在子任务时系统会阻止删除。',
-        okText: '删除',
+        title: `归档任务“${item.title}”？`,
+        content: '归档后任务将从当前列表移除，可在产品配置的归档任务中恢复。',
+        okText: '归档',
         cancelText: '取消',
         okButtonProps: { danger: true },
         onOk: async () => {
@@ -916,9 +914,9 @@ export const VersionIterationView: React.FC = () => {
             await productRepository.deleteWorkItem(productLineId, item.id, revision);
             setRemovedTaskIds((current) => [...current, `${item.kind}:${item.id}`]);
             setSelectedTaskIds((current) => current.filter((id) => id !== `${item.kind}:${item.id}`));
-            addToast('success', '任务已删除');
+            addToast('success', '任务已归档');
           } catch (error) {
-            addToast('error', '任务删除失败', error instanceof Error ? error.message : '请稍后重试');
+            addToast('error', '任务归档失败', error instanceof Error ? error.message : '请稍后重试');
           }
         }
       });
@@ -1258,6 +1256,7 @@ export const VersionIterationView: React.FC = () => {
 
   return (
     <div className="space-y-3 text-xs">
+      {reviewTask && <TaskReviewDialog task={reviewTask} onClose={() => setReviewTask(null)} />}
       {!showDetail && <div className="flex min-h-14 items-center border-b border-[var(--border-main)] pb-3"><div className="primary-line-tabs flex items-center gap-3" role="tablist" aria-label="版本迭代视图">{tabButton('list', '迭代列表', <ListTodo className="h-4 w-4" />)}{tabButton('planning', '迭代规划', <GitBranch className="h-4 w-4" />)}</div></div>}
       {mode === 'list' && !showDetail && <div className="grid h-[calc(100vh-190px)] min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3">
         {renderProductNavigation()}

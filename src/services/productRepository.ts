@@ -4,6 +4,8 @@ import type { PageResult } from './apiClient';
 import type { SaveTestCaseInput, SaveTestPlanInput, SaveVersionTestReportInput, TestCase, TestCaseDirectory, TestCasePage, TestPlan, VersionTestReport, VersionTestReportListItem } from '../types/testManagement';
 import type { SaveVersionReviewInput, VersionReview, VersionReviewListItem } from '../types/versionReview';
 
+export type WorkItemReview = { title: string; content: string; contentHtml: string; media: RequirementMedia[]; revision: number; updatedAt?: string };
+
 type SpecialTaskKind = 'bug' | 'dev';
 type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
 export type WorkItemCategoryKey = string;
@@ -131,6 +133,8 @@ export const productRepository = {
   updateAutomationSetting: (id: string, enabled: boolean) => apiRequest<{ enabled: boolean }>(`/api/product-lines/${id}/automation-rules/setting`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
   automationLogs: (id: string) => apiRequest<AutomationLog[]>(`/api/product-lines/${id}/automation-rules/logs`),
   workItemDetail: (lineId: string, id: string) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(lineId)}`),
+  workItemReview: (lineId: string, id: string) => apiRequest<WorkItemReview | null>(`/api/work-items/${id}/review?productLineId=${encodeURIComponent(lineId)}`),
+  saveWorkItemReview: (lineId: string, id: string, review: WorkItemReview) => apiRequest<WorkItemReview>(`/api/work-items/${id}/review?productLineId=${encodeURIComponent(lineId)}`, { method: 'PUT', body: JSON.stringify(review) }),
   workItemActivities: (lineId: string, id: string) => apiRequest<Record<string, unknown>[]>(`/api/work-items/${id}/activities?productLineId=${encodeURIComponent(lineId)}`),
   commentWorkItem: (lineId: string, id: string, content: string) => apiRequest<void>(`/api/work-items/${id}/comments?productLineId=${encodeURIComponent(lineId)}`, { method: 'POST', body: JSON.stringify({ content }) }),
   batchWorkItems: (body: { targets: Array<{ productLineId: string; id: string; revision: number }>; operation: string; value?: string; participants?: string[] }) => apiRequest<number>('/api/work-items/batch', { method: 'POST', body: JSON.stringify(body) }),

@@ -417,13 +417,14 @@ describe('VersionIterationView', () => {
     expect(await screen.findByText('王丽', { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
   });
 
-  it('shows child-task properties', async () => {
+  it('shows review and archive without obsolete task actions', async () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
     fireEvent.click(screen.getByRole('button', { name: '操作已纳入迭代的工作项' }));
-    fireEvent.click(await screen.findByText('添加子任务'));
-    expect(screen.getByRole('dialog', { name: '新建子任务产品任务' })).toHaveTextContent('基础字段');
-    expect(screen.getByRole('dialog', { name: '新建子任务产品任务' })).toHaveTextContent('已纳入迭代的工作项');
+    expect(await screen.findByText('复盘总结')).toBeInTheDocument();
+    expect(screen.getByText('归档')).toBeInTheDocument();
+    expect(screen.queryByText('添加子任务')).not.toBeInTheDocument();
+    expect(screen.queryByText('复制并关联')).not.toBeInTheDocument();
   });
 
   it('opens a version work item detail without leaving the iteration page', async () => {

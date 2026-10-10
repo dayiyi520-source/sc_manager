@@ -14,6 +14,7 @@ const value = (input: unknown) => {
 };
 export const taskActivitySummary = (event: RequirementEvent): string => {
   const metadata = event.metadata || {};
+  if (event.eventType === 'WORK_ITEM_REVIEWED') return `保存了复盘总结“${String((metadata.review as { title?: string })?.title || '')}”`;
   if (event.eventType === 'WORK_ITEM_CREATED') return '创建了任务';
   if (['WORK_ITEM_COMMENTED', '评论'].includes(event.eventType)) return '发表了评论';
   if (event.eventType === 'WORK_ITEM_TRANSITIONED') return `将状态从“${value(metadata.fromName || metadata.from)}”变更为“${value(metadata.toName || metadata.to)}”${metadata.actualHours != null && metadata.actualHours !== '' ? `，填写完成工时 ${value(metadata.actualHours)} 小时` : ''}`;

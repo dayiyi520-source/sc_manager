@@ -16,12 +16,14 @@ vi.mock('../../services/productRepository', () => ({ productRepository: {
   businessTasks: vi.fn().mockResolvedValue({ items: [], total: 0 }),
   createBusinessTask: vi.fn().mockResolvedValue(undefined),
   businessTask: vi.fn(), workItemDetail: vi.fn(),
+  workItemReview: vi.fn().mockResolvedValue(null), saveWorkItemReview: vi.fn(),
   workItemTypes: vi.fn().mockResolvedValue([]),
   workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }),
   workItemRelations: vi.fn().mockResolvedValue({ relations: [] }),
   businessTaskActivities: vi.fn().mockResolvedValue([]), workItemActivities: vi.fn().mockResolvedValue([]),
   commentBusinessTask: vi.fn().mockResolvedValue(undefined), commentWorkItem: vi.fn().mockResolvedValue(undefined),
 } }));
+vi.mock('./LazyRichTextEditor', () => ({ LazyRichTextEditor: () => <div>复盘富文本编辑器</div> }));
 vi.mock('../../utils/copyToClipboard', () => ({ copyToClipboard: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('./WorkItemCreatePanel', async () => ({ WorkItemDetailHeader: () => null, WorkItemRelationTabs: (await vi.importActual<typeof import('./WorkItemCreatePanel')>('./WorkItemCreatePanel')).WorkItemRelationTabs, WorkItemCreatePanel: ({ isOpen, title, headerActions, children, properties, footer, onClose }: { isOpen: boolean; title: React.ReactNode; headerActions?: React.ReactNode; children: React.ReactNode; properties?: React.ReactNode; footer?: React.ReactNode; onClose: () => void }) => isOpen ? <div>{title}{headerActions}{children}{properties}{footer}<button onClick={onClose}>关闭分享详情</button></div> : null }));
 
@@ -223,4 +225,22 @@ it.each(['presales', 'delivery', 'ops'] as const)('blocks %s creation with missi
   fireEvent.blur(endInput);
   fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ }));
   await waitFor(() => expect(productRepository.createBusinessTask).toHaveBeenCalledWith(kind, expect.objectContaining({ title: '日期必填验收', plannedStartDate: '2026-10-10', dueDate: '2026-10-11' })));
+});
+
+
+it.each(['requirement', 'design', 'dev', 'test', 'bug'] as const)('offers archive and the appropriate review action for %s task details', async (kind) => {
+  window.history.replaceState(null, '', '/manager/app/prod_rd_tasks?detailId=shared-task&productLineId=line-1');
+  vi.mocked(productRepository.workItemDetail).mockResolvedValue({ id: 'shared-task', code: 'TASK-001', category: kind, title: '验收任务', productLineId: 'line-1' } as Awaited<ReturnType<typeof productRepository.workItemDetail>>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: '操作验收任务' }));
+  expect(await screen.findByText('归档')).toBeInTheDocument();
+  if (kind !== 'bug') expect(screen.queryByText('复制并关联')).not.toBeInTheDocument();
+  else expect(screen.getByText('复制并关联')).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: /添加子任务/ })).not.toBeInTheDocument();
+  if (kind === 'bug') expect(screen.queryByRole('menuitem', { name: /复盘总结/ })).not.toBeInTheDocument();
+  else {
+    fireEvent.click(screen.getByRole('menuitem', { name: /复盘总结/ }));
+    expect(await screen.findByLabelText('复盘总结标题')).toHaveValue('验收任务复盘总结');
+    await waitFor(() => expect(productRepository.workItemReview).toHaveBeenCalledWith('line-1', 'shared-task'));
+  }
 });

@@ -6,7 +6,7 @@ import { collaborationCandidatesFor } from '../../utils/collaborationCandidates'
 import { normalizeTaskActivity, taskActivitySummary } from '../../utils/taskActivity';
 import { DetailCopyButton } from '../common/DetailCopyButton';
 import { Badge, Button, Checkbox, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popover, Segmented, Select, Tag, Tooltip, Upload } from 'antd';
-import { ApartmentOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, FileTextOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
@@ -36,6 +36,7 @@ import { employeeSelectOptions, PersonIdentity } from '../common/PersonIdentity'
 import { WorkItemGroupMenu } from './UnifiedWorkItemControls';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
 import { WorkItemBatchBar } from './WorkItemBatchBar';
+import { TaskReviewDialog, type TaskReviewTarget } from './TaskReviewDialog';
 import { openTaskCompletionDialog } from './TaskCompletionDialog';
 import { useWorkItemFieldConfig } from './useWorkItemFieldConfig';
 import type { DesignTaskVariant } from './DesignTasksView';
@@ -486,6 +487,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     return true;
   };
 
+  const [reviewTask, setReviewTask] = useState<TaskReviewTarget | null>(null);
   const [selectedTask, setSelectedTask] = useState<RequirementTask | null>(initialDetail || null);
   const handledDetailId = useRef('');
   const [selectedTestPlanIds, setSelectedTestPlanIds] = useState<string[]>([]);
@@ -1495,35 +1497,44 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     } catch (error) { addToast('error', linked ? '复制并关联失败' : '复制任务失败', error instanceof Error ? error.message : '请稍后重试'); }
   };
 
+  const refreshTaskLists = async () => {
+    await Promise.all([unifiedQuery.refetch(), ...['requirements', 'design-tasks', 'product-dev-tasks', 'product-bugs', 'product-recycle-bin'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))]);
+  };
+
   const deleteTask = (task: RequirementTask) => {
-    if (!task.productLineId || task.revision == null) { addToast('warning', '该任务不是统一工作项，暂不能从此处删除'); return; }
+    if (!task.productLineId || task.revision == null) { addToast('warning', '该任务不是统一工作项，暂不能从此处归档'); return; }
     Modal.confirm({
-      title: `删除任务“${task.title}”？`,
-      content: '任务将被软删除；存在子任务时系统会阻止删除。',
-      okText: '删除', cancelText: '取消', okButtonProps: { danger: true },
+      title: `归档任务“${task.title}”？`,
+      content: '归档后任务将从当前列表移除，可在产品配置的归档任务中恢复。',
+      okText: '归档', cancelText: '取消', okButtonProps: { danger: true },
       onOk: async () => {
         try {
           await productRepository.deleteWorkItem(task.productLineId!, task.id, task.revision!);
           if (selectedTask?.id === task.id) setSelectedTask(null);
-          await unifiedQuery.refetch();
-          addToast('success', '任务已删除');
-        } catch (error) { addToast('error', '任务删除失败', error instanceof Error ? error.message : '请稍后重试'); }
+          await refreshTaskLists();
+          addToast('success', '任务已归档');
+        } catch (error) { addToast('error', '任务归档失败', error instanceof Error ? error.message : '请稍后重试'); }
       }
     });
   };
 
   const operationMenu = (task: RequirementTask) => ({
     items: [
-      ...(unifiedCategory === 'bug' || task.category === 'bug' ? [] : [{ key: 'child', icon: <PlusOutlined />, label: '添加子任务' }]),
+      ...(!unifiedCategory ? [{ key: 'child', icon: <PlusOutlined />, label: '添加子任务' }, { key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' }] : []),
+      ...(['requirement', 'design', 'dev', 'test'].includes(task.category || unifiedCategory || '') ? [{ key: 'review', icon: <FileTextOutlined />, label: '复盘总结' }] : []),
       { key: 'copy', icon: <CopyOutlined />, label: '复制任务' },
-      { key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' },
+      ...(unifiedCategory === 'bug' ? [{ key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' }] : []),
       { type: 'divider' as const },
-      { key: 'delete', icon: <DeleteOutlined />, danger: true, label: '删除' }
+      { key: 'delete', icon: <DeleteOutlined />, danger: true, label: '归档' }
     ],
     onClick: ({ key }: { key: string }) => {
+      if (key === 'review') {
+        if (!task.productLineId) { addToast('warning', '任务缺少产品，无法复盘'); return; }
+        setReviewTask({ id: task.id, productLineId: task.productLineId, title: task.title });
+      }
       if (key === 'child') openChildModal(task);
-      if (key === 'copy') void copyTask(task, false);
       if (key === 'copy-link') void copyTask(task, true);
+      if (key === 'copy') void copyTask(task, false);
       if (key === 'delete') deleteTask(task);
     }
   });
@@ -1782,6 +1793,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
   return (
     <div className="task-page space-y-6 animate-in fade-in duration-150">
+      {reviewTask && <TaskReviewDialog task={reviewTask} onClose={() => setReviewTask(null)} onSaved={() => { if (selectedTask?.id === reviewTask.id) void activityQuery.refetch(); }} />}
       {!creationContext && !initialDetail && <div>
       {/* Tabs + Search + Filter + Group */}
       <div ref={controlsRef} className="task-page-toolbar bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3 text-xs">
@@ -1862,7 +1874,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
       {/* Requirement List Table (列表信息: 标题、状态、优先级、负责人、创建人、添加时间) */}
       {showProductTasks ? <ProductTaskAllocationView kind={allocationKind} items={productTasksQuery.data || []} designExtras={designExtras} productOptions={productLines.map((line) => ({ label: line.name, value: line.name }))} loading={productTasksQuery.isPending} error={productTasksQuery.isError} onRetry={() => void productTasksQuery.refetch()} onOpen={openProductTask} onCreate={createAllocatedTask}  /> : <div className="task-page-table bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
-          <WorkItemBatchBar targets={[...activeTasks, ...Object.values(listChildren).flat()].filter((task) => batchIds.includes(task.id)).map((task) => ({ id: task.id, category: String(task.category || unifiedCategory), productLineId: task.productLineId, revision: task.revision }))} versions={versions.map((version) => ({ value: version.id, label: version.name, productLineId: version.productLineId || productLines.find((line) => line.name === version.productLineName)?.id }))} employees={employeeNameOptions} onCancel={() => setBatchIds([])} onComplete={() => unifiedQuery.refetch()} />
+          <WorkItemBatchBar targets={[...activeTasks, ...Object.values(listChildren).flat()].filter((task) => batchIds.includes(task.id)).map((task) => ({ id: task.id, category: String(task.category || unifiedCategory), productLineId: task.productLineId, revision: task.revision }))} versions={versions.map((version) => ({ value: version.id, label: version.name, productLineId: version.productLineId || productLines.find((line) => line.name === version.productLineName)?.id }))} employees={employeeNameOptions} onCancel={() => setBatchIds([])} onComplete={refreshTaskLists} />
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1440px] text-left border-collapse text-xs">
               <colgroup>
@@ -1907,7 +1919,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           isOpen={!!selectedTask}
           onClose={closeTaskDetail}
           title={<span className="flex min-w-0 items-center gap-2"><WorkItemCategoryIcon category={String(selectedTask.category || taskKind || 'requirement')} className="text-[var(--primary)]" /><span>任务编号</span><span className="truncate font-mono text-xs">{selectedTask.code || selectedTask.id}</span><DetailCopyButton label="复制任务编号" onCopy={() => copyTaskValue(false)} /></span>}
-          headerActions={<DetailCopyButton label="复制详情链接" link onCopy={() => copyTaskValue(true)} />}
+          headerActions={<><DetailCopyButton label="复制详情链接" link onCopy={() => copyTaskValue(true)} /><Dropdown menu={operationMenu(selectedTask)} trigger={['click']}><Button type="text" icon={<MoreOutlined />} aria-label={`操作${selectedTask.title}`} /></Dropdown></>}
           detailHeader={detailVisible('title') ? <WorkItemDetailHeader title={selectedTask.title} titleEditable={!selectedTask.hasChildren && detailEditable('title')} creatorName={selectedTask.creatorName || currentUser.name} createdAt={selectedTask.createdAt} updaterName={(selectedTask as RequirementTask & { updaterName?: string }).updaterName || selectedTask.creatorName || currentUser.name} updatedAt={(selectedTask as RequirementTask & { updatedAt?: string }).updatedAt || selectedTask.createdAt} onTitleSave={(title) => { void saveDetailUpdates({ title }).then((saved) => saved && addToast('success', '标题修改成功', '')); }} /> : undefined}
           presentation="drawer"
           showContinueOption={false}

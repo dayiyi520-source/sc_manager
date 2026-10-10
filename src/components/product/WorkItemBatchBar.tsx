@@ -49,7 +49,7 @@ export const WorkItemBatchBar: React.FC<{
     owner: employees,
     participants: employees
   };
-  const labels: Record<string, string> = { version: '修改版本', status: '修改状态', owner: '修改负责人', participants: '修改参与人', delete: '批量删除' };
+  const labels: Record<string, string> = { version: '修改版本', status: '修改状态', owner: '修改负责人', participants: '修改参与人', delete: '批量归档' };
   const execute = async () => {
     if (!valid) { messageApi.warning('只能选择同类型且有版本信息的工作项'); return; }
     setLoading(true);
@@ -88,14 +88,14 @@ export const WorkItemBatchBar: React.FC<{
   const open = (key: string) => {
     if (!valid) { messageApi.warning('请选择同类型且有版本信息的工作项'); return; }
     if (key === 'delete') {
-      Modal.confirm({ title: `删除选中的 ${targets.length} 条工作项？`, content: '删除后工作项将不可在列表中查看；存在子任务的工作项不能删除。', okText: '确认删除', okButtonProps: { danger: true }, cancelText: '取消', onOk: async () => {
+      Modal.confirm({ title: `归档选中的 ${targets.length} 条工作项？`, content: '归档后工作项将从当前列表移除，可在产品配置的归档任务中恢复。', okText: '确认归档', okButtonProps: { danger: true }, cancelText: '取消', onOk: async () => {
         setLoading(true);
         try {
           await productRepository.batchWorkItems({ targets: targets.map(({ id, productLineId, revision }) => ({ id, productLineId: productLineId!, revision: revision! })), operation: 'delete' });
-          messageApi.success(`已删除 ${targets.length} 条工作项`);
+          messageApi.success(`已归档 ${targets.length} 条工作项`);
           onCancel();
           await onComplete();
-        } catch (error) { messageApi.error(error instanceof Error ? error.message : '批量删除失败'); }
+        } catch (error) { messageApi.error(error instanceof Error ? error.message : '批量归档失败'); }
         finally { setLoading(false); }
       } });
       return;

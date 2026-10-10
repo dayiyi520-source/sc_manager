@@ -1,3 +1,4 @@
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 import { handleMockTestReports, TEST_REPORT_STORAGE_KEY } from './mockTestReports';
 import {
   MOCK_BUGS,
@@ -318,7 +319,7 @@ const unfinishedTask = (status: unknown, assistanceStatus?: unknown) => {
 const myTasks = (viewerId: string) => {
   const viewerName = MOCK_USERS.find((user) => user.id === viewerId)?.name || '';
   const workItems = getWorkItems()
-    .filter((item) => (item.assigneeId === viewerId || (!item.assigneeId && item.ownerName === viewerName)) && item.requirementType !== '协助事项' && unfinishedTask(item.status))
+    .filter((item) => !item.deleted && !item.deleteFlag && (item.assigneeId === viewerId || (!item.assigneeId && item.ownerName === viewerName)) && item.requirementType !== '协助事项' && unfinishedTask(item.status))
     .map((item) => ({
       id: `task-${item.id}`,
       type: item.category || 'requirement',
@@ -373,6 +374,67 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     if (parts[3] === 'comments' && method === 'POST') {
       const content = text(body.content).trim();
       if (!content || content.length > 10000) throw new Error('评论内容不能为空且不能超过10000字');
+  if (parts[1] === 'work-items' && parts[2] && parts[3] === 'review') {
+    const line = queryOf(path).get('productLineId') || '';
+    const item = getWorkItems().find((task) => task.id === parts[2] && task.productLineId === line);
+    if (!item || item.deleted || item.deleteFlag) throw new Error('任务不存在或已归档');
+    if (!['requirement', 'design', 'dev', 'test'].includes(item.category)) throw new Error('该任务类型不支持复盘总结');
+    const events = taskActivities().filter((event) => event.subjectId === item.id && event.productLineId === line && event.eventType === 'WORK_ITEM_REVIEWED');
+    const previous = events.at(-1)?.content?.review;
+    if (method === 'GET') return previous || null;
+    if (method === 'PUT') {
+      if (body.revision !== (previous?.revision || 0)) throw new Error('复盘总结已被更新，请重新打开后重试');
+      const title = text(body.title).trim();
+      if (!title) throw new Error('请输入标题');
+      if (!Array.isArray(body.media) || body.media.some((media: any) => !media.id || !media.name || !/^data:[^;,]+;base64,[a-zA-Z0-9+/=\s]*$/.test(media.dataUrl || ''))) throw new Error('附件数据无效');
+      const review = { title, content: text(body.content), contentHtml: sanitizeHtml(text(body.contentHtml)), media: body.media.map((media: any) => ({ id: text(media.id), name: text(media.name), type: media.type === 'image' ? 'image' : 'file', dataUrl: media.dataUrl, ...(media.size != null ? { size: media.size } : {}), ...(media.mimeType ? { mimeType: media.mimeType } : {}) })), revision: (previous?.revision || 0) + 1, updatedAt: now() };
+      recordTaskActivity(item.id, line, 'WORK_ITEM_REVIEWED', { review });
+      return review;
+    }
+    throw new Error('不支持的复盘操作');
+  }
+
+  if (clean === '/api/work-items/batch' && method === 'POST' && body.operation === 'delete') {
+    const items = getWorkItems();
+    if (!Array.isArray(body.targets) || !body.targets.length || new Set(body.targets.map((target: any) => target.id)).size !== body.targets.length) throw new Error('请选择有效任务');
+    const targets = body.targets.map((target: any) => {
+      const item = items.find((task) => task.id === target.id && task.productLineId === target.productLineId);
+      if (!item) throw new Error('任务不存在');
+      if (Number(item.revision || 0) !== target.revision) throw new Error('任务已更新，请刷新后重试');
+      return item;
+    });
+    const operatedAt = now();
+    targets.forEach((item: any) => Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt, operatorName: MOCK_USERS[0]?.name || '当前用户' }));
+    write(KEYS.workItems, items);
+    return targets.length;
+  }
+  if (parts[1] === 'work-items' && parts[2] && parts.length === 3 && method === 'DELETE') {
+    const query = queryOf(path);
+    const items = getWorkItems();
+    const item = items.find((task) => task.id === parts[2] && task.productLineId === query.get('productLineId'));
+    if (!item) throw new Error('任务不存在');
+    if (item.deleted || item.deleteFlag) return null;
+    if (query.get('revision') == null || Number(query.get('revision')) !== Number(item.revision || 0)) throw new Error('任务已更新，请刷新后重试');
+    Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt: now(), operatorName: MOCK_USERS[0]?.name || '当前用户' });
+    write(KEYS.workItems, items);
+    return null;
+  }
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'recycle-bin') {
+    const items = getWorkItems();
+    if (method === 'GET') return items.filter((item) => item.productLineId === parts[2] && (item.deleted || item.deleteFlag)).map((item) => ({ ...item, versionName: item.versionName || getProductLines().find((line) => line.id === parts[2])?.versions?.find((version) => version.id === item.versionId)?.name || '未设置' }));
+    const item = items.find((task) => task.id === parts[4] && task.productLineId === parts[2] && (task.deleted || task.deleteFlag));
+    if (!item) throw new Error('归档任务不存在');
+    const revision = method === 'POST' ? body.revision : Number(queryOf(path).get('revision'));
+    if (revision !== Number(item.revision || 0)) throw new Error('任务已更新，请刷新后重试');
+    if (method === 'POST' && parts[5] === 'restore') {
+      Object.assign(item, { deleted: false, deleteFlag: 0, revision: Number(item.revision || 0) + 1 });
+      write(KEYS.workItems, items);
+      return null;
+    }
+    if (method === 'DELETE') { write(KEYS.workItems, items.filter((task) => task.id !== item.id)); return null; }
+    throw new Error('不支持的归档操作');
+  }
+
       recordTaskActivity(item.id, line, 'WORK_ITEM_COMMENTED', { content });
       return null;
     }
@@ -498,14 +560,14 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   }
   if (clean === '/api/requirements/departments' && method === 'GET') return getEmployeeOptions().map((item) => ({ id: item.id, name: item.department || '产品研发部', managerName: item.name }));
   if (clean === '/api/requirements' && method === 'GET') {
-    const items = getWorkItems().filter((item) => item.category === 'requirement');
+    const items = getWorkItems().filter((item) => item.category === 'requirement' && !item.deleted && !item.deleteFlag);
     const page = Math.max(1, Number(queryOf(path).get('page') || 1));
     const pageSize = Math.min(100, Math.max(1, Number(queryOf(path).get('pageSize') || 100)));
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
   }
   if (clean === '/api/requirements/audit-events' && method === 'GET') {
     const query = queryOf(path);
-    const items = getWorkItems().filter((item) => item.category === 'requirement').flatMap((item) => (item.events || []).map((event) => ({ ...event, requirementId: item.id }))).filter((event) => (!query.get('eventType') || event.eventType === query.get('eventType')) && (!query.get('operatorName') || event.operatorName === query.get('operatorName')));
+    const items = getWorkItems().filter((item) => item.category === 'requirement' && !item.deleted && !item.deleteFlag).flatMap((item) => (item.events || []).map((event) => ({ ...event, requirementId: item.id }))).filter((event) => (!query.get('eventType') || event.eventType === query.get('eventType')) && (!query.get('operatorName') || event.operatorName === query.get('operatorName')));
     const page = Math.max(1, Number(query.get('page') || 1));
     const pageSize = Math.min(100, Math.max(1, Number(query.get('pageSize') || 100)));
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
@@ -562,12 +624,12 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     items[index] = { ...current, status: nextStatus, workItems: nextWorkItems, ...((parts[3] === 'complete' || parts[3] === 'acceptance-failed') && ownerChanged ? { ownerName: nextOwnerName, assigneeName: nextOwnerName, ...(nextAssigneeId ? { assigneeId: nextAssigneeId } : {}) } : {}), revision: revision + 1, events: [...(current.events || []), event] };
     write(KEYS.workItems, items); return { id: current.id, status: nextStatus };
   }
-  if (clean === '/api/design-tasks' && method === 'GET') return { items: MOCK_DESIGN_TASKS, page: 1, pageSize: 100, total: MOCK_DESIGN_TASKS.length };
+  if (clean === '/api/design-tasks' && method === 'GET') { const items = getWorkItems().filter((item) => item.category === 'design' && !item.deleted && !item.deleteFlag); return { items, page: 1, pageSize: 100, total: items.length }; }
   if (clean === '/api/bugs' && method === 'GET') {
     const items = getWorkItems().filter((item) => item.category === 'bug' && !item.deleted && !item.deleteFlag).map((item) => ({ ...item, assignee: item.assigneeName || item.ownerName || item.assignee || '', reporter: item.reporter || item.creatorName || '', versionName: item.versionName || getProductLines().find((line) => line.id === item.productLineId)?.versions?.find((version) => version.id === item.versionId)?.name || '' }));
     return { items, page: 1, pageSize: 100, total: items.length };
   }
-  if (clean === '/api/dev-tasks' && method === 'GET') return { items: MOCK_DEV_TASKS, page: 1, pageSize: 100, total: MOCK_DEV_TASKS.length };
+  if (clean === '/api/dev-tasks' && method === 'GET') { const items = getWorkItems().filter((item) => item.category === 'dev' && !item.deleted && !item.deleteFlag); return { items, page: 1, pageSize: 100, total: items.length }; }
   if (['design-tasks', 'dev-tasks', 'bugs'].includes(parts[1]) && parts[2] && method === 'PUT') {
     const items = getWorkItems();
     const index = items.findIndex((item) => item.id === parts[2]);
@@ -684,7 +746,7 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'automation-rules' && method === 'GET') { const template = templateAutomation(); const keyword = (queryOf(path).get('keyword') || '').toLowerCase(); return { enabled: template.enabled, rules: template.rules.filter((rule: any) => !keyword || rule.name.toLowerCase().includes(keyword)) }; }
 
   if (clean.startsWith('/api/work-items/') && parts.length === 3 && method === 'GET') {
-    const found = [...getWorkItems().map(unifiedWorkItem), ...MOCK_BUGS.map((bug) => unifiedWorkItem({ ...bug, category: 'bug', assigneeName: bug.ownerName }))].find((item) => item.id === parts[2]);
+    const found = getWorkItems().filter((item) => !item.deleted && !item.deleteFlag).map(unifiedWorkItem).find((item) => item.id === parts[2]);
     return found || null;
   }
   if (parts[1] === 'work-items' && parts[2] && parts.length === 3 && method === 'PUT') {
@@ -755,7 +817,7 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   }
   if (clean === '/api/work-items' && method === 'GET') {
     const query = queryOf(path); const productLineId = query.get('productLineId'); const category = query.get('category'); const keyword = (query.get('keyword') || '').toLowerCase();
-    let items = getWorkItems().filter((item) => (!productLineId || item.productLineId === productLineId) && (!category || category === item.category) && (!keyword || String(item.title || '').toLowerCase().includes(keyword) || String(item.code || '').toLowerCase().includes(keyword) || (category === 'bug' && String(item.id).toLowerCase().includes(keyword))));
+    let items = getWorkItems().filter((item) => !item.deleted && !item.deleteFlag && (!productLineId || item.productLineId === productLineId) && (!category || category === item.category) && (!keyword || String(item.title || '').toLowerCase().includes(keyword) || String(item.code || '').toLowerCase().includes(keyword) || (category === 'bug' && String(item.id).toLowerCase().includes(keyword))));
     if (category === 'bug') items = items.filter((item) => !item.deleted && !item.deleteFlag);
     items = items.map((item) => unifiedWorkItem(item)) as any;
     const page = Math.max(1, Number(query.get('page') || 1)); const pageSize = Math.max(1, Number(query.get('pageSize') || 100));
