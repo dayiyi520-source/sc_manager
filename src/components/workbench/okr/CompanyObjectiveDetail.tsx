@@ -37,6 +37,7 @@ export function CompanyObjectiveDetail({ record, records, people, work, workLoad
   const index = records.filter(item => item.kind === 'objective' && item.ownerId === record.ownerId && item.periodKey === record.periodKey).findIndex(item => item.id === record.id) + 1;
   const assignees = [...new Set((record.payload.keyResults || []).flatMap(action => action.assigneeIds || []))];
   const source = record.payload.alignments?.map(alignment => records.find(item => item.id === alignment.parentObjectiveId)?.payload.title).filter(Boolean).join('、') || `${dayjs(record.periodKey).format('YYYY年MM月')}目标`;
+  const deadline = record.payload.deadline || [...(record.payload.keyResults || []).map(action => action.deadline).filter(Boolean)].sort().at(-1);
   return <Drawer open placement="bottom" size="calc(100dvh - 3rem)" rootClassName="company-objective-drawer company-objective-detail-drawer" closable={false} keyboard={!busy} maskClosable={!busy} extra={
     <div className="company-detail-header-actions" role="group" aria-label="目标操作">
       <Tooltip title={onEdit ? '修改' : '仅制定人可修改'}><span><Button type="text" aria-label="修改目标" disabled={busy || !onEdit} onClick={onEdit} icon={<PencilIcon/>}/></span></Tooltip>
@@ -53,7 +54,7 @@ export function CompanyObjectiveDetail({ record, records, people, work, workLoad
         <section className={`company-detail-overview${challenge ? ' is-challenge' : ''}`}>
           <div className="company-detail-source">{source}</div>
           <div className="company-detail-title"><span className={`company-kind${challenge ? ' is-challenge' : ''}`}>{challenge ? 'TO' : 'CO'}{index || 1}</span><h2>{record.payload.title}</h2></div>
-          <div className="company-detail-summary"><div className="company-detail-progress"><Progress type="circle" percent={objective?.progress ?? 0} size="small" showInfo={false}/><span>{objective?.progress ?? 0}%</span></div><span className="company-detail-level">{levelLabel}</span><span className="company-detail-owner" aria-label={`制定人：${name(record.ownerId)}`}><PersonAvatar name={name(record.ownerId)}/>{name(record.ownerId)}</span><span className="company-detail-weight">目标权重:{record.payload.weight ?? 100}%</span></div>
+          <div className="company-detail-summary"><div className="company-detail-progress"><Progress type="circle" percent={objective?.progress ?? 0} size="small" showInfo={false}/><span>{objective?.progress ?? 0}%</span></div><span className="company-detail-level">{levelLabel}</span><span className="company-detail-owner" aria-label={`制定人：${name(record.ownerId)}`}><PersonAvatar name={name(record.ownerId)}/>{name(record.ownerId)}</span><span className="company-detail-weight">目标权重:{record.payload.weight ?? 100}%</span>{levelLabel !== '公司级' && <><span className="company-detail-extra">完成时间:{deadline ? dayjs(deadline).format('YYYY-MM-DD') : '未设置'}</span><span className="company-detail-extra">所属部门:{owner?.department || '—'}</span></>}</div>
           <div className="company-detail-assignees">{assignees.length ? assignees.map(name).join('、') : '未指定承接人员'}</div>
         </section>
         {record.payload.note && <p className="company-detail-note">{record.payload.note}</p>}

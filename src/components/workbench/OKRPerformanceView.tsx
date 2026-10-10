@@ -561,18 +561,11 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               }}
               onOpenTarget={targetId => {
                 const target = targetItems.find(item => item.id === targetId);
-                const companyRecord = records.find(record => record.id === (target?.detailId || targetId) && record.kind === 'objective' && people.some(person => person.id === record.ownerId && person.rootFlag === 1));
-                if (companyRecord) {
+                const objectiveRecord = records.find(record => record.id === (target?.detailId || targetId) && record.kind === 'objective');
+                if (objectiveRecord) {
                   setSelectedMonthDetail(null);
                   setSelectedMonthTargetId(undefined);
-                  setSelectedOkrRecordId(companyRecord.id);
-                  return;
-                }
-                const supervisorRecord = records.find(record => record.id === target?.detailId && record.kind === 'objective' && target?.levelLabel === '主管级');
-                if (supervisorRecord) {
-                  setSelectedMonthDetail(null);
-                  setSelectedMonthTargetId(undefined);
-                  setSelectedOkrRecordId(supervisorRecord.id);
+                  setSelectedOkrRecordId(objectiveRecord.id);
                   return;
                 }
                 if (target?.status === 'draft' && target.detailId) {
