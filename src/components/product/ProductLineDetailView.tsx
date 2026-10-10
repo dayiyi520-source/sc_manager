@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Input, Select, Button, Switch, Drawer, Tag, Dropdown, Popconfirm, Spin } from 'antd';
 import Card from 'antd/es/card/Card';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { categoryCode, enabledCategoryOptions } from '../../utils/workItemCategories';
+import { categoryCode, displayedTaskCategoryCodes, enabledCategoryOptions } from '../../utils/workItemCategories';
 import { ApartmentOutlined, DeleteOutlined, DownOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined, UndoOutlined } from '@ant-design/icons';
 import {
   ArrowLeft,
@@ -304,7 +304,7 @@ const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ p
   const [activeCategory, setActiveCategory] = useState<ProductLineWorkItemCategory>('需求');
   const normalizeItems = (nextItems: ProductLineWorkItemType[]) => nextItems.map((item) => ({ ...item, enabled: Boolean(item.enabled), isDefault: Boolean(item.isDefault) }));
   const [items, setItems] = useState<ProductLineWorkItemType[]>(normalizeItems(productLine.workItemTypes || []));
-  const displayedCategories = [...new Set([...categoryOptions.map((item) => item.value), ...items.map((item) => item.category)].map(categoryCode))];
+  const displayedCategories = displayedTaskCategoryCodes(categoryOptions.map((item) => item.value), items.map((item) => item.category));
   useEffect(() => {
     if (displayedCategories.length && !displayedCategories.includes(activeCategory)) setActiveCategory(displayedCategories[0]);
   }, [categoryQuery.data, items, activeCategory]);

@@ -4,7 +4,7 @@ import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@
 import { ProductLineWorkItemCategory } from '../../types';
 import { productRepository, WorkItemCategoryKey, WorkItemTemplateType, type WorkItemCategoryDefinition } from '../../services/productRepository';
 import { CATEGORY_KEYS, buildWorkflowDefinition, createDefaultWorkItemStates, EditableWorkflowState, validateWorkflowStates, WorkItemStateEditor } from '../product/WorkItemStateConfigDrawer';
-import { categoryValue, enabledCategoryOptions } from '../../utils/workItemCategories';
+import { categoryValue, enabledCategoryOptions, isTaskCategory } from '../../utils/workItemCategories';
 
 const CATEGORY_CODE: Record<ProductLineWorkItemCategory, WorkItemCategoryKey> = { 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' };
 const categoryKey = (category: ProductLineWorkItemCategory) => CATEGORY_KEYS[category] || CATEGORY_CODE[category as keyof typeof CATEGORY_CODE] || category;
@@ -31,7 +31,7 @@ export const WorkItemModuleView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const categoryOptions = useMemo(() => categories.slice().sort((a, b) => a.sort - b.sort).map((item) => ({ value: categoryValue(item.code), label: item.displayName, enabled: item.enabled })), [categories]);
+  const categoryOptions = useMemo(() => categories.filter((item) => isTaskCategory(item.code) && item.capabilityType !== 'TEST_CASE').sort((a, b) => a.sort - b.sort).map((item) => ({ value: categoryValue(item.code), label: item.displayName, enabled: item.enabled })), [categories]);
   const selectedDefinition = categories.find((item) => item.code === category || item.name === category || item.displayName === category);
   const categoryCode = selectedDefinition?.code || CATEGORY_CODE[category as keyof typeof CATEGORY_CODE] || category;
   const visible = useMemo(() => items.filter((item) => item.category === category || item.category === selectedDefinition?.name || item.category === selectedDefinition?.displayName || item.category === categoryCode), [items, category, selectedDefinition, categoryCode]);

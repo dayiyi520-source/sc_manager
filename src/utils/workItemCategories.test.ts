@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { categoryCode, categoryValue, enabledCategoryOptions } from './workItemCategories';
+import { categoryCode, categoryValue, displayedTaskCategoryCodes, enabledCategoryOptions } from './workItemCategories';
 import type { WorkItemCategoryDefinition } from '../services/productRepository';
 
 describe('work item category compatibility', () => {
+  it('excludes test cases from dictionary options and historical product categories', () => {
+    const definitions = [
+      { code: 'requirement', displayName: '产品任务', enabled: true, sort: 0 },
+      { code: 'case', displayName: '测试用例', enabled: true, sort: 1 },
+      { code: 'custom_case', capabilityType: 'TEST_CASE', enabled: true, sort: 2 },
+    ] as WorkItemCategoryDefinition[];
+    expect(enabledCategoryOptions(definitions).map((item) => item.code)).toEqual(['requirement']);
+    expect(displayedTaskCategoryCodes(['需求', '设计', '研发', '测试', '缺陷'], ['case', '用例', '测试用例', 'CASE', 'dev', 'ops_task']))
+      .toEqual(['requirement', 'design', 'dev', 'test', 'bug', 'ops_task']);
+  });
   it('keeps existing stored values and custom stable codes across rename', () => {
     expect(categoryValue('requirement')).toBe('需求');
     expect(categoryCode('需求')).toBe('requirement');
