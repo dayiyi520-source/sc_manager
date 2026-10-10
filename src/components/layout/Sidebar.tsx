@@ -57,14 +57,14 @@ export const Sidebar: React.FC = () => {
       <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1.5 text-xs custom-scrollbar">
         {MENU_GROUPS.map((group) => {
           const isExpanded = expandedGroups[group.id] ?? true;
-          const isAnyChildActive = group.subMenus.some((m) => m.id === activeTabId);
+          const isAnyChildActive = group.homePage?.id === activeTabId || group.subMenus.some((m) => m.id === activeTabId);
 
           return (
             <div key={group.id} className="space-y-0.5">
               {!visuallyCollapsed ? (
                 /* 国内中后台标准一级主菜单：13px 中等加粗，层级鲜明，高可辨识度 */
                 <button
-                  onClick={() => toggleGroup(group.id)}
+                  onClick={() => group.homePage ? openPageTab(group.homePage.id) : toggleGroup(group.id)}
                   className={`w-full flex items-center justify-between px-3 py-2 text-left rounded-lg transition-all ${
                     isAnyChildActive
                       ? 'text-[var(--text-primary)] bg-[var(--bg-surface)] font-semibold'

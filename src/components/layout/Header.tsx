@@ -58,7 +58,7 @@ export const Header: React.FC = () => {
   
   // 面包屑逻辑
   const currentTab = openTabs.find((t) => t.id === activeTabId) || openTabs[0];
-  const currentGroup = MENU_GROUPS.find((group) => group.subMenus.some((menu) => menu.id === activeTabId));
+  const currentGroup = MENU_GROUPS.find((group) => group.homePage?.id === activeTabId || group.subMenus.some((menu) => menu.id === activeTabId));
   const currentMainMenu = currentGroup?.title || '工作台';
   const currentSubMenu = currentTab?.title || '业务模块';
 

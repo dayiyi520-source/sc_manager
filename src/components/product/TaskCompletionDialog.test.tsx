@@ -37,5 +37,27 @@ it('requires hours and retains input after save failure for retry', async () => 
   expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe('3.25');
   fireEvent.click(await screen.findByRole('button', { name: /确认完成/ }));
   await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
-  expect(save).toHaveBeenLastCalledWith(3.25, '');
+  expect(save).toHaveBeenLastCalledWith(3.25, '', { content: '', media: [] });
+});
+
+it('saves review text and attachments together with hours', async () => {
+  const save = vi.fn().mockResolvedValue(undefined);
+  await act(async () => { openTaskCompletionDialog(save); });
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '2' } });
+  fireEvent.change(screen.getByRole('textbox', { name: '复盘总结' }), { target: { value: '完成验证，补充回归用例' } });
+  const file = new File(['verification'], '复盘.txt', { type: 'text/plain' });
+  fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+  expect(await screen.findByText('复盘.txt')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /确认完成/ }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(2, '', { content: '完成验证，补充回归用例', media: [expect.objectContaining({ name: '复盘.txt', dataUrl: expect.stringMatching(/^data:text\/plain;base64,/) })] }));
+});
+
+it('accepts an attachment without a detected MIME type', async () => {
+  const save = vi.fn().mockResolvedValue(undefined);
+  await act(async () => { openTaskCompletionDialog(save); });
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '1' } });
+  fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(['ok'], '复盘.custom')] } });
+  expect(await screen.findByText('复盘.custom')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /确认完成/ }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(1, '', { content: '', media: [expect.objectContaining({ dataUrl: expect.stringMatching(/^data:application\/octet-stream;base64,/) })] }));
 });

@@ -29,7 +29,7 @@ export function useNavigationState(menuGroups: MainMenuGroup[], aliases: Partial
   useEffect(() => {
     setActiveTabId(routeTab);
     setOpenTabs((previousTabs) => {
-      const menuItems = menuGroups.flatMap((group) => group.subMenus);
+      const menuItems = menuGroups.flatMap((group) => group.homePage ? [group.homePage, ...group.subMenus] : group.subMenus);
       const normalizedTabs = previousTabs.map((tab) => {
         const normalizedId = (aliases[tab.id] || tab.id) as SubMenuId;
         const menu = menuItems.find((item) => item.id === normalizedId);
@@ -50,7 +50,7 @@ export function useNavigationState(menuGroups: MainMenuGroup[], aliases: Partial
     const resolvedId = (aliases[menuId as SubMenuId] || menuId) as SubMenuId;
     let foundMenu: NavigationMenuItem | undefined;
     for (const group of menuGroups) {
-      const match = group.subMenus.find((item) => item.id === resolvedId);
+      const match = group.homePage?.id === resolvedId ? group.homePage : group.subMenus.find((item) => item.id === resolvedId);
       if (match) { foundMenu = match; break; }
     }
     foundMenu ||= { id: resolvedId, title: menuId, mainMenuId: 'workbench', icon: 'FileText' };

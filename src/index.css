@@ -708,32 +708,42 @@ html:not(.dark) .tech-main .fixed.inset-0 button:disabled {
 .tech-main .test-and-defect-tabs > .ant-tabs-nav .ant-tabs-ink-bar { height: 2px; background: var(--primary); }
 
 /* Semantic tab markup is used by the right-side page workspace. */
-html:not(.dark) .tech-main [role="tablist"]:not(.original-okr *) {
+html:not(.dark) .tech-main [role="tablist"]:not(.original-okr *):not(.ant-tabs *) {
   background: transparent;
   border: none;
   padding: 0;
 }
-html:not(.dark) .tech-main [role="tab"]:not(.original-okr *) {
+html:not(.dark) .tech-main [role="tab"]:not(.original-okr *):not(.ant-tabs *) {
   border-radius: 8px;
   color: var(--text-muted);
   transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
-html:not(.dark) .tech-main [role="tab"]:not(.original-okr *):hover:not([aria-selected="true"]) {
+html:not(.dark) .tech-main [role="tab"]:not(.original-okr *):not(.ant-tabs *):hover:not([aria-selected="true"]) {
   background: var(--bg-surface-soft);
   color: var(--text-primary);
 }
-html:not(.dark) .tech-main [role="tab"][aria-selected="true"]:not(.original-okr *) {
+html:not(.dark) .tech-main [role="tab"][aria-selected="true"]:not(.original-okr *):not(.ant-tabs *) {
   background: #2563EB !important;
   color: #FFFFFF !important;
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
 }
-html:not(.dark) .tech-main [role="tab"][aria-selected="true"]:not(.original-okr *) * {
+html:not(.dark) .tech-main [role="tab"][aria-selected="true"]:not(.original-okr *):not(.ant-tabs *) * {
   color: #FFFFFF !important;
 }
-html:not(.dark) .tech-main [role="tab"]:not(.original-okr *):focus-visible {
+html:not(.dark) .tech-main [role="tab"]:not(.original-okr *):not(.ant-tabs *):focus-visible {
   outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
   outline-offset: 2px;
 }
+
+/* Standard Ant Design line tabs must not inherit filled segmented-tab states. */
+.tech-main .ant-tabs:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-tab,
+.tech-main .ant-tabs:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-tab-btn {
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+.tech-main .ant-tabs:not(.ant-tabs-card) > .ant-tabs-nav::before { border-bottom-color: var(--border-main); }
+.tech-main .ant-tabs:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-tab-active .ant-tabs-tab-btn { color: var(--primary); }
 
 /* 自动化规则使用纯下划线页签，覆盖上方通用胶囊式 tab 规则。 */
 html:not(.dark) .tech-main .automation-rules-tabs .ant-tabs-tab-btn[role="tab"],

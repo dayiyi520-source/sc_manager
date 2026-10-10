@@ -86,7 +86,10 @@ const initialWorkItems = [
   ...MOCK_TEST_TASKS.map((task) => ({ ...task, category: 'test' })),
   ...MOCK_BUGS.map((bug) => ({ ...bug, category: 'bug', assigneeName: bug.ownerName })),
 ];
+const snapshotWorkItems = new Map(MOCK_DATABASE.t_product_work_item.map(row => [row.id_, row]));
 const getWorkItems = () => read<any[]>(KEYS.workItems, initialWorkItems.map((item) => ({ ...item }))).map((item) => {
+  const snapshot = snapshotWorkItems.get(item.id);
+  item = { ...item, workItemTypeId: item.workItemTypeId || snapshot?.task_type_id_, workflowId: item.workflowId || snapshot?.workflow_id_, statusKey: item.statusKey || snapshot?.status_key_ };
   const migratedType = (collaborationTypes as Record<string, string>)[item.id];
   if (item.category === 'requirement' && (item.workOrderType || migratedType) && ['已驳回', '已退回'].includes(item.status)) {
     const creator = getMembers().find((member) => member.id === item.creatorId || member.name === item.creatorName);
@@ -173,9 +176,17 @@ const taskActivities = () => read<any[]>(KEYS.taskActivities, databaseRows('t_pr
 const recordTaskActivity = (subjectId: string, productLineId: string, eventType: string, content: Record<string, unknown>) => {
   write(KEYS.taskActivities, [...taskActivities(), { id: id('activity'), subjectId, productLineId, eventType, content, operatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now() }]);
 };
+const validateCompletion = (body: Record<string, any>) => {
+  if (body.actualHours == null || typeof body.actualHours !== 'number' || !Number.isFinite(body.actualHours) || body.actualHours < 0 || body.actualHours > 99999999.99 || Math.abs(body.actualHours * 100 - Math.round(body.actualHours * 100)) > 1e-6) throw new Error('请填写有效的完成工时');
+  if (body.completionReview !== undefined) {
+    const review = body.completionReview;
+    if (!review || typeof review.content !== 'string' || review.content.length > 10000 || !Array.isArray(review.media) || review.media.some((media: any) => !media.id || !media.name || !/^data:[^;,]+;base64,[a-zA-Z0-9+/=\s]*$/.test(media.dataUrl || ''))) throw new Error('复盘总结或附件数据无效');
+  }
+};
 const recordTaskChanges = (before: Record<string, any>, after: Record<string, any>) => {
   const codes = ['title', 'description', 'descriptionHtml', 'expectedGoal', 'priority', 'assigneeName', 'ownerName', 'versionId', 'customerName', 'plannedStartDate', 'plannedEndDate', 'dueDate', 'estimatedHours', 'actualHours', 'status'];
   const changes = codes.filter((field) => JSON.stringify(before[field] ?? '') !== JSON.stringify(after[field] ?? '')).map((field) => ({ field, from: before[field] ?? '', to: after[field] ?? '' }));
+  if (after.completionReview && JSON.stringify(before.completionReview) !== JSON.stringify(after.completionReview)) recordTaskActivity(String(after.id), String(after.productLineId || ''), 'WORK_ITEM_REVIEWED', { review: { title: `${after.title}复盘总结`, ...after.completionReview } });
   if (changes.length) recordTaskActivity(String(after.id), String(after.productLineId || ''), 'WORK_ITEM_UPDATED', { changes });
 };
 const categoryCode = (value: string) => ({ 产品: 'requirement', 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' } as Record<string, string>)[value] || value;
@@ -312,10 +323,18 @@ const templateTypes = () => {
   const workflows = databaseRows('t_work_item_template_workflow');
   return read(KEYS.researchTypes, databaseRows('t_work_item_template_type').map((row) => ({ id: row.id_, category: row.category_, name: row.name_, description: row.description_ || '', enabled: Boolean(row.enabled_), isDefault: Boolean(row.is_default_), revision: Number(row.version_ || 0), workflow: workflows.find((workflow) => workflow.template_type_id_ === row.id_) ? { id: workflows.find((workflow) => workflow.template_type_id_ === row.id_).id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: workflows.find((workflow) => workflow.template_type_id_ === row.id_).name_, workflowVersion: 1, status: 'PUBLISHED', revision: Number(workflows.find((workflow) => workflow.template_type_id_ === row.id_).revision_ || 0), definition: workflows.find((workflow) => workflow.template_type_id_ === row.id_).definition_ } : undefined }))).filter((item: any) => !isTestCaseCategory(item));
 };
+const productTypes = (product: ProductLine | undefined): any[] => {
+  if (product?.workItemTypes) return product.workItemTypes;
+  const types = databaseRows('t_product_line_work_item_type').filter(row => row.product_line_id_ === product?.id && !row.delete_flag_);
+  if (!types.length) return templateTypes();
+  const workflows = databaseRows('t_product_workflow');
+  return types.map(row => ({ id: row.id_, name: row.name_, category: row.category_, enabled: Boolean(row.enabled_), isDefault: Boolean(row.is_default_), revision: Number(row.version_ || 0), workflows: workflows.filter(flow => flow.task_type_id_ === row.id_ && !flow.delete_flag_).map(flow => ({ id: flow.id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: flow.name_, revision: Number(flow.version_ || 0), status: flow.status_, workflowVersion: flow.workflow_version_, definition: flow.definition_ })) }));
+};
 const templateNotifications = () => read(KEYS.researchNotifications, databaseRows('t_notification_template')[0]?.config_ || { categories: [] });
 const templateAutomation = () => ({ enabled: read(KEYS.researchAutomationSetting, Boolean(databaseRows('t_automation_template_setting')[0]?.enabled_ ?? true)), rules: read(KEYS.researchAutomation, databaseRows('t_automation_template_rule').map((row) => ({ id: row.id_, name: row.name_, enabled: Boolean(row.enabled_), triggerType: row.trigger_type_, triggerTypeId: row.trigger_type_id_, triggerStateKey: row.trigger_state_key_, conditionType: row.condition_type_, conditionValue: row.condition_value_, actionType: row.action_type_, actions: row.actions_ || [], conditions: row.conditions_ || [], actionConfig: row.action_config_ || {}, revision: Number(row.version_ || 0), updatedAt: row.update_time_ }))) });
 const unifiedWorkItem = (item: any) => ({
   ...item,
+  taskTypeId: item.taskTypeId || item.workItemTypeId,
   assigneeName: item.assigneeName ?? item.ownerName ?? '',
   status: typeof item.status === 'string'
     ? { name: item.status, group: item.status === '已完成' ? 'COMPLETED' : 'IN_PROGRESS', successful: item.status === '已完成' }
@@ -339,7 +358,8 @@ const myTasks = (viewerId: string) => {
       type: item.category || 'requirement',
       title: item.title,
       status: item.status || '未设置',
-      assigneeName: item.assigneeName ?? item.ownerName ?? '',
+      taskTypeId: item.taskTypeId || item.workItemTypeId,
+  assigneeName: item.assigneeName ?? item.ownerName ?? '',
       time: item.createdAt || '',
       dueDate: item.dueDate || '',
       progress: Number(item.progress || 0),
@@ -482,6 +502,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     }
     if (method === 'POST' && !taskId) {
       if (!text(body.title).trim()) throw new Error('任务标题不能为空');
+      if (!text(body.projectId).trim()) throw new Error('请选择关联项目');
       const task: RequirementTask = {
         ...body, id: id('ops'), code: `OPS-${Date.now()}`,
         title: text(body.title).trim(), status: text(body.status) || '待处理',
@@ -497,6 +518,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       const task = tasks.find(item => item.id === taskId);
       if (!task) throw new Error('运维任务不存在');
       if (body.title !== undefined && !text(body.title).trim()) throw new Error('任务标题不能为空');
+      if (body.status === '已完成' && task.status !== '已完成') validateCompletion(body);
       const updated = { ...task, ...body, id: task.id, code: task.code };
       write(KEYS.opsTasks, tasks.map(item => item.id === taskId ? updated : item));
       recordTaskChanges(task, updated);
@@ -833,7 +855,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && !parts[4] && method === 'GET') {
     const category = queryOf(path).get('category') || '';
     const product = getProductLines().find((item) => item.id === parts[2]);
-    const inherited = (product?.workItemTypes ?? templateTypes()).filter((item: any) => !category || item.category === category || categoryCode(item.category) === category);
+    const inherited = productTypes(product).filter((item: any) => !category || item.category === category || categoryCode(item.category) === category);
     return inherited.map((item: any) => ({ ...item, productLineId: parts[2] }));
   }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'child-type-rules' && method === 'GET') return [];
@@ -841,7 +863,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const products = getProductLines();
     const product = products.find((item) => item.id === parts[2]);
     if (!product) throw new Error('产品不存在');
-    const types = structuredClone(product.workItemTypes ?? templateTypes());
+    const types = structuredClone(productTypes(product));
     const type = types.find((item: any) => item.id === parts[4]) as any;
     if (!type) throw new Error('工作项类型不存在');
     const workflows = type.workflows ?? (type.workflow ? [type.workflow] : []);
@@ -865,7 +887,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const products = getProductLines();
     const product = products.find((item) => item.id === parts[2]);
     if (!product) throw new Error('产品不存在');
-    let types = [...(product.workItemTypes ?? templateTypes())];
+    let types = [...productTypes(product)];
     let createdId = parts[4];
     if (method === 'POST') {
       createdId = id('type');
@@ -962,12 +984,15 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (clean === '/api/work-items' && method === 'POST') {
     if (!String(body.title || '').trim()) throw new Error('任务标题不能为空');
     const product = getProductLines().find((line) => line.id === body.productLineId);
-    const type = (product?.workItemTypes ?? templateTypes()).find((item: any) => item.id === body.taskTypeId);
+    const type = productTypes(product).find((item: any) => item.id === body.taskTypeId);
     if (!product || !type || !type.enabled || categoryCode(type.category) !== body.category) throw new Error('产品或工作项类型不可用，请刷新后重试');
     const items = getWorkItems(); const existing = items.find((item) => item.requestId && item.requestId === body.requestId);
     if (existing) return unifiedWorkItem(existing);
     const owner = getEmployeeOptions().find((employee) => employee.id === body.assigneeId);
-    const task = { ...body, id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: '待处理', statusKey: 'pending', revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
+    const workflow = (type.workflows || (type.workflow ? [type.workflow] : [])).find((flow: any) => flow.status === 'PUBLISHED');
+    const initial = workflow?.definition?.states?.find((state: any) => state.initial && state.enabled !== false);
+    if (!initial) throw new Error('当前工作项类型未配置已发布的初始状态');
+    const task = { ...body, id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: initial.name, statusKey: initial.key, workflowId: workflow.id, statusColor: initial.color, revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
     write(KEYS.workItems, [task, ...items]);
     attachWorkItemToRequirement(task, type.name);
     recordTaskActivity(task.id, product.id, 'WORK_ITEM_CREATED', { title: task.title });
@@ -1009,7 +1034,41 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const page = Math.max(1, Number(query.get('page') || 1)); const pageSize = Math.max(1, Number(query.get('pageSize') || 100));
     return { page: { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length } };
   }
-  if (parts[1] === 'work-items' && parts[2] && parts[3] === 'transitions' && method === 'GET') return { revision: 0, actions: [], statuses: [] };
+  if (parts[1] === 'work-items' && parts[2] && parts[3] === 'transitions' && ['GET', 'POST'].includes(method)) {
+    const items = getWorkItems();
+    const index = items.findIndex((item) => item.id === parts[2] && item.productLineId === queryOf(path).get('productLineId'));
+    if (index < 0 || items[index].deleted || items[index].deleteFlag) throw new Error('任务不存在或已归档');
+    const current = items[index];
+    const product = getProductLines().find((line) => line.id === current.productLineId);
+    const type: any = productTypes(product).find((type: any) => type.id === (current.taskTypeId || current.workItemTypeId));
+    const workflows = type?.workflows || (type?.workflow ? [type.workflow] : []);
+    const workflow = workflows.find((workflow: any) => workflow.status === 'PUBLISHED' && (!current.workflowId || workflow.id === current.workflowId));
+    const states = workflow?.definition?.states?.filter((state: any) => state.enabled !== false) || [];
+    const currentKey = states.find((state: any) => state.key === current.statusKey)?.key || states.find((state: any) => state.name === current.status)?.key;
+    let role = '';
+    try { role = JSON.parse(sessionStorage.getItem('shichuang.session') || 'null')?.user?.role || ''; } catch { /* 无效会话不可变更状态 */ }
+    const hasChildren = current.hasChildren || items.some((item) => item.parentWorkItemId === current.id && !item.deleted && !item.deleteFlag);
+    const edges = (workflow?.definition?.transitions || []).filter((edge: any) => edge.from === currentKey && states.some((state: any) => state.key === edge.to));
+    const actions = edges.map((edge: any) => {
+      const reasons = [...(hasChildren ? ['含子任务的父任务不可直接修改状态'] : []), ...(edge.roles?.length && !edge.roles.includes(role) ? ['当前角色无权执行此流转'] : []), ...(edge.approvalTasks?.length ? ['该流转需要审批'] : [])];
+      return { edgeKey: edge.key, name: edge.name, to: edge.to, requiredFields: edge.requiredFields || [], allowed: !reasons.length, reasons };
+    });
+    const revision = Number(current.revision || 0);
+    if (method === 'GET') return { revision, actions, statuses: states.map((state: any) => ({ key: state.key, name: state.name, color: state.color || 'neutral', current: state.key === currentKey, allowed: state.key === currentKey || actions.some((action: any) => action.to === state.key && action.allowed), reasons: actions.find((action: any) => action.to === state.key)?.reasons || [] })) };
+    if (body.revision !== revision) throw new Error('任务已被其他人更新，请刷新后重试');
+    const action = actions.find((action: any) => action.edgeKey === body.edgeKey);
+    if (!action?.allowed) throw new Error(action?.reasons.join('；') || '当前状态不允许此流转');
+    for (const field of action.requiredFields) { if (body[field] == null || body[field] === '') throw new Error(field === 'reason' ? '请填写状态变更原因' : `请填写${field}`); }
+    const state = states.find((state: any) => state.key === action.to);
+    if (state.name === '已完成') validateCompletion(body);
+    const updated = { ...current, status: state.name, statusKey: state.key, statusColor: state.color, revision: revision + 1, ...(state.name === '已完成' ? { actualHours: body.actualHours, completionReview: body.completionReview, completedAt: now() } : {}) };
+    items[index] = updated;
+    write(KEYS.workItems, items);
+    syncAttachedWorkItem(updated);
+    recordTaskActivity(current.id, current.productLineId, 'WORK_ITEM_TRANSITIONED', { fromName: current.status, toName: state.name, reason: body.reason || '', ...(state.name === '已完成' ? { actualHours: body.actualHours } : {}) });
+    if (updated.completionReview && state.name === '已完成') recordTaskActivity(current.id, current.productLineId, 'WORK_ITEM_REVIEWED', { review: { title: `${current.title}复盘总结`, ...updated.completionReview } });
+    return unifiedWorkItem(updated);
+  }
   if (parts[1] === 'work-items' && parts[2] && parts[3] === 'relations' && method === 'GET') {
     const item = getWorkItems().find((candidate) => candidate.id === parts[2]);
     const ids = [...(item?.relatedTaskIds || []), ...(item?.sourceWorkOrderIds || [])];

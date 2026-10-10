@@ -5,6 +5,7 @@ import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { productRepository, type UnifiedWorkItem } from '../../services/productRepository';
 import { RequirementTasksView } from './RequirementTasksView';
+import { TestPlanOverview } from './TestPlanOverview';
 import { TestPlanCaseDefects } from './TestPlanCaseDefects';
 import type { TestCase, TestPlan, TestPlanCase, TestPlanCaseStatus } from '../../types/testManagement';
 
@@ -13,6 +14,7 @@ type SavedCase = TestPlanCase & Partial<TestCase>;
 
 export const TestPlanDetail: React.FC<{ record: TestPlanRecord; onBack: () => void }> = ({ record, onBack }) => {
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'cases' | 'overview'>('cases');
   const [addOpen, setAddOpen] = useState(false);
   const [savedDirectoryId, setSavedDirectoryId] = useState<string>();
   const [addDirectoryId, setAddDirectoryId] = useState<string>();
@@ -92,11 +94,18 @@ export const TestPlanDetail: React.FC<{ record: TestPlanRecord; onBack: () => vo
   const statusOptions = [{ value: 'NOT_EXECUTED', label: '待测试' }, { value: 'PASSED', label: '已通过' }, { value: 'FAILED', label: '未通过' }, { value: 'DEFERRED', label: '暂缓' }];
   const savedColumns = [...caseColumns, { title: '状态', width: 140, render: (_: unknown, item: SavedCase) => <Select aria-label={`${item.title}测试状态`} className={`test-plan-case-status is-${item.executionStatus || 'NOT_EXECUTED'}`} value={item.executionStatus || 'NOT_EXECUTED'} options={statusOptions} disabled={saving} onChange={(executionStatus: TestPlanCaseStatus) => void updateCase(item, { executionStatus })} /> }, { title: '缺陷', width: 160, render: (_: unknown, item: SavedCase) => <TestPlanCaseDefects item={item} productLineId={record.task.productLineId} saving={saving} onRemove={(id) => updateCase(item, { defectIds: (item.defectIds || []).filter((value) => value !== id) })} onAdd={(mode) => { setSaveError(''); setDefectCase(item); setDefectId(undefined); setDefectKeyword(''); setCreatedDefectId(undefined); defectRequestId.current = `plan-defect-${record.plan.id}-${item.testCaseId}-${crypto.randomUUID()}`; setDefectMode(mode); }} /> }];
   return <div className="test-plan-detail-page">
-    <div className="test-plan-detail-breadcrumb"><Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack}>返回</Button><i /><span>测试计划</span><i /><strong>{record.plan.name || '未命名计划'}</strong><Button aria-label="添加用例" className="test-plan-add-case-button" type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>添加用例</Button></div>
+    <header className="test-plan-detail-header">
+      <Button icon={<ArrowLeftOutlined />} aria-label="返回测试计划列表" onClick={onBack} />
+      <h1>测试计划详情</h1><span className="test-plan-header-divider" />
+      <nav role="tablist" aria-label="测试计划详情分类">{(['cases', 'overview'] as const).map((tab) => <button type="button" role="tab" id={`plan-tab-${tab}`} aria-controls={`plan-panel-${tab}`} aria-selected={activeTab === tab} key={tab} onClick={() => setActiveTab(tab)}>{tab === 'cases' ? '用例' : '概览'}</button>)}</nav>
+      {activeTab === 'cases' && <Button aria-label="添加用例" className="test-plan-add-case-button" type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>添加用例</Button>}
+    </header>
     {saveError && <Alert type="error" showIcon title={saveError} closable onClose={() => setSaveError('')} />}
-    <div className="test-plan-detail-layout">
+    <div role="tabpanel" id="plan-panel-cases" aria-labelledby="plan-tab-cases" hidden={activeTab !== 'cases'}><div className="test-plan-detail-layout">
       <main className="test-plan-detail-content">{record.plan.cases.length ? <div className="test-plan-case-browser"><aside className="test-plan-case-directories"><button type="button" className={!savedDirectoryId ? 'is-active' : ''} onClick={() => setSavedDirectoryId(undefined)}>全部用例 <span>{savedCases.length}</span></button>{savedDirectories.map((directory) => <button type="button" key={directory.id} className={savedDirectoryId === directory.id ? 'is-active' : ''} onClick={() => setSavedDirectoryId(directory.id)}>{directory.name} <span>{directory.count}</span></button>)}</aside><section className="test-plan-case-list"><Table rowKey="testCaseId" size="small" pagination={false} loading={planCases.isLoading} dataSource={visibleSavedCases} columns={savedColumns} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前目录暂无用例" /> }} /></section></div> : <div className="test-plan-detail-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无内容" /></div>}</main>
     </div>
+    </div>
+    {activeTab === 'overview' && <div role="tabpanel" id="plan-panel-overview" aria-labelledby="plan-tab-overview"><TestPlanOverview record={record} /></div>}
     <Modal title="添加用例" open={addOpen} onCancel={() => { setAddOpen(false); setSelectedIds([]); }} onOk={() => void saveCases()} okText="添加" cancelText="取消" confirmLoading={saving} width="min(1100px, calc(100vw - 32px))" destroyOnHidden>
       <div className="test-plan-add-cases"><aside><Select showSearch allowClear value={addDirectoryId} onChange={setAddDirectoryId} optionFilterProp="label" placeholder="搜索并选择功能目录" options={directoryOptions} className="w-full" /><div className="mt-3 text-xs text-[var(--text-muted)]">当前目录</div></aside><section>{saveError && <Alert className="mb-3" type="error" showIcon closable onClose={() => setSaveError('')} title="保存失败" description={saveError} />}<Input.Search allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索标题或编号" className="mb-3" />{cases.isError ? <Alert type="error" showIcon title="用例加载失败" action={<Button size="small" onClick={() => void cases.refetch()}>重试</Button>} /> : <Spin spinning={cases.isLoading}><Table rowKey="id" size="small" pagination={false} dataSource={availableCases} rowSelection={{ selectedRowKeys: selectedIds, onChange: (keys) => setSelectedIds(keys.map(String)), getCheckboxProps: (item: TestCase) => ({ disabled: currentIds.includes(item.id) }) }} columns={caseColumns as any} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前目录暂无可添加用例" /> }} /></Spin>}</section></div>
     </Modal>

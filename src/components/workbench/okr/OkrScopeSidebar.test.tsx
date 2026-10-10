@@ -104,3 +104,13 @@ describe('OkrScopeSidebar', () => {
     render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{ scope: 'my' }} onSelect={vi.fn()} onAddTarget={vi.fn()} />);
     expect(screen.queryByRole('button', { name: '目标设置' })).not.toBeInTheDocument();
   });
+
+it('preserves label-click expansion when people are refreshed with the same members', () => {
+  const props = { currentUserId: 'manager', selection: { scope: 'my' as const }, onSelect: vi.fn(), onAddTarget: vi.fn() };
+  const view = render(<OkrScopeSidebar {...props} people={people} />);
+  fireEvent.click(screen.getByRole('button', { name: '直属下级' }));
+  view.rerender(<OkrScopeSidebar {...props} people={people.map(person => ({ ...person }))} />);
+  expect(screen.getByRole('button', { name: '收起直属下级成员' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '直属下级' }));
+  expect(screen.getByRole('button', { name: '展开直属下级成员' })).toBeInTheDocument();
+});

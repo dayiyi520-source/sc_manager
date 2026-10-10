@@ -30,6 +30,30 @@ const renderDetail = () => {
 };
 describe('测试计划状态与缺陷操作', () => {
   beforeEach(() => { mocks.save.mockReset(); mocks.create.mockReset(); });
+  it('默认显示用例及添加入口，概览隐藏入口且统计使用计划结果', async () => {
+    renderDetail();
+    expect(screen.getByRole('tab', { name: '用例' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: '添加用例' })).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: '概览' }));
+    expect(screen.queryByRole('button', { name: '添加用例' })).not.toBeInTheDocument();
+    expect(screen.getByText('计划信息')).toBeVisible();
+    expect(screen.getByRole('img', { name: '执行通过率 0%' })).toBeVisible();
+    expect(screen.getByText('相关缺陷')).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: '用例' }));
+    expect(screen.getByRole('button', { name: '添加用例' })).toBeVisible();
+    expect(await screen.findByLabelText('登录测试状态')).toBeVisible();
+  });
+  it('概览按计划状态统计人员数据，关联缺陷去重展示', async () => {
+    const record = renderDetail();
+    record.plan.cases = (['PASSED', 'PASSED', 'FAILED', 'DEFERRED'] as const).map((executionStatus, index) => ({ ...record.plan.cases[0], testCaseId: `c${index + 1}`, executionStatus, defectIds: ['b1'] }));
+    fireEvent.click(screen.getByRole('tab', { name: '概览' }));
+    expect(screen.getByRole('img', { name: '执行通过率 50%' })).toBeVisible();
+    const panel = screen.getByRole('tabpanel', { name: '概览' });
+    const row = within(panel).getByText('张三').closest('tr')!;
+    expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['张张三', '4', '3', '2', '1', '1', '1', '50%']);
+    expect(await within(panel).findByText('登录缺陷')).toBeVisible();
+    expect(within(panel).getAllByText('登录缺陷')).toHaveLength(1);
+  });
   it('默认待测试，修改为暂缓后保存；失败保留原值', async () => {
     renderDetail();
     expect(await screen.findByText('待测试')).toBeInTheDocument();

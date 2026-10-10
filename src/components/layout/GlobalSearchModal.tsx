@@ -48,7 +48,7 @@ export const GlobalSearchModal: React.FC = () => {
 
     // Search menus
     MENU_GROUPS.forEach((group) => {
-      group.subMenus.forEach((sub) => {
+      (group.homePage ? [group.homePage, ...group.subMenus] : group.subMenus).forEach((sub) => {
         if (sub.title.toLowerCase().includes(q) || group.title.toLowerCase().includes(q)) {
           results.push({
             type: 'menu',

@@ -1,3 +1,4 @@
+import { ProductInsightFilter, filterInsightItems, initialInsightFilter, insightDateRange } from './ProductInsightFilter';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Input, Select, Button, Switch, Drawer, Tag, Dropdown, Popconfirm, Spin } from 'antd';
 import Card from 'antd/es/card/Card';
@@ -512,6 +513,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
 
   // Tabs state for sub-entities
   const [activeTab, setActiveTab] = useState<'basic' | 'board' | 'versions' | 'documents' | 'hours' | 'performance' | 'settings'>(initialSettingsSection ? 'settings' : 'basic');
+  const [insightFilter, setInsightFilter] = useState(initialInsightFilter);
+  useEffect(() => setInsightFilter(initialInsightFilter), [productLineId]);
   const workItemsQuery = useProductLineWorkItems(productLineId);
   const productInfoRef = useRef<HTMLDivElement>(null);
   const statsPanelRef = useRef<HTMLElement>(null);
@@ -671,6 +674,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     return groups;
   }, {})).sort(([left], [right]) => right.localeCompare(left));
   const workItems = workItemsQuery.data || [];
+  const insightItems = filterInsightItems(workItems, insightFilter);
   const pendingByCategory = (category: string) => workItems.filter((item) => item.category === category && (item.status?.group === 'NOT_STARTED' || item.status?.group === 'IN_PROGRESS')).length;
 
   return (
@@ -863,9 +867,10 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       </div>
 
       {activeTab === 'board' && <div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-base font-bold text-[var(--text-primary)]">产品看板</h2><p className="mt-1 text-xs text-[var(--text-muted)]">按任务类型和处理状态查看当前产品的工作项分布。</p></div><Dropdown menu={{ items: [{ key: 'requirement', label: '产品' }, { key: 'design', label: '设计' }, { key: 'dev', label: '研发' }, { key: 'test', label: '测试' }, { key: 'bug', label: '缺陷' }], onClick: ({ key }) => openBoardTaskCreate(key as 'requirement' | 'design' | 'dev' | 'test' | 'bug') }} trigger={['click']}><Button className="product-board-create-button !h-9" size="small" icon={<Plus className="h-3.5 w-3.5" />}>新建<DownOutlined className="text-[10px]" /></Button></Dropdown></div>}
-      {activeTab === 'hours' && <div className="mb-4"><h2 className="text-base font-bold text-[var(--text-primary)]">产品工时</h2><p className="mt-1 text-xs text-[var(--text-muted)]">汇总当前产品工作项的预计工时、实际投入和人员分布。</p></div>}
-      {activeTab === 'performance' && <div className="mb-4"><h2 className="text-base font-bold text-[var(--text-primary)]">产品效能</h2><p className="mt-1 text-xs text-[var(--text-muted)]">基于当前产品工作项汇总，帮助快速了解交付和质量状态。</p></div>}
+      {activeTab === 'hours' && <div className="mb-4 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-base font-bold text-[var(--text-primary)]">产品工时</h2><p className="mt-1 text-xs text-[var(--text-muted)]">汇总当前产品工作项的预计工时、实际投入和人员分布。</p></div><ProductInsightFilter value={insightFilter} onChange={setInsightFilter} versions={lineVersions} /></div>}
+      {activeTab === 'performance' && <div className="mb-4 flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-base font-bold text-[var(--text-primary)]">产品效能</h2><p className="mt-1 text-xs text-[var(--text-muted)]">基于当前产品工作项汇总，帮助快速了解交付和质量状态。</p></div><ProductInsightFilter value={insightFilter} onChange={setInsightFilter} versions={lineVersions} /></div>}
 
+      {(activeTab === 'hours' || activeTab === 'performance') && insightFilter.mode === 'time' && <p className="mb-4 text-xs text-[var(--text-muted)]">按工作项创建时间筛选，工时为所选工作项的累计值。{insightFilter.period === 'custom' && !insightFilter.range ? '请选择时间范围。' : ''}</p>}
       {(activeTab === 'board' || activeTab === 'hours' || activeTab === 'performance') && (workItemsQuery.isPending
         ? <div className="min-h-[calc(100vh-280px)] py-12 text-center text-xs text-[var(--text-muted)]">正在加载产品工作项...</div>
         : workItemsQuery.isError
@@ -875,8 +880,8 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 <ProductLineBoard items={workItems} versions={lineVersions} onOpenItem={setDetailWorkItem} onOpenCategory={(category) => navigateWithLine(({ requirement: 'prod_req_tasks', design: 'prod_design_tasks', dev: 'prod_rd_tasks', test: 'prod_test_tasks', bug: 'prod_bugs' } as const)[category])} />
               </Card>
             : activeTab === 'hours'
-              ? <ProductLineHours items={workItems} memberCount={memberCount} />
-              : <ProductLinePerformance items={workItems} />)}
+              ? <ProductLineHours items={insightItems} memberCount={memberCount} />
+              : <ProductLinePerformance items={insightItems} dateRange={insightDateRange(insightFilter)} />)}
 
       {/* Tab 1: 版本迭代计划 */}
       {activeTab === 'versions' && (

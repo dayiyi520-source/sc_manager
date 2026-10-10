@@ -421,7 +421,8 @@ describe('VersionIterationView', () => {
     render(<VersionIterationView />);
     fireEvent.click(screen.getByRole('button', { name: '秋季迭代' }));
     fireEvent.click(screen.getByRole('button', { name: '操作已纳入迭代的工作项' }));
-    expect(await screen.findByText('复盘总结')).toBeInTheDocument();
+    expect(await screen.findByText('归档')).toBeInTheDocument();
+    expect(screen.queryByText('复盘总结')).not.toBeInTheDocument();
     expect(screen.getByText('归档')).toBeInTheDocument();
     expect(screen.queryByText('添加子任务')).not.toBeInTheDocument();
     expect(screen.queryByText('复制并关联')).not.toBeInTheDocument();

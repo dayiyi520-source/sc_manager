@@ -74,9 +74,10 @@ export function OkrScopeSidebar({ people, currentUserId, selection, defaultExpan
   const primaryActionLabel = !currentUser ? '组织信息加载中' : currentUser.rootFlag === 1 ? '添加目标' : '拆解目标';
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(defaultExpandMembers ? groups.filter(group => group.members.length).map(group => group.key) : []));
+  const groupMembershipKey = groups.map(group => `${group.key}:${group.members.map(member => member.id).sort().join(',')}`).join('|');
   useEffect(() => {
     setExpanded(new Set(defaultExpandMembers ? groups.filter(group => group.members.length).map(group => group.key) : []));
-  }, [currentUserId, defaultExpandMembers, groups]);
+  }, [currentUserId, defaultExpandMembers, groupMembershipKey]);
   const normalizedQuery = query.trim().toLowerCase();
 
   return <aside className={`okr-scope-sidebar${collapsed ? ' is-collapsed' : ''}`} aria-label="目标范围导航">

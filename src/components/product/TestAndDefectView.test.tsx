@@ -12,7 +12,10 @@ vi.mock('./TestCaseLibraryView', () => ({
 }));
 
 vi.mock('./TestPlanWorkspace', () => ({
-  TestPlanWorkspace: ({ productLineFilter }: { productLineFilter?: string }) => <div>测试计划工作区：{productLineFilter}</div>
+  TestPlanWorkspace: ({ productLineFilter, onDetailChange }: { productLineFilter?: string; onDetailChange?: (open: boolean) => void }) => {
+    const [detail, setDetail] = React.useState(false);
+    return <div>{detail ? '计划详情内容' : `测试计划工作区：${productLineFilter}`}<button onClick={() => { setDetail(!detail); onDetailChange?.(!detail); }}>{detail ? '返回计划列表' : '打开计划详情'}</button></div>;
+  }
 }));
 
 vi.mock('./TestTaskWorkspace', () => ({
@@ -33,6 +36,17 @@ describe('TestAndDefectView', () => {
   beforeEach(() => {
     mocks.renderTestTaskWorkspace.mockClear();
     mocks.renderReportWorkspace.mockClear();
+  });
+
+  it('打开计划详情隐藏一级页签和产品导航，返回恢复列表', () => {
+    render(<TestAndDefectView mode="management" />);
+    fireEvent.click(screen.getByRole('button', { name: '打开计划详情' }));
+    expect(screen.queryByRole('tab', { name: '测试计划' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '产品导航栏' })).not.toBeInTheDocument();
+    expect(screen.getByText('计划详情内容')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '返回计划列表' }));
+    expect(screen.getByRole('tab', { name: '测试计划' })).toBeVisible();
+    expect(screen.getByRole('navigation', { name: '产品导航栏' })).toBeVisible();
   });
 
   it('默认展示测试任务，并复用统一工作项页面', () => {

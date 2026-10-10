@@ -149,12 +149,12 @@ describe('requirement task Ant Design contract', () => {
   it('organizes design work by type and keeps the design pool independent', () => {
     expect(designSource).toContain('设计任务');
     expect(designSource).toContain('待办设计');
-    expect(designSource).toContain("'all', '全部'");
+    expect(designSource).toContain("selectVariant('all')");
     expect(designSource).toContain("label: '产品设计'");
-    expect(designSource).toContain("label: '物料设计'");
+    expect(designSource).toContain("label: '项目设计'");
     expect(designSource).toContain("label: '其他设计'");
     expect(designSource).toContain('designTasks.filter');
-    expect(designSource).toContain("project: '物料设计'");
+    expect(designSource).toContain("project: '项目设计'");
     expect(designSource).toContain("title: '展厅导视与产品展板设计'");
     expect(designSource).toContain("title: '季度合作伙伴大会主视觉支持'");
     expect(designSource).toContain("title: '会员中心等级权益页视觉优化'");

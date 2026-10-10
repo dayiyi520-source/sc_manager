@@ -529,7 +529,10 @@ export interface ProductLine {
   activities?: ProductLineActivity[];
 }
 
+export type TaskCompletionReview = { content: string; media: RequirementMedia[] };
+
 export interface RequirementTask {
+  completionReview?: TaskCompletionReview;
   projectId?: string;
   projectName?: string;
   needsCollaboration?: Array<'design' | 'dev' | 'test'>;
@@ -805,6 +808,7 @@ export interface RequirementPoolItem {
 export type RequirementItem = RequirementPoolItem;
 
 export interface DevTask {
+  completionReview?: TaskCompletionReview;
   id: string;
   title: string;
   description?: string;

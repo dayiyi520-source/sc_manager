@@ -19,9 +19,9 @@ export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ mode = 'al
   // 两个菜单复用此组件，管理模式不能继续选中仅任务模式存在的标签。
   const visibleActiveTab = mode === 'management' && activeTab === 'test' ? 'test-plan' : activeTab;
   const [testPlanDetailOpen, setTestPlanDetailOpen] = useState(false);
-  const withProductNavigation = (workspace: React.ReactNode) => (
-    <div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3">
-      <ProductNavigation productLines={productLines} value={productLineFilter} onChange={onProductLineChange || (() => undefined)} />
+  const withProductNavigation = (workspace: React.ReactNode, detailOpen = false) => (
+    <div className={detailOpen ? 'min-h-[520px]' : 'grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3'}>
+      {!detailOpen && <ProductNavigation productLines={productLines} value={productLineFilter} onChange={onProductLineChange || (() => undefined)} />}
       <div className="min-w-0">{workspace}</div>
     </div>
   );
@@ -38,6 +38,7 @@ export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ mode = 'al
     <div className="test-and-defect-view">
       <Tabs
         className="test-and-defect-tabs"
+        tabBarStyle={testPlanDetailOpen && visibleActiveTab === 'test-plan' ? { display: 'none' } : undefined}
         activeKey={visibleActiveTab}
         onChange={setActiveTab}
         items={[
@@ -49,7 +50,7 @@ export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ mode = 'al
           mode !== 'tasks' && {
             key: 'test-plan',
             label: <span className="inline-flex items-center gap-2"><FileText size={16} />测试计划</span>,
-            children: <div className={testPlanDetailOpen ? 'test-plan-detail-shell' : undefined}>{withProductNavigation(<TestPlanWorkspace productLineFilter={productLineFilter} onDetailChange={setTestPlanDetailOpen} />)}</div>
+            children: <div className={testPlanDetailOpen ? 'test-plan-detail-shell' : undefined}>{withProductNavigation(<TestPlanWorkspace productLineFilter={productLineFilter} onDetailChange={setTestPlanDetailOpen} />, testPlanDetailOpen)}</div>
           },
           mode !== 'tasks' && {
             key: 'case-library',

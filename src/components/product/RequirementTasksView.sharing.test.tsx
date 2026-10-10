@@ -198,7 +198,7 @@ it.each(['design', 'dev', 'test'] as const)('shows product task cards with statu
   open.mockRestore();
 });
 
-it.each(['presales', 'delivery', 'ops'] as const)('blocks %s creation with missing dates even without field configuration', async (kind) => {
+it.each(['presales', 'delivery'] as const)('blocks %s creation with missing dates even without field configuration', async (kind) => {
   window.history.replaceState(null, '', '/app/wb_work_order');
   vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '协同产品' }] } as unknown as ReturnType<typeof useApp>);
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} creationContext={{ productLineId: 'line-1', title: '日期必填验收' }} /></QueryClientProvider>);
@@ -237,10 +237,19 @@ it.each(['requirement', 'design', 'dev', 'test', 'bug'] as const)('offers archiv
   if (kind !== 'bug') expect(screen.queryByText('复制并关联')).not.toBeInTheDocument();
   else expect(screen.getByText('复制并关联')).toBeInTheDocument();
   expect(screen.queryByRole('menuitem', { name: /添加子任务/ })).not.toBeInTheDocument();
-  if (kind === 'bug') expect(screen.queryByRole('menuitem', { name: /复盘总结/ })).not.toBeInTheDocument();
-  else {
-    fireEvent.click(screen.getByRole('menuitem', { name: /复盘总结/ }));
-    expect(await screen.findByLabelText('复盘总结标题')).toHaveValue('验收任务复盘总结');
-    await waitFor(() => expect(productRepository.workItemReview).toHaveBeenCalledWith('line-1', 'shared-task'));
-  }
+  expect(screen.queryByRole('menuitem', { name: /复盘总结/ })).not.toBeInTheDocument();
+});
+
+it('requires a project before selecting the optional ops product and hides task type', async () => {
+  window.history.replaceState(null, '', '/app/proj_ops_tasks');
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="ops" /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: '新建' }));
+  const project = screen.getByText('关联项目').closest('.ant-form-item')!;
+  const product = screen.getByText('所属产品').closest('.ant-form-item')!;
+  expect(project.querySelector('label')).toHaveClass('ant-form-item-required');
+  expect(product.querySelector('label')).not.toHaveClass('ant-form-item-required');
+  expect(product.querySelector('input')).toBeDisabled();
+  expect(project).toHaveStyle({ order: '-2' });
+  expect(product).toHaveStyle({ order: '-1' });
+  expect(screen.queryByText('运维任务类型')).not.toBeInTheDocument();
 });

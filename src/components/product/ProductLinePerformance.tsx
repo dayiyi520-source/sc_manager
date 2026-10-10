@@ -22,7 +22,7 @@ const formatDay = (value: Date) => `${value.getMonth() + 1}/${value.getDate()}`;
 const StatCard: React.FC<{ label: string; value: React.ReactNode; tone?: string }> = ({ label, value, tone = 'text-[var(--text-primary)]' }) => <div className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-3"><div className={`text-xl font-bold tabular-nums ${tone}`}>{value}</div><div className="mt-2 text-xs text-[var(--text-muted)]">{label}</div></div>;
 const ChartPanel: React.FC<{ title: string; action?: React.ReactNode; children: React.ReactNode }> = ({ title, action, children }) => <section className="min-w-0 border border-[var(--border-main)] bg-[var(--bg-surface)] p-4"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-bold text-[var(--text-primary)]">{title}</h3>{action}</div><div className="mt-3 h-64">{children}</div></section>;
 
-export const ProductLinePerformance: React.FC<{ items: UnifiedWorkItem[] }> = ({ items }) => {
+export const ProductLinePerformance: React.FC<{ items: UnifiedWorkItem[]; dateRange?: [string, string] | null }> = ({ items, dateRange }) => {
   const [selectedTaskCategory, setSelectedTaskCategory] = useState<TaskCategory | 'all'>('all');
   const [trendTaskCategory, setTrendTaskCategory] = useState<TaskCategory | 'all'>('all');
   const [defectDimension, setDefectDimension] = useState<DefectDimension>('status');
@@ -53,13 +53,16 @@ export const ProductLinePerformance: React.FC<{ items: UnifiedWorkItem[] }> = ({
   }, [defectDimension, stockDefects]);
   const trendData = useMemo(() => {
     const today = startOfDay(new Date());
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = new Date(today); day.setDate(today.getDate() - (6 - index));
-      const key = dateKey(day.toISOString());
+    const end = dateRange ? parseDate(dateRange[1])! : today;
+    const start = dateRange ? parseDate(dateRange[0])! : new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+    const length = daysBetween(start, end) + 1;
+    return Array.from({ length }, (_, index) => {
+      const day = new Date(start); day.setDate(start.getDate() + index);
+      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
       const stockAt = (scope: UnifiedWorkItem[]) => scope.filter((item) => { const created = parseDate(item.createdAt); const completedAt = parseDate(item.completedAt); return Boolean(created && created <= day && (!completedAt || completedAt > day) && item.status?.group !== 'CANCELLED'); }).length;
       return { day: formatDay(day), newItems: trendTasks.filter((item) => dateKey(item.createdAt) === key).length, completed: trendTasks.filter((item) => dateKey(item.completedAt) === key && isCompleted(item)).length, stock: stockAt(trendTasks), defectsNew: defectItems.filter((item) => dateKey(item.createdAt) === key).length, defectsFixed: defectItems.filter((item) => dateKey(item.completedAt) === key && isCompleted(item)).length, defectsStock: stockAt(defectItems) };
     });
-  }, [defectItems, trendTasks]);
+  }, [defectItems, trendTasks, dateRange]);
   const speedData = useMemo(() => {
     const buckets = [{ name: '1周内', min: 0, max: 7 }, { name: '1-2周', min: 7, max: 14 }, { name: '2-4周', min: 14, max: 28 }, { name: '4周以上', min: 28, max: Infinity }];
     const count = (scope: UnifiedWorkItem[]) => buckets.map(({ name, min, max }) => ({ name, value: scope.filter((item) => { const created = parseDate(item.createdAt); const completed = parseDate(item.completedAt); return isCompleted(item) && created && completed && daysBetween(created, completed) >= min && daysBetween(created, completed) < max; }).length }));

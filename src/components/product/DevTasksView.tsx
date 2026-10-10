@@ -33,8 +33,8 @@ export const DevTasksView: React.FC = () => {
   const { setDevTasks } = useApp();
   const changeStatus = (task: DevTask, status: string) => {
     if (status !== '已完成') { updateDevTask(task.id, { status }); return; }
-    openTaskCompletionDialog(async (actualHours) => {
-      await productRepository.updateTask('dev', task.id, { status, actualHours, spentHours: actualHours });
+    openTaskCompletionDialog(async (actualHours, _reason, completionReview) => {
+      await productRepository.updateTask('dev', task.id, { status, actualHours, completionReview, spentHours: actualHours });
       setDevTasks((items) => items.map((item) => item.id === task.id ? { ...item, status, spentHours: actualHours } : item));
       setSelectedTask((current) => current?.id === task.id ? { ...current, status, spentHours: actualHours } : current);
     });

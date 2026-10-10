@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Button, Empty, Input, Modal, Select, message } from 'antd';
+import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
+import { designGroupOf, designVariantOf } from './designTaskPresentation';
 import { Search } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import type { RequirementTask } from '../../types';
@@ -12,27 +14,14 @@ type PoolVariant = DesignTaskVariant | 'all';
 type TodoStatus = '待设计' | '设计中' | '已设计' | '已取消';
 type TodoDesign = { id: string; title: string; variant: DesignTaskVariant; ownership: string; creator: string; createdAt: string; status: TodoStatus; reason?: string; sourceTitle: string };
 
-const DESIGN_VARIANTS: Array<{ key: DesignTaskVariant; label: string }> = [{ key: 'product', label: '产品设计' }, { key: 'project', label: '物料设计' }, { key: 'other', label: '其他设计' }];
-const TODO_VARIANT_LABEL: Record<DesignTaskVariant, string> = { product: '产品设计', project: '物料设计', other: '其他设计' };
+const DESIGN_VARIANTS: Array<{ key: DesignTaskVariant; label: string }> = [{ key: 'product', label: '产品设计' }, { key: 'project', label: '项目设计' }, { key: 'other', label: '其他设计' }];
+const TODO_VARIANT_LABEL: Record<DesignTaskVariant, string> = { product: '产品设计', project: '项目设计', other: '其他设计' };
 const INITIAL_TODOS: TodoDesign[] = [
   { id: 'todo-design-product-demo', title: '会员中心等级权益页视觉优化', variant: 'product', ownership: '客户运营平台 / V2.6', creator: '林晓', createdAt: '2026-09-28', status: '待设计', sourceTitle: '会员等级与权益升级' },
   { id: 'todo-design-project-demo', title: '展厅导视与产品展板设计', variant: 'project', ownership: '华东体验中心建设项目', creator: '周明', createdAt: '2026-09-29', status: '设计中', sourceTitle: '展厅物料设计协助' },
   { id: 'todo-design-other-demo', title: '季度合作伙伴大会主视觉支持', variant: 'other', ownership: '市场部', creator: '陈佳', createdAt: '2026-09-30', status: '待设计', sourceTitle: '大会视觉协同事项' }
 ];
-const variantOf = (task: RequirementTask): DesignTaskVariant => {
-  if (task.designVariant) return task.designVariant;
-  const typeName = task.requirementType || '';
-  if (typeName.includes('其他')) return 'other';
-  if (typeName.includes('物料') || typeName.includes('项目')) return 'project';
-  return 'product';
-};
-const ownershipOf = (task: RequirementTask, variant: DesignTaskVariant) => {
-  if (variant === 'product') return [task.productLineName, task.versionName || '未关联'].filter(Boolean).join(' / ') || '未设置';
-  if (variant === 'project') return task.designProjectName || (task as RequirementTask & { projectName?: string }).projectName || task.productLineName || '未设置';
-  return task.designSourceDepartment || task.department || '未设置';
-};
-const Navigation: React.FC<{ title: string; value: string; items: Array<[string, string]>; counts: Record<string, number>; onChange: (value: string) => void }> = ({ title, value, items, counts, onChange }) => <aside className="min-w-[176px] rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2"><div className="px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">{title}</div>{items.map(([key, label]) => <button key={key} type="button" onClick={() => onChange(key)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${value === key ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'text-[var(--text-body)] hover:bg-[var(--bg-surface-soft)]'}`}><span>{label}</span><span className="font-mono text-xs text-[var(--text-muted)]">{counts[key] || 0}</span></button>)}</aside>;
-
+const variantOf = designVariantOf;
 const DesignPoolList: React.FC<{ variant: PoolVariant }> = ({ variant }) => {
   const [todos, setTodos] = useState(INITIAL_TODOS);
   const [keyword, setKeyword] = useState('');
@@ -76,6 +65,22 @@ export const DesignTasksView: React.FC<DesignTasksViewProps> = () => {
   const [designVariant, setDesignVariant] = useState<DesignTaskVariant>('product');
   const [designVariantFilter, setDesignVariantFilter] = useState<DesignTaskVariant | 'all'>('all');
   const { designTasks = [] } = useApp();
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [ownershipFilter, setOwnershipFilter] = useState('');
+  const designGroups = useMemo(() => Object.fromEntries(DESIGN_VARIANTS.map(({ key }) => {
+    const groups = new Map<string, { key: string; name: string; count: number }>();
+    designTasks.filter(task => variantOf(task) === key).forEach(task => {
+      const group = designGroupOf(task);
+      if (!group.key) return;
+      groups.set(group.key, { ...group, count: (groups.get(group.key)?.count || 0) + 1 });
+    });
+    return [key, [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))];
+  })), [designTasks]);
+  const selectVariant = (variant: DesignTaskVariant | 'all') => {
+    setDesignVariantFilter(variant); setOwnershipFilter('');
+    if (variant !== 'all') setDesignVariant(variant);
+  };
+  const toggleVariant = (variant: string) => setExpanded(current => { const next = new Set(current); next.has(variant) ? next.delete(variant) : next.add(variant); return next; });
   const designCounts = useMemo(() => ({ all: designTasks.length, product: designTasks.filter((task) => variantOf(task) === 'product').length, project: designTasks.filter((task) => variantOf(task) === 'project').length, other: designTasks.filter((task) => variantOf(task) === 'other').length }), [designTasks]);
   const designExtras = useMemo<DesignAllocationExtra[]>(() => INITIAL_TODOS.map((item) => ({
     id: item.id,
@@ -91,6 +96,16 @@ export const DesignTasksView: React.FC<DesignTasksViewProps> = () => {
     sourceTitle: item.sourceTitle,
     status: { name: item.status, successful: item.status === '已设计' },
   } as DesignAllocationExtra)), []);
-  return <div className="design-tasks-view"><div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3"><Navigation title="设计类型" value={designVariantFilter} items={[[ 'all', '全部'], ...DESIGN_VARIANTS.map(({ key, label }) => [key, label] as [string, string])]} counts={designCounts} onChange={(value) => { const next = value as DesignTaskVariant | 'all'; setDesignVariantFilter(next); if (next !== 'all') setDesignVariant(next); }} /><div className="min-w-0"><RequirementTasksView key={designVariantFilter} productLineFilter="all" itemLabel="设计任务" taskKind="design" designVariant={designVariant} designVariantFilter={designVariantFilter} onDesignVariantChange={setDesignVariant} designExtras={designExtras} /></div></div></div>;
+  return <div className="design-tasks-view"><div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3"><aside aria-label="设计类型" className="w-60 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2">
+    <div className="px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">设计类型</div>
+    <button type="button" aria-pressed={designVariantFilter === 'all'} onClick={() => selectVariant('all')} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${designVariantFilter === 'all' ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'hover:bg-[var(--bg-surface-soft)]'}`}><span>全部</span><span>{designCounts.all}</span></button>
+    {DESIGN_VARIANTS.map(({ key, label }) => <section key={key} aria-label={`${label}分组`}>
+      <div className="flex items-center">
+        <button type="button" aria-label={`${expanded.has(key) ? '收起' : '展开'}${label}`} aria-expanded={expanded.has(key)} onClick={() => toggleVariant(key)} className="rounded p-2 text-[var(--text-muted)] hover:bg-[var(--bg-surface-soft)]">{expanded.has(key) ? <CaretDownOutlined /> : <CaretRightOutlined />}</button>
+        <button type="button" aria-label={label} aria-pressed={designVariantFilter === key && !ownershipFilter} onClick={() => { selectVariant(key); toggleVariant(key); }} className={`flex min-w-0 flex-1 items-center justify-between rounded-md px-3 py-2 text-left text-sm ${designVariantFilter === key && !ownershipFilter ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'hover:bg-[var(--bg-surface-soft)]'}`}><span>{label}</span><span>{designCounts[key]}</span></button>
+      </div>
+      {expanded.has(key) && <div className="pl-6">{designGroups[key].map(group => <button type="button" key={group.key} aria-label={`${label}：${group.name}`} aria-pressed={designVariantFilter === key && ownershipFilter === group.key} onClick={() => { selectVariant(key); setOwnershipFilter(group.key); }} className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm ${designVariantFilter === key && ownershipFilter === group.key ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'hover:bg-[var(--bg-surface-soft)]'}`}><span className="truncate" title={group.name}>{group.name}</span><span className="text-xs text-[var(--text-muted)]">{group.count}</span></button>)}{!designGroups[key].length && <p className="px-3 py-2 text-xs text-[var(--text-muted)]">暂无设计任务</p>}</div>}
+    </section>)}
+  </aside><div className="min-w-0"><RequirementTasksView key={designVariantFilter} productLineFilter="all" itemLabel="设计任务" taskKind="design" designVariant={designVariant} designVariantFilter={designVariantFilter} designOwnershipFilter={ownershipFilter} onDesignVariantChange={setDesignVariant} designExtras={designExtras} /></div></div></div>;
 };
 export default DesignTasksView;
