@@ -16,6 +16,8 @@ type TestAndDefectViewProps = {
 
 export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ mode = 'all', productLineFilter = 'all', productLines = [], onProductLineChange }) => {
   const [activeTab, setActiveTab] = useState(mode === 'management' ? 'test-plan' : 'test');
+  // 两个菜单复用此组件，管理模式不能继续选中仅任务模式存在的标签。
+  const visibleActiveTab = mode === 'management' && activeTab === 'test' ? 'test-plan' : activeTab;
   const [testPlanDetailOpen, setTestPlanDetailOpen] = useState(false);
   const withProductNavigation = (workspace: React.ReactNode) => (
     <div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3">
@@ -36,7 +38,7 @@ export const TestAndDefectView: React.FC<TestAndDefectViewProps> = ({ mode = 'al
     <div className="test-and-defect-view">
       <Tabs
         className="test-and-defect-tabs"
-        activeKey={activeTab}
+        activeKey={visibleActiveTab}
         onChange={setActiveTab}
         items={[
           mode !== 'management' && {

@@ -77,6 +77,24 @@ describe('TestAndDefectView', () => {
     expect(screen.getByText('测试任务统一工作项页面')).toBeInTheDocument();
     rerender(<TestAndDefectView mode="management" productLineFilter="line-1" />);
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['测试计划', '用例库', '测试报告']);
+    expect(screen.getByRole('tab', { name: '测试计划' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('测试计划工作区：line-1')).toBeVisible();
+  });
+
+  it('反复切换任务与管理时，始终显示有效管理内容并保留已选标签', () => {
+    const { rerender } = render(<TestAndDefectView mode="tasks" productLineFilter="line-1" />);
+    for (let index = 0; index < 3; index += 1) {
+      rerender(<TestAndDefectView mode="management" productLineFilter="line-1" />);
+      expect(screen.getByText('测试计划工作区：line-1')).toBeVisible();
+      rerender(<TestAndDefectView mode="tasks" productLineFilter="line-1" />);
+      expect(screen.getByText('测试任务统一工作项页面')).toBeVisible();
+    }
+    rerender(<TestAndDefectView mode="management" productLineFilter="line-1" />);
+    fireEvent.click(screen.getByRole('tab', { name: '用例库' }));
+    rerender(<TestAndDefectView mode="tasks" productLineFilter="line-2" />);
+    rerender(<TestAndDefectView mode="management" productLineFilter="line-2" />);
+    expect(screen.getByRole('tab', { name: '用例库' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('用例库工作区：line-2')).toBeVisible();
   });
 
   it('仅在测试任务和测试报告内容区显示产品导航', () => {

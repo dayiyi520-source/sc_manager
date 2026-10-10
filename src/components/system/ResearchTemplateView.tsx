@@ -12,7 +12,7 @@ import { useApp } from '../../context/AppContext';
 
 type Section = 'dictionary' | 'work-items' | 'roles' | 'notifications' | 'automation' | 'archive';
 const SECTIONS: Array<{ id: Section; label: string }> = [
-  { id: 'dictionary', label: '产研字典' }, { id: 'work-items', label: '工作项模板' },
+  { id: 'dictionary', label: '产研字典' }, { id: 'work-items', label: '工作项模版' },
   { id: 'roles', label: '角色与职责' }, { id: 'notifications', label: '通知与提醒' },
   { id: 'automation', label: '自动化配置' },
   { id: 'archive', label: '归档' }
@@ -21,13 +21,14 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
 const archiveDate = (value?: string) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—';
 const ArchivePanel = () => {
   const { addToast } = useApp();
+  const queryClient = useQueryClient();
   const archivedQuery = useQuery({ queryKey: ['archived-product-lines'], queryFn: productRepository.archivedProductLines, retry: false });
   const [operatingId, setOperatingId] = useState('');
   const restore = async (item: ArchivedProductLine) => {
     setOperatingId(item.id);
     try {
       await productRepository.restoreProductLine(item.id);
-      await archivedQuery.refetch();
+      await Promise.all([archivedQuery.refetch(), queryClient.invalidateQueries({ queryKey: ['product-lines'] })]);
       addToast('success', '产品已取消归档');
     } catch (error) {
       addToast('error', '取消归档失败', error instanceof Error ? error.message : '请稍后重试');

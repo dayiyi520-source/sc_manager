@@ -1,4 +1,6 @@
+import collaborationTypes from '../data/mockCollaborationTypes.json';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
+import savedResearchTemplate from '../data/mockResearchTemplate.json';
 import { handleMockTestReports, TEST_REPORT_STORAGE_KEY } from './mockTestReports';
 import {
   MOCK_BUGS,
@@ -63,7 +65,9 @@ if (typeof window !== 'undefined' && localStorage.getItem(KEYS.snapshot) !== MOC
 const now = () => new Date().toISOString();
 const text = (value: unknown) => value == null ? '' : String(value);
 const read = <T>(key: string, fallback: T): T => {
-  try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : fallback; } catch { return fallback; }
+  const templateKey = key.replace('shichuang.frontend.mock.', '');
+  const seed = Object.prototype.hasOwnProperty.call(savedResearchTemplate, templateKey) ? (savedResearchTemplate as Record<string, unknown>)[templateKey] as T : fallback;
+  try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : seed; } catch { return seed; }
 };
 const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
 const bodyOf = (init?: RequestInit) => { try { return init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {}; } catch { return {}; } };
@@ -81,7 +85,11 @@ const initialWorkItems = [
   ...MOCK_TEST_TASKS.map((task) => ({ ...task, category: 'test' })),
   ...MOCK_BUGS.map((bug) => ({ ...bug, category: 'bug', assigneeName: bug.ownerName })),
 ];
-const getWorkItems = () => read<any[]>(KEYS.workItems, initialWorkItems.map((item) => ({ ...item })));
+const getWorkItems = () => read<any[]>(KEYS.workItems, initialWorkItems.map((item) => ({ ...item }))).map((item) => {
+  const migratedType = (collaborationTypes as Record<string, string>)[item.id];
+  return item.category === 'requirement' && migratedType && !['客户诉求', '线上问题', '售前支持', '交付支持', '其他问题'].includes(item.workOrderType)
+    ? { ...item, workOrderType: migratedType } : item;
+});
 const workItemSummary = (task: Record<string, any>, taskType?: string): RequirementWorkItem => ({
   id: String(task.id),
   requirementId: String(task.requirementId),
@@ -355,7 +363,7 @@ const myTasks = (viewerId: string) => {
   return [...workItems, ...assistanceItems];
 };
 
-export async function mockApiRequest(path: string, init: RequestInit = {}): Promise<any> {
+async function handleMockApiRequest(path: string, init: RequestInit = {}): Promise<any> {
   const method = (init.method || 'GET').toUpperCase();
   const clean = path.split('?')[0];
   const parts = clean.split('/').filter(Boolean);
@@ -366,14 +374,6 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     return handleMockTestReports(path, method, body, getProductLines(), session?.user?.name || '当前用户');
   }
 
-  if (parts[1] === 'work-items' && parts[2] && ['activities', 'comments'].includes(parts[3])) {
-    const item = [...getWorkItems(), ...MOCK_BUGS].find((task) => task.id === parts[2]);
-    const line = queryOf(path).get('productLineId') || '';
-    if (!item || String(item.productLineId || '') !== line) throw new Error('工作项不存在');
-    if (parts[3] === 'activities' && method === 'GET') return taskActivities().filter((event) => event.subjectId === item.id && event.productLineId === line);
-    if (parts[3] === 'comments' && method === 'POST') {
-      const content = text(body.content).trim();
-      if (!content || content.length > 10000) throw new Error('评论内容不能为空且不能超过10000字');
   if (parts[1] === 'work-items' && parts[2] && parts[3] === 'review') {
     const line = queryOf(path).get('productLineId') || '';
     const item = getWorkItems().find((task) => task.id === parts[2] && task.productLineId === line);
@@ -435,6 +435,14 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     throw new Error('不支持的归档操作');
   }
 
+  if (parts[1] === 'work-items' && parts[2] && ['activities', 'comments'].includes(parts[3])) {
+    const item = [...getWorkItems(), ...MOCK_BUGS].find((task) => task.id === parts[2]);
+    const line = queryOf(path).get('productLineId') || '';
+    if (!item || String(item.productLineId || '') !== line) throw new Error('工作项不存在');
+    if (parts[3] === 'activities' && method === 'GET') return taskActivities().filter((event) => event.subjectId === item.id && event.productLineId === line);
+    if (parts[3] === 'comments' && method === 'POST') {
+      const content = text(body.content).trim();
+      if (!content || content.length > 10000) throw new Error('评论内容不能为空且不能超过10000字');
       recordTaskActivity(item.id, line, 'WORK_ITEM_COMMENTED', { content });
       return null;
     }
@@ -496,7 +504,34 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     return { token: `dev-token-${user.role}`, expiresIn: 86400, user };
   }
   if (clean === '/api/auth/dev-accounts') return MOCK_USERS.map((user) => ({ username: user.role === 'admin' ? 'admin' : user.role.replace('_', '-'), name: user.name, role: user.roleTitle }));
-  if (clean === '/api/product-lines' && method === 'GET') return getProductLines();
+  if (clean === '/api/product-lines' && method === 'GET') return getProductLines().filter((product: any) => !product.archivedAt && product.status !== '已归档');
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'archive' && method === 'POST') {
+    const products = getProductLines();
+    const product: any = products.find((item) => item.id === parts[2]);
+    if (!product) throw new Error('产品不存在');
+    if (product.archivedAt || product.status === '已归档') throw new Error('产品已归档');
+    Object.assign(product, { archivedAt: now(), archivedByName: MOCK_USERS[0]?.name || '当前用户', archivedPreviousStatus: product.status, archivedPreviousHealth: product.health, status: '已归档', health: '已归档' });
+    write(KEYS.productLines, products);
+    return null;
+  }
+  if (clean === '/api/product-lines/archived' && method === 'GET') {
+    return getProductLines().filter((product: any) => product.archivedAt || product.status === '已归档').map((product: any) => ({ id: product.id, name: product.name, code: product.code, ownerName: product.ownerName, archivedAt: product.archivedAt, archivedByName: product.archivedByName }));
+  }
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'restore' && method === 'POST') {
+    const products = getProductLines();
+    const product: any = products.find((item) => item.id === parts[2]);
+    if (!product) throw new Error('产品不存在');
+    if (!product.archivedAt && product.status !== '已归档') throw new Error('产品未归档');
+    Object.assign(product, { status: product.archivedPreviousStatus || '待规划', health: product.archivedPreviousHealth, archivedAt: undefined, archivedByName: undefined, archivedPreviousStatus: undefined, archivedPreviousHealth: undefined });
+    write(KEYS.productLines, products);
+    return null;
+  }
+  if (parts[1] === 'product-lines' && parts[2] && !parts[3] && method === 'DELETE') {
+    const products = getProductLines();
+    if (!products.some((item) => item.id === parts[2])) throw new Error('产品不存在');
+    write(KEYS.productLines, products.filter((item) => item.id !== parts[2]));
+    return null;
+  }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'versions' && parts.length <= 5 && ['POST', 'PUT'].includes(method)) {
     const products = getProductLines();
     const product = products.find((item) => item.id === parts[2]);
@@ -525,6 +560,21 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     const input = body as Partial<ProductLine>;
     const product: ProductLine = { ...input, id: id('pl'), name: input.name || '新建产品', code: input.code || 'PL-NEW', description: input.description || '', ownerName: input.ownerName || '', visibility: input.visibility || '公开', commercialAvailability: input.commercialAvailability || '不可商用', sort: Number(input.sort || 0), status: '待规划', createdAt: now(), versions: [] };
     const products = [...getProductLines(), product]; write(KEYS.productLines, products); return product;
+  }
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'members' && ['POST', 'DELETE'].includes(method)) {
+    const products = getProductLines();
+    const product = products.find((item) => item.id === parts[2]);
+    if (!product) throw new Error('产品不存在');
+    if (method === 'POST') {
+      const user = getMembers().find((item) => item.id === body.userId && item.status === 'enabled');
+      if (!user) throw new Error('成员不可用');
+      if (!templateRoles().some((role: any) => role.name === body.role)) throw new Error('所属角色不可用');
+      if (!(product.members || []).some((member) => typeof member !== 'string' && member.userId === user.id)) {
+        product.members = [...(product.members || []), { id: id('product-member'), userId: user.id, name: user.name, role: body.role }] as ProductLine['members'];
+      }
+    } else product.members = (product.members || []).filter((member) => typeof member === 'string' || member.id !== parts[4]) as ProductLine['members'];
+    write(KEYS.productLines, products);
+    return null;
   }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'members' && parts[4] && method === 'PUT') {
     const products = getProductLines(); const product = products.find((item) => item.id === parts[2]);
@@ -709,16 +759,38 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   if (parts[1] === 'automation-template' && parts[2] === 'rules' && parts[3] && method === 'PUT') { const rules = templateAutomation().rules; const index = rules.findIndex((rule: any) => rule.id === parts[3]); if (index >= 0) { rules[index] = { ...rules[index], ...body, revision: rules[index].revision + 1, updatedAt: now() }; write(KEYS.researchAutomation, rules); return rules[index]; } }
   if (parts[1] === 'automation-template' && parts[2] === 'rules' && parts[3] && method === 'DELETE') { write(KEYS.researchAutomation, templateAutomation().rules.filter((rule: any) => rule.id !== parts[3])); return null; }
   if (clean === '/api/automation-template/setting' && method === 'PUT') { const enabled = Boolean(body.enabled); write(KEYS.researchAutomationSetting, enabled); return { enabled }; }
-  if (clean === '/api/product-lines/archived' && method === 'GET') return [];
-
   // 产品级配置在真实系统中由全局产研模板继承；纯前端演示保持同样的读取关系。
-  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && method === 'GET') {
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && !parts[4] && method === 'GET') {
     const category = queryOf(path).get('category') || '';
     const product = getProductLines().find((item) => item.id === parts[2]);
     const inherited = (product?.workItemTypes ?? templateTypes()).filter((item: any) => !category || item.category === category || categoryCode(item.category) === category);
     return inherited.map((item: any) => ({ ...item, productLineId: parts[2] }));
   }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'child-type-rules' && method === 'GET') return [];
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && parts[5] === 'workflows') {
+    const products = getProductLines();
+    const product = products.find((item) => item.id === parts[2]);
+    if (!product) throw new Error('产品不存在');
+    const types = structuredClone(product.workItemTypes ?? templateTypes());
+    const type = types.find((item: any) => item.id === parts[4]) as any;
+    if (!type) throw new Error('工作项类型不存在');
+    const workflows = type.workflows ?? (type.workflow ? [type.workflow] : []);
+    if (method === 'GET') return workflows;
+    let workflow: any;
+    if (method === 'POST') {
+      workflow = { ...body, id: id('workflow'), taskTypeId: type.id, status: 'DRAFT', revision: 0, workflowVersion: workflows.length + 1 };
+      workflows.push(workflow);
+    } else if (method === 'PUT') {
+      workflow = workflows.find((item: any) => item.id === parts[6]);
+      if (!workflow) throw new Error('状态流程不存在');
+      if (body.revision !== workflow.revision || workflow.status !== 'DRAFT') throw new Error('状态流程已更新，请刷新后重试');
+      Object.assign(workflow, body, { revision: workflow.revision + 1 });
+    } else throw new Error('不支持的状态流程操作');
+    type.workflows = workflows;
+    product.workItemTypes = types;
+    write(KEYS.productLines, products);
+    return workflow;
+  }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && ['POST', 'PUT', 'DELETE'].includes(method)) {
     const products = getProductLines();
     const product = products.find((item) => item.id === parts[2]);
@@ -738,12 +810,56 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     write(KEYS.productLines, products);
     return { id: createdId };
   }
-  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'notification-settings' && method === 'GET') return templateNotifications();
-  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'notification-settings' && method === 'PUT') { write(KEYS.researchNotifications, body); return body; }
+  if (parts[1] === 'product-lines' && parts[2] && ['notification-settings', 'automation-rules', 'workflows'].includes(parts[3])) {
+    const products = getProductLines();
+    const product = products.find((item) => item.id === parts[2]) as (ProductLine & { notificationSettings?: any; automation?: { enabled: boolean; rules: any[] } }) | undefined;
+    if (!product) throw new Error('产品不存在');
+    if (parts[3] === 'notification-settings') {
+      if (method === 'GET') return product.notificationSettings ?? templateNotifications();
+      if (method !== 'PUT') throw new Error('不支持的通知设置操作');
+      product.notificationSettings = body;
+      write(KEYS.productLines, products);
+      return body;
+    }
+    if (parts[3] === 'automation-rules') {
+      if (parts[4] === 'logs' && method === 'GET') return [];
+      const automation = product.automation ?? structuredClone(templateAutomation());
+      if (method === 'GET') {
+        const keyword = (queryOf(path).get('keyword') || '').toLowerCase();
+        return { enabled: automation.enabled, rules: automation.rules.filter((rule: any) => !keyword || rule.name.toLowerCase().includes(keyword)) };
+      }
+      let result: any;
+      if (parts[4] === 'setting' && method === 'PUT') {
+        automation.enabled = Boolean(body.enabled);
+        result = { enabled: automation.enabled };
+      } else if (!parts[4] && method === 'POST') {
+        result = { ...body, id: id('automation'), revision: 0, updatedAt: now() };
+        automation.rules.push(result);
+      } else {
+        const index = automation.rules.findIndex((rule: any) => rule.id === parts[4]);
+        if (index < 0) throw new Error('自动化规则不存在');
+        if (method === 'DELETE') automation.rules.splice(index, 1);
+        else if (method === 'PUT') {
+          if (body.revision !== automation.rules[index].revision) throw new Error('自动化规则已更新，请刷新后重试');
+          result = { ...automation.rules[index], ...body, revision: automation.rules[index].revision + 1, updatedAt: now() };
+          automation.rules[index] = result;
+        } else throw new Error('不支持的自动化操作');
+      }
+      product.automation = automation;
+      write(KEYS.productLines, products);
+      return result ?? null;
+    }
+    const type = product.workItemTypes?.find((item: any) => item.workflow?.id === parts[4] || item.workflows?.some((workflow: any) => workflow.id === parts[4])) as any;
+    const workflow = type?.workflows?.find((item: any) => item.id === parts[4]) ?? type?.workflow;
+    if (!workflow || parts[5] !== 'publish' || method !== 'POST') throw new Error('状态流程不存在');
+    if (body.revision !== workflow.revision) throw new Error('状态流程已更新，请刷新后重试');
+    workflow.status = 'PUBLISHED';
+    workflow.revision += 1;
+    type.workflow = workflow;
+    write(KEYS.productLines, products);
+    return workflow;
+  }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'activities' && method === 'GET') return [];
-  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'automation-rules' && parts[4] === 'logs' && method === 'GET') return [];
-  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'automation-rules' && parts[4] === 'setting' && method === 'PUT') { const enabled = Boolean(body.enabled); return { enabled }; }
-  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'automation-rules' && method === 'GET') { const template = templateAutomation(); const keyword = (queryOf(path).get('keyword') || '').toLowerCase(); return { enabled: template.enabled, rules: template.rules.filter((rule: any) => !keyword || rule.name.toLowerCase().includes(keyword)) }; }
 
   if (clean.startsWith('/api/work-items/') && parts.length === 3 && method === 'GET') {
     const found = getWorkItems().filter((item) => !item.deleted && !item.deleteFlag).map(unifiedWorkItem).find((item) => item.id === parts[2]);
@@ -884,4 +1000,65 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   if (method === 'GET') return [];
   if (method === 'POST') return { id: id('mock'), code: `MOCK-${Date.now()}` };
   return null;
+}
+
+const templateRoutes: Record<string, string> = {
+  '/api/product-lines': 'productLines',
+  '/api/research-template/roles': 'researchRoles',
+  '/api/research-template/statuses': 'researchStatuses',
+  '/api/work-item-categories': 'researchCategories',
+  '/api/work-item-field-configurations': 'researchFields',
+  '/api/work-item-template': 'researchTypes',
+  '/api/notification-template': 'researchNotifications',
+  '/api/automation-template/rules': 'researchAutomation',
+  '/api/automation-template/setting': 'researchAutomationSetting',
+};
+const templateFileEndpoint = '/__dev/research-template';
+let templateFile: Record<string, unknown> = {};
+let templateReady: Promise<void> | undefined;
+let templateQueue: Promise<unknown> = Promise.resolve();
+
+async function templateFileRequest(init?: RequestInit): Promise<Record<string, unknown>> {
+  const response = await fetch(templateFileEndpoint, init);
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || '项目 Mock 保存失败');
+  return result;
+}
+
+export async function mockApiRequest(path: string, init: RequestInit = {}): Promise<any> {
+  if (!import.meta.env.DEV || import.meta.env.MODE === 'test') return handleMockApiRequest(path, init);
+  if (!templateReady) {
+    templateReady = templateFileRequest().then((data) => {
+      templateFile = data;
+      for (const key of Object.values(templateRoutes)) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) write(`shichuang.frontend.mock.${key}`, data[key]);
+      }
+    }).catch((error) => { templateReady = undefined; throw error; });
+  }
+  await templateReady;
+  const clean = path.split('?')[0];
+  const route = Object.keys(templateRoutes).find((route) => clean === route || clean.startsWith(`${route}/`));
+  if (!route) return handleMockApiRequest(path, init);
+  const operation = templateQueue.then(async () => {
+    if ((init.method || 'GET').toUpperCase() === 'GET') return handleMockApiRequest(path, init);
+    const key = templateRoutes[route];
+    const storageKey = `shichuang.frontend.mock.${key}`;
+    const previousLocal = localStorage.getItem(storageKey);
+    try {
+      const result = await handleMockApiRequest(path, init);
+      const nextLocal = localStorage.getItem(storageKey);
+      if (nextLocal !== previousLocal) {
+        const value = JSON.parse(nextLocal!);
+        await templateFileRequest({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value, previous: templateFile[key] ?? null }) });
+        templateFile[key] = value;
+      }
+      return result;
+    } catch (error) {
+      if (previousLocal === null) localStorage.removeItem(storageKey);
+      else localStorage.setItem(storageKey, previousLocal);
+      throw error;
+    }
+  });
+  templateQueue = operation.catch(() => undefined);
+  return operation;
 }

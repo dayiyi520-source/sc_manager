@@ -1,0 +1,3589 @@
+{
+  "researchTypes": [
+    {
+      "id": "0d9b8edd-2fcb-47dc-b597-ce588282e156",
+      "category": "缺陷",
+      "name": "样式缺陷",
+      "description": "UI界面样式问题",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e7e22-bac5-11f1-8449-26d3944adf83",
+        "category": "bug",
+        "taskTypeId": "0d9b8edd-2fcb-47dc-b597-ce588282e156",
+        "name": "样式缺陷状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 1,
+        "definition": {
+          "states": [
+            {
+              "key": "todo",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ehqcu_snzi7b",
+              "name": "再次打开",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7enh46_6hr73b",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ehxuo_b3h16a",
+              "name": "已修复",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ehtiu_vh6sxr",
+              "name": "暂不修复",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "done",
+              "name": "已关闭",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_mu7ei4y1_cqehg8",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_mu7ehqcu_snzi7b",
+              "key": "move_todo_status_mu7ehqcu_snzi7b",
+              "from": "todo",
+              "name": "进入再次打开",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7enh46_6hr73b",
+              "key": "move_status_mu7ehqcu_snzi7b_status_mu7enh46_6hr73b",
+              "from": "status_mu7ehqcu_snzi7b",
+              "name": "进入处理中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ehxuo_b3h16a",
+              "key": "move_status_mu7enh46_6hr73b_status_mu7ehxuo_b3h16a",
+              "from": "status_mu7enh46_6hr73b",
+              "name": "进入已修复",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ehtiu_vh6sxr",
+              "key": "move_status_mu7ehxuo_b3h16a_status_mu7ehtiu_vh6sxr",
+              "from": "status_mu7ehxuo_b3h16a",
+              "name": "进入暂不修复",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "done",
+              "key": "move_status_mu7ehtiu_vh6sxr_done",
+              "from": "status_mu7ehtiu_vh6sxr",
+              "name": "进入已关闭",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ei4y1_cqehg8",
+              "key": "move_status_mu7ehtiu_vh6sxr_status_mu7ei4y1_cqehg8",
+              "from": "status_mu7ehtiu_vh6sxr",
+              "name": "进入已取消",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "40d346d2-7408-4d94-8f24-50e7844f82c6",
+      "category": "缺陷",
+      "name": "线上故障",
+      "description": "",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e8104-bac5-11f1-8449-26d3944adf83",
+        "category": "bug",
+        "taskTypeId": "40d346d2-7408-4d94-8f24-50e7844f82c6",
+        "name": "线上故障状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 1,
+        "definition": {
+          "states": [
+            {
+              "key": "todo",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_mu7elf9c_nukifg",
+              "name": "再次打开",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7el7st_nsyut2",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ekpkr_qg9o4o",
+              "name": "已修复",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ekoto_gf06c9",
+              "name": "暂不修复",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "done",
+              "name": "已关闭",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_mu7ekpzn_5scmoc",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_mu7elf9c_nukifg",
+              "key": "move_todo_status_mu7elf9c_nukifg",
+              "from": "todo",
+              "name": "进入再次打开",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7el7st_nsyut2",
+              "key": "move_status_mu7elf9c_nukifg_status_mu7el7st_nsyut2",
+              "from": "status_mu7elf9c_nukifg",
+              "name": "进入处理中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ekpkr_qg9o4o",
+              "key": "move_status_mu7el7st_nsyut2_status_mu7ekpkr_qg9o4o",
+              "from": "status_mu7el7st_nsyut2",
+              "name": "进入已修复",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ekoto_gf06c9",
+              "key": "move_status_mu7ekpkr_qg9o4o_status_mu7ekoto_gf06c9",
+              "from": "status_mu7ekpkr_qg9o4o",
+              "name": "进入暂不修复",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "done",
+              "key": "move_status_mu7ekoto_gf06c9_done",
+              "from": "status_mu7ekoto_gf06c9",
+              "name": "进入已关闭",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ekpzn_5scmoc",
+              "key": "move_status_mu7ekoto_gf06c9_status_mu7ekpzn_5scmoc",
+              "from": "status_mu7ekoto_gf06c9",
+              "name": "进入已取消",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6c96fbf6-dcdf-454b-a689-726cb17ba5ee",
+      "category": "需求",
+      "name": "数据需求",
+      "description": "数据相关的需求",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 4,
+      "workflow": {
+        "id": "af9e8ed3-bac5-11f1-8449-26d3944adf83",
+        "category": "requirement",
+        "taskTypeId": "6c96fbf6-dcdf-454b-a689-726cb17ba5ee",
+        "name": "数据需求状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "todo",
+              "name": "待处理",
+              "group": "NOT_STARTED",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "done",
+              "name": "已完成",
+              "group": "COMPLETED",
+              "stage": "acceptance",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            }
+          ],
+          "transitions": [
+            {
+              "to": "done",
+              "key": "complete",
+              "from": "todo",
+              "name": "完成",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d730-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "其他",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e6a3e-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d730-b3a0-11f1-8449-26d3944adf83",
+        "name": "其他状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d7c2-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "兼容性测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e6bba-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d7c2-b3a0-11f1-8449-26d3944adf83",
+        "name": "兼容性测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d7ce-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "冒烟测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e6caf-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d7ce-b3a0-11f1-8449-26d3944adf83",
+        "name": "冒烟测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d7d7-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "功能测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": true,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e6d90-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d7d7-b3a0-11f1-8449-26d3944adf83",
+        "name": "功能测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d7df-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "回归测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e6e77-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d7df-b3a0-11f1-8449-26d3944adf83",
+        "name": "回归测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d7e8-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "安全性测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e6f59-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d7e8-b3a0-11f1-8449-26d3944adf83",
+        "name": "安全性测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d7f0-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "性能测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e7077-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d7f0-b3a0-11f1-8449-26d3944adf83",
+        "name": "性能测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d7fa-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "按照部署测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e7159-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d7fa-b3a0-11f1-8449-26d3944adf83",
+        "name": "按照部署测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d803-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "接口测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e72a3-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d803-b3a0-11f1-8449-26d3944adf83",
+        "name": "接口测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d80c-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "易用性测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e737a-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d80c-b3a0-11f1-8449-26d3944adf83",
+        "name": "易用性测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d814-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "稳定性测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e748a-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d814-b3a0-11f1-8449-26d3944adf83",
+        "name": "稳定性测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a669d81d-b3a0-11f1-8449-26d3944adf83",
+      "category": "用例",
+      "name": "自动化测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e755b-bac5-11f1-8449-26d3944adf83",
+        "category": "case",
+        "taskTypeId": "a669d81d-b3a0-11f1-8449-26d3944adf83",
+        "name": "自动化测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待测试",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_passed",
+              "name": "已通过",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_failed",
+              "name": "未通过",
+              "color": "red",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_deferred",
+              "name": "暂缓",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_passed",
+              "key": "pass_pending",
+              "from": "status_pending",
+              "name": "测试通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_pending",
+              "from": "status_pending",
+              "name": "测试未通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_pending",
+              "from": "status_pending",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_failed",
+              "from": "status_failed",
+              "name": "复测通过"
+            },
+            {
+              "to": "status_deferred",
+              "key": "defer_failed",
+              "from": "status_failed",
+              "name": "暂缓测试"
+            },
+            {
+              "to": "status_passed",
+              "key": "pass_deferred",
+              "from": "status_deferred",
+              "name": "恢复并通过"
+            },
+            {
+              "to": "status_failed",
+              "key": "fail_deferred",
+              "from": "status_deferred",
+              "name": "恢复并未通过"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "af778520-5729-4cce-bd87-dc797d8d3fde",
+      "category": "缺陷",
+      "name": "系统缺陷",
+      "description": "",
+      "enabled": true,
+      "isDefault": true,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e7f4b-bac5-11f1-8449-26d3944adf83",
+        "category": "bug",
+        "taskTypeId": "af778520-5729-4cce-bd87-dc797d8d3fde",
+        "name": "系统缺陷状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 1,
+        "definition": {
+          "states": [
+            {
+              "key": "todo",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ebb4y_bgb60u",
+              "name": "再次打开",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ebbkw_k02aw2",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ebyq0_xgtqtb",
+              "name": "已修复",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7ec5vk_bksi83",
+              "name": "再不修复",
+              "color": "yellow",
+              "group": "COMPLETED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_mu7ecdhi_4cwu46",
+              "name": "已关闭",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_mu7echje_q1gyw6",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_mu7ebb4y_bgb60u",
+              "key": "move_todo_status_mu7ebb4y_bgb60u",
+              "from": "todo",
+              "name": "进入再次打开",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ebbkw_k02aw2",
+              "key": "move_status_mu7ebb4y_bgb60u_status_mu7ebbkw_k02aw2",
+              "from": "status_mu7ebb4y_bgb60u",
+              "name": "进入处理中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ebyq0_xgtqtb",
+              "key": "move_status_mu7ebbkw_k02aw2_status_mu7ebyq0_xgtqtb",
+              "from": "status_mu7ebbkw_k02aw2",
+              "name": "进入已修复",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7echje_q1gyw6",
+              "key": "move_status_mu7ebyq0_xgtqtb_status_mu7echje_q1gyw6",
+              "from": "status_mu7ebyq0_xgtqtb",
+              "name": "进入已取消",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ec5vk_bksi83",
+              "key": "move_status_mu7echje_q1gyw6_status_mu7ec5vk_bksi83",
+              "from": "status_mu7echje_q1gyw6",
+              "name": "进入再不修复",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7ecdhi_4cwu46",
+              "key": "move_status_mu7echje_q1gyw6_status_mu7ecdhi_4cwu46",
+              "from": "status_mu7echje_q1gyw6",
+              "name": "进入已关闭",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c80f683f-b34c-11f1-8449-26d3944adf83",
+      "category": "测试",
+      "name": "回归测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e64a2-bac5-11f1-8449-26d3944adf83",
+        "category": "test",
+        "taskTypeId": "c80f683f-b34c-11f1-8449-26d3944adf83",
+        "name": "回归测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_in_progress",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_completed",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_cancelled",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_in_progress",
+              "key": "start_processing",
+              "from": "status_pending",
+              "name": "进入处理中"
+            },
+            {
+              "to": "status_completed",
+              "key": "complete",
+              "from": "status_in_progress",
+              "name": "完成"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_pending",
+              "from": "status_pending",
+              "name": "取消"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_processing",
+              "from": "status_in_progress",
+              "name": "取消"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c80f6895-b34c-11f1-8449-26d3944adf83",
+      "category": "测试",
+      "name": "安全测试",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e65d8-bac5-11f1-8449-26d3944adf83",
+        "category": "test",
+        "taskTypeId": "c80f6895-b34c-11f1-8449-26d3944adf83",
+        "name": "安全测试状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_in_progress",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_completed",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_cancelled",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_in_progress",
+              "key": "start_processing",
+              "from": "status_pending",
+              "name": "进入处理中"
+            },
+            {
+              "to": "status_completed",
+              "key": "complete",
+              "from": "status_in_progress",
+              "name": "完成"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_pending",
+              "from": "status_pending",
+              "name": "取消"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_processing",
+              "from": "status_in_progress",
+              "name": "取消"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c80f68a4-b34c-11f1-8449-26d3944adf83",
+      "category": "测试",
+      "name": "测试任务",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": true,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e666b-bac5-11f1-8449-26d3944adf83",
+        "category": "test",
+        "taskTypeId": "c80f68a4-b34c-11f1-8449-26d3944adf83",
+        "name": "测试任务状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "test",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_in_progress",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_completed",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_cancelled",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "test",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_in_progress",
+              "key": "start_processing",
+              "from": "status_pending",
+              "name": "进入处理中"
+            },
+            {
+              "to": "status_completed",
+              "key": "complete",
+              "from": "status_in_progress",
+              "name": "完成"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_pending",
+              "from": "status_pending",
+              "name": "取消"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_processing",
+              "from": "status_in_progress",
+              "name": "取消"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c80f68d0-b34c-11f1-8449-26d3944adf83",
+      "category": "研发",
+      "name": "开发任务",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": true,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e76b6-bac5-11f1-8449-26d3944adf83",
+        "category": "dev",
+        "taskTypeId": "c80f68d0-b34c-11f1-8449-26d3944adf83",
+        "name": "开发任务状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_in_progress",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_completed",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_cancelled",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_in_progress",
+              "key": "start_processing",
+              "from": "status_pending",
+              "name": "进入处理中"
+            },
+            {
+              "to": "status_completed",
+              "key": "complete",
+              "from": "status_in_progress",
+              "name": "完成"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_pending",
+              "from": "status_pending",
+              "name": "取消"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_processing",
+              "from": "status_in_progress",
+              "name": "取消"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c80f68df-b34c-11f1-8449-26d3944adf83",
+      "category": "研发",
+      "name": "性能优化任务",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e77ee-bac5-11f1-8449-26d3944adf83",
+        "category": "dev",
+        "taskTypeId": "c80f68df-b34c-11f1-8449-26d3944adf83",
+        "name": "性能优化任务状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 0,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_in_progress",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_completed",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_cancelled",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_in_progress",
+              "key": "start_processing",
+              "from": "status_pending",
+              "name": "进入处理中"
+            },
+            {
+              "to": "status_completed",
+              "key": "complete",
+              "from": "status_in_progress",
+              "name": "完成"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_pending",
+              "from": "status_pending",
+              "name": "取消"
+            },
+            {
+              "to": "status_cancelled",
+              "key": "cancel_processing",
+              "from": "status_in_progress",
+              "name": "取消"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c80f691e-b34c-11f1-8449-26d3944adf83",
+      "category": "缺陷",
+      "name": "安全漏洞",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e7c30-bac5-11f1-8449-26d3944adf83",
+        "category": "bug",
+        "taskTypeId": "c80f691e-b34c-11f1-8449-26d3944adf83",
+        "name": "安全漏洞状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 1,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_mu7eo301_fyh01p",
+              "name": "再次打开",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_in_progress",
+              "name": "处理中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7enum0_ymbuag",
+              "name": "已修复",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7env4f_12xzfb",
+              "name": "暂不修复",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_completed",
+              "name": "已关闭",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_cancelled",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "dev",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_mu7eo301_fyh01p",
+              "key": "move_status_pending_status_mu7eo301_fyh01p",
+              "from": "status_pending",
+              "name": "进入再次打开",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_in_progress",
+              "key": "move_status_mu7eo301_fyh01p_status_in_progress",
+              "from": "status_mu7eo301_fyh01p",
+              "name": "进入处理中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7enum0_ymbuag",
+              "key": "move_status_in_progress_status_mu7enum0_ymbuag",
+              "from": "status_in_progress",
+              "name": "进入已修复",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7env4f_12xzfb",
+              "key": "move_status_mu7enum0_ymbuag_status_mu7env4f_12xzfb",
+              "from": "status_mu7enum0_ymbuag",
+              "name": "进入暂不修复",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_completed",
+              "key": "move_status_mu7env4f_12xzfb_status_completed",
+              "from": "status_mu7env4f_12xzfb",
+              "name": "进入已关闭",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_cancelled",
+              "key": "move_status_mu7env4f_12xzfb_status_cancelled",
+              "from": "status_mu7env4f_12xzfb",
+              "name": "进入已取消",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c80f6928-b34c-11f1-8449-26d3944adf83",
+      "category": "设计",
+      "name": "其他设计",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e81cd-bac5-11f1-8449-26d3944adf83",
+        "category": "design",
+        "taskTypeId": "c80f6928-b34c-11f1-8449-26d3944adf83",
+        "name": "其他设计状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 1,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "design",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_in_progress",
+              "name": "设计中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_completed",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_cancelled",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_in_progress",
+              "key": "move_status_pending_status_in_progress",
+              "from": "status_pending",
+              "name": "进入设计中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_completed",
+              "key": "move_status_in_progress_status_completed",
+              "from": "status_in_progress",
+              "name": "进入已完成",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_cancelled",
+              "key": "move_status_in_progress_status_cancelled",
+              "from": "status_in_progress",
+              "name": "进入已取消",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c80f6944-b34c-11f1-8449-26d3944adf83",
+      "category": "需求",
+      "name": "产品类型需求",
+      "description": "系统预设模板",
+      "enabled": true,
+      "isDefault": true,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e8cb9-bac5-11f1-8449-26d3944adf83",
+        "category": "requirement",
+        "taskTypeId": "c80f6944-b34c-11f1-8449-26d3944adf83",
+        "name": "产品类型需求状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 1,
+        "definition": {
+          "states": [
+            {
+              "key": "status_pending",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_in_progress",
+              "name": "需求设计中",
+              "color": "cyan",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7dzv6u_2xg0ky",
+              "name": "待评审",
+              "color": "cyan",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e0ish_pr5x3s",
+              "name": "已评审",
+              "color": "cyan",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e0zx2_rs9ksi",
+              "name": "UI设计中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e10ow_8jcoam",
+              "name": "开发中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e1oau_02z3j8",
+              "name": "测试中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e1wkn_86k82s",
+              "name": "验收中",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e2ig0_i9570d",
+              "name": "验收完成",
+              "color": "yellow",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e2vl0_2gu2ns",
+              "name": "已发布",
+              "color": "purple",
+              "group": "IN_PROGRESS",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "status_completed",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_cancelled",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "requirement",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_in_progress",
+              "key": "move_status_pending_status_in_progress",
+              "from": "status_pending",
+              "name": "进入需求设计中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7dzv6u_2xg0ky",
+              "key": "move_status_in_progress_status_mu7dzv6u_2xg0ky",
+              "from": "status_in_progress",
+              "name": "进入待评审",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e0ish_pr5x3s",
+              "key": "move_status_mu7dzv6u_2xg0ky_status_mu7e0ish_pr5x3s",
+              "from": "status_mu7dzv6u_2xg0ky",
+              "name": "进入已评审",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e0zx2_rs9ksi",
+              "key": "move_status_mu7e0ish_pr5x3s_status_mu7e0zx2_rs9ksi",
+              "from": "status_mu7e0ish_pr5x3s",
+              "name": "进入UI设计中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e10ow_8jcoam",
+              "key": "move_status_mu7e0zx2_rs9ksi_status_mu7e10ow_8jcoam",
+              "from": "status_mu7e0zx2_rs9ksi",
+              "name": "进入开发中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e1oau_02z3j8",
+              "key": "move_status_mu7e10ow_8jcoam_status_mu7e1oau_02z3j8",
+              "from": "status_mu7e10ow_8jcoam",
+              "name": "进入测试中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e1wkn_86k82s",
+              "key": "move_status_mu7e1oau_02z3j8_status_mu7e1wkn_86k82s",
+              "from": "status_mu7e1oau_02z3j8",
+              "name": "进入验收中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e2ig0_i9570d",
+              "key": "move_status_mu7e1wkn_86k82s_status_mu7e2ig0_i9570d",
+              "from": "status_mu7e1wkn_86k82s",
+              "name": "进入验收完成",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e2vl0_2gu2ns",
+              "key": "move_status_mu7e2ig0_i9570d_status_mu7e2vl0_2gu2ns",
+              "from": "status_mu7e2ig0_i9570d",
+              "name": "进入已发布",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_completed",
+              "key": "move_status_mu7e2vl0_2gu2ns_status_completed",
+              "from": "status_mu7e2vl0_2gu2ns",
+              "name": "进入已完成",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_cancelled",
+              "key": "move_status_mu7e2vl0_2gu2ns_status_cancelled",
+              "from": "status_mu7e2vl0_2gu2ns",
+              "name": "进入已取消",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cd689f9f-6dc5-4034-ba9f-4703e8fabedd",
+      "category": "设计",
+      "name": "物料设计",
+      "description": "公司物料",
+      "enabled": true,
+      "isDefault": false,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e82ca-bac5-11f1-8449-26d3944adf83",
+        "category": "design",
+        "taskTypeId": "cd689f9f-6dc5-4034-ba9f-4703e8fabedd",
+        "name": "物料设计状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 1,
+        "definition": {
+          "states": [
+            {
+              "key": "todo",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "design",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e5494_dm1hlx",
+              "name": "设计中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "done",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_mu7e53pt_f4arnk",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_mu7e5494_dm1hlx",
+              "key": "move_todo_status_mu7e5494_dm1hlx",
+              "from": "todo",
+              "name": "进入设计中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "done",
+              "key": "move_status_mu7e5494_dm1hlx_done",
+              "from": "status_mu7e5494_dm1hlx",
+              "name": "进入已完成",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e53pt_f4arnk",
+              "key": "move_status_mu7e5494_dm1hlx_status_mu7e53pt_f4arnk",
+              "from": "status_mu7e5494_dm1hlx",
+              "name": "进入已取消",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f47f1d63-ba5f-4a17-964e-6fd3bbc53d11",
+      "category": "设计",
+      "name": "需求设计",
+      "description": "需求的ui设计",
+      "enabled": true,
+      "isDefault": true,
+      "revision": 0,
+      "workflow": {
+        "id": "af9e844e-bac5-11f1-8449-26d3944adf83",
+        "category": "design",
+        "taskTypeId": "f47f1d63-ba5f-4a17-964e-6fd3bbc53d11",
+        "name": "需求设计状态配置",
+        "workflowVersion": 1,
+        "status": "PUBLISHED",
+        "revision": 1,
+        "definition": {
+          "states": [
+            {
+              "key": "todo",
+              "name": "待处理",
+              "color": "neutral",
+              "group": "NOT_STARTED",
+              "stage": "design",
+              "enabled": true,
+              "initial": true,
+              "successful": false
+            },
+            {
+              "key": "status_mu7e63s0_ikim86",
+              "name": "设计中",
+              "color": "blue",
+              "group": "IN_PROGRESS",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            },
+            {
+              "key": "done",
+              "name": "已完成",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_mu7e6k3b_sedzui",
+              "name": "无需设计",
+              "color": "green",
+              "group": "COMPLETED",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": true
+            },
+            {
+              "key": "status_mu7e6e03_92swa6",
+              "name": "已取消",
+              "color": "neutral",
+              "group": "CANCELLED",
+              "stage": "design",
+              "enabled": true,
+              "initial": false,
+              "successful": false
+            }
+          ],
+          "transitions": [
+            {
+              "to": "status_mu7e63s0_ikim86",
+              "key": "move_todo_status_mu7e63s0_ikim86",
+              "from": "todo",
+              "name": "进入设计中",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "done",
+              "key": "move_status_mu7e63s0_ikim86_done",
+              "from": "status_mu7e63s0_ikim86",
+              "name": "进入已完成",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e6k3b_sedzui",
+              "key": "move_status_mu7e63s0_ikim86_status_mu7e6k3b_sedzui",
+              "from": "status_mu7e63s0_ikim86",
+              "name": "进入无需设计",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            },
+            {
+              "to": "status_mu7e6e03_92swa6",
+              "key": "move_status_mu7e63s0_ikim86_status_mu7e6e03_92swa6",
+              "from": "status_mu7e63s0_ikim86",
+              "name": "进入已取消",
+              "roles": [
+                "admin",
+                "product_manager",
+                "tech_lead"
+              ],
+              "autoComplete": false,
+              "approvalTasks": null,
+              "requiredFields": []
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "productLines": [
+    {
+      "id": "2f4b7717-2b97-44ce-aeef-8ccf41bbc3ec",
+      "name": "测试",
+      "code": "cs_amin",
+      "description": "12132123",
+      "status": "待规划",
+      "ownerName": "黄晋",
+      "ownerUserId": "ee3eddde-369a-4991-abd4-a5c852e082aa",
+      "productOwner": "黄晋",
+      "technicalOwner": "",
+      "requirementOwner": "",
+      "requirementOwnerSecondary": "",
+      "techOwner": "",
+      "techOwnerSecondary": "",
+      "testOwner": "",
+      "testOwnerSecondary": "",
+      "members": [
+        {
+          "id": "snapshot-member-2f4b7717-2b97-44ce-aeef-8ccf41bbc3ec-0",
+          "userId": "ee3eddde-369a-4991-abd4-a5c852e082aa",
+          "name": "黄晋",
+          "role": "管理员"
+        }
+      ],
+      "visibility": "公开",
+      "commercialAvailability": "不可商用",
+      "sort": 1,
+      "currentVersion": "V1.0.0",
+      "totalRequirements": 0,
+      "inProgressReqs": 0,
+      "iterationProgress": 0,
+      "createdAt": "2026-09-28 11:37:08.000000",
+      "versions": []
+    },
+    {
+      "id": "32860365-6bf3-4c59-b193-9a49f0b73930",
+      "name": "接口诊断产品线",
+      "code": "PL-DIAG-001",
+      "description": "",
+      "status": "迭代中",
+      "ownerName": "林志豪",
+      "ownerUserId": "user-admin",
+      "productOwner": "林志豪",
+      "technicalOwner": "",
+      "requirementOwner": "",
+      "requirementOwnerSecondary": "",
+      "techOwner": "",
+      "techOwnerSecondary": "",
+      "testOwner": "",
+      "testOwnerSecondary": "",
+      "members": [
+        {
+          "id": "snapshot-member-32860365-6bf3-4c59-b193-9a49f0b73930-0",
+          "userId": "user-admin",
+          "name": "林志豪",
+          "role": "管理员"
+        }
+      ],
+      "visibility": "公开",
+      "commercialAvailability": "不可商用",
+      "sort": 0,
+      "currentVersion": "1.0.0",
+      "totalRequirements": 15,
+      "inProgressReqs": 11,
+      "iterationProgress": 0,
+      "createdAt": "2026-09-12 08:17:30.000000",
+      "versions": [
+        {
+          "id": "e2f7dc9f-276a-4e35-87f0-6bdde5d3d95e",
+          "name": "2131123",
+          "code": "1.0.0",
+          "startDate": "2026-09-29",
+          "endDate": "2026-10-07",
+          "releaseDate": "",
+          "status": "未开始"
+        }
+      ]
+    },
+    {
+      "id": "72685385-263d-40f5-b90e-55f815f71a83",
+      "name": "师创云平台",
+      "code": "PL-SC-CLOUD",
+      "description": "承载师创统一账号、应用接入、数据服务和运营管理能力的云平台产品线。",
+      "status": "迭代中",
+      "ownerName": "毛景强",
+      "ownerUserId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+      "productOwner": "毛景强",
+      "technicalOwner": "刘生璐",
+      "technicalOwnerUserId": "f863244b-1fb2-4247-af8f-46475217cfc5",
+      "requirementOwner": "王佳乐",
+      "requirementOwnerUserId": "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+      "requirementOwnerSecondary": "",
+      "techOwner": "刘生璐",
+      "techOwnerUserId": "f863244b-1fb2-4247-af8f-46475217cfc5",
+      "techOwnerSecondary": "",
+      "testOwner": "许迪",
+      "testOwnerUserId": "39bbbd09-2f46-4156-843c-751112c8b7a8",
+      "testOwnerSecondary": "",
+      "members": [
+        {
+          "id": "snapshot-member-72685385-263d-40f5-b90e-55f815f71a83-0",
+          "userId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+          "name": "毛景强",
+          "role": "管理员"
+        },
+        {
+          "id": "snapshot-member-72685385-263d-40f5-b90e-55f815f71a83-1",
+          "userId": "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+          "name": "王佳乐",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-72685385-263d-40f5-b90e-55f815f71a83-2",
+          "userId": "f863244b-1fb2-4247-af8f-46475217cfc5",
+          "name": "刘生璐",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-72685385-263d-40f5-b90e-55f815f71a83-3",
+          "userId": "39bbbd09-2f46-4156-843c-751112c8b7a8",
+          "name": "许迪",
+          "role": "参与人"
+        }
+      ],
+      "visibility": "公开",
+      "commercialAvailability": "不可商用",
+      "sort": 0,
+      "currentVersion": "V1.2.0",
+      "totalRequirements": 0,
+      "inProgressReqs": 0,
+      "iterationProgress": 0,
+      "createdAt": "2026-09-18 21:46:27.000000",
+      "versions": [
+        {
+          "id": "2d0c9232-dbc1-4041-ae94-e8177ebe57c7",
+          "name": "师创云平台 V1.0.0",
+          "code": "V1.0.0",
+          "startDate": "2026-09-01",
+          "endDate": "2026-09-28",
+          "releaseDate": "",
+          "status": "进行中"
+        },
+        {
+          "id": "7db15c76-bc3d-42a7-bb33-4864af305910",
+          "name": "师创云平台 V1.1.0",
+          "code": "V1.1.0",
+          "startDate": "2026-10-01",
+          "endDate": "2026-10-25",
+          "releaseDate": "",
+          "status": "未开始"
+        },
+        {
+          "id": "f3efb635-891e-4e4d-bcb5-4745532c88e2",
+          "name": "师创云平台 V1.2.0",
+          "code": "V1.2.0",
+          "startDate": "2026-11-01",
+          "endDate": "2026-11-25",
+          "releaseDate": "",
+          "status": "未开始"
+        }
+      ]
+    },
+    {
+      "id": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
+      "name": "部门考核管理系统",
+      "code": "PL-DEPT-ASSESS",
+      "description": "面向部门目标、过程跟踪与绩效复盘的一体化考核管理产品线。",
+      "status": "迭代中",
+      "ownerName": "王佳乐",
+      "ownerUserId": "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+      "productOwner": "王佳乐",
+      "technicalOwner": "吴雨",
+      "technicalOwnerUserId": "fcbf7374-9b54-4675-bae1-547dd5fc656f",
+      "requirementOwner": "陈宇璋",
+      "requirementOwnerUserId": "user-product",
+      "requirementOwnerSecondary": "",
+      "techOwner": "吴雨",
+      "techOwnerUserId": "fcbf7374-9b54-4675-bae1-547dd5fc656f",
+      "techOwnerSecondary": "",
+      "testOwner": "许迪",
+      "testOwnerUserId": "39bbbd09-2f46-4156-843c-751112c8b7a8",
+      "testOwnerSecondary": "",
+      "members": [
+        {
+          "id": "snapshot-member-9567cbd9-56f8-4e61-ac49-422664c5c08e-0",
+          "userId": "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+          "name": "王佳乐",
+          "role": "管理员"
+        },
+        {
+          "id": "snapshot-member-9567cbd9-56f8-4e61-ac49-422664c5c08e-1",
+          "userId": "user-product",
+          "name": "陈宇璋",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-9567cbd9-56f8-4e61-ac49-422664c5c08e-2",
+          "userId": "fcbf7374-9b54-4675-bae1-547dd5fc656f",
+          "name": "吴雨",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-9567cbd9-56f8-4e61-ac49-422664c5c08e-3",
+          "userId": "39bbbd09-2f46-4156-843c-751112c8b7a8",
+          "name": "许迪",
+          "role": "参与人"
+        }
+      ],
+      "visibility": "公开",
+      "commercialAvailability": "不可商用",
+      "sort": 0,
+      "currentVersion": "V1.2.0",
+      "totalRequirements": 0,
+      "inProgressReqs": 0,
+      "iterationProgress": 0,
+      "createdAt": "2026-09-18 21:46:01.000000",
+      "versions": [
+        {
+          "id": "aaf0d1f2-0a02-4d28-98aa-ba2ce35ab154",
+          "name": "部门考核管理系统 V1.0.0",
+          "code": "V1.0.0",
+          "startDate": "2026-09-01",
+          "endDate": "2026-09-28",
+          "releaseDate": "",
+          "status": "进行中"
+        },
+        {
+          "id": "e0b01fa9-9e31-444b-81ce-303e929039f8",
+          "name": "部门考核管理系统 V1.1.0",
+          "code": "V1.1.0",
+          "startDate": "2026-10-01",
+          "endDate": "2026-10-25",
+          "releaseDate": "",
+          "status": "未开始"
+        },
+        {
+          "id": "f1d1560e-2d63-4a2f-83d1-73a93bc649d5",
+          "name": "部门考核管理系统 V1.2.0",
+          "code": "V1.2.0",
+          "startDate": "2026-11-01",
+          "endDate": "2026-11-25",
+          "releaseDate": "",
+          "status": "未开始"
+        }
+      ]
+    },
+    {
+      "id": "aba9ad7d-5718-4230-bdd7-470d05f85557",
+      "name": "师创砺知堂",
+      "code": "PL-LIZHITANG",
+      "description": "服务教师研修、课程学习、知识沉淀与学习评价的数字化学习产品线。",
+      "status": "迭代中",
+      "ownerName": "王佳乐",
+      "ownerUserId": "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+      "productOwner": "王佳乐",
+      "technicalOwner": "刘笑星",
+      "technicalOwnerUserId": "932fd9a5-307d-4f85-864b-2b1cd6d6d41c",
+      "requirementOwner": "毛景强",
+      "requirementOwnerUserId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+      "requirementOwnerSecondary": "刘爱剑",
+      "requirementOwnerSecondaryUserId": "user-tech",
+      "techOwner": "刘笑星",
+      "techOwnerUserId": "932fd9a5-307d-4f85-864b-2b1cd6d6d41c",
+      "techOwnerSecondary": "严正宇",
+      "techOwnerSecondaryUserId": "a5348498-4c3f-4697-b076-20c5d2079231",
+      "testOwner": "许迪",
+      "testOwnerUserId": "39bbbd09-2f46-4156-843c-751112c8b7a8",
+      "testOwnerSecondary": "赵书琳",
+      "testOwnerSecondaryUserId": "9ef7c5ff-a130-4984-a7de-d5e26a7b3045",
+      "members": [
+        {
+          "id": "snapshot-member-aba9ad7d-5718-4230-bdd7-470d05f85557-0",
+          "userId": "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+          "name": "王佳乐",
+          "role": "管理员"
+        },
+        {
+          "id": "snapshot-member-aba9ad7d-5718-4230-bdd7-470d05f85557-1",
+          "userId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+          "name": "毛景强",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-aba9ad7d-5718-4230-bdd7-470d05f85557-2",
+          "userId": "user-tech",
+          "name": "刘爱剑",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-aba9ad7d-5718-4230-bdd7-470d05f85557-3",
+          "userId": "932fd9a5-307d-4f85-864b-2b1cd6d6d41c",
+          "name": "刘笑星",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-aba9ad7d-5718-4230-bdd7-470d05f85557-4",
+          "userId": "a5348498-4c3f-4697-b076-20c5d2079231",
+          "name": "严正宇",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-aba9ad7d-5718-4230-bdd7-470d05f85557-5",
+          "userId": "39bbbd09-2f46-4156-843c-751112c8b7a8",
+          "name": "许迪",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-aba9ad7d-5718-4230-bdd7-470d05f85557-6",
+          "userId": "9ef7c5ff-a130-4984-a7de-d5e26a7b3045",
+          "name": "赵书琳",
+          "role": "参与人"
+        }
+      ],
+      "visibility": "公开",
+      "commercialAvailability": "不可商用",
+      "sort": 0,
+      "currentVersion": "V1.2.0",
+      "totalRequirements": 15,
+      "inProgressReqs": 13,
+      "iterationProgress": 0,
+      "createdAt": "2026-09-18 21:46:28.000000",
+      "versions": [
+        {
+          "id": "08425501-bbb8-11f1-8fc4-a6113f53b203",
+          "name": "V1.0.5",
+          "code": "V1.0.5",
+          "startDate": "2026-09-20",
+          "endDate": "2026-09-20",
+          "releaseDate": "2026-09-20 00:00:00.000000",
+          "status": "已发布"
+        },
+        {
+          "id": "4f1149ef-84f9-43fd-9da1-191411998a0d",
+          "name": "师创砺知堂 V1.1.0",
+          "code": "V1.1.0",
+          "startDate": "2026-10-01",
+          "endDate": "2026-10-25",
+          "releaseDate": "",
+          "status": "未开始"
+        },
+        {
+          "id": "b827622b-3ce5-44c1-b38c-9b25f207382e",
+          "name": "师创砺知堂 V1.0.0",
+          "code": "V1.0.0",
+          "startDate": "2026-09-01",
+          "endDate": "2026-09-28",
+          "releaseDate": "",
+          "status": "进行中"
+        },
+        {
+          "id": "f7ce5998-fce4-4c12-a9aa-bb427ee00288",
+          "name": "师创砺知堂 V1.2.0",
+          "code": "V1.2.0",
+          "startDate": "2026-11-01",
+          "endDate": "2026-11-25",
+          "releaseDate": "",
+          "status": "未开始"
+        }
+      ],
+      "website": ""
+    },
+    {
+      "id": "f2c347ca-a93f-4e7d-b306-d396d4edd34b",
+      "name": "省级项目管理平台",
+      "code": "PL-PROVINCE-PM",
+      "description": "面向省级项目申报、评审、执行、验收和资金监管的全过程管理产品线。",
+      "status": "迭代中",
+      "ownerName": "朱金星",
+      "ownerUserId": "558f155c-51ed-4802-8a85-e3c64a31a422",
+      "productOwner": "朱金星",
+      "technicalOwner": "周星",
+      "technicalOwnerUserId": "06a548b0-38fb-434a-9728-6249fb14a77b",
+      "requirementOwner": "",
+      "requirementOwnerSecondary": "",
+      "techOwner": "周星",
+      "techOwnerUserId": "06a548b0-38fb-434a-9728-6249fb14a77b",
+      "techOwnerSecondary": "",
+      "testOwner": "赵书琳",
+      "testOwnerUserId": "9ef7c5ff-a130-4984-a7de-d5e26a7b3045",
+      "testOwnerSecondary": "",
+      "members": [
+        {
+          "id": "snapshot-member-f2c347ca-a93f-4e7d-b306-d396d4edd34b-0",
+          "userId": "558f155c-51ed-4802-8a85-e3c64a31a422",
+          "name": "朱金星",
+          "role": "管理员"
+        },
+        {
+          "id": "snapshot-member-f2c347ca-a93f-4e7d-b306-d396d4edd34b-1",
+          "userId": "06a548b0-38fb-434a-9728-6249fb14a77b",
+          "name": "周星",
+          "role": "参与人"
+        },
+        {
+          "id": "snapshot-member-f2c347ca-a93f-4e7d-b306-d396d4edd34b-2",
+          "userId": "9ef7c5ff-a130-4984-a7de-d5e26a7b3045",
+          "name": "赵书琳",
+          "role": "参与人"
+        }
+      ],
+      "visibility": "公开",
+      "commercialAvailability": "不可商用",
+      "sort": 0,
+      "currentVersion": "V1.1.0",
+      "totalRequirements": 0,
+      "inProgressReqs": 0,
+      "iterationProgress": 0,
+      "createdAt": "2026-09-18 21:46:28.000000",
+      "versions": [
+        {
+          "id": "6e790575-a147-4966-8469-025d063ccc12",
+          "name": "省级项目管理平台 V1.0.0",
+          "code": "V1.0.0",
+          "startDate": "2026-09-01",
+          "endDate": "2026-09-28",
+          "releaseDate": "",
+          "status": "进行中"
+        },
+        {
+          "id": "f1bfb5fe-4e0c-4e15-a9e9-cf2848f5c1c5",
+          "name": "省级项目管理平台 V1.1.0",
+          "code": "V1.1.0",
+          "startDate": "2026-10-01",
+          "endDate": "2026-10-25",
+          "releaseDate": "",
+          "status": "未开始"
+        }
+      ]
+    },
+    {
+      "id": "f9e04c66-d33d-4624-ad26-e23eae24a722",
+      "name": "测试产品",
+      "code": "stu_ai",
+      "description": "测试专用",
+      "status": "已停用",
+      "ownerName": "毛景强",
+      "ownerUserId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+      "productOwner": "毛景强",
+      "technicalOwner": "",
+      "requirementOwner": "",
+      "requirementOwnerSecondary": "",
+      "techOwner": "",
+      "techOwnerSecondary": "",
+      "testOwner": "",
+      "testOwnerSecondary": "",
+      "members": [
+        {
+          "id": "snapshot-member-f9e04c66-d33d-4624-ad26-e23eae24a722-0",
+          "userId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+          "name": "毛景强",
+          "role": "管理员"
+        }
+      ],
+      "visibility": "公开",
+      "commercialAvailability": "不可商用",
+      "sort": 1,
+      "currentVersion": "V1.0.0",
+      "totalRequirements": 0,
+      "inProgressReqs": 0,
+      "iterationProgress": 0,
+      "createdAt": "2026-09-27 15:10:16.000000",
+      "versions": []
+    }
+  ]
+}

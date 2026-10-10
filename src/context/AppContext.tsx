@@ -380,8 +380,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 所有领域共用同一数据模式，避免本地回退会话误请求后端。
   const crmEnabled = dataMode === 'remote';
   const requirementBackendEnabled = dataMode === 'remote';
+  const productConfigEnabled = requirementBackendEnabled || import.meta.env.VITE_MOCK_MODE !== 'false';
   const { leadQuery, customerQuery, opportunityQuery, biddingQuery, engagementQuery, followUpQuery, contractQuery } = useCrmQueries(crmSessionToken, crmEnabled);
-  const { requirementQuery, designQuery, productLineQuery, bugQuery, devTaskQuery } = useProductQueries(crmSessionToken, requirementBackendEnabled);
+  const { requirementQuery, designQuery, productLineQuery, bugQuery, devTaskQuery } = useProductQueries(crmSessionToken, requirementBackendEnabled, productConfigEnabled);
 
   // Remote success is authoritative, including an empty result. Demo data is only used in local mode.
   useEffect(()=>{ if (!crmEnabled) setCustomers(MOCK_CUSTOMERS); else if (customerQuery.isSuccess) setCustomers(customerQuery.data?.items || []); },[crmEnabled,customerQuery.data,customerQuery.isSuccess]);
@@ -1187,33 +1188,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateProductLine = async (id: string, updates: Partial<ProductLine>) => {
-    if (!requirementBackendEnabled) {
-      setProductLines((lines) => lines.map((line) => line.id === id ? { ...line, ...updates } : line));
-      addToast('success', '产品配置已保存');
-      return;
-    }
+    if (!productConfigEnabled) throw new Error('当前未连接后端服务，数据未保存');
     await productRepository.updateProductLine(id, updates);
     await productLineQuery.refetch();
     addToast('success', '产品配置已保存');
   };
 
   const addProductLineMembers = async (id: string, members: ProductLineMember[]) => {
-    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    if (!productConfigEnabled) throw new Error('当前未连接后端服务，数据未保存');
     await Promise.all(members.map(({ userId, role }) => productRepository.addProductLineMember(id, { userId, role })));
     await productLineQuery.refetch();
   };
 
   const updateProductLineMember = async (id: string, memberId: string, role: ProductLineMember['role']) => {
-    if (!requirementBackendEnabled) {
-      setProductLines((lines) => lines.map((line) => line.id === id ? { ...line, members: (line.members || []).map((member) => typeof member !== 'string' && member.id === memberId ? { ...member, role } : member) } : line));
-      return;
-    }
+    if (!productConfigEnabled) throw new Error('当前未连接后端服务，数据未保存');
     await productRepository.updateProductLineMember(id, memberId, { role });
     await productLineQuery.refetch();
   };
 
   const removeProductLineMember = async (id: string, memberId: string) => {
-    if (!requirementBackendEnabled) throw new Error('当前未连接后端服务，数据未保存');
+    if (!productConfigEnabled) throw new Error('当前未连接后端服务，数据未保存');
     await productRepository.removeProductLineMember(id, memberId);
     await productLineQuery.refetch();
   };

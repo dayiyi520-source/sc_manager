@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vitest/config';
+import { mockResearchTemplatePlugin } from './scripts/mock-research-template-plugin';
 
 function devApiMockPlugin() {
   return {
@@ -102,7 +103,7 @@ export default defineConfig(() => {
     || (templatePreviewPort ? 'http://127.0.0.1:8084' : researchPort ? 'http://127.0.0.1:8082' : 'http://127.0.0.1:8081');
   return {
     base: process.env.VITE_BASE_PATH || '/',
-    plugins: [devApiMockPlugin(), react(), tailwindcss()],
+    plugins: [mockResearchTemplatePlugin(), devApiMockPlugin(), react(), tailwindcss()],
     test: {
       environment: 'node',
       globals: true,

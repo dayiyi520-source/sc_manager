@@ -1,3 +1,4 @@
+import collaborationTypes from './mockCollaborationTypes.json';
 import type { ApprovalFlow, Contract, CurrentUser, Customer, DefectBug, FollowUpRecord, Lead, Opportunity, ProductLine, RequirementTask, TeamMember, VersionIteration } from '../types';
 import type { TestCase, TestCaseDirectory, TestPlan } from '../types/testManagement';
 import { MOCK_DATABASE, MOCK_SNAPSHOT_VERSION } from './mockDatabaseSnapshot';
@@ -147,10 +148,14 @@ const designVariantFor = (row: Row): RequirementTask['designVariant'] => {
 };
 
 const task = (row: Row): RequirementTask => ({
-  id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_), expectedGoal: text(row.expected_goal_), status: text(row.status_name_), priority: text(row.priority_), ownerName: text(row.assignee_name_) || usersById.get(text(row.assignee_id_))?.name || '', assigneeId: text(row.assignee_id_) || undefined, creatorName: text(row.creator_name_), creatorId: text(row.creator_id_) || usersByIdByName.get(text(row.creator_name_))?.id || undefined, department: text(row.department_), versionId: text(row.version_id_) || undefined, versionName: versionNameById.get(text(row.version_id_)) || '', productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', estimatedHours: Number(row.estimated_hours_ || 0), actualHours: Number(row.actual_hours_ || 0), dueDate: date(row.planned_end_date_ || row.expected_complete_date_), createdAt: date(row.create_time_), category: 'my_dept', requirementType: text(row.task_type_name_) || text(row.requirement_type_) || workItemTypeNameById.get(text(row.task_type_id_)) || undefined, designVariant: designVariantFor(row), designProjectName: text(row.project_name_) || text(row.projectName) || undefined, designSourceDepartment: text(row.source_department_) || text(row.department_) || undefined, revision: Number(row.version_ || 0),
+  id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_), expectedGoal: text(row.expected_goal_), status: text(row.status_name_), priority: text(row.priority_), ownerName: text(row.assignee_name_) || usersById.get(text(row.assignee_id_))?.name || '', assigneeId: text(row.assignee_id_) || undefined, creatorName: text(row.creator_name_), creatorId: text(row.creator_id_) || usersByIdByName.get(text(row.creator_name_))?.id || undefined, department: text(row.department_), versionId: text(row.version_id_) || undefined, versionName: versionNameById.get(text(row.version_id_)) || '', productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', estimatedHours: Number(row.estimated_hours_ || 0), actualHours: Number(row.actual_hours_ || 0), dueDate: date(row.planned_end_date_ || row.expected_complete_date_), createdAt: date(row.create_time_), category: 'my_dept', requirementType: text(row.task_type_name_) || text(row.requirement_type_) || workItemTypeNameById.get(text(row.task_type_id_)) || undefined, designVariant: designVariantFor(row), designProjectName: text(row.project_name_) || text(row.projectName) || undefined, designSourceDepartment: text(row.source_department_) || text(row.department_) || undefined, revision: Number(row.version_ || 0), workOrderType: (text(row.work_order_type_) || (collaborationTypes as Record<string, string>)[text(row.id_)]) as RequirementTask['workOrderType'],
 });
 
-export const MOCK_REQUIREMENT_TASKS = workItems.filter((row) => text(row.category_) === 'requirement').map(task);
+export const MOCK_REQUIREMENT_TASKS = workItems.filter((row) => text(row.category_) === 'requirement').map((row) => {
+  const item = task(row);
+  const type = (collaborationTypes as Record<string, string>)[item.id];
+  return type ? { ...item, workOrderType: type as RequirementTask['workOrderType'] } : item;
+});
 export const MOCK_OPS_TASKS: RequirementTask[] = [
   { title: '生产监控告警规则优化', description: '梳理接口延迟与错误率告警，合并重复通知并验证值班通知链路。', expectedGoal: '关键告警能够及时通知，重复告警明显减少。', status: '处理中', priority: '高', estimatedHours: 8, actualHours: 3, progress: 40 },
   { title: '数据库备份恢复演练', description: '使用最近一次备份在隔离环境完成恢复，记录恢复耗时和数据核验结果。', expectedGoal: '完成恢复验证并形成演练记录。', status: '待处理', priority: '高', estimatedHours: 12, actualHours: 0, progress: 0 },
