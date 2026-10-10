@@ -40,6 +40,21 @@ const targets: MyTargetViewItem[] = [
 ];
 
 describe('MyTargetMonthSection', () => {
+  it('excludes the current owner and displays lower record owners rather than assigned managers', () => {
+    const people: OkrPerson[] = [
+      {id:'manager',name:'陈宇璋',jobTitle:'产品主管',department:'产品部',rootFlag:0,supervisorId:'boss',version:1},
+      {id:'staff',name:'下级成员',department:'产品部',rootFlag:0,supervisorId:'manager',version:1},
+    ];
+    const objective: OkrRecord = {id:'o',kind:'objective',ownerId:'manager',periodKey:'2026-09',status:'active',version:1,payload:{title:'主管目标',keyResults:[{id:'a',title:'主管动作',weight:100,progress:0}]}};
+    const own: OkrRecord = {id:'own',kind:'action',ownerId:'manager',periodKey:'2026-09',status:'active',version:1,payload:{title:'自身拆解',parentActionId:'a',parentObjectiveId:'o'}};
+    const lower = {...own,id:'lower',ownerId:'staff',payload:{...own.payload,title:'成员动作',assigneeIds:['manager']}};
+    const lowerObjective = {...objective,id:'lower-o',ownerId:'staff',payload:{title:'成员目标',alignments:[{parentObjectiveId:'o',parentKeyResultId:'a'}]}};
+    const rows = buildMyTargetViewItems([objective], [], [own,lower,lowerObjective], people, 'manager')[0].actions[0].alignments!;
+    expect(rows).toHaveLength(2);
+    expect(rows.map(row => row.ownerName)).toEqual(['下级成员','下级成员']);
+    expect(rows.flatMap(row => row.actions).some(action => action.id === 'own')).toBe(false);
+  });
+
   it('shows alignment content and handles toolbar actions without opening the row', async () => {
     const onOpenTarget = vi.fn();
     const onEditTarget = vi.fn();
@@ -99,7 +114,7 @@ describe('MyTargetMonthSection', () => {
   it('uses the breakdown owner for level and the upstream owner for creator', () => {
     const people: OkrPerson[] = [
       { id: 'boss', name: '林志豪', department: '管理部', supervisorId: null, rootFlag: 1, version: 1 },
-      { id: 'manager', name: '陈宇璋', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 },
+      { id: 'manager', name: '陈宇璋', jobTitle: '产品主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 },
       { id: 'staff', name: '毛景强', department: '产品部', supervisorId: 'manager', rootFlag: 0, version: 1 },
     ];
     const records: OkrRecord[] = [
@@ -123,7 +138,7 @@ describe('MyTargetMonthSection', () => {
   });
 
   it('binds mixed action groups to the draft record for editing', () => {
-    const people: OkrPerson[] = [{ id: 'manager', name: '陈宇璋', department: '产品部', supervisorId: null, rootFlag: 0, version: 1 }];
+    const people: OkrPerson[] = [{ id: 'manager', name: '陈宇璋', jobTitle: '产品主管', department: '产品部', supervisorId: null, rootFlag: 0, version: 1 }];
     const records: OkrRecord[] = [
       { id: 'submitted', kind: 'action', ownerId: 'manager', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '已提交动作', parentObjectiveId: 'o1', parentActionId: 'parent' } },
       { id: 'draft', kind: 'action', ownerId: 'manager', periodKey: '2026-09', status: 'draft', version: 1, payload: { title: '草稿动作', parentObjectiveId: 'o1', parentActionId: 'parent' } },

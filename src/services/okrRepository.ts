@@ -1,6 +1,6 @@
 import { apiRequest } from './apiClient';
 
-export interface OkrPerson { id: string; name: string; department: string; supervisorId: string | null; rootFlag: number; version: number }
+export interface OkrPerson { id: string; name: string; department: string; jobTitle?: string; supervisorId: string | null; rootFlag: number; version: number }
 export interface OkrKr { id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[]; businessObject?: string; version?: string; stage?: string; action?: string; result?: string }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
 export interface OkrReviewItem { workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }

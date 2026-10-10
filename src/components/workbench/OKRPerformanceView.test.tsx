@@ -73,8 +73,8 @@ const draftOkrs: OKRItem[] = draftRecords.map((record, index) => ({
 }));
 
 const defaultPeople = [
-  { id: 'boss', name: '老板', department: '管理层', supervisorId: null, rootFlag: 1, version: 1 },
-  { id: 'manager', name: '主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 },
+  { id: 'boss', name: '林志豪', department: '管理层', supervisorId: null, rootFlag: 1, version: 1 },
+  { id: 'manager', name: '主管', jobTitle: '产品主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 },
 ];
 
 const okrState = {
@@ -111,8 +111,10 @@ const okrState = {
 
 vi.mock('./okr/useOriginalOkr', () => ({ useOriginalOkr: () => okrState }));
 vi.mock('./okr/OkrProvider', () => ({ OkrProvider: ({ children }: { children: ReactNode }) => children }));
+let currentUser = { id: 'boss', name: '老板', department: '管理层' };
+
 vi.mock('../../context/AppContext', () => ({
-  useApp: () => ({ currentUser: { id: 'boss', name: '老板', department: '管理层' }, addToast: vi.fn() }),
+  useApp: () => ({ currentUser, addToast: vi.fn() }),
   useAppNavigationContext: () => ({ openPageTab: vi.fn() }),
 }));
 
@@ -128,9 +130,61 @@ describe('OKRPerformanceView target navigation', () => {
     okrState.okrs = [okr];
     okrState.reviewableOkrs = [okr];
     okrState.people = defaultPeople;
+    okrState.actionParents = [actionParent];
+    okrState.settings.defaultView = 'list';
+    currentUser = { id: 'boss', name: '老板', department: '管理层' };
   });
 
   afterEach(() => vi.useRealTimers());
+
+  it.each(['list', 'card'])('opens the manager breakdown itself from %s instead of the upstream company goal', async view => {
+    currentUser = {id:'manager',name:'主管',department:'产品部'};
+    okrState.records = [objectiveRecord, actionParent, {...actionParent,id:'draft-breakdown',status:'draft'}];
+    okrState.settings.defaultView = view;
+    render(<OKRPerformanceView/>);
+    const label = view === 'list' ? '目标：改善重点客户交付' : '目标卡片：改善重点客户交付';
+    fireEvent.click(screen.getByLabelText(label));
+    expect(await screen.findByText('目标详情')).toBeInTheDocument();
+    expect(screen.getByLabelText('制定人：主管')).toBeInTheDocument();
+    expect(screen.getByText('主管级')).toBeInTheDocument();
+    expect(screen.queryByText('公司级')).not.toBeInTheDocument();
+    expect(document.querySelector('.company-objective-detail-drawer.ant-drawer-bottom')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name:'修改目标'})).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', {name:'关闭目标详情'}));
+    expect(await screen.findByLabelText(label)).toBeInTheDocument();
+    okrState.settings.defaultView = 'list';
+  });
+
+  it.each(['产品主管', '产品经理'])('edits a %s legacy goal in the creation drawer and closes directly to the list', async jobTitle => {
+    currentUser = { id: 'manager', name: '主管', department: '产品部' };
+    okrState.people = defaultPeople.map(person => person.id === 'manager' ? { ...person, jobTitle } : person);
+    okrState.records = [objectiveRecord, { ...actionParent, payload: { ...actionParent.payload, title: '已有动作', weight: 100, deadline: '2026-09-30', assigneeIds: ['manager'] } }];
+    okrState.actionParents = [okrState.records[1]];
+    render(<OKRPerformanceView />);
+    fireEvent.click(screen.getByLabelText(/^目标：/));
+    fireEvent.click(await screen.findByRole('button', { name: '修改目标' }));
+    expect(document.querySelector('.company-objective-drawer.ant-drawer-bottom')).toBeInTheDocument();
+    expect(screen.getByText(jobTitle === '产品主管' ? '主管级' : '个人级')).toBeInTheDocument();
+    expect(screen.getByLabelText('A1 动作')).toHaveValue('已有动作');
+    expect(screen.getByLabelText('A1 截止日期')).toHaveValue('2026-09-30');
+    fireEvent.click(screen.getByRole('button', { name: /Close|close|关闭/, exact: true }));
+    expect(await screen.findByLabelText(/^目标：/)).toBeInTheDocument();
+    expect(screen.queryByText('目标详情')).not.toBeInTheDocument();
+    expect(okrState.updateOkr).not.toHaveBeenCalled();
+  }, 15000);
+
+  it('confirms before deleting a manager legacy goal', async () => {
+    currentUser = { id: 'manager', name: '主管', department: '产品部' };
+    okrState.records = [objectiveRecord, actionParent];
+    render(<OKRPerformanceView />);
+    fireEvent.click(screen.getByLabelText('目标：改善重点客户交付'));
+    fireEvent.click(await screen.findByRole('button', { name: '删除目标' }));
+    const dialog = (await screen.findByText('删除目标', { selector: '.ant-modal-title' })).closest('[role="dialog"]') as HTMLElement;
+    expect(within(dialog).getByText(/的目标“改善重点客户交付”/)).toBeInTheDocument();
+    expect(okrState.deleteOkr).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: /^删\s*除$/ }));
+    await waitFor(() => expect(okrState.deleteOkr).toHaveBeenCalledWith('parent-action'));
+  }, 15000);
 
   it('opens reviews directly without the former primary tabs or goal sidebar', () => {
     render(<ReviewSummaryView />);

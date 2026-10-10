@@ -27,7 +27,7 @@ export const Header: React.FC = () => {
   const switchableNames = ['林志豪', '陈宇璋', '毛景强', '王佳乐', '许迪', '赵书琳'];
   const switchableIds = new Set(MOCK_USERS.filter((user) => switchableNames.includes(user.name)).map((user) => user.id));
   const roleMembersQuery = useQuery({
-    queryKey: ['team-member-role-options'],
+    queryKey: ['team-member-options'],
     queryFn: teamRepository.options,
     retry: false,
   });

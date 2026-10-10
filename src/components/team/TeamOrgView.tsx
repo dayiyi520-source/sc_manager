@@ -22,13 +22,18 @@ export const TeamOrgView: React.FC = () => {
 
   const membersQuery = useQuery({ queryKey: ['team-members'], queryFn: () => teamRepository.list(), retry: false });
   const departmentsQuery = useQuery({ queryKey: ['team-member-departments'], queryFn: teamRepository.departments, retry: false });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['team-members'] });
+  const refresh = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['team-members'] }),
+    queryClient.invalidateQueries({ queryKey: ['team-member-options'] }),
+    queryClient.invalidateQueries({ queryKey: ['team-member-departments'] }),
+    queryClient.invalidateQueries({ queryKey: ['okr'] }),
+  ]);
   const saveMutation = useMutation({
     mutationFn: async (values: FormValues) => editing
       ? teamRepository.update(editing.id, { ...values, version: editing.version })
       : teamRepository.create(values),
     onSuccess: async () => {
-      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ['team-member-options'] })]);
+      await refresh();
       addToast('success', editing ? '成员信息已更新' : '成员已添加');
       setFormOpen(false);
       setEditing(null);
@@ -39,7 +44,7 @@ export const TeamOrgView: React.FC = () => {
   const statusMutation = useMutation({
     mutationFn: (member: TeamMember) => teamRepository.updateStatus(member.id, member.status === 'enabled' ? 'disabled' : 'enabled', member.version),
     onSuccess: async (_, member) => {
-      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ['team-member-options'] })]);
+      await refresh();
       addToast('success', member.status === 'enabled' ? '成员已停用' : '成员已启用');
     },
     onError: (error) => addToast('error', '成员状态更新失败', error instanceof Error ? error.message : '请稍后重试'),

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { CompanyObjectiveDetail, companyActionTasks } from './CompanyObjectiveDetail';
+import { CompanyObjectiveDetail, companyActionTasks, actionGroupDetailRecord } from './CompanyObjectiveDetail';
 import { buildGoalHierarchy } from './GoalHierarchyView';
 import { okrRepository, type OkrRecord, type OkrWork } from '../../../services/okrRepository';
 
@@ -10,6 +10,54 @@ const child: OkrRecord = {id:'child',kind:'action',ownerId:'manager',periodKey:'
 const task = {id:'task',title:'实际任务',objectiveId:'o',keyResultId:'child',status:'已完成'} as OkrWork;
 
 describe('company objective detail', () => {
+  it('keeps legacy manager breakdown data and shows only the actual lower member alignments', async () => {
+    vi.spyOn(okrRepository, 'events').mockResolvedValue([]);
+    const people = [
+      {id:'boss',name:'林志豪',department:'管理层',rootFlag:1,supervisorId:null,version:1},
+      {id:'manager',name:'陈宇璋',jobTitle:'产品主管',department:'产品部',rootFlag:0,supervisorId:'boss',version:1},
+      {id:'staff',name:'下级成员',department:'产品部',rootFlag:0,supervisorId:'manager',version:1},
+    ];
+    const ownChild = {...child, id:'own-child', payload:{...child.payload,title:'主管自己的拆解',parentActionId:child.id}};
+    const lower = {...child, id:'lower', ownerId:'staff', payload:{...child.payload,title:'下级对齐的动作',parentActionId:child.id}};
+    const all = [objective, child, ownChild, lower];
+    const display = actionGroupDetailRecord(child, all, people);
+    expect(display.ownerId).toBe('manager');
+    expect(display.payload.keyResults?.map(item => item.id)).toEqual([child.id]);
+    render(<CompanyObjectiveDetail record={child} records={all} people={people} work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
+    expect(screen.getByText('主管级')).toBeInTheDocument();
+    expect(screen.queryByText('公司级')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('制定人：陈宇璋')).toBeInTheDocument();
+    expect(screen.queryByText('所属部门:产品部')).not.toBeInTheDocument();
+    expect(screen.queryByText(/完成时间:/)).not.toBeInTheDocument();
+    expect(screen.getByText('完成交付——来源于上级林志豪')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name:'A1下级对齐'}));
+    expect(screen.getByText('下级成员 · 75%')).toBeInTheDocument();
+    expect(screen.queryByText('陈宇璋 · 75%')).not.toBeInTheDocument();
+    expect(screen.queryByText('主管自己的拆解')).not.toBeInTheDocument();
+    await screen.findByText('暂无动态记录');
+    vi.restoreAllMocks();
+  });
+
+  it('shows upstream action content and marks only assignees with actual submitted alignments', async () => {
+    vi.spyOn(okrRepository, 'events').mockResolvedValue([]);
+    const people = [
+      {id:'boss',name:'上级甲',department:'管理层',rootFlag:1,supervisorId:null,version:1},
+      {id:'manager',name:'主管乙',department:'产品部',rootFlag:0,supervisorId:'boss',version:1},
+      {id:'staff',name:'成员丙',department:'产品部',rootFlag:0,supervisorId:'manager',version:1},
+      {id:'draft-owner',name:'草稿成员',department:'产品部',rootFlag:0,supervisorId:'manager',version:1},
+    ];
+    const manager: OkrRecord = {id:'manager-o',kind:'objective',ownerId:'manager',periodKey:'2026-10',status:'active',version:1,payload:{title:'主管目标',alignments:[{parentObjectiveId:'o',parentKeyResultId:'a'}],keyResults:[{id:'manager-a',title:'主管动作',weight:100,progress:0,assigneeIds:['staff','draft-owner']}]}};
+    const lower: OkrRecord = {id:'lower-o',kind:'objective',ownerId:'staff',periodKey:'2026-10',status:'active',version:1,payload:{title:'个人目标',alignments:[{parentObjectiveId:'manager-o',parentKeyResultId:'manager-a'}]}};
+    render(<CompanyObjectiveDetail record={manager} records={[objective,manager,lower,{...lower,id:'draft-o',ownerId:'draft-owner',status:'draft'}]} people={people} work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
+    expect(screen.getByText('完成交付——来源于上级上级甲')).toBeInTheDocument();
+    expect(screen.queryByText('公司经营目标')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('成员丙已对齐此动作')).toBeInTheDocument();
+    expect(screen.queryByLabelText('草稿成员已对齐此动作')).not.toBeInTheDocument();
+    expect(screen.getByText('@成员丙').closest('.company-action-title')).toContainElement(screen.getByText('主管动作'));
+    await screen.findByText('暂无动态记录');
+    vi.restoreAllMocks();
+  });
+
   it('rolls up descendant progress and collects deduplicated evidence without unrelated tasks', () => {
     const root = buildGoalHierarchy([objective,child],'2026-10')[0];
     expect(root.progress).toBe(75);

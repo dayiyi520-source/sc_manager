@@ -1,3 +1,4 @@
+import { goalLevel } from '../../../services/okrGoalRules';
 import React from 'react';
 import { Button, Dropdown, Empty, Progress, Tag, Tooltip, Popover } from 'antd';
 import { PencilIcon, KebabHorizontalIcon, GitBranchIcon } from '@primer/octicons-react';
@@ -101,8 +102,8 @@ export const buildMyTargetViewItems = (
   const ownerName = nameOf(currentUserId);
   const ownerNameOf = (id?: string) => nameOf(id) || '未指定';
   const allRecords = [...new Map([...sourceActions, ...records].map(record => [record.id, record])).values()];
-  const alignmentsFor = (actionId: string, periodKey: string) => {
-    const active = allRecords.filter(record => record.periodKey === periodKey && record.status !== 'draft');
+  const alignmentsFor = (actionId: string, periodKey: string, ownerId: string) => {
+    const active = allRecords.filter(record => record.periodKey === periodKey && record.status !== 'draft' && record.ownerId !== ownerId);
     const objectives = active.filter(record => record.kind === 'objective' && record.payload.alignments?.some(alignment => alignment.parentKeyResultId === actionId));
     const children = active.filter(record => record.kind === 'action' && (record.payload.parentActionId === actionId || record.payload.parentKeyResultId === actionId));
     const groups = new Map<string, OkrRecord[]>();
@@ -112,7 +113,7 @@ export const buildMyTargetViewItems = (
     });
     const levelOf = (ownerId: string) => {
       const person = people.find(item => item.id === ownerId);
-      return person?.rootFlag === 1 ? '公司级' : person?.supervisorId ? '主管级' : '个人级';
+      return goalLevel(person);
     };
     return [
       ...objectives.map(record => ({ id: record.id, title: record.payload.title, ownerName: ownerNameOf(record.ownerId), levelLabel: levelOf(record.ownerId), progress: Number(record.payload.progress || 0), actions: (record.payload.keyResults || []).map(item => ({ id: item.id, title: item.title, linked: true })) })),
@@ -126,7 +127,7 @@ export const buildMyTargetViewItems = (
     progress: Number(record.payload.progress || 0),
     weight: Number(record.payload.weight || 0),
     deadline: record.payload.deadline || '',
-    alignments: alignmentsFor(record.id, record.periodKey),
+    alignments: alignmentsFor(record.id, record.periodKey, record.ownerId),
   });
   const objectiveTargets = records.filter(record => record.kind === 'objective').map(record => {
     const actions: MyTargetActionViewItem[] = (record.payload.keyResults || []).map(action => ({
@@ -136,7 +137,7 @@ export const buildMyTargetViewItems = (
       progress: Number(action.progress || 0),
       weight: Number(action.weight || 0),
       deadline: action.deadline || '',
-      alignments: alignmentsFor(action.id, record.periodKey),
+      alignments: alignmentsFor(action.id, record.periodKey, record.ownerId),
     }));
     const sourceId = record.payload.parentObjectiveId || record.payload.alignments?.[0]?.parentObjectiveId;
     const recordOwner = people.find(person => person.id === record.ownerId);
@@ -152,8 +153,8 @@ export const buildMyTargetViewItems = (
       status: record.status,
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
-      creatorName: sourceOwner || ownerNameOf(record.ownerId),
-      levelLabel: recordOwner?.rootFlag === 1 ? '公司级' : recordOwner?.supervisorId ? '主管级' : '个人级',
+      creatorName: ownerNameOf(record.ownerId),
+      levelLabel: goalLevel(recordOwner),
       metaOwnerId: source?.ownerId || recordOwner?.supervisorId || record.ownerId,
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
       maxDeadline: record.payload.deadline || latestDeadline(actions.map(action => action.deadline)),
@@ -177,12 +178,13 @@ export const buildMyTargetViewItems = (
       id: `action-group-${parentId}`,
       alignmentLabel: source?.payload.title || '来源目标已不可用',
       editable: group.every(item => item.ownerId === currentUserId),
+      deletable: group.every(item => item.ownerId === currentUserId),
       detailId: group.find(item => item.status === 'draft')?.id || group[0]?.id,
       title: source?.payload.title || group[0]?.payload.title || '来源目标已不可用',
       status: group.some(item => item.status === 'draft') ? (group.some(item => item.status !== 'draft') ? 'partial-draft' : 'draft') : 'active',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       creatorName: ownerNameOf(group[0]?.ownerId),
-      levelLabel: groupOwner?.rootFlag === 1 ? '公司级' : groupOwner?.supervisorId ? '主管级' : '个人级',
+      levelLabel: goalLevel(groupOwner),
       metaOwnerId: source?.ownerId || groupOwner?.supervisorId || group[0]?.ownerId,
       totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
       maxDeadline: source?.payload.deadline || latestDeadline(actions.map(action => action.deadline)),

@@ -9,7 +9,7 @@ import { useApp, useAppNavigationContext } from '../../context/AppContext';
 import { OkrProvider } from './okr/OkrProvider';
 import './okr/originalOkr.css';
 import './okr/companyObjectives.css';
-import { CompanyObjectiveDetail } from './okr/CompanyObjectiveDetail';
+import { CompanyObjectiveDetail, actionGroupDetailRecord } from './okr/CompanyObjectiveDetail';
 import { cycleOptions, periodStatusLabel } from './okr/cycleOptions';
 import { OkrScopeSidebar, type OkrScopeSelection } from './okr/OkrScopeSidebar';
 import { OKRItem } from '../../types';
@@ -25,6 +25,7 @@ import { GoalHierarchyView } from './okr/GoalHierarchyView';
 import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewMode } from './okr/MyTargetMonthSection';
 import type { OkrPayload, OkrRecord } from '../../services/okrRepository';
 import { CompanyObjectiveCopyDialog } from './okr/CompanyObjectiveCopyDialog';
+import { goalLevel } from '../../services/okrGoalRules';
 import { CopyIcon, PlusIcon, RepoTemplateIcon } from '@primer/octicons-react';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace mainTab="okrs"/></OkrProvider>;
@@ -138,6 +139,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   // Write Review Form State
   const [reviewType, setReviewType] = useState<'week' | 'month'>('month');
   const me = people.find(p => p.id === currentUser.id);
+  const level = goalLevel(me);
+  const companyLevel = level === '公司级';
   const reviewerName = me?.supervisorId ? people.find(person => person.id === me.supervisorId)?.name : undefined;
   const directReviewSubmit = Boolean(me?.rootFlag);
   const periods = cycleOptions(records, currentUser.id);
@@ -191,6 +194,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   const copiedInitialPayload = copiedReview ? createReviewCopyDraft(copiedReview.payload) : undefined;
   const selectedOkrRecord = records.find(record => record.id === selectedOkrRecordId && (record.kind === 'objective' || record.kind === 'action'));
   const visibleActionParents = actionParents;
+  const objectiveDetailRecords = [...new Map([...visibleActionParents, ...records].map(record => [record.id, record])).values()];
   const scopeLabels: Record<OkrScopeSelection['scope'], string> = {
     my: '我的目标',
     supervisor: '直属上级',
@@ -335,7 +339,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
 
   const renderDraftEditor = (record: OkrRecord) => {
     if (record.status !== 'draft' && editingObjectiveId !== record.id) return null;
-    if (record.kind === 'objective') {
+    if (record.kind === 'objective' || record.kind === 'action') {
+      const editRecord = actionGroupDetailRecord(record, [...visibleActionParents, ...records], people);
       const closeEditor = () => { setEditingObjectiveId(null); setSelectedOkrRecordId(null); };
       const form = <ObjectiveForm
         key={record.id}
@@ -352,10 +357,10 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
         teamMembers={teamMembers}
         busy={busy}
         unavailable={loading || !!error}
-        root={!!me?.rootFlag}
-        supervisor={!me?.rootFlag}
+        root={companyLevel}
+        supervisor={!companyLevel} goalLevel={level}
         department={me?.department}
-        alignmentActions={visibleActionParents}
+        alignmentActions={visibleActionParents.filter(action => action.periodKey === record.periodKey)}
         productLineOptions={productLineOptions}
         productLineVersionOptions={productLineVersionOptions}
         projectOptions={projectOptions}
@@ -363,7 +368,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
         opportunityOptions={opportunityOptions}
         okrRecords={records}
         settings={settings}
-        initialPayload={record.payload}
+        initialPayload={editRecord.payload}
         submitLabel={record.status === 'draft' ? undefined : '保存修改'}
         allowAddAnotherInDetail={!me?.rootFlag}
         onAddAnother={() => { setSelectedOkrRecordId(null); setTargetFormCycle(record.periodKey); setObjectiveForms(forms => [...forms, crypto.randomUUID()]); }}
@@ -371,11 +376,11 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
         onSave={payload => updateOkr(record.id, payload, record.status === 'draft').then(ok => { if (ok) setEditingObjectiveId(null); return ok; })}
         onSaveDraft={record.status === 'draft' ? payload => updateOkr(record.id, payload, false).then(ok => { if (ok) { setEditingObjectiveId(null); setSelectedOkrRecordId(null); } return ok; }) : undefined}
       />;
-      return <CompanyEditorShell company blocked={busy} title={me?.rootFlag ? '修改公司级目标' : '修改主管级目标'} onClose={closeEditor}>
+      return <CompanyEditorShell company blocked={busy} title="编辑目标" onClose={closeEditor}>
         <div className="okr-objective-form-stack" aria-busy={busy}>
           <div className="okr-objective-period"><span>目标归属周期</span><Tooltip title="编辑原目标时保留所属周期"><span><Select aria-label="目标归属周期" className="company-objective-cycle-select" value={record.periodKey} disabled options={[{ value: record.periodKey, label: dayjs(record.periodKey).format('YYYY年MM月') }]}/></span></Tooltip></div>
           <div className="okr-objective-form-item">{form}</div>
-          <div className="okr-objective-footer"><Tooltip title="编辑当前目标时不追加其他目标，请返回列表后添加"><div className="company-objective-toolbar"><Button type="text" icon={<PlusIcon/>} disabled>添加目标</Button><span className="company-toolbar-divider"/><Button type="text" icon={<RepoTemplateIcon/>} disabled>目标模板</Button><span className="company-toolbar-divider"/><Button type="text" icon={<CopyIcon/>} disabled>复制目标</Button></div></Tooltip><span className="okr-objective-footer-spacer"/><Button onClick={closeEditor} disabled={busy}>取消</Button>{record.status === 'draft' && <Button onClick={() => void editingObjectiveRef.current?.saveDraft()} disabled={busy || loading || !!error}>存草稿</Button>}<Button type="primary" onClick={() => void editingObjectiveRef.current?.submit()} loading={busy} disabled={loading || !!error}>{record.status === 'draft' ? '提交目标' : '保存修改'}</Button></div>
+          <div className="okr-objective-footer"><Tooltip title="编辑当前目标时不追加其他目标，请返回列表后添加"><div className="company-objective-toolbar"><Button type="text" icon={<PlusIcon/>} disabled>添加目标</Button><span className="company-toolbar-divider"/><Button type="text" icon={<RepoTemplateIcon/>} disabled>目标模板</Button><span className="company-toolbar-divider"/><Button type="text" icon={<CopyIcon/>} disabled>复制目标</Button></div></Tooltip><span className="okr-objective-footer-spacer"/><Button onClick={closeEditor} disabled={busy}>取消</Button>{record.status === 'draft' && <Button onClick={() => void editingObjectiveRef.current?.saveDraft()} disabled={busy || loading || !!error}>存草稿</Button>}<Button type="primary" onClick={() => void editingObjectiveRef.current?.submit()} loading={busy} disabled={loading || !!error || (!companyLevel && !visibleActionParents.some(action => action.periodKey === record.periodKey))}>{record.status === 'draft' ? '提交目标' : '保存修改'}</Button></div>
         </div>
       </CompanyEditorShell>;
     }
@@ -478,10 +483,10 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
             <div className="okr-objective-period"><span>目标归属周期</span><Select aria-label="目标归属周期" className="company-objective-cycle-select" value={targetFormCycle} disabled={busy || objectiveBatchAction !== null} options={periods.flatMap(group => group.children).map(month => ({ value: month.value, label: month.label }))} onChange={setTargetFormCycle}/></div>
               {objectiveForms.map((formId, formIndex) => (
             <div key={formId} className="okr-objective-form-item"><ObjectiveForm ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={targetFormCycle} objectiveIndex={formIndex} ownerName={currentUser.name} ownerAvatar={currentUser.avatar} parents={parents} people={people} teamMembers={teamMembers} busy={busy} unavailable={loading || !!error} initialPayload={copiedObjectives[formId]}
-              root={!!me?.rootFlag}
-              supervisor={!me?.rootFlag}
+              root={companyLevel}
+              supervisor={!companyLevel} goalLevel={level}
               department={me?.department}
-              alignmentActions={visibleActionParents}
+              alignmentActions={visibleActionParents.filter(action => action.periodKey === targetFormCycle)}
               productLineOptions={productLineOptions}
               productLineVersionOptions={productLineVersionOptions}
               projectOptions={projectOptions}
@@ -498,7 +503,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               onSaveDraft={async payload => { const ok = await saveObjectiveDraft(targetFormCycle, payload); if (ok) setSelectedCycles(current => includeSelectedCycle(current, targetFormCycle)); return ok; }}
               onAddAnother={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])}/></div>
             ))}
-            <div className="okr-objective-footer"><div className="company-objective-toolbar"><Button type="text" icon={<PlusIcon/>} onClick={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])} disabled={busy || objectiveBatchAction !== null}>添加目标</Button><span className="company-toolbar-divider"/><Button type="text" icon={<RepoTemplateIcon/>} onClick={() => setCompanyTemplateOpen(true)} disabled={busy || objectiveBatchAction !== null}>目标模板</Button><span className="company-toolbar-divider"/><Button type="text" icon={<CopyIcon/>} onClick={() => setCompanyCopyOpen(true)} disabled={busy || objectiveBatchAction !== null}>复制目标</Button></div><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy || objectiveBatchAction !== null}>取消</Button><Button onClick={() => void handleObjectiveBatch('draft')} loading={objectiveBatchAction === 'draft'} disabled={busy || loading || !!error || objectiveBatchAction !== null}>存草稿</Button><Button type="primary" onClick={() => void handleObjectiveBatch('submit')} loading={objectiveBatchAction === 'submit'} disabled={loading || !!error || objectiveBatchAction !== null}>{me?.rootFlag ? '提交目标' : '提交主管确认'}</Button></div>
+            <div className="okr-objective-footer"><div className="company-objective-toolbar"><Button type="text" icon={<PlusIcon/>} onClick={() => setObjectiveForms(forms => [...forms, crypto.randomUUID()])} disabled={busy || objectiveBatchAction !== null}>添加目标</Button><span className="company-toolbar-divider"/><Button type="text" icon={<RepoTemplateIcon/>} onClick={() => setCompanyTemplateOpen(true)} disabled={busy || objectiveBatchAction !== null}>目标模板</Button><span className="company-toolbar-divider"/><Button type="text" icon={<CopyIcon/>} onClick={() => setCompanyCopyOpen(true)} disabled={busy || objectiveBatchAction !== null}>复制目标</Button></div><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy || objectiveBatchAction !== null}>取消</Button><Button onClick={() => void handleObjectiveBatch('draft')} loading={objectiveBatchAction === 'draft'} disabled={busy || loading || !!error || objectiveBatchAction !== null}>存草稿</Button><Button type="primary" onClick={() => void handleObjectiveBatch('submit')} loading={objectiveBatchAction === 'submit'} disabled={loading || !!error || objectiveBatchAction !== null || (!companyLevel && !visibleActionParents.some(action => action.periodKey === targetFormCycle))}>{companyLevel ? '提交目标' : '提交主管确认'}</Button></div>
             </div>
             </CompanyEditorShell>
           )}
@@ -527,8 +532,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               onSubmitDraft={record => setOkrDraftToSubmit(record.id)}
             />
           </div> : selectedOkrRecord ? <div className="okr-detail-page">
-            {editingObjectiveId === selectedOkrRecord.id || (selectedOkrRecord.status === 'draft' && !people.some(person => person.id === selectedOkrRecord.ownerId && person.rootFlag === 1)) ? renderDraftEditor(selectedOkrRecord) : selectedOkrRecord.kind === 'objective' ? <CompanyObjectiveDetail record={selectedOkrRecord} records={records} people={people} work={work} workLoading={workLoading} workError={workError} onRetryWork={() => void refreshWork()} busy={busy} onEdit={selectedOkrRecord.ownerId === currentUser.id ? () => setEditingObjectiveId(selectedOkrRecord.id) : undefined} onDelete={selectedOkrRecord.ownerId === currentUser.id ? () => setDeleteObjectiveId(selectedOkrRecord.id) : undefined} onClose={() => setSelectedOkrRecordId(null)}/> : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.ownerId} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedOkrRecordId(null)} />}
-            <Modal title="删除目标" open={!!deleteObjectiveId} okText="删除" okButtonProps={{ danger: true }} confirmLoading={busy} cancelButtonProps={{disabled: busy}} closable={!busy} maskClosable={false} keyboard={!busy} onCancel={() => setDeleteObjectiveId(null)} onOk={async () => { if (!deleteObjectiveId || busy) return; if (await deleteOkr(deleteObjectiveId)) { setDeleteObjectiveId(null); setEditingObjectiveId(null); setSelectedOkrRecordId(null); } }}><p>确定删除{dayjs(selectedOkrRecord.periodKey).format('YYYY年MM月')}的目标“{selectedOkrRecord.payload.title}”吗？仅删除当前目标及其动作，不删除该周期其他目标；历史复盘保留。已有下级对齐的目标不能直接删除。</p></Modal>
+            {editingObjectiveId === selectedOkrRecord.id ? renderDraftEditor(selectedOkrRecord) : (selectedOkrRecord.kind === 'objective' || selectedOkrRecord.kind === 'action') ? <CompanyObjectiveDetail record={selectedOkrRecord} records={objectiveDetailRecords} people={people} work={work} workLoading={workLoading} workError={workError} onRetryWork={() => void refreshWork()} busy={busy} onEdit={selectedOkrRecord.ownerId === currentUser.id ? () => setEditingObjectiveId(selectedOkrRecord.id) : undefined} onDelete={selectedOkrRecord.ownerId === currentUser.id ? () => setDeleteObjectiveId(selectedOkrRecord.id) : undefined} onClose={() => setSelectedOkrRecordId(null)}/> : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.ownerId} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedOkrRecordId(null)} />}
+            <Modal title="删除目标" open={!!deleteObjectiveId} okText="删除" okButtonProps={{ danger: true }} confirmLoading={busy} cancelButtonProps={{disabled: busy}} closable={!busy} maskClosable={false} keyboard={!busy} onCancel={() => setDeleteObjectiveId(null)} onOk={async () => { if (!deleteObjectiveId || busy) return; if (await deleteOkr(deleteObjectiveId)) { setDeleteObjectiveId(null); setEditingObjectiveId(null); setSelectedOkrRecordId(null); } }}><p>确定删除{dayjs(selectedOkrRecord.periodKey).format('YYYY年MM月')}的目标“{actionGroupDetailRecord(selectedOkrRecord, objectiveDetailRecords, people).payload.title}”吗？仅删除当前目标及其动作，不删除该周期其他目标；历史复盘保留。已有下级对齐的目标不能直接删除。</p></Modal>
           </div> : ((!me?.rootFlag && objectiveForms.length > 0) || actionFormOpen ? null : <div className="okr-summary-month-list">
              {selectedCycles.length === 0 ? (
                <div className="okr-empty-period-state"><Empty description="至少选择一个周期" /></div>
@@ -569,7 +574,10 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               }}
               onOpenTarget={targetId => {
                 const target = targetItems.find(item => item.id === targetId);
-                const detailId = target?.detailId || targetId;
+                const submittedActionId = target?.status === 'partial-draft'
+                  ? target.actions.find(action => records.some(record => record.id === action.id && record.status !== 'draft'))?.id
+                  : undefined;
+                const detailId = submittedActionId || target?.detailId || targetId;
                 const objectiveRecord = records.find(record => record.id === detailId && record.kind === 'objective');
                 if (objectiveRecord) {
                   setSelectedMonthDetail(null);
@@ -583,16 +591,11 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
                   setSelectedOkrRecordId(target.detailId);
                   return;
                 }
-                // 下级拆解目标以 action-group-* 聚合展示，统一打开其所属 O 的底部详情抽屉。
                 const actionRecord = records.find(record => record.id === detailId && record.kind === 'action');
-                const parentObjectiveId = actionRecord?.payload.parentObjectiveId;
-                const parentObjective = parentObjectiveId
-                  ? records.find(record => record.id === parentObjectiveId && record.kind === 'objective')
-                  : undefined;
-                if (parentObjective) {
+                if (actionRecord) {
                   setSelectedMonthDetail(null);
                   setSelectedMonthTargetId(undefined);
-                  setSelectedOkrRecordId(parentObjective.id);
+                  setSelectedOkrRecordId(actionRecord.id);
                   return;
                 }
                 setSelectedOkrRecordId(null);

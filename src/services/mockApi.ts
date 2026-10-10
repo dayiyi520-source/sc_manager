@@ -1,3 +1,4 @@
+import { assignedGoalActions, legacyGoalActions } from './okrGoalRules';
 import collaborationTypes from '../data/mockCollaborationTypes.json';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
 import savedResearchTemplate from '../data/mockResearchTemplate.json';
@@ -76,7 +77,7 @@ const id = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString
 
 const getEmployeeOptions = (): EmployeeOption[] => getMembers().filter((member) => member.status === 'enabled').map((member) => {
   const seed = MOCK_USERS.find((user) => user.id === member.id);
-  return { id: member.id, name: member.name, avatar: seed?.avatar, department: member.department || seed?.department, role: seed?.role || 'product_manager', roleTitle: member.jobTitle || seed?.roleTitle };
+  return { id: member.id, name: member.name, avatar: seed?.avatar, department: member.department || seed?.department, role: seed?.role || 'product_manager', jobTitle: member.jobTitle, roleTitle: member.jobTitle || seed?.roleTitle };
 });
 const initialWorkItems = [
   ...MOCK_REQUIREMENT_TASKS.map((task) => ({ ...task, category: 'requirement' })),
@@ -154,7 +155,8 @@ const getOkrPeople = () => {
   const cached = read(KEYS.okrPeople, MOCK_OKR_PEOPLE);
   return MOCK_OKR_PEOPLE.map((person) => {
     const saved = cached.find((item) => item.id === person.id);
-    return saved && saved.version > person.version ? { ...person, ...saved } : { ...person };
+    const member = getMembers().find(item => item.id === person.id);
+    return { ...(saved && saved.version > person.version ? { ...person, ...saved } : person), ...(member ? { name: member.name, department: member.department, jobTitle: member.jobTitle } : {}) };
   });
 };
 const planCases = (caseIds: string[]): TestPlanCase[] => getCases().filter((item) => caseIds.includes(item.id)).map((item, index) => ({
@@ -697,7 +699,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (clean === '/api/okr/settings' && method === 'PUT') { write(KEYS.okrSettings, body); return body; }
   if (clean === '/api/okr/records' && method === 'GET') {
     const viewerId = queryOf(path).get('viewerId');
-    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => record.status !== 'deleted' && (!viewerId || record.ownerId === viewerId || record.payload?.keyResults?.some((keyResult: any) => keyResult.assigneeIds?.includes(viewerId))));
+    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => record.status !== 'deleted' && (record.kind !== 'review' || !viewerId || record.ownerId === viewerId));
   }
   if (clean === '/api/okr/records' && method === 'POST') { const record = { id: id('okr'), kind: body.kind, ownerId: body.viewerId || MOCK_USERS[0]?.id, periodKey: body.periodKey, status: body.submit === false ? 'draft' : 'active', version: 0, createdAt: now(), payload: body.payload || {} }; const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS); write(KEYS.okrRecords, [...records, record]); return { id: record.id }; }
   if (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH') {
@@ -705,15 +707,32 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const index = records.findIndex(record => record.id === parts[3]);
     if (index < 0) throw new Error('目标记录不存在');
     const record = records[index];
-    if (record.kind === 'objective') {
+    if (record.kind === 'objective' || record.kind === 'action') {
       if (!body.viewerId || record.ownerId !== body.viewerId) throw new Error('只能修改或删除本人制定的目标');
       if (record.status === 'deleted' && body.action === 'delete') return record;
       if (record.status === 'deleted') throw new Error('目标已删除');
       if (body.version !== record.version) throw new Error('目标已被更新，请刷新后重试');
-      const dependents = records.filter(item => item.status !== 'deleted' && item.kind !== 'review' && (item.payload?.parentObjectiveId === record.id || item.payload?.alignments?.some((alignment: any) => alignment.parentObjectiveId === record.id)));
+      const group = record.kind === 'action' ? legacyGoalActions(record, records) : [record];
+      const groupIds = new Set(group.map(item => item.id));
+      const dependents = records.filter(item => item.status !== 'deleted' && item.kind !== 'review' && !groupIds.has(item.id) && (groupIds.has(item.payload?.parentObjectiveId) || groupIds.has(item.payload?.parentActionId) || groupIds.has(item.payload?.parentKeyResultId) || item.payload?.alignments?.some((alignment: any) => groupIds.has(alignment.parentObjectiveId) || groupIds.has(alignment.parentKeyResultId))));
       if (body.action === 'delete') {
         if (dependents.length) throw new Error('目标已有下级对齐，不能直接删除');
-        records[index] = { ...record, status: 'deleted', version: record.version + 1, deletedAt: now(), deletedBy: body.viewerId };
+        groupIds.forEach(recordId => { const i = records.findIndex(item => item.id === recordId); records[i] = { ...records[i], status: 'deleted', version: records[i].version + 1, deletedAt: now(), deletedBy: body.viewerId }; });
+        write(KEYS.okrRecords, records);
+        return records[index];
+      }
+      if (record.kind === 'action' && body.payload?.keyResults) {
+        const retainedIds = new Set(body.payload.keyResults.map((item: any) => item.id));
+        if (dependents.some(item => !retainedIds.has(item.payload.parentActionId || item.payload.parentKeyResultId) && groupIds.has(item.payload.parentActionId || item.payload.parentKeyResultId) || item.payload.alignments?.some((alignment: any) => groupIds.has(alignment.parentKeyResultId) && !retainedIds.has(alignment.parentKeyResultId)))) throw new Error('已被下级对齐的动作不能移除');
+        groupIds.forEach(recordId => { const i = records.findIndex(item => item.id === recordId); if (i !== index) records[i] = { ...records[i], status: 'deleted', version: records[i].version + 1 }; });
+        dependents.forEach(item => {
+          const i = records.findIndex(row => row.id === item.id);
+          records[i] = { ...item, version: item.version + 1, payload: { ...item.payload,
+            ...(groupIds.has(item.payload.parentActionId || item.payload.parentKeyResultId) ? { parentObjectiveId: record.id } : {}),
+            ...(item.payload.alignments ? { alignments: item.payload.alignments.map((alignment: any) => groupIds.has(alignment.parentKeyResultId) ? { ...alignment, parentObjectiveId: record.id } : alignment) } : {}),
+          } };
+        });
+        records[index] = { ...record, kind: 'objective', payload: body.payload, status: body.action === 'submit' ? 'active' : record.status, version: record.version + 1 };
         write(KEYS.okrRecords, records);
         return records[index];
       }
@@ -728,7 +747,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   }
   if (parts[1] === 'okr' && parts[2] === 'people' && parts[3] && method === 'PUT') { const people = getOkrPeople(); const index = people.findIndex((person) => person.id === parts[3]); if (index < 0) throw new Error('组织成员不存在'); people[index] = { ...people[index], supervisorId: body.supervisorId || null, rootFlag: body.root ? 1 : 0, version: people[index].version + 1 }; write(KEYS.okrPeople, people); return people[index]; }
   if (clean === '/api/okr/work' && method === 'GET') return [];
-  if (clean === '/api/okr/actions/parents' && method === 'GET') { const periodKey = queryOf(path).get('periodKey'); return read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record) => record.kind === 'objective' && record.status !== 'deleted' && (!periodKey || record.periodKey === periodKey)); }
+  if (clean === '/api/okr/actions/parents' && method === 'GET') { const query = queryOf(path); return assignedGoalActions(read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS), getOkrPeople().find(person => person.id === query.get('viewerId'))).filter(record => !query.get('periodKey') || record.periodKey === query.get('periodKey')); }
   if (clean === '/api/okr/actions' && method === 'POST') { const record = { id: id('okr-action'), kind: 'action', ownerId: body.viewerId || MOCK_USERS[0]?.id, periodKey: body.periodKey, status: body.submit === false ? 'draft' : 'active', version: 0, createdAt: now(), payload: body.payload || {} }; const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS); write(KEYS.okrRecords, [...records, record]); return { id: record.id }; }
   if (parts[1] === 'okr' && parts[2] && parts[3] === 'events' && method === 'GET') return [];
 

@@ -190,3 +190,34 @@ describe('ObjectiveForm assignee search', () => {
     expect(await screen.findByText('陈宇璋 · 产品规划部')).toBeInTheDocument();
   });
 });
+
+
+
+describe('assigned supervisor actions', () => {
+  const source = {id:'source-a',kind:'action' as const,ownerId:'manager',periodKey:'2026-09',status:'active',version:0,payload:{title:'上级产研动作',deadline:'2026-09-25',parentObjectiveId:'parent',parentKeyResultId:'source-a'}};
+  const people = [{id:'manager',name:'陈宇璋',department:'产品部',jobTitle:'产品主管',rootFlag:0,version:0}];
+  it('blocks submission when no assigned action exists', async()=>{
+    const ref=createRef<ObjectiveFormHandle>(); const onSave=vi.fn();
+    render(<ObjectiveForm ref={ref} cycle="2026-09" ownerName="毛景强" goalLevel="个人级" parents={[]} busy={false} unavailable={false} root={false} supervisor onCancel={vi.fn()} onSave={onSave}/>);
+    expect(screen.getByText('暂无需要承接的动作')).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:/提\s*交/})).toBeDisabled();
+    await act(async()=>{expect(await ref.current?.submit()).toBe(false);});
+    expect(onSave).not.toHaveBeenCalled();
+  });
+  it('rejects saved dates beyond the upper action deadline for both save paths',async()=>{
+    const ref=createRef<ObjectiveFormHandle>(); const onSave=vi.fn(); const onSaveDraft=vi.fn();
+    render(<ObjectiveForm ref={ref} cycle="2026-09" ownerName="毛景强" goalLevel="个人级" parents={[]} people={people} alignmentActions={[source]} busy={false} unavailable={false} root={false} supervisor onCancel={vi.fn()} onSave={onSave} onSaveDraft={onSaveDraft} initialPayload={{title:'个人目标',parentObjectiveId:'parent',keyResults:[{id:'a',title:'动作',deadline:'2026-09-26',weight:100,progress:0}]}}/>);
+    expect(screen.getByText(/上级产研动作——来源于上级陈宇璋/)).toBeInTheDocument();
+    await act(async()=>{expect(await ref.current?.submit()).toBe(false);expect(await ref.current?.saveDraft()).toBe(false);});
+    expect(screen.getByText(/不能超过上级动作截止日期 2026-09-25/)).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();expect(onSaveDraft).not.toHaveBeenCalled();
+  });
+  it('defaults the first objective to CO after switching into an assigned cycle',async()=>{
+    const ref=createRef<ObjectiveFormHandle>();
+    const props={ownerName:'毛景强',parents:[],people,busy:false,unavailable:false,root:false,supervisor:true,onCancel:vi.fn(),onSave:vi.fn()};
+    const view=render(<ObjectiveForm ref={ref} {...props} cycle="2026-10" alignmentActions={[]}/>);
+    expect(ref.current?.snapshot().objectiveType).toBe('challenge');
+    view.rerender(<ObjectiveForm ref={ref} {...props} cycle="2026-09" alignmentActions={[source]}/>);
+    expect(ref.current?.snapshot().objectiveType).toBe('target');
+  });
+});

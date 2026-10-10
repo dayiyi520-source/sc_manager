@@ -58,4 +58,21 @@ describe('TeamOrgView', () => {
 
     await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ name: '新员工', department: '产品规划部', jobTitle: '产品经理' })));
   });
+
+  it('refreshes shared role and goal caches after saving a member rename', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['team-member-options'], [{ id: 'user-admin', name: '林志豪' }]);
+    client.setQueryData(['okr', 'user-admin', 'people'], [{ id: 'user-admin', name: '林志豪' }]);
+    mocks.update.mockResolvedValue({ id: 'user-admin', name: '新姓名', version: 1 });
+    const { unmount } = render(<QueryClientProvider client={client}><TeamOrgView /></QueryClientProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: '编辑林志豪' }));
+    fireEvent.change(screen.getByPlaceholderText('请输入员工姓名'), { target: { value: '新姓名' } });
+    fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith('user-admin', expect.objectContaining({ name: '新姓名', version: 0 })));
+    await waitFor(() => expect(client.getQueryState(['team-member-options'])?.isInvalidated).toBe(true));
+    expect(client.getQueryState(['okr', 'user-admin', 'people'])?.isInvalidated).toBe(true);
+    await waitFor(() => expect(mocks.addToast).toHaveBeenCalledWith('success', '成员信息已更新'));
+    unmount();
+    client.clear();
+  });
 });
