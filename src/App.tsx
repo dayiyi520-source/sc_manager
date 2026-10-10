@@ -20,6 +20,7 @@ const lazyNamed = (loader: () => Promise<Record<string, unknown>>, exportName: s
   return { default: module[exportName] as React.ComponentType };
 });
 const MyTasksView = lazyNamed(() => import('./components/workbench/MyTasksView'), 'MyTasksView');
+const TrainingCenterView = lazyNamed(() => import('./components/training/TrainingCenterView'), 'TrainingCenterView');
 const KnowledgeBaseView = lazyNamed(() => import('./components/workbench/KnowledgeBaseView'), 'KnowledgeBaseView');
 const CRMDashboardView = lazyNamed(() => import('./components/crm/CRMDashboardView'), 'CRMDashboardView');
 const RequirementTasksView = lazyNamed(() => import('./components/product/RequirementTasksView'), 'RequirementTasksView');
@@ -91,6 +92,11 @@ const MainContent: React.FC = () => {
 
   const renderView = () => {
     switch (routedTabId) {
+      case 'training_home':
+      case 'training_courses':
+      case 'training_learning':
+      case 'training_admin':
+        return <TrainingCenterView key={routedTabId} />;
       // Workbench
       case 'wb_my_tasks':
         return <MyTasksView />;

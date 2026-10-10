@@ -14,11 +14,16 @@ export type MainMenuId =
   | 'workbench' 
   | 'crm' 
   | 'product' 
+  | 'training'
   | 'approval' 
   | 'project' 
   | 'system';
 
 export type SubMenuId =
+  | 'training_home'
+  | 'training_courses'
+  | 'training_learning'
+  | 'training_admin'
   // 工作台
   | 'wb_my_tasks'
   | 'wb_okr_perf'
