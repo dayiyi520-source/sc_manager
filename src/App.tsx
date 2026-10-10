@@ -220,7 +220,7 @@ const MainContent: React.FC = () => {
   };
 
   return (
-    <main className="tech-main flex-1 overflow-y-auto p-4 lg:p-6">
+    <main className="tech-main min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:p-6">
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
         {/* 产品范围由任务工作区与测试资产共同复用。 */}
         {/* Dynamic View Component */}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeTaskActivity, taskActivitySummary } from './taskActivity';
+import { normalizeTaskActivity, taskActivitySummary, formatTaskActivityTime } from './taskActivity';
 
 describe('task activity display', () => {
   it('reads persisted JSON and explains field and priority changes', () => {
@@ -14,3 +14,10 @@ describe('task activity display', () => {
     expect(taskActivitySummary(normalizeTaskActivity({ eventType: 'WORK_ITEM_UPDATED', content: 'invalid json' }))).toBe('修改了任务');
   });
 });
+
+ it('将本地补全事件和未知英文事件显示为中文，时间去除 ISO 标记与微秒', () => {
+   expect(taskActivitySummary(normalizeTaskActivity({ eventType: 'LOCAL_DATA_ENRICHED' }))).toBe('补充了任务资料');
+   expect(taskActivitySummary(normalizeTaskActivity({ eventType: 'UNKNOWN_EVENT' }))).toBe('更新了任务记录');
+   expect(formatTaskActivityTime('2026-10-10T07:38:42.987123Z')).toMatch(/^2026-10-10 \d{2}:38:42$/);
+   expect(formatTaskActivityTime('invalid')).toBe('—');
+ });

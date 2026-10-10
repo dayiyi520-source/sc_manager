@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, AlertCircle, CheckCircle2, Info, AlertTriangle, ArrowUpRight, ArrowDownRight } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { Card, Statistic, Tag } from 'antd';
@@ -119,7 +120,7 @@ export const StatusTag: React.FC<{
   if (!detectedType) {
     if (['已通过', '中标', '已发布', '已完成', '合作中', '履行中', 'healthy', '低风险', 'reviewed'].includes(status)) {
       detectedType = 'success';
-    } else if (priorityLabels[status] === '紧急' || status === '紧急' || ['已驳回', '未中标', '流标', '已终止', '致命', '严重', 'error', '严重滞后', '有逾期款项'].includes(status)) {
+    } else if (priorityLabels[status] === '紧急' || status === '紧急' || ['已驳回', '已退回', '未中标', '流标', '已终止', '致命', '严重', 'error', '严重滞后', '有逾期款项'].includes(status)) {
       detectedType = 'danger';
     } else if (priorityLabels[status] === '高' || status === '高' || ['待审批', '招投标', '制作标书中', '进行中', '处理中', '测试中', '研发中', 'warning', '中度预警', '待修复', '待评审'].includes(status)) {
       detectedType = 'warning';
@@ -173,8 +174,8 @@ export const Modal: React.FC<{
     '4xl': 'max-w-4xl'
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity" onClick={onClose} />
       <div
         className={`relative bg-[var(--bg-surface)] text-[var(--text-body)] rounded-xl shadow-2xl border border-[var(--border-main)] w-full ${maxWidthClasses[maxWidth]} my-8 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}
@@ -202,7 +203,7 @@ export const Modal: React.FC<{
           </div>
         )}
       </div>
-    </div>
+    </div>, document.body
   );
 };
 
@@ -216,15 +217,16 @@ export const Drawer: React.FC<{
   footer?: React.ReactNode;
   width?: string;
   headerActions?: React.ReactNode;
-}> = ({ isOpen, onClose, title, subtitle, hideSubtitle, children, footer, width = 'max-w-2xl', headerActions }) => {
+  contentClassName?: string;
+}> = ({ isOpen, onClose, title, subtitle, hideSubtitle, children, footer, width = 'max-w-2xl', headerActions, contentClassName }) => {
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-hidden">
       <div className="drawer-backdrop absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-xs transition-opacity" onClick={onClose} />
       <div className="fixed inset-y-0 right-0 pl-10 max-w-full flex">
         <div
-        className={`w-screen ${width} bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl border-l border-[var(--border-main)] flex flex-col`}
+        className={`w-screen ${width} bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl border-l border-[var(--border-main)] flex min-h-0 flex-col`}
         >
           <div className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-surface-soft)]">
             <div className="min-w-0 flex-1 mr-4">
@@ -244,7 +246,7 @@ export const Drawer: React.FC<{
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+          <div className={`min-h-0 flex-1 overscroll-contain px-6 py-5 ${contentClassName || "overflow-y-auto"}`} >{children}</div>
           {footer && (
             <div className="border-t border-[var(--border-main)] px-6 py-4 bg-[var(--bg-main)] flex items-center justify-end gap-3">
               {footer}
@@ -252,7 +254,7 @@ export const Drawer: React.FC<{
           )}
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 };
 

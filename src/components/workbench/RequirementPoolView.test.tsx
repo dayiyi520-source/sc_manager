@@ -20,7 +20,7 @@ vi.mock('../product/RequirementTasksView', () => ({
   RequirementTasksView: ({ taskKind, itemLabel, creationContext }: { taskKind: string; itemLabel: string; creationContext: { sourceWorkOrder?: RequirementTask; onClose?: () => void; onCreated?: () => void } }) => <section aria-label={`新建${itemLabel}`} data-testid="embedded-task-create" data-kind={taskKind} data-source={creationContext.sourceWorkOrder?.id}><h2>新建{itemLabel}</h2><button onClick={creationContext.onClose}>取消任务新建</button><button onClick={() => { creationContext.onCreated?.(); creationContext.onClose?.(); }}>模拟任务保存</button></section>,
 }));
 vi.mock('../../services/requirementRepository', () => ({
-  requirementRepository: { allForScope: vi.fn(), transferredBy: vi.fn(), employees: vi.fn(), detail: vi.fn(), receive: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), createWorkItem: vi.fn() },
+  requirementRepository: { allForScope: vi.fn(), transferredBy: vi.fn(), employees: vi.fn(), detail: vi.fn(), receive: vi.fn(), transition: vi.fn(), acceptancePassed: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), addComment: vi.fn(), createWorkItem: vi.fn() },
   normalizeRequirementTask: (task: RequirementTask) => task,
 }));
 vi.mock('../product/LazyRichTextEditor', () => ({
@@ -113,11 +113,105 @@ describe('workbench work-order creation layout', () => {
   const renderDetail = async (overrides: Partial<RequirementTask> = {}) => {
     const task = { id: 'receive-1', title: '接收协同事项', status: '待处理', ownerName: '林志豪', creatorName: '林志豪', workOrderType: '客户诉求', productLineName: '协同产品', specialFields: { projectName: '项目甲', requestSource: '客户访谈' }, ...overrides } as RequirementTask;
     window.history.replaceState(null, '', '/app/wb_work_order?detailId=receive-1');
-    vi.mocked(requirementRepository.detail).mockResolvedValue({ ...task, events: [], workItems: [] });
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ ...task, events: task.events ?? [], workItems: [] });
     render(<RequirementPoolView />);
     await screen.findByRole('heading', { name: task.title });
     return task;
   };
+
+  it('评论发表后更新讨论和历程，历程入口打开全部评论并定位', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const task = await renderDetail({ revision: 2 });
+    expect(screen.getByLabelText('事项讨论')).toHaveTextContent('讨论（0）');
+    expect(screen.getByRole('button', { name: '发表评论' })).toBeDisabled();
+    const comment = { id: 'comment-1', eventType: '发表评论', operatorName: '林志豪', createdAt: '2026-10-10T10:00:00', metadata: { commentContent: '请补充客户确认结果' } };
+    vi.mocked(requirementRepository.addComment).mockResolvedValue({ ...task, revision: 3, events: [comment] });
+    fireEvent.change(screen.getByLabelText('评论内容'), { target: { value: '请补充客户确认结果' } });
+    fireEvent.click(screen.getByRole('button', { name: '发表评论' }));
+    await waitFor(() => expect(requirementRepository.addComment).toHaveBeenCalledWith(task.id, { content: '请补充客户确认结果', requestId: expect.any(String), revision: 2 }));
+    await waitFor(() => expect(screen.getByLabelText('最近评论')).toHaveTextContent('请补充客户确认结果'));
+    expect(screen.getByLabelText('评论内容')).toHaveValue('');
+    expect(screen.getByLabelText('事项全历程列表')).not.toHaveTextContent('请补充客户确认结果');
+    fireEvent.click(screen.getByRole('button', { name: '查看评论' }));
+    expect(screen.getByLabelText('全部评论列表')).toHaveTextContent('请补充客户确认结果');
+    await waitFor(() => expect(document.activeElement).toHaveAttribute('aria-label', '评论：林志豪'));
+  });
+
+  it('验收通过先评价，取消不完成，确认后保存评分和评价', async () => {
+    const task = await renderDetail({ status: '待验收', revision: 2 });
+    fireEvent.click(screen.getByRole('button', { name: '验收通过' }));
+    expect(requirementRepository.acceptancePassed).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '确认评价并完成' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '取消评价' }));
+    expect(requirementRepository.acceptancePassed).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '验收通过' }));
+    fireEvent.click(document.querySelectorAll('.ant-rate-star')[4].querySelector('[role="radio"]')!);
+    fireEvent.change(screen.getByLabelText('评价内容'), { target: { value: '处理及时' } });
+    vi.mocked(requirementRepository.acceptancePassed).mockResolvedValue({ id: task.id, status: '已完成' });
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ ...task, status: '已完成', events: [{ id: 'rated', eventType: '验收通过', operatorName: '林志豪', reason: '处理及时', createdAt: '2026-10-10T10:00:00', metadata: { rating: 5 } }], workItems: [] });
+    fireEvent.click(screen.getByRole('button', { name: '确认评价并完成' }));
+    await waitFor(() => expect(requirementRepository.acceptancePassed).toHaveBeenCalledWith(task.id, { revision: 2, rating: 5, comment: '处理及时' }));
+    await screen.findByRole('button', { name: '重新开启' });
+    expect(screen.getByLabelText('事项全历程列表')).toHaveTextContent('5 星');
+    expect(screen.getByLabelText('事项全历程列表')).toHaveTextContent('处理及时');
+  });
+
+  it('评价提交失败时保留评分和文案，事项仍待验收', async () => {
+    await renderDetail({ status: '待验收' });
+    vi.mocked(requirementRepository.acceptancePassed).mockRejectedValue(new Error('版本冲突'));
+    fireEvent.click(screen.getByRole('button', { name: '验收通过' }));
+    fireEvent.click(document.querySelectorAll('.ant-rate-star')[3].querySelector('[role="radio"]')!);
+    fireEvent.change(screen.getByLabelText('评价内容'), { target: { value: '评价草稿' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认评价并完成' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '验收操作失败', '版本冲突'));
+    expect(screen.getByLabelText('评价内容')).toHaveValue('评价草稿');
+    expect(screen.getByText('4 星')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '重新开启' })).not.toBeInTheDocument();
+  });
+
+  it('产品需求默认需要转产品，选择不需要隐藏产品需求编辑器，切回保留输入', async () => {
+    await openCustomerRequest();
+    expect(screen.getByText('客户原始诉求 *')).toBeVisible();
+    expect(screen.getByText('产品需求描述')).toBeVisible();
+    expect(screen.getAllByTestId('rich-text-editor')).toHaveLength(2);
+    expect(screen.getAllByTestId('rich-text-editor')[1].compareDocumentPosition(screen.getByText(/添加文档附件/)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.mouseDown(screen.getByLabelText('是否转产品'));
+    fireEvent.click(await screen.findByText('不需要', { selector: '.ant-select-item-option-content' }));
+    expect(screen.queryByText('产品需求描述')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('rich-text-editor')).toHaveLength(1);
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('林志豪');
+    fireEvent.mouseDown(screen.getByLabelText('所属项目 *'));
+    fireEvent.click(await screen.findByText('中标项目甲', { selector: '.ant-select-item-option-content' }));
+    expect(screen.getByLabelText('负责人 *').closest('.ant-select')).toHaveTextContent('林志豪');
+    fireEvent.mouseDown(screen.getByLabelText('是否转产品'));
+    fireEvent.click(await screen.findByText('需要', { selector: '.ant-select-item-option-content' }));
+    expect(screen.getAllByTestId('rich-text-editor')).toHaveLength(2);
+  });
+
+  it('不需要转产品的详情只显示客户原始诉求', async () => {
+    await renderDetail({ specialFields: { transferToProduct: '不需要', productDescription: '隐藏的产品描述' } });
+    expect(screen.getByRole('region', { name: '客户原始诉求' })).toBeVisible();
+    expect(screen.queryByRole('region', { name: '产品需求描述' })).not.toBeInTheDocument();
+  });
+
+  it('不需要转产品时创建人不在人员选项中也能按默认负责人提交', async () => {
+    addRequirementTask.mockResolvedValueOnce(true);
+    await openCustomerRequest();
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '无需转产品的诉求' } });
+    fireEvent.mouseDown(screen.getByLabelText('所属项目 *'));
+    fireEvent.click(await screen.findByText('中标项目甲', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('所属产品 *'));
+    fireEvent.click(await screen.findByText('协同产品', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('是否转产品'));
+    fireEvent.click(await screen.findByText('不需要', { selector: '.ant-select-item-option-content' }));
+    fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-19' } });
+    fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
+    fireEvent.change(screen.getByLabelText('诉求来源 *'), { target: { value: '客户反馈' } });
+    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '林志豪', specialFields: expect.objectContaining({ transferToProduct: '不需要' }) })));
+  });
 
   it('shows indirect tasks with real status and opens their exact detail without matter acceptance', async () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
@@ -167,7 +261,7 @@ describe('workbench work-order creation layout', () => {
     await renderDetail({ descriptionHtml: '<p>必须恢复的事项描述</p>' });
     expect(screen.getByRole('region', { name: '基础字段' })).toHaveTextContent('协同产品');
     expect(screen.getByRole('region', { name: '基础字段' })).toHaveTextContent('项目甲');
-    expect(screen.getByRole('region', { name: '事项描述' })).toHaveTextContent('必须恢复的事项描述');
+    expect(screen.getByRole('region', { name: '客户原始诉求' })).toHaveTextContent('必须恢复的事项描述');
     expect(screen.getByRole('region', { name: '附件' })).toHaveTextContent('暂无附件');
     expect(screen.getByRole('heading', { name: '事项全历程' })).toBeVisible();
   });
@@ -206,6 +300,29 @@ describe('workbench work-order creation layout', () => {
     expect(screen.queryByRole('button', { name: '事项转交' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '事项退回' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '新增任务' })).toBeDisabled();
+  });
+
+  it('退回后读取保存结果立即更新负责人，原负责人不可完成', async () => {
+    await renderDetail({ creatorName: '陈雅婷', ownerName: '林志豪' });
+    fireEvent.click(screen.getByRole('button', { name: '事项退回' }));
+    fireEvent.mouseDown(screen.getByLabelText('驳回原因 *'));
+    const option = (await screen.findAllByText(/.+/, { selector: '.ant-select-item-option-content' }))[0];
+    fireEvent.click(option);
+    fireEvent.change(screen.getByPlaceholderText('请输入详细驳回说明或补充建议...'), { target: { value: '资料不完整，请创建人处理' } });
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ id: 'receive-1', title: '接收协同事项', status: '已退回', ownerName: '陈雅婷', creatorName: '陈雅婷', assigneeId: 'employee-1', revision: 3, events: [], workItems: [] } as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
+    fireEvent.submit(screen.getByLabelText('驳回原因 *').closest('form')!);
+    await waitFor(() => expect(requirementRepository.transition).toHaveBeenCalledWith('receive-1', 'reject', expect.any(String)));
+    await waitFor(() => expect(screen.getByText('负责人', { exact: true, selector: 'span' }).parentElement).toHaveTextContent('陈雅婷'));
+    expect(screen.getAllByText('已退回').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: '事项完成' })).not.toBeInTheDocument();
+  });
+
+  it('已退回事项允许创建人完成', async () => {
+    await renderDetail({ status: '已退回', creatorName: '林志豪', ownerName: '林志豪' });
+    expect(screen.getByRole('button', { name: '事项完成' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '事项完成' }));
+    expect(screen.getByRole('button', { name: '确认完成' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: '事项接收' })).not.toBeInTheDocument();
   });
 
   it('keeps task creation available in processing even with an existing task', async () => {
@@ -292,8 +409,8 @@ describe('workbench work-order creation layout', () => {
     const submit = screen.getByRole('button', { name: '发起协同' });
     expect(screen.getAllByRole('button', { name: '发起协同' })).toHaveLength(1);
     expect(submit.closest('.sticky')).not.toBeNull();
-    expect(submit.closest('.sticky')).toHaveClass('-top-4', 'lg:-top-6', '-mt-6', 'px-6', 'py-4');
-    expect(screen.getByTestId('rich-text-editor')).toHaveAttribute('data-size', 'work-order');
+    expect(submit.closest('.sticky')).toHaveClass('-top-6', 'lg:-top-6', '-mt-6', 'px-6', 'py-4');
+    expect(screen.getAllByTestId('rich-text-editor')[0]).toHaveAttribute('data-size', 'work-order');
     expect(screen.getByText(/添加文档附件/)).toBeInTheDocument();
   });
 
@@ -325,7 +442,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
     fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
     fireEvent.change(screen.getByLabelText('诉求来源 *'), { target: { value: '客户反馈' } });
-    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '填写事项描述' })[0]);
     fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
 
     expect(screen.getByRole('button', { name: '提交中…' })).toBeDisabled();
@@ -386,7 +503,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-09' } });
     fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
     fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
-    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '填写事项描述' })[0]);
     fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
     expect(addRequirementTask).not.toHaveBeenCalled();
     expect(addToast).toHaveBeenCalledWith('warning', '请完成所有必填业务参数');
@@ -443,7 +560,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-09' } });
     fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
     fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
-    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '填写事项描述' })[0]);
     fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
     await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '林志豪', priority: '高' })));
   });
@@ -584,7 +701,7 @@ describe('workbench work-order creation layout', () => {
       expect(screen.getByLabelText('严重程度').closest('.ant-select')).toHaveTextContent('请选择严重程度（选填）');
       expect(screen.getByLabelText('优先级').closest('.ant-select')?.querySelector('.ant-select-content')).toHaveTextContent('高');
     }
-    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '填写事项描述' })[0]);
     fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
     await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({
       workOrderType: '线上问题',
@@ -617,7 +734,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-09' } });
     fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
     fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
-    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '填写事项描述' })[0]);
     fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
     await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({ workOrderType: type })));
     const fields = addRequirementTask.mock.calls[0][0].specialFields;
@@ -649,7 +766,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '线上异常' } });
     fireEvent.mouseDown(screen.getByLabelText('负责人 *'));
     fireEvent.click(await screen.findByText(/陈雅婷/, { selector: '.ant-select-item-option-content' }));
-    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '填写事项描述' })[0]);
     fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
     expect(addToast).toHaveBeenCalledWith('warning', '请完成所有必填业务参数');
     expect(addRequirementTask).not.toHaveBeenCalled();

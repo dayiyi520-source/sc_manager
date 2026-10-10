@@ -88,6 +88,10 @@ const initialWorkItems = [
 ];
 const getWorkItems = () => read<any[]>(KEYS.workItems, initialWorkItems.map((item) => ({ ...item }))).map((item) => {
   const migratedType = (collaborationTypes as Record<string, string>)[item.id];
+  if (item.category === 'requirement' && (item.workOrderType || migratedType) && ['已驳回', '已退回'].includes(item.status)) {
+    const creator = getMembers().find((member) => member.id === item.creatorId || member.name === item.creatorName);
+    item = { ...item, status: '已退回', ...(item.creatorName ? { ownerName: item.creatorName, assigneeName: item.creatorName, assigneeId: item.creatorId || creator?.id || '' } : {}) };
+  }
   return item.category === 'requirement' && migratedType && !['客户诉求', '线上问题', '售前支持', '交付支持', '其他问题'].includes(item.workOrderType)
     ? { ...item, workOrderType: migratedType } : item;
 });
@@ -612,7 +616,8 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   }
   if (clean === '/api/requirements/departments' && method === 'GET') return getEmployeeOptions().map((item) => ({ id: item.id, name: item.department || '产品研发部', managerName: item.name }));
   if (clean === '/api/requirements' && method === 'GET') {
-    const items = getWorkItems().filter((item) => item.category === 'requirement' && !item.deleted && !item.deleteFlag);
+    const query = queryOf(path);
+    const items = getWorkItems().filter((item) => item.category === 'requirement' && !item.deleted && !item.deleteFlag && (!query.get('status') || item.status === query.get('status')));
     const page = Math.max(1, Number(queryOf(path).get('page') || 1));
     const pageSize = Math.min(100, Math.max(1, Number(queryOf(path).get('pageSize') || 100)));
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
@@ -633,16 +638,59 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (!item) throw new Error('事项不存在');
     return { ...item, events: item.events || [], workItems: item.workItems || [] };
   }
+  if (parts[1] === 'requirements' && parts[2] && parts[3] === 'comments' && method === 'POST') {
+    const items = getWorkItems();
+    const index = items.findIndex((item) => item.id === parts[2] && item.category === 'requirement' && !item.deleted && !item.deleteFlag);
+    if (index < 0) throw new Error('事项不存在');
+    const current = items[index];
+    let viewer: { id?: string; name?: string } | undefined;
+    try { viewer = JSON.parse(sessionStorage.getItem('shichuang.session') || 'null')?.user; } catch { /* 无效会话不可发表评论。 */ }
+    if (!viewer?.name) throw new Error('请登录后发表评论');
+    const content = typeof body.content === 'string' ? body.content.trim() : '';
+    if (!content || content.length > 1000) throw new Error('评论需填写1至1000字');
+    const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : '';
+    if (!requestId || requestId.length > 100) throw new Error('评论提交标识无效，请重新提交');
+    const previous = (current.events || []).find((event) => event.eventType === '发表评论' && event.metadata?.commentRequestId === requestId);
+    if (previous) {
+      if (previous.metadata?.commentContent !== content || previous.metadata?.commentAuthorId !== (viewer.id || viewer.name)) throw new Error('评论提交标识已使用，请重新提交');
+      return { ...current, events: current.events || [], workItems: current.workItems || [] };
+    }
+    const revision = Number(current.revision ?? current.version ?? 0);
+    if (body.revision !== revision) throw new Error('事项已被其他人更新，请刷新后重试');
+    const event = { id: id('comment'), eventType: '发表评论', operatorName: viewer.name, createdAt: now(), metadata: { commentContent: content, commentAuthorId: viewer.id || viewer.name, commentRequestId: requestId } };
+    const updated = { ...current, revision: revision + 1, events: [...(current.events || []), event] };
+    items[index] = updated;
+    write(KEYS.workItems, items);
+    return { ...updated, workItems: updated.workItems || [] };
+  }
+  if (parts[1] === 'requirements' && parts[2] && parts[3] === 'reopen' && method === 'POST') {
+    const items = getWorkItems();
+    const index = items.findIndex((item) => item.id === parts[2] && !item.deleted && !item.deleteFlag);
+    if (index < 0) throw new Error('事项不存在');
+    const current = items[index];
+    const revision = Number(current.revision ?? current.version ?? 0);
+    if (Number(body.revision) !== revision) throw new Error('事项已被其他人更新，请刷新后重试');
+    if (current.status !== '已完成') throw new Error('仅已完成事项可以重新开启');
+    const owner = getMembers().find((member) => member.id === body.assigneeId && member.status === 'enabled');
+    if (!owner || !text(body.reason).trim()) throw new Error('请选择有效处理人并填写重开原因');
+    const event = { id: id('event'), eventType: '事项重开', fromStatus: current.status, toStatus: '待处理', reason: text(body.reason).trim(), operatorName: current.creatorName, createdAt: now(), metadata: { ownerChanged: true, fromAssigneeName: current.ownerName, assigneeName: owner.name } };
+    items[index] = { ...current, status: '待处理', progress: 0, ownerName: owner.name, assigneeName: owner.name, assigneeId: owner.id, revision: revision + 1, events: [...(current.events || []), event] };
+    write(KEYS.workItems, items);
+    return items[index];
+  }
   if (parts[1] === 'requirements' && parts[2] && parts[3] === 'transition' && method === 'POST') {
     const items = getWorkItems();
     const index = items.findIndex((candidate) => candidate.id === parts[2]);
     if (index < 0) throw new Error('事项不存在');
     const current = items[index];
-    const status = body.action === 'reject' ? '已驳回' : body.action === 'hold' ? '已搁置' : body.status;
-    if (!['处理中', '已驳回', '已搁置'].includes(status)) throw new Error('不支持的事项状态');
+    const status = body.action === 'reject' ? '已退回' : body.action === 'hold' ? '已搁置' : body.status;
+    if (!['处理中', '已退回', '已搁置'].includes(status)) throw new Error('不支持的事项状态');
     if (status === '处理中' && current.status !== '待处理') throw new Error('事项状态已变化，请刷新');
-    const event = { id: id('event'), eventType: status === '处理中' ? '事项接收' : body.action === 'reject' ? '驳回' : '搁置', fromStatus: current.status, toStatus: status, reason: text(body.reason), operatorName: current.ownerName, createdAt: now() };
-    items[index] = { ...current, status, revision: Number(current.revision || current.version || 0) + 1, events: [...(current.events || []), event] };
+    const returning = body.action === 'reject';
+    if (returning && (current.status !== '待处理' || !text(body.reason).trim() || !current.creatorName)) throw new Error('仅待处理事项可退回，请确认创建人并填写退回原因');
+    const creator = returning ? getMembers().find((member) => member.id === current.creatorId || member.name === current.creatorName) : undefined;
+    const event = { id: id('event'), eventType: status === '处理中' ? '事项接收' : returning ? '退回' : '搁置', fromStatus: current.status, toStatus: status, reason: text(body.reason), operatorName: current.ownerName, createdAt: now(), ...(returning ? { metadata: { ownerChanged: true, fromAssigneeName: current.ownerName, assigneeName: current.creatorName } } : {}) };
+    items[index] = { ...current, status, ...(returning ? { ownerName: current.creatorName, assigneeName: current.creatorName, assigneeId: current.creatorId || creator?.id || '' } : {}), revision: Number(current.revision || current.version || 0) + 1, events: [...(current.events || []), event] };
     write(KEYS.workItems, items);
     return null;
   }
@@ -651,8 +699,11 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (index < 0) throw new Error('事项不存在');
     const current = items[index]; const revision = Number(current.revision || current.version || 0);
     if (body.revision != null && Number(body.revision) !== revision) throw new Error('事项已被其他人更新，请刷新后重试');
+    const ratedAcceptance = parts[3] === 'acceptance-passed';
+    if (ratedAcceptance && (!Number.isInteger(body.rating) || Number(body.rating) < 1 || Number(body.rating) > 5)) throw new Error('请选择1至5星的验收评价');
+    if (ratedAcceptance && text(body.comment).length > 500) throw new Error('评价内容不能超过500字');
     const nextStatus = parts[3] === 'complete' ? '待验收' : parts[3] === 'acceptance-passed' ? '已完成' : '处理中';
-    if ((parts[3] === 'complete' && current.status !== '处理中') || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
+    if ((parts[3] === 'complete' && !(current.status === '处理中' || (current.status === '已退回' && current.ownerName === current.creatorName))) || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
     if (parts[3] === 'complete' && (current.workItems || []).some((item: RequirementWorkItem) => item.status !== '已完成' && item.assistanceTaskStatus !== 'COMPLETED')) throw new Error('存在未完成的关联任务');
     const stagedAttachments = read<any[]>(KEYS.attachments, []);
     const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.map(String) : [];
@@ -669,7 +720,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const nextOwnerName = String(parts[3] === 'complete' ? (body.assigneeName || creatorName || previousOwnerName) : parts[3] === 'acceptance-failed' ? (failedOwner?.name || failedTask?.assigneeName || previousOwnerName) : previousOwnerName).trim();
     const nextAssigneeId = String(parts[3] === 'complete' ? (body.assigneeId || creatorId || previousAssigneeId) : parts[3] === 'acceptance-failed' ? (body.taskOwnerId || failedTaskAssigneeId || previousAssigneeId) : previousAssigneeId).trim();
     const ownerChanged = Boolean(nextOwnerName && nextOwnerName !== previousOwnerName) || Boolean(previousAssigneeId && nextAssigneeId && nextAssigneeId !== previousAssigneeId);
-    const event = { id: id('event'), eventType: parts[3] === 'complete' ? '事项完成' : parts[3] === 'acceptance-passed' ? '验收通过' : '验收未通过', fromStatus: current.status, toStatus: nextStatus, reason: text(body.note || body.reason), operatorName: current.ownerName, createdAt: now(), metadata: { ...(body.noteHtml ? { noteHtml: text(body.noteHtml) } : {}), ...(ownerChanged ? { ownerChanged: true, fromAssigneeName: previousOwnerName, assigneeName: nextOwnerName } : {}), attachments: stagedAttachments.filter((attachment) => attachmentIds.includes(String(attachment.id))) } };
+    const event = { id: id('event'), eventType: parts[3] === 'complete' ? '事项完成' : parts[3] === 'acceptance-passed' ? '验收通过' : '验收未通过', fromStatus: current.status, toStatus: nextStatus, reason: ratedAcceptance ? text(body.comment).trim() : text(body.note || body.reason), operatorName: ratedAcceptance ? current.creatorName : current.ownerName, createdAt: now(), metadata: { ...(ratedAcceptance ? { rating: body.rating } : {}), ...(body.noteHtml ? { noteHtml: text(body.noteHtml) } : {}), ...(ownerChanged ? { ownerChanged: true, fromAssigneeName: previousOwnerName, assigneeName: nextOwnerName } : {}), attachments: stagedAttachments.filter((attachment) => attachmentIds.includes(String(attachment.id))) } };
     const nextWorkItems = parts[3] === 'acceptance-failed'
       ? (current.workItems || []).map((item: RequirementWorkItem) => item.id === failedTask?.id ? { ...item, status: '处理中', assistanceTaskStatus: 'PROCESSING', assigneeName: nextOwnerName } : item)
       : current.workItems;

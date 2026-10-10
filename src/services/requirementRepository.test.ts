@@ -1,13 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './apiClient';
-import { requirementRepository } from './requirementRepository';
+import { normalizeRequirementTask, requirementRepository } from './requirementRepository';
+import type { RequirementTask } from '../types';
 
 describe('requirementRepository', () => {
+  it('统一历史退回状态的列表与详情显示名称', () => {
+    expect(normalizeRequirementTask({ id: 'returned', status: '已驳回' } as RequirementTask).status).toBe('已退回');
+  });
   const storage = { value: new Map<string, string>(), getItem(key: string) { return this.value.get(key) ?? null; }, setItem(key: string, value: string) { this.value.set(key, value); }, removeItem(key: string) { this.value.delete(key); }, clear() { this.value.clear(); } };
   beforeEach(() => { vi.stubGlobal('sessionStorage', storage); });
   afterEach(() => {
     vi.unstubAllGlobals();
     storage.clear();
+  });
+
+  it('posts comment content and revision and normalizes the saved detail', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', data: { id: 'req-comment', status: '处理中', revision: 3, events: [{ id: 'comment-1', eventType: '发表评论', operatorName: '讨论者', metadata: { commentContent: '补充说明' }, createdAt: '2026-10-10T10:00:00' }] } }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const input = { content: '补充说明', requestId: 'request-1', revision: 2 };
+    const detail = await requirementRepository.addComment('req-comment', input);
+    expect(fetchMock.mock.calls[0][0]).toContain('/api/requirements/req-comment/comments');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(input);
+    expect(detail).toMatchObject({ id: 'req-comment', revision: 3, events: [expect.objectContaining({ metadata: { commentContent: '补充说明' } })] });
   });
 
   it('encodes list filters and unwraps the API payload', async () => {

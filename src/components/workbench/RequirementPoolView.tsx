@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Dropdown, Input, Select } from "antd";
+import { Button, Dropdown, Input, Rate, Select } from "antd";
 import { openWorkItemDetailLink, workItemDetailLink } from '../../utils/workItemDetailLink';
 import { loadCollaborationRelatedTasks } from '../../services/collaborationRelatedTasks';
 import { workOrderDisplayName } from '../../utils/workOrderDisplay';
+import { WorkOrderDiscussion } from './WorkOrderDiscussion';
 import { DetailCopyButton } from '../common/DetailCopyButton';
 import {
   Inbox,
@@ -306,6 +307,7 @@ export const RequirementPoolView: React.FC = () => {
   const [media, setMedia] = useState<RequirementMedia[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [workflowSubmitting, setWorkflowSubmitting] = useState(false);
+  const productDescriptionEditor = useRef<HTMLDivElement>(null);
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
   const [workOpen, setWorkOpen] = useState(false);
   const [workflowAction, setWorkflowAction] = useState<"" | "convert" | "reassign" | "memo">("");
@@ -320,6 +322,26 @@ export const RequirementPoolView: React.FC = () => {
   const [completeNote, setCompleteNote] = useState("");
   const [completeNoteHtml, setCompleteNoteHtml] = useState("");
   const [completeSubmitting, setCompleteSubmitting] = useState(false);
+  const commentMatterId = useRef(selected?.id);
+  commentMatterId.current = selected?.id;
+  const [commentsModalOpen, setCommentsModalOpen] = useState(false);
+  const [commentTargetId, setCommentTargetId] = useState("");
+  useEffect(() => { setCommentsModalOpen(false); setCommentTargetId(""); }, [selected?.id]);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [acceptanceRating, setAcceptanceRating] = useState(0);
+  const [acceptanceComment, setAcceptanceComment] = useState("");
+  const taskListRef = useRef<HTMLDivElement>(null);
+  const [taskListHeight, setTaskListHeight] = useState<number>();
+  useEffect(() => {
+    const list = taskListRef.current;
+    if (!list || typeof ResizeObserver === "undefined") return;
+    const cards = Array.from(list.children).slice(0, 3) as Element[];
+    const measure = () => setTaskListHeight(cards.reduce((height, card) => height + card.getBoundingClientRect().height, 0) + Math.max(0, cards.length - 1) * 8);
+    measure();
+    const observer = new ResizeObserver(measure);
+    cards.forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+  }, [selected?.id, displayedWorkItems]);
   const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false);
   const [acceptanceReason, setAcceptanceReason] = useState("");
   const [acceptanceWorkItemId, setAcceptanceWorkItemId] = useState("");
@@ -352,16 +374,18 @@ export const RequirementPoolView: React.FC = () => {
   const primaryOwnerName = creationProduct?.requirementOwner;
   const changeCreationProduct = (id: string) => {
     ownerManuallyChanged.current = false;
-    setOwnerName("");
+    setOwnerName(workOrderType === "客户诉求" && specialFields.transferToProduct === "不需要" ? currentUser.name : "");
     setProductLineId(id);
   };
   useEffect(() => {
-    if (!productLineId || ownerManuallyChanged.current) return;
+    if (ownerManuallyChanged.current) return;
+    if (workOrderType === "客户诉求" && specialFields.transferToProduct === "不需要") { setOwnerName(currentUser.name); return; }
+    if (!productLineId) return;
     const primaryOwner = employees.find((employee) => primaryOwnerId
       ? employee.id === primaryOwnerId
       : Boolean(primaryOwnerName) && employee.name === primaryOwnerName);
     setOwnerName(primaryOwner?.name || "");
-  }, [productLineId, primaryOwnerId, primaryOwnerName, employees]);
+  }, [productLineId, primaryOwnerId, primaryOwnerName, employees, workOrderType, specialFields.transferToProduct, currentUser.name]);
   const availableRejectReasons = useMemo(() => getRejectReasonsForType(currentWorkOrderType), [currentWorkOrderType]);
 
   useEffect(() => {
@@ -465,7 +489,7 @@ export const RequirementPoolView: React.FC = () => {
     event.preventDefault();
     const selectedEmployee = employees.find(
       (item) => item.name === ownerName.trim(),
-    );
+    ) || (workOrderType === "客户诉求" && specialFields.transferToProduct === "不需要" && ownerName === currentUser.name ? currentUser : undefined);
     const selectedProductLine = availableProductLines.find((item) => item.id === productLineId);
     const descriptionText = description || editor.current?.innerText || "";
     const requiredParameters = workOrderType === "售前支持"
@@ -509,7 +533,7 @@ export const RequirementPoolView: React.FC = () => {
         customerName: customer?.name,
         priority: (requirementPriority || "中") as RequirementTask["priority"],
         workOrderType: workOrderType || "其他问题",
-        specialFields,
+        specialFields: workOrderType === "客户诉求" ? { ...specialFields, transferToProduct: specialFields.transferToProduct || "需要" } : specialFields,
         expectedCompleteDate: dueDate || undefined,
       });
       if (!saved) return;
@@ -708,48 +732,30 @@ export const RequirementPoolView: React.FC = () => {
       ? `[${rejectCategory}] ${reason.trim()}`
       : reason.trim();
     if (!finalReason.trim()) return;
-    const now = new Date().toISOString();
-    const nextStatus = reasonType === "hold" ? "已搁置" : "已驳回";
-    let persisted = true;
+    const nextStatus = reasonType === "hold" ? "已搁置" : "已退回";
     try {
       await requirementRepository.transition(
         selected.id,
         reasonType,
         finalReason,
       );
+      const detail = await requirementRepository.detail(selected.id);
+      if (detail.status !== nextStatus) throw new Error("事项状态未更新，请刷新后重试");
+      const next = { ...selected, ...detail };
+      setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
+      setSelected(next);
+      setEvents(Array.isArray(detail.events) ? detail.events : []);
     } catch {
-      persisted = false;
-    }
-    if (!persisted) {
       addToast("error", "事项操作失败", "服务未确认本次流转，请稍后重试");
       return;
     }
-    const eventItem: RequirementEvent = {
-      id: `event-${Date.now()}`,
-      eventType: reasonType === "hold" ? "搁置" : "驳回",
-      fromStatus: selected.status,
-      toStatus: nextStatus,
-      reason: finalReason,
-      operatorName: currentUser.name,
-      createdAt: now,
-    };
-    const next = {
-      ...selected,
-      status: nextStatus as RequirementTask["status"],
-      events: [...(selected.events || []), eventItem],
-    };
-    setRequirementTasks((list) =>
-      list.map((item) => (item.id === selected.id ? next : item)),
-    );
-    setSelected(next);
-    setEvents((list) => [...list, eventItem]);
     setReasonType(null);
     setReason("");
     setRejectCategory("");
     addToast(
       "success",
       `事项${nextStatus}`,
-      persisted ? "流转记录已保存" : "后端暂不可用，已在当前会话记录",
+      "流转记录已保存",
     );
   };
   const submitComplete = async (event: React.FormEvent) => {
@@ -784,6 +790,7 @@ export const RequirementPoolView: React.FC = () => {
         reason: reopenReason.trim(),
         revision: selected.revision ?? selected.version ?? 0,
       });
+      if (result.id !== selected.id || !["待处理", "处理中"].includes(result.status)) throw new Error("事项状态未更新，请刷新后重试");
       const detail = result;
       const next = { ...selected, ...detail };
       setSelected(next);
@@ -826,16 +833,33 @@ export const RequirementPoolView: React.FC = () => {
       setAcceptanceSubmitting(false);
     }
   };
+  const submitComment = async (content: string, requestId: string) => {
+    if (!selected) throw new Error("请先打开事项详情");
+    try {
+      const detail = await requirementRepository.addComment(selected.id, { content, requestId, revision: selected.revision ?? selected.version ?? 0 });
+      if (commentMatterId.current === detail.id) {
+        setSelected(detail);
+        setEvents(Array.isArray(detail.events) ? detail.events : []);
+      }
+      setRequirementTasks((items) => items.map((item) => item.id === detail.id ? { ...item, ...detail } : item));
+      addToast("success", "评论已发表", "已加入事项讨论及全历程");
+    } catch (error) {
+      addToast("error", "评论发表失败", error instanceof Error ? error.message : "请稍后重试");
+      throw error;
+    }
+  };
   const passAcceptance = async () => {
-    if (!selected) return;
+    if (!selected || acceptanceSubmitting || !acceptanceRating) return;
     setAcceptanceSubmitting(true);
     try {
-      await requirementRepository.acceptancePassed(selected.id, selected.revision ?? selected.version ?? 0);
+      await requirementRepository.acceptancePassed(selected.id, { revision: selected.revision ?? selected.version ?? 0, rating: acceptanceRating, comment: acceptanceComment.trim() });
       const detail = await requirementRepository.detail(selected.id);
-      const next = { ...selected, ...detail, status: "已完成" as RequirementTask["status"] };
+      if (detail.status !== "已完成") throw new Error("事项尚未完成，请刷新后核实验收结果");
+      const next = { ...selected, ...detail };
       setSelected(next); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
       setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
-      addToast("success", "验收通过", "事项已完成");
+      setRatingModalOpen(false);
+      addToast("success", "验收通过", "评价已保存，事项已完成");
     } catch (error) { addToast("error", "验收操作失败", error instanceof Error ? error.message : "请刷新后重试"); }
     finally { setAcceptanceSubmitting(false); }
   };
@@ -883,7 +907,7 @@ export const RequirementPoolView: React.FC = () => {
     ["已完成", "已搁置"].includes(item.status),
   ).length;
   const rejectedCount = requirementTasks.filter(
-    (item) => item.status === "已驳回",
+    (item) => item.status === "已退回",
   ).length;
   const scopeCounts = Object.fromEntries(REQUIREMENT_SCOPES.map(([value]) => [value, listItems.filter((item) => isWorkOrderInScope(item, value, currentUser, organizationEmployees, transferredIds)).length]));
   const isToday = (value?: string) =>
@@ -901,7 +925,7 @@ export const RequirementPoolView: React.FC = () => {
       isToday(item.createdAt) && ["已完成", "已搁置"].includes(item.status),
   ).length;
   const todayRejected = requirementTasks.filter(
-    (item) => isToday(item.createdAt) && item.status === "已驳回",
+    (item) => isToday(item.createdAt) && item.status === "已退回",
   ).length;
   const ownsSelected = Boolean(selected && (selected.assigneeId && currentUser.id
     ? selected.assigneeId === currentUser.id : samePerson(selected.ownerName, currentUser.name)));
@@ -946,6 +970,7 @@ export const RequirementPoolView: React.FC = () => {
       selected.workOrderType === "售前支持" ? detailSpecial.opportunityName : detailSpecial.projectName || selected.projectName],
     ["所属产品", selected.productLineName],
     ...(selected.workOrderType !== "其他问题" ? [["负责人", selected.ownerName]] as Array<[string, unknown]> : []),
+    ...(selected.workOrderType === "客户诉求" ? [["是否转产品", detailSpecial.transferToProduct || "需要"]] as Array<[string, unknown]> : []),
     ["优先级", selected.priority], ["期望完成时间", selected.expectedCompleteDate || selected.dueDate],
     ...(selected.workOrderType === "客户诉求" ? [["诉求来源", detailSpecial.requestSource]] as Array<[string, unknown]> : []),
     ...(selected.workOrderType === "线上问题" ? [["严重程度", detailSpecial.severity], ["发生频率", detailSpecial.frequency]] as Array<[string, unknown]> : []),
@@ -973,6 +998,7 @@ export const RequirementPoolView: React.FC = () => {
       <WorkOrderSelect label="优先级" value={requirementPriority} options={["紧急", "高", "中", "低"]} placeholder="请选择优先级" onChange={(value) => setRequirementPriority(value as RequirementTask["priority"])} />
       <DateField label="期望完成时间 *" value={dueDate} onChange={setDueDate} />
       {workOrderType === "客户诉求" && <WorkOrderInput label="诉求来源 *" value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(value) => setSpecialFields((current) => ({ ...current, requestSource: value }))} />}
+      {workOrderType === "客户诉求" && <WorkOrderSelect label="是否转产品" value={specialFields.transferToProduct || "需要"} options={["需要", "不需要"]} onChange={(value) => { ownerManuallyChanged.current = false; setSpecialFields((current) => ({ ...current, transferToProduct: value })); setOwnerName(value === "不需要" ? currentUser.name : employees.find((employee) => primaryOwnerId ? employee.id === primaryOwnerId : Boolean(primaryOwnerName) && employee.name === primaryOwnerName)?.name || ""); }} />}
       {workOrderType === "线上问题" && <>
         <WorkOrderSelect label="严重程度" value={specialFields.severity || ""} options={Object.keys(severityPriorities)} placeholder="请选择严重程度（选填）" onChange={(value) => { const priority = severityPriorities[value]; setSpecialFields((current) => ({ ...current, severity: value, ...(priority ? { priority } : {}) })); if (priority) setRequirementPriority(priority); }} />
         <WorkOrderSelect label="发生频率" value={specialFields.frequency || ""} options={["必现（100%）", "高频发生", "偶现（特点条件）", "环境相关偶发"]} placeholder="请选择发生频率" onChange={(value) => setSpecialFields((current) => ({ ...current, frequency: value }))} />
@@ -981,8 +1007,13 @@ export const RequirementPoolView: React.FC = () => {
       {workOrderType === "其他问题" && <WorkOrderInput label="问题来源" value={specialFields.problemSource || ""} placeholder="请输入问题来源" onChange={(value) => setSpecialFields((current) => ({ ...current, problemSource: value }))} />}
     </div>
     <div>
-      <span className="text-xs text-[var(--text-muted)]">事项描述 *</span>
+      <span className="text-xs text-[var(--text-muted)]">{workOrderType === "客户诉求" ? "客户原始诉求 *" : "事项描述 *"}</span>
       <RichTextEditor size="work-order" editor={editor} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} />
+    </div>
+    {workOrderType === "客户诉求" && specialFields.transferToProduct !== "不需要" && <div>
+      <span className="text-xs text-[var(--text-muted)]">产品需求描述</span>
+      <RichTextEditor size="work-order" editor={productDescriptionEditor} value={specialFields.productDescription || ""} htmlValue={specialFields.productDescriptionHtml || ""} onInput={(text, html) => setSpecialFields((current) => ({ ...current, productDescription: text, productDescriptionHtml: html }))} />
+    </div>}
       <div className="mt-2 flex items-center gap-2">
         <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-body)]">
           <Paperclip className="h-4 w-4" />
@@ -991,15 +1022,14 @@ export const RequirementPoolView: React.FC = () => {
         </label>
         {media.length > 0 && <div className="flex flex-wrap gap-2">{media.map((item) => <span key={item.id} className="inline-flex items-center gap-1 rounded border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--text-body)]">{item.name}<button type="button" title="移除附件" aria-label="移除附件" onClick={() => setMedia((items) => items.filter((mediaItem) => mediaItem.id !== item.id))}><X className="h-3 w-3" /></button></span>)}</div>}
       </div>
-    </div>
   </div>;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
       {creating && (
-        <section className="dark-panel rounded-xl p-6">
+        <section className="dark-panel max-h-[calc(100dvh-190px)] overflow-y-auto overscroll-contain rounded-xl p-6">
             <form onSubmit={save} className="space-y-5">
-              <div className="sticky -top-4 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
+              <div className="sticky -top-6 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold text-[var(--text-primary)]">
                     {workOrderDisplayName(workOrderType) || "发起协同"}
@@ -1143,6 +1173,7 @@ export const RequirementPoolView: React.FC = () => {
         <Drawer
           isOpen={!!selected}
           width="max-w-6xl"
+          contentClassName="overflow-hidden"
           onClose={closeDetail}
           hideSubtitle
           title={<span className="flex min-w-0 items-center gap-2"><span className="shrink-0">事项编号</span><span className="truncate font-mono">{selected.code || selected.id}</span><DetailCopyButton label="复制事项编号" onCopy={copyDetailId} /></span>}
@@ -1152,16 +1183,16 @@ export const RequirementPoolView: React.FC = () => {
             <div className="flex w-full justify-between">
               <div className="flex items-center gap-2">
                 {canReceive && <><Button aria-label="事项接收" type="primary" loading={receiving} disabled={receiving} onClick={() => void receiveMatter()}>事项接收</Button><Button disabled={receiving} onClick={() => openWorkflow("reassign")}>事项转交</Button><Button danger disabled={receiving} onClick={() => setReasonType("reject")}>事项退回</Button></>}
-                {selected.status === "处理中" && ownsSelected && <Button type="primary" disabled={completeSubmitting || workItems.some((item) => !(item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"))} onClick={() => setCompleteModalOpen(true)}>事项完成</Button>}
-                {selected.status === "待验收" && isInitiator(selected, currentUser) && <><Button type="primary" loading={acceptanceSubmitting} disabled={acceptanceSubmitting} onClick={() => void passAcceptance()}>验收通过</Button><button type="button" onClick={() => { const first = workItems.find((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"); const owner = first ? employees.find((person) => person.name === first.assigneeName) : undefined; setAcceptanceWorkItemId(first?.id || ""); setAcceptanceTaskOwnerId(owner?.id || ""); setAcceptanceModalOpen(true); }} className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]">验收未通过</button></>}
+                {(selected.status === "处理中" || (selected.status === "已退回" && isInitiator(selected, currentUser))) && ownsSelected && <Button type="primary" disabled={completeSubmitting || workItems.some((item) => !(item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"))} onClick={() => setCompleteModalOpen(true)}>事项完成</Button>}
+                {selected.status === "待验收" && isInitiator(selected, currentUser) && <><Button type="primary" loading={acceptanceSubmitting} disabled={acceptanceSubmitting} onClick={() => { setAcceptanceRating(0); setAcceptanceComment(""); setRatingModalOpen(true); }}>验收通过</Button><button type="button" onClick={() => { const first = workItems.find((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"); const owner = first ? employees.find((person) => person.name === first.assigneeName) : undefined; setAcceptanceWorkItemId(first?.id || ""); setAcceptanceTaskOwnerId(owner?.id || ""); setAcceptanceModalOpen(true); }} className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]">验收未通过</button></>}
                 {selected.status === "已完成" && isInitiator(selected, currentUser) && <button type="button" onClick={() => { setReopenAssigneeId(""); setReopenReason(""); setReopenModalOpen(true); }} className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]">重新开启</button>}
               </div>
               <button type="button" onClick={closeDetail} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]">关闭</button>
             </div>
           }
         >
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="min-w-0 space-y-5 text-sm lg:col-span-2">
+          <div className="grid h-full min-h-0 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-3 lg:overflow-hidden">
+            <div aria-label="事项内容" className="min-h-0 min-w-0 space-y-5 text-sm lg:col-span-2 lg:overflow-y-auto lg:overscroll-contain lg:pr-2">
               <section aria-label="基础字段" className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
                 <div className="flex items-start justify-between gap-4"><h2 className="break-words text-lg font-semibold text-[var(--text-primary)]">{selected.title}</h2><StatusTag status={selected.status} /></div>
                 <h3 className="my-4 text-sm font-semibold text-[var(--text-primary)]">基础字段</h3>
@@ -1171,7 +1202,8 @@ export const RequirementPoolView: React.FC = () => {
                 </div>
                 {Object.entries(detailSpecial).some(([key, value]) => value && ["progressStage", "other", "deliveryType", "expectedResult", "leadName", "biddingName"].includes(key)) && <details className="mt-4 border-t border-[var(--border-main)] pt-3"><summary className="cursor-pointer text-xs text-[var(--text-muted)]">历史字段（仅查看）</summary><div className="mt-3 grid grid-cols-2 gap-3">{Object.entries(detailSpecial).filter(([key, value]) => value && ["progressStage", "other", "deliveryType", "expectedResult", "leadName", "biddingName"].includes(key)).map(([key, value]) => <div key={key}><span className="text-xs text-[var(--text-muted)]">{({ progressStage: "项目阶段", other: "项目类型", deliveryType: "交付类型", expectedResult: "期望结果", leadName: "所属线索", biddingName: "所属投标" } as Record<string, string>)[key]}</span><p className="mt-1 break-words">{String(value)}</p></div>)}</div></details>}
               </section>
-              <section aria-label="事项描述"><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项描述</h3><div className="break-words rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-body)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(selected.descriptionHtml || selected.description || "暂无描述") }} /></section>
+              <section aria-label={selected.workOrderType === "客户诉求" ? "客户原始诉求" : "事项描述"}><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">{selected.workOrderType === "客户诉求" ? "客户原始诉求" : "事项描述"}</h3><div className="break-words rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-body)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(selected.descriptionHtml || selected.description || "暂无描述") }} /></section>
+              {selected.workOrderType === "客户诉求" && detailSpecial.transferToProduct !== "不需要" && <section aria-label="产品需求描述"><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">产品需求描述</h3><div className="break-words rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3" dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(detailSpecial.productDescriptionHtml || detailSpecial.productDescription || "暂无描述")) }} /></section>}
               <section aria-label="附件"><h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">附件</h3>
                 {!selectedMedia.length && !selected.attachments?.length && <p className="text-xs text-[var(--text-muted)]">暂无附件</p>}
               {selectedMedia.length ? (
@@ -1210,11 +1242,12 @@ export const RequirementPoolView: React.FC = () => {
                 </div>
               ) : null}
               </section>
+              <WorkOrderDiscussion key={selected.id} events={events} formatTime={formatDateTime} open={commentsModalOpen} targetId={commentTargetId} onOpen={() => { setCommentTargetId(""); setCommentsModalOpen(true); }} onClose={() => { setCommentsModalOpen(false); setCommentTargetId(""); }} onSubmit={submitComment} />
             </div>
-            <div className="min-w-0 space-y-5 text-sm">
+            <div aria-label="事项任务与历程" className="min-h-0 min-w-0 space-y-5 text-sm lg:overflow-y-auto lg:overscroll-contain lg:pr-2">
             <section>
               <div className="mb-4 flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-[var(--text-primary)]">关联任务（{displayedWorkItems.length}）</h3><Dropdown key={canAddTask && !receiving ? 'enabled' : 'disabled'} trigger={["click"]} disabled={!canAddTask || receiving} menu={taskCreationMenu}><Button type="primary" disabled={!canAddTask || receiving}>新增任务 <ChevronDown className="ml-1 inline h-3.5 w-3.5" /></Button></Dropdown></div>
-              {displayedWorkItems.length ? <div className="space-y-2">{displayedWorkItems.map((item) => {
+              {displayedWorkItems.length ? <div ref={taskListRef} aria-label="关联任务列表" className="space-y-2 overflow-y-auto overscroll-contain" style={{ maxHeight: taskListHeight ? `min(${taskListHeight}px, 40vh)` : "40vh" }}>{displayedWorkItems.map((item) => {
                 const done = item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED";
                 const accepted = item.assistanceTaskStatus === "ACCEPTED";
                 const taskTargetPage = TASK_PAGE_BY_TYPE[item.taskType] || "prod_req_tasks";
@@ -1231,7 +1264,7 @@ export const RequirementPoolView: React.FC = () => {
             </section>
             <section>
               <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">事项全历程</h3>
-              {events.length ? <div className="space-y-3">{[...events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))).map((item) => {
+              {events.length ? <div aria-label="事项全历程列表" className="max-h-80 space-y-3 overflow-y-auto overscroll-contain">{[...events].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))).map((item) => {
                 const meta = eventMetadata(item.metadata);
                 const targetPage = typeof meta.targetPage === "string" ? meta.targetPage : "";
                 const progressValue = meta.toProgress ?? meta.progress;
@@ -1242,7 +1275,8 @@ export const RequirementPoolView: React.FC = () => {
                 return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3">
                   <div className="flex justify-between gap-2"><b className="text-[var(--active-text)]">{item.eventType}{meta.isDemo === true && <span className="ml-2 rounded bg-[var(--bg-surface-soft)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">示例历程</span>}</b><span className="text-[11px] text-[var(--text-muted)]">{formatDateTime(item.createdAt)}</span></div>
                   <div className="mt-1 text-[11px] text-[var(--text-muted)]">{eventOperatorLabel(item, meta)}</div>
-                  {noteHtml ? <div className="mt-2 break-words text-xs" dangerouslySetInnerHTML={{ __html: sanitizeHtml(noteHtml) }} /> : item.reason && <p className="mt-2 whitespace-pre-wrap break-words text-xs">{item.reason}</p>}
+                  {typeof meta.rating === "number" && <div className="mt-2 flex items-center gap-2"><Rate disabled value={meta.rating} count={5} /><span className="text-xs">{meta.rating} 星</span></div>}
+                  {item.eventType === "发表评论" && typeof meta.commentContent === "string" ? <Button type="link" className="mt-2" onClick={() => { setCommentTargetId(item.id); setCommentsModalOpen(true); }}>查看评论</Button> : noteHtml ? <div className="mt-2 break-words text-xs" dangerouslySetInnerHTML={{ __html: sanitizeHtml(noteHtml) }} /> : item.reason && <p className="mt-2 whitespace-pre-wrap break-words text-xs">{item.reason}</p>}
                   {attachments.length > 0 && <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-[var(--border-main)] pt-3">{attachments.map((attachment) => attachment.type === "image" && attachment.dataUrl ? <a key={attachment.id} href={attachment.dataUrl} target="_blank" rel="noreferrer" title={attachment.name}><img src={attachment.dataUrl} alt={attachment.name} className="h-16 w-16 rounded border border-[var(--border-main)] object-cover" /></a> : <a key={attachment.id} href={attachment.dataUrl || "#"} download={attachment.name} target={attachment.dataUrl ? "_blank" : undefined} rel={attachment.dataUrl ? "noreferrer" : undefined} className="max-w-48 truncate rounded border border-[var(--border-main)] px-2 py-1 text-[11px] text-[var(--active-text)] hover:bg-[var(--bg-hover)]">{attachment.name}</a>)}</div>}
                   {progress !== null && <div className="mt-2 text-xs text-[var(--text-muted)]">任务进度：{Math.max(0, Math.min(100, progress))}%{meta.overdueRisk === true && <span className="ml-2 text-[var(--danger)]">已逾期</span>}</div>}
                   {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => {
@@ -1448,6 +1482,15 @@ export const RequirementPoolView: React.FC = () => {
           </div>
         </form>
       </Modal>
+      <Modal isOpen={ratingModalOpen} onClose={() => { if (!acceptanceSubmitting) setRatingModalOpen(false); }} title="验收评价">
+        <form className="work-order-dialog space-y-4" onSubmit={(event) => { event.preventDefault(); void passAcceptance(); }}>
+          <p className="text-sm text-[var(--text-primary)]">{selected?.title}</p>
+          <p className="text-xs text-[var(--text-muted)]">请选择星级，确认评价后事项将变为已完成，评价会记录在事项全历程中。</p>
+          <div className="space-y-2"><div className="text-sm">满意度 <span className="text-[var(--danger)]">*</span></div><Rate aria-label="验收满意度" count={5} value={acceptanceRating} onChange={setAcceptanceRating} disabled={acceptanceSubmitting} /><span className="ml-3 text-xs text-[var(--text-muted)]">{acceptanceRating ? `${acceptanceRating} 星` : "请选择星级"}</span></div>
+          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">评价内容（选填）<Input.TextArea aria-label="评价内容" rows={4} maxLength={500} showCount value={acceptanceComment} onChange={(event) => setAcceptanceComment(event.target.value)} disabled={acceptanceSubmitting} placeholder="说说本次处理的质量、效率或改进建议" /></label>
+          <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-4"><Button aria-label="取消评价" disabled={acceptanceSubmitting} onClick={() => setRatingModalOpen(false)}>取消</Button><Button type="primary" htmlType="submit" loading={acceptanceSubmitting} disabled={!acceptanceRating || acceptanceSubmitting}>确认评价并完成</Button></div>
+        </form>
+      </Modal>
       <Modal
         isOpen={acceptanceModalOpen}
         onClose={() => setAcceptanceModalOpen(false)}
@@ -1480,7 +1523,7 @@ export const RequirementPoolView: React.FC = () => {
         title="重新开启事项"
       >
         <form onSubmit={submitReopen} className="work-order-dialog space-y-4">
-          <p className="text-xs text-[var(--text-muted)]">历史事项将恢复为处理中，并保留原有历程记录。</p>
+          <p className="text-xs text-[var(--text-muted)]">历史事项将恢复为待处理，提交所选处理人接收，并保留原有历程记录。</p>
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
             处理人
             <Select className="w-full" showSearch optionFilterProp="label" value={reopenAssigneeId || undefined} options={employeeSelectOptions(employees, 'id')} onChange={setReopenAssigneeId} disabled={reopenSubmitting} placeholder="请选择处理人" />

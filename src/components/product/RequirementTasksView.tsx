@@ -3,7 +3,7 @@ import { openWorkItemDetailLink, workItemDetailLink } from '../../utils/workItem
 import { copyToClipboard } from '../../utils/copyToClipboard';
 import { workOrderDisplayName } from '../../utils/workOrderDisplay';
 import { collaborationCandidatesFor } from '../../utils/collaborationCandidates';
-import { normalizeTaskActivity, taskActivitySummary } from '../../utils/taskActivity';
+import { normalizeTaskActivity, taskActivitySummary, formatTaskActivityTime } from '../../utils/taskActivity';
 import { DetailCopyButton } from '../common/DetailCopyButton';
 import { Badge, Button, Checkbox, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popover, Segmented, Select, Tag, Tooltip, Upload } from 'antd';
 import { ApartmentOutlined, FileTextOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
@@ -2084,7 +2084,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                       const metadata = event.metadata || {};
                       return <div key={event.id} className="relative pl-6 text-xs">
                         <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--primary)] ring-4 ring-[var(--primary)]/10" />
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 break-words text-[var(--text-muted)]"><span className="font-medium text-[var(--text-primary)]">{event.operatorName}</span><span className="min-w-0 break-all">{eventSummary(event)}</span><span className="font-mono text-[11px]">{event.createdAt}</span></div>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 break-words text-[var(--text-muted)]"><span className="font-medium text-[var(--text-primary)]">{event.operatorName}</span><span className="min-w-0 break-all">{eventSummary(event)}</span><span className="font-mono text-[11px]">{formatTaskActivityTime(event.createdAt)}</span></div>
                         {['评论', 'WORK_ITEM_COMMENTED'].includes(event.eventType) && <p className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-[var(--bg-surface-soft)] px-3 py-2 leading-5 text-[var(--text-body)]">{String(metadata.content || '')}</p>}
                       </div>;
                     }) : <p className="text-[var(--text-muted)]">暂无动态记录</p>}

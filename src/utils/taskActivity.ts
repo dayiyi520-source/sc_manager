@@ -14,6 +14,7 @@ const value = (input: unknown) => {
 };
 export const taskActivitySummary = (event: RequirementEvent): string => {
   const metadata = event.metadata || {};
+  if (event.eventType === 'LOCAL_DATA_ENRICHED') return '补充了任务资料';
   if (event.eventType === 'WORK_ITEM_REVIEWED') return `保存了复盘总结“${String((metadata.review as { title?: string })?.title || '')}”`;
   if (event.eventType === 'WORK_ITEM_CREATED') return '创建了任务';
   if (['WORK_ITEM_COMMENTED', '评论'].includes(event.eventType)) return '发表了评论';
@@ -23,5 +24,12 @@ export const taskActivitySummary = (event: RequirementEvent): string => {
   if (event.eventType === '变更状态') return `将状态从“${value(event.fromStatus)}”变更为“${value(event.toStatus)}”`;
   if (event.eventType === '提需求') return '提交了需求';
   if (event.eventType.startsWith('修改') || event.eventType === '变更负责人') return `${event.eventType}：从“${value(metadata.from)}”变更为“${value(metadata.to)}”`;
-  return event.eventType;
+  return /^[A-Z][A-Z_]+$/.test(event.eventType) ? '更新了任务记录' : event.eventType;
+};
+
+export const formatTaskActivityTime = (input?: string): string => {
+  if (!input) return '—';
+  const date = new Date(input.replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1'));
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date).replace(/\//g, '-');
 };
