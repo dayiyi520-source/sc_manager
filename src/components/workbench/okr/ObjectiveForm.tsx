@@ -35,14 +35,18 @@ interface Props {
   department?: string;
   alignmentActions?: OkrRecord[];
   productLineOptions?: string[];
+  productLineVersionOptions?: Record<string, string[]>;
   projectOptions?: string[];
+  projectProductOptions?: Record<string, string[]>;
+  opportunityOptions?: Array<{ value: string; label: string; products: string[] }>;
+  okrRecords?: OkrRecord[];
   settings?: OkrSettings;
 }
 
 export interface ObjectiveFormHandle { submit: () => Promise<boolean>; saveDraft: () => Promise<boolean>; snapshot: () => OkrPayload; }
 export const calculateKrWeightTotal = (items: Pick<OkrKr, 'weight'>[]) => items.reduce((total, item) => total + item.weight, 0);
 
-export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, ownerName, ownerAvatar, people = [], teamMembers, busy, unavailable, root, onCancel, onRemove, onSave, onSaveDraft, submitLabel, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false, supervisor = false, department, alignmentActions = [], productLineOptions = [], projectOptions = [], settings }, ref) {
+export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, ownerName, ownerAvatar, people = [], teamMembers, busy, unavailable, root, onCancel, onRemove, onSave, onSaveDraft, submitLabel, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false, supervisor = false, department, alignmentActions = [], productLineOptions = [], productLineVersionOptions = {}, projectOptions = [], projectProductOptions = {}, opportunityOptions = [], okrRecords = [], settings }, ref) {
   const [title, setTitle] = useState(initialPayload?.title || '');
   const [objectiveWeight, setObjectiveWeight] = useState(initialPayload?.weight ?? 100);
   const [note, setNote] = useState(initialPayload?.note ?? '');
@@ -61,10 +65,16 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   }, [initialPayload]);
   const krWeightTotal = calculateKrWeightTotal(krs);
   const assigneeOptions = (teamMembers ?? people).map(person => ({ value: person.id, label: `${person.name}${person.department ? ` · ${person.department}` : ''}` }));
-  const stageOptions = settings?.dictionaries?.productNodes || ['方案确认', '阶段评审', '上线验收'];
+  const stageOptions = ['产品设计', 'UI设计', '产品开发', '测试验收', '上线运维'];
+  const stageDepartments: Record<string, string> = {
+    产品设计: '产品规划部',
+    UI设计: '交互设计部',
+    产品开发: '软件研发部',
+    测试验收: '软件研发部测试组',
+    上线运维: '软件研发部系统运维组',
+  };
   const typeOptions = settings?.dictionaries?.supportTypes || ['客户成功', '服务响应', '体验优化'];
   const actionTypeForIndex = (index: number) => index === 0 ? 'support' : index === 1 ? 'product' : index === 2 ? 'presales' : 'delivery';
-  const actionTypeLabel = (type: string) => ({ support: '其他部门', product: '产研部门', presales: '售前部门', delivery: '项目交付部门' }[type] || type);
   const actionTypeForKr = (index: number) => actionTypeForIndex(index);
   const changeKr = (id: string, patch: Partial<OkrKr>) => setKrs(items => items.map(kr => kr.id === id ? { ...kr, ...patch } : kr));
   const distribute = (items: OkrKr[]) => items.map((kr, i) => ({ ...kr, weight: Math.floor(100 / items.length) + (i < 100 % items.length ? 1 : 0) }));
@@ -107,9 +117,19 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const renderSupervisorFields = (kr: OkrKr, index: number) => {
     const type = actionTypeForIndex(index);
     if (type === 'support') return <><Select aria-label={`A${index + 1} 类型`} placeholder="选择类型" value={kr.businessObject} options={typeOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value })}/><Input aria-label={`A${index + 1} 动作`} placeholder="输入动作" value={kr.action} onChange={event => changeKr(kr.id, { action: event.target.value })}/><Input aria-label={`A${index + 1} 结果`} placeholder="输入结果" value={kr.result} onChange={event => changeKr(kr.id, { result: event.target.value })}/></>;
-    if (type === 'product') return <><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.businessObject} options={productLineOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value })}/><Input aria-label={`A${index + 1} 版本`} placeholder="选择版本" value={kr.version} onChange={event => changeKr(kr.id, { version: event.target.value })}/><Select aria-label={`A${index + 1} 阶段`} placeholder="选择阶段" value={kr.stage} options={stageOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/></>;
-    if (type === 'presales') return <><Select aria-label={`A${index + 1} 商机`} placeholder="选择商机" value={kr.businessObject} options={typeOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value })}/><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.version} options={productLineOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 阶段`} placeholder="选择阶段" value={kr.stage} options={stageOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/></>;
-    return <><Select aria-label={`A${index + 1} 项目`} placeholder="选择项目" value={kr.businessObject} options={projectOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value })}/><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.version} options={productLineOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 阶段`} placeholder="选择阶段" value={kr.stage} options={stageOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/></>;
+    if (type === 'product') return <><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.businessObject} options={productLineOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value, version: undefined })}/><Select aria-label={`A${index + 1} 版本`} placeholder="选择版本" value={kr.version} disabled={!kr.businessObject} options={(productLineVersionOptions[kr.businessObject || ''] || []).map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 阶段`} placeholder="选择阶段" value={kr.stage} options={stageOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/>{kr.stage && <span className="supervisor-stage-department">对应部门：{stageDepartments[kr.stage]}</span>}{renderStageDeadlines(kr)}</>;
+    if (type === 'presales') { const products = opportunityOptions.find(item => item.value === kr.businessObject)?.products || []; return <><Select aria-label={`A${index + 1} 商机`} placeholder="选择商机" value={kr.businessObject} options={opportunityOptions.map(item => ({ value: item.value, label: item.label }))} onChange={value => changeKr(kr.id, { businessObject: value, version: undefined })}/><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.version} disabled={!kr.businessObject} options={products.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 阶段`} placeholder="选择阶段" value={kr.stage} options={stageOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/></>; }
+    const products = projectProductOptions[kr.businessObject || ''] || productLineOptions;
+    return <><Select aria-label={`A${index + 1} 项目`} placeholder="选择项目" value={kr.businessObject} options={projectOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value, version: undefined })}/><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.version} disabled={!kr.businessObject} options={products.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 类型`} placeholder="选择类型" value={kr.stage} options={typeOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/></>;
+  };
+  const renderStageDeadlines = (kr: OkrKr) => {
+    if (!kr.businessObject || !kr.version) return null;
+    const rows = okrRecords.flatMap(record => record.kind === 'action' ? [record.payload] : (record.payload.keyResults || []))
+      .filter(item => item.businessObject === kr.businessObject && item.version === kr.version && item.stage && item.deadline)
+      .map(item => ({ stage: String(item.stage), deadline: dayjs(item.deadline).format('YYYY-MM-DD') }));
+    const deadlineByStage = new Map(rows.map(row => [row.stage, row.deadline]));
+    const orderedRows = stageOptions.filter(stage => deadlineByStage.has(stage)).map(stage => `${stage}：${deadlineByStage.get(stage)}`);
+    return orderedRows.length ? <div className="supervisor-stage-deadlines" aria-label="同产品版本阶段截止时间">{orderedRows.join('；')}</div> : null;
   };
   const moveKr = (from: number, to: number) => setKrs(items => { const copy = [...items]; [copy[from], copy[to]] = [copy[to], copy[from]]; return copy; });
   return <Form className={`okr-objective-form${isCompanyStyle ? ' company-objective-form' : ''}${supervisor ? ' supervisor-objective-form' : ''}`} disabled={busy || readOnly} onFinish={() => void submit()}>

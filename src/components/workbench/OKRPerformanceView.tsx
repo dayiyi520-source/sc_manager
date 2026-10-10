@@ -70,7 +70,7 @@ const impactLabel = (value?: string) => ({
 const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab }) => {
   const { currentUser, addToast } = useApp();
   const { openPageTab } = useAppNavigationContext();
-  const { records, okrs, reviewableOkrs, performances, people, work, teamMembers, actionParents, productLineOptions, projectOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, deleteOkr, busy, settings } = useOriginalOkr();
+  const { records, okrs, reviewableOkrs, performances, people, work, teamMembers, actionParents, productLineOptions, productLineVersionOptions, projectOptions, projectProductOptions, opportunityOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, deleteOkr, busy, settings } = useOriginalOkr();
 
   const pageTitle = mainTab === 'okrs' ? '月度目标' : '复盘总结';
 
@@ -357,7 +357,11 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
         department={me?.department}
         alignmentActions={visibleActionParents}
         productLineOptions={productLineOptions}
+        productLineVersionOptions={productLineVersionOptions}
         projectOptions={projectOptions}
+        projectProductOptions={projectProductOptions}
+        opportunityOptions={opportunityOptions}
+        okrRecords={records}
         settings={settings}
         initialPayload={record.payload}
         submitLabel={record.status === 'draft' ? undefined : '保存修改'}
@@ -479,7 +483,11 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               department={me?.department}
               alignmentActions={visibleActionParents}
               productLineOptions={productLineOptions}
+              productLineVersionOptions={productLineVersionOptions}
               projectOptions={projectOptions}
+              projectProductOptions={projectProductOptions}
+              opportunityOptions={opportunityOptions}
+              okrRecords={records}
               settings={settings}
               onCancel={() => setObjectiveForms(forms => forms.filter(id => id !== formId))}
               onRemove={formIndex > 0 && objectiveForms.length > 1 ? () => {

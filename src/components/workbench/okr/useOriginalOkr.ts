@@ -43,6 +43,7 @@ export function useOriginalOkr() {
   const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>okrRepository.work(currentUser.id),retry:false});
   const productLinesQuery = useQuery({queryKey:['okr',currentUser.id,'product-lines'],queryFn:()=>productRepository.productLines(),retry:false});
   const projectsQuery = useQuery({queryKey:['okr',currentUser.id,'projects'],queryFn:()=>crmRepository.projects({page:1,pageSize:100}),retry:false});
+  const opportunitiesQuery = useQuery({queryKey:['okr',currentUser.id,'opportunities'],queryFn:()=>crmRepository.opportunities({page:1,pageSize:100}),retry:false});
   const actionParents = useQuery({
     queryKey:['okr',currentUser.id,'action-parents'],
     queryFn:async()=>{
@@ -55,8 +56,22 @@ export function useOriginalOkr() {
   });
   const people = peopleQuery.data || [];
   const productLineOptions = (productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => line.name);
+  const productLineVersionOptions = Object.fromEntries((productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => [line.name, (line.versions || []).map(version => String(version.name || version.code || '')).filter(Boolean)]));
   const projectOptions = (projectsQuery.data?.items || []).map(project => String(project.name || '')).filter(Boolean);
-  const businessOptionsError = productLinesQuery.error || projectsQuery.error;
+  const namesFrom = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.flatMap(item => namesFrom(item));
+    if (value && typeof value === 'object') {
+      const item = value as Record<string, unknown>;
+      return [item.name, item.productName, item.relatedProduct, item.product].filter(value => typeof value === 'string' && value.trim()).map(value => String(value));
+    }
+    return typeof value === 'string' && value.trim() ? [value] : [];
+  };
+  const projectProductOptions = Object.fromEntries((projectsQuery.data?.items || []).map(project => [String(project.name || ''), [...new Set(namesFrom([project.productName, project.relatedProduct, project.product, project.productNameList, project.products]))]]));
+  const opportunityOptions = (opportunitiesQuery.data?.items || []).map(opportunity => {
+    const item = opportunity as typeof opportunity & Record<string, unknown>;
+    return { value: String(item.name || ''), label: String(item.name || ''), products: [...new Set(namesFrom([item.relatedProduct, item.product, item.products]))] };
+  }).filter(item => item.value);
+  const businessOptionsError = productLinesQuery.error || projectsQuery.error || opportunitiesQuery.error;
   const all = records.data || [];
   const me = people.find(p=>p.id===currentUser.id);
   const derivedActionParents = useMemo(() => {
@@ -195,7 +210,7 @@ export function useOriginalOkr() {
   const saveSettings = async (settings: OkrSettings) => { setBusy(true); try { await okrRepository.saveSettings(settings); await client.invalidateQueries({queryKey:['okr','settings']}); addToast('success','OKR 配置已保存'); return true; } catch(error) { addToast('error',error instanceof Error ? error.message : '配置保存失败'); return false; } finally { setBusy(false); } };
   return {records:all,okrs,reviewableOkrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
     error:records.error || peopleQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
-    productLineOptions,projectOptions,businessOptionsLoading:productLinesQuery.isPending || projectsQuery.isPending,
+    productLineOptions,productLineVersionOptions,projectOptions,projectProductOptions,opportunityOptions,businessOptionsLoading:productLinesQuery.isPending || projectsQuery.isPending || opportunitiesQuery.isPending,
     businessOptionsError:businessOptionsError instanceof Error ? businessOptionsError.message : businessOptionsError ? '业务数据加载失败' : undefined,
     actionParents:derivedActionParents.length ? derivedActionParents : actionParents.data || [],actionParentsLoading:actionParents.isPending,actionParentsError:actionParents.error,saveActions,
     saveObjective:(period:string,payload:OkrPayload)=>save('objective',period,payload),
