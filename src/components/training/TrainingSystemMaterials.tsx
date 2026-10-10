@@ -13,7 +13,7 @@ export function TrainingFilePreview({ file, onClose }: { file?: TrainingSystemFi
     if (file) readTrainingFile(file.id).then(async blob => {
       const type = blob.type === 'application/pdf' || /\.pdf$/i.test(file.name) ? 'pdf' : /^image\/(png|jpeg|gif|webp)$/.test(blob.type) ? 'image' : /\.(txt|md|csv)$/i.test(file.name) ? 'text' : 'other';
       const content = type === 'text' ? (await blob.text()).slice(0, 100000) : '';
-      if (!cancelled) { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); setText(content); setKind(type); }
+      if (!cancelled) { objectUrl = URL.createObjectURL(type === 'pdf' && blob.type !== 'application/pdf' ? new Blob([blob], { type: 'application/pdf' }) : blob); setUrl(objectUrl); setText(content); setKind(type); }
     }).catch(cause => { if (!cancelled) setError(cause.message); });
     return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [file?.id]);

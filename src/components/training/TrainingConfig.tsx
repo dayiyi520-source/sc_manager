@@ -15,7 +15,7 @@ export function TrainingConfig({ state, commit }: Props) {
   const [editing, setEditing] = useState<TrainingCourse>();
   const [systemId, setSystemId] = useState<string>();
   const [materialsId, setMaterialsId] = useState<string>();
-  const [detail, setDetail] = useState<{ course: TrainingCourse; mode: 'roles' | 'materials' }>();
+  const [detail, setDetail] = useState<{ course: TrainingCourse; mode: 'roles' }>();
   const [uploading, setUploading] = useState(false);
   const [form] = Form.useForm();
   const [detailForm] = Form.useForm();
@@ -27,7 +27,7 @@ export function TrainingConfig({ state, commit }: Props) {
   const openDetail = (course: TrainingCourse, mode: 'lessons' | 'roles' | 'materials') => {
     if (mode === 'lessons') { setSystemId(course.id); return; }
     if (mode === 'materials') { setMaterialsId(course.id); return; }
-    detailForm.resetFields(); detailForm.setFieldsValue({ lessons: course.lessons, roles: course.roles || [], materials: course.materials || '' }); setDetail({ course, mode });
+    detailForm.resetFields(); detailForm.setFieldsValue({ roles: course.roles || [] }); setDetail({ course, mode });
   };
   const saveSystem = async () => {
     try {
@@ -44,7 +44,7 @@ export function TrainingConfig({ state, commit }: Props) {
     try {
       const values = await detailForm.validateFields(); if (!detail) return;
       const existing = state.courses.find(course => course.id === detail.course.id); if (!existing) { message.error('业务系统已不存在'); return; }
-      const updated = { ...existing, ...(detail.mode === 'roles' ? { roles: values.roles || [] } : { materials: values.materials || '' }) };
+      const updated = { ...existing, roles: values.roles || [] };
       if (commit({ ...state, courses: state.courses.map(course => course.id === existing.id ? updated : course) })) { setDetail(undefined); message.success('配置已保存'); }
     } catch { /* Keep invalid input visible for correction. */ }
   };
@@ -71,8 +71,8 @@ export function TrainingConfig({ state, commit }: Props) {
         return false;
       }}><Button loading={uploading}>上传封面</Button></Upload><p className="training-muted">建议 16:9，jpg/png，不超过 8MB</p></div></div></Form.Item><Form.Item name="cover" hidden><Input /></Form.Item><Form.Item label="排序" name="sort" rules={[{ required: true, message: '请填写排序' }]}><InputNumber min={0} max={99999} precision={0} style={{ width: '100%' }} /></Form.Item><Form.Item label="状态" name="published" valuePropName="checked"><Switch /></Form.Item>{state.courses.some(course => course.id === editing?.id) && <Form.Item label="课程版本" name="version" rules={[{ required: true, whitespace: true }]}><Input maxLength={32} /></Form.Item>}</Form>
     </Modal>
-    <Modal title={detail?.mode === 'roles' ? '角色授权' : '系统资料'} width={720} open={Boolean(detail)} okText="保存" cancelText="取消" onCancel={() => setDetail(undefined)} onOk={saveDetail}>
-      <Form name="training-system-detail" form={detailForm} layout="vertical">{detail?.mode === 'roles' ? <><p className="training-muted">仅保存本地演示角色配置，正式访问权限待接入。</p><Form.Item name="roles"><Checkbox.Group options={roles} /></Form.Item></> : <Form.Item label="系统资料" name="materials"><Input.TextArea rows={8} maxLength={10000} placeholder="填写系统学习资料" /></Form.Item>}</Form>
+    <Modal title="角色授权" width={720} open={Boolean(detail)} okText="保存" cancelText="取消" onCancel={() => setDetail(undefined)} onOk={saveDetail}>
+      <Form name="training-system-detail" form={detailForm} layout="vertical"><p className="training-muted">仅保存本地演示角色配置，正式访问权限待接入。</p><Form.Item name="roles"><Checkbox.Group options={roles} /></Form.Item></Form>
     </Modal>
   </section>;
 }
