@@ -14,6 +14,7 @@ vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.
 vi.mock('../../services/requirementRepository', () => ({ requirementRepository: { workOrderCandidates: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../services/productRepository', () => ({ productRepository: {
   businessTasks: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+  createBusinessTask: vi.fn().mockResolvedValue(undefined),
   businessTask: vi.fn(), workItemDetail: vi.fn(),
   workItemTypes: vi.fn().mockResolvedValue([]),
   workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }),
@@ -22,11 +23,12 @@ vi.mock('../../services/productRepository', () => ({ productRepository: {
   commentBusinessTask: vi.fn().mockResolvedValue(undefined), commentWorkItem: vi.fn().mockResolvedValue(undefined),
 } }));
 vi.mock('../../utils/copyToClipboard', () => ({ copyToClipboard: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('./WorkItemCreatePanel', async () => ({ WorkItemDetailHeader: () => null, WorkItemRelationTabs: (await vi.importActual<typeof import('./WorkItemCreatePanel')>('./WorkItemCreatePanel')).WorkItemRelationTabs, WorkItemCreatePanel: ({ isOpen, title, headerActions, children, onClose }: { isOpen: boolean; title: React.ReactNode; headerActions?: React.ReactNode; children: React.ReactNode; onClose: () => void }) => isOpen ? <div>{title}{headerActions}{children}<button onClick={onClose}>关闭分享详情</button></div> : null }));
+vi.mock('./WorkItemCreatePanel', async () => ({ WorkItemDetailHeader: () => null, WorkItemRelationTabs: (await vi.importActual<typeof import('./WorkItemCreatePanel')>('./WorkItemCreatePanel')).WorkItemRelationTabs, WorkItemCreatePanel: ({ isOpen, title, headerActions, children, properties, footer, onClose }: { isOpen: boolean; title: React.ReactNode; headerActions?: React.ReactNode; children: React.ReactNode; properties?: React.ReactNode; footer?: React.ReactNode; onClose: () => void }) => isOpen ? <div>{title}{headerActions}{children}{properties}{footer}<button onClick={onClose}>关闭分享详情</button></div> : null }));
 
 const addToast = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(productRepository.workItems).mockReset().mockResolvedValue({ page: { items: [], total: 0 } } as never);
   sessionStorage.clear();
   window.history.replaceState(null, '', '/manager/app/crm_presales_tasks?detailId=shared-task');
   vi.mocked(useApp).mockReturnValue({ currentUser: { name: '测试人员' }, requirementTasks: [], designTasks: [], productLines: [], projects: [], versions: [], customers: [], bugs: [], devTasks: [], requirementPool: [], risks: [], addToast } as unknown as ReturnType<typeof useApp>);
@@ -117,9 +119,9 @@ it.each(['design', 'dev', 'test'] as const)('preselects the allocated product ta
   const task = { id: 'product-1', title: '当前待分配产品任务', productLineName: '协同产品', assigneeName: '产品负责人', status: { name: '处理中' } };
   act(() => window.dispatchEvent(new CustomEvent('product-task-create', { detail: { targetKind: kind, parent: task, relatedProductTask: task } })));
   fireEvent.click(screen.getByRole('button', { name: '关联任务 · 1' }));
-  expect(screen.getByRole('button', { name: '当前待分配产品任务', exact: true })).toBeVisible();
+  expect(screen.getByRole('button', { name: '当前待分配产品任务' })).toBeVisible();
   expect(screen.getByText('负责人：产品负责人')).toBeVisible();
-  expect(screen.getByText('当前状态：处理中')).toBeVisible();
+  expect(screen.getByText('状态：处理中')).toBeVisible();
 });
 
 it('shows only collaboration in the product creation relation area', async () => {
@@ -145,4 +147,80 @@ it('filters product task options by status instead of collaboration type', () =>
   }
   fireEvent.click(screen.getByText('已完成产品任务'));
   expect(onChange).toHaveBeenCalledWith(['2']);
+});
+
+it.each([['product', '产品设计'], ['project', '物料设计'], ['other', '其他设计']] as const)('locks the %s design type first and hides the duplicate project field for material design', async (variant, label) => {
+  window.history.replaceState(null, '', '/app/prod_design_tasks');
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '协同产品', workItemTypes: [{ id: 'different', name: '其他设计', category: '设计', enabled: true, default: true }] }] } as unknown as ReturnType<typeof useApp>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="design" itemLabel="设计任务" designVariant={variant} creationContext={{ productLineId: 'line-1' }} /></QueryClientProvider>);
+  await screen.findByText('新建设计任务');
+  const field = screen.getByText('设计任务类型').closest('.ant-form-item')!;
+  await waitFor(() => expect(field).toHaveTextContent(label));
+  expect(field).toHaveStyle({ order: '-1' });
+  expect(field.querySelector('.ant-select')).toHaveClass('ant-select-disabled');
+  if (variant === 'project') expect(screen.queryByText('关联项目')).not.toBeInTheDocument();
+  else expect(screen.getByText('关联项目')).toBeVisible();
+});
+
+it('hides related tasks in a product detail', async () => {
+  window.history.replaceState(null, '', '/app/prod_req_tasks');
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="requirement" initialDetail={{ id: 'p-1', title: '产品详情', status: '待处理', relatedTaskIds: ['d-1'] } as import('../../types').RequirementTask} /></QueryClientProvider>);
+  expect(screen.queryByRole('button', { name: /关联任务 ·/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '协同事项 · 0' })).toBeVisible();
+});
+
+it('opens a source collaboration title in a new tab from task creation', async () => {
+  const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+  window.history.replaceState(null, '', '/manager/app/wb_work_order?detailId=m-1');
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="requirement" creationContext={{ productLineId: 'line-1', sourceWorkOrder: { id: 'm-1', title: '来源协同标题' } as import('../../types').RequirementTask }} /></QueryClientProvider>);
+  await screen.findByText('新建产品任务');
+  fireEvent.click(screen.getByRole('button', { name: '协同事项 · 1' }));
+  fireEvent.click(screen.getByRole('button', { name: '来源协同标题' }));
+  expect(open).toHaveBeenCalledWith(`${window.location.origin}/manager/app/wb_work_order?detailId=m-1`, '_blank');
+  open.mockRestore();
+});
+
+it.each(['design', 'dev', 'test'] as const)('shows product task cards with status in %s detail and opens the referenced product', async (kind) => {
+  const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+  window.history.replaceState(null, '', `/app/prod_${kind}_tasks`);
+  const product = { id: 'p-1', title: '关联产品任务', productLineId: 'line-1', category: 'requirement', status: { name: '处理中' }, assigneeName: '产品负责人' };
+  vi.mocked(productRepository.workItems).mockResolvedValue({ page: { items: [product, { ...product, id: 'not-product', category: 'design', title: '不应作为候选' }], total: 2 } } as never);
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '产品' }] } as unknown as ReturnType<typeof useApp>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} initialDetail={{ id: 'detail-1', title: '下游详情', category: kind, relatedTaskIds: ['p-1'] } as import('../../types').RequirementTask} /></QueryClientProvider>);
+  fireEvent.click(screen.getByRole('button', { name: '关联任务 · 1' }));
+  fireEvent.click(await screen.findByRole('button', { name: '关联产品任务' }));
+  expect(screen.getByText('状态：处理中')).toBeVisible();
+  expect(open).toHaveBeenCalledWith(`${window.location.origin}/app/prod_req_tasks?detailId=p-1&productLineId=line-1`, '_blank');
+  fireEvent.click(screen.getByRole('button', { name: /已关联 1 条事项/ }));
+  expect(screen.queryByText('不应作为候选')).not.toBeInTheDocument();
+  open.mockRestore();
+});
+
+it.each(['presales', 'delivery', 'ops'] as const)('blocks %s creation with missing dates even without field configuration', async (kind) => {
+  window.history.replaceState(null, '', '/app/wb_work_order');
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '协同产品' }] } as unknown as ReturnType<typeof useApp>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} creationContext={{ productLineId: 'line-1', title: '日期必填验收' }} /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: /^保\s*存$/ }));
+  expect(addToast).toHaveBeenCalledWith('warning', '请选择计划开始时间');
+  expect(productRepository.createBusinessTask).not.toHaveBeenCalled();
+  const start = screen.getByText('计划开始时间').closest('.ant-form-item')!;
+  const end = screen.getByText('计划完成时间').closest('.ant-form-item')!;
+  expect(start.querySelector('label')).toHaveClass('ant-form-item-required');
+  expect(end.querySelector('label')).toHaveClass('ant-form-item-required');
+  const input = start.querySelector('input')!;
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: '2026-10-10' } });
+  fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
+  fireEvent.blur(input);
+  fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ }));
+  await waitFor(() => expect(addToast).toHaveBeenCalledWith('warning', '请选择计划完成时间'));
+  expect(productRepository.createBusinessTask).not.toHaveBeenCalled();
+  expect(screen.getByDisplayValue('日期必填验收')).toBeInTheDocument();
+  const endInput = end.querySelector('input')!;
+  fireEvent.focus(endInput);
+  fireEvent.change(endInput, { target: { value: '2026-10-11' } });
+  fireEvent.keyDown(endInput, { key: 'Enter', code: 'Enter', keyCode: 13 });
+  fireEvent.blur(endInput);
+  fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ }));
+  await waitFor(() => expect(productRepository.createBusinessTask).toHaveBeenCalledWith(kind, expect.objectContaining({ title: '日期必填验收', plannedStartDate: '2026-10-10', dueDate: '2026-10-11' })));
 });

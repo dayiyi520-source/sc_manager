@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createRef } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ObjectiveForm, type ObjectiveFormHandle } from './ObjectiveForm';
 
@@ -29,6 +29,19 @@ describe('ObjectiveForm A dragging', () => {
 });
 
 describe('ObjectiveForm objective numbering', () => {
+  it('confirms removal of an added challenge objective and keeps cancellation unchanged', async () => {
+    const onRemove = vi.fn();
+    render(<ObjectiveForm cycle="2026-09" objectiveIndex={1} ownerName="测试用户" parents={[]} busy={false} unavailable={false} root chrome={false} onCancel={vi.fn()} onRemove={onRemove} onSave={vi.fn(async () => true)}/>);
+    expect(screen.getByLabelText('目标编号 O2')).toHaveTextContent('TO2');
+    fireEvent.click(screen.getByRole('button', { name: '删除新增目标 O2' }));
+    expect(onRemove).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: /^取\s*消$/ }));
+    expect(onRemove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '删除新增目标 O2' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^删\s*除$/ }));
+    await waitFor(() => expect(onRemove).toHaveBeenCalledTimes(1));
+  });
+
   it('shows the selected period calendar state instead of always showing active', () => {
     render(<ObjectiveForm cycle="2026-08" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn(async () => true)}/>);
 

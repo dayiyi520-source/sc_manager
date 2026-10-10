@@ -49,3 +49,12 @@ describe('defect create field controls', () => {
     expect(await readCreate()).toEqual(refreshed);
   });
 });
+
+it.each(['requirement', 'design', 'dev', 'test', 'bug', 'presales', 'delivery', 'ops'])('locks both creation dates for %s after saving and reloading old overrides', async (categoryCode) => {
+  for (const scene of ['CREATE', 'CREATE_CHILD']) {
+    await mockApiRequest(`/api/work-item-field-configurations/${categoryCode}/${scene}`, { method: 'PUT', body: JSON.stringify({ fields: ['plannedStartDate', 'plannedEndDate'].map((fieldCode) => ({ fieldCode, visible: false, required: false, locked: false })) }) });
+    const result = await mockApiRequest(`/api/work-item-field-configurations?categoryCode=${categoryCode}`);
+    const fields = result.scenes.find((item: any) => item.scene === scene).fields;
+    for (const fieldCode of ['plannedStartDate', 'plannedEndDate']) expect(fields.find((field: any) => field.fieldCode === fieldCode)).toMatchObject({ visible: true, required: true, locked: true });
+  }
+});

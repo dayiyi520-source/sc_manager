@@ -598,6 +598,7 @@ export interface RequirementWorkOrderCandidate {
   creatorName?: string;
   expectedCompleteDate?: string;
   productLineName?: string;
+  productLineId?: string;
   status?: string;
   summary?: string;
   sourceType?: string;
@@ -632,6 +633,7 @@ export type RequirementTaskType =
   | '交付任务'
   | '运维任务'
   | '研发任务'
+  | '测试任务'
   | 'bug修复'
   | '售前支持'
   | '项目交付'
@@ -663,6 +665,8 @@ export interface RequirementWorkItem {
   requirementId: string;
   requirementCode?: string;
   requirementTitle?: string;
+  productLineId?: string;
+  category?: string;
   taskType: RequirementTaskType;
   title: string;
   assigneeName: string;

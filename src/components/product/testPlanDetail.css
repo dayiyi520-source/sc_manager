@@ -1,0 +1,30 @@
+.test-plan-case-status { width: 120px; --case-status-color: var(--text-muted); }
+.test-plan-case-status.is-PASSED { --case-status-color: var(--success); }
+.test-plan-case-status.is-FAILED { --case-status-color: var(--danger); }
+.test-plan-case-status.is-DEFERRED { --case-status-color: var(--warning); }
+.test-plan-case-list .test-plan-case-status.ant-select { color: var(--text-on-primary); background: var(--case-status-color); border-color: var(--case-status-color); border-radius: 4px; }
+.test-plan-case-list .test-plan-case-status.ant-select:hover { filter: brightness(1.08); }
+.test-plan-case-list .test-plan-case-status.ant-select-focused { outline: 2px solid var(--primary); outline-offset: 2px; }
+.test-plan-case-list .test-plan-case-status.ant-select-disabled { opacity: .5; cursor: not-allowed; }
+.test-plan-case-list .test-plan-case-status .ant-select-content,
+.test-plan-case-list .test-plan-case-status .ant-select-arrow { color: var(--text-on-primary); }
+.test-plan-case-list .test-plan-defect-add { background: var(--bg-surface-soft); border-radius: 4px; }
+.test-plan-case-list .test-plan-defect-add:hover { background: color-mix(in srgb, var(--primary) 12%, var(--bg-surface-soft)); }
+.test-plan-case-defects { display: flex; align-items: center; gap: 8px; }
+.test-plan-defect-count { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 0; border-radius: 4px; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); white-space: nowrap; cursor: pointer; }
+.test-plan-defect-count:hover { background: color-mix(in srgb, var(--danger) 20%, transparent); }
+.test-plan-defect-count:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.test-plan-case-defects.has-defects .test-plan-defect-add { visibility: hidden; }
+.test-plan-case-defects.has-defects:hover .test-plan-defect-add,
+.test-plan-case-defects.has-defects:focus-within .test-plan-defect-add { visibility: visible; }
+.test-plan-defect-preview { width: min(720px, calc(100vw - 64px)); font-size: 14px; }
+.test-plan-defect-preview-header,
+.test-plan-defect-preview-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(100px, 1fr) minmax(120px, 1fr) 32px; gap: 16px; align-items: center; padding: 12px; }
+.test-plan-defect-preview-header { color: var(--text-muted); border-bottom: 1px solid var(--border-main); }
+.test-plan-defect-preview-row { border-radius: 4px; color: var(--text-primary); }
+.test-plan-defect-preview-row:hover,
+.test-plan-defect-preview-row:focus-within { background: var(--bg-surface-soft); }
+.test-plan-defect-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.test-plan-defect-preview-row .test-plan-defect-unlink { visibility: hidden; }
+.test-plan-defect-preview-row:hover .test-plan-defect-unlink,
+.test-plan-defect-preview-row:focus-within .test-plan-defect-unlink { visibility: visible; }

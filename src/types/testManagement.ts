@@ -81,7 +81,11 @@ export interface TestPlanCase {
   ownerName: string;
   enabled: boolean;
   latestResult?: TestResultStatus | null;
+  executionStatus?: TestPlanCaseStatus;
+  defectIds?: string[];
 }
+
+export type TestPlanCaseStatus = 'NOT_EXECUTED' | 'PASSED' | 'FAILED' | 'DEFERRED';
 
 export interface TestPlan {
   id?: string | null;
@@ -98,6 +102,7 @@ export interface TestPlan {
 }
 
 export interface SaveTestPlanInput {
+  caseResults?: Array<{ testCaseId: string; executionStatus: TestPlanCaseStatus; defectIds: string[] }>;
   testCaseIds: string[];
   name: string;
   environment?: string;
@@ -111,22 +116,6 @@ export interface SaveTestPlanInput {
   revision: number;
 }
 
-export interface VersionTestReportPlan {
-  id: string;
-  name: string;
-  taskTitle: string;
-  ownerName: string;
-  startDate?: string | null;
-  endDate?: string | null;
-  environment?: string | null;
-  status?: string;
-  total?: number;
-  passed?: number;
-  failed?: number;
-  notExecuted?: number;
-  passRate?: number;
-}
-
 export interface VersionTestReportListItem {
   id: string;
   name: string;
@@ -137,30 +126,21 @@ export interface VersionTestReportListItem {
   productLineName?: string;
   versionId?: string;
   versionName?: string;
-  firstPlanName?: string;
-  planCount: number;
   revision: number;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface TestReportMetric { name: string; value: number }
-
 export interface VersionTestReport extends VersionTestReportListItem {
   versionName: string;
-  plans: VersionTestReportPlan[];
-  statistics: { total: number; defects: number; urgent: number; severe: number };
-  resultDistribution: TestReportMetric[];
-  repairDistribution: TestReportMetric[];
-  severityDistribution: TestReportMetric[];
-  priorityDistribution: TestReportMetric[];
-  urgentDefects: Array<{ id: string; code: string; title: string; status: string; priority: string; severity: string; assigneeName?: string }>;
+  attachments?: SaveVersionTestReportInput['attachments'];
 }
 
 export interface SaveVersionTestReportInput {
+  productLineId?: string;
+  versionId?: string;
   name: string;
   reportType: '功能测试' | '安全测试' | '回归测试';
-  testPlanIds: string[];
   summary?: string;
   attachments?: Array<{ name: string; url?: string; size?: number; type?: string }>;
   revision?: number;

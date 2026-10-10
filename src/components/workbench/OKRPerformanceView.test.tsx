@@ -171,7 +171,7 @@ describe('OKRPerformanceView target navigation', () => {
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).not.toBeInTheDocument());
   });
 
-  it('edits a submitted goal without resubmitting and returns to detail on cancel', async () => {
+  it('edits a submitted goal without resubmitting and returns to the list on cancel', async () => {
     okrState.records = [{ ...objectiveRecord, payload: { ...objectiveRecord.payload, keyResults: [{ ...objectiveRecord.payload.keyResults![0], deadline: '2026-09-30' }] } }];
     render(<OKRPerformanceView />);
     fireEvent.click(screen.getByLabelText('目标：提升年度经营质量'));
@@ -188,7 +188,8 @@ describe('OKRPerformanceView target navigation', () => {
     expect(await screen.findByText('目标详情')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '修改目标' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^取\s*消$/ }).at(-1)!);
-    expect(await screen.findByText('目标详情')).toBeInTheDocument();
+    expect(await screen.findByLabelText('目标：提升年度经营质量')).toBeInTheDocument();
+    expect(screen.queryByText('目标详情')).not.toBeInTheDocument();
     expect(okrState.updateOkr).toHaveBeenCalledTimes(1);
   }, 15000);
 
@@ -213,6 +214,23 @@ describe('OKRPerformanceView target navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
     expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
     expect(container.querySelector('.okr-action-breakdown-page')).not.toBeInTheDocument();
+  });
+
+  it('protects the initial objective and removes only an added objective', async () => {
+    render(<OKRPerformanceView />);
+    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.change(screen.getByLabelText('目标名称'), { target: { value: '保留的承诺目标' } });
+    expect(screen.queryByRole('button', { name: '删除新增目标 O1' })).not.toBeInTheDocument();
+    const editor = screen.getByLabelText('目标名称').closest('.ant-drawer-body') as HTMLElement;
+    fireEvent.click(within(editor).getByRole('button', { name: '添加目标' }));
+    fireEvent.click(screen.getByRole('button', { name: '删除新增目标 O2' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^删\s*除$/ }));
+    await waitFor(() => expect(screen.getAllByLabelText('目标名称')).toHaveLength(1));
+    expect(screen.getByLabelText('目标名称')).toHaveValue('保留的承诺目标');
+    expect(okrState.saveObjective).not.toHaveBeenCalled();
+    expect(okrState.saveObjectiveDraft).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '删除新增目标 O1' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
   });
 
   it('opens creation even when the root user already has a target in the cycle', async () => {

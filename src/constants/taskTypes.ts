@@ -15,7 +15,7 @@ export const TASK_PAGE_BY_TYPE: Record<string, string> = {
   [TASK_TYPES.requirement]: 'prod_req_tasks', [TASK_TYPES.dataRequirement]: 'prod_req_tasks',
   [TASK_TYPES.bug]: 'prod_bugs', [TASK_TYPES.design]: 'prod_design_tasks',
   [TASK_TYPES.presales]: 'crm_presales_tasks', [TASK_TYPES.delivery]: 'proj_delivery_tasks',
-  [TASK_TYPES.ops]: 'proj_ops_tasks', [TASK_TYPES.development]: 'prod_rd_tasks',
+  '测试任务': 'prod_test_tasks', [TASK_TYPES.ops]: 'proj_ops_tasks', [TASK_TYPES.development]: 'prod_rd_tasks',
   bug修复: 'prod_bugs', 售前支持: 'crm_presales_tasks', 项目交付: 'proj_delivery_tasks',
   交付支持: 'proj_delivery_tasks', 运维部署: 'proj_ops_tasks', 技术问题: 'prod_rd_tasks',
 };

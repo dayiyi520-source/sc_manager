@@ -1,3 +1,4 @@
+import { handleMockTestReports, TEST_REPORT_STORAGE_KEY } from './mockTestReports';
 import {
   MOCK_BUGS,
   MOCK_DATABASE,
@@ -29,6 +30,7 @@ import type {
 } from '../types/testManagement';
 
 const KEYS = {
+  testReports: TEST_REPORT_STORAGE_KEY,
   snapshot: 'shichuang.frontend.mock.snapshotVersion',
   members: 'shichuang.frontend.mock.teamMembers',
   plans: 'shichuang.frontend.mock.testPlans',
@@ -48,6 +50,7 @@ const KEYS = {
   workItems: 'shichuang.frontend.mock.workItems',
   opsTasks: 'shichuang.frontend.mock.opsTasks',
   taskActivities: 'shichuang.frontend.mock.taskActivities',
+  attachments: 'shichuang.frontend.mock.attachments',
 };
 
 // 每次导入新数据库快照时，淘汰浏览器里由旧演示数据留下的本地状态。
@@ -147,7 +150,7 @@ const getOkrPeople = () => {
 };
 const planCases = (caseIds: string[]): TestPlanCase[] => getCases().filter((item) => caseIds.includes(item.id)).map((item, index) => ({
   linkId: id('link'), testCaseId: item.id, sort: index + 1, code: item.code, title: item.title, priority: item.priority,
-  ownerName: item.ownerName, enabled: item.enabled, latestResult: item.latestResult,
+  ownerName: item.ownerName, enabled: item.enabled, latestResult: item.latestResult, executionStatus: 'NOT_EXECUTED', defectIds: [],
 }));
 
 const databaseRows = (table: keyof typeof MOCK_DATABASE) => (MOCK_DATABASE[table] as unknown as Array<Record<string, any>>).filter((row) => Number(row.delete_flag_ || 0) === 0);
@@ -237,7 +240,8 @@ const defaultFieldVisible = (scene: string, fieldCode: string) => scene === 'CRE
 const normalizeTemplateField = (field: any) => {
   const metadata = FIELD_METADATA[field.fieldCode];
   const detailSystemField = field.scene === 'DETAIL' && DETAIL_SYSTEM_FIELD_CODES.has(field.fieldCode);
-  const locked = REQUIRED_FIELD_CODES.has(field.fieldCode) || detailSystemField;
+  const creationDate = (field.scene === 'CREATE' || field.scene === 'CREATE_CHILD') && (field.fieldCode === 'plannedStartDate' || field.fieldCode === 'plannedEndDate');
+  const locked = REQUIRED_FIELD_CODES.has(field.fieldCode) || detailSystemField || creationDate;
   return {
     ...(metadata ? { ...field, ...metadata } : field),
     required: locked ? true : Boolean(field.required),
@@ -355,6 +359,11 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   const clean = path.split('?')[0];
   const parts = clean.split('/').filter(Boolean);
   const body = bodyOf(init);
+  if (parts.includes('test-reports')) {
+    let session: { user?: { name?: string } } | null = null;
+    try { session = JSON.parse(sessionStorage.getItem('shichuang.session') || 'null'); } catch { /* 兼容失效的本地会话。 */ }
+    return handleMockTestReports(path, method, body, getProductLines(), session?.user?.name || '当前用户');
+  }
 
   if (parts[1] === 'work-items' && parts[2] && ['activities', 'comments'].includes(parts[3])) {
     const item = [...getWorkItems(), ...MOCK_BUGS].find((task) => task.id === parts[2]);
@@ -367,6 +376,12 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
       recordTaskActivity(item.id, line, 'WORK_ITEM_COMMENTED', { content });
       return null;
     }
+  }
+
+  if (clean === '/api/attachments/stage' && method === 'POST') {
+    const attachment = { ...body, id: id('attachment'), scanStatus: 'PASSED', visibility: 'SHARED' };
+    write(KEYS.attachments, [...read<any[]>(KEYS.attachments, []), attachment]);
+    return attachment;
   }
 
   if (parts[0] === 'api' && parts[1] === 'ops-tasks') {
@@ -495,6 +510,10 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     const pageSize = Math.min(100, Math.max(1, Number(query.get('pageSize') || 100)));
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
   }
+  if (clean === '/api/requirements/my-tasks' && method === 'GET') {
+    const viewerId = queryOf(path).get('viewerId') || '';
+    return viewerId ? myTasks(viewerId) : [];
+  }
   if (parts[1] === 'requirements' && parts[2] && parts.length === 3 && method === 'GET') {
     const item = getWorkItems().find((candidate) => candidate.id === parts[2]);
     if (!item) throw new Error('事项不存在');
@@ -521,12 +540,33 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     const nextStatus = parts[3] === 'complete' ? '待验收' : parts[3] === 'acceptance-passed' ? '已完成' : '处理中';
     if ((parts[3] === 'complete' && current.status !== '处理中') || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
     if (parts[3] === 'complete' && (current.workItems || []).some((item: RequirementWorkItem) => item.status !== '已完成' && item.assistanceTaskStatus !== 'COMPLETED')) throw new Error('存在未完成的关联任务');
-    const event = { id: id('event'), eventType: parts[3] === 'complete' ? '事项完成' : parts[3] === 'acceptance-passed' ? '验收通过' : '验收未通过', fromStatus: current.status, toStatus: nextStatus, reason: text(body.note || body.reason), operatorName: current.ownerName, createdAt: now() };
-    items[index] = { ...current, status: nextStatus, revision: revision + 1, events: [...(current.events || []), event] };
+    const stagedAttachments = read<any[]>(KEYS.attachments, []);
+    const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.map(String) : [];
+    const previousOwnerName = String(current.ownerName || current.assigneeName || '').trim();
+    const previousAssigneeId = String(current.assigneeId || '').trim();
+    const creatorName = String(current.creatorName || '').trim();
+    const creatorId = String(current.creatorId || MOCK_USERS.find((user) => user.name === creatorName)?.id || '').trim();
+    const failedTask = parts[3] === 'acceptance-failed'
+      ? (current.workItems || []).find((item: RequirementWorkItem) => item.id === String(body.workItemId || '') && (item.status === '已完成' || item.assistanceTaskStatus === 'COMPLETED'))
+      : undefined;
+    if (parts[3] === 'acceptance-failed' && !failedTask) throw new Error('请选择已完成的关联任务');
+    const failedTaskAssigneeId = failedTask ? String((failedTask as RequirementWorkItem & { assigneeId?: string }).assigneeId || '') : '';
+    const failedOwner = failedTask ? MOCK_USERS.find((user) => user.id === String(body.taskOwnerId || failedTaskAssigneeId)) : undefined;
+    const nextOwnerName = String(parts[3] === 'complete' ? (body.assigneeName || creatorName || previousOwnerName) : parts[3] === 'acceptance-failed' ? (failedOwner?.name || failedTask?.assigneeName || previousOwnerName) : previousOwnerName).trim();
+    const nextAssigneeId = String(parts[3] === 'complete' ? (body.assigneeId || creatorId || previousAssigneeId) : parts[3] === 'acceptance-failed' ? (body.taskOwnerId || failedTaskAssigneeId || previousAssigneeId) : previousAssigneeId).trim();
+    const ownerChanged = Boolean(nextOwnerName && nextOwnerName !== previousOwnerName) || Boolean(previousAssigneeId && nextAssigneeId && nextAssigneeId !== previousAssigneeId);
+    const event = { id: id('event'), eventType: parts[3] === 'complete' ? '事项完成' : parts[3] === 'acceptance-passed' ? '验收通过' : '验收未通过', fromStatus: current.status, toStatus: nextStatus, reason: text(body.note || body.reason), operatorName: current.ownerName, createdAt: now(), metadata: { ...(body.noteHtml ? { noteHtml: text(body.noteHtml) } : {}), ...(ownerChanged ? { ownerChanged: true, fromAssigneeName: previousOwnerName, assigneeName: nextOwnerName } : {}), attachments: stagedAttachments.filter((attachment) => attachmentIds.includes(String(attachment.id))) } };
+    const nextWorkItems = parts[3] === 'acceptance-failed'
+      ? (current.workItems || []).map((item: RequirementWorkItem) => item.id === failedTask?.id ? { ...item, status: '处理中', assistanceTaskStatus: 'PROCESSING', assigneeName: nextOwnerName } : item)
+      : current.workItems;
+    items[index] = { ...current, status: nextStatus, workItems: nextWorkItems, ...((parts[3] === 'complete' || parts[3] === 'acceptance-failed') && ownerChanged ? { ownerName: nextOwnerName, assigneeName: nextOwnerName, ...(nextAssigneeId ? { assigneeId: nextAssigneeId } : {}) } : {}), revision: revision + 1, events: [...(current.events || []), event] };
     write(KEYS.workItems, items); return { id: current.id, status: nextStatus };
   }
   if (clean === '/api/design-tasks' && method === 'GET') return { items: MOCK_DESIGN_TASKS, page: 1, pageSize: 100, total: MOCK_DESIGN_TASKS.length };
-  if (clean === '/api/bugs' && method === 'GET') return { items: MOCK_BUGS, page: 1, pageSize: 100, total: MOCK_BUGS.length };
+  if (clean === '/api/bugs' && method === 'GET') {
+    const items = getWorkItems().filter((item) => item.category === 'bug' && !item.deleted && !item.deleteFlag).map((item) => ({ ...item, assignee: item.assigneeName || item.ownerName || item.assignee || '', reporter: item.reporter || item.creatorName || '', versionName: item.versionName || getProductLines().find((line) => line.id === item.productLineId)?.versions?.find((version) => version.id === item.versionId)?.name || '' }));
+    return { items, page: 1, pageSize: 100, total: items.length };
+  }
   if (clean === '/api/dev-tasks' && method === 'GET') return { items: MOCK_DEV_TASKS, page: 1, pageSize: 100, total: MOCK_DEV_TASKS.length };
   if (['design-tasks', 'dev-tasks', 'bugs'].includes(parts[1]) && parts[2] && method === 'PUT') {
     const items = getWorkItems();
@@ -715,14 +755,11 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   }
   if (clean === '/api/work-items' && method === 'GET') {
     const query = queryOf(path); const productLineId = query.get('productLineId'); const category = query.get('category'); const keyword = (query.get('keyword') || '').toLowerCase();
-    let items = getWorkItems().filter((item) => (!productLineId || item.productLineId === productLineId) && (!category || category === item.category) && (!keyword || item.title.toLowerCase().includes(keyword) || String(item.code || '').toLowerCase().includes(keyword)));
+    let items = getWorkItems().filter((item) => (!productLineId || item.productLineId === productLineId) && (!category || category === item.category) && (!keyword || String(item.title || '').toLowerCase().includes(keyword) || String(item.code || '').toLowerCase().includes(keyword) || (category === 'bug' && String(item.id).toLowerCase().includes(keyword))));
+    if (category === 'bug') items = items.filter((item) => !item.deleted && !item.deleteFlag);
     items = items.map((item) => unifiedWorkItem(item)) as any;
     const page = Math.max(1, Number(query.get('page') || 1)); const pageSize = Math.max(1, Number(query.get('pageSize') || 100));
     return { page: { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length } };
-  }
-  if (clean === '/api/requirements/my-tasks' && method === 'GET') {
-    const viewerId = queryOf(path).get('viewerId') || '';
-    return viewerId ? myTasks(viewerId) : [];
   }
   if (parts[1] === 'work-items' && parts[2] && parts[3] === 'transitions' && method === 'GET') return { revision: 0, actions: [], statuses: [] };
   if (parts[1] === 'work-items' && parts[2] && parts[3] === 'relations' && method === 'GET') {
@@ -762,7 +799,25 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     const workItemId = parts[2]; const plans = getPlans();
     if (method === 'GET') return plans.filter((plan) => plan.workItemId === workItemId);
     if (method === 'POST') { const input = body as SaveTestPlanInput; const plan: TestPlan = { id: id('plan'), workItemId: input.workItemId || workItemId, executable: true, name: input.name, environment: input.environment, startDate: input.startDate, endDate: input.endDate, ownerId: input.ownerId, ownerName: input.ownerName, revision: 0, cases: planCases(input.testCaseIds || []) }; write(KEYS.plans, [...plans, plan]); return plan; }
-    if (method === 'PUT' && parts[4]) { const index = plans.findIndex((plan) => plan.id === parts[4]); if (index >= 0) { plans[index] = { ...plans[index], ...body, cases: planCases(body.testCaseIds || []) as any, revision: plans[index].revision + 1 }; write(KEYS.plans, plans); return plans[index]; } }
+    if (method === 'PUT' && parts[4]) {
+      const index = plans.findIndex((plan) => plan.id === parts[4] && plan.workItemId === workItemId);
+      if (index < 0) throw new Error('测试计划不存在');
+      const current = plans[index];
+      if (body.revision !== current.revision) throw new Error('测试计划已被更新，请刷新后重试');
+      const task = getWorkItems().find((item) => item.id === workItemId && !item.deleted && !item.deleteFlag);
+      if (!task) throw new Error('测试任务不存在');
+      const caseIds = body.testCaseIds;
+      if (!Array.isArray(caseIds) || new Set(caseIds).size !== caseIds.length || caseIds.some((caseId) => !getCases().some((item) => item.id === caseId && item.productLineId === task.productLineId && item.enabled))) throw new Error('请选择当前产品的有效用例');
+      const results = body.caseResults || [];
+      if (!Array.isArray(results) || new Set(results.map((result) => result.testCaseId)).size !== results.length) throw new Error('用例结果无效');
+      results.forEach((result) => {
+        if (!caseIds.includes(result.testCaseId) || !['NOT_EXECUTED', 'PASSED', 'FAILED', 'DEFERRED'].includes(result.executionStatus) || !Array.isArray(result.defectIds) || new Set(result.defectIds).size !== result.defectIds.length) throw new Error('用例结果无效');
+        if (result.defectIds.some((defectId) => !getWorkItems().some((item) => item.id === defectId && item.category === 'bug' && item.productLineId === task.productLineId && !item.deleted && !item.deleteFlag))) throw new Error('请选择当前产品的有效缺陷');
+      });
+      const cases = planCases(caseIds).map((item) => ({ ...item, ...current.cases.find((old) => old.testCaseId === item.testCaseId), ...results.find((result) => result.testCaseId === item.testCaseId) }));
+      plans[index] = { ...current, name: body.name, environment: body.environment, startDate: body.startDate, endDate: body.endDate, ownerId: body.ownerId, ownerName: body.ownerName, cases, revision: current.revision + 1 };
+      write(KEYS.plans, plans); return plans[index];
+    }
   }
   if (method === 'GET') return [];
   if (method === 'POST') return { id: id('mock'), code: `MOCK-${Date.now()}` };

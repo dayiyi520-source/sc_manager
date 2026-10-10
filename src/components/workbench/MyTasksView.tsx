@@ -358,7 +358,7 @@ export const MyTasksView: React.FC = () => {
                   active={feedTab === 'competitor'}
                   onClick={() => setFeedTab('competitor')}
                 >
-                  友商动态
+                  行业资讯
                 </TabButton>
               </div>
             </div>

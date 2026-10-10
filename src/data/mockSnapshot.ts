@@ -78,6 +78,7 @@ export const MOCK_WORKBENCH_FEEDS = [
 ];
 
 const usersById = new Map(MOCK_USERS.map((user) => [user.id, user]));
+const usersByIdByName = new Map(MOCK_USERS.map((user) => [user.name, user]));
 
 export const MOCK_SYSTEM_ROLES = rows('t_sys_role')
   .filter((row) => text(row.tenant_id_) === 'local-tenant' && Number(row.delete_flag_ || 0) === 0)
@@ -146,7 +147,7 @@ const designVariantFor = (row: Row): RequirementTask['designVariant'] => {
 };
 
 const task = (row: Row): RequirementTask => ({
-  id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_), expectedGoal: text(row.expected_goal_), status: text(row.status_name_), priority: text(row.priority_), ownerName: text(row.assignee_name_) || usersById.get(text(row.assignee_id_))?.name || '', assigneeId: text(row.assignee_id_) || undefined, creatorName: text(row.creator_name_), department: text(row.department_), versionId: text(row.version_id_) || undefined, versionName: versionNameById.get(text(row.version_id_)) || '', productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', estimatedHours: Number(row.estimated_hours_ || 0), actualHours: Number(row.actual_hours_ || 0), dueDate: date(row.planned_end_date_ || row.expected_complete_date_), createdAt: date(row.create_time_), category: 'my_dept', requirementType: text(row.task_type_name_) || text(row.requirement_type_) || workItemTypeNameById.get(text(row.task_type_id_)) || undefined, designVariant: designVariantFor(row), designProjectName: text(row.project_name_) || text(row.projectName) || undefined, designSourceDepartment: text(row.source_department_) || text(row.department_) || undefined, revision: Number(row.version_ || 0),
+  id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_), expectedGoal: text(row.expected_goal_), status: text(row.status_name_), priority: text(row.priority_), ownerName: text(row.assignee_name_) || usersById.get(text(row.assignee_id_))?.name || '', assigneeId: text(row.assignee_id_) || undefined, creatorName: text(row.creator_name_), creatorId: text(row.creator_id_) || usersByIdByName.get(text(row.creator_name_))?.id || undefined, department: text(row.department_), versionId: text(row.version_id_) || undefined, versionName: versionNameById.get(text(row.version_id_)) || '', productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', estimatedHours: Number(row.estimated_hours_ || 0), actualHours: Number(row.actual_hours_ || 0), dueDate: date(row.planned_end_date_ || row.expected_complete_date_), createdAt: date(row.create_time_), category: 'my_dept', requirementType: text(row.task_type_name_) || text(row.requirement_type_) || workItemTypeNameById.get(text(row.task_type_id_)) || undefined, designVariant: designVariantFor(row), designProjectName: text(row.project_name_) || text(row.projectName) || undefined, designSourceDepartment: text(row.source_department_) || text(row.department_) || undefined, revision: Number(row.version_ || 0),
 });
 
 export const MOCK_REQUIREMENT_TASKS = workItems.filter((row) => text(row.category_) === 'requirement').map(task);

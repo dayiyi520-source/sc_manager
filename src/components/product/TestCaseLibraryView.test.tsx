@@ -50,8 +50,7 @@ describe('TestCaseLibraryView', () => {
     render(<QueryClientProvider client={client}><TestCaseLibraryView productLineFilter="all" /></QueryClientProvider>);
 
     await screen.findByText('当前目录暂无测试用例');
-    const scopeTabs = screen.getByRole('tablist', { name: '用例范围' });
-    expect(scopeTabs.closest('.test-case-data-plane')).not.toBeNull();
+    expect(screen.queryByRole('tablist', { name: '用例范围' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '搜索' }).closest('.test-case-data-plane')).not.toBeNull();
     expect(screen.getByText('新建').closest('.test-case-data-plane')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '新建更多操作' }));

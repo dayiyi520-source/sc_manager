@@ -9,7 +9,6 @@ import { TestCaseEditorDrawer } from './TestCaseEditorDrawer';
 import { PersonIdentity } from '../common/PersonIdentity';
 import { TestCaseBatchActionModal, type TestCaseBatchAction } from './TestCaseBatchActionModal';
 import { Filter, Search, X } from '@/components/common/octicons-compat';
-import { readSession } from '../../services/session';
 
 type TestCaseLibraryViewProps = { productLineFilter?: string };
 export type TestCaseGroup = { key: string; title: string; path: string; items: TestCase[] };
@@ -52,9 +51,6 @@ export function groupTestCasesByDirectory(items: TestCase[], directories: TestCa
 
 export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ productLineFilter = 'all' }) => {
   const lineId = productLineFilter === 'all' ? 'all' : productLineFilter;
-  const currentSessionUser = readSession()?.user;
-  const currentUserName = currentSessionUser?.name || '';
-  const currentUserId = currentSessionUser?.id || '';
   const queryClient = useQueryClient();
   const [directoryId, setDirectoryId] = useState('');
   const [importOpen, setImportOpen] = useState(false);
@@ -65,7 +61,6 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
   const [keyword, setKeyword] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created' | 'my_participated'>('all');
   const [priority, setPriority] = useState<TestPriority | ''>('');
   const [enabled, setEnabled] = useState<boolean | undefined>(true);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -95,7 +90,7 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
   const productLines = useQuery({ queryKey: ['test-case-product-lines'], queryFn: () => productRepository.productLines(), enabled: true, retry: false });
   const selectedLineTypes = useQuery({ queryKey: ['test-case-work-item-types', activeLineId], queryFn: () => productRepository.workItemTypes(activeLineId, '用例'), enabled: activeLineId !== 'all', retry: false });
   const employees = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: batchAction === 'owner', retry: false });
-  const cases = useQuery({ queryKey: ['test-cases', activeLineId, directoryId, keyword, priority, enabled, activeTab, currentUserName, currentUserId, page], queryFn: () => productRepository.testCases(activeLineId, { directoryId, includeDescendants: Boolean(directoryId), keyword, priority, ownerId: activeTab === 'my_owned' ? currentUserId : undefined, creatorName: activeTab === 'my_created' ? currentUserName : undefined, participantName: activeTab === 'my_participated' ? currentUserName : undefined, enabled, page, pageSize: 100 }), enabled: true, retry: false });
+  const cases = useQuery({ queryKey: ['test-cases', activeLineId, directoryId, keyword, priority, enabled, page], queryFn: () => productRepository.testCases(activeLineId, { directoryId, includeDescendants: Boolean(directoryId), keyword, priority, enabled, page, pageSize: 100 }), enabled: true, retry: false });
   useEffect(() => { setSelectedProductLineId(''); setDirectoryId(''); }, [productLineFilter]);
   useEffect(() => {
     const handleOutsidePointerDown = (event: PointerEvent) => {
@@ -168,8 +163,7 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
     setBatchAction(value as TestCaseBatchAction);
   };
   const directoryLine = (item: TestCaseDirectory) => item.productLineId || (productLineFilter === 'all' ? '' : productLineFilter);
-  const scopedCases = useMemo(() => (cases.data?.items || []).filter((item) => activeTab === 'all' || (activeTab === 'my_owned' ? item.ownerName === currentUserName : activeTab === 'my_created' ? item.creatorName === currentUserName : true)), [activeTab, cases.data?.items, currentUserName]);
-  const tabCounts = useMemo(() => ({ all: activeTab === 'all' ? cases.data?.total || 0 : (cases.data?.items || []).length, my_owned: activeTab === 'my_owned' ? cases.data?.total || 0 : (cases.data?.items || []).filter((item) => item.ownerName === currentUserName).length, my_created: activeTab === 'my_created' ? cases.data?.total || 0 : (cases.data?.items || []).filter((item) => item.creatorName === currentUserName).length, my_participated: activeTab === 'my_participated' ? cases.data?.total || 0 : (cases.data?.items || []).length }), [activeTab, cases.data?.items, cases.data?.total, currentUserName]);
+  const scopedCases = cases.data?.items || [];
   const filteredCases = useMemo(() => scopedCases.filter((item) => {
     const created = item.createdAt ? String(item.createdAt).slice(0, 10) : '';
     return (!appliedFilters.code || item.code.includes(appliedFilters.code)) && (!appliedFilters.title || item.title.toLocaleLowerCase().includes(appliedFilters.title.toLocaleLowerCase())) && (!appliedFilters.owner || item.ownerName === appliedFilters.owner) && (!appliedFilters.createdFrom || created >= appliedFilters.createdFrom) && (!appliedFilters.createdTo || created <= appliedFilters.createdTo) && (!appliedFilters.priority || item.priority === appliedFilters.priority) && (!appliedFilters.type || item.workItemTypeName === appliedFilters.type);
@@ -229,9 +223,6 @@ export const TestCaseLibraryView: React.FC<TestCaseLibraryViewProps> = ({ produc
       <main className="test-case-data-plane">
         <header className="test-case-library-toolbar" ref={controlsRef}>
           <div className="test-case-library-toolbar-top">
-            <div role="tablist" aria-label="用例范围" className="test-case-scope-tabs">
-              {([['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_participated', '我参与的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeTab === value} onClick={() => { setActiveTab(value); setPage(1); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{tabCounts[value]}</button>)}
-            </div>
             <div className="test-case-library-actions"><div className={`test-case-search ${searchOpen ? 'is-open' : ''}`}>{searchOpen && <Input allowClear prefix={<Search className="h-4 w-4" />} value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} onPressEnter={() => { setKeyword(searchDraft); setPage(1); setSearchOpen(false); }} placeholder="搜索编号或标题" />}<Button type="text" aria-label="搜索" aria-pressed={searchOpen} icon={<Search className="h-4 w-4" />} onClick={() => { setSearchDraft(keyword); setSearchOpen((value) => !value); setFilterOpen(false); }} /></div><Badge count={activeFilterCount} size="small" offset={[-2, 2]}><Button type="text" aria-label="过滤器" aria-pressed={filterOpen} icon={<Filter className="h-4 w-4" />} onClick={() => { setFilterDraft(appliedFilters); setFilterOpen((value) => !value); setSearchOpen(false); }} /></Badge><Dropdown trigger={['click']} menu={{ items: [{ key: 'import', label: '导入数据', icon: <UploadOutlined /> }], onClick: ({ key }) => { if (key === 'import') { setImportFile(null); setImportType('xlsx'); setImportOpen(true); } } }}><Space.Compact><Button type="primary" icon={<PlusOutlined />} disabled={directories.isLoading || directories.isError} onClick={() => openEditor()}>新建</Button><Button type="primary" aria-label="新建更多操作" icon={<DownOutlined />} disabled={directories.isLoading || directories.isError} /></Space.Compact></Dropdown></div>
           </div>
           {filterOpen && <div className="test-case-filters"><div className="test-case-filter-grid">

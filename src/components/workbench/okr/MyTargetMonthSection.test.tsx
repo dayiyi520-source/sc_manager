@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewItem } from './MyTargetMonthSection';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
@@ -40,6 +40,62 @@ const targets: MyTargetViewItem[] = [
 ];
 
 describe('MyTargetMonthSection', () => {
+  it('shows alignment content and handles toolbar actions without opening the row', async () => {
+    const onOpenTarget = vi.fn();
+    const onEditTarget = vi.fn();
+    const onDeleteTarget = vi.fn();
+    const target = { ...targets[1], editable: true, deletable: true, alignmentLabel: '2026年09月目标' };
+    render(<MyTargetMonthSection periodKey="2026-09" targets={[target]} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={onOpenTarget} onEditTarget={onEditTarget} onDeleteTarget={onDeleteTarget}/>);
+    expect(screen.getByText('2026年09月目标')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: `编辑目标：${target.title}` }));
+    expect(onEditTarget).toHaveBeenCalledWith(target.id);
+    expect(onOpenTarget).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: `更多操作：${target.title}` }));
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: '删除' })).toBeInTheDocument());
+    expect(screen.queryByText('查看详情')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除' }));
+    expect(onDeleteTarget).toHaveBeenCalledWith(target.id);
+    expect(onOpenTarget).not.toHaveBeenCalled();
+  });
+
+  it('supports card editing and deletion without opening details and shows progress only below', async () => {
+    const onOpenTarget = vi.fn();
+    const onEditTarget = vi.fn();
+    const onDeleteTarget = vi.fn();
+    const target = { ...targets[1], editable: true, deletable: true };
+    render(<MyTargetMonthSection periodKey="2026-09" targets={[target]} viewMode="card" collapsed={false} onToggle={vi.fn()} onOpenTarget={onOpenTarget} onEditTarget={onEditTarget} onDeleteTarget={onDeleteTarget}/>);
+    const card = screen.getByLabelText(`目标卡片：${target.title}`);
+    expect(within(card).getAllByText('42%')).toHaveLength(1);
+    fireEvent.click(within(card).getByRole('button', { name: `编辑目标：${target.title}` }));
+    expect(onEditTarget).toHaveBeenCalledWith(target.id);
+    fireEvent.click(within(card).getByRole('button', { name: `更多操作：${target.title}` }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '删除' }));
+    expect(onDeleteTarget).toHaveBeenCalledWith(target.id);
+    expect(onOpenTarget).not.toHaveBeenCalled();
+  });
+
+  it('uses the same aligned objective titles and monthly fallback as the detail page', () => {
+    const people: OkrPerson[] = [{ id: 'boss', name: '林志豪', department: '管理部', supervisorId: null, rootFlag: 1, version: 1 }];
+    const parent: OkrRecord = { id: 'parent-objective', kind: 'objective', ownerId: 'boss', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '来源目标' } };
+    const child: OkrRecord = { ...parent, id: 'child-objective', payload: { title: '当前目标', alignments: [{ parentObjectiveId: parent.id }] } };
+    expect(buildMyTargetViewItems([child], [], [parent], people, 'boss')[0].alignmentLabel).toBe('来源目标');
+    expect(buildMyTargetViewItems([parent], [], [], people, 'boss')[0].alignmentLabel).toBe('2026年09月目标');
+    expect(buildMyTargetViewItems([child], [], [parent], people, 'another-user')[0].editable).toBe(false);
+  });
+
+  it('shows only submitted lower alignments from the same period and previews their actions', async () => {
+    const people: OkrPerson[] = [{ id: 'staff', name: '张瑶', department: '设计部', supervisorId: 'boss', rootFlag: 0, version: 1 }];
+    const objective: OkrRecord = { id: 'o1', kind: 'objective', ownerId: 'boss', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '公司目标', keyResults: [{ id: 'a1', title: '上级动作', weight: 100, progress: 0 }] } };
+    const child: OkrRecord = { id: 'child', kind: 'action', ownerId: 'staff', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '交付设计方案', parentObjectiveId: 'o1', parentActionId: 'a1', weight: 100, progress: 50 } };
+    const result = buildMyTargetViewItems([objective], [], [child, { ...child, id: 'draft', status: 'draft' }, { ...child, id: 'old', periodKey: '2026-08' }], people, 'boss');
+    expect(result[0].actions[0].alignments).toHaveLength(1);
+    expect(result[0].actions[0].alignments?.[0].actions).toEqual([{ id: 'child', title: '交付设计方案', linked: true }]);
+    render(<MyTargetMonthSection periodKey="2026-09" targets={result} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()}/>);
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'A1下级对齐' }));
+    await waitFor(() => expect(screen.getByText('交付设计方案')).toBeInTheDocument());
+    expect(screen.getByText('对齐我的')).toBeInTheDocument();
+  });
+
   it('uses the breakdown owner for level and the upstream owner for creator', () => {
     const people: OkrPerson[] = [
       { id: 'boss', name: '林志豪', department: '管理部', supervisorId: null, rootFlag: 1, version: 1 },
@@ -74,7 +130,7 @@ describe('MyTargetMonthSection', () => {
     ];
 
     const target = buildMyTargetViewItems(records, [], [], people, 'manager').find(item => item.id === 'action-group-parent');
-    expect(target?.status).toBe('draft');
+    expect(target?.status).toBe('partial-draft');
     expect(target?.detailId).toBe('draft');
   });
 
@@ -100,11 +156,12 @@ describe('MyTargetMonthSection', () => {
     const draftCard = screen.getByLabelText('目标卡片：完善客户交付方案');
     const activeCard = screen.getByLabelText('目标卡片：推进平台智能化能力建设');
     expect(within(draftCard).getByText('草稿')).toBeInTheDocument();
-    expect(within(draftCard).getByText('当前进度：0%')).toBeInTheDocument();
+    expect(within(draftCard).getByText('当前进度：')).toHaveTextContent('当前进度：0%');
     expect(within(draftCard).getByText('截止日期：09-30')).toBeInTheDocument();
     expect(within(activeCard).queryByText('已提交')).not.toBeInTheDocument();
-    expect(within(activeCard).getByText('当前进度：42%')).toBeInTheDocument();
+    expect(within(activeCard).getByText('当前进度：')).toHaveTextContent('当前进度：42%');
     expect(within(activeCard).getByText('截止日期：09-28')).toBeInTheDocument();
+    expect(within(activeCard).queryByRole('progressbar')).not.toBeInTheDocument();
     expect(within(activeCard).getByText('@吴清 @刘笑星')).toBeInTheDocument();
     expect(within(activeCard).queryByText('来源自上级 · 陈宇璋')).not.toBeInTheDocument();
     expect(within(activeCard).getByText('42%')).toBeInTheDocument();

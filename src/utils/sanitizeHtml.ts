@@ -1,4 +1,4 @@
-const ALLOWED_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'UL', 'OL', 'LI', 'A']);
+const ALLOWED_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'UL', 'OL', 'LI', 'A', 'IMG']);
 const DROP_CONTENT_TAGS = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH']);
 
 const isSafeHref = (value: string) => {
@@ -8,6 +8,20 @@ const isSafeHref = (value: string) => {
     const baseUrl = typeof window === 'undefined' ? 'http://localhost' : window.location.origin;
     const url = new URL(href, baseUrl);
     return ['http:', 'https:', 'mailto:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+};
+
+const isSafeImageSrc = (value: string) => {
+  const src = value.trim();
+  if (!src) return false;
+  if (/^data:image\/(?:gif|jpe?g|png|webp|bmp|svg\+xml);base64,/i.test(src)) return true;
+  if (/^blob:/i.test(src)) return true;
+  try {
+    const baseUrl = typeof window === 'undefined' ? 'http://localhost' : window.location.origin;
+    const url = new URL(src, baseUrl);
+    return ['http:', 'https:'].includes(url.protocol);
   } catch {
     return false;
   }
@@ -36,9 +50,11 @@ export const sanitizeHtml = (html: string) => {
     Array.from(element.attributes).forEach((attribute) => {
       const name = attribute.name.toLowerCase();
       if (tagName === 'A' && name === 'href' && isSafeHref(attribute.value)) return;
+      if (tagName === 'IMG' && name === 'src' && isSafeImageSrc(attribute.value)) return;
       element.removeAttribute(attribute.name);
     });
     if (tagName === 'A' && !element.hasAttribute('href')) element.remove();
+    if (tagName === 'IMG' && !element.hasAttribute('src')) element.remove();
   });
 
   return root.innerHTML;

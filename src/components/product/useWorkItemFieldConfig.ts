@@ -5,6 +5,7 @@ export const REQUIRED_WORK_ITEM_FIELDS = ['title', 'status', 'assignee'] as cons
 const DETAIL_SYSTEM_FIELDS = ['creator', 'createdAt', 'updater', 'updatedAt'] as const;
 
 const isRequiredField = (fieldCode: string) => REQUIRED_WORK_ITEM_FIELDS.includes(fieldCode as typeof REQUIRED_WORK_ITEM_FIELDS[number]);
+const isRequiredCreationDate = (fieldCode: string, scene: WorkItemFieldScene) => (scene === 'CREATE' || scene === 'CREATE_CHILD') && (fieldCode === 'plannedStartDate' || fieldCode === 'plannedEndDate');
 
 export const useWorkItemFieldConfig = (categoryCode: string, scene: WorkItemFieldScene) => {
   const [fields, setFields] = useState<WorkItemFieldConfiguration[]>([]);
@@ -30,8 +31,8 @@ export const useWorkItemFieldConfig = (categoryCode: string, scene: WorkItemFiel
   }, [categoryCode, scene]);
 
   const fieldMap = useMemo(() => new Map(fields.map((field) => [field.fieldCode, field])), [fields]);
-  const visible = (fieldCode: string) => isRequiredField(fieldCode) || (scene === 'DETAIL' && DETAIL_SYSTEM_FIELDS.includes(fieldCode as typeof DETAIL_SYSTEM_FIELDS[number])) || fieldMap.get(fieldCode)?.visible !== false;
-  const required = (fieldCode: string) => isRequiredField(fieldCode) || Boolean(fieldMap.get(fieldCode)?.required);
+  const visible = (fieldCode: string) => isRequiredField(fieldCode) || isRequiredCreationDate(fieldCode, scene) || (scene === 'DETAIL' && DETAIL_SYSTEM_FIELDS.includes(fieldCode as typeof DETAIL_SYSTEM_FIELDS[number])) || fieldMap.get(fieldCode)?.visible !== false;
+  const required = (fieldCode: string) => isRequiredField(fieldCode) || isRequiredCreationDate(fieldCode, scene) || Boolean(fieldMap.get(fieldCode)?.required);
   const editable = (fieldCode: string) => !DETAIL_SYSTEM_FIELDS.includes(fieldCode as typeof DETAIL_SYSTEM_FIELDS[number]) && !fieldMap.get(fieldCode)?.locked && fieldMap.get(fieldCode)?.editable !== false;
   const order = (fieldCode: string) => fieldMap.get(fieldCode)?.sort ?? 999;
 

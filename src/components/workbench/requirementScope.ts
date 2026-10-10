@@ -4,7 +4,7 @@ export type RequirementScope = 'mine_created' | 'mine_owned' | 'mine_participati
 export const REQUIREMENT_SCOPES = [['mine_created', '我创建的'], ['mine_owned', '我负责的'], ['mine_participating', '我参与的'], ['department', '我部门的'], ['all', '全公司的']] as const;
 type Viewer = { id?: string; name: string; department?: string };
 const matches = (id: string | undefined, name: string | undefined, viewer: Viewer) =>
-  id && viewer.id ? id === viewer.id : Boolean(name?.trim()) && name?.trim() === viewer.name.trim();
+  Boolean((id && viewer.id && id === viewer.id) || (name?.trim() && name.trim() === viewer.name.trim()));
 
 export function ownerDepartment(item: RequirementTask, employees: EmployeeOption[]) {
   // 历史重名且没有人员标识时，不猜测部门归属。

@@ -131,9 +131,7 @@ describe('product line work item defaults', () => {
     expect(settingsSource).toContain('maxLength={1000}');
   });
 
-  it('keeps planned completion optional and lets Ant Design own DatePicker internals', () => {
-    expect(tasksSource).toContain('<Form.Item label="计划完成时间"><DatePicker');
-    expect(tasksSource).not.toContain('<Form.Item label="计划完成时间" required>');
+  it('lets Ant Design own DatePicker internals', () => {
     expect(datePickerStyles).toContain('.tech-shell .ant-picker .ant-picker-input > input');
     expect(datePickerStyles).not.toContain('.task-page .work-item-panel .ant-picker .ant-picker-input');
     expect(datePickerStyles).not.toContain('.ant-picker-cell-inner');

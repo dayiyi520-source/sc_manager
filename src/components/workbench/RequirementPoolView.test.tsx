@@ -6,11 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useApp } from '../../context/AppContext';
 import { requirementRepository } from '../../services/requirementRepository';
-import { RequirementPoolView, isWorkOrderInScope } from './RequirementPoolView';
+import { loadCollaborationRelatedTasks } from '../../services/collaborationRelatedTasks';
+import { RequirementPoolView, eventOperatorLabel, isWorkOrderInScope } from './RequirementPoolView';
 import type { RequirementTask } from '../../types';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
 vi.mock('../../utils/copyToClipboard', () => ({ copyToClipboard: vi.fn().mockResolvedValue(undefined) }));
+
+vi.mock('../../services/collaborationRelatedTasks', () => ({ loadCollaborationRelatedTasks: vi.fn(async (_id, items) => ({ items, indirectIds: new Set() })) }));
 
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
 vi.mock('../product/RequirementTasksView', () => ({
@@ -31,6 +34,11 @@ vi.mock('../product/LazyRichTextEditor', () => ({
 describe('workbench work-order creation layout', () => {
   it('includes unrelated matters in company scope', () => {
     expect(isWorkOrderInScope({ creatorName: '陈雅婷', ownerName: '陈雅婷' } as RequirementTask, 'all', { name: '林志豪' })).toBe(true);
+  });
+
+  it('only shows the assignee phrase when the owner actually changes', () => {
+    expect(eventOperatorLabel({ operatorName: '林志豪' } as never, {})).toBe('操作人：林志豪');
+    expect(eventOperatorLabel({ operatorName: '林志豪' } as never, { ownerChanged: true, assigneeName: '陈雅婷' })).toBe('操作人：林志豪 · 负责人指派为：陈雅婷');
   });
   const addRequirementTask = vi.fn();
   const addToast = vi.fn();
@@ -79,6 +87,23 @@ describe('workbench work-order creation layout', () => {
     expect(screen.queryByLabelText('所属部门')).not.toBeInTheDocument();
   });
 
+  it('shows related project and product columns instead of customer', async () => {
+    const app = useApp();
+    vi.mocked(useApp).mockReturnValue({ ...app, requirementTasks: [{
+      id: 'list-item', title: '项目协同事项', creatorName: '林志豪', ownerName: '陈雅婷', status: '待处理', priority: '中',
+      productLineName: '协同产品', specialFields: { projectName: '项目甲' },
+    }] } as unknown as ReturnType<typeof useApp>);
+    render(<RequirementPoolView />);
+    await waitFor(() => expect(screen.getByText('项目协同事项')).toBeInTheDocument());
+    expect(screen.getByText('创建人')).toBeInTheDocument();
+    expect(screen.queryByText('提出人')).not.toBeInTheDocument();
+    expect(screen.getByText('关联项目')).toBeInTheDocument();
+    expect(screen.getByText('关联产品')).toBeInTheDocument();
+    expect(screen.getByText('项目甲')).toBeInTheDocument();
+    expect(screen.getByText('协同产品')).toBeInTheDocument();
+    expect(screen.queryByText('关联客户')).not.toBeInTheDocument();
+  });
+
   const openCustomerRequest = async () => {
     render(<RequirementPoolView />);
     await waitFor(() => expect(requirementRepository.employees).toHaveBeenCalled());
@@ -93,6 +118,19 @@ describe('workbench work-order creation layout', () => {
     await screen.findByRole('heading', { name: task.title });
     return task;
   };
+
+  it('shows indirect tasks with real status and opens their exact detail without matter acceptance', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    vi.mocked(loadCollaborationRelatedTasks).mockResolvedValueOnce({ items: [
+      { id: 'd-1', requirementId: 'receive-1', title: '反向关联设计', taskType: '设计任务', category: 'design', productLineId: 'line-2', status: '已完成', assigneeName: '设计负责人', blocksClosure: false },
+    ], indirectIds: new Set(['d-1']) });
+    await renderDetail({ status: '处理中', productLineId: 'line-1' });
+    fireEvent.click(await screen.findByRole('button', { name: '设计任务 · 反向关联设计' }));
+    expect(open).toHaveBeenCalledWith(`${window.location.origin}/app/prod_design_tasks?detailId=d-1&productLineId=line-2`, '_blank');
+    expect(screen.queryByRole('button', { name: '验收通过' })).not.toBeInTheDocument();
+    expect(screen.getByText('已完成')).toBeVisible();
+    open.mockRestore();
+  });
 
   it('only enables tasks after reception is persisted and blocks duplicate reception', async () => {
     const task = await renderDetail();
