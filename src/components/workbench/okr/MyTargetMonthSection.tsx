@@ -104,7 +104,7 @@ export const buildMyTargetViewItems = (
   const alignmentsFor = (actionId: string, periodKey: string) => {
     const active = allRecords.filter(record => record.periodKey === periodKey && record.status !== 'draft');
     const objectives = active.filter(record => record.kind === 'objective' && record.payload.alignments?.some(alignment => alignment.parentKeyResultId === actionId));
-    const children = active.filter(record => record.kind === 'action' && record.payload.parentActionId === actionId);
+    const children = active.filter(record => record.kind === 'action' && (record.payload.parentActionId === actionId || record.payload.parentKeyResultId === actionId));
     const groups = new Map<string, OkrRecord[]>();
     children.forEach(record => {
       const key = `${record.ownerId}:${record.payload.parentObjectiveId}`;

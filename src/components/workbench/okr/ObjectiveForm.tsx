@@ -115,7 +115,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   return <Form className={`okr-objective-form${isCompanyStyle ? ' company-objective-form' : ''}${supervisor ? ' supervisor-objective-form' : ''}`} disabled={busy || readOnly} onFinish={() => void submit()}>
     {chrome && <div className="okr-objective-period">{dayjs(cycle).format('YYYY年MM月')}{!compactDetail && <span>{periodStatusLabel(cycle)}</span>}{detailMode && <Button type="text" onClick={onCancel} disabled={busy}>取消</Button>}</div>}
     <div className="okr-objective-body">
-      {(root || supervisor) && <div className={`company-objective-alignment${supervisor ? ' is-supervisor-alignment' : ''}`}>{root && <span className="company-alignment-period">{dayjs(cycle).format('YYYY年MM月')}目标</span>}{supervisor && (alignmentActions.length > 0 ? <div className="supervisor-alignment-actions">{alignmentActions.map(action => <div key={action.id} className="supervisor-alignment-action">A：{action.payload.title}</div>)}</div> : <span className="supervisor-alignment-placeholder">+ 选择对齐</span>)}</div>}
+      {(root || supervisor) && <div className={`company-objective-alignment${supervisor ? ' is-supervisor-alignment' : ''}`}>{root && <span className="company-alignment-period">{dayjs(cycle).format('YYYY年MM月')}目标</span>}{supervisor && (alignmentActions.length > 0 ? <div className="supervisor-alignment-actions">{alignmentActions.map(action => <div key={action.id} className="supervisor-alignment-action">{action.payload.title}</div>)}</div> : <span className="supervisor-alignment-placeholder">+ 选择对齐</span>)}</div>}
       <div className={`okr-objective-columns okr-objective-head${supervisor ? ' supervisor-objective-head' : ''}`}>
         <span>{supervisor ? '' : '目标与动作'}</span><span>权重</span><span>截止日期</span><span/>
       </div>
@@ -135,7 +135,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
           <InputNumber aria-label={`A${index + 1} 权重`} min={1} max={100} precision={0} suffix="%" value={kr.weight} onChange={value => changeKr(kr.id, { weight: value ?? 0 })}/>
           <DatePicker aria-label={`A${index + 1} 截止日期`} placeholder="截止日期" value={kr.deadline ? dayjs(kr.deadline) : null} onChange={value => changeKr(kr.id, { deadline: value?.format('YYYY-MM-DD') })}/>
           <Tooltip title="删除动作"><Button aria-label={`删除 A${index + 1}`} type="text" icon={<TrashIcon/>} disabled={busy || krs.length === 1} onClick={() => setKrs(items => distribute(items.filter(item => item.id !== kr.id)))}/></Tooltip>
-          {supervisor && <div className="supervisor-action-fields"><span className="supervisor-action-template-label">{actionTypeLabel(actionTypeForIndex(index))}</span>{renderSupervisorFields(kr, index)}</div>}
+          {supervisor && <div className="supervisor-action-fields">{renderSupervisorFields(kr, index)}</div>}
           <Select className="okr-action-assignees" aria-label={`A${index + 1} 承接人员`} mode="multiple" allowClear showSearch optionFilterProp="label" maxTagCount="responsive" placeholder="指定承接人员（可选）" value={kr.assigneeIds || []} onChange={assigneeIds => changeKr(kr.id, { assigneeIds })} options={assigneeOptions}/>
         </div>)}
       </div>

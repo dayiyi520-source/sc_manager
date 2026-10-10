@@ -172,55 +172,16 @@
   color: var(--text-primary);
 }
 .supervisor-objective-form .company-objective-alignment.is-supervisor-alignment {
-  position: relative;
   align-items: flex-start;
   min-height: 2rem;
-  padding-left: 3.25rem;
+  padding-left: 0;
   margin-bottom: var(--company-space-sm, 8px);
-}
-.supervisor-objective-form .company-objective-alignment.is-supervisor-alignment::before {
-  content: '';
-  position: absolute;
-  left: 1rem;
-  top: 0;
-  bottom: -1.25rem;
-  border-left: 1px solid var(--border-main);
-}
-.supervisor-objective-form .company-objective-alignment.is-supervisor-alignment::after {
-  content: '';
-  position: absolute;
-  left: .75rem;
-  bottom: -.25rem;
-  width: 1.5rem;
-  height: 1px;
-  background: var(--border-main);
 }
 .supervisor-objective-form .supervisor-alignment-placeholder { color: var(--primary); }
 .supervisor-objective-form .supervisor-alignment-action {
-  position: relative;
   padding: 0;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   line-height: 1.5rem;
-}
-.supervisor-objective-form .supervisor-alignment-action::before {
-  content: '';
-  position: absolute;
-  left: -2rem;
-  top: 50%;
-  width: 1.5rem;
-  height: 1px;
-  background: var(--border-main);
-}
-.supervisor-objective-form .supervisor-alignment-action::after {
-  content: '';
-  position: absolute;
-  left: -2.25rem;
-  top: 50%;
-  width: .375rem;
-  height: .375rem;
-  border-radius: 50%;
-  background: var(--border-main);
-  transform: translateY(-50%);
 }
 .supervisor-objective-form .supervisor-action-fields {
   grid-column: 1 / -1;
@@ -228,20 +189,6 @@
   grid-template-columns: repeat(3, minmax(160px, 1fr));
   gap: var(--company-space-sm, 8px);
   margin: 8px 0 0 3.25rem;
-}
-.supervisor-objective-form .supervisor-action-template-label {
-  grid-column: 1 / -1;
-  color: var(--text-muted);
-  font-size: .75rem;
-}
-.supervisor-objective-form .okr-objective-title { position: relative; }
-.supervisor-objective-form .okr-objective-title::before {
-  content: '';
-  position: absolute;
-  left: 1rem;
-  top: -1.25rem;
-  height: 1.25rem;
-  border-left: 1px solid var(--border-main);
 }
 @media (max-width: 900px) {
   .supervisor-objective-form .supervisor-action-fields { grid-template-columns: 1fr; margin-left: 0; }

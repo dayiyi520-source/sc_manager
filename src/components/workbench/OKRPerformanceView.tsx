@@ -561,7 +561,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               }}
               onOpenTarget={targetId => {
                 const target = targetItems.find(item => item.id === targetId);
-                const objectiveRecord = records.find(record => record.id === (target?.detailId || targetId) && record.kind === 'objective');
+                const detailId = target?.detailId || targetId;
+                const objectiveRecord = records.find(record => record.id === detailId && record.kind === 'objective');
                 if (objectiveRecord) {
                   setSelectedMonthDetail(null);
                   setSelectedMonthTargetId(undefined);
@@ -572,6 +573,18 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
                   setSelectedMonthDetail(null);
                   setSelectedMonthTargetId(undefined);
                   setSelectedOkrRecordId(target.detailId);
+                  return;
+                }
+                // 下级拆解目标以 action-group-* 聚合展示，统一打开其所属 O 的底部详情抽屉。
+                const actionRecord = records.find(record => record.id === detailId && record.kind === 'action');
+                const parentObjectiveId = actionRecord?.payload.parentObjectiveId;
+                const parentObjective = parentObjectiveId
+                  ? records.find(record => record.id === parentObjectiveId && record.kind === 'objective')
+                  : undefined;
+                if (parentObjective) {
+                  setSelectedMonthDetail(null);
+                  setSelectedMonthTargetId(undefined);
+                  setSelectedOkrRecordId(parentObjective.id);
                   return;
                 }
                 setSelectedOkrRecordId(null);
