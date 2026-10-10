@@ -568,6 +568,13 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
                   setSelectedOkrRecordId(companyRecord.id);
                   return;
                 }
+                const supervisorRecord = records.find(record => record.id === target?.detailId && record.kind === 'objective' && target?.levelLabel === '主管级');
+                if (supervisorRecord) {
+                  setSelectedMonthDetail(null);
+                  setSelectedMonthTargetId(undefined);
+                  setSelectedOkrRecordId(supervisorRecord.id);
+                  return;
+                }
                 if (target?.status === 'draft' && target.detailId) {
                   setSelectedMonthDetail(null);
                   setSelectedMonthTargetId(undefined);
