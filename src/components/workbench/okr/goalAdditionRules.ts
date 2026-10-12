@@ -1,8 +1,9 @@
+import { krDetailContentComplete } from '../../../services/okrKrDetails';
 import type { OkrPayload, OkrKr } from '../../../services/okrRepository';
 
-export const GOAL_ADDITION_MESSAGE = '请先填写当前已添加的O/KR/A的内容后再继续';
+export const GOAL_ADDITION_MESSAGE = '请先填写当前已有的O/KRA的内容后再继续';
 export function krContentComplete(kr: OkrKr, level?: OkrPayload['goalLevel']): boolean {
-  if (level === 'department') return Boolean(kr.businessObject?.trim() && (kr.structureType === 'support' ? kr.action?.trim() && kr.result?.trim() : kr.version?.trim() && kr.stage?.trim()));
+  if (level === 'department') return Boolean(kr.businessObject?.trim() && (kr.structureType === 'support' ? kr.action?.trim() && kr.result?.trim() : krDetailContentComplete(kr)));
   return Boolean(kr.title?.trim());
 }
 export function goalContentComplete(payload: OkrPayload): boolean {

@@ -1,3 +1,7 @@
+import { canEditOkr } from '../../../services/okrSettingsPolicy';
+import { periodLabel, periodBounds } from '../../../services/okrPeriods';
+import type { OkrSettings } from '../../../services/okrRepository';
+import { KrDetailTable } from './KrDetailTable';
 import './goalTemplates.css';
 import { goalLevel } from '../../../services/okrGoalRules';
 import React from 'react';
@@ -5,13 +9,14 @@ import { Alert, Button, Dropdown, Empty, Progress, Tag, Tooltip, Popover } from 
 import { PencilIcon, KebabHorizontalIcon, GitBranchIcon, PlusIcon, CopyIcon, RepoTemplateIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
 import { ChevronDown, ChevronRight } from '@/components/common/octicons-compat';
-import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
+import type { OkrPerson, OkrRecord, OkrKrDetail } from '../../../services/okrRepository';
 import type { ActionGroupValues } from './ActionBreakdownForm';
 
 export type MyTargetViewMode = 'list' | 'card';
 
 export type MyTargetActionViewItem = {
-  label?: string; executionActions?: Array<{ id: string; title: string; progress: number; deadline?: string }>;
+  details?: OkrKrDetail[]; detailLabel?: string;
+  label?: string; executionActions?: Array<{ id: string; title: string; progress: number; weight?: number; deadline?: string }>;
   id: string;
   title: string;
   assigneeNames: string[];
@@ -37,7 +42,7 @@ export type MyTargetViewItem = {
   totalWeight?: number;
   maxDeadline?: string;
   progress: number;
-  savedAt?: string; awaitingApproval?: boolean; autonomous?: boolean;
+  objectiveWeight?: number; initialPending?: boolean; savedAt?: string; awaitingApproval?: boolean; autonomous?: boolean;
   actions: MyTargetActionViewItem[];
 };
 
@@ -56,6 +61,7 @@ type Props = {
   collapsed: boolean;
   onToggle: () => void;
   onOpenTarget: (targetId: string) => void;
+  onProgress?: (recordId: string, itemId: string) => void;
   onEditTarget?: (targetId: string) => void;
   onDeleteTarget?: (targetId: string) => void;
   busy?: boolean;
@@ -67,7 +73,9 @@ type Props = {
 
 export const getPeriodCountdown = (periodKey: string) => {
   const today = dayjs().startOf('day');
-  const periodEnd = dayjs(`${periodKey}-01`).endOf('month').startOf('day');
+  const bounds = periodBounds(periodKey);
+  if (!bounds) return '周期无效';
+  const periodEnd = dayjs(bounds.end).startOf('day');
   const remaining = periodEnd.diff(today, 'day');
   if (remaining < 0) return '周期已结束';
   if (remaining === 0) return '今天结束';
@@ -99,6 +107,7 @@ export const buildMyTargetViewItems = (
   sourceActions: OkrRecord[],
   people: OkrPerson[],
   currentUserId: string,
+  settings?: OkrSettings,
 ): MyTargetViewItem[] => {
   const nameOf = (id?: string) => people.find(person => person.id === id)?.name;
   const namesOf = (ids?: string[] | string) => {
@@ -139,6 +148,7 @@ export const buildMyTargetViewItems = (
     const ownPersonal = record.payload.goalLevel === 'personal' && record.payload.origin === 'autonomous';
     const displayActions = ownPersonal ? (record.payload.keyResults || []).flatMap(kr => (kr.executionActions || []).filter(action => action.ownerId === record.ownerId)) : record.payload.keyResults || [];
     const actions: MyTargetActionViewItem[] = displayActions.map(action => ({
+      details: 'details' in action ? action.details : undefined, detailLabel: 'structureType' in action && action.structureType === 'delivery' ? '项目产品' : '迭代版本',
       label: ownPersonal ? 'A' : 'KR', executionActions: 'executionActions' in action ? action.executionActions?.filter(item => item.ownerId === record.ownerId) : undefined,
       id: action.id,
       title: action.title,
@@ -154,12 +164,13 @@ export const buildMyTargetViewItems = (
     const sourceOwner = nameOf(source?.ownerId || recordOwner?.supervisorId);
     return {
       id: record.id,
+      objectiveWeight: record.payload.weight ?? 100, initialPending: record.changeRequest?.purpose === 'initial' && record.changeRequest.status !== 'approved',
       detailId: record.id,
-      alignmentLabel: record.payload.alignments?.map(alignment => [...sourceActions, ...records].find(item => item.id === alignment.parentObjectiveId)?.payload.title).filter(Boolean).join('、') || `${dayjs(record.periodKey).format('YYYY年MM月')}目标`,
-      editable: record.ownerId === currentUserId && record.changeRequest?.status !== 'pending',
-      deletable: record.ownerId === currentUserId && !record.payload.inherited && record.changeRequest?.status !== 'pending',
+      alignmentLabel: record.payload.alignments?.map(alignment => [...sourceActions, ...records].find(item => item.id === alignment.parentObjectiveId)?.payload.title).filter(Boolean).join('、') || `${periodLabel(record.periodKey)}目标`,
+      editable: canEditOkr(record,currentUserId,settings,people) && record.changeRequest?.status !== 'pending',
+      deletable: record.changeRequest?.status === 'pending' ? record.ownerId === currentUserId : canEditOkr(record,currentUserId,settings,people) && !record.payload.inherited,
       title: record.payload.title,
-      status: record.status, awaitingApproval: record.changeRequest?.purpose === 'initial' && record.changeRequest.status === 'pending', autonomous: record.payload.origin === 'autonomous',
+      status: record.status, awaitingApproval: record.changeRequest?.status === 'pending', autonomous: record.payload.origin === 'autonomous',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
       creatorName: ownerNameOf(record.ownerId),
@@ -232,7 +243,7 @@ export const buildMyTargetViewItems = (
   return [...objectiveTargets, ...actionTargets, ...demoTargets];
 };
 
-const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submitted: boolean; compact?: boolean; inlineAssignees?: boolean }> = ({ action, index, submitted, compact, inlineAssignees = false }) => {
+const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submitted: boolean; compact?: boolean; inlineAssignees?: boolean; onProgress?: (id: string) => void }> = ({ action, index, submitted, compact, inlineAssignees = false, onProgress }) => {
   const overdue = Boolean(action.deadline) && dayjs(action.deadline).endOf('day').isBefore(dayjs()) && action.progress < 100;
   return <div className={`okr-target-action-row${compact ? ' is-compact' : ''}${inlineAssignees ? ' has-inline-assignees' : ''}`}>
     <span className="okr-target-action-index">{action.label || 'A'}{index + 1}</span>
@@ -241,23 +252,24 @@ const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submi
     </div>
     {!inlineAssignees && <span title={assigneeLabel(action.assigneeNames)}>{assigneeLabel(action.assigneeNames)}</span>}
     {!compact && <>
-      <span className="okr-target-action-progress">{submitted ? <><Progress type="circle" percent={action.progress} size={24} showInfo={false}/><b>{action.progress}%</b></> : '--'}</span>
+      <span className="okr-target-action-progress">{submitted ? <Button type="text" aria-label={`查看${action.label || 'A'}${index + 1}进度`} onClick={event => { event.stopPropagation(); onProgress?.(action.id); }} onKeyDown={event => event.stopPropagation()}><Progress type="circle" percent={action.progress} size={24} showInfo={false}/><b>{action.progress}%</b></Button> : '--'}</span>
       <span>{action.weight}%</span>
       <time className={overdue ? 'is-overdue' : ''}>{formatDeadline(action.deadline)}</time>
     </>}
-    {!!action.executionActions?.length && <div className="okr-own-actions">{action.executionActions.map((item, i) => <div key={item.id}>A{i + 1}　{item.title}　{item.progress}%　{item.deadline ? dayjs(item.deadline).format('MM-DD') : '未设置'}</div>)}</div>}
+    {!compact && !!action.details?.length && <KrDetailTable rows={action.details} label={action.detailLabel || '迭代版本'}/>}
+    {!compact && !!action.executionActions?.length && <div className="okr-target-execution-actions">{action.executionActions.map((item, i) => <ActionRow key={item.id} action={{ ...item, weight: item.weight ?? 0, deadline: item.deadline || '', assigneeNames: [], label: 'A' }} index={i} submitted={submitted} inlineAssignees onProgress={onProgress}/>)}</div>}
   </div>;
 };
 
 const TargetToolbar: React.FC<{ target: MyTargetViewItem; onEdit?: () => void; onDelete?: () => void; busy?: boolean }> = ({ target, onEdit, onDelete, busy }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
   return <div className={`okr-target-list-toolbar okr-target-toolbar${menuOpen ? ' is-open' : ''}`} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
-    <Tooltip title={target.editable ? '编辑目标' : '仅制定人可编辑'}><Button type="text" aria-label={`编辑目标：${target.title}`} icon={<PencilIcon/>} disabled={busy || !target.editable || !onEdit} onClick={onEdit}/></Tooltip>
-    <Dropdown disabled={busy || !target.deletable || !onDelete} onOpenChange={setMenuOpen} menu={{ items: [{ key: 'delete', label: '删除', danger: true }], onClick: () => onDelete?.() }} trigger={['click']}><Button type="text" aria-label={`更多操作：${target.title}`} icon={<KebabHorizontalIcon/>} disabled={busy || !target.deletable || !onDelete}/></Dropdown>
+    {!target.awaitingApproval && <Tooltip title={target.editable ? '编辑目标' : '仅制定人可编辑'}><Button type="text" aria-label={`编辑目标：${target.title}`} icon={<PencilIcon/>} disabled={busy || !target.editable || !onEdit} onClick={onEdit}/></Tooltip>}
+    <Dropdown disabled={busy || !target.deletable || !onDelete} onOpenChange={setMenuOpen} menu={{ items: [{ key: 'delete', label: target.awaitingApproval ? '撤回' : '删除', danger: !target.awaitingApproval }], onClick: ({ domEvent }) => { domEvent.stopPropagation(); setMenuOpen(false); onDelete?.(); } }} trigger={['click']}><Button type="text" aria-label={`更多操作：${target.title}`} icon={<KebabHorizontalIcon/>} disabled={busy || !target.deletable || !onDelete}/></Dropdown>
   </div>;
 };
 
-const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: () => void; onEdit?: () => void; onDelete?: () => void; busy?: boolean }> = ({ target, index, onOpen, onEdit, onDelete, busy }) => {
+const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: () => void; onEdit?: () => void; onDelete?: () => void; onProgress?: (id: string) => void; busy?: boolean }> = ({ target, index, onOpen, onEdit, onDelete, onProgress, busy }) => {
   const submitted = isSubmitted(target);
   return <article className="okr-target-list-item" role="button" tabIndex={0} aria-label={`目标：${target.title}`} onClick={onOpen} onKeyDown={event => { if (event.target === event.currentTarget) openOnKeyboard(event, onOpen); }}>
     <header>
@@ -276,15 +288,15 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
       </div>
     </header>
     <div className="okr-target-actions">{target.actions.length
-      ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees/>)
+      ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees onProgress={onProgress}/>)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>
   </article>;
 };
 
-const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: () => void; onEdit?: () => void; onDelete?: () => void; busy?: boolean }> = ({ target, index, onOpen, onEdit, onDelete, busy }) => {
+const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: () => void; onEdit?: () => void; onDelete?: () => void; onProgress?: (id: string) => void; busy?: boolean }> = ({ target, index, onOpen, onEdit, onDelete, onProgress, busy }) => {
   const submitted = isSubmitted(target);
-  const visibleActions = target.actions.slice(0, 4);
+  const visibleActions = target.actions.filter(action => action.label !== 'A');
   return <article className="okr-target-grid-card" role="button" tabIndex={0} aria-label={`目标卡片：${target.title}`} onClick={onOpen} onKeyDown={event => { if (event.target === event.currentTarget) openOnKeyboard(event, onOpen); }}>
     <header>
       <div className="okr-target-card-title"><span className="okr-summary-index">O{index + 1}</span><h3 title={target.title}>{target.title}</h3></div>
@@ -299,26 +311,29 @@ const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   </article>;
 };
 
-export const MyTargetMonthSection: React.FC<Props> = ({ periodKey, targets, viewMode, collapsed, onToggle, onOpenTarget, onEditTarget, onDeleteTarget, busy, onAddGoal, onCopyGoal, onGoalTemplates, draftCount = 0, onSubmitDrafts }) => {
+export const MyTargetMonthSection: React.FC<Props> = ({ periodKey, targets, viewMode, collapsed, onToggle, onOpenTarget, onEditTarget, onDeleteTarget, onProgress, busy, onAddGoal, onCopyGoal, onGoalTemplates, draftCount = 0, onSubmitDrafts }) => {
   const [submitting, setSubmitting] = React.useState(false);
   const submitLock = React.useRef(false);
   const [submitError, setSubmitError] = React.useState('');
   const submitDrafts = async () => { if (submitLock.current || busy || !onSubmitDrafts) return; submitLock.current = true; setSubmitting(true); setSubmitError(''); try { await onSubmitDrafts(); } catch (reason) { setSubmitError(reason instanceof Error ? reason.message : '草稿提交失败，请重试'); } finally { submitLock.current = false; setSubmitting(false); } };
   const [dismissed, setDismissed] = React.useState(false);
   React.useEffect(() => setDismissed(false), [draftCount]);
+  const activeTargets = targets.filter(target => !['draft', 'submitted'].includes(target.status) && !target.initialPending);
+  const totalWeight = activeTargets.reduce((sum, target) => sum + (target.objectiveWeight ?? 100), 0);
+  const overallProgress = totalWeight ? Math.round(activeTargets.reduce((sum, target) => sum + target.progress * (target.objectiveWeight ?? 100), 0) / totalWeight * 10) / 10 : 0;
   return (
-  <section className="okr-target-month" aria-label={`${dayjs(periodKey).format('YYYY年MM月')}目标`}>
-    <button type="button" className="okr-target-month-head" onClick={onToggle} aria-expanded={!collapsed} aria-label={`${collapsed ? '展开' : '收起'}${dayjs(periodKey).format('YYYY年MM月')}`}>
+  <section className="okr-target-month" aria-label={`${periodLabel(periodKey)}目标`}>
+    <button type="button" className="okr-target-month-head" onClick={onToggle} aria-expanded={!collapsed} aria-label={`${collapsed ? '展开' : '收起'}${periodLabel(periodKey)}`}>
       {collapsed ? <ChevronRight/> : <ChevronDown/>}
-      <strong>{dayjs(periodKey).format('YYYY年MM月')}</strong>
+      <strong>{periodLabel(periodKey)}</strong>
       <span>{getPeriodCountdown(periodKey)}</span>
-      <em>{targets.length} 个目标</em>
+      <em>{targets.length} 个目标</em><span className="okr-period-progress" aria-label={`本周期整体进度：${overallProgress}%`}><Progress percent={overallProgress} showInfo={false}/><span>{overallProgress}%</span></span>
     </button>
     {!collapsed && submitError && <Alert type="error" title={submitError} showIcon/>}
     {!collapsed && draftCount > 0 && !dismissed && <Alert className="okr-month-draft-notice" type="info" showIcon title={`你有 ${draftCount} 个草稿未提交确认`} closable afterClose={() => setDismissed(true)} action={<Button type="primary" size="small" disabled={busy} loading={submitting} onClick={() => void submitDrafts()}>提交</Button>}/>}
-    {!collapsed && (targets.length === 0 ? <div className="okr-target-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`${dayjs(periodKey).format('YYYY年MM月')}暂无目标`} />{onAddGoal && <div className="okr-target-empty-actions"><Button type="primary" icon={<PlusIcon/>} disabled={busy} onClick={onAddGoal}>添加目标</Button><Button icon={<CopyIcon/>} disabled={busy} onClick={onCopyGoal}>复制目标</Button><Button icon={<RepoTemplateIcon/>} disabled={busy} onClick={onGoalTemplates}>目标模板</Button></div>}</div> : <div className={viewMode === 'list' ? 'okr-target-list' : 'okr-target-grid'}>
+    {!collapsed && (targets.length === 0 ? <div className="okr-target-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`${periodLabel(periodKey)}暂无目标`} />{onAddGoal && <div className="okr-target-empty-actions"><Button type="primary" icon={<PlusIcon/>} disabled={busy} onClick={onAddGoal}>添加目标</Button><Button icon={<CopyIcon/>} disabled={busy} onClick={onCopyGoal}>复制目标</Button><Button icon={<RepoTemplateIcon/>} disabled={busy} onClick={onGoalTemplates}>目标模板</Button></div>}</div> : <div className={viewMode === 'list' ? 'okr-target-list' : 'okr-target-grid'}>
       {targets.map((target, index) => viewMode === 'list'
-        ? <ListTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)} onEdit={onEditTarget ? () => onEditTarget(target.id) : undefined} onDelete={onDeleteTarget ? () => onDeleteTarget(target.id) : undefined} busy={busy}/>
+        ? <ListTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)} onEdit={onEditTarget ? () => onEditTarget(target.id) : undefined} onDelete={onDeleteTarget ? () => onDeleteTarget(target.id) : undefined} onProgress={itemId => onProgress?.(target.detailId || target.id, itemId)} busy={busy}/>
         : <CardTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)} onEdit={onEditTarget ? () => onEditTarget(target.id) : undefined} onDelete={onDeleteTarget ? () => onDeleteTarget(target.id) : undefined} busy={busy}/>) }
       {viewMode === 'card' && onAddGoal && <div className="okr-month-create-actions is-card"><Button icon={<PlusIcon/>} disabled={busy} onClick={onAddGoal}>添加目标</Button><Button icon={<CopyIcon/>} disabled={busy} onClick={onCopyGoal}>复制目标</Button></div>}
     </div>)}

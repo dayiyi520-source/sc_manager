@@ -96,7 +96,7 @@ const ProductLineSettingsPanel: React.FC<{
   const [description, setDescription] = useState(productLine.description);
   const [commercialAvailability, setCommercialAvailability] = useState<ProductLine['commercialAvailability']>(productLine.commercialAvailability || '不可商用');
   const [visibility, setVisibility] = useState<'公开' | '私密'>(normalizeProductVisibility(productLine.visibility));
-  const [pendingOperation, setPendingOperation] = useState<'archive' | 'delete' | null>(null);
+  const [pendingOperation, setPendingOperation] = useState<'archive' | null>(null);
   const [isOperating, setIsOperating] = useState(false);
   const [memberTab, setMemberTab] = useState('全部');
   const [memberToRemove, setMemberToRemove] = useState<ProductLineMember | null>(null);
@@ -164,19 +164,17 @@ const ProductLineSettingsPanel: React.FC<{
   ];
 
   const operationCopy = {
-    archive: { title: '归档产品', description: '归档后，产品将从产品管理列表移至产研模板的归档列表。', confirm: '确认归档' },
-    delete: { title: '删除产品', description: '删除后，产品将不再展示。此操作不可在界面中恢复。', confirm: '确认删除' }
+    archive: { title: '归档产品', description: '归档后，产品将从产品管理列表移至产研模板的归档列表。', confirm: '确认归档' }
   } as const;
   const executeOperation = async () => {
     if (!pendingOperation) return;
     setIsOperating(true);
     try {
       if (pendingOperation === 'archive') await productRepository.archiveProductLine(productLine.id);
-      if (pendingOperation === 'delete') await productRepository.deleteProductLine(productLine.id);
       const refreshedProductLines = await productRepository.productLines();
       setProductLines(refreshedProductLines);
-      if (pendingOperation === 'archive' || pendingOperation === 'delete') {
-        addToast('success', pendingOperation === 'archive' ? '产品已归档' : '产品已删除');
+      if (pendingOperation === 'archive') {
+        addToast('success', '产品已归档');
         setPendingOperation(null);
         onProductRemoved();
         return;
@@ -259,7 +257,7 @@ const ProductLineSettingsPanel: React.FC<{
             </div>
           )}
           {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
-          {section === 'other' && <div className="w-full space-y-5 px-0 text-xs sm:px-2 lg:px-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品操作</h3><p className="mt-1 text-[var(--text-muted)]">集中管理产品的归档和删除。</p></div><div className="space-y-3"><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">产品归档</h4><p className="mt-1 text-[var(--text-muted)]">产品完成后可归档，归档产品统一在产研模板中管理。</p></div><Button className="!h-9" type="primary" onClick={() => setPendingOperation('archive')}>归档</Button></div><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">删除产品</h4><p className="mt-1 text-[var(--text-muted)]">删除后产品不再展示，关联历史数据不支持从界面恢复。</p></div><Button className="!h-9" danger onClick={() => setPendingOperation('delete')}>删除</Button></div></div></div>}
+          {section === 'other' && <div className="w-full space-y-5 px-0 text-xs sm:px-2 lg:px-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品操作</h3><p className="mt-1 text-[var(--text-muted)]">管理产品归档。</p></div><div className="space-y-3"><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">产品归档</h4><p className="mt-1 text-[var(--text-muted)]">产品完成后可归档，归档产品统一在产研模板中管理。</p></div><Button className="!h-9" type="primary" onClick={() => setPendingOperation('archive')}>归档</Button></div></div></div>}
           {section === 'recycle-bin' && <ProductRecycleBin productLineId={productLine.id} />}
         </section>
       </div>

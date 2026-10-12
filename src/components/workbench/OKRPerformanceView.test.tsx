@@ -179,11 +179,31 @@ describe('OKRPerformanceView target navigation', () => {
     render(<OKRPerformanceView />);
     fireEvent.click(screen.getByLabelText('目标：改善重点客户交付'));
     fireEvent.click(await screen.findByRole('button', { name: '删除目标' }));
-    const dialog = (await screen.findByText('删除目标', { selector: '.ant-modal-title' })).closest('[role="dialog"]') as HTMLElement;
-    expect(within(dialog).getByText(/的目标“改善重点客户交付”/)).toBeInTheDocument();
+    const dialog = (await screen.findByText('确认删除此目标吗？')).closest('[role="dialog"]') as HTMLElement;
+    expect(within(dialog).getByText('删除后本条目标内容将全部丢失。')).toBeInTheDocument();
     expect(okrState.deleteOkr).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole('button', { name: /^删\s*除$/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /^确\s*定$/ }));
     await waitFor(() => expect(okrState.deleteOkr).toHaveBeenCalledWith('parent-action'));
+  }, 15000);
+
+  it.each(['list', 'card'] as const)('deletes a draft directly from %s without mounting detail or editor', async view => {
+    okrState.settings.defaultView = view;
+    okrState.records = [{ ...objectiveRecord, status: 'draft' }];
+    render(<OKRPerformanceView />);
+    fireEvent.click(screen.getByLabelText('更多操作：提升年度经营质量'));
+    fireEvent.click(await screen.findByRole('menuitem', {name:'删除'}));
+    expect(await screen.findByText('删除后本条目标内容将全部丢失。')).toBeInTheDocument();
+    expect(screen.queryByText('目标详情')).not.toBeInTheDocument();
+    expect(document.querySelector('.company-objective-drawer')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name:/Cancel|取\s*消/}));
+    fireEvent.click(screen.getByLabelText('编辑目标：提升年度经营质量'));
+    expect(document.querySelector('.company-objective-drawer')).toBeInTheDocument();
+    expect(screen.queryByText('删除后本条目标内容将全部丢失。')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name:/Close|close|关闭/}));
+    fireEvent.click(screen.getByLabelText('更多操作：提升年度经营质量'));
+    fireEvent.click(await screen.findByRole('menuitem', {name:'删除'}));
+    fireEvent.click(screen.getByRole('button', {name:/^确\s*定$/}));
+    await waitFor(() => expect(okrState.deleteOkr).toHaveBeenCalledWith('objective-1'));
   }, 15000);
 
   it('opens reviews directly without the former primary tabs or goal sidebar', () => {
@@ -225,7 +245,7 @@ describe('OKRPerformanceView target navigation', () => {
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).not.toBeInTheDocument());
   });
 
-  it('edits a submitted goal without resubmitting and returns to the list on cancel', async () => {
+  it('requests review with a required reason when editing an effective goal and returns to the list on cancel', async () => {
     okrState.records = [{ ...objectiveRecord, payload: { ...objectiveRecord.payload, keyResults: [{ ...objectiveRecord.payload.keyResults![0], deadline: '2026-09-30' }] } }];
     render(<OKRPerformanceView />);
     fireEvent.click(screen.getByLabelText('目标：提升年度经营质量'));
@@ -238,7 +258,12 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('目标名称'), { target: { value: '修改后的目标' } });
     fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
-    await waitFor(() => expect(okrState.updateOkr).toHaveBeenCalledWith('objective-1', expect.objectContaining({ title: '修改后的目标' }), false));
+    expect(await screen.findByText('申请修改审核')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '提交申请' })).toBeDisabled();
+    expect(okrState.updateOkr).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('修改原因'), { target: { value: '业务范围调整' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交申请' }));
+    await waitFor(() => expect(okrState.updateOkr).toHaveBeenCalledWith('objective-1', expect.objectContaining({ title: '修改后的目标', changeReason: '业务范围调整' }), false));
     expect(await screen.findByText('目标详情')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '修改目标' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^取\s*消$/ }).at(-1)!);
@@ -251,11 +276,11 @@ describe('OKRPerformanceView target navigation', () => {
     render(<OKRPerformanceView />);
     fireEvent.click(screen.getByLabelText('目标：提升年度经营质量'));
     fireEvent.click(await screen.findByRole('button', { name: '删除目标' }));
-    const dialog = (await screen.findByText('删除目标', { selector: '.ant-modal-title' })).closest('[role="dialog"]') as HTMLElement;
-    fireEvent.click(within(dialog).getByRole('button', { name: /Cancel|取消/ }));
+    const dialog = (await screen.findByText('确认删除此目标吗？')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancel|取\s*消/ }));
     expect(okrState.deleteOkr).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '删除目标' }));
-    fireEvent.click(within((await screen.findByText('删除目标', { selector: '.ant-modal-title' })).closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: /^删\s*除$/ }));
+    fireEvent.click(within((await screen.findByText('确认删除此目标吗？')).closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: /^确\s*定$/ }));
     await waitFor(() => expect(okrState.deleteOkr).toHaveBeenCalledWith('objective-1'));
     await waitFor(() => expect(screen.queryByText('目标详情')).not.toBeInTheDocument());
   }, 15000);
@@ -272,7 +297,7 @@ describe('OKRPerformanceView target navigation', () => {
 
   it('opens every pending assignment and allows another independent goal in the same editor', () => {
     currentUser = {id:'manager',name:'主管',department:'产品部'};
-    okrState.records = [objectiveRecord, ...['a1','a2'].map((id,index) => ({id:`inherited-${id}`,kind:'objective' as const,ownerId:'manager',periodKey:'2026-09',status:'draft' as const,version:0,payload:{goalModelVersion:2 as const,goalLevel:'department' as const,origin:'assigned' as const,inherited:true,title:'',sourceObjectiveId:'objective-1',sourceKrId:id,sourceVersion:1,sourceTitle:`来源${index+1}`,keyResults:[]}}))];
+    okrState.records = [{ ...objectiveRecord, payload: { ...objectiveRecord.payload, keyResults: ['a1','a2'].map(id => ({id,title:id,weight:50,progress:0,assigneeIds:['manager']})) } }];
     render(<OKRPerformanceView/>);
     fireEvent.click(within(screen.getByRole('complementary',{name:'目标范围导航'})).getByRole('button',{name:/添加目标|拆解目标/}));
     expect(screen.getAllByLabelText('目标名称')).toHaveLength(2);

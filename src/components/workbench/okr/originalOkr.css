@@ -921,3 +921,72 @@
 .okr-target-grid-card:focus-within .okr-target-toolbar,
 .okr-target-toolbar.is-open { opacity:1; pointer-events:auto; }
 @media (hover:none) { .okr-target-toolbar { opacity:1; pointer-events:auto; } }
+
+.okr-settings-template .okr-template-departments { width: min(100%, 480px); min-width: 240px; }
+.okr-settings-template .okr-template-kind { width: 200px; }
+
+.okr-required-marker { color: var(--danger); }
+
+.okr-policy-settings label:has(> .ant-switch),
+.okr-policy-settings label:has(> .ant-checkbox-group),
+.okr-policy-settings label:has(> .ant-radio-group),
+.okr-policy-settings label:has(> .ant-select) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  min-height: 32px;
+}
+.okr-policy-settings .ant-radio-group { display: flex; flex-wrap: wrap; gap: 16px; }
+.okr-policy-settings .ant-checkbox-group { gap: 16px; }
+.okr-policy-settings label.ant-checkbox-wrapper,
+.okr-policy-settings label.ant-radio-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Reserve alignment space and share metric columns across O, KR and A. */
+.okr-target-list-item { --okr-metric-width: 72px; --okr-metrics-width: 232px; }
+.okr-target-list-item > header { grid-template-columns: minmax(0, 1fr) var(--okr-metrics-width); }
+.okr-target-list-status { width: var(--okr-metrics-width); min-width: var(--okr-metrics-width); grid-template-columns: repeat(3, var(--okr-metric-width)); gap: 8px; }
+.okr-target-list-status > div { width: var(--okr-metric-width); }
+.okr-target-action-row:not(.is-compact) { grid-template-columns: 40px minmax(0, 1fr) repeat(3, var(--okr-metric-width)); column-gap: 8px; padding-inline: 0; }
+.okr-target-action-content { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 8px; }
+.okr-target-action-alignment { grid-column: 2; }
+.okr-target-execution-actions { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
+.okr-target-execution-actions > .okr-target-action-row { grid-column: 1 / -1; grid-template-columns: subgrid; }
+.okr-target-grid-card .okr-target-execution-actions { display: block; }
+.okr-target-grid-card .okr-target-execution-actions > .okr-target-action-row { grid-template-columns: 32px minmax(0, 1fr) repeat(3, 64px); }
+.okr-delete-confirm-title { display: flex; gap: 16px; align-items: center; }
+.okr-delete-confirm-title .anticon { color: var(--primary); font-size: 24px; }
+
+/* O text and all descendant content share the same left edge. */
+.okr-target-list-item { --okr-content-left: 82px; }
+.okr-target-list-item .okr-target-actions { padding-left: var(--okr-content-left); }
+.okr-target-list-item .okr-target-action-row:not(.is-compact) { position: relative; grid-template-columns: minmax(0, 1fr) repeat(3, var(--okr-metric-width)); }
+.okr-target-list-item .okr-target-action-index { position: absolute; left: -48px; top: 16px; width: 40px; }
+.okr-target-list-item .okr-kr-detail-table { grid-column: 1 / -1; margin-left: 0; }
+.okr-target-list-item .okr-target-execution-actions { grid-template-columns: subgrid; }
+.okr-target-grid-card .okr-target-card-title h3,
+.okr-target-grid-card .okr-target-action-content strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
+.okr-target-grid-card .okr-target-action-content { display: block; min-width: 0; }
+.okr-period-progress { display: flex; align-items: center; gap: 12px; width: 180px; margin-left: auto; }
+.okr-period-progress .ant-progress { flex: 1; margin: 0; }
+.okr-progress-title { display: flex; gap: 8px; }
+.okr-progress-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+.okr-progress-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 24px; padding: 24px 0; }
+.okr-progress-values, .okr-progress-records { background: var(--bg-surface-soft); padding: 24px; }
+.okr-progress-values .ant-input-number, .okr-progress-values .ant-select { width: 100%; }
+.okr-progress-records { max-height: 420px; overflow: auto; }
+.okr-progress-records article { border-bottom: 1px solid var(--border-main); padding: 16px 0; }
+.okr-progress-records a { display: block; }
+.okr-progress-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.okr-progress-footer { display: flex; align-items: center; gap: 8px; }
+.okr-progress-footer > span { flex: 1; }
+@media (max-width: 900px) { .okr-progress-layout { grid-template-columns: 1fr; } .okr-target-list-item { --okr-content-left: 48px; } }
+
+.okr-target-month-head { grid-template-columns: 20px auto auto 1fr auto; }
+.okr-target-list-item .okr-target-actions { padding-right: 20px; }
+
+.okr-target-list-item .okr-target-title-line .okr-summary-index { width: 32px; flex: none; }

@@ -19,8 +19,9 @@ describe('objective mutations', () => {
     expect(JSON.parse(localStorage.getItem(key)!)[0]).toMatchObject({status:'deleted',deletedBy:'boss',version:3});
     const records = await mockApiRequest('/api/okr/records?viewerId=boss') as OkrRecord[];
     expect(records.map(record => record.id)).toEqual(['other','review']);
-    const parents = await mockApiRequest('/api/okr/actions/parents?periodKey=2026-10') as OkrRecord[];
-    expect(parents.map(record => record.id)).toEqual(['other']);
+    // The parent endpoint returns assigned actions, not all objectives.
+    const parents = await mockApiRequest('/api/okr/actions/parents?periodKey=2026-10&viewerId=boss') as OkrRecord[];
+    expect(parents.map(record => record.id)).toEqual([]);
     await expect(mutate('delete')).resolves.toBeDefined();
   });
   it('rejects unauthorized and stale changes without writing', async () => {

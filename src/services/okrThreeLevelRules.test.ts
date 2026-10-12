@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assignedReferences, goalsWithAssignments, inheritedGoalPayload, timingError } from './okrThreeLevelRules';
+import { assignedReferences, goalsWithAssignments, inheritedGoalPayload, timingError, validateThreeLevelGoal } from './okrThreeLevelRules';
 import { mutateOkrLifecycle } from './mockOkrLifecycle';
 import type { OkrPayload, OkrPerson, OkrRecord } from './okrRepository';
 const people: OkrPerson[] = [{ id: 'user-admin', name: '林志豪', department: '公司', supervisorId: null, rootFlag: 1, version: 0 }, { id: 'manager', name: '主管', jobTitle: '产品主管', department: '研发', supervisorId: 'user-admin', rootFlag: 0, version: 0 }, { id: 'employee', name: '员工', jobTitle: '设计师', department: '研发', supervisorId: 'manager', rootFlag: 0, version: 0 }];
@@ -11,8 +11,8 @@ describe('三级目标承接与本人执行', () => {
     const refs = assignedReferences([company], people[1]);
     expect(refs.map(item => item.id)).toEqual(['company-kr']);
     const targets = goalsWithAssignments([company], people[1]);
-    expect(targets.filter(item => item.ownerId === 'manager')).toHaveLength(1);
-    expect(targets.at(-1)?.payload).toMatchObject({ inherited: true, sourceKrId: 'company-kr' });
+    expect(targets.filter(item => item.ownerId === 'manager')).toHaveLength(0);
+    expect(targets).toEqual([company]);
     const saved = createDepartment();
     expect(goalsWithAssignments(saved.records, people[1]).filter(item => item.ownerId === 'manager')).toHaveLength(1);
     expect(() => mutateOkrLifecycle(undefined, { kind: 'objective', viewerId: 'manager', periodKey: '2026-10', payload: department(), submit: true }, saved.records, people)).toThrow('已承接');
@@ -75,5 +75,24 @@ describe('目标修改审核和原计划锁定', () => {
     expect(returned.records.at(-1)?.changeRequest).toMatchObject({ status: 'returned', feedback: '指标需明确', payload: { title: '调整目标' } });
     const changedUpstream = requested.records.map(item => item.id === 'company' ? { ...item, version: 2 } : item);
     expect(() => mutateOkrLifecycle(record.id, { action: 'approve-change', viewerId: 'user-admin', version: pending.version }, changedUpstream, people)).toThrow('确认同步');
+  });
+});
+
+describe('KR 权重与上级日期约束', () => {
+  it('requires five-percent increments and at least one KR above twenty percent', () => {
+    const goal: OkrPayload = { goalLevel: 'company', title: '测试权重', deadline: '2026-10-31', keyResults: [33, 67].map((weight, i) => ({ id: String(i), title: '结果', weight, progress: 0, deadline: '2026-10-31' })) };
+    expect(validateThreeLevelGoal(goal, 'user-admin')).toContain('5%');
+    goal.keyResults = [20, 20, 20, 20, 20].map((weight, i) => ({ id: String(i), title: '结果', weight, progress: 0, deadline: '2026-10-31' }));
+    expect(validateThreeLevelGoal(goal, 'user-admin')).toContain('大于 20%');
+    goal.keyResults = [35, 35, 30].map((weight, i) => ({ id: String(i), title: '结果', weight, progress: 0, deadline: '2026-10-31' }));
+    expect(validateThreeLevelGoal(goal, 'user-admin')).toBeUndefined();
+  });
+  it.each([false, true])('rejects deadlines beyond the assigned source even for submit=%s', submit => {
+    const goal = department();
+    goal.deadline = '2026-11-01';
+    expect(() => mutateOkrLifecycle(undefined, { kind: 'objective', viewerId: 'manager', periodKey: '2026-10', payload: goal, submit }, [company], people)).toThrow('截止');
+    goal.deadline = '2026-10-31';
+    goal.keyResults![0].executionActions![0].deadline = '2026-11-01';
+    expect(() => mutateOkrLifecycle(undefined, { kind: 'objective', viewerId: 'manager', periodKey: '2026-10', payload: goal, submit }, [company], people)).toThrow('截止');
   });
 });

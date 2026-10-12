@@ -17,7 +17,7 @@ describe('添加对齐抽屉',()=>{
  });
  it('handles absent and removed sources without confirming an invalid selection',()=>{
   render(<GoalAlignmentDrawer open records={[]} cycle="2026-10" value="source:kr" onCancel={vi.fn()} onConfirm={vi.fn()}/>);
-  expect(screen.getByText('本月暂无可对齐的上级生效目标')).toBeInTheDocument();
+  expect(screen.getByText('当前周期暂无可对齐的上级生效目标')).toBeInTheDocument();
   expect(screen.getByRole('button',{name:/确.*定/})).toBeDisabled();
  });
 });

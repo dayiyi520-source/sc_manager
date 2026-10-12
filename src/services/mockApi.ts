@@ -1,3 +1,4 @@
+import { normalizedPolicy, validatePolicy, isOkrAdmin, canEditOkr, confirmationReviewer } from './okrSettingsPolicy';
 import { withBusinessWorkItemCategories } from './businessWorkItemCategories';
 import { productTaskPreviewSamples, PRODUCT_PREVIEW_SEED_VERSION } from '../data/mockProductTaskPreview';
 import type { OkrRecord } from './okrRepository';
@@ -796,14 +797,22 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   }
   if (clean === '/api/okr/goal-templates' || clean.startsWith('/api/okr/goal-templates/')) return handleMockGoalTemplates(clean, method, body, MOCK_USERS.find(user => user.role === 'admin')?.id);
   if (clean === '/api/okr/people' && method === 'GET') return getOkrPeople();
-  if (clean === '/api/okr/settings' && method === 'GET') return read(KEYS.okrSettings, MOCK_OKR_SETTINGS);
-  if (clean === '/api/okr/settings' && method === 'PUT') { write(KEYS.okrSettings, body); return body; }
+  if (clean === '/api/okr/settings' && method === 'GET') { const settings=normalizedPolicy(read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings),getOkrPeople()); write(KEYS.okrSettings,settings); return settings; }
+  if (clean === '/api/okr/settings' && method === 'PUT') {
+    const people=getOkrPeople(), current=normalizedPolicy(read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings),people);
+    if (!body.viewerId || !isOkrAdmin(body.viewerId,current,people)) throw new Error('仅 OKR 管理员可保存设置');
+    if ((body.version ?? 0)!==(current.version ?? 0)) throw new Error('配置已更新，请刷新后重试');
+    const {viewerId: _viewerId,...input}=body;
+    const error=validatePolicy(input as OkrSettings,people); if(error) throw new Error(error);
+    const saved=normalizedPolicy({...input,version:(current.version ?? 0)+1} as OkrSettings,people); write(KEYS.okrSettings,saved); return saved;
+  }
   if (clean === '/api/okr/records' && method === 'GET') {
     const viewerId = queryOf(path).get('viewerId');
-    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => record.status !== 'deleted' && (record.kind !== 'review' || !viewerId || record.ownerId === viewerId));
+    const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);
+    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => (!record.changeRequest || record.changeRequest.status !== 'pending' || settings.confirmation?.visiblePending !== false || record.ownerId===viewerId || record.changeRequest.reviewerId===viewerId || isOkrAdmin(viewerId || '',settings,getOkrPeople())) && record.status !== 'deleted' && (record.kind !== 'review' || !viewerId || record.ownerId === viewerId));
   }
   if ((clean === '/api/okr/records' && method === 'POST') || (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH')) {
-    const mutation = mutateOkrLifecycle(parts[3], body, read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]), getOkrPeople());
+    const mutation = mutateOkrLifecycle(parts[3], body, read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]), getOkrPeople(), read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings));
     if (mutation) { write(KEYS.okrRecords, mutation.records); return mutation.value; }
   }
   if (clean === '/api/okr/records' && method === 'POST') {
@@ -818,7 +827,11 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       }
     }
     const submittedAt = body.kind === 'review' && body.submit !== false ? now() : undefined;
-    const record = { id: id('okr'), kind: body.kind, ownerId, periodKey: body.periodKey, status: body.submit === false ? 'draft' : body.kind === 'review' ? 'submitted' : 'active', version: 0, createdAt: now(), ...(submittedAt ? { submittedAt } : {}), payload: body.payload || {} };
+    let record: OkrRecord = { id: id('okr'), kind: body.kind, ownerId, periodKey: body.periodKey, status: body.submit === false ? 'draft' : body.kind === 'review' ? 'submitted' : 'active', version: 0, createdAt: now(), ...(submittedAt ? { submittedAt } : {}), payload: body.payload || {} };
+    const owner = getOkrPeople().find(person=>person.id===ownerId);
+    const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);
+    const reviewerId = record.kind === 'objective' && body.submit !== false && owner && settings.confirmation ? confirmationReviewer(owner,'create',record.payload,settings,getOkrPeople()) : undefined;
+    if (reviewerId) record = {...record,status:'submitted',changeRequest:{id:id('change'),purpose:'initial',status:'pending',reason:'目标首次提交',reviewerId,payload:record.payload,baseVersion:0,requestedAt:now()}};
     write(KEYS.okrRecords, [...records, record]);
     return { id: record.id };
   }
@@ -843,15 +856,26 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       return records[index];
     }
     if (record.kind === 'objective' || record.kind === 'action') {
-      if (!body.viewerId || record.ownerId !== body.viewerId) throw new Error('只能修改或删除本人制定的目标');
+      if (!body.viewerId || !canEditOkr(record,body.viewerId,read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings),getOkrPeople())) throw new Error('只能修改本人目标或已授权的公司级目标');
       if (record.status === 'deleted' && body.action === 'delete') return record;
       if (record.status === 'deleted') throw new Error('目标已删除');
       if (body.version !== record.version) throw new Error('目标已被更新，请刷新后重试');
+      if (record.changeRequest?.status === 'pending') throw new Error('已有待确认申请，请等待确认或撤回');
+      const queueConfirmation = (purpose: 'delete' | 'update' | 'initial') => {
+        if (record.kind !== 'objective') return undefined;
+        const people = getOkrPeople(), owner = people.find(person=>person.id===record.ownerId);
+        const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);
+        const reviewerId = owner && settings.confirmation ? confirmationReviewer(owner,purpose === 'initial' ? 'create' : purpose,body.payload || record.payload,settings,people) : undefined;
+        if (!reviewerId) return undefined;
+        const next = {...record,version:record.version+1,changeRequest:{id:id('change'),purpose,status:'pending',reason:body.payload?.changeReason || (purpose === 'delete' ? '申请删除目标' : '申请修改目标'),reviewerId,payload:body.payload || record.payload,baseVersion:record.version,requestedAt:now()}};
+        records[index] = next; write(KEYS.okrRecords,records); return next;
+      };
       const group = record.kind === 'action' ? legacyGoalActions(record, records) : [record];
       const groupIds = new Set(group.map(item => item.id));
       const dependents = records.filter(item => item.status !== 'deleted' && item.kind !== 'review' && !groupIds.has(item.id) && (groupIds.has(item.payload?.parentObjectiveId) || groupIds.has(item.payload?.parentActionId) || groupIds.has(item.payload?.parentKeyResultId) || item.payload?.alignments?.some((alignment: any) => groupIds.has(alignment.parentObjectiveId) || groupIds.has(alignment.parentKeyResultId))));
       if (body.action === 'delete') {
         if (dependents.length) throw new Error('目标已有下级对齐，不能直接删除');
+        if (!['draft','submitted'].includes(record.status)) { const pending = queueConfirmation('delete'); if (pending) return pending; }
         groupIds.forEach(recordId => { const i = records.findIndex(item => item.id === recordId); records[i] = { ...records[i], status: 'deleted', version: records[i].version + 1, deletedAt: now(), deletedBy: body.viewerId }; });
         write(KEYS.okrRecords, records);
         return records[index];
@@ -875,6 +899,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
         const retainedIds = new Set((body.payload.keyResults || []).map((item: any) => item.id));
         if (dependents.some(item => (item.payload.parentObjectiveId === record.id && (item.payload.parentActionId || item.payload.parentKeyResultId) && !retainedIds.has(item.payload.parentActionId || item.payload.parentKeyResultId)) || item.payload.alignments?.some((alignment: any) => alignment.parentObjectiveId === record.id && alignment.parentKeyResultId && !retainedIds.has(alignment.parentKeyResultId)))) throw new Error('已被下级对齐的动作不能移除');
       }
+      if (body.action === 'submit' || body.action === 'save' && !['draft','submitted'].includes(record.status)) { const pending = queueConfirmation(['draft','submitted'].includes(record.status) ? 'initial' : 'update'); if (pending) return pending; }
     }
     records[index] = { ...record, ...(body.payload ? { payload: body.payload } : {}), status: body.action === 'submit' ? 'active' : record.status, version: record.version + 1 };
     write(KEYS.okrRecords, records);
@@ -886,7 +911,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (clean === '/api/okr/actions' && method === 'POST') { const record = { id: id('okr-action'), kind: 'action', ownerId: body.viewerId || MOCK_USERS[0]?.id, periodKey: body.periodKey, status: body.submit === false ? 'draft' : 'active', version: 0, createdAt: now(), payload: body.payload || {} }; const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS); write(KEYS.okrRecords, [...records, record]); return { id: record.id }; }
   if (parts[1] === 'okr' && parts[2] && parts[3] === 'events' && method === 'GET') {
     const record = read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]).find(item => item.id === parts[2]);
-    return (record?.changeHistory || []).map(change => ({ action: change.status === 'approved' ? `目标修改已生效：${change.reason}` : `目标修改退回：${change.feedback}`, operator: getOkrPeople().find(person => person.id === change.reviewerId)?.name || '审核人', createdAt: change.reviewedAt || change.requestedAt }));
+    return (record?.changeHistory || []).map(change => ({ action: change.feedback === '申请人撤回' ? '申请人撤回确认流程' : change.status === 'approved' ? `${change.purpose === 'initial' ? '目标首次确认已生效' : change.purpose === 'delete' ? '目标删除已确认' : '目标修改已生效'}：${change.reason}` : `${change.purpose === 'initial' ? '目标首次提交' : '目标修改'}退回：${change.feedback}`, operator: getOkrPeople().find(person => person.id === change.reviewerId)?.name || '审核人', createdAt: change.reviewedAt || change.requestedAt }));
   }
 
   if (clean === '/api/research-template/roles' && method === 'GET') return templateRoles();
