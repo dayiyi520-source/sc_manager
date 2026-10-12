@@ -16,17 +16,42 @@ describe('进度更新与只读历史',()=>{
     expect(update).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('更新说明'),{target:{value:'完成第一阶段'}});
     fireEvent.change(screen.getByLabelText('当前进度'),{target:{value:'45'}});
+    fireEvent.click(screen.getByRole('radio',{name:'风险'}));
     fireEvent.click(screen.getByRole('button',{name:'更新进度'}));
-    await waitFor(()=>expect(update).toHaveBeenCalledWith(record,'update-progress',expect.objectContaining({itemId:'a',progress:45,note:'完成第一阶段'}),'owner'));
+    await waitFor(()=>expect(update).toHaveBeenCalledWith(record,'update-progress',expect.objectContaining({itemId:'a',progress:45,note:'完成第一阶段',progressStatus:'risk'}),'owner'));
     expect(await screen.findByText('保存失败')).toBeInTheDocument();
     expect(screen.getByLabelText('更新说明')).toHaveValue('完成第一阶段');
     expect(close).not.toHaveBeenCalled(); expect(refresh).not.toHaveBeenCalled();
     expect(screen.queryByText(/信心/)).not.toBeInTheDocument();
   });
-  it('only displays history for another person’s action',()=>{
+  it('opens a disabled update form from another person’s action history',()=>{
+    const update=vi.spyOn(okrRepository,'update');
     render(<GoalProgressModal record={{...record,progressHistory:[{id:'entry',itemId:'a',operatorId:'owner',createdAt:'2026-10-12T10:00:00',previousProgress:0,progress:20,status:'normal',note:'完成设计',attachments:[]}]}} itemId="a" records={[record]} people={[]} viewerId="other" onClose={vi.fn()} onRefresh={vi.fn()}/>);
     expect(screen.getByText('完成设计')).toBeInTheDocument();
     expect(screen.queryByLabelText('当前进度')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button',{name:'更新进度'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'更新进度'}));
+    expect(screen.getByLabelText('当前进度')).toBeDisabled();
+    expect(screen.getByLabelText('更新说明')).toBeDisabled();
+    expect(screen.getByRole('button',{name:'添加附件'})).toBeDisabled();
+    for (const radio of screen.getAllByRole('radio')) expect(radio).toBeDisabled();
+    expect(screen.getByRole('button',{name:'更新进度'})).toBeDisabled();
+    fireEvent.click(screen.getByRole('button',{name:'更新进度'}));
+    expect(update).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button',{name:'查看历史进度'}));
+    expect(screen.getByText('完成设计')).toBeInTheDocument();
+  });
+  it('prevents updating an owned KR with a downstream alignment',()=>{
+    const child:OkrRecord={...record,id:'child',ownerId:'other',payload:{title:'下级目标',sourceObjectiveId:'goal',sourceKrId:'kr'}};
+    render(<GoalProgressModal record={record} itemId="kr" records={[record,child]} people={[]} viewerId="owner" onClose={vi.fn()} onRefresh={vi.fn()}/>);
+    expect(screen.getByText('进度变化')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'更新进度'}));
+    expect(screen.getByLabelText('当前进度')).toBeDisabled();
+    expect(screen.getByRole('button',{name:'更新进度'})).toBeDisabled();
+    expect(screen.getByRole('radio',{name:'正常'})).toBeDisabled();
+  });
+  it('restores the most recently saved status',()=>{
+    render(<GoalProgressModal record={{...record,progressHistory:[{id:'entry',itemId:'a',operatorId:'owner',createdAt:'2026-10-12T10:00:00',previousProgress:0,progress:20,status:'overdue',note:'依赖延期',attachments:[]}]}} itemId="a" records={[record]} people={[]} viewerId="owner" onClose={vi.fn()} onRefresh={vi.fn()}/>);
+    expect(screen.getByRole('radio',{name:'逾期'})).toBeChecked();
+    expect(screen.getByRole('radio',{name:'逾期'})).toBeEnabled();
   });
 });

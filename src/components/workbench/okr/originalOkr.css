@@ -973,18 +973,52 @@
 .okr-target-grid-card .okr-target-action-content { display: block; min-width: 0; }
 .okr-period-progress { display: flex; align-items: center; gap: 12px; width: 180px; margin-left: auto; }
 .okr-period-progress .ant-progress { flex: 1; margin: 0; }
-.okr-progress-title { display: flex; gap: 8px; }
-.okr-progress-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
-.okr-progress-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 24px; padding: 24px 0; }
-.okr-progress-values, .okr-progress-records { background: var(--bg-surface-soft); padding: 24px; }
-.okr-progress-values .ant-input-number, .okr-progress-values .ant-select { width: 100%; }
-.okr-progress-records { max-height: 420px; overflow: auto; }
-.okr-progress-records article { border-bottom: 1px solid var(--border-main); padding: 16px 0; }
-.okr-progress-records a { display: block; }
-.okr-progress-note { white-space: pre-wrap; overflow-wrap: anywhere; }
-.okr-progress-footer { display: flex; align-items: center; gap: 8px; }
+/* Progress dialogs share the same field spacing and panel hierarchy. */
+.okr-progress-modal .ant-modal-title { padding-right: 24px; }
+.okr-progress-title { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 18px; }
+.okr-progress-title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 14px; font-weight: 400; }
+.okr-progress-title-divider { flex: none; }
+.okr-progress-modal .ant-modal-footer { margin-top: 0; padding-top: 16px; border-top: 1px solid var(--border-main); }
+.okr-progress-layout { display: grid; gap: 24px; padding: 24px 0; align-items: stretch; }
+.okr-progress-layout.is-update { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+.okr-progress-layout.is-history { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.okr-progress-layout > section { min-width: 0; padding: 24px; border: 1px solid var(--border-main); border-radius: 8px; }
+.okr-progress-values, .okr-progress-records { background: var(--bg-surface-soft); }
+.okr-progress-layout h3 { display: flex; align-items: center; gap: 4px; margin: 0 0 12px; color: var(--text-primary); font-size: 14px; font-weight: 600; line-height: 24px; }
+.okr-progress-values .ant-input-number { width: 100%; }
+.okr-progress-values > p { margin: 12px 0 32px; font-size: 12px; color: var(--text-muted); }
+.okr-progress-status-options { display: flex; flex-wrap: wrap; gap: 12px 16px; }
+.okr-progress-status.ant-radio-wrapper { --okr-status-color: var(--primary); margin: 0; gap: 4px; font-size: 14px; }
+.okr-progress-status.is-ahead { --okr-status-color: var(--success); }
+.okr-progress-status.is-risk { --okr-status-color: var(--warning); }
+.okr-progress-status.is-overdue { --okr-status-color: var(--danger); }
+.okr-progress-status .ant-radio { width: 20px; height: 20px; border: 2px solid var(--okr-status-color); background: transparent; }
+.okr-progress-status .ant-radio-checked { border-color: var(--okr-status-color); background: transparent; }
+.okr-progress-status .ant-radio::after { background: var(--okr-status-color); width: 12px; height: 12px; margin: 0; }
+.okr-progress-status.ant-radio-wrapper:hover:not(.ant-radio-wrapper-disabled) .ant-radio { border-color: var(--okr-status-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--okr-status-color) 12%, transparent); }
+.okr-progress-status .ant-radio:has(.ant-radio-input:focus-visible) { outline: 2px solid var(--okr-status-color); outline-offset: 4px; }
+.okr-progress-status.ant-radio-wrapper-disabled { opacity: .5; cursor: not-allowed; }
+.okr-progress-update > h3:not(:first-child) { margin-top: 24px; }
+.okr-progress-update textarea { min-height: 192px; }
+.okr-progress-optional { margin-left: auto; color: var(--text-muted); font-size: 12px; font-weight: 400; }
+.okr-progress-records { max-height: 448px; overflow: auto; }
+.okr-progress-records article { padding: 16px 0; border-bottom: 1px solid var(--border-main); }
+.okr-progress-records article:first-of-type { padding-top: 4px; }
+.okr-progress-records article:last-child { padding-bottom: 0; border-bottom: 0; }
+.okr-progress-records strong { display: block; font-size: 14px; line-height: 24px; }
+.okr-progress-records p { margin: 8px 0 0; color: var(--text-muted); font-size: 12px; line-height: 20px; }
+.okr-progress-records .okr-progress-note { color: var(--text-primary); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.okr-progress-records a { display: block; margin-top: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.okr-progress-readonly { margin-top: 16px; }
+.okr-progress-footer { display: flex; align-items: center; gap: 12px; }
 .okr-progress-footer > span { flex: 1; }
-@media (max-width: 900px) { .okr-progress-layout { grid-template-columns: 1fr; } .okr-target-list-item { --okr-content-left: 48px; } }
+@media (max-width: 900px) {
+  .okr-progress-layout.is-update, .okr-progress-layout.is-history { grid-template-columns: 1fr; }
+  .okr-progress-layout { gap: 16px; padding: 16px 0; }
+  .okr-progress-layout > section { padding: 16px; }
+  .okr-progress-optional { margin-left: 4px; }
+  .okr-target-list-item { --okr-content-left: 48px; }
+}
 
 .okr-target-month-head { grid-template-columns: 20px auto auto 1fr auto; }
 .okr-target-list-item .okr-target-actions { padding-right: 20px; }
