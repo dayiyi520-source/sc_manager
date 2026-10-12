@@ -1,6 +1,12 @@
+import { withBusinessWorkItemCategories } from './businessWorkItemCategories';
 import { productTaskPreviewSamples, PRODUCT_PREVIEW_SEED_VERSION } from '../data/mockProductTaskPreview';
+import type { OkrRecord } from './okrRepository';
+import { mutateOkrLifecycle } from './mockOkrLifecycle';
 import { applyCollaborationWorkflow } from './mockCollaborationWorkflow';
+import type { OkrSettings } from './okrRepository';
+import { reviewSubmissionAccess } from './okrReviewRules';
 import { handleMockBusinessTasks } from './mockBusinessTasks';
+import { handleMockGoalTemplates, GOAL_TEMPLATE_STORAGE_KEY } from './mockGoalTemplates';
 import { assignedGoalActions, legacyGoalActions } from './okrGoalRules';
 import collaborationTypes from '../data/mockCollaborationTypes.json';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
@@ -37,6 +43,7 @@ import type {
 } from '../types/testManagement';
 
 const KEYS = {
+  goalTemplates: GOAL_TEMPLATE_STORAGE_KEY,
   testReports: TEST_REPORT_STORAGE_KEY,
   snapshot: 'shichuang.frontend.mock.snapshotVersion',
   members: 'shichuang.frontend.mock.teamMembers',
@@ -103,6 +110,7 @@ const readWorkItems = () => {
   return tasks;
 };
 const getWorkItems = () => readWorkItems().map((item) => {
+  if (!item.plannedStartDate && Number(item.estimatedHours || 0) > 0) { const offset = Math.abs(String(item.id).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)) % 12; item = { ...item, plannedStartDate: `2026-10-${String(1 + offset).padStart(2, '0')}`, plannedEndDate: `2026-10-${String(3 + offset).padStart(2, '0')}` }; }
   const snapshot = snapshotWorkItems.get(item.id);
   item = { ...item, workItemTypeId: item.workItemTypeId || snapshot?.task_type_id_, workflowId: item.workflowId || snapshot?.workflow_id_, statusKey: item.statusKey || snapshot?.status_key_ };
   const migratedType = (collaborationTypes as Record<string, string>)[item.id];
@@ -206,7 +214,7 @@ const recordTaskChanges = (before: Record<string, any>, after: Record<string, an
 };
 const categoryCode = (value: string) => ({ 产品: 'requirement', 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug', 用例: 'case' } as Record<string, string>)[value] || value;
 const isTestCaseCategory = (value: any) => String(value?.code || value?.category || value?.name || '').toLowerCase() === 'case' || value?.capabilityType === 'TEST_CASE';
-const templateCategories = () => read(KEYS.researchCategories, databaseRows('t_work_item_category_dictionary').map((row) => ({ id: row.id_, code: row.code_, name: row.name_, displayName: row.display_name_ || row.name_, iconKey: row.icon_key_ || row.code_, capabilityType: row.capability_type_ || 'STANDARD', sort: Number(row.sort_ || 0), enabled: Boolean(row.enabled_), builtIn: Boolean(row.built_in_), revision: Number(row.version_ || 0) }))).filter((item: any) => !isTestCaseCategory(item));
+const templateCategories = () => withBusinessWorkItemCategories(read(KEYS.researchCategories, databaseRows('t_work_item_category_dictionary').map((row) => ({ id: row.id_, code: row.code_, name: row.name_, displayName: row.display_name_ || row.name_, iconKey: row.icon_key_ || row.code_, capabilityType: row.capability_type_ || 'STANDARD', sort: Number(row.sort_ || 0), enabled: Boolean(row.enabled_), builtIn: Boolean(row.built_in_), revision: Number(row.version_ || 0) }))).filter((item: any) => !isTestCaseCategory(item)));
 const templateRoles = () => read(KEYS.researchRoles, databaseRows('t_product_role_template').map((row) => ({ id: row.id_, name: row.name_, responsibility: row.responsibility_ || '', sort: Number(row.sort_ || 0), revision: Number(row.version_ || 0), updatedAt: row.update_time_ })));
 const templateStatuses = () => read(KEYS.researchStatuses, databaseRows('t_research_status_template').map((row) => ({ id: row.id_, scope: row.scope_, name: row.name_, phase: row.phase_, color: row.color_ || 'neutral', initial: Boolean(row.initial_), enabled: Boolean(row.enabled_), sort: Number(row.sort_ || 0), revision: Number(row.version_ || 0) })));
 const DETAIL_FIELD_DEFINITIONS: Record<string, Array<[string, string, string, string, boolean]>> = {
@@ -338,12 +346,13 @@ const templateTypes = () => {
   const workflows = databaseRows('t_work_item_template_workflow');
   return read(KEYS.researchTypes, databaseRows('t_work_item_template_type').map((row) => ({ id: row.id_, category: row.category_, name: row.name_, description: row.description_ || '', enabled: Boolean(row.enabled_), isDefault: Boolean(row.is_default_), revision: Number(row.version_ || 0), workflow: workflows.find((workflow) => workflow.template_type_id_ === row.id_) ? { id: workflows.find((workflow) => workflow.template_type_id_ === row.id_).id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: workflows.find((workflow) => workflow.template_type_id_ === row.id_).name_, workflowVersion: 1, status: 'PUBLISHED', revision: Number(workflows.find((workflow) => workflow.template_type_id_ === row.id_).revision_ || 0), definition: workflows.find((workflow) => workflow.template_type_id_ === row.id_).definition_ } : undefined }))).filter((item: any) => !isTestCaseCategory(item));
 };
+const defaultProductWorkflow = (type: any) => ({ id: `mock-workflow-${type.id}`, category: categoryCode(type.category), taskTypeId: type.id, name: `${type.name}状态流程`, revision: 0, status: 'PUBLISHED', workflowVersion: 1, definition: { states: [{ key: 'todo', name: '待处理', group: 'NOT_STARTED', initial: true, successful: false, enabled: true, stage: '待处理', color: 'neutral' }, { key: 'processing', name: '处理中', group: 'IN_PROGRESS', initial: false, successful: false, enabled: true, stage: '处理中', color: 'blue' }, { key: 'completed', name: '已完成', group: 'COMPLETED', initial: false, successful: true, enabled: true, stage: '已完成', color: 'green' }], transitions: [{ key: 'todo-processing', from: 'todo', to: 'processing', name: '开始处理' }, { key: 'processing-completed', from: 'processing', to: 'completed', name: '完成任务', requiredFields: ['actualHours'] }] } } );
 const productTypes = (product: ProductLine | undefined): any[] => {
-  if (product?.workItemTypes) return product.workItemTypes;
+  if (product?.workItemTypes) return product.workItemTypes.map((type: any) => ({ ...type, workflows: (type.workflows || (type.workflow ? [type.workflow] : [])).length ? (type.workflows || [type.workflow]) : [defaultProductWorkflow(type)] }));
   const types = databaseRows('t_product_line_work_item_type').filter(row => row.product_line_id_ === product?.id && !row.delete_flag_);
   if (!types.length) return templateTypes();
   const workflows = databaseRows('t_product_workflow');
-  return types.map(row => ({ id: row.id_, name: row.name_, category: row.category_, enabled: Boolean(row.enabled_), isDefault: Boolean(row.is_default_), revision: Number(row.version_ || 0), workflows: workflows.filter(flow => flow.task_type_id_ === row.id_ && !flow.delete_flag_).map(flow => ({ id: flow.id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: flow.name_, revision: Number(flow.version_ || 0), status: flow.status_, workflowVersion: flow.workflow_version_, definition: flow.definition_ })) }));
+  return types.map(row => ({ id: row.id_, name: row.name_, category: row.category_, enabled: Boolean(row.enabled_), isDefault: Boolean(row.is_default_), revision: Number(row.version_ || 0), workflows: workflows.filter(flow => flow.task_type_id_ === row.id_ && !flow.delete_flag_).map(flow => ({ id: flow.id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: flow.name_, revision: Number(flow.version_ || 0), status: flow.status_, workflowVersion: flow.workflow_version_, definition: flow.definition_ })).length ? workflows.filter(flow => flow.task_type_id_ === row.id_ && !flow.delete_flag_).map(flow => ({ id: flow.id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: flow.name_, revision: Number(flow.version_ || 0), status: flow.status_, workflowVersion: flow.workflow_version_, definition: flow.definition_ })) : [defaultProductWorkflow({ id: row.id_, name: row.name_, category: row.category_ })] }));
 };
 const templateNotifications = () => read(KEYS.researchNotifications, databaseRows('t_notification_template')[0]?.config_ || { categories: [] });
 const templateAutomation = () => ({ enabled: read(KEYS.researchAutomationSetting, Boolean(databaseRows('t_automation_template_setting')[0]?.enabled_ ?? true)), rules: read(KEYS.researchAutomation, databaseRows('t_automation_template_rule').map((row) => ({ id: row.id_, name: row.name_, enabled: Boolean(row.enabled_), triggerType: row.trigger_type_, triggerTypeId: row.trigger_type_id_, triggerStateKey: row.trigger_state_key_, conditionType: row.condition_type_, conditionValue: row.condition_value_, actionType: row.action_type_, actions: row.actions_ || [], conditions: row.conditions_ || [], actionConfig: row.action_config_ || {}, revision: Number(row.version_ || 0), updatedAt: row.update_time_ }))) });
@@ -409,7 +418,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   const clean = path.split('?')[0];
   const parts = clean.split('/').filter(Boolean);
   const body = bodyOf(init);
-  if (parts[0] === 'api' && ['presales-tasks', 'delivery-tasks'].includes(parts[1])) {
+  if (parts[0] === 'api' && ['presales-tasks', 'delivery-tasks', 'ops-tasks'].includes(parts[1])) {
     return handleMockBusinessTasks(path, method, body, { activities: taskActivities, record: recordTaskActivity, changes: recordTaskChanges, validateCompletion });
   }
   if (parts.includes('test-reports')) {
@@ -761,6 +770,12 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     items[index] = { ...current, status: nextStatus, workItems: current.workItems, ...((parts[3] === 'complete' || parts[3] === 'acceptance-failed') && ownerChanged ? { ownerName: nextOwnerName, assigneeName: nextOwnerName, ...(nextAssigneeId ? { assigneeId: nextAssigneeId } : {}) } : {}), revision: revision + 1, events: [...(current.events || []), event] };
     write(KEYS.workItems, items); return { id: current.id, status: nextStatus };
   }
+  if (clean === '/api/design-tasks' && method === 'POST') {
+    if (!String(body.title || '').trim()) throw new Error('任务标题不能为空');
+    const task = { ...body, id: id('design'), code: `DESIGN-${Date.now()}`, category: 'design', status: body.status || '待处理', assigneeName: body.ownerName || '', revision: 0, createdAt: now(), updatedAt: now() };
+    write(KEYS.workItems, [...getWorkItems(), task]);
+    return { id: task.id, code: task.code };
+  }
   if (clean === '/api/design-tasks' && method === 'GET') { const items = getWorkItems().filter((item) => item.category === 'design' && !item.deleted && !item.deleteFlag); return { items, page: 1, pageSize: 100, total: items.length }; }
   if (clean === '/api/bugs' && method === 'GET') {
     const items = getWorkItems().filter((item) => item.category === 'bug' && !item.deleted && !item.deleteFlag).map((item) => ({ ...item, assignee: item.assigneeName || item.ownerName || item.assignee || '', reporter: item.reporter || item.creatorName || '', versionName: item.versionName || getProductLines().find((line) => line.id === item.productLineId)?.versions?.find((version) => version.id === item.versionId)?.name || '' }));
@@ -779,6 +794,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     write(KEYS.workItems, items);
     return items[index];
   }
+  if (clean === '/api/okr/goal-templates' || clean.startsWith('/api/okr/goal-templates/')) return handleMockGoalTemplates(clean, method, body, MOCK_USERS.find(user => user.role === 'admin')?.id);
   if (clean === '/api/okr/people' && method === 'GET') return getOkrPeople();
   if (clean === '/api/okr/settings' && method === 'GET') return read(KEYS.okrSettings, MOCK_OKR_SETTINGS);
   if (clean === '/api/okr/settings' && method === 'PUT') { write(KEYS.okrSettings, body); return body; }
@@ -786,12 +802,46 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const viewerId = queryOf(path).get('viewerId');
     return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => record.status !== 'deleted' && (record.kind !== 'review' || !viewerId || record.ownerId === viewerId));
   }
-  if (clean === '/api/okr/records' && method === 'POST') { const record = { id: id('okr'), kind: body.kind, ownerId: body.viewerId || MOCK_USERS[0]?.id, periodKey: body.periodKey, status: body.submit === false ? 'draft' : 'active', version: 0, createdAt: now(), payload: body.payload || {} }; const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS); write(KEYS.okrRecords, [...records, record]); return { id: record.id }; }
+  if ((clean === '/api/okr/records' && method === 'POST') || (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH')) {
+    const mutation = mutateOkrLifecycle(parts[3], body, read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]), getOkrPeople());
+    if (mutation) { write(KEYS.okrRecords, mutation.records); return mutation.value; }
+  }
+  if (clean === '/api/okr/records' && method === 'POST') {
+    const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS);
+    const ownerId = body.viewerId || MOCK_USERS[0]?.id;
+    if (body.kind === 'review') {
+      if (!body.viewerId) throw new Error('缺少复盘提交人');
+      if (records.some(record => record.kind === 'review' && record.status !== 'deleted' && record.ownerId === ownerId && record.periodKey === body.periodKey && record.payload.reviewType === body.payload?.reviewType)) throw new Error('本周期已有复盘，请继续编辑原记录');
+      if (body.submit !== false) {
+        const access = reviewSubmissionAccess(read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings), body.payload || {});
+        if (!access.allowed) throw new Error(access.reason);
+      }
+    }
+    const submittedAt = body.kind === 'review' && body.submit !== false ? now() : undefined;
+    const record = { id: id('okr'), kind: body.kind, ownerId, periodKey: body.periodKey, status: body.submit === false ? 'draft' : body.kind === 'review' ? 'submitted' : 'active', version: 0, createdAt: now(), ...(submittedAt ? { submittedAt } : {}), payload: body.payload || {} };
+    write(KEYS.okrRecords, [...records, record]);
+    return { id: record.id };
+  }
   if (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH') {
     const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS);
     const index = records.findIndex(record => record.id === parts[3]);
     if (index < 0) throw new Error('目标记录不存在');
     const record = records[index];
+    if (record.kind === 'review') {
+      if (!body.viewerId || record.ownerId !== body.viewerId) throw new Error('只能修改本人复盘');
+      if (!['draft', 'returned'].includes(record.status)) throw new Error('已提交的复盘不能重复提交或修改');
+      if (body.version !== record.version) throw new Error('复盘已变化，请刷新后重试');
+      if (!['save', 'submit'].includes(body.action)) throw new Error('不支持此复盘操作');
+      const payload = body.payload || record.payload;
+      if (payload.reviewType !== record.payload.reviewType || payload.startDate !== record.payload.startDate || payload.endDate !== record.payload.endDate) throw new Error('不能修改原复盘的周期');
+      if (body.action === 'submit') {
+        const access = reviewSubmissionAccess(read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings), payload);
+        if (!access.allowed) throw new Error(access.reason);
+      }
+      records[index] = { ...record, payload, status: body.action === 'submit' ? 'submitted' : record.status, ...(body.action === 'submit' ? { submittedAt: now() } : {}), version: record.version + 1 };
+      write(KEYS.okrRecords, records);
+      return records[index];
+    }
     if (record.kind === 'objective' || record.kind === 'action') {
       if (!body.viewerId || record.ownerId !== body.viewerId) throw new Error('只能修改或删除本人制定的目标');
       if (record.status === 'deleted' && body.action === 'delete') return record;
@@ -834,7 +884,10 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (clean === '/api/okr/work' && method === 'GET') return [];
   if (clean === '/api/okr/actions/parents' && method === 'GET') { const query = queryOf(path); return assignedGoalActions(read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS), getOkrPeople().find(person => person.id === query.get('viewerId'))).filter(record => !query.get('periodKey') || record.periodKey === query.get('periodKey')); }
   if (clean === '/api/okr/actions' && method === 'POST') { const record = { id: id('okr-action'), kind: 'action', ownerId: body.viewerId || MOCK_USERS[0]?.id, periodKey: body.periodKey, status: body.submit === false ? 'draft' : 'active', version: 0, createdAt: now(), payload: body.payload || {} }; const records = read<any[]>(KEYS.okrRecords, MOCK_OKR_RECORDS); write(KEYS.okrRecords, [...records, record]); return { id: record.id }; }
-  if (parts[1] === 'okr' && parts[2] && parts[3] === 'events' && method === 'GET') return [];
+  if (parts[1] === 'okr' && parts[2] && parts[3] === 'events' && method === 'GET') {
+    const record = read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]).find(item => item.id === parts[2]);
+    return (record?.changeHistory || []).map(change => ({ action: change.status === 'approved' ? `目标修改已生效：${change.reason}` : `目标修改退回：${change.feedback}`, operator: getOkrPeople().find(person => person.id === change.reviewerId)?.name || '审核人', createdAt: change.reviewedAt || change.requestedAt }));
+  }
 
   if (clean === '/api/research-template/roles' && method === 'GET') return templateRoles();
   if (clean === '/api/research-template/roles' && method === 'POST') { const roles = templateRoles(); const role = { id: id('role'), ...body, revision: 0, updatedAt: now() }; write(KEYS.researchRoles, [...roles, role]); return role; }

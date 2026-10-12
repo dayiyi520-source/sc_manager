@@ -207,3 +207,47 @@
 
 .company-action-assignees > span, .company-assignee-alignment { display: inline-flex; align-items: center; gap: var(--company-space-sm); }
 .company-assignee-alignment svg { width: var(--company-metric-icon-size); height: var(--company-metric-icon-size); }
+
+.okr-own-actions { grid-column: 1 / -1; display: grid; gap: var(--company-space-sm, .5rem); padding: var(--company-space-md, 1rem); border-top: 1px solid var(--border-main); }
+.okr-own-action { display: grid; gap: var(--company-space-sm, .5rem); }
+
+.okr-month-draft-notice { margin: var(--company-space-md, 1rem) 0; }
+.okr-month-create-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--company-space-md, 1rem); margin-top: var(--company-space-md, 1rem); }
+.okr-month-create-actions .ant-btn { height: auto; min-height: 3rem; padding: var(--company-space-md, 1rem); color: var(--text-muted); background: var(--bg-surface); }
+.okr-month-create-actions .ant-btn:hover, .okr-month-create-actions .ant-btn:focus-visible { color: var(--primary); border-color: var(--primary); }
+.okr-month-create-actions.is-card { margin-top: 0; align-self: stretch; grid-template-columns: minmax(0, 1fr); }
+.okr-month-create-actions.is-card .ant-btn { min-height: 6rem; }
+
+.goal-execution-content { display: flex; align-items: center; gap: var(--company-space-sm, .5rem); min-width: 0; }
+.okr-own-actions .okr-personal-action-columns { grid-template-columns: minmax(0, 1fr) 120px 160px 40px; }
+.okr-own-actions .okr-personal-action-columns .ant-input-number { width: 100%; }
+
+.okr-objective-kr .okr-own-actions { padding-inline: 0; }
+.okr-objective-kr .okr-own-action .okr-personal-action-columns { gap: 12px; }
+
+.okr-objective-kr .okr-execution-fields { border-top: 0; padding: 0; }
+.okr-objective-kr .okr-execution-fields .okr-personal-action-columns { gap: 12px; }
+
+.okr-objective-title { gap: var(--company-space-sm, .5rem); }
+
+.company-objective-form .okr-objective-body { grid-template-columns: minmax(0, 1fr); }
+.company-objective-form .okr-objective-krs,
+.company-objective-form .okr-own-actions,
+.company-objective-form .okr-own-action { min-width: 0; }
+
+.company-objective-form .okr-execution-fields { padding-inline: 0; }
+
+/* Goal authoring keeps alignment and metric headings on one shared grid row. */
+.company-objective-form { --okr-result-indent: 3.25rem; }
+.company-objective-form .okr-source-readiness { margin-bottom: var(--company-space-sm); }
+.company-objective-form .okr-source-heading { color: var(--text-muted); font-size: var(--company-font-caption); margin-bottom: var(--company-space-md); }
+.company-objective-form .okr-source-heading > .company-objective-alignment { position: static; min-width: 0; min-height: 0; margin: 0 0 0 var(--okr-result-indent); padding: 0; gap: var(--company-space-sm); flex-wrap: wrap; }
+.company-objective-form .okr-source-heading > .company-objective-alignment::after { display: none; }
+.okr-alignment-trigger { color: var(--text-muted); }
+.okr-add-operations { display: flex; flex-wrap: wrap; align-items: center; gap: var(--company-space-sm); }
+.company-objective-form .okr-objective-add .okr-add-operations > .ant-btn:first-child { margin-left: var(--okr-result-indent); }
+.company-objective-form .okr-execution-fields .goal-execution-content { margin-inline-start: var(--okr-result-indent); gap: 0; }
+.company-objective-form .okr-execution-fields .goal-execution-content::before { content: ''; flex: 0 0 var(--company-space-lg); }
+.okr-execution-label { flex: 0 0 var(--company-space-xl); font-weight: 600; }
+.company-objective-form .okr-execution-fields .okr-execution-label { flex-basis: calc(var(--company-space-xl) + var(--company-space-md)); }
+.company-objective-form .okr-execution-fields { padding-block: var(--company-space-sm); border-top: 0; }

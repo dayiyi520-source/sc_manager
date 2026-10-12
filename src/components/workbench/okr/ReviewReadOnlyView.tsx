@@ -113,6 +113,8 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
         </section>
       </div>
 
+      {review.type === 'week' && <section className="okr-review-readonly-section"><div className="okr-review-readonly-title"><Target/><h3>下周计划</h3></div><p>{review.nextWeekPlan || '暂无下周计划'}</p></section>}
+
       {review.type === 'month' && (
         <div className="okr-review-readonly-columns">
           <section className="okr-review-readonly-section"><div className="okr-review-readonly-title"><FileText /><h3>其他补充</h3></div><p>{review.otherNotes || '暂无其他补充'}</p></section>

@@ -123,6 +123,8 @@ export interface OKRItem {
     weight: number;
     deadline: string;
     assigneeIds?: string[];
+    businessObject?: string;
+    version?: string;
   }[];
 }
 
@@ -154,6 +156,7 @@ export interface PerformanceReview {
   nextMonthPlans?: import('../services/okrRepository').OkrMonthlyPlan[];
   otherNotes?: string;
   nextMonthArrangement?: string;
+  nextWeekPlan?: string;
 }
 
 export interface ReviewWorkItem {

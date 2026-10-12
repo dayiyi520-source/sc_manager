@@ -262,6 +262,7 @@
 .okr-review-objective-collapse .ant-collapse-expand-icon { color: var(--text-muted); }
 .okr-review-objective-collapse .ant-collapse-content { border-top-color: var(--border-main); background: var(--bg-card); }
 .okr-review-objective-collapse .ant-collapse-content-box { padding: 0 !important; }
+.okr-review-objective-collapse .okr-review-objective-body { padding: 0 !important; }
 .okr-review-progress-compact { width: 80px; min-width: 80px; margin: 0; }
 .okr-review-progress-compact .ant-progress-inner { background: var(--bg-surface-soft); }
 .okr-work-association-modal .ant-modal-header { margin-bottom: 0; }

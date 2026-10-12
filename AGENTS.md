@@ -251,3 +251,11 @@ This project uses the stringplugin team plugin. Follow these rules before creati
 - **禁止行为**：硬编码颜色、混用图标库、跳过状态设计、前端 Mock 生产数据
 
 遵守这两份文档，确保项目在视觉一致性和技术规范性上达到生产级标准。
+
+
+## 空状态统一规则（2026-10-12 用户明确规定）
+
+- 全平台空状态统一使用 Ant Design `Empty` 官方默认样式。
+- 不自行设计空状态图标，不用香蕉、自绘 SVG、插画或其他图标替换默认空状态。
+- 不通过 `ConfigProvider.renderEmpty` 注入自定义空状态图标。
+- 此规则覆盖之前要求在空状态中加入品牌香蕉元素的约定；品牌元素不用于空状态。

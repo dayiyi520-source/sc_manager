@@ -24,7 +24,7 @@ const presalesSamples: Sample[] = [
 const deliverySamples: Sample[] = [
   { title: '智慧校园项目启动资料准备', description: '整理启动会议资料、交付计划与双方责任分工。', sourceName: '', projectName: '智慧校园二期', customerName: '云州大学', stage: '项目立项', status: '待处理', priority: '高', hours: 8 },
   { title: '教学质量平台业务需求确认', description: '与院校业务部门核对指标体系、数据来源和需求确认结果。', sourceName: '', projectName: '教学质量评估平台', customerName: '江南职业学院', stage: '需求调研', status: '处理中', priority: '中', hours: 12 },
-  { title: '数据治理平台试运行验收', description: '按验收清单核对数据质量和平台功能，收集试运行结论。', sourceName: '', projectName: '校级数据治理平台', customerName: '海川大学', stage: 'UAT验收', status: '待验收', priority: '紧急', hours: 16 },
+  { title: '数据治理平台试运行验收', description: '按验收清单核对数据质量和平台功能，收集试运行结论。', sourceName: '', projectName: '校级数据治理平台', customerName: '海川大学', stage: 'UAT验收', status: '待审核', priority: '紧急', hours: 16 },
   { title: '统一身份认证上线切换', description: '完成上线切换、接入应用验证及异常回退方案核对。', sourceName: '', projectName: '统一身份认证升级', customerName: '新港理工学院', stage: '割接上线', status: '已完成', priority: '高', hours: 10 },
   { title: '实训管理系统培训材料补充', description: '补充教师操作手册和培训案例，复核前次培训反馈。', sourceName: '', projectName: '实训教学管理系统', customerName: '青禾职业学院', stage: '系统开发', status: '已退回', priority: '中', hours: 6 },
   { title: '科研平台实施配置复核', description: '核对实施配置、审批流程与角色授权，整理配置交付清单。', sourceName: '', projectName: '科研管理平台升级', customerName: '星河师范大学', stage: '系统设计', status: '待处理', priority: '低', hours: 8 },

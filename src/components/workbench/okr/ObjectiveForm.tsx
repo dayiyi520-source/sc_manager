@@ -1,5 +1,9 @@
+import { GoalAlignmentDrawer } from './GoalAlignmentDrawer';
+import { goalContentComplete, GOAL_ADDITION_MESSAGE } from './goalAdditionRules';
+import { inheritedGoalPayload, validateThreeLevelGoal, upstreamReadiness, sourceKeyResults } from '../../../services/okrThreeLevelRules';
+import { GoalExecutionFields, GoalTimeFields } from './GoalExecutionFields';
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Alert, Avatar, Button, DatePicker, Dropdown, Form, Input, InputNumber, Popconfirm, Select, Tooltip } from 'antd';
+import { Alert, Avatar, Button, DatePicker, Dropdown, Form, Input, InputNumber, Popconfirm, Select, Tooltip, Typography } from 'antd';
 import { GrabberIcon, PlusIcon, TrashIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
 import type { EmployeeOption, OKRItem } from '../../../types';
@@ -9,6 +13,7 @@ import { isSubmissionDeadline, isSubmissionWeight } from './submissionValidation
 import { PersonAvatar } from '../../common/PersonIdentity';
 
 interface Props {
+  threeLevel?: boolean; ownerId?: string; planLocked?: boolean;
   cycle: string;
   objectiveIndex?: number;
   ownerName: string;
@@ -47,42 +52,53 @@ interface Props {
 export interface ObjectiveFormHandle { submit: () => Promise<boolean>; saveDraft: () => Promise<boolean>; snapshot: () => OkrPayload; }
 export const calculateKrWeightTotal = (items: Pick<OkrKr, 'weight'>[]) => items.reduce((total, item) => total + item.weight, 0);
 
-export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ cycle, objectiveIndex = 0, ownerName, ownerAvatar, people = [], teamMembers, busy, unavailable, root, onCancel, onRemove, onSave, onSaveDraft, submitLabel, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false, supervisor = false, goalLevel: levelLabel, department, alignmentActions: suppliedAlignments = [], productLineOptions = [], productLineVersionOptions = {}, projectOptions = [], projectProductOptions = {}, opportunityOptions = [], okrRecords = [], settings }, ref) {
-  const [title, setTitle] = useState(initialPayload?.title || '');
+export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ threeLevel = false, ownerId = '', planLocked = false, cycle, objectiveIndex = 0, ownerName, ownerAvatar, people = [], teamMembers, busy, unavailable, root, onCancel, onRemove, onSave, onSaveDraft, submitLabel, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false, supervisor = false, goalLevel: levelLabel, department, alignmentActions: suppliedAlignments = [], productLineOptions = [], productLineVersionOptions = {}, projectOptions = [], projectProductOptions = {}, opportunityOptions = [], okrRecords = [], settings }, ref) {
+  const person = people.find(item => item.id === ownerId);
+  const assigned = suppliedAlignments.filter(reference => reference.payload.assigneeIds?.includes(ownerId));
+  const referenceId = initialPayload?.sourceKrId || initialPayload?.alignments?.[0]?.parentKeyResultId || initialPayload?.parentKeyResultId;
+  const autonomous = initialPayload?.origin === 'autonomous';
+  const reference = autonomous ? undefined : referenceId ? assigned.find(item => item.id === referenceId) : assigned.filter(reference => !okrRecords.some(record => record.ownerId === ownerId && !record.payload.inherited && record.payload.sourceKrId === reference.id && record.periodKey === cycle))[objectiveIndex];
+  const seed = threeLevel && !root && reference && person ? inheritedGoalPayload(reference, person) : undefined;
+  const personal = threeLevel && levelLabel === '个人级' && !autonomous;
+  const ownPersonal = threeLevel && levelLabel === '个人级' && autonomous;
+  const effectiveInitial = initialPayload?.inherited && initialPayload.goalLevel === 'department' ? { ...initialPayload, title: '' } : personal && seed && !initialPayload?.sourceKrId ? seed : initialPayload ? { ...seed, ...initialPayload } : seed;
+  const [selectedSource, setSelectedSource] = useState<string>(initialPayload?.sourceObjectiveId ? `${initialPayload.sourceObjectiveId}:${initialPayload.sourceKrId || ''}` : '');
+  const availableSources = okrRecords.filter(record => record.periodKey === cycle && record.ownerId === person?.supervisorId && ['active','reviewed'].includes(record.status) && ['objective','action'].includes(record.kind) && !(record.changeRequest?.purpose === 'initial' && record.changeRequest.status !== 'approved'));
+  const [alignmentOpen, setAlignmentOpen] = useState(false);
+  const [changeReason, setChangeReason] = useState(initialPayload?.changeReason || '');
+  const [objectiveTiming, setObjectiveTiming] = useState(initialPayload || {} as OkrPayload);
+  const [title, setTitle] = useState(effectiveInitial?.title || '');
   const [objectiveWeight, setObjectiveWeight] = useState(initialPayload?.weight ?? 100);
   const [note, setNote] = useState(initialPayload?.note ?? '');
-  const [objectiveType, setObjectiveType] = useState<'target' | 'challenge'>(initialPayload?.objectiveType ?? (supervisor ? (suppliedAlignments.length > 0 && objectiveIndex === 0 ? 'target' : 'challenge') : (objectiveIndex === 0 ? 'target' : 'challenge')));
-  const [krs, setKrs] = useState<OkrKr[]>(() => initialPayload?.keyResults?.length ? initialPayload.keyResults : [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
+  const [objectiveType, setObjectiveType] = useState<'target' | 'challenge'>(initialPayload?.objectiveType ?? (autonomous ? 'challenge' : supervisor ? (suppliedAlignments.length > 0 && objectiveIndex === 0 ? 'target' : 'challenge') : (objectiveIndex === 0 ? 'target' : 'challenge')));
+  const initialKrs = (): OkrKr[] => {
+    const rows: OkrKr[] = effectiveInitial?.keyResults?.length ? effectiveInitial.keyResults : [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }];
+    return personal || ownPersonal ? rows.map(kr => ({ ...kr, assigneeIds: [ownerId], executionActions: kr.executionActions?.length ? kr.executionActions : [{ id: crypto.randomUUID(), ownerId, title: '', weight: 100, progress: 0 }] })) : rows;
+  };
+  const [krs, setKrs] = useState<OkrKr[]>(initialKrs);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const dragHandleIndex = useRef<number | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
-    setTitle(initialPayload?.title || '');
+    setTitle(effectiveInitial?.title || '');
     setObjectiveWeight(initialPayload?.weight ?? 100);
     setNote(initialPayload?.note ?? '');
-    setObjectiveType(initialPayload?.objectiveType ?? (supervisor ? (suppliedAlignments.length > 0 && objectiveIndex === 0 ? 'target' : 'challenge') : (objectiveIndex === 0 ? 'target' : 'challenge')));
-    setKrs(initialPayload?.keyResults?.length ? initialPayload.keyResults : [{ id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }]);
-  }, [initialPayload]);
+    setObjectiveType(initialPayload?.objectiveType ?? (autonomous ? 'challenge' : supervisor ? (suppliedAlignments.length > 0 && objectiveIndex === 0 ? 'target' : 'challenge') : (objectiveIndex === 0 ? 'target' : 'challenge')));
+    setKrs(initialKrs());
+  }, [initialPayload, threeLevel ? reference?.id : undefined]);
   const alignmentActions = initialPayload?.alignments?.length
     ? suppliedAlignments.filter(action => initialPayload.alignments?.some(alignment => alignment.parentKeyResultId === action.id))
     : suppliedAlignments;
   const hasAssignedActions = suppliedAlignments.length > 0;
   useEffect(() => {
-    if (!initialPayload && supervisor) setObjectiveType(objectiveIndex === 0 && hasAssignedActions ? 'target' : 'challenge');
+    if (!initialPayload && supervisor && !autonomous) setObjectiveType(objectiveIndex === 0 && hasAssignedActions ? 'target' : 'challenge');
   }, [cycle, hasAssignedActions, objectiveIndex, initialPayload, supervisor]);
-  const parentDeadline = alignmentActions.map(action => action.payload.deadline).filter((value): value is string => Boolean(value)).sort()[0];
+  const parentDeadline = (threeLevel ? reference ? [reference] : [] : alignmentActions).map(action => action.payload.deadline).filter((value): value is string => Boolean(value)).sort()[0];
   const exceedsParentDeadline = krs.some(kr => kr.deadline && parentDeadline && dayjs(kr.deadline).isAfter(dayjs(parentDeadline), 'day'));
   const krWeightTotal = calculateKrWeightTotal(krs);
   const assigneeOptions = (teamMembers ?? people).map(person => ({ value: person.id, label: `${person.name}${person.department ? ` · ${person.department}` : ''}` }));
   const stageOptions = ['产品设计', 'UI设计', '产品开发', '测试验收', '上线运维'];
-  const stageDepartments: Record<string, string> = {
-    产品设计: '产品规划部',
-    UI设计: '交互设计部',
-    产品开发: '软件研发部',
-    测试验收: '软件研发部测试组',
-    上线运维: '软件研发部系统运维组',
-  };
   const stageShortLabels: Record<string, string> = {
     产品设计: '产品',
     UI设计: '设计',
@@ -91,7 +107,9 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     上线运维: '上线',
   };
   const typeOptions = settings?.dictionaries?.supportTypes || ['客户成功', '服务响应', '体验优化'];
-  const actionTypeForIndex = (index: number) => index === 0 ? 'support' : index === 1 ? 'product' : index === 2 ? 'presales' : 'delivery';
+  const configuredTypes = (settings?.templates || []).filter(template => ['product', 'delivery', 'support'].includes(template.type)).map(template => template.type);
+  const defaultTypes = configuredTypes.length ? configuredTypes : ['product', 'delivery', 'support'];
+  const actionTypeForIndex = (index: number) => threeLevel ? krs[index]?.structureType || defaultTypes[index % defaultTypes.length] : index === 0 ? 'support' : index === 1 ? 'product' : index === 2 ? 'presales' : 'delivery';
   const actionTypeForKr = (index: number) => actionTypeForIndex(index);
   const changeKr = (id: string, patch: Partial<OkrKr>) => setKrs(items => items.map(kr => kr.id === id ? { ...kr, ...patch } : kr));
   const distribute = (items: OkrKr[]) => items.map((kr, i) => ({ ...kr, weight: Math.floor(100 / items.length) + (i < 100 % items.length ? 1 : 0) }));
@@ -99,34 +117,38 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const payload = (): OkrPayload => {
     const latestKrDate = krs.map(kr => kr.deadline).filter(Boolean).sort().at(-1) || '';
     return {
-      ...initialPayload,
-      title: title.trim() || (supervisor ? (krs[0]?.result || krs[0]?.action || krs[0]?.businessObject || '主管目标') : ''),
-      objectiveType,
-      alignments: initialPayload?.alignments ?? (supervisor ? alignmentActions.map(action => ({ parentObjectiveId: String(action.payload.parentObjectiveId || ''), parentKeyResultId: String(action.payload.parentKeyResultId || action.id) })) : []),
+      ...effectiveInitial,
+      ...(threeLevel ? { ...objectiveTiming, goalModelVersion: 2 as const, goalLevel: root ? 'company' as const : personal || ownPersonal ? 'personal' as const : 'department' as const, inherited: false, changeReason } : {}),
+      title: title.trim() || (!threeLevel && supervisor ? (krs[0]?.result || krs[0]?.action || krs[0]?.businessObject || '主管目标') : ''),
+      objectiveType: threeLevel && !root && ((!reference && !autonomous) || personal) ? 'target' : objectiveType,
+      alignments: effectiveInitial?.alignments ?? (supervisor ? (threeLevel ? reference ? [reference] : [] : alignmentActions).map(action => ({ parentObjectiveId: String(action.payload.parentObjectiveId || ''), parentKeyResultId: String(action.payload.parentKeyResultId || action.id) })) : []),
       weight: objectiveWeight,
-      deadline: latestKrDate || undefined,
+      deadline: planLocked ? initialPayload?.deadline : (ownPersonal ? krs[0]?.executionActions?.map(action => action.deadline).filter(Boolean).sort().at(-1) : latestKrDate) || undefined,
       note,
-      keyResults: krs.map(kr => ({ ...kr, title: kr.title.trim() || (supervisor ? (kr.result || kr.action || kr.businessObject || `A${krs.indexOf(kr) + 1}`) : ''), ...(kr.deadline ? { deadline: kr.deadline } : {}) })),
+      ...(autonomous ? (() => { const source = availableSources.find(item => selectedSource.startsWith(`${item.id}:`)); const krId = source ? selectedSource.slice(source.id.length + 1) : undefined; return { origin: 'autonomous' as const, sourceObjectiveId: source?.id, sourceKrId: krId || undefined, sourceVersion: source?.version, sourceTitle: (source ? sourceKeyResults(source).find(kr => kr.id === krId)?.title : undefined) || source?.payload.title, alignments: source ? [{ parentObjectiveId: source.id, parentKeyResultId: krId || undefined }] : [] }; })() : {}),
+      keyResults: ownPersonal ? krs.map(kr => ({ ...kr, title: title.trim(), deadline: planLocked ? kr.deadline : kr.executionActions?.map(action => action.deadline).filter(Boolean).sort().at(-1), weight: 100, assigneeIds: [ownerId] })) : krs.map((kr, index) => ({ ...kr, ...(threeLevel && supervisor && !personal && !ownPersonal ? { structureType: actionTypeForIndex(index) as 'support' | 'product' | 'delivery' } : {}), title: threeLevel && supervisor && !personal && !ownPersonal ? [kr.businessObject, kr.version, kr.stage, kr.action, kr.result].filter(Boolean).join(' · ') : kr.title.trim() || (supervisor ? (kr.result || kr.action || kr.businessObject || `A${krs.indexOf(kr) + 1}`) : ''), ...(kr.deadline ? { deadline: kr.deadline } : {}) })),
     };
   };
   const submit = async (fromBatch = false): Promise<boolean> => {
     if ((!fromBatch && busy) || unavailable || readOnly) return false;
-    if (supervisor && !alignmentActions.length) { setError('暂无需要承接的动作，无法提交。'); return false; }
-    if (exceedsParentDeadline) { setError(`动作截止日期不能超过上级动作截止日期 ${parentDeadline}。`); return false; }
-    if ((!supervisor && !title.trim()) || krs.length === 0 || (!supervisor && krs.some(kr => !kr.title.trim()))) { setError('请填写目标名称和每条 A 动作。'); return false; }
+    if (threeLevel) { const validation = validateThreeLevelGoal(payload(), ownerId); if (validation) { setError(validation); return false; } if (planLocked && !root && !changeReason.trim()) { setError('请填写修改原因'); return false; } setError(''); return onSave(payload()); }
+    if (supervisor && !alignmentActions.length && !autonomous) { setError('暂无需要承接的动作，无法提交。'); return false; }
+    if (!autonomous && exceedsParentDeadline) { setError(`动作截止日期不能超过上级动作截止日期 ${parentDeadline}。`); return false; }
+    if ((!supervisor && !title.trim()) || krs.length === 0 || (!supervisor && krs.some(kr => !kr.title.trim()))) { setError('请填写目标名称和每条 KR。'); return false; }
     if (!isSubmissionWeight(objectiveWeight)) { setError('目标权重须为 1-100 的整数。'); return false; }
-    if (krs.some(kr => !isSubmissionDeadline(kr.deadline))) { setError('请设置每条 A 动作的有效截止日期。'); return false; }
-    if (supervisor && !initialPayload?.parentObjectiveId && krs.some((kr, index) => actionTypeForKr(index) === 'support' ? !kr.businessObject?.trim() || !kr.action?.trim() || !kr.result?.trim() : !kr.businessObject?.trim() || !kr.version?.trim() || !kr.stage?.trim())) { setError('请按每条 A 的模板填写完整业务字段。'); return false; }
-    if (krs.some(kr => !isSubmissionWeight(kr.weight)) || (krWeightTotal !== 100 && !(initialPayload?.parentObjectiveId && krWeightTotal === calculateKrWeightTotal(initialPayload.keyResults || [])))) { setError('A 权重须为 1-100 的整数，合计为 100%。'); return false; }
+    if (krs.some(kr => !isSubmissionDeadline(kr.deadline))) { setError('请设置每条 KR的有效截止日期。'); return false; }
+    if (supervisor && !initialPayload?.parentObjectiveId && krs.some((kr, index) => actionTypeForKr(index) === 'support' ? !kr.businessObject?.trim() || !kr.action?.trim() || !kr.result?.trim() : !kr.businessObject?.trim() || !kr.version?.trim() || !kr.stage?.trim())) { setError('请按每条 KR 的模板填写完整业务字段。'); return false; }
+    if (krs.some(kr => !isSubmissionWeight(kr.weight)) || (krWeightTotal !== 100 && !(initialPayload?.parentObjectiveId && krWeightTotal === calculateKrWeightTotal(initialPayload.keyResults || [])))) { setError('KR 权重须为 1-100 的整数，合计为 100%。'); return false; }
     setError('');
     return onSave(payload());
   };
   const saveDraft = async (fromBatch = false): Promise<boolean> => {
     if ((!fromBatch && busy) || unavailable || readOnly) return false;
     if (!onSaveDraft) return false;
-    if (!title.trim() && !supervisor) { setError('请先填写目标名称。'); return false; }
+    if (!title.trim() && (!supervisor || threeLevel)) { setError('请先填写目标名称。'); return false; }
     if (!isSubmissionWeight(objectiveWeight)) { setError('目标权重须为 1-100 的整数。'); return false; }
-    if (exceedsParentDeadline) { setError(`动作截止日期不能超过上级动作截止日期 ${parentDeadline}。`); return false; }
+    if (!autonomous && exceedsParentDeadline) { setError(`动作截止日期不能超过上级动作截止日期 ${parentDeadline}。`); return false; }
+    if (threeLevel && !root && !reference && !autonomous) { setError('暂无指派给本人的 KR'); return false; }
     return onSaveDraft(payload());
   };
   useImperativeHandle(ref, () => ({
@@ -137,7 +159,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const renderSupervisorFields = (kr: OkrKr, index: number) => {
     const type = actionTypeForIndex(index);
     if (type === 'support') return <><Select aria-label={`A${index + 1} 类型`} placeholder="选择类型" value={kr.businessObject} options={typeOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value })}/><Input aria-label={`A${index + 1} 动作`} placeholder="输入动作" value={kr.action} onChange={event => changeKr(kr.id, { action: event.target.value })}/><Input aria-label={`A${index + 1} 结果`} placeholder="输入结果" value={kr.result} onChange={event => changeKr(kr.id, { result: event.target.value })}/></>;
-    if (type === 'product') return <><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.businessObject} options={productLineOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value, version: undefined })}/><Select aria-label={`A${index + 1} 版本`} placeholder="选择版本" value={kr.version} disabled={!kr.businessObject} options={(productLineVersionOptions[kr.businessObject || ''] || []).map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 阶段`} placeholder="选择阶段" value={kr.stage} options={stageOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/>{kr.stage && <span className="supervisor-stage-department">对应部门：{stageDepartments[kr.stage]}</span>}{renderStageDeadlines(kr)}</>;
+    if (type === 'product') return <><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.businessObject} options={productLineOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value, version: undefined })}/><Select aria-label={`A${index + 1} 版本`} placeholder="选择版本" value={kr.version} disabled={!kr.businessObject} options={(productLineVersionOptions[kr.businessObject || ''] || []).map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 阶段`} placeholder="选择阶段" value={kr.stage} options={stageOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/>{renderStageDeadlines(kr)}</>;
     if (type === 'presales') { const products = opportunityOptions.find(item => item.value === kr.businessObject)?.products || []; return <><Select aria-label={`A${index + 1} 商机`} placeholder="选择商机" value={kr.businessObject} options={opportunityOptions.map(item => ({ value: item.value, label: item.label }))} onChange={value => changeKr(kr.id, { businessObject: value, version: undefined })}/><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.version} disabled={!kr.businessObject} options={products.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 阶段`} placeholder="选择阶段" value={kr.stage} options={stageOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/></>; }
     const products = projectProductOptions[kr.businessObject || ''] || productLineOptions;
     return <><Select aria-label={`A${index + 1} 项目`} placeholder="选择项目" value={kr.businessObject} options={projectOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { businessObject: value, version: undefined })}/><Select aria-label={`A${index + 1} 产品`} placeholder="选择产品" value={kr.version} disabled={!kr.businessObject} options={products.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { version: value })}/><Select aria-label={`A${index + 1} 类型`} placeholder="选择类型" value={kr.stage} options={typeOptions.map(value => ({ value, label: value }))} onChange={value => changeKr(kr.id, { stage: value })}/></>;
@@ -155,37 +177,60 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     const orderedRows = stageOptions.filter(stage => deadlineByStage.has(stage)).map(stage => `${stageShortLabels[stage]}：${deadlineByStage.get(stage)}`);
     return orderedRows.length ? <div className="supervisor-stage-deadlines" aria-label="同产品版本阶段截止时间">{orderedRows.join('；')}</div> : null;
   };
+  const canAddContent = () => {
+    if (!goalContentComplete(payload())) { setError(GOAL_ADDITION_MESSAGE); return false; }
+    setError(''); return true;
+  };
+  const ownKrIds = krs.filter(kr => personal || ownPersonal || kr.assigneeIds?.includes(ownerId)).map(kr => kr.id);
+  const addOwnAction = (krId: string) => {
+    if (busy || readOnly || !canAddContent()) return;
+    setKrs(items => items.map(kr => {
+      if (kr.id !== krId || (kr.executionActions || []).length >= 20) return kr;
+      const actions = [...(kr.executionActions || []), { id: crypto.randomUUID(), ownerId, title: '', progress: 0, weight: 0 }];
+      return { ...kr, executionActions: actions.map((action, index) => ({ ...action, weight: Math.floor(100 / actions.length) + (index < 100 % actions.length ? 1 : 0) })) };
+    }));
+  };
   const moveKr = (from: number, to: number) => setKrs(items => { const copy = [...items]; [copy[from], copy[to]] = [copy[to], copy[from]]; return copy; });
   return <Form className={`okr-objective-form${isCompanyStyle ? ' company-objective-form' : ''}${supervisor ? ' supervisor-objective-form' : ''}`} disabled={busy || readOnly} onFinish={() => void submit()}>
     {chrome && <div className="okr-objective-period">{dayjs(cycle).format('YYYY年MM月')}{!compactDetail && <span>{periodStatusLabel(cycle)}</span>}{detailMode && <Button type="text" onClick={onCancel} disabled={busy}>取消</Button>}</div>}
     <div className="okr-objective-body">
-      {(root || supervisor) && <div className={`company-objective-alignment${supervisor ? ' is-supervisor-alignment' : ''}`}>{root && <span className="company-alignment-period">{dayjs(cycle).format('YYYY年MM月')}目标</span>}{supervisor && (alignmentActions.length > 0 ? <div className="supervisor-alignment-actions">{alignmentActions.map(action => <div key={action.id} className="supervisor-alignment-action">{action.payload.title}——来源于上级{people.find(person => person.id === action.ownerId)?.name || '未知人员'}</div>)}</div> : <span className="supervisor-alignment-placeholder">暂无需要承接的动作</span>)}</div>}
-      <div className={`okr-objective-columns okr-objective-head${supervisor ? ' supervisor-objective-head' : ''}`}>
-        <span>{supervisor ? '' : '目标与动作'}</span><span>权重</span><span>截止日期</span><span/>
+      {autonomous && <Alert className="okr-source-readiness" type="info" title={upstreamReadiness(okrRecords, person, cycle)} showIcon/>}
+      <div className="okr-objective-columns okr-source-heading">
+        <div className="company-objective-alignment">
+          {autonomous ? <><Typography.Text type="secondary">自主提出 · {selectedSource ? '已选择对齐' : '未对齐'}</Typography.Text><Button type="text" size="small" className="okr-alignment-trigger" icon={<PlusIcon/>} disabled={busy || readOnly} onClick={() => setAlignmentOpen(true)}>选择对齐</Button></> : root ? <span>{dayjs(cycle).format('YYYY年MM月')}目标</span> : <div className="supervisor-alignment-actions">{(threeLevel ? reference ? [reference] : [] : alignmentActions).map(action => <div key={action.id} className="supervisor-alignment-action">{action.payload.title}——来源于上级{people.find(person => person.id === action.ownerId)?.name || '未知人员'}</div>)}{!alignmentActions.length && <span className="supervisor-alignment-placeholder">暂无需要承接的动作</span>}</div>}
+        </div><span>权重</span><span>截止日期</span><span/>
       </div>
       <div className="okr-objective-columns">
         <div className="okr-objective-title">
-          {isCompanyStyle ? <Dropdown disabled={busy || readOnly} menu={{selectedKeys:[objectiveType],items:[{key:'target',label:'CO · 承诺目标'},{key:'challenge',label:'TO · 挑战目标'}],onClick:({key}) => setObjectiveType(key as 'target' | 'challenge')}}><Button className={`okr-objective-kind ${objectiveType === 'challenge' ? 'is-challenge' : ''}`} aria-label={`目标编号 O${objectiveIndex + 1}`}>{objectiveType === 'challenge' ? 'TO' : 'CO'}{objectiveIndex + 1}</Button></Dropdown> : <span className="okr-objective-kind" aria-label={`目标编号 O${objectiveIndex + 1}`}>O{objectiveIndex + 1}</span>}
-          <Input aria-label="目标名称" variant="borderless" maxLength={255} value={title} onChange={event => setTitle(event.target.value)} placeholder={root ? '输入目标名称：明确你要达成什么，不写含糊概括的目标' : '输入目标名称'}/>
+          {personal ? <span className="okr-objective-kind" aria-label="承接的 KR">KR</span> : threeLevel && !root && (!reference && !autonomous) ? <span className="okr-objective-kind" aria-label={`目标编号 O${objectiveIndex + 1}`}>O{objectiveIndex + 1}</span> : isCompanyStyle ? <Dropdown disabled={busy || readOnly} menu={{selectedKeys:[objectiveType],items:[{key:'target',label:'CO · 承诺目标'},{key:'challenge',label:'TO · 挑战目标'}],onClick:({key}) => setObjectiveType(key as 'target' | 'challenge')}}><Button className={`okr-objective-kind ${objectiveType === 'challenge' ? 'is-challenge' : ''}`} aria-label={`目标编号 O${objectiveIndex + 1}`}>{objectiveType === 'challenge' ? 'TO' : 'CO'}{objectiveIndex + 1}</Button></Dropdown> : <span className="okr-objective-kind" aria-label={`目标编号 O${objectiveIndex + 1}`}>O{objectiveIndex + 1}</span>}
+          {personal ? <Typography.Text>{title || '暂无指派给本人的 KR'}</Typography.Text> : <Input aria-label="目标名称" variant="borderless" maxLength={255} value={title} readOnly={personal} onChange={event => setTitle(event.target.value)} placeholder={threeLevel && supervisor && !personal && !ownPersonal ? '输入部门目标及指标，例如 APP 日新增提高至 1 万' : root ? '输入目标名称：明确你要达成什么，不写含糊概括的目标' : '输入目标名称'}/>}
         </div>
-        {isCompanyStyle ? <span className="company-objective-weight-summary">{objectiveWeight}%</span> : <InputNumber aria-label="目标权重" min={1} max={100} precision={0} suffix="%" value={objectiveWeight} onChange={value => setObjectiveWeight(value ?? 0)}/>}
+        {isCompanyStyle || personal ? <span className="company-objective-weight-summary">{objectiveWeight}%</span> : <InputNumber aria-label="目标权重" min={1} max={100} precision={0} suffix="%" value={objectiveWeight} onChange={value => setObjectiveWeight(value ?? 0)}/>}
         <span className="okr-objective-deadline">{krs.map(kr => kr.deadline).filter(Boolean).sort().at(-1) || '—'}</span>
         {onRemove && !readOnly ? <Popconfirm title={`删除目标 O${objectiveIndex + 1}？`} description="将移除该目标及其未保存的动作，其他目标不受影响。" okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={onRemove} disabled={busy}><Button type="text" danger aria-label={`删除新增目标 O${objectiveIndex + 1}`} icon={<TrashIcon/>} disabled={busy}/></Popconfirm> : <span/>}
       </div>
       {(root || supervisor) && <div className="company-objective-metadata"><span>{levelLabel || (root ? '公司级' : '主管级')}</span>{supervisor && <span>{department || '—'}</span>}<Tooltip title={ownerName}><span className="company-objective-owner" aria-label={ownerName}>{ownerAvatar ? <Avatar size={24} src={ownerAvatar}>{Array.from(ownerName)[0]}</Avatar> : <PersonAvatar name={ownerName}/>}<span>{Array.from(ownerName).slice(0, 2).join('')}{Array.from(ownerName).length > 2 ? '...' : ''}</span></span></Tooltip><InputNumber aria-label="目标权重" min={1} max={100} precision={0} suffix="%" value={objectiveWeight} onChange={value => setObjectiveWeight(value ?? 0)}/></div>}
       <div className="okr-objective-krs">
-        {krs.map((kr, index) => <div key={kr.id} draggable={!busy} className={`okr-objective-columns okr-objective-kr${draggingIndex === index ? ' is-dragging' : ''}${dragOverIndex === index && draggingIndex !== index ? ' is-drag-over' : ''}`} onPointerDown={event => { dragHandleIndex.current = (event.target as Element).closest('.okr-kr-drag') ? index : null; }} onDragStart={event => { if (dragHandleIndex.current !== index) { event.preventDefault(); return; } event.dataTransfer.setData('text/plain', String(index)); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setDragImage(event.currentTarget, 24, 20); setDraggingIndex(index); }} onDragEnd={() => { dragHandleIndex.current = null; setDraggingIndex(null); setDragOverIndex(null); }} onDragOver={event => { if (draggingIndex === null) return; event.preventDefault(); if (krs.length > 1) setDragOverIndex(index); }} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (krs.length > 1 && Number.isInteger(from) && from !== index) moveKr(from, index); dragHandleIndex.current = null; setDraggingIndex(null); setDragOverIndex(null); }}>
-          <div className="okr-objective-kr-title"><span className="okr-kr-drag" title="拖动调整顺序" aria-label={`拖动 A${index + 1}`}><GrabberIcon/></span><span>A{index + 1}</span>{!supervisor && <Input aria-label={`A${index + 1} 名称`} variant="borderless" maxLength={2000} value={kr.title} onChange={event => changeKr(kr.id, { title: event.target.value })} placeholder={root ? '输入动作名称：要写工作结果（做到什么），不能只写动作描述（做什么）' : '输入动作名称'}/>}</div>
-          <InputNumber aria-label={`A${index + 1} 权重`} min={1} max={100} precision={0} suffix="%" value={kr.weight} onChange={value => changeKr(kr.id, { weight: value ?? 0 })}/>
-          <DatePicker aria-label={`A${index + 1} 截止日期`} placeholder="截止日期" disabledDate={date => Boolean(supervisor && parentDeadline && date.isAfter(dayjs(parentDeadline), 'day'))} value={kr.deadline ? dayjs(kr.deadline) : null} onChange={value => changeKr(kr.id, { deadline: value?.format('YYYY-MM-DD') })}/>
-          <Tooltip title="删除动作"><Button aria-label={`删除 A${index + 1}`} type="text" icon={<TrashIcon/>} disabled={busy || krs.length === 1} onClick={() => setKrs(items => distribute(items.filter(item => item.id !== kr.id)))}/></Tooltip>
-          {supervisor && <div className="supervisor-action-fields">{renderSupervisorFields(kr, index)}</div>}
-          <Select className="okr-action-assignees" aria-label={`A${index + 1} 承接人员`} mode="multiple" allowClear showSearch optionFilterProp="label" maxTagCount="responsive" placeholder="指定承接人员（可选）" value={kr.assigneeIds || []} onChange={assigneeIds => changeKr(kr.id, { assigneeIds })} options={assigneeOptions}/>
+        {(ownPersonal || personal ? [] : krs).map((kr, index) => <div key={kr.id} draggable={!busy} className={`okr-objective-columns okr-objective-kr${draggingIndex === index ? ' is-dragging' : ''}${dragOverIndex === index && draggingIndex !== index ? ' is-drag-over' : ''}`} onPointerDown={event => { dragHandleIndex.current = (event.target as Element).closest('.okr-kr-drag') ? index : null; }} onDragStart={event => { if (dragHandleIndex.current !== index) { event.preventDefault(); return; } event.dataTransfer.setData('text/plain', String(index)); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setDragImage(event.currentTarget, 24, 20); setDraggingIndex(index); }} onDragEnd={() => { dragHandleIndex.current = null; setDraggingIndex(null); setDragOverIndex(null); }} onDragOver={event => { if (draggingIndex === null) return; event.preventDefault(); if (krs.length > 1) setDragOverIndex(index); }} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (krs.length > 1 && Number.isInteger(from) && from !== index) moveKr(from, index); dragHandleIndex.current = null; setDraggingIndex(null); setDragOverIndex(null); }}>
+          <div className="okr-objective-kr-title"><span className="okr-kr-drag" title="拖动调整顺序" aria-label={`拖动 A${index + 1}`}><GrabberIcon/></span><span>KR{index + 1}</span>{personal && <Typography.Text>{kr.title}</Typography.Text>}{!supervisor && !personal && <Input aria-label={`A${index + 1} 名称`} variant="borderless" maxLength={2000} value={kr.title} readOnly={personal} onChange={event => changeKr(kr.id, { title: event.target.value })} placeholder={threeLevel ? '输入关键结果名称' : root ? '输入动作名称：要写工作结果（做到什么），不能只写动作描述（做什么）' : '输入动作名称'}/>}</div>
+          {personal ? <span>{kr.weight}%</span> : <InputNumber aria-label={`A${index + 1} 权重`} min={1} max={100} precision={0} disabled={personal} suffix="%" value={kr.weight} onChange={value => changeKr(kr.id, { weight: value ?? 0 })}/>}
+          {personal ? <span>{kr.deadline || '未设置'}</span> : <DatePicker aria-label={`KR${index + 1} 截止日期`} placeholder="截止日期" disabled={personal || (planLocked && !!initialPayload?.keyResults?.some(item => item.id === kr.id && !!item.deadline))} disabledDate={date => Boolean(supervisor && parentDeadline && date.isAfter(dayjs(parentDeadline), 'day'))} value={kr.deadline ? dayjs(kr.deadline) : null} onChange={value => changeKr(kr.id, { deadline: value?.format('YYYY-MM-DD') })}/>}
+          <Tooltip title="删除动作"><Button aria-label={`删除 A${index + 1}`} type="text" icon={<TrashIcon/>} disabled={busy || personal || krs.length === 1} onClick={() => setKrs(items => distribute(items.filter(item => item.id !== kr.id)))}/></Tooltip>
+          {supervisor && !personal && !ownPersonal && <div className="supervisor-action-fields"> {renderSupervisorFields(kr, index)}</div>}
+          {!personal && <Select className="okr-action-assignees" aria-label={`A${index + 1} 承接人员`} mode="multiple" allowClear showSearch optionFilterProp="label" maxTagCount="responsive" placeholder="指定承接人员（可选）" value={kr.assigneeIds || []} onChange={assigneeIds => changeKr(kr.id, { assigneeIds })} options={assigneeOptions}/>}
+          {threeLevel && !root && (personal || kr.assigneeIds?.includes(ownerId)) && <GoalExecutionFields actions={kr.executionActions || []} ownerId={ownerId} disabled={busy || readOnly} locked={planLocked} onChange={executionActions => changeKr(kr.id, { executionActions })}/>}
+          {threeLevel && planLocked && <div className="okr-own-actions">{!personal && <InputNumber aria-label={`KR${index + 1}结果进度`} min={0} max={100} precision={0} suffix="%" value={kr.progress} disabled={busy || readOnly} onChange={progress => changeKr(kr.id, { progress: progress ?? 0 })}/>}<GoalTimeFields value={kr} disabled={busy || readOnly || personal} onChange={patch => changeKr(kr.id, patch)}/></div>}
         </div>)}
       </div>
-      <div className="okr-objective-add">{!readOnly && <Button type="text" icon={<PlusIcon/>} disabled={busy || krs.length >= 4} onClick={() => setKrs(items => distribute([...items, { id: crypto.randomUUID(), title: '', weight: 0, progress: 0 }]))}>{isCompanyStyle ? '添加动作' : '继续添加'}</Button>}{supervisor && <span className="okr-objective-limit-hint">最多 4 条，按顺序使用四类模板</span>}<span>A 权重合计 {krWeightTotal}%</span></div>
+      {(ownPersonal || personal) && <GoalExecutionFields ownerId={ownerId} actions={krs[0]?.executionActions || []} locked={planLocked} disabled={busy || readOnly} onChange={executionActions => setKrs(items => [{ ...(items[0] || { id: crypto.randomUUID(), title: '', weight: 100, progress: 0 }), assigneeIds: [ownerId], executionActions }])}/>}
+      <div className="okr-objective-add"><div className="okr-add-operations">{!readOnly && !personal && !ownPersonal && <Button type="text" icon={<PlusIcon/>} disabled={busy || krs.length >= (threeLevel ? settings?.validation.maxActions || 8 : 4)} onClick={() => { if (canAddContent()) setKrs(items => distribute([...items, { id: crypto.randomUUID(), title: '', weight: 0, progress: 0 }])); }}>添加关键结果</Button>}{threeLevel && !root && ownKrIds.length > 0 && !readOnly && (ownKrIds.length > 1 ? <Dropdown disabled={busy} menu={{items:ownKrIds.map(id => ({key:id,label:`KR${krs.findIndex(kr => kr.id === id)+1} · ${krs.find(kr=>kr.id===id)?.title || '本人承接的关键结果'}`,disabled:(krs.find(kr=>kr.id===id)?.executionActions?.length || 0)>=20})),onClick:({key})=>addOwnAction(key)}}><Button type="text" icon={<PlusIcon/>} disabled={busy}>添加本人动作</Button></Dropdown> : <Button type="text" icon={<PlusIcon/>} disabled={busy || (krs.find(kr=>kr.id===ownKrIds[0])?.executionActions?.length || 0)>=20} onClick={()=>addOwnAction(ownKrIds[0])}>添加本人动作</Button>)}
+        </div><span>{ownPersonal || personal ? 'A' : 'KR'} 权重合计 {ownPersonal || personal ? (krs[0]?.executionActions || []).reduce((sum, action) => sum + (action.weight ?? 0), 0) : krWeightTotal}%</span></div>
+      {threeLevel && planLocked && <div className="okr-own-actions"><GoalTimeFields value={objectiveTiming} disabled={busy || readOnly || personal} onChange={patch => setObjectiveTiming(current => ({ ...current, ...patch }))}/>{!root && <Input.TextArea aria-label="修改原因" placeholder="修改原因（提交上级审核）" maxLength={1000} value={changeReason} onChange={event => setChangeReason(event.target.value)} disabled={busy || readOnly}/>}</div>}
+      {threeLevel && !root && !reference && !autonomous && <Alert type="info" title="暂无指派给本人的 KR，请等待上级指派后填写" showIcon/>}
+      {initialPayload?.reviewerSuggestedSource && <Alert type="warning" title="上级要求补充对齐，请在来源区域核对建议目标后重新提交" description={(() => { const suggestion = initialPayload.reviewerSuggestedSource || ''; const source = availableSources.find(item => suggestion.startsWith(`${item.id}:`)); return source ? source.payload.keyResults?.find(kr => `${source.id}:${kr.id}` === suggestion)?.title || source.payload.title : '建议来源已变化，请重新选择本月已生效的上级目标'; })()} showIcon/>}
       {error && <Alert type="warning" title={error} showIcon/>}
     </div>
-    {chrome && <div className="okr-objective-footer">{(!detailMode || allowAddAnotherInDetail) && <Button type="text" onClick={onAddAnother} disabled={busy || readOnly}>+ 添加目标</Button>}<span className="okr-objective-footer-spacer"/>{!detailMode && <Button onClick={onCancel} disabled={busy}>返回列表</Button>}{!readOnly && <>{onSaveDraft && <Button onClick={() => void saveDraft()} disabled={busy || unavailable}>存草稿</Button>}<Button type="primary" htmlType="submit" loading={busy} disabled={unavailable || (supervisor && !alignmentActions.length)}>{submitLabel ?? (isCompanyStyle ? '提交目标' : '提交主管确认')}</Button></>}</div>}
+    <GoalAlignmentDrawer open={alignmentOpen} records={availableSources} cycle={cycle} value={selectedSource} onCancel={()=>setAlignmentOpen(false)} onConfirm={value=>{setSelectedSource(value);setAlignmentOpen(false);}}/>
+    {chrome && <div className="okr-objective-footer">{(!detailMode || allowAddAnotherInDetail) && <Button type="text" onClick={() => { if (canAddContent()) onAddAnother?.(); }} disabled={busy || readOnly}>+ 添加目标</Button>}<span className="okr-objective-footer-spacer"/>{!detailMode && <Button onClick={onCancel} disabled={busy}>返回列表</Button>}{!readOnly && <>{onSaveDraft && <Button onClick={() => void saveDraft()} disabled={busy || unavailable}>存草稿</Button>}<Button type="primary" htmlType="submit" loading={busy} disabled={unavailable || (supervisor && !alignmentActions.length && !autonomous)}>{submitLabel ?? (isCompanyStyle ? '提交目标' : '提交主管确认')}</Button></>}</div>}
   </Form>;
 });

@@ -5,7 +5,7 @@ import { MOCK_SNAPSHOT_VERSION } from '../data/mockSnapshot';
 import type { RequirementTask } from '../types';
 import type { PageResult } from './apiClient';
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
-const create = async (kind: 'presales' | 'delivery', title: string) => await mockApiRequest('/api/' + kind + '-tasks', { method: 'POST', body: JSON.stringify({ title }) }) as { id: string };
+const create = async (kind: 'presales' | 'delivery' | 'ops', title: string) => await mockApiRequest('/api/' + kind + '-tasks', { method: 'POST', body: JSON.stringify({ title }) }) as { id: string };
 describe('local commercial task routes', () => {
   it('seeds eight tasks per kind and paginates independent stores', async () => {
     expect((await mockApiRequest('/api/presales-tasks') as PageResult<RequirementTask>).total).toBe(8);
@@ -67,4 +67,41 @@ describe('local commercial task routes', () => {
     expect(activities[1].content).toEqual({ content: '已联系客户' });
     await expect(mockApiRequest('/api/delivery-tasks/' + created.id + '/comments', { method: 'POST', body: JSON.stringify({ content: ' ' }) })).rejects.toThrow('评论内容');
   });
+});
+
+it('moves a delivery task to review when a different creator completes it, then supports approval and rejection', async () => {
+  const created = await mockApiRequest('/api/delivery-tasks', { method: 'POST', body: JSON.stringify({ title: '需要主管审核的交付任务', ownerName: '毛景强', assigneeId: 'u-002', estimatedHours: 4 }) }) as { id: string };
+  await mockApiRequest(`/api/delivery-tasks/${created.id}`, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 4 }) });
+  expect(await mockApiRequest(`/api/delivery-tasks/${created.id}`)).toMatchObject({ status: '待审核' });
+  await mockApiRequest(`/api/delivery-tasks/${created.id}/review`, { method: 'POST', body: JSON.stringify({ action: 'reject', comment: '请补充验收记录' }) });
+  expect(await mockApiRequest(`/api/delivery-tasks/${created.id}`)).toMatchObject({ status: '处理中' });
+  const approved = await mockApiRequest('/api/delivery-tasks', { method: 'POST', body: JSON.stringify({ title: '审核通过任务', ownerName: '毛景强', assigneeId: 'u-002', estimatedHours: 4 }) }) as { id: string };
+  await mockApiRequest(`/api/delivery-tasks/${approved.id}`, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 4 }) });
+  await mockApiRequest(`/api/delivery-tasks/${approved.id}/review`, { method: 'POST', body: JSON.stringify({ action: 'approve', comment: '验收通过' }) });
+  expect(await mockApiRequest(`/api/delivery-tasks/${approved.id}`)).toMatchObject({ status: '已完成' });
+  await expect(mockApiRequest(`/api/delivery-tasks/${approved.id}/review`, { method: 'POST', body: JSON.stringify({ action: 'approve' }) })).rejects.toThrow('待审核');
+});
+it('keeps business tasks out of product work-item templates and supports ops route', async () => {
+  const ops = await mockApiRequest('/api/ops-tasks') as PageResult<RequirementTask>;
+  expect(ops.items.length).toBeGreaterThan(0);
+  const categories = await mockApiRequest('/api/work-item-categories') as Array<{ code: string }>;
+  expect(categories.map((item) => item.code)).toEqual(expect.arrayContaining(['ops', 'presales', 'delivery']));
+  const templates = await mockApiRequest('/api/work-item-template') as Array<{ category: string }>;
+  expect(templates.some((item) => ['ops', 'presales', 'delivery'].includes(item.category))).toBe(false);
+});
+
+it('provides multiple status candidates for product task transitions when the type has no stored workflow', async () => {
+  const page = await mockApiRequest('/api/work-items') as { page: { items: Array<{ id: string; productLineId: string }> } };
+  const item = page.page.items[0];
+  expect(item).toBeTruthy();
+  if (!item) return;
+  const options = await mockApiRequest(`/api/work-items/${item.id}/transitions?productLineId=${item.productLineId}`);
+  expect(options.statuses.length).toBeGreaterThan(1);
+});
+
+it('seeds plan dates for estimated product work items used by the hours timeline', async () => {
+  const result = await mockApiRequest('/api/work-items') as { page: { items: Array<{ estimatedHours?: number; plannedStartDate?: string; plannedEndDate?: string }> } };
+  const planned = result.page.items.filter((item) => Number(item.estimatedHours || 0) > 0);
+  expect(planned.length).toBeGreaterThan(0);
+  expect(planned.every((item) => item.plannedStartDate && item.plannedEndDate)).toBe(true);
 });

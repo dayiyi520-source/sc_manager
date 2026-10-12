@@ -31,7 +31,7 @@ export const WorkItemModuleView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const categoryOptions = useMemo(() => categories.filter((item) => isTaskCategory(item.code) && item.capabilityType !== 'TEST_CASE').sort((a, b) => a.sort - b.sort).map((item) => ({ value: categoryValue(item.code), label: item.displayName, enabled: item.enabled })), [categories]);
+  const categoryOptions = useMemo(() => categories.filter((item) => !['ops', 'presales', 'delivery'].includes(item.code) && isTaskCategory(item.code) && item.capabilityType !== 'TEST_CASE').sort((a, b) => a.sort - b.sort).map((item) => ({ value: categoryValue(item.code), label: item.displayName, enabled: item.enabled })), [categories]);
   const selectedDefinition = categories.find((item) => item.code === category || item.name === category || item.displayName === category);
   const categoryCode = selectedDefinition?.code || CATEGORY_CODE[category as keyof typeof CATEGORY_CODE] || category;
   const visible = useMemo(() => items.filter((item) => item.category === category || item.category === selectedDefinition?.name || item.category === selectedDefinition?.displayName || item.category === categoryCode), [items, category, selectedDefinition, categoryCode]);

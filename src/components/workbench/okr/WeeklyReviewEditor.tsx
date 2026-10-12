@@ -14,20 +14,22 @@ import {
   Select,
   Space,
   Table,
-  Tabs,
   Tag
 } from 'antd';
 import dayjs from 'dayjs';
 import type { EmployeeOption, OKRItem, WorkOrderType } from '../../../types';
 import type { OkrPayload, OkrWork } from '../../../services/okrRepository';
-import { AlertTriangle, Plus, Save, Search, Send, Trash2 } from '@/components/common/octicons-compat';
-import { periodWork, workSource } from './workAggregation';
+import { AlertTriangle, Plus, Save, Send, Trash2 } from '@/components/common/octicons-compat';
+import { workSource } from './workAggregation';
 import { reviewPeriod } from './simpleReview';
 import { mergeCopiedKrReviews } from './reviewCopy';
+import { WorkEvidencePicker } from './WorkEvidencePicker';
+import { defaultCollapsedReview } from './evidenceFilters';
+import type { EvidenceViewer } from '../../../services/reviewEvidenceRepository';
+import type { ReviewPeriod } from '../../../services/okrReviewRules';
 
 type Health = 'normal' | 'risk' | 'blocked';
-type PickerSource = 'task' | 'ticket';
-type PickerState = { target: string; source: PickerSource; selection: string[]; keyword: string; status: string } | null;
+type PickerState = { target: string; selection: string[] } | null;
 type ManualWork = { id: string; content: string; source: string; status: string; hours: string; impact: string; note: string };
 
 export interface KrReviewDraft {
@@ -81,11 +83,12 @@ interface WeeklyReviewEditorProps {
   onSaveDraft: (payload: OkrPayload) => Promise<boolean>;
   onSubmit: (payload: OkrPayload) => Promise<boolean>;
   onCancel: () => void;
-  onAddObjective?: () => void;
+  viewer?: EvidenceViewer;
   reviewerName?: string;
   teamMembers?: EmployeeOption[];
   directSubmit?: boolean;
   initialPayload?: OkrPayload;
+  periodOverride?: ReviewPeriod;
 }
 
 export function WeeklyReviewEditor({
@@ -98,13 +101,15 @@ export function WeeklyReviewEditor({
   onSaveDraft,
   onSubmit,
   onCancel,
-  onAddObjective,
+  viewer,
   reviewerName,
   teamMembers = [],
   directSubmit = false,
-  initialPayload
+  initialPayload,
+  periodOverride
 }: WeeklyReviewEditorProps) {
-  const period = useMemo(() => reviewPeriod('week'), []);
+  const period = useMemo(() => periodOverride || reviewPeriod('week'), [periodOverride]);
+  const periodOkrs = okrs.filter(objective => objective.cycle === period.startDate.slice(0, 7) || objective.cycle === period.endDate.slice(0, 7));
   const start = dayjs(period.startDate);
   const end = dayjs(period.endDate);
 
@@ -125,10 +130,12 @@ export function WeeklyReviewEditor({
   const [sync, setSync] = useState<boolean>(initialPayload?.syncKrProgress ?? true);
   const [submitModalOpen, setSubmitModalOpen] = useState<boolean>(false);
   const [collapsedObjectives, setCollapsedObjectives] = useState<Record<string, boolean>>({});
+  const [collapsedKrs, setCollapsedKrs] = useState<Record<string, boolean>>({});
+  const [nextWeekPlan, setNextWeekPlan] = useState(initialPayload?.nextWeekPlan || '');
   const [picker, setPicker] = useState<PickerState>(null);
   const toolbarSentinelRef = useRef<HTMLDivElement>(null);
   const [toolbarStuck, setToolbarStuck] = useState(false);
-  const selectedObjectiveIds = useMemo(() => okrs.map(o => o.id), [okrs]);
+  const selectedObjectiveIds = useMemo(() => periodOkrs.map(o => o.id), [okrs, period.startDate, period.endDate]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
@@ -144,8 +151,8 @@ export function WeeklyReviewEditor({
   }, []);
 
   const [krs, setKrs] = useState<KrReviewDraft[]>(() => {
-    const currentKrs = okrs.flatMap(o =>
-      (o.keyResults || []).filter(k => k.progress < 100).map((k, kIdx) => ({
+    const currentKrs = periodOkrs.flatMap(o =>
+      (o.keyResults || []).map((k, kIdx) => ({
           objectiveId: o.id,
           objectiveTitle: o.objective,
           keyResultId: k.id,
@@ -159,10 +166,10 @@ export function WeeklyReviewEditor({
           workIds: []
         }))
     );
-    return mergeCopiedKrReviews(currentKrs, initialPayload?.krReviews || []);
+    return initialPayload?.startDate ? currentKrs.map(kr => ({ ...kr, ...initialPayload.krReviews?.find(item => item.keyResultId === kr.keyResultId) })) : mergeCopiedKrReviews(currentKrs, initialPayload?.krReviews || []);
   });
 
-  const [workNotes, setWorkNotes] = useState<Record<string, string>>({});
+  const [workNotes, setWorkNotes] = useState<Record<string, string>>(() => Object.fromEntries((initialPayload?.items || []).map(item => [item.workId, item.result || ''])));
 
   // Section 3: Extra work
   const [extra, setExtra] = useState<{
@@ -171,10 +178,10 @@ export function WeeklyReviewEditor({
     impact: string;
     notes: Record<string, string>;
   }>({
-    workIds: [],
+    workIds: initialPayload?.extraWork?.workIds || [],
     description: initialPayload?.extraWork?.description || '',
     impact: initialPayload?.extraWork?.impact || 'none',
-    notes: {}
+    notes: initialPayload?.extraWork?.notes || {}
   });
 
   const [manualWorks, setManualWorks] = useState<ManualWork[]>(() => {
@@ -203,11 +210,7 @@ export function WeeklyReviewEditor({
     }));
   });
 
-  const candidates = useMemo(
-    () => periodWork(work, period.startDate, period.endDate),
-    [work, period.startDate, period.endDate]
-  );
-  const workById = useMemo(() => new Map(candidates.map(item => [item.id, item])), [candidates]);
+  const workById = useMemo(() => new Map(work.map(item => [item.id, item])), [work]);
 
   const update = (id: string, p: Partial<KrReviewDraft>) =>
     setKrs(rows => rows.map(row => (row.keyResultId === id ? { ...row, ...p } : row)));
@@ -247,12 +250,6 @@ export function WeeklyReviewEditor({
     if (!directSubmit && !reviewerName) {
       errors.push('尚未配置直属上级，无法确定审批人');
     }
-    if (selectedKrs.some(kr => !kr.achievement.trim())) {
-      errors.push('请补充所有已选 A 的本期成果');
-    }
-    if (selectedKrs.some(kr => !kr.nextPlan.trim())) {
-      errors.push('请补充所有已选 A 的下一步计划');
-    }
     if (selectedKrs.some(kr => kr.health !== 'normal' && !kr.blocker.trim())) {
       errors.push('风险或阻塞状态的 A 必须填写原因');
     }
@@ -276,7 +273,8 @@ export function WeeklyReviewEditor({
     reviewType: 'week',
     reviewMode: 'structured',
     selfScore,
-    summary: '',
+    summary: initialPayload?.summary || '',
+    nextWeekPlan: nextWeekPlan.trim(),
     syncKrProgress: sync,
     krReviews: selectedKrs.map(kr => ({
       ...kr,
@@ -291,72 +289,29 @@ export function WeeklyReviewEditor({
       ...extra,
       description: manualWorks.length ? JSON.stringify(manualWorks) : extra.description
     },
-    items: selectedWorks.map(item => ({
-      workId: item.id,
-      title: item.title,
-      status: item.status,
-      workType: workSource(item),
-      result: workNotes[item.id] || '',
-      impact: ''
-    }))
+    items: [
+      ...selectedWorks.map(item => ({
+        workId: item.id,
+        title: item.title,
+        status: item.status,
+        workType: workSource(item),
+        result: workNotes[item.id] || '',
+        impact: ''
+      })),
+      ...(initialPayload?.items || []).filter(item => linkedIds.has(item.workId) && !workById.has(item.workId))
+        .map(item => ({ ...item, result: workNotes[item.workId] ?? item.result }))
+    ]
   });
 
-  const openPicker = (target: string, source: PickerSource = 'task') => {
+  const openPicker = (target: string) => {
     const kr = krs.find(item => item.keyResultId === target);
-    setPicker({
-      target,
-      source,
-      selection: target === 'extra' ? [...extra.workIds] : [...(kr?.workIds || [])],
-      keyword: '',
-      status: 'all'
-    });
+    setPicker({ target, selection: target === 'extra' ? [...extra.workIds] : [...(kr?.workIds || [])] });
   };
-
-  const pickerCandidates = useMemo(() => {
-    if (!picker) return [];
-    return candidates
-      .filter(item => picker.source === workSource(item))
-      .filter(
-        item =>
-          !terminalStatuses.has(item.status) ||
-          (!dayjs(item.updatedAt).isBefore(period.startDate, 'day') &&
-            !dayjs(item.updatedAt).isAfter(period.endDate, 'day'))
-      )
-      .filter(
-        item =>
-          !picker.keyword.trim() ||
-          `${item.title} ${item.sourceId || ''} ${item.id}`.toLowerCase().includes(picker.keyword.trim().toLowerCase())
-      )
-      .filter(item => picker.status === 'all' || item.status === picker.status);
-  }, [candidates, picker, period.startDate, period.endDate]);
-
-  const pickerStatusOptions = useMemo(() => {
-    if (!picker) return [{ value: 'all', label: '全部状态' }];
-    const statuses = candidates
-      .filter(item => picker.source === workSource(item))
-      .map(item => item.status)
-      .filter(Boolean);
-    return [
-      { value: 'all', label: '全部状态' },
-      ...Array.from(new Set(statuses)).map(status => ({ value: status, label: status }))
-    ];
-  }, [candidates, picker]);
-
-  const pickerKr = picker?.target !== 'extra'
-    ? krs.find(kr => kr.keyResultId === picker?.target)
-    : undefined;
-  const pickerKrIndex = pickerKr
-    ? krs.filter(kr => kr.objectiveId === pickerKr.objectiveId)
-      .findIndex(kr => kr.keyResultId === pickerKr.keyResultId) + 1
-    : 0;
-
-  const confirmPicker = () => {
+  const pickerSourceKr = picker?.target === 'extra' ? undefined : periodOkrs.flatMap(objective => objective.keyResults).find(item => item.id === picker?.target);
+  const confirmPicker = (ids: string[]) => {
     if (!picker) return;
-    if (picker.target === 'extra') {
-      setExtra(value => ({ ...value, workIds: picker.selection }));
-    } else {
-      update(picker.target, { workIds: picker.selection });
-    }
+    if (picker.target === 'extra') setExtra(value => ({ ...value, workIds: ids }));
+    else update(picker.target, { workIds: ids });
     setPicker(null);
   };
 
@@ -378,7 +333,7 @@ export function WeeklyReviewEditor({
       .map(item => ({
         id: item.id,
         content: item.title,
-        source: workSource(item) === 'ticket' ? '工单' : '任务',
+        source: workSource(item) === 'ticket' ? '协同事项' : '任务',
         status: item.status,
         hours: item.actualHours ? `${item.actualHours} 小时` : '',
         impact: extra.impact || 'none',
@@ -454,11 +409,7 @@ export function WeeklyReviewEditor({
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
             <span>1. 本月目标复盘</span>
           </div>
-          {onAddObjective && (
-            <Button size="small" icon={<Plus className="h-3.5 w-3.5" />} onClick={onAddObjective}>
-              添加目标
-            </Button>
-          )}
+
         </div>
 
         {objectiveGroups.length === 0 ? (
@@ -470,6 +421,7 @@ export function WeeklyReviewEditor({
             <Collapse
               key={objective.id}
               className="okr-review-objective-collapse"
+              classNames={{ body: 'okr-review-objective-body' }}
               activeKey={collapsedObjectives[objective.id] ? [] : [objective.id]}
               expandIconPosition="end"
               onChange={keys => {
@@ -487,22 +439,19 @@ export function WeeklyReviewEditor({
                   </div>
                 ),
                 children: (
-                <div className="p-5 space-y-6">
+                <div className="okr-review-a-list grid gap-4 p-4">
                   {objectiveKrs.map((kr, krIdx) => {
                   const evidence = kr.workIds
                     .map(id => workById.get(id))
                     .filter((item): item is OkrWork => !!item);
 
+                  const collapsed = collapsedKrs[kr.keyResultId] ?? defaultCollapsedReview(kr);
                   return (
-                    <div
-                      key={kr.keyResultId}
-                      className="bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg p-5 space-y-4"
-                    >
-                      {/* KR Header */}
-                      <div className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 border-b border-[var(--border-main)] pb-3">
-                        <span className="text-[var(--primary)] font-bold">A{krIdx + 1}</span>
-                    <span>关键结果 (A{krIdx + 1})：{kr.keyResultTitle}</span>
-                      </div>
+                    <Collapse key={kr.keyResultId} className="okr-review-a-collapse" activeKey={collapsed ? [] : [kr.keyResultId]} expandIconPosition="end" onChange={keys => setCollapsedKrs(current => ({ ...current, [kr.keyResultId]: !keys.length }))} items={[{
+                      key: kr.keyResultId,
+                      label: <div className="flex flex-wrap items-center gap-3"><strong>A{krIdx + 1}：{kr.keyResultTitle}</strong><Tag>{kr.currentProgress}%</Tag>{defaultCollapsedReview(kr) && kr.currentProgress < 100 ? <Tag>本周无变化</Tag> : null}</div>,
+                      children: <div className="space-y-4">
+
 
                       {/* Progress & Health */}
                       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 py-2.5 px-3.5 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-body)]">
@@ -565,6 +514,21 @@ export function WeeklyReviewEditor({
                         </div>
                       </div>
 
+                      {kr.health !== 'normal' && (
+                        <div className="okr-review-risk-callout">
+                          <AlertTriangle />
+                          <div>
+                            <b>风险原因及所需支持</b>
+                            <Input.TextArea
+                              value={kr.blocker}
+                              onChange={e => update(kr.keyResultId, { blocker: e.target.value })}
+                              autoSize={{ minRows: 2, maxRows: 5 }}
+                              placeholder="说明风险或阻塞原因、外部依赖和所需支持"
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       {/* Evidence Section */}
                       <div className="space-y-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -574,9 +538,9 @@ export function WeeklyReviewEditor({
                           <Button
                             size="small"
                             icon={<Plus className="h-3.5 w-3.5" />}
-                            onClick={() => openPicker(kr.keyResultId, 'task')}
+                            onClick={() => openPicker(kr.keyResultId)}
                           >
-                            关联任务或工单
+                            关联工作证据
                           </Button>
                         </div>
 
@@ -593,7 +557,7 @@ export function WeeklyReviewEditor({
                                   width: 80,
                                   render: (_, item) => (
                                     <Tag color={workSource(item) === 'ticket' ? 'purple' : 'blue'}>
-                                      {workSource(item) === 'ticket' ? '工单' : '任务'}
+                                      {workSource(item) === 'ticket' ? '协同事项' : '任务'}
                                     </Tag>
                                   )
                                 },
@@ -658,48 +622,9 @@ export function WeeklyReviewEditor({
                         )}
                       </div>
 
-                      {kr.health !== 'normal' && (
-                        <div className="okr-review-risk-callout">
-                          <AlertTriangle />
-                          <div>
-                            <b>风险原因及所需支持</b>
-                            <Input.TextArea
-                              value={kr.blocker}
-                              onChange={e => update(kr.keyResultId, { blocker: e.target.value })}
-                              autoSize={{ minRows: 2, maxRows: 5 }}
-                              placeholder="说明风险或阻塞原因、外部依赖和所需支持"
-                            />
-                          </div>
-                        </div>
-                      )}
 
-                      {/* Narrative Fields */}
-                      <div className="space-y-3 pt-2">
-                        <div>
-                          <div className="text-xs font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1">
-                            <span className="text-[var(--danger)]">*</span> 本期成果 (成果/结果导向，非任务流水账)
-                          </div>
-                          <Input.TextArea
-                            autoSize={{ minRows: 3 }}
-                            value={kr.achievement}
-                            onChange={e => update(kr.keyResultId, { achievement: e.target.value })}
-                            placeholder="填写本期交付结果、数据变化和已完成的里程碑"
-                          />
-                        </div>
-
-                        <div>
-                          <div className="text-xs font-semibold text-[var(--text-body)] mb-1.5 flex items-center gap-1">
-                            <span className="text-[var(--danger)]">*</span> 下一步计划 (下周动作)
-                          </div>
-                          <Input.TextArea
-                            autoSize={{ minRows: 3 }}
-                            value={kr.nextPlan}
-                            onChange={e => update(kr.keyResultId, { nextPlan: e.target.value })}
-                            placeholder="填写下一周期的行动、负责人和预期结果"
-                          />
-                        </div>
-                      </div>
                     </div>
+                    }]}/>
                   );
                 })}
                 </div>
@@ -721,9 +646,9 @@ export function WeeklyReviewEditor({
             <Button
               size="small"
               icon={<Plus className="h-3.5 w-3.5" />}
-              onClick={() => openPicker('extra', 'task')}
+              onClick={() => openPicker('extra')}
             >
-              关联任务或工单
+              关联工作证据
             </Button>
           </div>
         </div>
@@ -857,11 +782,16 @@ export function WeeklyReviewEditor({
         </div>
       </section>
 
-      {/* ▌ 3. 需要协助与反馈的事项说明 */}
+      <section className="space-y-2" aria-label="下周计划">
+        <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]"><span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" aria-hidden="true"/><span>3. 下周计划</span></div>
+        <Input.TextArea aria-label="下周计划" value={nextWeekPlan} onChange={event => setNextWeekPlan(event.target.value)} autoSize={{ minRows: 3, maxRows: 8 }} maxLength={10000} showCount placeholder="填写下周重点工作、预期结果与关键节点" disabled={busy}/>
+      </section>
+
+      {/* ▌ 4. 需要协助事项 */}
       <section className="space-y-2">
         <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]">
           <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-          <span>3. 需要协助与反馈的事项说明</span>
+          <span>4. 需要协助事项</span>
         </div>
 
         <div className="bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-4 shadow-sm">
@@ -880,150 +810,7 @@ export function WeeklyReviewEditor({
         </div>
       </section>
 
-      {picker && (
-        <Modal
-          className="okr-work-association-modal"
-          open
-          title="关联任务或工单"
-          width={1120}
-          destroyOnHidden
-          onCancel={() => setPicker(null)}
-          footer={[
-            <span key="count" className="okr-work-association-count">
-              已选 <strong>{picker.selection.length}</strong> 项任务或工单
-            </span>,
-            <Button key="cancel" onClick={() => setPicker(null)}>取消</Button>,
-            <Button key="confirm" type="primary" onClick={confirmPicker}>确认关联</Button>
-          ]}
-        >
-          <div className="okr-work-association-body">
-            <p className="okr-work-association-context">
-              {picker.target === 'extra' ? (
-                <>为 <strong>非本月目标任务</strong> 选择任务或工单</>
-              ) : (
-                <>为 <strong>{pickerKr ? `A${pickerKrIndex}：${pickerKr.keyResultTitle}` : '当前 A'}</strong> 选择工作证据</>
-              )}
-            </p>
-            <Tabs
-              className="okr-work-association-tabs"
-              activeKey={picker.source}
-              items={[
-                { key: 'task', label: '我的任务' },
-                { key: 'ticket', label: '我的工单' }
-              ]}
-              onChange={source => setPicker(value => value && {
-                ...value,
-                source: source as PickerSource,
-                status: 'all'
-              })}
-            />
-            <div className="okr-work-association-filters">
-              <Input
-                allowClear
-                prefix={<Search className="h-4 w-4 text-[var(--text-muted)]" />}
-                value={picker.keyword}
-                onChange={event => setPicker(value => value && { ...value, keyword: event.target.value })}
-                placeholder={`搜索${picker.source === 'ticket' ? '工单' : '任务'}名称或编号`}
-              />
-              <Select
-                value={picker.status}
-                style={{ width: 140 }}
-                onChange={status => setPicker(value => value && { ...value, status })}
-                options={pickerStatusOptions}
-              />
-            </div>
-            <div className="okr-work-association-results">
-              {workError && (
-                <Alert
-                  type="error"
-                  title="工作项加载失败"
-                  className="mb-3"
-                  action={<Button onClick={onRefreshWork}>重试</Button>}
-                />
-              )}
-              <Table<OkrWork>
-                rowKey="id"
-                loading={workLoading}
-                pagination={false}
-                scroll={{ x: 760, y: 420 }}
-                dataSource={pickerCandidates}
-                locale={{
-                  emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前条件下暂无可关联工作" />
-                }}
-                rowSelection={{
-                  selectedRowKeys: picker.selection,
-                  onChange: keys => setPicker(value => value && { ...value, selection: keys as string[] }),
-                  getCheckboxProps: item => ({
-                    disabled: linkedIds.has(item.id) && !picker.selection.includes(item.id)
-                  })
-                }}
-                columns={[
-                  {
-                    title: '来源',
-                    width: 80,
-                    render: (_, item) => (
-                      <Tag color={workSource(item) === 'ticket' ? 'purple' : 'blue'}>
-                        {workSource(item) === 'ticket' ? '工单' : '任务'}
-                      </Tag>
-                    )
-                  },
-                  {
-                    title: '编号 / 名称',
-                    ellipsis: true,
-                    render: (_, item) => (
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <span className="font-mono text-[var(--text-muted)] font-medium">#{item.sourceId || item.id}</span>
-                        <span className="text-[var(--text-primary)]">{item.title}</span>
-                      </div>
-                    )
-                  },
-                  {
-                    title: '状态',
-                    dataIndex: 'status',
-                    width: 100,
-                    render: (status: string) => <Tag color={statusColor(status)}>{status}</Tag>
-                  },
-                  {
-                    title: '创建者',
-                    dataIndex: 'creatorName',
-                    width: 120,
-                    render: (value: string) => value || '未知'
-                  },
-                  {
-                    title: '更新时间',
-                    dataIndex: 'updatedAt',
-                    width: 120,
-                    render: (value: string) => value?.slice(0, 10) || '-'
-                  },
-                  {
-                    title: '操作',
-                    width: 90,
-                    render: (_, item) => (
-                      <Button
-                        type="link"
-                        size="small"
-                        disabled={linkedIds.has(item.id) && !picker.selection.includes(item.id)}
-                        onClick={() =>
-                          setPicker(value =>
-                            value && {
-                              ...value,
-                              selection: value.selection.includes(item.id)
-                                ? value.selection.filter(id => id !== item.id)
-                                : [...value.selection, item.id]
-                            }
-                          )
-                        }
-                      >
-                        {picker.selection.includes(item.id) ? '取消选择' : '选择'}
-                      </Button>
-                    )
-                  }
-                ]}
-              />
-            </div>
-          </div>
-        </Modal>
-      )}
+      {picker && <WorkEvidencePicker work={work} viewer={viewer} product={pickerSourceKr?.businessObject} version={pickerSourceKr?.version} startDate={period.startDate} endDate={period.endDate} selectedIds={picker.selection} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPicker(null)} onConfirm={confirmPicker}/>}
 
       {/* 提交确认弹窗 (带中文界面及OKR系统进度同步勾选) */}
       <Modal

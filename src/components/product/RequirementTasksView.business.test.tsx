@@ -32,7 +32,7 @@ it.each(['presales', 'delivery'] as const)('shows exact %s columns and the share
   const { container } = mount(kind);
   await screen.findByText('没有符合当前搜索、过滤或分组条件的' + (kind === 'presales' ? '售前任务' : '交付任务'));
   expect(screen.getAllByRole('columnheader').map(header => header.textContent)).toEqual(['标题', '状态', '优先级', '来源归属', ...(kind === 'delivery' ? ['项目阶段'] : []), '负责人', '创建人', '创建时间', '操作']);
-  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['我负责的·0', '我创建的·0', '我部门的·0']);
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(kind === 'delivery' ? ['我负责的·0', '我创建的·0', '我部门的·0', '待审核·0'] : ['我负责的·0', '我创建的·0', '我部门的·0']);
   expect(container.querySelector('.test-case-banana')).toBeNull();
   expect(screen.getByText(/没有符合当前搜索、过滤或分组条件的/).closest('td')).toHaveClass('px-4', 'py-12', 'text-center');
 });
@@ -97,4 +97,10 @@ it.each(['presales', 'delivery'] as const)('limits %s details to activity, colla
   expect(screen.getByRole('button', { name: /请选择关联任务|请选择协同事项/ })).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: '关联任务 · 0' }));
   expect(screen.getByRole('button', { name: /请选择关联任务|请选择协同事项/ })).toBeVisible();
+});
+
+it('does not request legacy field settings for task pages', async () => {
+  mount('presales');
+  await screen.findByText('没有符合当前搜索、过滤或分组条件的售前任务');
+  expect(productRepository.workItemFieldConfigurations).not.toHaveBeenCalled();
 });

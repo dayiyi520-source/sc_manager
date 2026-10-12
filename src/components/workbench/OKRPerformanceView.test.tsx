@@ -166,8 +166,8 @@ describe('OKRPerformanceView target navigation', () => {
     expect(document.querySelector('.company-objective-drawer.ant-drawer-bottom')).toBeInTheDocument();
     expect(screen.getByText(jobTitle === '产品主管' ? '主管级' : '个人级')).toBeInTheDocument();
     expect(screen.getByLabelText('A1 动作')).toHaveValue('已有动作');
-    expect(screen.getByLabelText('A1 截止日期')).toHaveValue('2026-09-30');
-    fireEvent.click(screen.getByRole('button', { name: /Close|close|关闭/, exact: true }));
+    expect(screen.getByLabelText('KR1 截止日期')).toHaveValue('2026-09-30');
+    fireEvent.click(screen.getByRole('button', { name: /Close|close|关闭/ }));
     expect(await screen.findByLabelText(/^目标：/)).toBeInTheDocument();
     expect(screen.queryByText('目标详情')).not.toBeInTheDocument();
     expect(okrState.updateOkr).not.toHaveBeenCalled();
@@ -210,7 +210,7 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.getByRole('complementary', { name: '目标范围导航' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '我的目标' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('button', { name: /拆解目标/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '添加目标' })).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('目标：提升年度经营质量'));
     expect(await screen.findByText('目标详情')).toBeInTheDocument();
@@ -219,7 +219,7 @@ describe('OKRPerformanceView target navigation', () => {
     await waitFor(() => expect(screen.queryByText('目标详情')).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: '我的目标' }));
-    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.click(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' }));
     await waitFor(() => expect(screen.getByLabelText('目标名称')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: '直属下级' }));
     await waitFor(() => expect(container.querySelector('.okr-action-breakdown-page[aria-label="拆解目标"]')).not.toBeInTheDocument());
@@ -265,15 +265,39 @@ describe('OKRPerformanceView target navigation', () => {
     okrState.okrs = [];
     const { container } = render(<OKRPerformanceView />);
 
-    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.click(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' }));
     expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
     expect(container.querySelector('.okr-action-breakdown-page')).not.toBeInTheDocument();
   });
 
+  it('opens every pending assignment and allows another independent goal in the same editor', () => {
+    currentUser = {id:'manager',name:'主管',department:'产品部'};
+    okrState.records = [objectiveRecord, ...['a1','a2'].map((id,index) => ({id:`inherited-${id}`,kind:'objective' as const,ownerId:'manager',periodKey:'2026-09',status:'draft' as const,version:0,payload:{goalModelVersion:2 as const,goalLevel:'department' as const,origin:'assigned' as const,inherited:true,title:'',sourceObjectiveId:'objective-1',sourceKrId:id,sourceVersion:1,sourceTitle:`来源${index+1}`,keyResults:[]}}))];
+    render(<OKRPerformanceView/>);
+    fireEvent.click(within(screen.getByRole('complementary',{name:'目标范围导航'})).getByRole('button',{name:/添加目标|拆解目标/}));
+    expect(screen.getAllByLabelText('目标名称')).toHaveLength(2);
+    expect(screen.getByRole('combobox',{name:'目标归属周期'})).toBeDisabled();
+    const editor=screen.getAllByLabelText('目标名称')[0].closest('.ant-drawer-body') as HTMLElement;
+    fireEvent.click(within(editor).getByRole('button',{name:'添加目标'}));
+    expect(screen.getAllByLabelText('目标名称')).toHaveLength(2);
+    expect(screen.queryByRole('button',{name:'选择对齐'})).not.toBeInTheDocument();
+  });
+
+  it('allows a supervisor without assignments to create an autonomous goal', () => {
+    currentUser = {id:'manager',name:'主管',department:'产品部'};
+    okrState.records=[]; okrState.okrs=[];
+    render(<OKRPerformanceView/>);
+    fireEvent.click(within(screen.getByRole('complementary',{name:'目标范围导航'})).getByRole('button',{name:/添加目标|拆解目标/}));
+    expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
+    expect(screen.getByText(/尚未生效/)).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'提交主管确认'})).toBeEnabled();
+  });
+
   it('protects the initial objective and removes only an added objective', async () => {
     render(<OKRPerformanceView />);
-    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.click(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' }));
     fireEvent.change(screen.getByLabelText('目标名称'), { target: { value: '保留的承诺目标' } });
+    fireEvent.change(screen.getByLabelText('A1 名称'),{target:{value:'已有关键结果'}});
     expect(screen.queryByRole('button', { name: '删除新增目标 O1' })).not.toBeInTheDocument();
     const editor = screen.getByLabelText('目标名称').closest('.ant-drawer-body') as HTMLElement;
     fireEvent.click(within(editor).getByRole('button', { name: '添加目标' }));
@@ -290,7 +314,7 @@ describe('OKRPerformanceView target navigation', () => {
   it('opens creation even when the root user already has a target in the cycle', async () => {
     render(<OKRPerformanceView />);
 
-    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.click(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' }));
 
     expect(screen.queryByRole('region', { name: '目标逐级承接关系' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('目标名称')).toBeInTheDocument();
@@ -313,7 +337,7 @@ describe('OKRPerformanceView target navigation', () => {
     fireEvent.click(screen.getByText('已结束'));
     fireEvent.click(screen.getByText(dayjs().subtract(1, 'month').format('YYYY年MM月')));
 
-    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.click(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' }));
 
     expect(document.querySelector('.company-objective-drawer .okr-objective-period')).toHaveTextContent(dayjs().subtract(1, 'month').format('YYYY年MM月'));
     expect(screen.getByLabelText('目标归属周期')).toBeInTheDocument();
@@ -322,12 +346,14 @@ describe('OKRPerformanceView target navigation', () => {
 
   it('copies only a submitted historical objective into an editable TO', async () => {
     render(<OKRPerformanceView />);
-    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.click(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' }));
     fireEvent.mouseDown(screen.getByLabelText('目标归属周期'));
     fireEvent.click(await screen.findByText(dayjs().add(1, 'month').format('YYYY年MM月')));
     expect(screen.getByText(`${dayjs().add(1, 'month').format('YYYY年MM月')}目标`)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '复制目标' }));
+    fireEvent.change(screen.getByLabelText('目标名称'),{target:{value:'本月新增目标'}});
+    fireEvent.change(screen.getByLabelText('A1 名称'),{target:{value:'本月新增结果'}});
+    fireEvent.click(within(screen.getByLabelText('目标名称').closest('.company-objective-drawer') as HTMLElement).getByRole('button', { name: '复制目标' }));
     const dialog = document.querySelector('.company-copy-modal') as HTMLElement;
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByText('提升年度经营质量')).toBeInTheDocument();

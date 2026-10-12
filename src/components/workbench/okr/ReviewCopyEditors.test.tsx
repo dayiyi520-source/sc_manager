@@ -41,7 +41,7 @@ describe('review copy editor persistence', () => {
     render(<MonthlyReviewEditor okrs={okrs} records={[]} currentUserId="me" busy={false} initialPayload={initialPayload} onCancel={vi.fn()} onSaveDraft={onSaveDraft} onSubmit={onSubmit} />);
 
     expect(screen.getByDisplayValue('复制后的月度总结')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('复制后的成果')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('复制后的成果')).not.toBeInTheDocument();
     expect(onSaveDraft).not.toHaveBeenCalled();
     expect(onSubmit).not.toHaveBeenCalled();
 
@@ -52,6 +52,7 @@ describe('review copy editor persistence', () => {
       reviewType: 'month',
       title: `[月报] ${dayjs().format('YYYY年MM月')}复盘`,
       summary: '复制后的月度总结',
+      krReviews: expect.arrayContaining([expect.objectContaining({ achievement: '复制后的成果' })]),
       weeklyReviewIds: [],
       monthlyOtherTasks: [],
     });

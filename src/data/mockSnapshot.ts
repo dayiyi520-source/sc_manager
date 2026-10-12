@@ -104,7 +104,7 @@ export const MOCK_OKR_SETTINGS = rows('t_okr_setting').find((row) => Number(row.
   timeRules: [
     { key: 'addObjective', label: '添加目标', startDay: 1, endDay: 31, shortMonthRule: 'clamp', allowBackfill: false },
     { key: 'breakdown', label: '拆解目标', startDay: 1, endDay: 31, shortMonthRule: 'clamp', allowBackfill: true },
-    { key: 'weeklyReview', label: '周总结', startDay: 1, endDay: 31, shortMonthRule: 'clamp', allowBackfill: true },
+    { key: 'weeklyReview', label: '周总结', startDay: 1, endDay: 7, allowBackfill: true },
     { key: 'monthlyReview', label: '月总结', startDay: 1, endDay: 31, shortMonthRule: 'clamp', allowBackfill: true }
   ],
   validation: { actionWeightTotal: 100, maxActions: 8, assigneeMultiple: true, keyNodeMultiple: true, resultRequired: true },

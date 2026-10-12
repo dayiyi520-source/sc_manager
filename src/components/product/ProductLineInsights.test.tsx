@@ -32,7 +32,7 @@ describe('product line board', () => {
 
   it('uses assistance as a board view and does not offer a standalone test-case list', () => {
     render(<ProductLineBoard items={[]} onOpenCategory={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /协助事项/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /协同事项/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /测试用例/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '查看全部' })).not.toBeInTheDocument();
   });

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { goalsWithAssignments, assignedReferences } from '../../../services/okrThreeLevelRules';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useApp } from '../../../context/AppContext';
@@ -6,6 +7,8 @@ import { crmRepository } from '../../../services/crmRepository';
 import { okrRepository, type OkrPayload, type OkrRecord, type OkrSettings } from '../../../services/okrRepository';
 import { productRepository } from '../../../services/productRepository';
 import { teamRepository } from '../../../services/teamRepository';
+import { loadReviewEvidence } from '../../../services/reviewEvidenceRepository';
+import { reviewSubmissionAccess } from '../../../services/okrReviewRules';
 import { assignedGoalActions, legacyGoalActions } from '../../../services/okrGoalRules';
 import type { EmployeeOption, OKRItem, PerformanceReview } from '../../../types';
 
@@ -20,7 +23,7 @@ export const findReviewForPayload = (records: OkrRecord[], ownerId: string, peri
   ));
 
 export const isReviewableObjective = (objective: OKRItem, userId: string) => (
-  ['active', 'submitted', 'reviewed'].includes(objective.status || '')
+  ['active', 'reviewed'].includes(objective.status || '')
   && (objective.ownerId === userId
   || objective.keyResults.some(keyResult => keyResult.assigneeIds?.includes(userId))
   )
@@ -41,7 +44,7 @@ export function useOriginalOkr() {
   const settingsQuery = useQuery({queryKey:['okr','settings'],queryFn:okrRepository.settings,retry:false});
   const peopleQuery = useQuery({queryKey:['okr',currentUser.id,'people'],queryFn:okrRepository.people,retry:false});
   const teamMembersQuery = useQuery<EmployeeOption[]>({queryKey:['team-member-options'],queryFn:teamRepository.options,retry:false});
-  const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>okrRepository.work(currentUser.id),retry:false});
+  const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>loadReviewEvidence(currentUser),retry:false});
   const productLinesQuery = useQuery({queryKey:['okr',currentUser.id,'product-lines'],queryFn:()=>productRepository.productLines(),retry:false});
   const projectsQuery = useQuery({queryKey:['okr',currentUser.id,'projects'],queryFn:()=>crmRepository.projects({page:1,pageSize:100}),retry:false});
   const opportunitiesQuery = useQuery({queryKey:['okr',currentUser.id,'opportunities'],queryFn:()=>crmRepository.opportunities({page:1,pageSize:100}),retry:false});
@@ -76,9 +79,10 @@ export function useOriginalOkr() {
     return { value: String(item.name || ''), label: String(item.name || ''), products: [...new Set(namesFrom([item.relatedProduct, item.product, item.products]))] };
   }).filter(item => item.value);
   const businessOptionsError = productLinesQuery.error || projectsQuery.error || opportunitiesQuery.error;
-  const all = records.data || [];
+  const rawRecords = records.data || [];
   const me = people.find(p=>p.id===currentUser.id);
-  const derivedActionParents = assignedGoalActions(all, me);
+  const all = useMemo(() => goalsWithAssignments(rawRecords, me), [rawRecords, currentUser.id, me?.supervisorId, me?.jobTitle, me?.name]);
+  const derivedActionParents = [...new Map([...assignedGoalActions(all, me), ...assignedReferences(all, me)].map(item => [item.id, item])).values()];
   const okrs: OKRItem[] = all.filter(r=>r.kind==='objective').map(r=>{
     const owner = people.find(p=>p.id===r.ownerId);
     return {
@@ -88,7 +92,7 @@ export function useOriginalOkr() {
       parentObjectiveId:r.payload.parentObjectiveId,alignTo:all.find(p=>p.id===r.payload.parentObjectiveId)?.payload.title,
       parentKeyResultId:r.payload.parentKeyResultId,alignments:r.payload.alignments, objectiveType:r.payload.objectiveType || 'target',
       status:r.status as OKRItem['status'],
-      keyResults:(r.payload.keyResults || []).map(k=>({id:k.id,content:k.title,progress:k.progress,weight:k.weight,deadline:k.deadline || '',assigneeIds:k.assigneeIds})),
+      keyResults:(r.payload.keyResults || []).map(k=>({id:k.id,content:k.title,progress:k.progress,weight:k.weight,deadline:k.deadline || '',assigneeIds:k.assigneeIds,businessObject:k.businessObject,version:k.version})),
     };
   });
   const reviewableOkrs = reviewableObjectivesFor(okrs, currentUser.id);
@@ -101,7 +105,7 @@ export function useOriginalOkr() {
       linkedWorkItems:(p.items || []).map(i=>({id:i.workId,title:i.title,type:'task',status:i.status})),
       krReviews:p.krReviews || [], assistance:p.assistance || [], extraWork:p.extraWork, syncKrProgress:p.syncKrProgress,
       weeklyReviewSnapshots:p.weeklyReviewSnapshots || [], monthlyOtherTasks:p.monthlyOtherTasks || [], nextMonthPlans:p.nextMonthPlans || [],
-      otherNotes:p.otherNotes || '', nextMonthArrangement:p.nextMonthArrangement || '',
+      otherNotes:p.otherNotes || '', nextMonthArrangement:p.nextMonthArrangement || '', nextWeekPlan:p.nextWeekPlan || '',
     };
   });
   const refresh = () => client.invalidateQueries({queryKey:['okr']});
@@ -113,7 +117,10 @@ export function useOriginalOkr() {
   };
   const submitReviewDraft = async (id:string) => {
     const record = all.find(item=>item.id===id && item.kind==='review');
-    if(!record){addToast('error','复盘记录不存在或已刷新');return false;}
+    if(!record || record.ownerId !== currentUser.id){addToast('error','复盘记录不存在或无提交权限');return false;}
+    if (settingsQuery.error) { addToast('warning', '填写日期配置加载失败，请重试'); return false; }
+    const access = reviewSubmissionAccess(settingsQuery.data, record.payload);
+    if (!access.allowed) { addToast('warning', access.reason); return false; }
     setBusy(true);
     try{
       await okrRepository.update(record,'submit',{},currentUser.id);
@@ -144,6 +151,11 @@ export function useOriginalOkr() {
     finally { setBusy(false); }
   };
   const save = async (kind: 'objective' | 'review', period:string, payload:OkrPayload, submit = true) => {
+    if (kind === 'review' && submit) {
+      if (settingsQuery.error) { addToast('warning', '填写日期配置加载失败，请重试'); return false; }
+      const access = reviewSubmissionAccess(settingsQuery.data, payload);
+      if (!access.allowed) { addToast('warning', access.reason); return false; }
+    }
     setBusy(true);
     try {
       if (kind === 'review') {
@@ -168,7 +180,7 @@ export function useOriginalOkr() {
     const record = all.find(item => item.id === recordId && (item.kind === 'objective' || item.kind === 'action'));
     if (!record || record.ownerId !== currentUser.id) { addToast('error', '目标记录不存在或无修改权限'); return false; }
     setBusy(true);
-    try { await okrRepository.update(record, submit ? 'submit' : 'save', { payload: { ...record.payload, ...payload } }, currentUser.id); await refresh(); addToast('success', submit ? '目标已提交' : record.status === 'draft' ? '目标草稿已保存' : '目标修改已保存'); return true; }
+    try { if (record.payload.inherited) await okrRepository.create('objective', record.periodKey, { ...payload, inherited: false }, submit, currentUser.id); else await okrRepository.update(record, submit ? 'submit' : 'save', { payload: { ...record.payload, ...payload } }, currentUser.id); await refresh(); addToast('success', submit ? (payload.origin === 'autonomous' ? '自主目标已提交上级审核' : '目标已提交') : record.status === 'draft' ? '目标草稿已保存' : (record.payload.goalLevel && record.payload.goalLevel !== 'company' ? '修改申请已提交上级审核，原计划继续生效' : '目标修改已保存')); return true; }
     catch(error) { addToast('error', error instanceof Error ? error.message : '目标保存失败'); return false; }
     finally { setBusy(false); }
   };
@@ -193,6 +205,6 @@ export function useOriginalOkr() {
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
     saveReviewDraft:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload,false),
     submitReviewDraft,submitOkrDraft,updateOkr,deleteOkr,
-    settings: settingsQuery.data, settingsLoading: settingsQuery.isPending, saveSettings, teamMembers: teamMembersQuery.data || [],
+    settings: settingsQuery.data, settingsLoading: settingsQuery.isPending, settingsError: settingsQuery.error, saveSettings, teamMembers: teamMembersQuery.data || [],
   };
 }

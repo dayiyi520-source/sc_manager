@@ -3359,7 +3359,3992 @@
           "status": "未开始"
         }
       ],
-      "website": ""
+      "website": "",
+      "workItemTypes": [
+        {
+          "id": "04d42f3a-e470-45ad-b260-8524902c5d12",
+          "name": "稳定性测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "7a3c68ff-90b9-4678-b283-f2d1382829af",
+              "category": "case",
+              "taskTypeId": "04d42f3a-e470-45ad-b260-8524902c5d12",
+              "name": "稳定性测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "10c08471-eb69-4ee2-ba13-cebe7bcaf404",
+          "name": "功能测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": true,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "9d575849-a05d-4b18-adf5-5ce731887f7e",
+              "category": "case",
+              "taskTypeId": "10c08471-eb69-4ee2-ba13-cebe7bcaf404",
+              "name": "功能测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "28f05ef8-5f4d-4c5d-9c06-8a418dccd688",
+          "name": "回归测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "f49a5f45-a8cc-4297-ae04-f935c09f81fa",
+              "category": "case",
+              "taskTypeId": "28f05ef8-5f4d-4c5d-9c06-8a418dccd688",
+              "name": "回归测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "426e5bcc-41d9-4a61-bf64-dc6780460cf0",
+          "name": "安全测试",
+          "category": "测试",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "23492c23-5b0d-412a-97cc-bdd8fed86314",
+              "category": "test",
+              "taskTypeId": "426e5bcc-41d9-4a61-bf64-dc6780460cf0",
+              "name": "安全测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "4675e6b8-9d9c-449b-9104-40688adafd44",
+          "name": "安全漏洞",
+          "category": "缺陷",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "25498893-ad3b-4cc2-8a25-ec5efafadd80",
+              "category": "bug",
+              "taskTypeId": "4675e6b8-9d9c-449b-9104-40688adafd44",
+              "name": "安全漏洞状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "4c12ba56-c122-409d-be96-4f6ef826707e",
+          "name": "物料设计",
+          "category": "设计",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "ff4af966-b0e8-41bc-8972-daca3a052262",
+              "category": "design",
+              "taskTypeId": "4c12ba56-c122-409d-be96-4f6ef826707e",
+              "name": "物料设计状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "61628256-a7f4-40bf-95c1-9f02acf9bad1",
+          "name": "安全性测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "b26cd915-0bd4-42b9-a685-fc738572ece3",
+              "category": "case",
+              "taskTypeId": "61628256-a7f4-40bf-95c1-9f02acf9bad1",
+              "name": "安全性测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "761e23a7-7972-4aa7-84e1-6a8e2ae9fea8",
+          "name": "接口测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "254e8d82-8b54-4e49-b3d2-2c1f33448951",
+              "category": "case",
+              "taskTypeId": "761e23a7-7972-4aa7-84e1-6a8e2ae9fea8",
+              "name": "接口测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "7dd89f2b-11b9-417f-b82a-5c60becd18f9",
+          "name": "自动化测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "5c4b6752-a38a-4d07-9409-7f977c13df8e",
+              "category": "case",
+              "taskTypeId": "7dd89f2b-11b9-417f-b82a-5c60becd18f9",
+              "name": "自动化测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "860421cd-ddae-446e-9d5e-483c0c5c4f09",
+          "name": "兼容性测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "49e77477-70ea-4ac3-af9a-5b30a6e355e7",
+              "category": "case",
+              "taskTypeId": "860421cd-ddae-446e-9d5e-483c0c5c4f09",
+              "name": "兼容性测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "878406b3-fb57-4f13-8c5b-297775a7de40",
+          "name": "系统缺陷",
+          "category": "缺陷",
+          "enabled": true,
+          "isDefault": true,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "49bd82fa-4b1c-41ae-8eaf-d310e530b141",
+              "category": "bug",
+              "taskTypeId": "878406b3-fb57-4f13-8c5b-297775a7de40",
+              "name": "系统缺陷标准阶段",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 2,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待开始",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "进行中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "开始",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "4acb707b-93dd-4df4-88c1-9aa8e1d50a49",
+              "category": "bug",
+              "taskTypeId": "878406b3-fb57-4f13-8c5b-297775a7de40",
+              "name": "系统缺陷状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "8a5ea198-cef3-4449-b56f-0518189aeb4c",
+          "name": "性能测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "8e44c813-8b65-4dd5-9718-8b160308fbad",
+              "category": "case",
+              "taskTypeId": "8a5ea198-cef3-4449-b56f-0518189aeb4c",
+              "name": "性能测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "8c96b59f-0c44-4650-a944-c84d2837e30c",
+          "name": "数据类需求",
+          "category": "需求",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "27245a08-5a18-4a43-b983-212c090da9e8",
+              "category": "requirement",
+              "taskTypeId": "8c96b59f-0c44-4650-a944-c84d2837e30c",
+              "name": "数据类需求状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "9347e164-f81e-4e49-a966-f97bbfad0af8",
+          "name": "测试任务",
+          "category": "测试",
+          "enabled": true,
+          "isDefault": true,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "5af1df21-185b-4c99-b3f2-4939f4072485",
+              "category": "test",
+              "taskTypeId": "9347e164-f81e-4e49-a966-f97bbfad0af8",
+              "name": "测试任务状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "73b92619-2896-4b35-bcb5-aa7e2ce1f96a",
+              "category": "test",
+              "taskTypeId": "9347e164-f81e-4e49-a966-f97bbfad0af8",
+              "name": "测试任务标准阶段",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 2,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待开始",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "进行中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "开始",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "a382917b-fcee-4760-92c1-b2e7d4a193be",
+          "name": "产品类型需求",
+          "category": "需求",
+          "enabled": true,
+          "isDefault": true,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "0a3ab8b2-a58c-460f-ae51-7fac3c8badb6",
+              "category": "requirement",
+              "taskTypeId": "a382917b-fcee-4760-92c1-b2e7d4a193be",
+              "name": "产品类型需求状态配置",
+              "revision": 5,
+              "status": "PUBLISHED",
+              "workflowVersion": 4,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumyprov_h3z02e",
+                    "name": "需求设计中",
+                    "color": "cyan",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumypsen_vvmurr",
+                    "name": "待评审",
+                    "color": "cyan",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_reviewed",
+                    "name": "已评审",
+                    "color": "cyan",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumypsyv_o3zwbs",
+                    "name": "UI设计中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "开发中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumyqxia_23b0c6",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumyr1rh_tisnf0",
+                    "name": "验收中",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumyrk6u_92zq2q",
+                    "name": "已验收",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumys4xt_0aelhs",
+                    "name": "已发布",
+                    "color": "purple",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_mumyprov_h3z02e",
+                    "key": "move_status_pending_status_mumyprov_h3z02e",
+                    "from": "status_pending",
+                    "name": "进入需求设计中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumypsen_vvmurr",
+                    "key": "move_status_mumyprov_h3z02e_status_mumypsen_vvmurr",
+                    "from": "status_mumyprov_h3z02e",
+                    "name": "进入待评审",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_reviewed",
+                    "key": "move_status_mumypsen_vvmurr_status_reviewed",
+                    "from": "status_mumypsen_vvmurr",
+                    "name": "进入已评审",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumypsyv_o3zwbs",
+                    "key": "move_status_reviewed_status_mumypsyv_o3zwbs",
+                    "from": "status_reviewed",
+                    "name": "进入UI设计中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "move_status_mumypsyv_o3zwbs_status_in_progress",
+                    "from": "status_mumypsyv_o3zwbs",
+                    "name": "进入开发中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumyqxia_23b0c6",
+                    "key": "move_status_in_progress_status_mumyqxia_23b0c6",
+                    "from": "status_in_progress",
+                    "name": "进入测试中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumyr1rh_tisnf0",
+                    "key": "move_status_mumyqxia_23b0c6_status_mumyr1rh_tisnf0",
+                    "from": "status_mumyqxia_23b0c6",
+                    "name": "进入验收中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumyrk6u_92zq2q",
+                    "key": "move_status_mumyr1rh_tisnf0_status_mumyrk6u_92zq2q",
+                    "from": "status_mumyr1rh_tisnf0",
+                    "name": "进入已验收",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumys4xt_0aelhs",
+                    "key": "move_status_mumyrk6u_92zq2q_status_mumys4xt_0aelhs",
+                    "from": "status_mumyrk6u_92zq2q",
+                    "name": "进入已发布",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "move_status_mumys4xt_0aelhs_status_completed",
+                    "from": "status_mumys4xt_0aelhs",
+                    "name": "进入已完成",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "move_status_mumys4xt_0aelhs_status_cancelled",
+                    "from": "status_mumys4xt_0aelhs",
+                    "name": "进入已取消",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  }
+                ]
+              }
+            },
+            {
+              "id": "1f32af75-04a2-49ff-bc6f-9da5875fc201",
+              "category": "requirement",
+              "taskTypeId": "a382917b-fcee-4760-92c1-b2e7d4a193be",
+              "name": "产品类型需求评审流程",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 3,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_reviewed",
+                    "name": "已评审",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "进行中",
+                    "color": "cyan",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_reviewed",
+                    "key": "review",
+                    "from": "status_pending",
+                    "name": "评审通过",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "start",
+                    "from": "status_reviewed",
+                    "name": "开始实施",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_reviewed",
+                    "from": "status_reviewed",
+                    "name": "直接完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_reviewed",
+                    "from": "status_reviewed",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_progress",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "62f3a5c8-ed3a-441d-a176-3b2174d2a4d5",
+              "category": "requirement",
+              "taskTypeId": "a382917b-fcee-4760-92c1-b2e7d4a193be",
+              "name": "产品类型需求状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "6a7f74d4-489a-4560-a934-9e2aba57424e",
+              "category": "requirement",
+              "taskTypeId": "a382917b-fcee-4760-92c1-b2e7d4a193be",
+              "name": "产品类型需求状态配置",
+              "revision": 5,
+              "status": "PUBLISHED",
+              "workflowVersion": 5,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumyprov_h3z02e",
+                    "name": "需求设计中",
+                    "color": "cyan",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumypsen_vvmurr",
+                    "name": "待评审",
+                    "color": "cyan",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_reviewed",
+                    "name": "已评审",
+                    "color": "cyan",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumypsyv_o3zwbs",
+                    "name": "UI设计中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "开发中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumyqxia_23b0c6",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumyr1rh_tisnf0",
+                    "name": "验收中",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumyrk6u_92zq2q",
+                    "name": "已验收",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_mumys4xt_0aelhs",
+                    "name": "已发布",
+                    "color": "purple",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_mumyprov_h3z02e",
+                    "key": "move_status_pending_status_mumyprov_h3z02e",
+                    "from": "status_pending",
+                    "name": "进入需求设计中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumypsen_vvmurr",
+                    "key": "move_status_mumyprov_h3z02e_status_mumypsen_vvmurr",
+                    "from": "status_mumyprov_h3z02e",
+                    "name": "进入待评审",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_reviewed",
+                    "key": "move_status_mumypsen_vvmurr_status_reviewed",
+                    "from": "status_mumypsen_vvmurr",
+                    "name": "进入已评审",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumypsyv_o3zwbs",
+                    "key": "move_status_reviewed_status_mumypsyv_o3zwbs",
+                    "from": "status_reviewed",
+                    "name": "进入UI设计中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "move_status_mumypsyv_o3zwbs_status_in_progress",
+                    "from": "status_mumypsyv_o3zwbs",
+                    "name": "进入开发中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumyqxia_23b0c6",
+                    "key": "move_status_in_progress_status_mumyqxia_23b0c6",
+                    "from": "status_in_progress",
+                    "name": "进入测试中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumyr1rh_tisnf0",
+                    "key": "move_status_mumyqxia_23b0c6_status_mumyr1rh_tisnf0",
+                    "from": "status_mumyqxia_23b0c6",
+                    "name": "进入验收中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumyrk6u_92zq2q",
+                    "key": "move_status_mumyr1rh_tisnf0_status_mumyrk6u_92zq2q",
+                    "from": "status_mumyr1rh_tisnf0",
+                    "name": "进入已验收",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_mumys4xt_0aelhs",
+                    "key": "move_status_mumyrk6u_92zq2q_status_mumys4xt_0aelhs",
+                    "from": "status_mumyrk6u_92zq2q",
+                    "name": "进入已发布",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "move_status_mumys4xt_0aelhs_status_completed",
+                    "from": "status_mumys4xt_0aelhs",
+                    "name": "进入已完成",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "move_status_mumys4xt_0aelhs_status_cancelled",
+                    "from": "status_mumys4xt_0aelhs",
+                    "name": "进入已取消",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": []
+                  }
+                ]
+              }
+            },
+            {
+              "id": "b4cbee6c-a16d-4254-970e-60604e99ac44",
+              "category": "requirement",
+              "taskTypeId": "a382917b-fcee-4760-92c1-b2e7d4a193be",
+              "name": "产品类型需求评审流程",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 2,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待评审",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_reviewed",
+                    "name": "已评审",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "进行中",
+                    "color": "cyan",
+                    "group": "IN_PROGRESS",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "requirement",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_reviewed",
+                    "key": "review",
+                    "from": "status_pending",
+                    "name": "评审通过",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "start",
+                    "from": "status_reviewed",
+                    "name": "开始实施",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_reviewed",
+                    "from": "status_reviewed",
+                    "name": "直接完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_reviewed",
+                    "from": "status_reviewed",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_progress",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "a953bcb2-da0f-44fc-a451-278dff1e05bc",
+          "name": "冒烟测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "e15c13bf-7f60-4bf9-80b4-720e62f0a261",
+              "category": "case",
+              "taskTypeId": "a953bcb2-da0f-44fc-a451-278dff1e05bc",
+              "name": "冒烟测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "abbce28e-a390-4fd0-b7aa-533c439424c4",
+          "name": "回归测试",
+          "category": "测试",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "5e28003d-f167-4000-a2f5-a7b37dbf3c82",
+              "category": "test",
+              "taskTypeId": "abbce28e-a390-4fd0-b7aa-533c439424c4",
+              "name": "回归测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "acfc914f-1265-4ebf-a14c-673c609a8b99",
+          "name": "易用性测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "6c3fcdc9-e82b-4860-b8c7-9295de811f56",
+              "category": "case",
+              "taskTypeId": "acfc914f-1265-4ebf-a14c-673c609a8b99",
+              "name": "易用性测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "b3b83d77-aa52-4833-ab34-84f14f5928b4",
+          "name": "其他",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "c8c26000-a473-49b2-b5c6-2e0d65cbf36b",
+              "category": "case",
+              "taskTypeId": "b3b83d77-aa52-4833-ab34-84f14f5928b4",
+              "name": "其他状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "cfef9470-62e8-418c-8c5a-04172ed4b102",
+          "name": "性能优化任务",
+          "category": "研发",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "3f4a85b5-5531-42c7-ac17-5dc3c2cdf45b",
+              "category": "dev",
+              "taskTypeId": "cfef9470-62e8-418c-8c5a-04172ed4b102",
+              "name": "性能优化任务状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "d5975c74-b434-4820-b75d-5299c5b19e58",
+          "name": "其他设计",
+          "category": "设计",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "a8c1da8f-4777-46b1-a239-6c11f860e9b6",
+              "category": "design",
+              "taskTypeId": "d5975c74-b434-4820-b75d-5299c5b19e58",
+              "name": "其他设计状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "d5da8638-7bde-4e3d-986a-8a0fb5054876",
+          "name": "线上故障",
+          "category": "缺陷",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "644fff80-5ef2-4242-b12d-3b5f0ce28320",
+              "category": "bug",
+              "taskTypeId": "d5da8638-7bde-4e3d-986a-8a0fb5054876",
+              "name": "线上故障状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "d81266ce-6efb-4190-8ed1-becd1e358e86",
+          "name": "按照部署测试",
+          "category": "用例",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "40eec71e-0ad1-4668-a4da-d6054cd5f5ee",
+              "category": "case",
+              "taskTypeId": "d81266ce-6efb-4190-8ed1-becd1e358e86",
+              "name": "按照部署测试状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待测试",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "测试中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_deferred",
+                    "name": "暂缓",
+                    "color": "yellow",
+                    "group": "IN_PROGRESS",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "test",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_testing",
+                    "from": "status_pending",
+                    "name": "开始测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_pending",
+                    "from": "status_pending",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_deferred",
+                    "key": "defer_testing",
+                    "from": "status_in_progress",
+                    "name": "暂缓测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_in_progress",
+                    "key": "resume_testing",
+                    "from": "status_deferred",
+                    "name": "恢复测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete_testing",
+                    "from": "status_in_progress",
+                    "name": "完成测试",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "e0b70bc5-0492-4ad4-b379-8271c75a7a07",
+          "name": "开发任务",
+          "category": "研发",
+          "enabled": true,
+          "isDefault": true,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "c400ecc9-8ff3-4712-a566-f6c5e0cdad87",
+              "category": "dev",
+              "taskTypeId": "e0b70bc5-0492-4ad4-b379-8271c75a7a07",
+              "name": "开发任务标准阶段",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 2,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待开始",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "进行中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "开始",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "f613d27d-c75f-4e51-abf1-3319cbb0bb5f",
+              "category": "dev",
+              "taskTypeId": "e0b70bc5-0492-4ad4-b379-8271c75a7a07",
+              "name": "开发任务状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "e83dc41d-304b-462d-b655-7bfa69c65584",
+          "name": "样式缺陷",
+          "category": "缺陷",
+          "enabled": true,
+          "isDefault": false,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "d21a5e3e-0074-4b26-8f8f-d175d74ac392",
+              "category": "bug",
+              "taskTypeId": "e83dc41d-304b-462d-b655-7bfa69c65584",
+              "name": "样式缺陷状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "dev",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "f1b21dde-537f-4f82-a57f-2702f921cb0c",
+          "name": "需求设计",
+          "category": "设计",
+          "enabled": true,
+          "isDefault": true,
+          "revision": 0,
+          "workflows": [
+            {
+              "id": "487fe974-9cc3-49c1-9256-af04ffeb38c7",
+              "category": "design",
+              "taskTypeId": "f1b21dde-537f-4f82-a57f-2702f921cb0c",
+              "name": "需求设计状态配置",
+              "revision": 1,
+              "status": "PUBLISHED",
+              "workflowVersion": 1,
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待处理",
+                    "color": "neutral",
+                    "group": "NOT_STARTED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": true,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "处理中",
+                    "color": "blue",
+                    "group": "IN_PROGRESS",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "color": "green",
+                    "group": "COMPLETED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": true
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "color": "neutral",
+                    "group": "CANCELLED",
+                    "stage": "design",
+                    "enabled": true,
+                    "initial": false,
+                    "successful": false
+                  }
+                ],
+                "transitions": [
+                  {
+                    "to": "status_in_progress",
+                    "key": "start_processing",
+                    "from": "status_pending",
+                    "name": "进入处理中",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_completed",
+                    "key": "complete",
+                    "from": "status_in_progress",
+                    "name": "完成",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_pending",
+                    "from": "status_pending",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  },
+                  {
+                    "to": "status_cancelled",
+                    "key": "cancel_processing",
+                    "from": "status_in_progress",
+                    "name": "取消",
+                    "roles": null,
+                    "autoComplete": false,
+                    "approvalTasks": null,
+                    "requiredFields": null
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "f2c347ca-a93f-4e7d-b306-d396d4edd34b",

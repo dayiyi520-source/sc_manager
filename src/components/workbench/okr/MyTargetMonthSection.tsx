@@ -1,7 +1,8 @@
+import './goalTemplates.css';
 import { goalLevel } from '../../../services/okrGoalRules';
 import React from 'react';
-import { Button, Dropdown, Empty, Progress, Tag, Tooltip, Popover } from 'antd';
-import { PencilIcon, KebabHorizontalIcon, GitBranchIcon } from '@primer/octicons-react';
+import { Alert, Button, Dropdown, Empty, Progress, Tag, Tooltip, Popover } from 'antd';
+import { PencilIcon, KebabHorizontalIcon, GitBranchIcon, PlusIcon, CopyIcon, RepoTemplateIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
 import { ChevronDown, ChevronRight } from '@/components/common/octicons-compat';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
@@ -10,6 +11,7 @@ import type { ActionGroupValues } from './ActionBreakdownForm';
 export type MyTargetViewMode = 'list' | 'card';
 
 export type MyTargetActionViewItem = {
+  label?: string; executionActions?: Array<{ id: string; title: string; progress: number; deadline?: string }>;
   id: string;
   title: string;
   assigneeNames: string[];
@@ -35,7 +37,7 @@ export type MyTargetViewItem = {
   totalWeight?: number;
   maxDeadline?: string;
   progress: number;
-  savedAt?: string;
+  savedAt?: string; awaitingApproval?: boolean; autonomous?: boolean;
   actions: MyTargetActionViewItem[];
 };
 
@@ -57,6 +59,10 @@ type Props = {
   onEditTarget?: (targetId: string) => void;
   onDeleteTarget?: (targetId: string) => void;
   busy?: boolean;
+  draftCount?: number; onSubmitDrafts?: () => Promise<void>;
+  onAddGoal?: () => void;
+  onCopyGoal?: () => void;
+  onGoalTemplates?: () => void;
 };
 
 export const getPeriodCountdown = (periodKey: string) => {
@@ -130,10 +136,13 @@ export const buildMyTargetViewItems = (
     alignments: alignmentsFor(record.id, record.periodKey, record.ownerId),
   });
   const objectiveTargets = records.filter(record => record.kind === 'objective').map(record => {
-    const actions: MyTargetActionViewItem[] = (record.payload.keyResults || []).map(action => ({
+    const ownPersonal = record.payload.goalLevel === 'personal' && record.payload.origin === 'autonomous';
+    const displayActions = ownPersonal ? (record.payload.keyResults || []).flatMap(kr => (kr.executionActions || []).filter(action => action.ownerId === record.ownerId)) : record.payload.keyResults || [];
+    const actions: MyTargetActionViewItem[] = displayActions.map(action => ({
+      label: ownPersonal ? 'A' : 'KR', executionActions: 'executionActions' in action ? action.executionActions?.filter(item => item.ownerId === record.ownerId) : undefined,
       id: action.id,
       title: action.title,
-      assigneeNames: namesOf(action.assigneeIds),
+      assigneeNames: namesOf('assigneeIds' in action ? action.assigneeIds : []),
       progress: Number(action.progress || 0),
       weight: Number(action.weight || 0),
       deadline: action.deadline || '',
@@ -147,10 +156,10 @@ export const buildMyTargetViewItems = (
       id: record.id,
       detailId: record.id,
       alignmentLabel: record.payload.alignments?.map(alignment => [...sourceActions, ...records].find(item => item.id === alignment.parentObjectiveId)?.payload.title).filter(Boolean).join('、') || `${dayjs(record.periodKey).format('YYYY年MM月')}目标`,
-      editable: record.ownerId === currentUserId,
-      deletable: record.ownerId === currentUserId,
+      editable: record.ownerId === currentUserId && record.changeRequest?.status !== 'pending',
+      deletable: record.ownerId === currentUserId && !record.payload.inherited && record.changeRequest?.status !== 'pending',
       title: record.payload.title,
-      status: record.status,
+      status: record.status, awaitingApproval: record.changeRequest?.purpose === 'initial' && record.changeRequest.status === 'pending', autonomous: record.payload.origin === 'autonomous',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
       creatorName: ownerNameOf(record.ownerId),
@@ -202,7 +211,7 @@ export const buildMyTargetViewItems = (
     const actions: MyTargetActionViewItem[] = group.actions.map((action, index) => ({
       id: `${breakdown.id}-${group.parent.id}-${index}`,
       title: action.title || '',
-      assigneeNames: namesOf(action.assigneeIds),
+      assigneeNames: namesOf('assigneeIds' in action ? action.assigneeIds : []),
       progress: 0,
       weight: Number(action.weight || 0),
       deadline: action.deadline?.format('YYYY-MM-DD') || '',
@@ -226,7 +235,7 @@ export const buildMyTargetViewItems = (
 const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submitted: boolean; compact?: boolean; inlineAssignees?: boolean }> = ({ action, index, submitted, compact, inlineAssignees = false }) => {
   const overdue = Boolean(action.deadline) && dayjs(action.deadline).endOf('day').isBefore(dayjs()) && action.progress < 100;
   return <div className={`okr-target-action-row${compact ? ' is-compact' : ''}${inlineAssignees ? ' has-inline-assignees' : ''}`}>
-    <span className="okr-target-action-index">A{index + 1}</span>
+    <span className="okr-target-action-index">{action.label || 'A'}{index + 1}</span>
     <div className="okr-target-action-content"><strong title={action.title}>{action.title || '未填写行动描述'}{inlineAssignees && action.assigneeNames.length > 0 && <span className="okr-target-action-assignees-inline"> {action.assigneeNames.map(name => `@${name}`).join(' ')}</span>}</strong>
       {!compact && !!action.alignments?.length && <Popover trigger={['hover', 'focus']} placement="bottomRight" title="对齐我的" content={<div className="okr-target-alignment-preview" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{action.alignments.map(target => <section key={target.id}><h4 title={target.title}>{target.title}</h4><div className="okr-target-alignment-meta"><Progress type="circle" percent={target.progress} size={24} showInfo={false}/><span>{target.progress}%</span><Tag color="green">{target.levelLabel}</Tag><span>{target.ownerName}</span></div>{target.actions.map((item, i) => <div key={item.id} className={`okr-target-alignment-action${item.linked ? ' is-linked' : ''}`}><span>A{i + 1}</span><span title={item.title}>{item.title}</span>{item.linked && <GitBranchIcon size={14}/>}</div>)}</section>)}</div>}><Button className="okr-target-action-alignment" type="text" aria-label={`A${index + 1}下级对齐`} icon={<GitBranchIcon size={16}/>} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}/></Popover>}
     </div>
@@ -236,6 +245,7 @@ const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submi
       <span>{action.weight}%</span>
       <time className={overdue ? 'is-overdue' : ''}>{formatDeadline(action.deadline)}</time>
     </>}
+    {!!action.executionActions?.length && <div className="okr-own-actions">{action.executionActions.map((item, i) => <div key={item.id}>A{i + 1}　{item.title}　{item.progress}%　{item.deadline ? dayjs(item.deadline).format('MM-DD') : '未设置'}</div>)}</div>}
   </div>;
 };
 
@@ -252,7 +262,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   return <article className="okr-target-list-item" role="button" tabIndex={0} aria-label={`目标：${target.title}`} onClick={onOpen} onKeyDown={event => { if (event.target === event.currentTarget) openOnKeyboard(event, onOpen); }}>
     <header>
       <div className="okr-target-list-copy">
-        {target.status === 'draft' && <Tag className="okr-target-list-draft">草稿</Tag>}{target.status === 'partial-draft' && <Tag className="okr-target-list-draft">部分草稿</Tag>}
+        {target.awaitingApproval && <Tag color="processing">待上级审核</Tag>}{target.autonomous && <Tag>自主提出</Tag>}{target.status === 'draft' && <Tag className="okr-target-list-draft">草稿</Tag>}{target.status === 'partial-draft' && <Tag className="okr-target-list-draft">部分草稿</Tag>}
         <div className={`okr-target-hierarchy${target.alignmentLabel || target.sourceName || target.ownerNames.length ? ' has-links' : ''}`}>
           <span className="okr-target-hierarchy-source"><span className="okr-target-hierarchy-label">{target.alignmentLabel || target.sourceName || '未设置对齐'}</span></span>
           <div className="okr-target-title-line"><span className="okr-summary-index">O{index + 1}</span><h3>{target.title}</h3></div>
@@ -278,7 +288,7 @@ const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   return <article className="okr-target-grid-card" role="button" tabIndex={0} aria-label={`目标卡片：${target.title}`} onClick={onOpen} onKeyDown={event => { if (event.target === event.currentTarget) openOnKeyboard(event, onOpen); }}>
     <header>
       <div className="okr-target-card-title"><span className="okr-summary-index">O{index + 1}</span><h3 title={target.title}>{target.title}</h3></div>
-      <div className="okr-target-card-head-right">{target.status === 'draft' && <Tag>草稿</Tag>}{target.status === 'partial-draft' && <Tag>部分草稿</Tag>}<TargetToolbar target={target} onEdit={onEdit} onDelete={onDelete} busy={busy}/></div>
+      <div className="okr-target-card-head-right">{target.awaitingApproval && <Tag color="processing">待上级审核</Tag>}{target.autonomous && <Tag>自主提出</Tag>}{target.status === 'draft' && <Tag>草稿</Tag>}{target.status === 'partial-draft' && <Tag>部分草稿</Tag>}<TargetToolbar target={target} onEdit={onEdit} onDelete={onDelete} busy={busy}/></div>
     </header>
     <div className="okr-target-meta-line"><Tag color="blue">{target.levelLabel || '公司级'}</Tag><span className="okr-target-creator">{target.creatorName || '未指定'}</span><span className="okr-target-weight">{target.totalWeight ?? 0}%</span></div>
     <div className="okr-target-card-meta"><span>当前进度：<strong className="okr-target-card-progress">{target.progress}%</strong></span><time>截止日期：{formatDeadline(target.maxDeadline || '')}</time></div>
@@ -289,7 +299,14 @@ const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   </article>;
 };
 
-export const MyTargetMonthSection: React.FC<Props> = ({ periodKey, targets, viewMode, collapsed, onToggle, onOpenTarget, onEditTarget, onDeleteTarget, busy }) => (
+export const MyTargetMonthSection: React.FC<Props> = ({ periodKey, targets, viewMode, collapsed, onToggle, onOpenTarget, onEditTarget, onDeleteTarget, busy, onAddGoal, onCopyGoal, onGoalTemplates, draftCount = 0, onSubmitDrafts }) => {
+  const [submitting, setSubmitting] = React.useState(false);
+  const submitLock = React.useRef(false);
+  const [submitError, setSubmitError] = React.useState('');
+  const submitDrafts = async () => { if (submitLock.current || busy || !onSubmitDrafts) return; submitLock.current = true; setSubmitting(true); setSubmitError(''); try { await onSubmitDrafts(); } catch (reason) { setSubmitError(reason instanceof Error ? reason.message : '草稿提交失败，请重试'); } finally { submitLock.current = false; setSubmitting(false); } };
+  const [dismissed, setDismissed] = React.useState(false);
+  React.useEffect(() => setDismissed(false), [draftCount]);
+  return (
   <section className="okr-target-month" aria-label={`${dayjs(periodKey).format('YYYY年MM月')}目标`}>
     <button type="button" className="okr-target-month-head" onClick={onToggle} aria-expanded={!collapsed} aria-label={`${collapsed ? '展开' : '收起'}${dayjs(periodKey).format('YYYY年MM月')}`}>
       {collapsed ? <ChevronRight/> : <ChevronDown/>}
@@ -297,10 +314,15 @@ export const MyTargetMonthSection: React.FC<Props> = ({ periodKey, targets, view
       <span>{getPeriodCountdown(periodKey)}</span>
       <em>{targets.length} 个目标</em>
     </button>
-    {!collapsed && (targets.length === 0 ? <div className="okr-target-empty"><Empty description={`${dayjs(periodKey).format('YYYY年MM月')}暂无目标`} /></div> : <div className={viewMode === 'list' ? 'okr-target-list' : 'okr-target-grid'}>
+    {!collapsed && submitError && <Alert type="error" title={submitError} showIcon/>}
+    {!collapsed && draftCount > 0 && !dismissed && <Alert className="okr-month-draft-notice" type="info" showIcon title={`你有 ${draftCount} 个草稿未提交确认`} closable afterClose={() => setDismissed(true)} action={<Button type="primary" size="small" disabled={busy} loading={submitting} onClick={() => void submitDrafts()}>提交</Button>}/>}
+    {!collapsed && (targets.length === 0 ? <div className="okr-target-empty"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`${dayjs(periodKey).format('YYYY年MM月')}暂无目标`} />{onAddGoal && <div className="okr-target-empty-actions"><Button type="primary" icon={<PlusIcon/>} disabled={busy} onClick={onAddGoal}>添加目标</Button><Button icon={<CopyIcon/>} disabled={busy} onClick={onCopyGoal}>复制目标</Button><Button icon={<RepoTemplateIcon/>} disabled={busy} onClick={onGoalTemplates}>目标模板</Button></div>}</div> : <div className={viewMode === 'list' ? 'okr-target-list' : 'okr-target-grid'}>
       {targets.map((target, index) => viewMode === 'list'
         ? <ListTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)} onEdit={onEditTarget ? () => onEditTarget(target.id) : undefined} onDelete={onDeleteTarget ? () => onDeleteTarget(target.id) : undefined} busy={busy}/>
         : <CardTarget key={target.id} target={target} index={index} onOpen={() => onOpenTarget(target.id)} onEdit={onEditTarget ? () => onEditTarget(target.id) : undefined} onDelete={onDeleteTarget ? () => onDeleteTarget(target.id) : undefined} busy={busy}/>) }
+      {viewMode === 'card' && onAddGoal && <div className="okr-month-create-actions is-card"><Button icon={<PlusIcon/>} disabled={busy} onClick={onAddGoal}>添加目标</Button><Button icon={<CopyIcon/>} disabled={busy} onClick={onCopyGoal}>复制目标</Button></div>}
     </div>)}
+    {!collapsed && viewMode === 'list' && targets.length > 0 && onAddGoal && <div className={`okr-month-create-actions is-${viewMode}`}><Button icon={<PlusIcon/>} disabled={busy} onClick={onAddGoal}>添加目标</Button><Button icon={<CopyIcon/>} disabled={busy} onClick={onCopyGoal}>复制目标</Button></div>}
   </section>
 );
+};

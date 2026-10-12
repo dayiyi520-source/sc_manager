@@ -67,14 +67,14 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).not.toContain('shrink-0 rounded border border-[var(--border-main)] bg-[var(--bg-surface)] px-1.5');
   });
 
-  it('keeps children and relations in dedicated detail tabs', () => {
+  it('keeps child creation context while applying fixed detail relation tabs', () => {
     expect(requirementSource).toContain("value: 'collaborationItems'");
     expect(requirementSource).toContain("value: 'relatedTasks'");
     expect(requirementSource).toContain("value: 'children'");
     expect(requirementSource).toContain('title="添加子任务"');
     expect(requirementSource).toContain('父级任务');
     expect(requirementSource).toContain('openWorkItemDetail(child, selectedTask)');
-    expect(requirementSource).toContain('label="所属产品"><Input value={selectedTask?.productLineName || \'未设置\'} disabled');
+    expect(requirementSource).toContain('label="关联产品"><Input value={selectedTask?.productLineName || \'未设置\'} disabled');
     expect(requirementSource).toContain('label="迭代版本"><Input value={selectedTask?.versionName || \'未设置\'} disabled');
     expect(requirementSource).toContain('label="关联项目"><Input value={selectedTask?.projectName || \'未关联\'} disabled');
   });
@@ -111,14 +111,14 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('onOpenParent: parentWorkItem ?');
   });
 
-  it('puts product line first and uses Ant Design for both hour fields', () => {
-    const properties = requirementSource.slice(requirementSource.indexOf('properties={<Form layout="horizontal"'));
-    expect(properties.indexOf('label="所属产品"')).toBeLessThan(properties.indexOf('label={`${itemLabel}类型`}'));
-    expect(requirementSource).toContain('label="预计工时（小时）"><InputNumber');
+  it('uses fixed field contracts and Ant Design hour inputs', () => {
+    expect(requirementSource).not.toContain('workItemFieldConfigurations');
+    expect(requirementSource).toContain("detailFields.order('estimatedHours')");
+    expect(requirementSource).toContain('label="关联产品"');
+    expect(requirementSource).toContain('label="需要协同"');
     expect(requirementSource).toContain('className="requirement-create-properties requirement-detail-properties"');
     expect(requirementSource).toContain('label="实际工时（小时）"><InputNumber');
     expect(requirementSource).toContain('className="requirement-hours-input w-full"');
-    expect(requirementSource).not.toContain('<Form.Item label="验收标准"');
   });
 
   it('uses configured workflow states and keeps parents with children read-only', () => {

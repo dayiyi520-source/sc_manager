@@ -30,7 +30,7 @@ describe('company objective detail', () => {
     expect(screen.queryByText('所属部门:产品部')).not.toBeInTheDocument();
     expect(screen.queryByText(/完成时间:/)).not.toBeInTheDocument();
     expect(screen.getByText('完成交付——来源于上级林志豪')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name:'A1下级对齐'}));
+    fireEvent.click(screen.getByRole('button', {name:'KR1下级对齐'}));
     expect(screen.getByText('下级成员 · 75%')).toBeInTheDocument();
     expect(screen.queryByText('陈宇璋 · 75%')).not.toBeInTheDocument();
     expect(screen.queryByText('主管自己的拆解')).not.toBeInTheDocument();
@@ -77,29 +77,29 @@ describe('company objective detail', () => {
     expect(screen.getByRole('separator')).toBeInTheDocument();
     expect(screen.getByRole('main', {name:'目标与动作'})).toHaveAttribute('tabindex', '0');
     expect(screen.getByRole('complementary', {name:'动态记录'})).toHaveAttribute('tabindex', '0');
-    expect(screen.getByLabelText('A1进度：75%')).toBeInTheDocument();
-    expect(screen.getByLabelText('A1权重：100%')).toBeInTheDocument();
-    for (const name of ['A1关联任务', 'A1项目', 'A1产品', 'A1下级对齐']) expect(screen.getByRole('button', {name})).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(screen.getByRole('button',{name:'A1关联任务'}));
+    expect(screen.getByLabelText('KR1进度：75%')).toBeInTheDocument();
+    expect(screen.getByLabelText('KR1权重：100%')).toBeInTheDocument();
+    for (const name of ['KR1关联任务', 'KR1项目', 'KR1产品', 'KR1下级对齐']) expect(screen.getByRole('button', {name})).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button',{name:'KR1关联任务'}));
     expect(screen.getByText('实际任务')).toBeInTheDocument();
-    expect(screen.getByRole('button', {name:'A1关联任务'})).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', {name:'A1关联任务'}));
+    expect(screen.getByRole('button', {name:'KR1关联任务'})).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', {name:'KR1关联任务'}));
     expect(screen.queryByText('实际任务')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', {name:'A1关联任务'})).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(screen.getByRole('button', {name:'A1关联任务'}));
+    expect(screen.getByRole('button', {name:'KR1关联任务'})).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('button', {name:'KR1关联任务'}));
     expect(screen.getByText('实际任务')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'A1下级对齐'}));
+    fireEvent.click(screen.getByRole('button',{name:'KR1下级对齐'}));
     expect(screen.getByText('部门交付')).toBeInTheDocument();
     expect(screen.queryByText('实际任务')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', {name:'A1项目'})).toBeInTheDocument();
-    expect(screen.getByRole('button', {name:'A1产品'})).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name:'A1收起关联内容'}));
+    expect(screen.getByRole('button', {name:'KR1项目'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name:'KR1产品'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name:'KR1收起关联内容'}));
     expect(screen.queryByText('部门交付')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name:'A1展开关联内容'}));
+    fireEvent.click(screen.getByRole('button', {name:'KR1展开关联内容'}));
     expect(screen.getByText('部门交付')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name:'A1项目'}));
+    fireEvent.click(screen.getByRole('button', {name:'KR1项目'}));
     expect(screen.getByText('暂无关联项目')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name:'A1产品'}));
+    fireEvent.click(screen.getByRole('button', {name:'KR1产品'}));
     expect(screen.getByText('暂无关联产品')).toBeInTheDocument();
     expect(await screen.findByText('动态记录加载失败')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:/重\s*试/}));
@@ -123,12 +123,22 @@ describe('company objective detail', () => {
     vi.spyOn(okrRepository, 'events').mockResolvedValue([]);
     const linked = {...child, payload:{...child.payload,structureType:'delivery',businessObject:'交付项目甲',productLine:'产品甲'}};
     render(<CompanyObjectiveDetail record={objective} records={[objective,linked]} people={[]} work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
-    fireEvent.click(screen.getByRole('button', {name:'A1项目'}));
+    fireEvent.click(screen.getByRole('button', {name:'KR1项目'}));
     expect(screen.getByText('交付项目甲')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name:'A1产品'}));
+    fireEvent.click(screen.getByRole('button', {name:'KR1产品'}));
     expect(screen.getByText('产品甲')).toBeInTheDocument();
     expect(screen.queryByText('交付项目甲')).not.toBeInTheDocument();
     await screen.findByText('暂无动态记录');
     vi.restoreAllMocks();
   });
+});
+
+
+describe('personal autonomous details',()=>{
+ it('renders actual A rows without exposing an internal KR container',()=>{
+  vi.spyOn(okrRepository,'events').mockResolvedValue([]);
+  const record:OkrRecord={id:'personal',kind:'objective',ownerId:'staff',periodKey:'2026-09',status:'active',version:1,payload:{goalLevel:'personal',origin:'autonomous',title:'个人自主目标',keyResults:[{id:'container',title:'个人自主目标',weight:100,progress:0,executionActions:[{id:'a',ownerId:'staff',title:'完成具体工作',weight:100,progress:30,deadline:'2026-09-25'}]}]}};
+  render(<CompanyObjectiveDetail record={record} records={[record]} people={[]} work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
+  expect(screen.getByText('A1')).toBeInTheDocument();expect(screen.getByText('完成具体工作')).toBeInTheDocument();expect(screen.queryByText('KR1')).not.toBeInTheDocument();
+ });
 });

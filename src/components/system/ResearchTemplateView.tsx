@@ -6,13 +6,12 @@ import { WorkItemModuleView } from './WorkItemModuleView';
 import { NotificationSettingsPanel } from '../product/NotificationSettingsPanel';
 import { AutomationRulesPanel } from '../product/AutomationRulesPanel';
 import { WorkItemCategoryPanel } from './WorkItemCategoryPanel';
-import { WorkItemFieldConfigurationPanel } from './WorkItemFieldConfigurationPanel';
 import { productRepository, type ArchivedProductLine, type ProductRoleTemplate } from '../../services/productRepository';
 import { useApp } from '../../context/AppContext';
 
 type Section = 'dictionary' | 'work-items' | 'roles' | 'notifications' | 'automation' | 'archive';
 const SECTIONS: Array<{ id: Section; label: string }> = [
-  { id: 'dictionary', label: '产研字典' }, { id: 'work-items', label: '工作项模版' },
+  { id: 'dictionary', label: '工作项分类' }, { id: 'work-items', label: '工作项模版' },
   { id: 'roles', label: '角色与职责' }, { id: 'notifications', label: '通知与提醒' },
   { id: 'automation', label: '自动化配置' },
   { id: 'archive', label: '归档' }
@@ -51,17 +50,9 @@ const ArchivePanel = () => {
   const items = archivedQuery.data || [];
   return <div className="mx-auto w-full max-w-5xl space-y-4 text-xs"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">归档产品</h3><p className="mt-1 text-[var(--text-muted)]">统一查看已归档产品，并支持取消归档或删除。</p></div>{archivedQuery.isError && <Alert type="error" showIcon message="归档产品加载失败" description={archivedQuery.error instanceof Error ? archivedQuery.error.message : '请稍后重试。'} action={<Button onClick={() => archivedQuery.refetch()}>重试</Button>} />}{archivedQuery.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : !archivedQuery.isError && <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[860px]"><div className="grid grid-cols-[minmax(160px,1.5fr)_140px_140px_180px_140px_150px] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-3 text-[var(--text-muted)]"><span>产品名称</span><span>编号</span><span>负责人</span><span>归档时间</span><span>操作人</span><span className="text-right">操作</span></div>{items.map((item) => <div key={item.id} className="grid grid-cols-[minmax(160px,1.5fr)_140px_140px_180px_140px_150px] items-center gap-3 border-b border-[var(--border-main)] px-4 py-3 last:border-0"><span className="truncate font-medium text-[var(--text-primary)]" title={item.name}>{item.name}</span><span className="truncate font-mono text-[var(--text-body)]" title={item.code}>{item.code}</span><span className="truncate text-[var(--text-body)]" title={item.ownerName || '未设置'}>{item.ownerName || '未设置'}</span><span className="text-[var(--text-muted)]">{archiveDate(item.archivedAt)}</span><span className="truncate text-[var(--text-body)]" title={item.archivedByName || '未记录'}>{item.archivedByName || '未记录'}</span><span className="flex justify-end gap-1"><Popconfirm title="取消归档" description={`确定恢复“${item.name}”吗？`} okText="取消归档" cancelText="返回" onConfirm={() => restore(item)}><Button type="link" size="small" loading={operatingId === item.id} icon={<UndoOutlined />}>取消归档</Button></Popconfirm><Popconfirm title="删除归档产品" description={`确定删除“${item.name}”吗？删除后无法从界面恢复。`} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => remove(item)}><Button type="link" danger size="small" loading={operatingId === item.id} icon={<DeleteOutlined />}>删除</Button></Popconfirm></span></div>)}{items.length === 0 && <div className="px-4 py-10 text-center text-[var(--text-muted)]">暂无已归档产品</div>}</div></div>}</div>;
 };
-const DictionaryPanel = () => {
-  const [tab, setTab] = useState<'fields' | 'categories'>('fields');
-  const queryClient = useQueryClient();
-  const categoryQuery = useQuery({ queryKey: ['work-item-categories'], queryFn: productRepository.workItemCategories, retry: false });
-  const categories = categoryQuery.data || [];
-  return <div className="mx-auto w-full max-w-5xl space-y-5 text-xs">
-    <div><h3 className="text-sm font-bold text-[var(--text-primary)]">产研字典</h3><p className="mt-1 text-[var(--text-muted)]">统一维护分类、显示名称和图标，并按分类配置工作项字段。启用分类同步用于全局模板和产品配置。</p></div>
-    {categoryQuery.isError && <Alert type="error" showIcon message="工作项分类读取失败" action={<Button onClick={() => void categoryQuery.refetch()}>重试</Button>} />}
-    <Tabs activeKey={tab} onChange={(key) => setTab(key as 'fields' | 'categories')} items={[{ key: 'fields', label: '工作项字段', children: <WorkItemFieldConfigurationPanel categories={categories} /> }, { key: 'categories', label: '工作项分类', children: <WorkItemCategoryPanel onChanged={() => queryClient.invalidateQueries({ queryKey: ['work-item-categories'] })} /> }]} />
-  </div>;
-};
+const DictionaryPanel = () => <div className="mx-auto w-full max-w-5xl space-y-5 text-xs">
+  <WorkItemCategoryPanel />
+</div>;
 const RolesPanel = () => {
   const { addToast } = useApp();
   const queryClient = useQueryClient();

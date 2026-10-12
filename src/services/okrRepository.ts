@@ -1,7 +1,10 @@
 import { apiRequest } from './apiClient';
 
 export interface OkrPerson { id: string; name: string; department: string; jobTitle?: string; supervisorId: string | null; rootFlag: number; version: number }
-export interface OkrKr { id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[]; businessObject?: string; version?: string; stage?: string; action?: string; result?: string }
+export interface GoalTiming { deadline?: string; plannedDeadline?: string; forecastDeadline?: string; actualStartedAt?: string; actualCompletedAt?: string; delayReason?: string; delayResponsibility?: 'self' | 'dependency' | 'company'; }
+export interface OkrExecutionAction extends GoalTiming { weight?: number; id: string; title: string; ownerId: string; progress: number; }
+export interface OkrGoalChange { id: string; status: 'pending' | 'approved' | 'returned'; purpose?: 'initial' | 'update' | 'alignment'; reason: string; reviewerId: string; payload: OkrPayload; baseVersion: number; requestedAt: string; feedback?: string; reviewedAt?: string; }
+export interface OkrKr extends GoalTiming { structureType?: 'product' | 'delivery' | 'support'; executionActions?: OkrExecutionAction[]; confidence?: number; currentValue?: number; targetValue?: number; id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[]; businessObject?: string; version?: string; stage?: string; action?: string; result?: string }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
 export interface OkrReviewItem { workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
 export interface OkrKrReview { objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
@@ -13,12 +16,17 @@ export interface OkrWeeklyReviewSnapshot {
   id:string; title:string; startDate:string; endDate:string; status:string; summary?:string;
   krReviews:OkrKrReview[]; assistance:OkrReviewAssistance[]; extraWork?:OkrExtraWork; items:OkrReviewItem[];
 }
-export interface OkrPayload {
+export interface OkrPayload extends GoalTiming {
+  goalModelVersion?: 2; goalLevel?: 'company' | 'department' | 'personal';
+  sourceKrData?: OkrKr; sourceObjectiveId?: string; sourceKrId?: string; sourceVersion?: number; sourceTitle?: string;
+  origin?: 'assigned' | 'autonomous'; reviewerSuggestedSource?: string;
+  inherited?: boolean; changeReason?: string;
+
   reviewMode?: 'completed' | 'structured' | 'monthly'; reviewType?: 'week' | 'month'; selfScore?: number;
   krReviews?: OkrKrReview[]; assistance?: OkrReviewAssistance[]; extraWork?: OkrExtraWork; syncKrProgress?: boolean;
   weeklyReviewIds?: string[]; weeklyReviewSnapshots?: OkrWeeklyReviewSnapshot[];
   monthlyOtherTasks?: OkrMonthlyTask[]; nextMonthPlans?: OkrMonthlyPlan[];
-  otherNotes?: string; nextMonthArrangement?: string;
+  otherNotes?: string; nextMonthArrangement?: string; nextWeekPlan?: string;
   uncompletedReason?: string; suggestions?: string; helpNeeded?: string; sendTo?: string[];
   weight?: number; deadline?: string;
   objectiveType?: 'target' | 'challenge'; note?: string;
@@ -39,11 +47,15 @@ export interface OkrActionPayload {
   /** Sum of the sibling actions in this lower-level breakdown. */
   breakdownWeightTotal?: number;
 }
-export interface OkrRecord { id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; payload: OkrPayload & Partial<OkrActionPayload> }
-export interface OkrWork { id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; creatorName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
+export interface OkrRecord { id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; submittedAt?: string; changeRequest?: OkrGoalChange; changeHistory?: OkrGoalChange[]; payload: OkrPayload & Partial<OkrActionPayload> }
+export interface OkrWork {
+  productLineId?: string; productLineName?: string; versionId?: string; versionName?: string;
+  assigneeId?: string; creatorId?: string; participantIds?: string[]; participantNames?: string[];
+  completedAt?: string; statusGroup?: string; id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; creatorName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }
 export type OkrTimeRule = {
   key: 'addObjective' | 'breakdown' | 'weeklyReview' | 'monthlyReview' | string;
   label: string;
+  /** weeklyReview uses Monday=1 through Sunday=7; other rules use days of the month. */
   startDay: number;
   endDay: number;
   shortMonthRule?: 'clamp' | 'reject';

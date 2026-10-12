@@ -1,0 +1,17 @@
+import type { WorkItemFieldConfiguration, WorkItemFieldScene } from '../../services/productRepository';
+import type { DesignVariant } from './designTaskPresentation';
+
+const labels: Record<string, string> = { source: '关联商机/投标项', customer: '关联客户', title: '标题', taskType: '任务类型', assignee: '负责人', priority: '优先级', productLine: '关联产品', version: '迭代版本', project: '关联项目', sourceDepartment: '来源部门', needsCollaboration: '需要协同', plannedStartDate: '计划开始时间', plannedEndDate: '计划完成时间', expectedCompleteDate: '期望完成时间', estimatedHours: '预计工时', actualHours: '实际工时', attachments: '附件' };
+const aliases: Record<string, string> = { dueDate: 'plannedEndDate' };
+export const fixedTaskFields = (category: string, scene: WorkItemFieldScene, variant: DesignVariant = 'product') => {
+  const strict = ['requirement', 'design', 'dev', 'test', ...['ops', 'presales', 'delivery']].includes(category);
+  const detail = scene === 'DETAIL';
+  const list = scene === 'LIST' || scene === 'ITERATION';
+  const ownership = category === 'design' ? variant === 'product' ? ['productLine', 'version'] : variant === 'project' ? ['project', 'productLine'] : ['sourceDepartment', 'productLine'] : category === 'ops' ? ['project', 'productLine'] : category === 'presales' ? ['source', 'customer'] : category === 'delivery' ? ['project', 'customer'] : ['productLine', 'version', 'project'];
+  const propertyCodes = [...(category === 'requirement' ? ['needsCollaboration'] : category === 'design' ? ['taskType'] : []), 'assignee', 'priority', ...ownership, 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', ...(detail ? ['actualHours'] : []), 'attachments'];
+  const codes = ['title', 'description', 'collaborationItems', ...(!detail && category !== 'requirement' || detail && ['design', 'ops', 'presales', 'delivery'].includes(category) ? ['relatedTasks'] : []), ...(detail ? ['creator', 'createdAt', 'updater', 'updatedAt'] : []), ...propertyCodes];
+  const requiredCodes = ['title', 'assignee', 'priority', 'plannedStartDate', 'plannedEndDate', ...(category === 'design' ? ['taskType', variant === 'product' ? 'productLine' : variant === 'project' ? 'project' : 'sourceDepartment'] : category === 'ops' ? [] : category === 'presales' ? ['source', 'customer'] : category === 'delivery' ? ['project', 'customer'] : ['productLine', 'version']), ...(category === 'requirement' ? ['needsCollaboration'] : [])];
+  const fields: WorkItemFieldConfiguration[] = codes.map((fieldCode) => ({ fieldCode, label: labels[fieldCode] || fieldCode, fieldType: 'text', visible: true, required: requiredCodes.includes(fieldCode), editable: true, locked: false, sort: propertyCodes.indexOf(fieldCode) }));
+  const normalize = (code: string) => aliases[code] || code;
+  return { fields: strict && !list ? fields : [], loaded: true, visible: (code: string) => list || !strict || codes.includes(normalize(code)), required: (code: string) => !list && (strict ? requiredCodes.includes(normalize(code)) : ['title', 'assignee', 'plannedStartDate', 'plannedEndDate'].includes(normalize(code))), editable: (code: string) => !['creator', 'createdAt', 'updater', 'updatedAt'].includes(code), order: (code: string) => strict && !list ? propertyCodes.indexOf(normalize(code)) : 999 };
+};

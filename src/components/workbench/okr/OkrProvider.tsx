@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { App, ConfigProvider, Empty, theme } from 'antd';
+import { App, ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 
 /** Keep portalled dialogs and feedback on the same AIEDIT tokens as the workspace. */
@@ -12,7 +12,7 @@ export function OkrProvider({ children }: { children: ReactNode }) {
   }, []);
   const css = getComputedStyle(document.documentElement);
   const value = (name: string) => css.getPropertyValue(name).trim();
-  return <ConfigProvider locale={zhCN} renderEmpty={()=><Empty image={<svg viewBox="0 0 48 48" height="48" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M33 7c3 15-5 25-20 25 6 8 19 8 25-1 5-8 3-18-2-24Z"/><path d="M13 32c12 3 23-4 23-18M33 7l1-3 4 1-2 3"/></svg>} description="暂无记录"/>} theme={{
+  return <ConfigProvider locale={zhCN} theme={{
     algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: {
       colorPrimary: value('--primary'), colorLink: value(dark?'--active-text':'--primary'),

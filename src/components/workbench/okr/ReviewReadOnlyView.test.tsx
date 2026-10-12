@@ -7,7 +7,7 @@ import { ReviewReadOnlyView } from './ReviewReadOnlyView';
 const review: PerformanceReview & { authorId: string } = {
   id: 'review-1', authorId: 'user-admin', type: 'week', cycleName: '2026年第37周', author: '林志豪',
   authorDept: '平台架构部', summary: '完成核心流程验收', uncompletedReason: '', selfScore: 90,
-  suggestions: '', helpNeeded: '', sendTo: [], createdAt: '2026-09-13 18:30', status: 'reviewed',
+  nextWeekPlan: '下周完成验证', suggestions: '', helpNeeded: '', sendTo: [], createdAt: '2026-09-13 18:30', status: 'reviewed',
   feedback: '继续保持', leaderScore: 92,
   krReviews: [{ objectiveId: 'o-1', objectiveTitle: '平台目标', keyResultId: 'kr-1', keyResultTitle: '核心流程稳定', previousProgress: 40, currentProgress: 80, health: 'normal', achievement: '完成回归', blocker: '', nextPlan: '补齐自动化', workIds: [] }],
   assistance: [{ subject: '产品团队', result: '完成验收口径统一' }],
@@ -22,6 +22,7 @@ describe('ReviewReadOnlyView', () => {
 
     expect(screen.getByRole('heading', { name: '2026年第37周' })).toBeInTheDocument();
     expect(screen.getByText('完成核心流程验收')).toBeInTheDocument();
+    expect(screen.getByText('下周完成验证')).toBeInTheDocument();
     expect(screen.getByText('完成回归')).toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 

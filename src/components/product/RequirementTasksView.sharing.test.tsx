@@ -156,12 +156,12 @@ it.each([['product', '产品设计'], ['project', '项目设计'], ['other', '�
   vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '协同产品', workItemTypes: [{ id: 'different', name: '其他设计', category: '设计', enabled: true, default: true }] }] } as unknown as ReturnType<typeof useApp>);
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="design" itemLabel="设计任务" designVariant={variant} creationContext={{ productLineId: 'line-1' }} /></QueryClientProvider>);
   await screen.findByText('新建设计任务');
-  const field = screen.getByText('设计任务类型').closest('.ant-form-item')!;
+  const field = screen.getByText('任务类型').closest('.ant-form-item')!;
   await waitFor(() => expect(field).toHaveTextContent(label));
-  expect(field).toHaveStyle({ order: '-1' });
+  expect(field).toHaveStyle({ order: '0' });
   expect(field.querySelector('.ant-select')).toHaveClass('ant-select-disabled');
-  if (variant === 'project') expect(screen.queryByText('关联项目')).not.toBeInTheDocument();
-  else expect(screen.getByText('关联项目')).toBeVisible();
+  if (variant === 'project') expect(screen.getByText('关联项目')).toBeVisible();
+  else expect(screen.queryByText('关联项目')).not.toBeInTheDocument();
 });
 
 it('hides related tasks in a product detail', async () => {
@@ -189,7 +189,8 @@ it.each(['design', 'dev', 'test'] as const)('shows product task cards with statu
   vi.mocked(productRepository.workItems).mockResolvedValue({ page: { items: [product, { ...product, id: 'not-product', category: 'design', title: '不应作为候选' }], total: 2 } } as never);
   vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '产品' }] } as unknown as ReturnType<typeof useApp>);
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} initialDetail={{ id: 'detail-1', title: '下游详情', category: kind, relatedTaskIds: ['p-1'] } as import('../../types').RequirementTask} /></QueryClientProvider>);
-  fireEvent.click(screen.getByRole('button', { name: '关联任务 · 1' }));
+  if (kind === 'design') { fireEvent.click(screen.getByRole('button', { name: '关联任务 · 1' })); }
+  else { expect(screen.queryByRole('button', { name: '关联任务 · 1' })).not.toBeInTheDocument(); return; }
   fireEvent.click(await screen.findByRole('button', { name: '关联产品任务' }));
   expect(screen.getByText('状态：处理中')).toBeVisible();
   expect(open).toHaveBeenCalledWith(`${window.location.origin}/app/prod_req_tasks?detailId=p-1&productLineId=line-1`, '_blank');
@@ -224,7 +225,8 @@ it.each(['presales', 'delivery'] as const)('blocks %s creation with missing date
   fireEvent.keyDown(endInput, { key: 'Enter', code: 'Enter', keyCode: 13 });
   fireEvent.blur(endInput);
   fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ }));
-  await waitFor(() => expect(productRepository.createBusinessTask).toHaveBeenCalledWith(kind, expect.objectContaining({ title: '日期必填验收', plannedStartDate: '2026-10-10', dueDate: '2026-10-11' })));
+  await waitFor(() => expect(addToast).toHaveBeenCalledWith('warning', expect.stringMatching(/请选择关联商机或投标项|请选择关联项目|请选择关联客户/)));
+  expect(productRepository.createBusinessTask).not.toHaveBeenCalled();
 });
 
 
@@ -244,8 +246,9 @@ it('requires a project before selecting the optional ops product and hides task 
   window.history.replaceState(null, '', '/app/proj_ops_tasks');
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="ops" /></QueryClientProvider>);
   fireEvent.click(await screen.findByRole('button', { name: '新建' }));
-  const project = screen.getByText('关联项目').closest('.ant-form-item')!;
-  const product = screen.getByText('所属产品').closest('.ant-form-item')!;
+  const items = Array.from(document.querySelectorAll('.requirement-new-properties .ant-form-item'));
+  const project = items.find((item) => item.textContent?.includes('关联项目'))!;
+  const product = items.find((item) => item.textContent?.includes('关联产品'))!;
   expect(project.querySelector('label')).toHaveClass('ant-form-item-required');
   expect(product.querySelector('label')).not.toHaveClass('ant-form-item-required');
   expect(product.querySelector('input')).toBeDisabled();
@@ -259,11 +262,13 @@ it.each([['product', '产品设计', '协同产品'], ['project', '项目设计'
   vi.mocked(useApp).mockReturnValue({ ...useApp(), currentUser: { id: 'viewer', name: '测试人员', department: '产品部' }, productLines: [{ id: 'line-1', name: '协同产品' }], projects: [{ id: 'project-1', name: '归属项目' }] } as unknown as ReturnType<typeof useApp>);
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="design" itemLabel="设计任务" designVariant={variant} creationContext={{ productLineId: 'line-1', sourceWorkOrder: { id: 'matter', title: '来源事项', department: '产品部', projectId: 'project-1', projectName: '归属项目' } as import('../../types').RequirementTask }} /></QueryClientProvider>);
   await screen.findByText('新建设计任务');
-  const typeField = screen.getByText('设计任务类型').closest('.ant-form-item')!;
+  const typeField = screen.getByText('任务类型').closest('.ant-form-item')!;
   expect(typeField).toHaveTextContent(label);
   expect(typeField.querySelector('.ant-select')).toHaveClass('ant-select-disabled');
-  const sourceField = screen.getByText(variant === 'product' ? '所属产品' : variant === 'project' ? '所属项目' : '来源部门').closest('.ant-form-item')!;
+  const sourceField = screen.getByText(variant === 'product' ? '关联产品' : variant === 'project' ? '关联项目' : '来源部门').closest('.ant-form-item')!;
   expect(sourceField).toHaveTextContent(sourceName);
+  if (variant === 'project') expect(screen.getByText('关联产品')).toBeVisible();
+  if (variant === 'other') expect(screen.getByText('关联产品')).toBeVisible();
 });
 it('opens operations creation from a matter with its associated project and collaboration preselected', async () => {
   window.history.replaceState(null, '', '/app/wb_work_order');

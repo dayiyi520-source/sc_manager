@@ -200,3 +200,51 @@ describe('MyTargetMonthSection', () => {
     expect(screen.getByRole('button', { name: '展开2026年09月' })).toBeInTheDocument();
   });
 });
+
+
+describe('我的目标空月份操作', () => {
+  it('shows all three actions and calls their own handlers', () => {
+    const add = vi.fn(), copy = vi.fn(), templates = vi.fn();
+    render(<MyTargetMonthSection periodKey="2026-10" targets={[]} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()} onAddGoal={add} onCopyGoal={copy} onGoalTemplates={templates}/>);
+    fireEvent.click(screen.getByRole('button', { name: '添加目标' }));
+    fireEvent.click(screen.getByRole('button', { name: '复制目标' }));
+    fireEvent.click(screen.getByRole('button', { name: '目标模板' }));
+    expect(add).toHaveBeenCalledTimes(1); expect(copy).toHaveBeenCalledTimes(1); expect(templates).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('模板导入')).not.toBeInTheDocument();
+    expect(document.querySelector('.ant-empty-image')).toBeInTheDocument();
+  });
+  it('disables actions when busy and hides creation in read-only scopes', () => {
+    const props = { periodKey: '2026-10', targets: [], viewMode: 'list' as const, collapsed: false, onToggle: vi.fn(), onOpenTarget: vi.fn() };
+    const { rerender } = render(<MyTargetMonthSection {...props} busy onAddGoal={vi.fn()} onCopyGoal={vi.fn()} onGoalTemplates={vi.fn()}/>);
+    expect(screen.getByRole('button', { name: '添加目标' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '复制目标' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '目标模板' })).toBeDisabled();
+    rerender(<MyTargetMonthSection {...props}/>);
+    expect(screen.queryByRole('button', { name: '添加目标' })).not.toBeInTheDocument();
+  });
+});
+
+
+describe('月份目标创建入口和草稿提示', () => {
+  it.each(['list', 'card'] as const)('shows period draft feedback before targets and separate add/copy buttons in %s view', async viewMode => {
+    const add = vi.fn(), copy = vi.fn(), submit = vi.fn().mockResolvedValue(undefined);
+    const {container,rerender}=render(<MyTargetMonthSection periodKey="2026-10" targets={targets} viewMode={viewMode} collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()} onAddGoal={add} onCopyGoal={copy} draftCount={1} onSubmitDrafts={submit}/>);
+    const notice=screen.getByText('你有 1 个草稿未提交确认').closest('.ant-alert')!;
+    const target=container.querySelector(viewMode === 'list' ? '.okr-target-list' : '.okr-target-grid')!;
+    expect(notice.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('button',{name:'添加目标'}));fireEvent.click(screen.getByRole('button',{name:'复制目标'}));
+    expect(add).toHaveBeenCalledOnce();expect(copy).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button',{name:/提\s*交/})); await waitFor(()=>expect(submit).toHaveBeenCalledOnce());
+    rerender(<MyTargetMonthSection periodKey="2026-10" targets={targets} viewMode={viewMode} collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()} onAddGoal={add} onCopyGoal={copy} draftCount={0}/>);
+    expect(screen.queryByText('你有 1 个草稿未提交确认')).not.toBeInTheDocument();
+  });
+});
+
+
+describe('personal autonomous target presentation',()=>{
+ it('shows own execution actions directly without a repeated hidden KR',()=>{
+  const record:OkrRecord={id:'personal',kind:'objective',ownerId:'staff',periodKey:'2026-09',status:'active',version:1,payload:{goalLevel:'personal',origin:'autonomous',title:'个人自主目标',keyResults:[{id:'container',title:'个人自主目标',weight:100,progress:0,executionActions:[{id:'a',ownerId:'staff',title:'完成具体工作',weight:100,progress:30,deadline:'2026-09-25'}]}]}};
+  const result=buildMyTargetViewItems([record],[],[record],[],'staff')[0];
+  expect(result.actions).toHaveLength(1);expect(result.actions[0]).toMatchObject({id:'a',label:'A',title:'完成具体工作',progress:30,weight:100});
+ });
+});

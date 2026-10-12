@@ -33,6 +33,7 @@ export const Header: React.FC = () => {
   });
   const organizationRoleMembers = (roleMembersQuery.data || [])
     .filter((member) => switchableIds.has(member.id))
+    .filter(member => member.id !== 'user-product-member' || !(roleMembersQuery.data || []).some(other => other.id !== member.id && other.name === member.name && other.department === member.department))
     .sort((a, b) => switchableIds.has(a.id) && switchableIds.has(b.id) ? [...switchableIds].indexOf(a.id) - [...switchableIds].indexOf(b.id) : 0);
   const roleMembers = organizationRoleMembers;
   const roleMemberToUser = (member: EmployeeOption): CurrentUser => ({

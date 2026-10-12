@@ -3,7 +3,7 @@ import { MOCK_DATABASE, MOCK_SNAPSHOT_VERSION, MOCK_USERS } from '../data/mockSn
 import { SESSION_KEY } from './sessionStorage';
 import type { RequirementTask } from '../types';
 
-type Kind = 'presales' | 'delivery';
+type Kind = 'presales' | 'delivery' | 'ops';
 type AuditContext = {
   activities: () => Array<{ subjectId: string }>;
   record: (id: string, productLineId: string, eventType: string, content: Record<string, unknown>) => void;
@@ -12,7 +12,12 @@ type AuditContext = {
 };
 const text = (value: unknown) => value == null ? '' : String(value);
 const storageKey = (kind: Kind) => 'shichuang.frontend.mock.' + kind + 'Tasks';
+const statusFlow = (kind: Kind) => kind === 'delivery' ? ['待处理', '处理中', '待审核', '已完成'] : ['待处理', '处理中', '已完成'];
 function initialTasks(kind: Kind): RequirementTask[] {
+  if (kind === 'ops') return [
+    { id: 'demo-ops-1', code: 'OP-DEMO-001', title: '运维巡检与告警规则复核', description: '检查生产环境运行指标和告警规则。', status: '处理中', priority: '高', ownerName: '管理员', assigneeId: 'u-admin', creatorName: '管理员', creatorId: 'u-admin', department: '产研部门', projectId: 'project-1', projectName: '统一身份认证升级', productLineName: '', versionName: '', dueDate: '2026-10-20', plannedStartDate: '2026-10-12', estimatedHours: 8, actualHours: 2, createdAt: '2026-10-08T09:00:00+08:00' },
+    { id: 'demo-ops-2', code: 'OP-DEMO-002', title: '数据库备份恢复演练', description: '完成备份恢复演练并记录结果。', status: '待处理', priority: '中', ownerName: '毛景强', assigneeId: 'u-002', creatorName: '管理员', creatorId: 'u-admin', department: '产研部门', projectId: 'project-2', projectName: '实训教学系统', productLineName: '', versionName: '', dueDate: '2026-10-22', plannedStartDate: '2026-10-13', estimatedHours: 6, actualHours: 0, createdAt: '2026-10-09T09:00:00+08:00' }
+  ];
   const rows = MOCK_DATABASE[kind === 'presales' ? 't_crm_presales_task' : 't_project_delivery_task'] as unknown as Array<Record<string, unknown>>;
   return rows.filter(row => !Number(row.delete_flag_ || 0)).map(row => ({
     id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_),
@@ -50,8 +55,8 @@ const write = (kind: Kind, tasks: RequirementTask[]) => localStorage.setItem(sto
 export function handleMockBusinessTasks(path: string, method: string, body: Record<string, unknown>, audit: AuditContext) {
   const url = new URL(path, 'http://mock.local');
   const parts = url.pathname.split('/').filter(Boolean);
-  const kind: Kind = parts[1] === 'presales-tasks' ? 'presales' : 'delivery';
-  const label = kind === 'presales' ? '售前任务' : '交付任务';
+  const kind: Kind = parts[1] === 'presales-tasks' ? 'presales' : parts[1] === 'ops-tasks' ? 'ops' : 'delivery';
+  const label = kind === 'presales' ? '售前任务' : kind === 'ops' ? '运维任务' : '交付任务';
   const tasks = read(kind);
   const taskId = parts[2] ? decodeURIComponent(parts[2]) : '';
   const task = taskId ? tasks.find(item => item.id === taskId) : undefined;
@@ -62,6 +67,16 @@ export function handleMockBusinessTasks(path: string, method: string, body: Reco
     if (!content || content.length > 10000) throw new Error('评论内容不能为空且不能超过10000字');
     audit.record(taskId, task.productLineId || '', 'WORK_ITEM_COMMENTED', { content });
     return null;
+  }
+  if (task && parts[3] === 'review' && method === 'POST') {
+    if (kind !== 'delivery' || task.status !== '待审核') throw new Error('当前任务不在待审核状态');
+    const action = text(body.action);
+    if (!['approve', 'reject'].includes(action)) throw new Error('审核动作无效');
+    const nextStatus = action === 'approve' ? '已完成' : '处理中';
+    const updated = { ...task, status: nextStatus, reviewComment: text(body.comment), reviewedAt: new Date().toISOString(), reviewedBy: text(body.operatorName) || '主管' } as RequirementTask;
+    write(kind, tasks.map(item => item.id === taskId ? updated : item));
+    audit.record(taskId, task.productLineId || '', action === 'approve' ? 'BUSINESS_TASK_REVIEW_APPROVED' : 'BUSINESS_TASK_REVIEW_REJECTED', { fromStatus: task.status, toStatus: nextStatus, comment: text(body.comment) });
+    return updated;
   }
   if (parts[3]) throw new Error('不支持的任务操作');
   if (method === 'GET') {
@@ -88,8 +103,11 @@ export function handleMockBusinessTasks(path: string, method: string, body: Reco
   }
   if (method === 'PUT' && task) {
     if (body.title !== undefined && !text(body.title).trim()) throw new Error('任务标题不能为空');
-    if (body.status === '已完成' && task.status !== '已完成') audit.validateCompletion(body);
-    const updated: RequirementTask = { ...task, ...body, id: task.id, code: task.code, creatorId: task.creatorId, creatorName: task.creatorName, createdAt: task.createdAt };
+    const requestedStatus = text(body.status);
+    const waitingApproval = kind === 'delivery' && requestedStatus === '已完成' && task.creatorId && task.assigneeId && task.creatorId !== task.assigneeId;
+    const normalizedBody = waitingApproval ? { ...body, status: '待审核' } : body;
+    if (requestedStatus === '已完成' && task.status !== '已完成' && !waitingApproval) audit.validateCompletion(body);
+    const updated: RequirementTask = { ...task, ...normalizedBody, id: task.id, code: task.code, creatorId: task.creatorId, creatorName: task.creatorName, createdAt: task.createdAt };
     if (body.ownerName !== undefined && body.assigneeId === undefined && body.ownerName !== task.ownerName) updated.assigneeId = undefined;
     write(kind, tasks.map(item => item.id === taskId ? updated : item));
     audit.changes(task, updated);
