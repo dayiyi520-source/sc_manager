@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useEffect, useRef } from 'react';
 import { Drawer } from 'antd';
 import { X } from '@/components/common/octicons-compat';
@@ -93,8 +94,8 @@ export const WorkItemCreatePanel: React.FC<{
       <div className={properties ? 'work-item-panel-grid grid min-h-full lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]' : 'min-h-full'}><main className="min-w-0 px-2 py-2">{detailHeader}{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-6" aria-label="字段设置">{properties}</aside>}</div>
     </Drawer>;
   }
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true" aria-label={title}>
+  return createPortal(
+    <div className="fixed inset-0 z-[60] overflow-hidden" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" aria-label="关闭面板" className="absolute inset-0 h-full w-full cursor-default bg-black/40" onClick={onClose} />
       <aside className={`work-item-panel ${presentation === 'drawer' ? 'absolute inset-y-0 right-0 flex w-[min(100%,1280px)] flex-col overflow-hidden border-l border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl' : 'absolute inset-4 flex flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl sm:inset-6 lg:inset-y-8 lg:inset-x-[clamp(32px,10vw,192px)]'}`}>
         <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-card)] px-6">
@@ -104,6 +105,6 @@ export const WorkItemCreatePanel: React.FC<{
         <div className="min-h-0 flex-1 overflow-y-auto"><div className={properties ? 'work-item-panel-grid grid min-h-full lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]' : 'min-h-full'}> <main className="min-w-0 px-6 py-4">{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-4 lg:sticky lg:top-0 lg:self-start lg:max-h-full" aria-label="字段设置">{properties}</aside>}</div></div>
         {footer && <footer className="flex shrink-0 items-center gap-3 border-t border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-3">{showContinueOption && <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><input type="checkbox" checked={continueChecked} onChange={(event) => onContinueCheckedChange?.(event.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />继续新建下一个</label>}<span className="flex-1" />{secondaryAction}{footer}</footer>}
       </aside>
-    </div>
+    </div>, document.body
   );
 };

@@ -95,6 +95,22 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     ]
   },
   {
+    id: 'crm',
+    title: '客户与商机',
+    icon: 'Users',
+    subMenus: [
+      { id: 'crm_presales_tasks', title: '售前任务', mainMenuId: 'crm', icon: 'ListTodo' }
+    ]
+  },
+  {
+    id: 'project',
+    title: '项目管理',
+    icon: 'FolderKanban',
+    subMenus: [
+      { id: 'proj_delivery_tasks', title: '交付任务', mainMenuId: 'project', icon: 'CheckSquare' }
+    ]
+  },
+  {
     id: 'product',
     title: '产研管理',
     icon: 'Layers',

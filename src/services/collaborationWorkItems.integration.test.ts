@@ -39,7 +39,7 @@ describe('协同事项关联任务卡片契约', () => {
     await expect(submit(5, 3)).rejects.toThrow('状态不允许');
   });
 
-  it('事项退回后统一状态并持久化创建人责任，创建人可继续完成', async () => {
+  it('事项退回后统一创建人责任，创建人关闭而不是提交完成', async () => {
     const record = { id: 'returned-flow', category: 'requirement', workOrderType: '客户诉求', title: '退回验收', status: '待处理', creatorId: 'creator-id', creatorName: '创建人', ownerName: '原负责人', assigneeName: '原负责人', assigneeId: 'owner-id', revision: 2, events: [], workItems: [] };
     localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify([record]));
     await mockApiRequest(`/api/requirements/${record.id}/transition`, { method: 'POST', body: JSON.stringify({ action: 'reject', reason: '资料不完整' }) });
@@ -50,8 +50,9 @@ describe('协同事项关联任务卡片契约', () => {
     const page = await mockApiRequest('/api/requirements?status=已退回') as { items: typeof record[] };
     expect(page.items.map(item => item.id)).toContain(record.id);
     await expect(mockApiRequest(`/api/requirements/${record.id}/transition`, { method: 'POST', body: JSON.stringify({ action: 'reject', reason: '再次退回' }) })).rejects.toThrow('仅待处理');
-    await mockApiRequest(`/api/requirements/${record.id}/complete`, { method: 'POST', body: JSON.stringify({ revision: 3, note: '创建人处理完成' }) });
-    expect(await mockApiRequest(`/api/requirements/${record.id}`)).toMatchObject({ status: '待验收', ownerName: '创建人', revision: 4 });
+    sessionStorage.setItem('shichuang.session', JSON.stringify({ user: { id: 'creator-id', name: '创建人' } }));
+    await mockApiRequest(`/api/requirements/${record.id}/transition`, { method: 'POST', body: JSON.stringify({ revision: 3, action: 'close' }) });
+    expect(await mockApiRequest(`/api/requirements/${record.id}`)).toMatchObject({ status: '已完成', ownerName: '创建人', revision: 4 });
   });
 
   it('历史已驳回事项兼容为已退回并恢复创建人责任，不改变其他任务', async () => {
@@ -112,7 +113,7 @@ describe('协同事项关联任务卡片契约', () => {
     expect(event?.metadata).toMatchObject({ ownerChanged: true, fromAssigneeName: expect.any(String), assigneeName: detail.creatorName });
   });
 
-  it('验收通过和不通过都立即写入详情，未通过时退回所选任务负责人', async () => {
+  it('验收未通过只反馈所选任务，保留任务状态并交回原事项处理人', async () => {
     const page = await mockApiRequest('/api/requirements?page=1&pageSize=1') as { items: Array<{ id: string }> };
     const requirementId = page.items[0].id;
     const created = await mockApiRequest(`/api/requirements/${requirementId}/work-items/batch`, {
@@ -131,13 +132,15 @@ describe('协同事项关联任务卡片契约', () => {
     detail = await mockApiRequest(`/api/requirements/${requirementId}`) as typeof detail;
     expect(detail.status).toBe('待验收');
 
+    const currentDetail = await mockApiRequest(`/api/requirements/${requirementId}`) as any;
+    sessionStorage.setItem('shichuang.session', JSON.stringify({ user: { id: currentDetail.creatorId, name: currentDetail.creatorName } }));
     await mockApiRequest(`/api/requirements/${requirementId}/acceptance-failed`, {
       method: 'POST',
       body: JSON.stringify({ revision: detail.revision ?? detail.version ?? 0, workItemId: taskId, taskOwnerId: '', reason: '需要补充' }),
     });
     detail = await mockApiRequest(`/api/requirements/${requirementId}`) as typeof detail;
     expect(detail.status).toBe('处理中');
-    expect(detail.workItems.find((item) => item.id === taskId)).toEqual(expect.objectContaining({ status: '处理中', assigneeName: '毛景强' }));
+    expect(detail.workItems.find((item) => item.id === taskId)).toEqual(expect.objectContaining({ status: '已完成', assigneeName: '毛景强' }));
     expect(detail.events.at(-1)).toMatchObject({ eventType: '验收未通过' });
   });
 });
@@ -174,6 +177,10 @@ describe('事项重新开启持久化', () => {
     localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify(items));
     const members = await mockApiRequest('/api/team-members') as Array<any>;
     const owner = members.find((item) => item.status === 'enabled');
+    const original = items.find((item: any) => item.id === record.id);
+    original.workOrderType = '其他问题'; original.description = '重新开启前的描述'; original.expectedCompleteDate = '2026-10-20'; original.specialFields = { problemType: '其他' };
+    localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify(items));
+    sessionStorage.setItem('shichuang.session', JSON.stringify({ user: { id: original.creatorId, name: original.creatorName } }));
     const payload = { assigneeId: owner.id, revision: record.revision ?? record.version ?? 0, reason: '补充客户诉求' };
     await expect(mockApiRequest(`/api/requirements/${record.id}/reopen`, { method: 'POST', body: JSON.stringify({ ...payload, revision: -1 }) })).rejects.toThrow('更新');
     const result = await mockApiRequest(`/api/requirements/${record.id}/reopen`, { method: 'POST', body: JSON.stringify(payload) }) as any;
@@ -182,4 +189,13 @@ describe('事项重新开启持久化', () => {
     expect(detail.events.at(-1)).toMatchObject({ eventType: '事项重开', reason: payload.reason });
     await expect(mockApiRequest(`/api/requirements/${record.id}/reopen`, { method: 'POST', body: JSON.stringify({ ...payload, revision: result.revision }) })).rejects.toThrow('仅已完成');
   });
+});
+
+it('operations created from a collaboration matter remain associated and refresh their real task status', async () => {
+  localStorage.clear(); sessionStorage.clear();
+  localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify([{ id: 'ops-source', title: '运维来源事项', category: 'requirement', workOrderType: '交付支持', status: '处理中', revision: 1, workItems: [] }]));
+  const created = await mockApiRequest('/api/ops-tasks', { method: 'POST', body: JSON.stringify({ title: '来源事项运维任务', projectId: 'project-1', requirementId: 'ops-source', sourceType: 'WORK_ORDER', sourceWorkOrderIds: ['ops-source'], ownerName: '运维人员' }) });
+  expect((await mockApiRequest('/api/requirements/ops-source')).workItems).toEqual([expect.objectContaining({ id: created.id, taskType: '运维任务', title: '来源事项运维任务', status: '待处理' })]);
+  await mockApiRequest('/api/ops-tasks/' + created.id, { method: 'PUT', body: JSON.stringify({ status: '处理中' }) });
+  expect((await mockApiRequest('/api/requirements/ops-source')).workItems[0]).toMatchObject({ status: '处理中', taskType: '运维任务' });
 });

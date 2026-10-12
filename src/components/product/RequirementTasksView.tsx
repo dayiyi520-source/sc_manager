@@ -1,3 +1,5 @@
+import { BUSINESS_TASK_SCOPES, businessTaskSource, matchesBusinessTaskScope } from './businessTaskPresentation';
+import { loadBusinessTasks } from '../../services/businessTaskRepository';
 import { designGroupOf, designTypeLabel } from './designTaskPresentation';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { openWorkItemDetailLink, workItemDetailLink } from '../../utils/workItemDetailLink';
@@ -195,6 +197,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     setDesignTasks,
     productLines = [],
     projects = [],
+    opportunities = [],
+    biddings = [],
     versions = [],
     customers = [],
     currentUser,
@@ -210,23 +214,29 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const [businessTasks, setBusinessTasks] = useState<RequirementTask[]>([]);
   const [specialTasks, setSpecialTasks] = useState<RequirementTask[]>([]);
   const isBusinessTask = taskKind === 'presales' || taskKind === 'delivery' || taskKind === 'ops';
+  const isCommercialTask = taskKind === 'presales' || taskKind === 'delivery';
+  const commercialTasksQuery = useQuery({
+    queryKey: ['business-task-list', taskKind, currentUser.id],
+    enabled: isCommercialTask,
+    queryFn: () => loadBusinessTasks(taskKind as 'presales' | 'delivery')
+  });
   const isSpecialTask = taskKind === 'bug' || taskKind === 'dev';
   useEffect(() => {
-    if (!isBusinessTask) { setBusinessTasks([]); return; }
+    if (!isBusinessTask || isCommercialTask) { setBusinessTasks([]); return; }
     productRepository.businessTasks(taskKind).then((result) => setBusinessTasks(result.items)).catch(() => setBusinessTasks([]));
-  }, [isBusinessTask, taskKind]);
+  }, [isBusinessTask, isCommercialTask, taskKind]);
   useEffect(() => {
     if (taskKind === 'bug') setSpecialTasks(bugs.map((item: DefectBug) => ({ ...item, ownerName: item.ownerName || item.assignee || '', expectedGoal: '', dueDate: '', priority: item.priority || '中', versionName: item.versionName || '', productLineName: item.productLineName || '', description: item.description || '', status: item.status || '待修复' })) as RequirementTask[]);
     else if (taskKind === 'dev') setSpecialTasks(devTasks.map((item: DevTask) => ({ ...item, ownerName: item.developer || '', expectedGoal: '', dueDate: '', priority: item.priority || '中', versionName: item.versionName || '', productLineName: item.productLineName || '', description: item.description || '', status: item.status || '开发中' })) as RequirementTask[]);
     else setSpecialTasks([]);
   }, [taskKind, bugs, devTasks]);
-  const contextTasks = taskKind === 'design' ? designTasks : isBusinessTask ? businessTasks : isSpecialTask ? specialTasks : requirementTasks;
+  const contextTasks = taskKind === 'design' ? designTasks : isCommercialTask ? commercialTasksQuery.data || EMPTY_REQUIREMENT_TASKS : isBusinessTask ? businessTasks : isSpecialTask ? specialTasks : requirementTasks;
   const addTask = async (task: Partial<RequirementTask>) => {
     if (taskKind === 'design') return addDesignTask(task);
     if (isBusinessTask) {
       const optimistic: RequirementTask = { ...task, id: `${taskKind}-${Date.now()}`, title: task.title || `新建${itemLabel}`, description: task.description || '', expectedGoal: task.expectedGoal || '', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, productLineName: task.productLineName || '', versionName: task.versionName || '', estimatedHours: task.estimatedHours || 0, dueDate: task.dueDate || '' };
       setBusinessTasks((prev) => [optimistic, ...prev]);
-      try { await productRepository.createBusinessTask(taskKind, optimistic); setBusinessTasks((await productRepository.businessTasks(taskKind)).items); return true; }
+      try { await productRepository.createBusinessTask(taskKind, optimistic); if (isCommercialTask) await queryClient.invalidateQueries({ queryKey: ['business-task-list', taskKind] }); else setBusinessTasks((await productRepository.businessTasks(taskKind)).items); return true; }
       catch (error) { setBusinessTasks((prev) => prev.filter((item) => item.id !== optimistic.id)); addToast('error', `${itemLabel}保存失败`, error instanceof Error ? error.message : '请稍后重试'); return false; }
     }
     if (isSpecialTask) {
@@ -238,7 +248,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     }
     return addRequirementTask(task);
   };
-  const productTaskScope = taskKind === 'requirement' || taskKind === 'design' || taskKind === 'dev' || taskKind === 'test' || taskKind === 'bug' || taskKind === 'ops';
+  const productTaskScope = isCommercialTask || taskKind === 'requirement' || taskKind === 'design' || taskKind === 'dev' || taskKind === 'test' || taskKind === 'bug' || taskKind === 'ops';
   const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created' | 'my_participated' | 'my_department'>(productTaskScope ? 'my_owned' : initialScope);
   useEffect(() => { if (productTaskScope) setActiveTab('my_owned'); }, [productTaskScope, taskKind]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -327,7 +337,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   };
   const serverPageQuery = useQuery({
     queryKey: ['task-page', taskKind, serverQueryValues],
-    enabled: Boolean(remoteEnabled && !unifiedCategory),
+    enabled: Boolean(remoteEnabled && !unifiedCategory && !isCommercialTask),
     queryFn: async (): Promise<{ items: RequirementTask[]; total: number; groups: Array<{ label: string; count: number }> }> => {
       if (taskKind === 'requirement') {
         const result = await requirementRepository.list({ ...serverQueryValues, workItemKind: 'requirement' });
@@ -478,7 +488,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     }
     if (taskKind === 'design') { updateDesignTask(id, updates); return true; }
     if (isBusinessTask) {
-      try { await productRepository.updateBusinessTask(taskKind, id, updates as Record<string, unknown>); setBusinessTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task)); void queryClient.invalidateQueries({ queryKey: ['task-activities', taskKind] }); return true; }
+      try { await productRepository.updateBusinessTask(taskKind, id, { ...updates, ...(isCommercialTask && updates.ownerName !== undefined ? { assigneeId: employeeOptions.find(employee => employee.name === updates.ownerName)?.id || '' } : {}) }); setBusinessTasks((prev) => prev.map((task) => task.id === id ? { ...task, ...updates } : task)); if (isCommercialTask) await queryClient.invalidateQueries({ queryKey: ['business-task-list', taskKind] }); void queryClient.invalidateQueries({ queryKey: ['task-activities', taskKind] }); return true; }
       catch (error) { addToast('error', `${itemLabel}同步失败`, error instanceof Error ? error.message : '请稍后重试'); return false; }
     }
     if (isSpecialTask) {
@@ -515,7 +525,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const detailField = (fieldCode: string) => detailFieldConfig.find((field) => field.fieldCode === fieldCode);
   const detailVisible = (fieldCode: string) => !detailConfigLoaded || detailField(fieldCode)?.visible !== false;
   const detailEditable = (fieldCode: string) => !detailConfigLoaded || detailField(fieldCode)?.editable !== false;
-  const relationTabOrder = (['collaborationItems', 'relatedTasks', 'children', 'support', 'hours'] as const).filter((code) => detailVisible(code) && !(detailCategory === 'requirement' && code === 'relatedTasks')).sort((a, b) => (detailField(a)?.sort ?? 999) - (detailField(b)?.sort ?? 999));
+  const relationTabOrder = isCommercialTask ? ['collaborationItems', 'relatedTasks'] as const : (['collaborationItems', 'relatedTasks', 'children', 'support', 'hours'] as const).filter((code) => detailVisible(code) && !(detailCategory === 'requirement' && code === 'relatedTasks')).sort((a, b) => (detailField(a)?.sort ?? 999) - (detailField(b)?.sort ?? 999));
   useEffect(() => {
     if (!selectedTask || !detailCategory) { setDetailFieldConfig([]); setDetailConfigLoaded(false); return; }
     setDetailConfigLoaded(false);
@@ -1033,13 +1043,17 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       return;
     }
     openAddModal();
-    setFormProductLineName(line?.name || '');
+    const source = creationContext.sourceWorkOrder;
+    const sourceFields = source?.specialFields && typeof source.specialFields === 'object' ? source.specialFields : {};
+    const sourceProject = projects.find(project => project.id === source?.projectId || project.name === (source?.projectName || sourceFields.projectName));
+    setFormProductLineName(taskKind === 'design' && designVariant === 'project' ? sourceProject?.name || '' : taskKind === 'design' && designVariant === 'other' ? source?.department || currentUser.department || '' : line?.name || '');
+    if (taskKind === 'ops' && sourceProject) setFormCustomerName(sourceProject.id);
     if (creationContext.sourceWorkOrder) setSelectedWorkOrderIds([creationContext.sourceWorkOrder.id]);
     if (creationContext.relatedProductTask) setSelectedRequirementTaskIds([creationContext.relatedProductTask.id]);
     setFormVersionName(version?.name || '');
     setFormOwnerName(ownerName || '');
     setFormTitle(creationContext.title || '');
-  }, [creationContext, creationIntentKey, productLines, versions, employeeOptions]);
+  }, [creationContext, creationIntentKey, productLines, versions, employeeOptions, designVariant, projects, currentUser.department]);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('shichuang.iterationTaskCreate');
@@ -1501,7 +1515,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   };
 
   const refreshTaskLists = async () => {
-    await Promise.all([unifiedQuery.refetch(), ...['requirements', 'design-tasks', 'product-dev-tasks', 'product-bugs', 'product-recycle-bin'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))]);
+    await Promise.all([...(isCommercialTask ? [commercialTasksQuery.refetch()] : [unifiedQuery.refetch()]), ...['requirements', 'design-tasks', 'product-dev-tasks', 'product-bugs', 'product-recycle-bin'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))]);
   };
 
   const deleteTask = (task: RequirementTask) => {
@@ -1569,6 +1583,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   ];
   const categoryMatch = (task: RequirementTask, tab: typeof activeTab) => {
     if (tab === 'all') return true;
+    if (isCommercialTask && tab !== 'my_participated') return matchesBusinessTaskScope(task, tab, currentUser, employeeOptions);
     if (tab === 'my_owned') return task.ownerName.trim() === currentUser.name.trim();
     if (tab === 'my_created') return (task.creatorName || '').trim() === currentUser.name.trim();
     if (tab === 'my_department') return Boolean(currentUser.department) && (task.department || employeeOptions.find((employee) => employee.name === task.ownerName)?.department || task.departmentId || '').trim() === currentUser.department.trim();
@@ -1600,7 +1615,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     matchesTextFilter(task.title, filters.title) &&
     matchesMultiFilter([task.status], filters.status) &&
     matchesMultiFilter([task.ownerName], filters.owner) &&
-    matchesMultiFilter([task.creatorName || currentUser.name], filters.creator) &&
+    matchesMultiFilter([isCommercialTask ? task.creatorName : task.creatorName || currentUser.name], filters.creator) &&
     matchesMultiFilter([task.customerName], filters.customer) &&
     matchesMultiFilter([taskKind === 'design' ? designSourceOwnershipValue(task) : task.versionName], filters.version) &&
     matchesDateFilter(task.createdAt, filters.createdAt) &&
@@ -1610,9 +1625,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const designVariantTasks = taskKind === 'design' && designVariantFilter !== 'all' ? activeTasks.filter((task) => designTaskTypeOf(task) === designVariantFilter) : activeTasks;
   const designOwnershipTasks = taskKind === 'design' && designOwnershipFilter ? designVariantTasks.filter(task => designGroupOf(task).key === designOwnershipFilter) : designVariantTasks;
   const productLineTasks = productLineFilter === 'all' ? designOwnershipTasks : designOwnershipTasks.filter((task) => task.productLineId === productLineFilter || task.productLineName === selectedProductLine?.name);
-  const baseTasks = remoteEnabled && !unifiedCategory && taskKind !== 'ops' ? productLineTasks : productLineTasks.filter((task) => categoryMatch(task, activeTab));
+  const baseTasks = remoteEnabled && !unifiedCategory && taskKind !== 'ops' && !isCommercialTask ? productLineTasks : productLineTasks.filter((task) => categoryMatch(task, activeTab));
   const filteredTasks = baseTasks.filter((task) => {
-    if (remoteEnabled && !unifiedCategory && taskKind !== 'ops') return true;
+    if (remoteEnabled && !unifiedCategory && taskKind !== 'ops' && !isCommercialTask) return true;
     const titlePart = searchQuery.trim().toLocaleLowerCase();
     const titleMatch = textMatches(task.title, titlePart);
     const ownerMatch = searchOwnerNames.length === 0 || searchOwnerNames.includes(task.ownerName);
@@ -1620,8 +1635,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   });
   const tabCounts = {
     all: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId).length : remoteEnabled && activeTab === 'all' ? serverPageQuery.data?.total || 0 : productLineTasks.length,
-    my_owned: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_owned')).length : remoteEnabled && taskKind !== 'ops' && activeTab === 'my_owned' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_owned')).length,
-    my_created: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_created')).length : remoteEnabled && taskKind !== 'ops' && activeTab === 'my_created' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length,
+    my_owned: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_owned')).length : remoteEnabled && taskKind !== 'ops' && !isCommercialTask && activeTab === 'my_owned' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_owned')).length,
+    my_created: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_created')).length : remoteEnabled && taskKind !== 'ops' && !isCommercialTask && activeTab === 'my_created' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length,
     my_participated: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_participated')).length : remoteEnabled && activeTab === 'my_participated' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_participated')).length,
     my_department: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_department')).length : productLineTasks.filter((task) => categoryMatch(task, 'my_department')).length
   };
@@ -1643,18 +1658,19 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     groups.set(label, (groups.get(label) || 0) + 1);
     return groups;
   }, new Map<string, number>()).entries());
-  const groupTabs: Array<[string, number]> = remoteEnabled && !unifiedCategory && taskKind !== 'ops'
+  const groupTabs: Array<[string, number]> = remoteEnabled && !unifiedCategory && taskKind !== 'ops' && !isCommercialTask
     ? (serverPageQuery.data?.groups || []).map((group): [string, number] => [group.label, Number(group.count)])
     : localGroupTabs;
   const groupValueExists = groupTabs.some(([label]) => label === groupValue);
   const firstGroupValue = groupTabs[0]?.[0] || '';
   const effectiveGroupValue = groupBy === 'none' ? '' : groupValueExists ? groupValue : firstGroupValue;
-  const visibleTasks = (remoteEnabled && !unifiedCategory && taskKind !== 'ops') || groupBy === 'none' ? rootTasks : rootTasks.filter((task) => getGroupValue(task) === effectiveGroupValue);
+  const visibleTasks = (remoteEnabled && !unifiedCategory && taskKind !== 'ops' && !isCommercialTask) || groupBy === 'none' ? rootTasks : rootTasks.filter((task) => getGroupValue(task) === effectiveGroupValue);
   const pagedTasks = remoteEnabled && unifiedCategory
     ? visibleTasks.slice((page - 1) * pageSize, page * pageSize)
-    : remoteEnabled && taskKind !== 'ops' ? visibleTasks : visibleTasks.slice((page - 1) * pageSize, page * pageSize);
-  const paginationTotal = taskKind === 'ops' ? visibleTasks.length : unifiedCategory && remoteEnabled ? visibleTasks.length : remoteEnabled ? serverPageQuery.data?.total || 0 : visibleTasks.length;
+    : remoteEnabled && taskKind !== 'ops' && !isCommercialTask ? visibleTasks : visibleTasks.slice((page - 1) * pageSize, page * pageSize);
+  const paginationTotal = taskKind === 'ops' || isCommercialTask ? visibleTasks.length : unifiedCategory && remoteEnabled ? visibleTasks.length : remoteEnabled ? serverPageQuery.data?.total || 0 : visibleTasks.length;
 
+  useEffect(() => { if (isCommercialTask && page > Math.max(1, Math.ceil(paginationTotal / pageSize))) setPage(Math.max(1, Math.ceil(paginationTotal / pageSize))); }, [isCommercialTask, page, pageSize, paginationTotal]);
   useEffect(() => setPage(1), [activeTab, searchQuery, searchOwnerNames, appliedFilters, groupBy, groupValue, pageSize, productLineFilter]);
   useEffect(() => {
     if (!remoteEnabled || groupBy === 'none' || !firstGroupValue || groupValueExists) return;
@@ -1753,7 +1769,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     const isChild = depth > 0;
     const linkedVersion = versions.find((version) => version.id === task.versionId);
     const designTaskType = taskKind === 'design' ? designTaskTypeOf(task) : undefined;
-    const productVersion = taskKind === 'design' ? designSourceOwnershipValue(task, designTaskType) : [task.productLineName, linkedVersion?.code || (task.versionId ? '版本号未设置' : '未关联')].filter(Boolean).join(' / ');
+    const source = isCommercialTask ? businessTaskSource(task, taskKind, { projects, opportunities, biddings, customers }) : undefined;
+    const productVersion = source ? source.ownership : taskKind === 'design' ? designSourceOwnershipValue(task, designTaskType) : [task.productLineName, linkedVersion?.code || (task.versionId ? '版本号未设置' : '未关联')].filter(Boolean).join(' / ');
     return <React.Fragment key={task.id}>
       <tr className={`${isChild ? 'bg-[var(--bg-surface-soft)]/60' : ''} transition-colors hover:bg-[var(--bg-surface-soft)]`}>
         <td className="max-w-[360px] px-4 py-3.5 font-semibold text-[var(--text-primary)]">
@@ -1771,15 +1788,16 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           {taskStatusControl(task)}
         </td>
         {taskKind === 'design' && <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-body)]">{({ product: '产品设计', project: '项目设计', other: '其他设计' } as Record<DesignTaskVariant, string>)[designTaskType || 'product']}</td>}
-        {listFields.visible('priority') && <td className="whitespace-nowrap px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>}
-        {(taskKind === 'design' || listFields.visible('version')) && <td className="px-4 py-3.5 text-[var(--text-body)]"><span className="block truncate whitespace-nowrap text-[var(--primary)]" title={productVersion}>{productVersion}</span></td>}
-        {listFields.visible('assignee') && <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-muted)]">
+        {(isCommercialTask || listFields.visible('priority')) && <td className="whitespace-nowrap px-4 py-3.5"><StatusTag status={normalizePriority(task.priority)} /></td>}
+        {(isCommercialTask || taskKind === 'design' || listFields.visible('version')) && <td className="px-4 py-3.5 text-[var(--text-body)]"><span className="block truncate whitespace-nowrap text-[var(--primary)]" title={productVersion}>{productVersion}</span></td>}
+        {taskKind === 'delivery' && <td className="px-4 py-3.5 text-[var(--text-body)]"><span className="block truncate" title={source?.stage}>{source?.stage}</span></td>}
+        {(isCommercialTask || listFields.visible('assignee')) && <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-muted)]">
           <div className="work-item-owner-cell">
             {hasChildren ? <PersonIdentity name={task.ownerName} emptyLabel="未设置" variant="list" /> : <Select aria-label={`${task.title}负责人`} variant="borderless" className="work-item-owner-select" style={{ width: 180 }} popupMatchSelectWidth={220} showSearch optionFilterProp="label" value={task.ownerName || undefined} labelRender={({ value }) => <PersonIdentity name={String(value)} variant="list" />} placeholder="未设置" options={employeeNameOptions} onChange={(ownerName) => void updateTask(task.id, { ownerName })} />}
           </div>
         </td>}
-        {listFields.visible('creator') && <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-muted)]"><PersonIdentity name={task.creatorName || currentUser.name} emptyLabel="未设置" variant="list" /></td>}
-        {listFields.visible('createdAt') && <td className="whitespace-nowrap px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt ? dayjs(task.createdAt).format('YYYY-MM-DD') : '—'}</td>}
+        {(isCommercialTask || listFields.visible('creator')) && <td className="whitespace-nowrap px-4 py-3.5 text-[var(--text-muted)]"><PersonIdentity name={isCommercialTask ? task.creatorName : task.creatorName || currentUser.name} emptyLabel="未设置" variant="list" /></td>}
+        {(isCommercialTask || listFields.visible('createdAt')) && <td className="whitespace-nowrap px-4 py-3.5 font-mono text-[var(--text-muted)]">{task.createdAt ? dayjs(task.createdAt).format('YYYY-MM-DD') : '—'}</td>}
         <td className="task-list-action-cell whitespace-nowrap px-4 py-3.5 text-right">
           <Dropdown menu={operationMenu(task)} trigger={['click']}>
             <Button type="text" icon={<MoreOutlined />} aria-label={`操作${task.title}`} />
@@ -1798,7 +1816,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           {/* 分类 */}
           <div role="tablist" aria-label={`${itemLabel}范围`} className="requirement-scope-tabs inline-flex h-10 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">
-            {(productTaskScope ? [['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_department', '我部门的']] as const : [['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_participated', '我参与的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={!showProductTasks && activeTab === value} onClick={() => { setShowProductTasks(false); setActiveTab(value); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{tabCounts[value]}</button>)}
+            {(productTaskScope ? BUSINESS_TASK_SCOPES : [['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_participated', '我参与的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={!showProductTasks && activeTab === value} onClick={() => { setShowProductTasks(false); setActiveTab(value); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{isCommercialTask && !commercialTasksQuery.data ? '—' : tabCounts[value]}</button>)}
             {(taskKind === 'dev' || taskKind === 'test' || taskKind === 'design') && <button type="button" role="tab" aria-selected={showProductTasks} onClick={() => { setShowProductTasks(true); setFilterOpen(false); setGroupOpen(false); setSearchOpen(false); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">待分配任务·{productTasksQuery.data?.length || 0}</button>}
           </div>
 
@@ -1881,6 +1899,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                 {taskKind === 'design' && <col className="w-[120px]" />}
                 <col className="w-[112px]" />
                 <col className="w-[220px]" />
+                {taskKind === 'delivery' && <col className="w-[150px]" />}
                 <col className="w-[210px]" />
                 <col className="w-[210px]" />
                 <col className="w-[150px]" />
@@ -1891,17 +1910,18 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                   <th className="py-3 px-4"><span className="inline-flex items-center gap-3"><Checkbox aria-label="全选当前页工作项" checked={pagedTasks.length > 0 && pagedTasks.every((task) => batchIds.includes(task.id))} indeterminate={pagedTasks.some((task) => batchIds.includes(task.id)) && !pagedTasks.every((task) => batchIds.includes(task.id))} onChange={(event) => setBatchIds(event.target.checked ? pagedTasks.map((task) => task.id) : [])} />标题</span></th>
                   <th className="whitespace-nowrap py-3 px-4">状态</th>
                   {taskKind === 'design' && <th className="whitespace-nowrap py-3 px-4">任务类型</th>}
-                  {listFields.visible('priority') && <th className="whitespace-nowrap py-3 px-4">优先级</th>}
-                  {(taskKind === 'design' || listFields.visible('version')) && <th className="whitespace-nowrap py-3 px-4">{taskKind === 'design' ? designOwnershipLabel : '迭代版本'}</th>}
-                  {listFields.visible('assignee') && <th className="whitespace-nowrap py-3 px-4">负责人</th>}
-                  {listFields.visible('creator') && <th className="whitespace-nowrap py-3 px-4">创建人</th>}
-                  {listFields.visible('createdAt') && <th className="whitespace-nowrap py-3 px-4">创建时间</th>}
+                  {(isCommercialTask || listFields.visible('priority')) && <th className="whitespace-nowrap py-3 px-4">优先级</th>}
+                  {(isCommercialTask || taskKind === 'design' || listFields.visible('version')) && <th className="whitespace-nowrap py-3 px-4">{isCommercialTask || taskKind === 'design' ? designOwnershipLabel : '迭代版本'}</th>}
+                  {taskKind === 'delivery' && <th className="whitespace-nowrap py-3 px-4">项目阶段</th>}
+                  {(isCommercialTask || listFields.visible('assignee')) && <th className="whitespace-nowrap py-3 px-4">负责人</th>}
+                  {(isCommercialTask || listFields.visible('creator')) && <th className="whitespace-nowrap py-3 px-4">创建人</th>}
+                  {(isCommercialTask || listFields.visible('createdAt')) && <th className="whitespace-nowrap py-3 px-4">创建时间</th>}
                   <th className="whitespace-nowrap py-3 px-4 text-right task-list-action-cell task-list-action-header">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {pagedTasks.map((task, index) => renderTaskRows(task, 0, index === pagedTasks.length - 1))}
-                {pagedTasks.length === 0 && <tr><td colSpan={taskKind === 'design' ? 9 : 8} className="px-4 py-12 text-center text-[var(--text-muted)]">{unifiedCategory && remoteEnabled && unifiedQuery.isPending ? `正在加载${itemLabel}...` : unifiedCategory && remoteEnabled && unifiedQuery.isError ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => unifiedQuery.refetch()}>重试</Button></span> : serverPageQuery.isPending && remoteEnabled && !unifiedCategory ? `正在加载${itemLabel}...` : serverPageQuery.isError && remoteEnabled && !unifiedCategory ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => serverPageQuery.refetch()}>重试</Button></span> : `没有符合当前搜索、过滤或分组条件的${itemLabel === '需求任务' ? '需求' : itemLabel}`}</td></tr>}
+                {pagedTasks.length === 0 && <tr><td colSpan={taskKind === 'design' || taskKind === 'delivery' ? 9 : 8} className="px-4 py-12 text-center text-[var(--text-muted)]">{isCommercialTask ? <>{commercialTasksQuery.isPending ? '正在加载' + itemLabel + '...' : commercialTasksQuery.isError ? <span role="alert" className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => void commercialTasksQuery.refetch()}>重试</Button></span> : '没有符合当前搜索、过滤或分组条件的' + itemLabel}</> : unifiedCategory && remoteEnabled && unifiedQuery.isPending ? `正在加载${itemLabel}...` : unifiedCategory && remoteEnabled && unifiedQuery.isError ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => unifiedQuery.refetch()}>重试</Button></span> : serverPageQuery.isPending && remoteEnabled && !unifiedCategory ? `正在加载${itemLabel}...` : serverPageQuery.isError && remoteEnabled && !unifiedCategory ? <span className="inline-flex items-center gap-2">{itemLabel}加载失败<Button size="small" onClick={() => serverPageQuery.refetch()}>重试</Button></span> : `没有符合当前搜索、过滤或分组条件的${itemLabel === '需求任务' ? '需求' : itemLabel}`}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -2183,11 +2203,11 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           {createFields.visible('expectedGoal') && <Form.Item label="期望结果" required={createFields.required('expectedGoal')}><Input.TextArea rows={3} value={formTarget} onChange={(event) => setFormTarget(event.target.value)} placeholder="请填写任务完成后的预期结果" /></Form.Item>}
           {createFields.visible('description') && <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} onBlur={() => { /* auto-save description */ }} placeholder="详细记录需求背景、业务场景和实现说明..." /></Form.Item>}
           <WorkItemRelationTabs items={[
-            ...(createFields.visible('collaborationItems') ? [{ key: 'collaborationItems', label: '协同事项', count: selectedWorkOrderIds.length, content: <WorkOrderPicker candidates={collaborationCandidates} selectedIds={selectedWorkOrderIds} onChange={setSelectedWorkOrderIds} onNavigate={navigateWorkOrderCandidate} placeholder="请选择协同事项" /> }] : []),
-            ...((taskKind !== 'requirement' || editingTask) && createFields.visible('relatedTasks') ? [{ key: 'relatedTasks', label: '关联任务', count: selectedRequirementTaskIds.length, content: <WorkOrderPicker relationMode={['design', 'dev', 'test'].includes(taskKind) ? 'productTask' : 'workOrder'} candidates={creationTaskCandidates.filter((item) => item.id !== editingTask?.id)} selectedIds={selectedRequirementTaskIds} onChange={setSelectedRequirementTaskIds} onNavigate={navigateWorkOrderCandidate} placeholder="请选择关联任务" /> }] : []),
-            ...((taskKind !== 'requirement' || editingTask) && createFields.visible('children') ? [{ key: 'children', label: '子任务', count: 0, description: '创建后可在详情页新增或关联子任务。' }] : []),
-            ...((taskKind !== 'requirement' || editingTask) && createFields.visible('support') ? [{ key: 'support', label: '支撑项', count: 0, description: '创建后可在详情页关联测试计划等支撑事项。' }] : []),
-            ...((taskKind !== 'requirement' || editingTask) && createFields.visible('hours') ? [{ key: 'hours', label: '工时', count: 0, description: '创建后可在详情页登记工时并查看统计。' }] : []),
+            ...((isCommercialTask || createFields.visible('collaborationItems')) ? [{ key: 'collaborationItems', label: '协同事项', count: selectedWorkOrderIds.length, content: <WorkOrderPicker candidates={collaborationCandidates} selectedIds={selectedWorkOrderIds} onChange={setSelectedWorkOrderIds} onNavigate={navigateWorkOrderCandidate} placeholder="请选择协同事项" /> }] : []),
+            ...((taskKind !== 'requirement' || editingTask) && (isCommercialTask || createFields.visible('relatedTasks')) ? [{ key: 'relatedTasks', label: '关联任务', count: selectedRequirementTaskIds.length, content: <WorkOrderPicker relationMode={['design', 'dev', 'test'].includes(taskKind) ? 'productTask' : 'workOrder'} candidates={creationTaskCandidates.filter((item) => item.id !== editingTask?.id)} selectedIds={selectedRequirementTaskIds} onChange={setSelectedRequirementTaskIds} onNavigate={navigateWorkOrderCandidate} placeholder="请选择关联任务" /> }] : []),
+            ...(!isCommercialTask && (taskKind !== 'requirement' || editingTask) && createFields.visible('children') ? [{ key: 'children', label: '子任务', count: 0, description: '创建后可在详情页新增或关联子任务。' }] : []),
+            ...(!isCommercialTask && (taskKind !== 'requirement' || editingTask) && createFields.visible('support') ? [{ key: 'support', label: '支撑项', count: 0, description: '创建后可在详情页关联测试计划等支撑事项。' }] : []),
+            ...(!isCommercialTask && (taskKind !== 'requirement' || editingTask) && createFields.visible('hours') ? [{ key: 'hours', label: '工时', count: 0, description: '创建后可在详情页登记工时并查看统计。' }] : []),
           ]} />
         </Form>
       </WorkItemCreatePanel>

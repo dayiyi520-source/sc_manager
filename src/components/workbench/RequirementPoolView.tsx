@@ -1,3 +1,4 @@
+import { collaborationDesignVariant, isCollaborationCreator, lastCollaborationProcessor } from '../../utils/collaborationWorkflow';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Dropdown, Input, Rate, Select } from "antd";
 import { openWorkItemDetailLink, workItemDetailLink } from '../../utils/workItemDetailLink';
@@ -109,8 +110,7 @@ const normalizeMedia = (value: unknown): RequirementMedia[] => {
 const samePerson = (value: string | undefined, currentUserName: string) =>
   Boolean(value?.trim()) && value.trim().toLocaleLowerCase() === currentUserName.trim().toLocaleLowerCase();
 
-const isInitiator = (task: RequirementTask, currentUser: { id: string; name: string }) =>
-  Boolean(task.creatorId && currentUser.id && task.creatorId === currentUser.id) || samePerson(task.creatorName, currentUser.name);
+const isInitiator = isCollaborationCreator;
 
 const eventMetadata = (value: unknown): Record<string, unknown> => {
   if (value && typeof value === "object") return value as Record<string, unknown>;
@@ -241,9 +241,14 @@ export const RequirementPoolView: React.FC = () => {
     openPageTab,
   } = useApp();
   const [creating, setCreating] = useState(false);
+  const [editingMode, setEditingMode] = useState<'returned' | 'reopen' | null>(null);
+  const [editingMatter, setEditingMatter] = useState<RequirementTask | null>(null);
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [closeSubmitting, setCloseSubmitting] = useState(false);
+  const saveInFlight = useRef(false);
   const [workOrderType, setWorkOrderType] = useState<WorkOrderType | null>(null);
   const [selected, setSelected] = useState<RequirementTask | null>(null);
-  const [taskCreationKind, setTaskCreationKind] = useState<'requirement' | 'design' | 'bug' | 'presales' | 'delivery' | null>(null);
+  const [taskCreationKind, setTaskCreationKind] = useState<'requirement' | 'design' | 'bug' | 'presales' | 'delivery' | 'ops' | null>(null);
   const [receiving, setReceiving] = useState(false);
   const receiveInFlight = useRef(false);
   const [events, setEvents] = useState<RequirementEvent[]>([]);
@@ -348,10 +353,7 @@ export const RequirementPoolView: React.FC = () => {
   const [acceptanceTaskOwnerId, setAcceptanceTaskOwnerId] = useState("");
   const [acceptanceSubmitting, setAcceptanceSubmitting] = useState(false);
   const [rejectCategory, setRejectCategory] = useState("");
-  const [reopenModalOpen, setReopenModalOpen] = useState(false);
-  const [reopenAssigneeId, setReopenAssigneeId] = useState('');
   const [reopenReason, setReopenReason] = useState("");
-  const [reopenSubmitting, setReopenSubmitting] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
   const completeEditor = useRef<HTMLDivElement>(null);
   const ownerManuallyChanged = useRef(false);
@@ -368,7 +370,9 @@ export const RequirementPoolView: React.FC = () => {
   const selectedRelatedOpportunity = opportunities.find((item) => item.id === (workOrderType === "售前支持" ? specialFields.opportunityId : selectedProject?.opportunityId));
   const relatedProducts = [selectedRelatedOpportunity?.relatedProduct || ""];
   const hasProductSource = workOrderType === "售前支持" ? Boolean(selectedRelatedOpportunity) : Boolean(selectedProject);
-  const availableProductLines = hasProductSource ? productLines.filter((line) => relatedProducts.some((value) => value === line.id || value === line.name || line.products?.some((item) => item.id === value || item.name === value))) : [];
+  const sourceProductLines = hasProductSource ? productLines.filter((line) => relatedProducts.some((value) => value === line.id || value === line.name || line.products?.some((item) => item.id === value || item.name === value))) : [];
+  const savedProduct = editingMatter && productLineId === (editingMatter.productLineId || productLines.find(line => line.name === editingMatter.productLineName)?.id) ? productLines.find(line => line.id === productLineId) : undefined;
+  const availableProductLines = savedProduct && !sourceProductLines.some(line => line.id === savedProduct.id) ? [...sourceProductLines, savedProduct] : sourceProductLines;
   const creationProduct = availableProductLines.find((line) => line.id === productLineId);
   const primaryOwnerId = creationProduct?.requirementOwnerUserId;
   const primaryOwnerName = creationProduct?.requirementOwner;
@@ -408,6 +412,7 @@ export const RequirementPoolView: React.FC = () => {
       ]),
     ).map((name) => ({ id: name, name, department: currentUser.department }));
   const reset = () => {
+    setEditingMode(null); setEditingMatter(null); setReopenReason("");
     setTitle("");
     setProductLineId("");
     setOwnerName("");
@@ -427,6 +432,20 @@ export const RequirementPoolView: React.FC = () => {
     setWorkOrderType(type || null);
     setCreating(true);
   };
+  const startEditing = (mode: 'returned' | 'reopen') => {
+    if (!selected || !isInitiator(selected, currentUser) || selected.status !== (mode === 'returned' ? '已退回' : '已完成')) return;
+    reset();
+    setEditingMatter({ ...selected, events }); setEditingMode(mode);
+    setWorkOrderType(selected.workOrderType || '其他问题');
+    setTitle(selected.title); setProductLineId(selected.productLineId || productLines.find(line => line.name === selected.productLineName)?.id || '');
+    setOwnerName(selected.ownerName || ''); ownerManuallyChanged.current = true;
+    setRequirementPriority(({ P0: '紧急', P1: '高', P2: '中', P3: '低' } as Record<string, RequirementTask['priority']>)[selected.priority] || selected.priority || '中'); setCustomerId(selected.customerId || ''); setCustomerQuery(selected.customerName || '');
+    setDueDate(selected.expectedCompleteDate || selected.dueDate || ''); setDescription(selected.description || ''); setDescriptionHtml(selected.descriptionHtml || '');
+    setMedia(normalizeMedia(selected.media));
+    setSpecialFields({ ...(selected.projectName ? { projectName: selected.projectName } : {}), ...Object.fromEntries(Object.entries(selected.specialFields && typeof selected.specialFields === 'object' ? selected.specialFields : {}).map(([key, value]) => [key, String(value ?? '')])) });
+    setTaskCreationKind(null); setCreating(true);
+  };
+  const cancelEditing = () => { if (!isSubmitting) { setCreating(false); setEditingMode(null); setEditingMatter(null); setReopenReason(''); } };
   const onMedia = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []) as File[];
     const allowed = new Set(["text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/pdf"]);
@@ -487,6 +506,8 @@ export const RequirementPoolView: React.FC = () => {
   };
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (saveInFlight.current) return;
+    if (editingMode === "reopen" && !reopenReason.trim()) { addToast("warning", "请填写重新开启原因"); return; }
     const selectedEmployee = employees.find(
       (item) => item.name === ownerName.trim(),
     ) || (workOrderType === "客户诉求" && specialFields.transferToProduct === "不需要" && ownerName === currentUser.name ? currentUser : undefined);
@@ -518,9 +539,10 @@ export const RequirementPoolView: React.FC = () => {
     }
     const customer = customers.find((item) => item.id === customerId)
       || customers.find((item) => item.name.trim().toLocaleLowerCase() === customerQuery.trim().toLocaleLowerCase());
+    saveInFlight.current = true;
     setIsSubmitting(true);
     try {
-      const saved = await addRequirementTask({
+      const input: Partial<RequirementTask> = {
         title: title.trim(),
         description: descriptionText,
         descriptionHtml: descriptionHtml || editor.current?.innerHTML || "",
@@ -529,19 +551,34 @@ export const RequirementPoolView: React.FC = () => {
         productLineName: selectedProductLine?.name || "",
         ownerName: selectedEmployee.name,
         department: selectedEmployee.department,
+        assigneeId: selectedEmployee.id,
         customerId: customer?.id || customerId || undefined,
         customerName: customer?.name,
         priority: (requirementPriority || "中") as RequirementTask["priority"],
         workOrderType: workOrderType || "其他问题",
         specialFields: workOrderType === "客户诉求" ? { ...specialFields, transferToProduct: specialFields.transferToProduct || "需要" } : specialFields,
         expectedCompleteDate: dueDate || undefined,
-      });
+      };
+      if (editingMatter) {
+        const result = await requirementRepository.reopen(editingMatter.id, { assigneeId: selectedEmployee.id, revision: editingMatter.revision ?? editingMatter.version ?? 0, ...(editingMode === 'reopen' ? { reason: reopenReason.trim() } : {}), changes: input });
+        if (result.id !== editingMatter.id || result.status !== '待处理') throw new Error('事项状态未更新，请刷新后重试');
+        setSelected(result); setEvents(Array.isArray(result.events) ? result.events : []); setWorkItems(Array.isArray(result.workItems) ? result.workItems : []);
+        setRequirementTasks(list => list.map(item => item.id === result.id ? result : item));
+        setScopeReload(value => value + 1);
+        setCreating(false); setEditingMode(null); setEditingMatter(null); setReopenReason('');
+        addToast('success', '事项已重新发起', '已进入待处理，等待负责人接收');
+        return;
+      }
+      const saved = await addRequirementTask(input);
       if (!saved) return;
       setCreating(false);
       setTypeFilter("all");
       setScope("mine_created");
       setPage(1);
+    } catch (error) {
+      addToast("error", editingMatter ? "重新发起失败" : "协同事项保存失败", error instanceof Error ? error.message : "请稍后重试");
     } finally {
+      saveInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -779,44 +816,40 @@ export const RequirementPoolView: React.FC = () => {
       addToast("error", "事项完成失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally { setCompleteSubmitting(false); }
   };
-  const submitReopen = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selected) return;
-    if (!reopenAssigneeId || !reopenReason.trim()) { addToast('warning', '请选择处理人并填写重开原因'); return; }
-    setReopenSubmitting(true);
+  const submitClose = async () => {
+    if (!selected || closeSubmitting) return;
+    setCloseSubmitting(true);
     try {
-      const result = await requirementRepository.reopen(selected.id, {
-        assigneeId: reopenAssigneeId,
-        reason: reopenReason.trim(),
-        revision: selected.revision ?? selected.version ?? 0,
-      });
-      if (result.id !== selected.id || !["待处理", "处理中"].includes(result.status)) throw new Error("事项状态未更新，请刷新后重试");
-      const detail = result;
+      const detail = await requirementRepository.close(selected.id, { revision: selected.revision ?? selected.version ?? 0 });
+      if (detail.id !== selected.id || detail.status !== '已完成') throw new Error('事项状态未更新，请刷新后重试');
       const next = { ...selected, ...detail };
-      setSelected(next);
-      setRequirementTasks((list) => list.map((item) => (item.id === next.id ? next : item)));
-      setEvents(Array.isArray(detail.events) ? detail.events : []);
-      setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
-      setReopenModalOpen(false);
-      setReopenReason("");
-      addToast("success", "事项已重新开启", "已提交所选处理人受理");
-    } catch (error) {
-      addToast("error", "事项重开失败", error instanceof Error ? error.message : "请刷新后重试");
-    } finally {
-      setReopenSubmitting(false);
-    }
+      setSelected(next); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
+      setRequirementTasks(list => list.map(item => item.id === next.id ? next : item)); setScopeReload(value => value + 1);
+      setCloseModalOpen(false); addToast('success', '事项已关闭', '已完成本次诉求，不代表负责人交付或验收通过');
+    } catch (error) { addToast('error', '事项关闭失败', error instanceof Error ? error.message : '请稍后重试'); }
+    finally { setCloseSubmitting(false); }
+  };
+  const originalProcessor = selected ? lastCollaborationProcessor(selected, employees, events) : { id: '', name: '', resolved: false };
+  useEffect(() => {
+    if (acceptanceModalOpen && originalProcessor.resolved) setAcceptanceTaskOwnerId(originalProcessor.id);
+  }, [acceptanceModalOpen, originalProcessor.id, originalProcessor.resolved]);
+  const openAcceptanceFailed = () => {
+    if (!selected || !isInitiator(selected, currentUser) || selected.status !== '待验收') return;
+    setAcceptanceWorkItemId(''); setAcceptanceTaskOwnerId(originalProcessor.id); setAcceptanceReason(''); setFlowMedia([]); setAcceptanceModalOpen(true);
   };
   const submitAcceptanceFailed = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selected || !acceptanceReason.trim() || !acceptanceWorkItemId || !acceptanceTaskOwnerId) {
-      addToast("warning", "请选择退回任务负责人并填写验收未通过原因");
+    if (acceptanceSubmitting) return;
+    if (!selected || !acceptanceReason.trim() || !acceptanceTaskOwnerId) {
+      addToast("warning", "请选择有效事项负责人并填写验收未通过原因");
       return;
     }
     setAcceptanceSubmitting(true);
     try {
-      await requirementRepository.acceptanceFailed(selected.id, { reason: acceptanceReason.trim(), workItemId: acceptanceWorkItemId, taskOwnerId: acceptanceTaskOwnerId, revision: selected.revision ?? selected.version ?? 0, attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
+      await requirementRepository.acceptanceFailed(selected.id, { reason: acceptanceReason.trim(), ...(acceptanceWorkItemId ? { workItemId: acceptanceWorkItemId } : {}), taskOwnerId: acceptanceTaskOwnerId, revision: selected.revision ?? selected.version ?? 0, attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
       const detail = await requirementRepository.detail(selected.id);
-      const next = { ...selected, ...detail, status: "处理中" as RequirementTask["status"] };
+      if (detail.id !== selected.id || detail.status !== "处理中") throw new Error("事项状态未更新，请刷新后重试");
+      const next = { ...selected, ...detail };
       setSelected(next);
       setEvents(Array.isArray(detail.events) ? detail.events : []);
       setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
@@ -826,7 +859,8 @@ export const RequirementPoolView: React.FC = () => {
       setAcceptanceWorkItemId("");
       setAcceptanceTaskOwnerId("");
       setFlowMedia([]);
-      addToast("success", "已退回任务负责人", "事项状态已变更为处理中，请负责人重新处理");
+      setScopeReload(value => value + 1);
+      addToast("success", "已反馈事项负责人", "事项恢复处理中，关联任务状态保持不变");
     } catch (error) {
       addToast("error", "验收操作失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally {
@@ -933,11 +967,11 @@ export const RequirementPoolView: React.FC = () => {
   const canAddTask = ownsSelected && selected?.status === "处理中";
   const openTaskCreation = (taskType: string) => {
     if (!selected || !canAddTask || receiving) return;
-    setTaskCreationKind(({ "产品需求": "requirement", "设计任务": "design", "缺陷管理": "bug", "售前任务": "presales", "交付任务": "delivery" } as const)[taskType as "产品需求" | "设计任务" | "缺陷管理" | "售前任务" | "交付任务"] || null);
+    setTaskCreationKind(({ "产品需求": "requirement", "设计任务": "design", "缺陷管理": "bug", "售前任务": "presales", "交付任务": "delivery", "运维任务": "ops" } as const)[taskType as "产品需求" | "设计任务" | "缺陷管理" | "售前任务" | "交付任务" | "运维任务"] || null);
   };
   const taskCreationMenu = {
-    items: ["产品", "设计", "缺陷", "售前", "交付"].map((label) => ({ key: label, label })),
-    onClick: ({ key }: { key: string }) => openTaskCreation(({ 产品: "产品需求", 设计: "设计任务", 缺陷: "缺陷管理", 售前: "售前任务", 交付: "交付任务" } as Record<string, string>)[key]),
+    items: ["产品", "设计", "缺陷", "售前", "交付", "运维"].map((label) => ({ key: label, label })),
+    onClick: ({ key }: { key: string }) => openTaskCreation(({ 产品: "产品需求", 设计: "设计任务", 缺陷: "缺陷管理", 售前: "售前任务", 交付: "交付任务", 运维: "运维任务" } as Record<string, string>)[key]),
   };
   const openWorkflow = (action: "convert" | "reassign") => {
     if ((action === "convert" && !canAddTask) || (action === "reassign" && !canReceive)) return;
@@ -965,6 +999,7 @@ export const RequirementPoolView: React.FC = () => {
   };
   const detailSpecial = selected?.specialFields && typeof selected.specialFields === "object" ? selected.specialFields : {};
   const detailFields: Array<[string, unknown]> = selected ? [
+    ["事项类型", workOrderDisplayName(selected.workOrderType || selected.requirementType || selected.taskType)],
     ...(selected.workOrderType === "其他问题" ? [["协助类型", detailSpecial.problemType], ["负责人", selected.ownerName]] as Array<[string, unknown]> : []),
     [selected.workOrderType === "售前支持" ? "所属商机" : "所属项目",
       selected.workOrderType === "售前支持" ? detailSpecial.opportunityName : detailSpecial.projectName || selected.projectName],
@@ -1008,7 +1043,7 @@ export const RequirementPoolView: React.FC = () => {
     </div>
     <div>
       <span className="text-xs text-[var(--text-muted)]">{workOrderType === "客户诉求" ? "客户原始诉求 *" : "事项描述 *"}</span>
-      <RichTextEditor size="work-order" editor={editor} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} />
+      <RichTextEditor size="work-order" editor={editor} value={description} htmlValue={descriptionHtml} onInput={(text, html) => { setDescription(text); setDescriptionHtml(html); }} />
     </div>
     {workOrderType === "客户诉求" && specialFields.transferToProduct !== "不需要" && <div>
       <span className="text-xs text-[var(--text-muted)]">产品需求描述</span>
@@ -1032,17 +1067,17 @@ export const RequirementPoolView: React.FC = () => {
               <div className="sticky -top-6 z-10 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-[var(--border-main)] bg-[var(--bg-surface)] px-6 py-4 lg:-top-6">
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                    {workOrderDisplayName(workOrderType) || "发起协同"}
+                    {editingMode === "reopen" ? "重新开启协同事项" : editingMode === "returned" ? "重新编辑协同事项" : workOrderDisplayName(workOrderType) || "发起协同"}
                   </h2>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     提交后将会自动通知到负责人
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                {!editingMode && <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
                     disabled={isSubmitting}
-                    onClick={() => setCreating(false)}
+                    onClick={cancelEditing}
                     className="h-10 rounded-lg border border-[var(--border-main)] px-4 text-sm text-[var(--text-body)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     取消
@@ -1053,11 +1088,13 @@ export const RequirementPoolView: React.FC = () => {
                     className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
-                    {isSubmitting ? "提交中…" : productLines.length === 0 && workOrderType !== "其他问题" ? "暂无可用产品" : "发起协同"}
+                    {isSubmitting ? "提交中…" : productLines.length === 0 && workOrderType !== "其他问题" ? "暂无可用产品" : editingMode ? "重新发起" : "发起协同"}
                   </button>
-                </div>
+                </div>}
               </div>
               {fields}
+              {editingMode === 'reopen' && <label className="work-order-field block text-xs text-[var(--text-muted)]">重新开启原因 *<Input.TextArea aria-label="重新开启原因" value={reopenReason} onChange={event => setReopenReason(event.target.value)} disabled={isSubmitting} maxLength={2000} rows={4} required placeholder="请说明为什么需要重新开启，以及本次需要补充或继续处理的内容。" /></label>}
+              {editingMode && <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[var(--border-main)] bg-[var(--bg-surface)] py-4"><Button aria-label="取消编辑" disabled={isSubmitting} onClick={cancelEditing}>取消</Button><Button aria-label="重新发起" type="primary" htmlType="submit" loading={isSubmitting} disabled={isSubmitting || (productLines.length === 0 && workOrderType !== '其他问题')}>重新发起</Button></div>}
             </form>
         </section>
       )}
@@ -1169,7 +1206,7 @@ export const RequirementPoolView: React.FC = () => {
           </div>
         </>
       )}
-      {selected && (
+      {selected && !creating && (
         <Drawer
           isOpen={!!selected}
           width="max-w-6xl"
@@ -1183,9 +1220,10 @@ export const RequirementPoolView: React.FC = () => {
             <div className="flex w-full justify-between">
               <div className="flex items-center gap-2">
                 {canReceive && <><Button aria-label="事项接收" type="primary" loading={receiving} disabled={receiving} onClick={() => void receiveMatter()}>事项接收</Button><Button disabled={receiving} onClick={() => openWorkflow("reassign")}>事项转交</Button><Button danger disabled={receiving} onClick={() => setReasonType("reject")}>事项退回</Button></>}
-                {(selected.status === "处理中" || (selected.status === "已退回" && isInitiator(selected, currentUser))) && ownsSelected && <Button type="primary" disabled={completeSubmitting || workItems.some((item) => !(item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"))} onClick={() => setCompleteModalOpen(true)}>事项完成</Button>}
-                {selected.status === "待验收" && isInitiator(selected, currentUser) && <><Button type="primary" loading={acceptanceSubmitting} disabled={acceptanceSubmitting} onClick={() => { setAcceptanceRating(0); setAcceptanceComment(""); setRatingModalOpen(true); }}>验收通过</Button><button type="button" onClick={() => { const first = workItems.find((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"); const owner = first ? employees.find((person) => person.name === first.assigneeName) : undefined; setAcceptanceWorkItemId(first?.id || ""); setAcceptanceTaskOwnerId(owner?.id || ""); setAcceptanceModalOpen(true); }} className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]">验收未通过</button></>}
-                {selected.status === "已完成" && isInitiator(selected, currentUser) && <button type="button" onClick={() => { setReopenAssigneeId(""); setReopenReason(""); setReopenModalOpen(true); }} className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]">重新开启</button>}
+                {selected.status === "处理中" && ownsSelected && <Button type="primary" disabled={completeSubmitting || workItems.some((item) => !(item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"))} onClick={() => setCompleteModalOpen(true)}>事项完成</Button>}
+                {selected.status === "已退回" && isInitiator(selected, currentUser) && <><Button danger disabled={closeSubmitting} onClick={() => setCloseModalOpen(true)}>事项关闭</Button><Button type="primary" onClick={() => startEditing('returned')}>重新编辑</Button></>}
+                {selected.status === "待验收" && isInitiator(selected, currentUser) && <><Button type="primary" loading={acceptanceSubmitting} disabled={acceptanceSubmitting} onClick={() => { setAcceptanceRating(0); setAcceptanceComment(""); setRatingModalOpen(true); }}>验收通过</Button><button type="button" onClick={openAcceptanceFailed} className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]">验收未通过</button></>}
+                {selected.status === "已完成" && isInitiator(selected, currentUser) && <button type="button" onClick={() => startEditing('reopen')} className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]">重新开启</button>}
               </div>
               <button type="button" onClick={closeDetail} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]">关闭</button>
             </div>
@@ -1270,6 +1308,7 @@ export const RequirementPoolView: React.FC = () => {
                 const progressValue = meta.toProgress ?? meta.progress;
                 const progress = typeof progressValue === "number" || typeof progressValue === "string" ? Number(progressValue) : null;
                 const taskTitle = String(meta.taskTitle || "").trim();
+                const taskCode = String(meta.taskCode || "").trim();
                 const noteHtml = typeof meta.noteHtml === "string" ? meta.noteHtml : typeof meta.contentHtml === "string" ? meta.contentHtml : "";
                 const attachments = eventAttachments(meta);
                 return <div key={item.id} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-3">
@@ -1277,6 +1316,7 @@ export const RequirementPoolView: React.FC = () => {
                   <div className="mt-1 text-[11px] text-[var(--text-muted)]">{eventOperatorLabel(item, meta)}</div>
                   {typeof meta.rating === "number" && <div className="mt-2 flex items-center gap-2"><Rate disabled value={meta.rating} count={5} /><span className="text-xs">{meta.rating} 星</span></div>}
                   {item.eventType === "发表评论" && typeof meta.commentContent === "string" ? <Button type="link" className="mt-2" onClick={() => { setCommentTargetId(item.id); setCommentsModalOpen(true); }}>查看评论</Button> : noteHtml ? <div className="mt-2 break-words text-xs" dangerouslySetInnerHTML={{ __html: sanitizeHtml(noteHtml) }} /> : item.reason && <p className="mt-2 whitespace-pre-wrap break-words text-xs">{item.reason}</p>}
+                  {item.eventType === '验收未通过' && taskTitle && <p className="mt-2 break-words text-xs text-[var(--text-body)]">反馈任务：{[taskCode, taskTitle].filter(Boolean).join(' · ')}</p>}
                   {attachments.length > 0 && <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-[var(--border-main)] pt-3">{attachments.map((attachment) => attachment.type === "image" && attachment.dataUrl ? <a key={attachment.id} href={attachment.dataUrl} target="_blank" rel="noreferrer" title={attachment.name}><img src={attachment.dataUrl} alt={attachment.name} className="h-16 w-16 rounded border border-[var(--border-main)] object-cover" /></a> : <a key={attachment.id} href={attachment.dataUrl || "#"} download={attachment.name} target={attachment.dataUrl ? "_blank" : undefined} rel={attachment.dataUrl ? "noreferrer" : undefined} className="max-w-48 truncate rounded border border-[var(--border-main)] px-2 py-1 text-[11px] text-[var(--active-text)] hover:bg-[var(--bg-hover)]">{attachment.name}</a>)}</div>}
                   {progress !== null && <div className="mt-2 text-xs text-[var(--text-muted)]">任务进度：{Math.max(0, Math.min(100, progress))}%{meta.overdueRisk === true && <span className="ml-2 text-[var(--danger)]">已逾期</span>}</div>}
                   {meta.taskType && <><div className="my-3 border-t border-[var(--border-main)]" /><button type="button" className="text-left text-xs text-[var(--active-text)] hover:text-[var(--primary-hover)]" onClick={() => {
@@ -1294,7 +1334,8 @@ export const RequirementPoolView: React.FC = () => {
       {taskCreationKind && selected && <RequirementTasksView
         key={taskCreationKind}
         taskKind={taskCreationKind}
-        itemLabel={{ requirement: "产品任务", design: "设计任务", bug: "缺陷", presales: "售前任务", delivery: "交付任务" }[taskCreationKind]}
+        itemLabel={{ requirement: "产品任务", design: "设计任务", bug: "缺陷", presales: "售前任务", delivery: "交付任务", ops: "运维任务" }[taskCreationKind]}
+        designVariant={collaborationDesignVariant(selected)}
         creationContext={{
           productLineId: selected.productLineId || productLines.find((line) => line.name === selected.productLineName)?.id || '',
           sourceWorkOrder: selected,
@@ -1497,18 +1538,20 @@ export const RequirementPoolView: React.FC = () => {
         title="验收未通过"
       >
         <form onSubmit={submitAcceptanceFailed} className="work-order-dialog space-y-4">
-          <p className="text-xs text-[var(--text-muted)]">请选择需要退回的已完成任务，事项将恢复为“处理中”并交回该任务负责人。</p>
+          <p className="text-xs text-[var(--text-muted)]">请说明验收未通过的原因，可选关联任务作为反馈依据。仅协同事项恢复为“处理中”，不修改任务状态或负责人。</p>
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-            退回任务
-            <Select className="w-full" showSearch optionFilterProp="label" value={acceptanceWorkItemId || undefined} options={workItems.filter((item) => item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED").map((item) => ({ label: `${item.title} · ${item.assigneeName || "未分配"}`, value: item.id }))} onChange={(value) => { setAcceptanceWorkItemId(value); const item = workItems.find((candidate) => candidate.id === value); setAcceptanceTaskOwnerId(employees.find((person) => person.name === item?.assigneeName)?.id || ""); }} placeholder="请选择验收未通过的任务" disabled={acceptanceSubmitting} />
+            事项负责人 *
+            <Select className="w-full" showSearch optionFilterProp="label" value={acceptanceTaskOwnerId || undefined} options={employeeSelectOptions(employees, 'id')} onChange={setAcceptanceTaskOwnerId} aria-label="验收反馈负责人" placeholder="请选择有效事项负责人" disabled={acceptanceSubmitting || originalProcessor.resolved} />
           </label>
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-            指派负责人
-            <Select className="w-full" showSearch optionFilterProp="label" value={acceptanceTaskOwnerId || undefined} options={employeeSelectOptions(employees, 'id')} onChange={setAcceptanceTaskOwnerId} placeholder="请选择退回负责人" disabled={acceptanceSubmitting} />
+            未通过任务（选填）
+            <Select className="w-full" showSearch optionFilterProp="label" value={acceptanceWorkItemId || undefined} allowClear options={displayedWorkItems.map((item) => ({ label: `${item.title} · ${item.assigneeName || "未分配"}`, value: item.id }))} onChange={(value) => setAcceptanceWorkItemId(value || "")} placeholder="请选择验收未通过的任务" disabled={acceptanceSubmitting} />
           </label>
+
+          {!originalProcessor.resolved && <p role="alert" className="text-xs text-[var(--danger)]">原处理负责人失效或无法识别，请补选有效负责人。</p>}
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
             未通过原因 *
-            <Input.TextArea value={acceptanceReason} onChange={(event) => setAcceptanceReason(event.target.value)} rows={4} placeholder="请说明需要补充或修正的内容" required />
+            <Input.TextArea value={acceptanceReason} disabled={acceptanceSubmitting} maxLength={2000} onChange={(event) => setAcceptanceReason(event.target.value)} rows={4} placeholder="请说明需要补充或修正的内容" required />
           </label>
           <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
           <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3">
@@ -1517,26 +1560,9 @@ export const RequirementPoolView: React.FC = () => {
           </div>
         </form>
       </Modal>
-      <Modal
-        isOpen={reopenModalOpen}
-        onClose={() => { if (!reopenSubmitting) setReopenModalOpen(false); }}
-        title="重新开启事项"
-      >
-        <form onSubmit={submitReopen} className="work-order-dialog space-y-4">
-          <p className="text-xs text-[var(--text-muted)]">历史事项将恢复为待处理，提交所选处理人接收，并保留原有历程记录。</p>
-          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-            处理人
-            <Select className="w-full" showSearch optionFilterProp="label" value={reopenAssigneeId || undefined} options={employeeSelectOptions(employees, 'id')} onChange={setReopenAssigneeId} disabled={reopenSubmitting} placeholder="请选择处理人" />
-          </label>
-          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-            重开原因
-            <Input.TextArea value={reopenReason} disabled={reopenSubmitting} maxLength={2000} onChange={(event) => setReopenReason(event.target.value)} rows={4} placeholder="请输入重新开启原因" />
-          </label>
-          <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3">
-            <button type="button" onClick={() => setReopenModalOpen(false)} disabled={reopenSubmitting} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)] disabled:opacity-50">取消</button>
-            <button type="submit" disabled={reopenSubmitting} className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{reopenSubmitting ? "提交中…" : "确认重开"}</button>
-          </div>
-        </form>
+      <Modal isOpen={closeModalOpen} title="事项关闭" onClose={() => { if (!closeSubmitting) setCloseModalOpen(false); }}>
+        <p className="text-sm text-[var(--text-body)]">确认结束“{selected?.title}”协同事项？关闭后代表该事项的本次流转已结束。</p>
+        <div className="mt-4 flex justify-end gap-2"><Button disabled={closeSubmitting} onClick={() => setCloseModalOpen(false)}>取消</Button><Button danger type="primary" loading={closeSubmitting} disabled={closeSubmitting} onClick={() => void submitClose()}>确认关闭</Button></div>
       </Modal>
     </div>
   );

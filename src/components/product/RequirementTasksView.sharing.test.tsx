@@ -151,7 +151,7 @@ it('filters product task options by status instead of collaboration type', () =>
   expect(onChange).toHaveBeenCalledWith(['2']);
 });
 
-it.each([['product', '产品设计'], ['project', '物料设计'], ['other', '其他设计']] as const)('locks the %s design type first and hides the duplicate project field for material design', async (variant, label) => {
+it.each([['product', '产品设计'], ['project', '项目设计'], ['other', '其他设计']] as const)('locks the %s design type first and hides the duplicate project field for material design', async (variant, label) => {
   window.history.replaceState(null, '', '/app/prod_design_tasks');
   vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '协同产品', workItemTypes: [{ id: 'different', name: '其他设计', category: '设计', enabled: true, default: true }] }] } as unknown as ReturnType<typeof useApp>);
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="design" itemLabel="设计任务" designVariant={variant} creationContext={{ productLineId: 'line-1' }} /></QueryClientProvider>);
@@ -252,4 +252,24 @@ it('requires a project before selecting the optional ops product and hides task 
   expect(project).toHaveStyle({ order: '-2' });
   expect(product).toHaveStyle({ order: '-1' });
   expect(screen.queryByText('运维任务类型')).not.toBeInTheDocument();
+});
+
+it.each([['product', '产品设计', '协同产品'], ['project', '项目设计', '归属项目'], ['other', '其他设计', '产品部']] as const)('opens a %s design form with the correct source from a matter', async (variant, label, sourceName) => {
+  window.history.replaceState(null, '', '/app/wb_work_order');
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), currentUser: { id: 'viewer', name: '测试人员', department: '产品部' }, productLines: [{ id: 'line-1', name: '协同产品' }], projects: [{ id: 'project-1', name: '归属项目' }] } as unknown as ReturnType<typeof useApp>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="design" itemLabel="设计任务" designVariant={variant} creationContext={{ productLineId: 'line-1', sourceWorkOrder: { id: 'matter', title: '来源事项', department: '产品部', projectId: 'project-1', projectName: '归属项目' } as import('../../types').RequirementTask }} /></QueryClientProvider>);
+  await screen.findByText('新建设计任务');
+  const typeField = screen.getByText('设计任务类型').closest('.ant-form-item')!;
+  expect(typeField).toHaveTextContent(label);
+  expect(typeField.querySelector('.ant-select')).toHaveClass('ant-select-disabled');
+  const sourceField = screen.getByText(variant === 'product' ? '所属产品' : variant === 'project' ? '所属项目' : '来源部门').closest('.ant-form-item')!;
+  expect(sourceField).toHaveTextContent(sourceName);
+});
+it('opens operations creation from a matter with its associated project and collaboration preselected', async () => {
+  window.history.replaceState(null, '', '/app/wb_work_order');
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), projects: [{ id: 'project-1', name: '归属项目' }] } as unknown as ReturnType<typeof useApp>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="ops" itemLabel="运维任务" creationContext={{ productLineId: '', sourceWorkOrder: { id: 'matter', title: '来源事项', projectId: 'project-1' } as import('../../types').RequirementTask }} /></QueryClientProvider>);
+  await screen.findByText('新建运维任务');
+  expect(screen.getByRole('button', { name: '协同事项 · 1' })).toBeVisible();
+  expect(screen.getByText('关联项目').closest('.ant-form-item')).toHaveTextContent('归属项目');
 });

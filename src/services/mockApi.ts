@@ -1,3 +1,5 @@
+import { applyCollaborationWorkflow } from './mockCollaborationWorkflow';
+import { handleMockBusinessTasks } from './mockBusinessTasks';
 import { assignedGoalActions, legacyGoalActions } from './okrGoalRules';
 import collaborationTypes from '../data/mockCollaborationTypes.json';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
@@ -25,7 +27,7 @@ import {
 } from '../data/mockSnapshot';
 import type { ProductLine, RequirementTask, RequirementWorkItem, VersionIteration } from '../types';
 import { normalizeVersionStatus } from '../components/product/productLinePresentation';
-import type { CurrentUser, EmployeeOption } from '../types';
+import type { AttachmentMetadata, CurrentUser, EmployeeOption } from '../types';
 import type {
   SaveTestPlanInput,
   TestCase,
@@ -394,6 +396,9 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   const clean = path.split('?')[0];
   const parts = clean.split('/').filter(Boolean);
   const body = bodyOf(init);
+  if (parts[0] === 'api' && ['presales-tasks', 'delivery-tasks'].includes(parts[1])) {
+    return handleMockBusinessTasks(path, method, body, { activities: taskActivities, record: recordTaskActivity, changes: recordTaskChanges, validateCompletion });
+  }
   if (parts.includes('test-reports')) {
     let session: { user?: { name?: string } } | null = null;
     try { session = JSON.parse(sessionStorage.getItem('shichuang.session') || 'null'); } catch { /* 兼容失效的本地会话。 */ }
@@ -511,6 +516,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
         estimatedHours: Number(body.estimatedHours) || 0, dueDate: text(body.dueDate), createdAt: now(),
       };
       write(KEYS.opsTasks, [task, ...tasks]);
+      attachWorkItemToRequirement(task, '运维任务');
       recordTaskActivity(task.id, String(task.productLineId || ''), 'WORK_ITEM_CREATED', { title: task.title });
       return { id: task.id, code: task.code };
     }
@@ -521,6 +527,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       if (body.status === '已完成' && task.status !== '已完成') validateCompletion(body);
       const updated = { ...task, ...body, id: task.id, code: task.code };
       write(KEYS.opsTasks, tasks.map(item => item.id === taskId ? updated : item));
+      syncAttachedWorkItem({ ...updated, taskType: '运维任务' });
       recordTaskChanges(task, updated);
       return null;
     }
@@ -685,20 +692,21 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     write(KEYS.workItems, items);
     return { ...updated, workItems: updated.workItems || [] };
   }
-  if (parts[1] === 'requirements' && parts[2] && parts[3] === 'reopen' && method === 'POST') {
+  if (parts[1] === 'requirements' && parts[2] && method === 'POST' && (parts[3] === 'reopen' || parts[3] === 'acceptance-failed' || parts[3] === 'transition' && body.action === 'close')) {
     const items = getWorkItems();
-    const index = items.findIndex((item) => item.id === parts[2] && !item.deleted && !item.deleteFlag);
-    if (index < 0) throw new Error('事项不存在');
-    const current = items[index];
-    const revision = Number(current.revision ?? current.version ?? 0);
-    if (Number(body.revision) !== revision) throw new Error('事项已被其他人更新，请刷新后重试');
-    if (current.status !== '已完成') throw new Error('仅已完成事项可以重新开启');
-    const owner = getMembers().find((member) => member.id === body.assigneeId && member.status === 'enabled');
-    if (!owner || !text(body.reason).trim()) throw new Error('请选择有效处理人并填写重开原因');
-    const event = { id: id('event'), eventType: '事项重开', fromStatus: current.status, toStatus: '待处理', reason: text(body.reason).trim(), operatorName: current.creatorName, createdAt: now(), metadata: { ownerChanged: true, fromAssigneeName: current.ownerName, assigneeName: owner.name } };
-    items[index] = { ...current, status: '待处理', progress: 0, ownerName: owner.name, assigneeName: owner.name, assigneeId: owner.id, revision: revision + 1, events: [...(current.events || []), event] };
-    write(KEYS.workItems, items);
-    return items[index];
+    let viewer: { id?: string; name?: string } | undefined;
+    try { viewer = JSON.parse(sessionStorage.getItem('shichuang.session') || 'null')?.user; } catch { /* 无效会话不得修改事项。 */ }
+    const action = parts[3] === 'transition' ? 'close' : parts[3] as 'reopen' | 'acceptance-failed';
+    const updated = applyCollaborationWorkflow(action, parts[2], body, { items, people: getEmployeeOptions(), viewer, now: now(), eventId: id('event') });
+    if (action === 'acceptance-failed') {
+      const staged = read<AttachmentMetadata[]>(KEYS.attachments, []);
+      const ids = Array.isArray(body.attachmentIds) ? body.attachmentIds.map(String) : [];
+      if (ids.some(attachmentId => !staged.some(attachment => attachment.id === attachmentId))) throw new Error('反馈附件失效，请重新上传');
+      const event = updated.events?.at(-1);
+      if (event?.metadata) event.metadata.attachments = staged.filter(attachment => ids.includes(attachment.id));
+    }
+    write(KEYS.workItems, items.map(item => item.id === updated.id ? updated : item));
+    return { ...updated, workItems: updated.workItems || [] };
   }
   if (parts[1] === 'requirements' && parts[2] && parts[3] === 'transition' && method === 'POST') {
     const items = getWorkItems();
@@ -716,7 +724,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     write(KEYS.workItems, items);
     return null;
   }
-  if (parts[1] === 'requirements' && parts[2] && ['complete', 'acceptance-passed', 'acceptance-failed'].includes(parts[3]) && method === 'POST') {
+  if (parts[1] === 'requirements' && parts[2] && ['complete', 'acceptance-passed'].includes(parts[3]) && method === 'POST') {
     const items = getWorkItems(); const index = items.findIndex((candidate) => candidate.id === parts[2]);
     if (index < 0) throw new Error('事项不存在');
     const current = items[index]; const revision = Number(current.revision || current.version || 0);
@@ -725,7 +733,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (ratedAcceptance && (!Number.isInteger(body.rating) || Number(body.rating) < 1 || Number(body.rating) > 5)) throw new Error('请选择1至5星的验收评价');
     if (ratedAcceptance && text(body.comment).length > 500) throw new Error('评价内容不能超过500字');
     const nextStatus = parts[3] === 'complete' ? '待验收' : parts[3] === 'acceptance-passed' ? '已完成' : '处理中';
-    if ((parts[3] === 'complete' && !(current.status === '处理中' || (current.status === '已退回' && current.ownerName === current.creatorName))) || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
+    if ((parts[3] === 'complete' && current.status !== '处理中') || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
     if (parts[3] === 'complete' && (current.workItems || []).some((item: RequirementWorkItem) => item.status !== '已完成' && item.assistanceTaskStatus !== 'COMPLETED')) throw new Error('存在未完成的关联任务');
     const stagedAttachments = read<any[]>(KEYS.attachments, []);
     const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.map(String) : [];
@@ -733,20 +741,11 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const previousAssigneeId = String(current.assigneeId || '').trim();
     const creatorName = String(current.creatorName || '').trim();
     const creatorId = String(current.creatorId || MOCK_USERS.find((user) => user.name === creatorName)?.id || '').trim();
-    const failedTask = parts[3] === 'acceptance-failed'
-      ? (current.workItems || []).find((item: RequirementWorkItem) => item.id === String(body.workItemId || '') && (item.status === '已完成' || item.assistanceTaskStatus === 'COMPLETED'))
-      : undefined;
-    if (parts[3] === 'acceptance-failed' && !failedTask) throw new Error('请选择已完成的关联任务');
-    const failedTaskAssigneeId = failedTask ? String((failedTask as RequirementWorkItem & { assigneeId?: string }).assigneeId || '') : '';
-    const failedOwner = failedTask ? MOCK_USERS.find((user) => user.id === String(body.taskOwnerId || failedTaskAssigneeId)) : undefined;
-    const nextOwnerName = String(parts[3] === 'complete' ? (body.assigneeName || creatorName || previousOwnerName) : parts[3] === 'acceptance-failed' ? (failedOwner?.name || failedTask?.assigneeName || previousOwnerName) : previousOwnerName).trim();
-    const nextAssigneeId = String(parts[3] === 'complete' ? (body.assigneeId || creatorId || previousAssigneeId) : parts[3] === 'acceptance-failed' ? (body.taskOwnerId || failedTaskAssigneeId || previousAssigneeId) : previousAssigneeId).trim();
+    const nextOwnerName = String(parts[3] === 'complete' ? (body.assigneeName || creatorName || previousOwnerName) : previousOwnerName).trim();
+    const nextAssigneeId = String(parts[3] === 'complete' ? (body.assigneeId || creatorId || previousAssigneeId) : previousAssigneeId).trim();
     const ownerChanged = Boolean(nextOwnerName && nextOwnerName !== previousOwnerName) || Boolean(previousAssigneeId && nextAssigneeId && nextAssigneeId !== previousAssigneeId);
-    const event = { id: id('event'), eventType: parts[3] === 'complete' ? '事项完成' : parts[3] === 'acceptance-passed' ? '验收通过' : '验收未通过', fromStatus: current.status, toStatus: nextStatus, reason: ratedAcceptance ? text(body.comment).trim() : text(body.note || body.reason), operatorName: ratedAcceptance ? current.creatorName : current.ownerName, createdAt: now(), metadata: { ...(ratedAcceptance ? { rating: body.rating } : {}), ...(body.noteHtml ? { noteHtml: text(body.noteHtml) } : {}), ...(ownerChanged ? { ownerChanged: true, fromAssigneeName: previousOwnerName, assigneeName: nextOwnerName } : {}), attachments: stagedAttachments.filter((attachment) => attachmentIds.includes(String(attachment.id))) } };
-    const nextWorkItems = parts[3] === 'acceptance-failed'
-      ? (current.workItems || []).map((item: RequirementWorkItem) => item.id === failedTask?.id ? { ...item, status: '处理中', assistanceTaskStatus: 'PROCESSING', assigneeName: nextOwnerName } : item)
-      : current.workItems;
-    items[index] = { ...current, status: nextStatus, workItems: nextWorkItems, ...((parts[3] === 'complete' || parts[3] === 'acceptance-failed') && ownerChanged ? { ownerName: nextOwnerName, assigneeName: nextOwnerName, ...(nextAssigneeId ? { assigneeId: nextAssigneeId } : {}) } : {}), revision: revision + 1, events: [...(current.events || []), event] };
+    const event = { id: id('event'), eventType: parts[3] === 'complete' ? '事项完成' : parts[3] === 'acceptance-passed' ? '验收通过' : '验收未通过', fromStatus: current.status, toStatus: nextStatus, reason: ratedAcceptance ? text(body.comment).trim() : text(body.note || body.reason), operatorName: ratedAcceptance ? current.creatorName : current.ownerName, createdAt: now(), metadata: { ...(parts[3] === 'complete' ? { processingAssigneeId: previousAssigneeId, processingAssigneeName: previousOwnerName } : {}), ...(ratedAcceptance ? { rating: body.rating } : {}), ...(body.noteHtml ? { noteHtml: text(body.noteHtml) } : {}), ...(ownerChanged ? { ownerChanged: true, fromAssigneeName: previousOwnerName, assigneeName: nextOwnerName } : {}), attachments: stagedAttachments.filter((attachment) => attachmentIds.includes(String(attachment.id))) } };
+    items[index] = { ...current, status: nextStatus, workItems: current.workItems, ...((parts[3] === 'complete' || parts[3] === 'acceptance-failed') && ownerChanged ? { ownerName: nextOwnerName, assigneeName: nextOwnerName, ...(nextAssigneeId ? { assigneeId: nextAssigneeId } : {}) } : {}), revision: revision + 1, events: [...(current.events || []), event] };
     write(KEYS.workItems, items); return { id: current.id, status: nextStatus };
   }
   if (clean === '/api/design-tasks' && method === 'GET') { const items = getWorkItems().filter((item) => item.category === 'design' && !item.deleted && !item.deleteFlag); return { items, page: 1, pageSize: 100, total: items.length }; }
