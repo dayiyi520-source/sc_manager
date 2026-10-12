@@ -1,3 +1,4 @@
+import { productTaskPreviewSamples, PRODUCT_PREVIEW_SEED_VERSION } from '../data/mockProductTaskPreview';
 import { applyCollaborationWorkflow } from './mockCollaborationWorkflow';
 import { handleMockBusinessTasks } from './mockBusinessTasks';
 import { assignedGoalActions, legacyGoalActions } from './okrGoalRules';
@@ -62,6 +63,7 @@ const KEYS = {
 // 每次导入新数据库快照时，淘汰浏览器里由旧演示数据留下的本地状态。
 if (typeof window !== 'undefined' && localStorage.getItem(KEYS.snapshot) !== MOCK_SNAPSHOT_VERSION) {
   Object.values(KEYS).filter((key) => key !== KEYS.snapshot).forEach((key) => localStorage.removeItem(key));
+  localStorage.removeItem(KEYS.workItems + '.previewSeedVersion');
   localStorage.setItem(KEYS.snapshot, MOCK_SNAPSHOT_VERSION);
 }
 
@@ -89,7 +91,18 @@ const initialWorkItems = [
   ...MOCK_BUGS.map((bug) => ({ ...bug, category: 'bug', assigneeName: bug.ownerName })),
 ];
 const snapshotWorkItems = new Map(MOCK_DATABASE.t_product_work_item.map(row => [row.id_, row]));
-const getWorkItems = () => read<any[]>(KEYS.workItems, initialWorkItems.map((item) => ({ ...item }))).map((item) => {
+const readWorkItems = () => {
+  const tasks = read<any[]>(KEYS.workItems, initialWorkItems.map(item => ({ ...item })));
+  const seedKey = KEYS.workItems + '.previewSeedVersion';
+  if (localStorage.getItem(seedKey) !== PRODUCT_PREVIEW_SEED_VERSION) {
+    const ids = new Set(tasks.map(task => task.id));
+    const merged = [...tasks, ...productTaskPreviewSamples().filter(task => !ids.has(task.id))];
+    write(KEYS.workItems, merged); localStorage.setItem(seedKey, PRODUCT_PREVIEW_SEED_VERSION);
+    return merged;
+  }
+  return tasks;
+};
+const getWorkItems = () => readWorkItems().map((item) => {
   const snapshot = snapshotWorkItems.get(item.id);
   item = { ...item, workItemTypeId: item.workItemTypeId || snapshot?.task_type_id_, workflowId: item.workflowId || snapshot?.workflow_id_, statusKey: item.statusKey || snapshot?.status_key_ };
   const migratedType = (collaborationTypes as Record<string, string>)[item.id];

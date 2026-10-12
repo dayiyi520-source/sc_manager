@@ -1,105 +1,29 @@
-# Production Deployment Runbook
+# 静态 Mock 演示站部署
 
-Status: verified
+当前目标：用户确认的 https://cp.stringedu.com/sc-manager-frontend/ 。站点仅发布前端及其内置 Mock，实际 Nginx 目录为 /opt/sc-manager-frontend/dist 。历史 /manage-admin/ 是另一应用，本流程不切换其发布目录、不部署其后端、不修改数据库。
 
-Canonical deployment script:
+部署入口为 scripts/deploy-production.sh，Windows 可直接执行同一入口委托的 Python 脚本：
 
-```bash
-scripts/deploy-production.sh
+```powershell
+python scripts/deploy_frontend_mock.py --project . --source-dir <已验证的独立源码快照目录> --revision <源码提交号>
 ```
 
-Production endpoint:
+准备命令从 stringplugin 根目录运行：
 
-- Web: `https://cp.stringedu.com/manage-admin/`
-- Frontend route: `/manage-admin/`
-- API route: `/manage-admin/api/`
-- Backend service: `manage-admin.service` on port `18082`
-- Database: `eaf_manage_admin`
-
-Prerequisites:
-
-- Node.js/npm, Java 17/Maven, `ssh`, `scp`, `curl`, and `tar` are available locally.
-- On Windows Git Bash, the script excludes `VITE_BASE_PATH` and `VITE_API_BASE_URL` from MSYS path conversion so the configured Nginx subpath is preserved in the generated HTML.
-- `sshpass` is available when password-based SSH is used.
-- Deployment values are loaded from `.enterprise-app-factory/secrets/runtime.env` or exported environment variables.
-- Docker, `gzip`, and the `SOURCE_DB_*` variables are required only for an explicitly requested complete database replacement.
-- The server already has MySQL client tools, the dedicated Nginx route file `/www/server/panel/vhost/nginx/routes/manage-admin.conf`, and the service environment file `/opt/manage-admin/backend/.env`.
-
-Deploy:
-
-```bash
-scripts/deploy-production.sh
+```text
+python scripts/prepare_deployment.py --project <项目目录> --environment prod --config .enterprise-app-factory/config/frontend-deployment.json
 ```
 
-The default command builds and uploads the frontend and backend, verifies the dedicated Nginx route, backs up the current server database and application files, switches only the application files, lets Flyway migrate the existing database, and verifies the internal and public endpoints. It does not import local business data or modify the site root or `/tongren/` routes.
+此专用配置明确 database.mode=none，适用于已经核实的静态演示站，并保留原团队应用配置。原默认数据库预检为新生成的数据库名报不存在，不能将该数据库误当作此站点的依赖。
 
-Before upload and again after the public switch, deployment verifies that the generated HTML references `/manage-admin/assets/` and rejects root `/assets/` references. The public check uses the release ID as a cache-busting query parameter. It also verifies direct access to the product defect page so a wrong frontend base path cannot be reported as a successful release.
+前置条件：Node 与现有 Vite 依赖可用，Python 已有 paramiko；凭证只从 .enterprise-app-factory/secrets/runtime.env 或环境变量加载。源码目录必须为本次已提交版本的独立快照加明确审查过的部署修复，不自动发布共享工作区里的其他未提交修改。构建强制 VITE_BASE_PATH=/sc-manager-frontend/ 和 VITE_MOCK_MODE=true。
 
-Complete database replacement is exceptional and must be explicit:
+Mock 数据编译进静态资源：数据库快照、产研模板、产品/设计/研发/测试/缺陷演示任务，以及售前8条和交付8条样例随资源上传。额外的产研演示样例每类3条，由内置管理员负责并创建，避免全新浏览器默认“我负责的”无记录；原任务归属不变。每个浏览器的编辑与新建仍保存在该浏览器，不是多人共享数据库。
 
-```bash
-scripts/deploy-production.sh --replace-database
-```
+流程：预检已有专属路由和 nginx -t；构建并检查资源路径及 Mock 数据；上传到 /opt/sc-manager-frontend/incoming/；解压到独立 releases/<时间戳>/；保留旧资源以支持打开中的页面；把旧站备份到 backups/<时间戳>/，切换 dist 链接；验证公共 index、JS 资源和直接业务路由。验证失败自动切回旧目录。每次产物包含 release.json，记录源码版本、模式及样例数量，不记录凭证。
 
-Replacement mode additionally requires Docker, `gzip`, `SOURCE_DB_HOST`, `SOURCE_DB_PORT`, `SOURCE_DB_NAME`, `SOURCE_DB_USERNAME`, and `SOURCE_DB_PASSWORD`. It exports the complete source database and replaces the server database only after the remote backup succeeds.
+回滚：在服务器上读取所选 backups/<时间戳>/previous-target.txt；首次目录切换前的旧文件位于同备份的 dist/，后续版本则指向此前 releases/。将 /opt/sc-manager-frontend/dist 原子切换到该旧目录，然后校验公共首页和业务路由。不要删除其他站点、数据库或备份。
 
-Rollback:
+最后成功部署：2026-10-12（北京时间13:46）。发布版本20261012T054650Z，源码abb6359加本次Mock可见性修复。
 
-- Failed default deployments restore the frontend and backend JAR before restarting `manage-admin.service`; the existing database is not replaced.
-- Failed database-replacement deployments additionally restore the database snapshot from `/opt/manage-admin/backups/<release-id>/`.
-- For a manual rollback, stop `manage-admin.service`, restore the three artifacts from the selected backup directory, then start the service and verify the health, frontend, and API endpoints.
-- Do not delete another project's Nginx route, release, database, or backup while reclaiming disk space.
-
-Rules:
-
-- Use the canonical deployment script for production deployments.
-- Use the default application-only mode for routine releases. Database replacement requires an explicit data synchronization decision.
-- Do not hard-code server passwords, database passwords, tokens, or access keys.
-- Load deployment values from `.enterprise-app-factory/secrets/runtime.env` or existing environment variables.
-- After a deployment succeeds, update this runbook with the verified command, required preconditions, rollback notes, and last success date.
-
-Last successful deploy: 2026-09-30
-
-Latest complete local-data release:
-
-- Release `20260930022759` deployed commit `cddf849` to the existing `/manage-admin/` and `/manage-admin/api/` routes. Because the local secret file and `sshpass` were unavailable, the verified deployment script's build, backup, upload, switch, and verification sequence was performed manually. Do not interpret this as a successful end-to-end run of `scripts/deploy-production.sh --replace-database`.
-- The complete local `eaf_project_f194fd0628` snapshot was first imported into a temporary database on the MySQL 8.0 server to verify compatibility, then used to replace only `eaf_manage_admin` after the production database, frontend, and JAR were backed up at `/opt/manage-admin/backups/20260930022759/`. The previous frontend directory is also retained at `/opt/manage-admin/frontend/dist.pre-20260930022759/`.
-- After switching, the production database contained 63 tables, 92 successful Flyway migrations with no failed records, 163 work items, 9 products, and 15 versions. The backend health, Nginx configuration, public frontend, direct business route, entry JavaScript, and authentication API were checked. The local data scripts were not rerun during deployment; the published data is the local database snapshot at export time.
-- This replacement intentionally supersedes production changes made after the previous release. To restore the old production data and application, stop `manage-admin.service`, restore the database dump and application artifacts from the backup directory, then restart and recheck the health and dedicated routes. The application database account cannot create a staging database; database replacement requires separately supplied administrator credentials without storing them in the repository.
-
-Latest verified demo release:
-
-- Release `20260927134948` deployed the current working tree in application-only mode to the existing `/manage-admin/` route on `103.236.98.125`; the server database was preserved. The remote release step was run from the canonical script's extracted remote block after the local password adapter failed to forward standard input. It completed with an application and database backup at `/opt/manage-admin/backups/20260927134948/`.
-- The backend is active and healthy, Nginx configuration passed, Flyway applied `20260927.1`, and the public entry, direct business route, and authentication endpoint returned successfully. A read-only Chen Yuzhang perspective check found no actionable item in the current demo data: the root objective is still `pending_review` and its KR has no assignee ID. This release alone does not close that specific business acceptance scenario.
-- Release `20260927131638` deployed local commit `363ff03` to the existing `/manage-admin/` route on `103.236.98.125` in application-only mode. The server database was not replaced.
-- The canonical script built and uploaded the application, but its remote backup step exceeded the SSH wrapper's timeout. The uploaded artifacts were switched manually only after a separate compressed database backup and frontend/JAR backups succeeded. The script itself did not report completion for this release.
-- The backend service is active, Nginx configuration is valid, the public entry page and JavaScript asset return 200, direct defect-page navigation returns 200, and the public development-account API returns 200.
-- Flyway completed through `20260926.2`; 53 tables and no failed Flyway records were observed after deployment. This confirms schema migration, not business-level browser acceptance.
-- Backup: `/opt/manage-admin/backups/20260927131638/` (database, frontend, and JAR). The uploaded package remains in `/opt/manage-admin/incoming/20260927131638/`.
-- Before the next release, fix or accommodate the canonical script's remote backup timeout. The local full test suites failed before this demo deployment; do not treat this release as a clean automated-test pass.
-
-Latest verified application release:
-
-- Release `20260923120029` deployed commit `0ec3c09`, including the assistance business-parameter adjustments and the goal/performance copy updates, in the default application-only mode.
-- The existing production database was preserved; the deployment created a database and application backup before switching files.
-- Backend health, the internal frontend and authentication endpoints, the public frontend and authentication routes, service state, and Nginx configuration all passed.
-- The public index references `/manage-admin/assets/`, and the deployed entry JavaScript returned successfully.
-- Backup: `/opt/manage-admin/backups/20260923120029/`.
-
-Latest verified repair:
-
-- Frontend-only release `20260921092314` repaired production assets that were incorrectly built against root `/assets/` URLs.
-- The public index now references `/manage-admin/assets/`; all six entry JavaScript and CSS resources, the direct product defect page, and the development-account API returned successfully.
-- The backend JAR, backend service, and database were not changed during this repair.
-- Frontend backup: `/opt/manage-admin/backups/20260921092314/frontend.tar.gz`.
-
-Verified deployment:
-
-- Release `20260920161403` used the default application-only mode; no local business data was imported.
-- The production database contains 49 tables and 59 successful Flyway records; the latest migration is `20260920.1`.
-- The two added tables belong to version reviews. All 46 pre-existing business tables retained exactly the same row counts across the deployment.
-- The repaired `V1.0.26` history entry uses checksum `-1182548249`; no other migration history row was changed.
-- Browser navigation and refresh preserve the `/manage-admin/` prefix.
-- The frontend, development-account API, backend health endpoint, service state, and Nginx configuration were verified after the switch.
-- Existing root and `/tongren/` routes remain unchanged.
-- Backup: `/opt/manage-admin/backups/20260920161403/`
+发布目录：/opt/sc-manager-frontend/releases/20261012T054650Z；备份：/opt/sc-manager-frontend/backups/20261012T054650Z。公共index与本地产物一致，入口JS及直接业务地址返回成功；全新浏览器验证产品、设计、研发、测试、缺陷默认各3条，售前和交付我负责的各6条、我创建的各4条。相关Mock测试23项通过。原数据库未写入，其他站点路由未改。
