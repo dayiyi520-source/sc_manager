@@ -22,10 +22,10 @@ describe('自主目标与历史承接规则',()=>{
   const live=approved.records[0];const changed=mutateOkrLifecycle(live.id,{viewerId:'employee',action:'save',version:live.version,payload:{...live.payload,title:'修改目标',changeReason:'范围调整'}},approved.records,people)!;
   expect(changed.records[0].status).toBe('active');expect(changed.records[0].payload.title).toBe('本月工作目标');expect(changed.records[0].changeRequest?.purpose).toBe('update');
  });
- it('lists all pending assigned KR and keeps a saved acceptance out of pending placeholders',()=>{
-  const all=goalsWithAssignments([company],people[1]);expect(all.filter(r=>r.payload.inherited)).toHaveLength(2);
+ it('preserves assigned references without generating subordinate drafts',()=>{
+  const all=goalsWithAssignments([company],people[1]);expect(all.filter(r=>r.payload.inherited)).toHaveLength(0);expect(assignedReferences(all,people[1])).toHaveLength(2);
   const ref=assignedReferences([company],people[1])[0];const accepted:OkrRecord={id:'saved',kind:'objective',ownerId:'manager',periodKey:'2026-09',status:'draft',version:0,payload:{...inheritedGoalPayload(ref,people[1]),inherited:false,title:'部门指标'}};
-  expect(goalsWithAssignments([company,accepted],people[1]).filter(r=>r.payload.inherited)).toHaveLength(1);
+  expect(goalsWithAssignments([company,accepted],people[1]).filter(r=>r.payload.inherited)).toHaveLength(0);
  });
  it('resolves actual September Chen to Mao assignments from legacy action records',()=>{
   const person=MOCK_OKR_PEOPLE.find(p=>p.name==='毛景强'&&p.id!=='user-product-member')!;

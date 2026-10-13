@@ -251,3 +251,11 @@
 .okr-execution-label { flex: 0 0 var(--company-space-xl); font-weight: 600; }
 .company-objective-form .okr-execution-fields .okr-execution-label { flex-basis: calc(var(--company-space-xl) + var(--company-space-md)); }
 .company-objective-form .okr-execution-fields { padding-block: var(--company-space-sm); border-top: 0; }
+
+.okr-kr-detail-table { grid-column: 1 / -1; min-width: 0; overflow-x: auto; margin-top: 8px; }
+.okr-kr-detail-table .ant-table { background: var(--bg-surface); }
+.okr-kr-detail-table .ant-select, .okr-kr-detail-table .ant-picker { width: 100%; min-width: 160px; }
+
+.company-execution-actions { display: grid; gap: 8px; padding-block: 8px; }
+.company-action-metrics { gap: 8px; }
+.company-objective-form .okr-personal-kr-details { margin-inline-start: var(--okr-result-indent); }

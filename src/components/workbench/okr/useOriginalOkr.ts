@@ -1,3 +1,4 @@
+import { canEditOkr } from '../../../services/okrSettingsPolicy';
 import { goalsWithAssignments, assignedReferences } from '../../../services/okrThreeLevelRules';
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -58,7 +59,7 @@ export function useOriginalOkr() {
     },
     retry:false,
   });
-  const people = (peopleQuery.data || []).map(person => ({ ...person, jobTitle: teamMembersQuery.data?.find(member => member.id === person.id)?.jobTitle || teamMembersQuery.data?.find(member => member.id === person.id)?.roleTitle || person.jobTitle }));
+  const people = (peopleQuery.data || []).map(person => ({ ...person, department: teamMembersQuery.data?.find(member => member.id === person.id)?.department || person.department, jobTitle: teamMembersQuery.data?.find(member => member.id === person.id)?.jobTitle || teamMembersQuery.data?.find(member => member.id === person.id)?.roleTitle || person.jobTitle }));
   const productLineOptions = (productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => line.name);
   const productLineVersionOptions = Object.fromEntries((productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => [line.name, (line.versions || []).map(version => String(version.code || version.name || '')).filter(Boolean)]));
   const projectOptions = (projectsQuery.data?.items || []).map(project => String(project.name || '')).filter(Boolean);
@@ -178,25 +179,33 @@ export function useOriginalOkr() {
   };
   const updateOkr = async (recordId: string, payload: OkrPayload, submit = false) => {
     const record = all.find(item => item.id === recordId && (item.kind === 'objective' || item.kind === 'action'));
-    if (!record || record.ownerId !== currentUser.id) { addToast('error', '目标记录不存在或无修改权限'); return false; }
+    if (!record || !canEditOkr(record, currentUser.id, settingsQuery.data, people)) { addToast('error', '目标记录不存在或无修改权限'); return false; }
     setBusy(true);
-    try { if (record.payload.inherited) await okrRepository.create('objective', record.periodKey, { ...payload, inherited: false }, submit, currentUser.id); else await okrRepository.update(record, submit ? 'submit' : 'save', { payload: { ...record.payload, ...payload } }, currentUser.id); await refresh(); addToast('success', submit ? (payload.origin === 'autonomous' ? '自主目标已提交上级审核' : '目标已提交') : record.status === 'draft' ? '目标草稿已保存' : (record.payload.goalLevel && record.payload.goalLevel !== 'company' ? '修改申请已提交上级审核，原计划继续生效' : '目标修改已保存')); return true; }
+    try {
+      const saved = record.payload.inherited
+        ? await okrRepository.create('objective', record.periodKey, { ...payload, inherited: false }, submit, currentUser.id)
+        : await okrRepository.update(record, submit ? 'submit' : 'save', { payload: { ...record.payload, ...payload } }, currentUser.id);
+      await refresh();
+      const pending = (saved as OkrRecord | undefined)?.changeRequest?.status === 'pending';
+      addToast('success', pending ? '目标申请已提交确认，原生效内容保持不变' : record.status === 'draft' && !submit ? '目标草稿已保存' : '目标已保存');
+      return true;
+    }
     catch(error) { addToast('error', error instanceof Error ? error.message : '目标保存失败'); return false; }
     finally { setBusy(false); }
   };
   const deleteOkr = async (recordId: string) => {
     const record = all.find(item => item.id === recordId && (item.kind === 'objective' || item.kind === 'action'));
-    if (!record || record.ownerId !== currentUser.id) { addToast('error', '目标不存在或无删除权限'); return false; }
+    if (!record || !canEditOkr(record, currentUser.id, settingsQuery.data, people)) { addToast('error', '目标不存在或无删除权限'); return false; }
     const ids = new Set(record.kind === 'action' ? legacyGoalActions(record, all).map(item => item.id) : [record.id]);
     if (all.some(item => !ids.has(item.id) && item.kind !== 'review' && (ids.has(item.payload.parentObjectiveId || '') || ids.has(item.payload.parentActionId || '') || item.payload.alignments?.some(alignment => ids.has(alignment.parentObjectiveId) || ids.has(alignment.parentKeyResultId || ''))))) { addToast('error', '目标已有下级对齐，不能直接删除'); return false; }
     setBusy(true);
-    try { await okrRepository.update(record, 'delete', {}, currentUser.id); await refresh(); addToast('success', '目标已删除'); return true; }
+    try { const saved = await okrRepository.update(record, 'delete', {}, currentUser.id); await refresh(); addToast('success', (saved as OkrRecord | undefined)?.changeRequest?.status === 'pending' ? '删除申请已提交确认，目标暂时保留' : '目标已删除'); return true; }
     catch (error) { addToast('error', error instanceof Error ? error.message : '删除失败，请重试'); return false; }
     finally { setBusy(false); }
   };
-  const saveSettings = async (settings: OkrSettings) => { setBusy(true); try { await okrRepository.saveSettings(settings); await client.invalidateQueries({queryKey:['okr','settings']}); addToast('success','OKR 配置已保存'); return true; } catch(error) { addToast('error',error instanceof Error ? error.message : '配置保存失败'); return false; } finally { setBusy(false); } };
-  return {records:all,okrs,reviewableOkrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending,
-    error:records.error || peopleQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
+  const saveSettings = async (settings: OkrSettings) => { setBusy(true); try { await okrRepository.saveSettings(settings, currentUser.id); await client.invalidateQueries({queryKey:['okr','settings']}); addToast('success','OKR 配置已保存'); return true; } catch(error) { addToast('error',error instanceof Error ? error.message : '配置保存失败'); return false; } finally { setBusy(false); } };
+  return {records:all,okrs,reviewableOkrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending || settingsQuery.isPending,
+    error:records.error || peopleQuery.error || settingsQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
     productLineOptions,productLineVersionOptions,projectOptions,projectProductOptions,opportunityOptions,businessOptionsLoading:productLinesQuery.isPending || projectsQuery.isPending || opportunitiesQuery.isPending,
     businessOptionsError:businessOptionsError instanceof Error ? businessOptionsError.message : businessOptionsError ? '业务数据加载失败' : undefined,
     actionParents:derivedActionParents,actionParentsLoading:actionParents.isPending,actionParentsError:actionParents.error,saveActions,

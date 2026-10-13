@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react';
+import { periodLabel } from '../../../services/okrPeriods';
+import { KrDetailTable } from './KrDetailTable';
+import { krDetails } from '../../../services/okrKrDetails';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Button, Drawer, Empty, Progress, Skeleton, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, HistoryIcon, PencilIcon, GitBranchIcon, GraphIcon, TrashIcon, XIcon } from '@primer/octicons-react';
@@ -8,7 +11,7 @@ import { buildGoalHierarchy, type GoalHierarchyNode } from './GoalHierarchyView'
 import { goalLevel } from '../../../services/okrGoalRules';
 import { buildMyTargetViewItems } from './MyTargetMonthSection';
 
-type Props = { record: OkrRecord; records: OkrRecord[]; people: OkrPerson[]; work: OkrWork[]; workLoading: boolean; workError: Error | null; onRetryWork: () => void; onClose: () => void; onEdit?: () => void; onDelete?: () => void; editDisabledReason?: string; deleteDisabledReason?: string; busy?: boolean };
+type Props = { record: OkrRecord; records: OkrRecord[]; people: OkrPerson[]; work: OkrWork[]; workLoading: boolean; workError: Error | null; onRetryWork: () => void; onClose: () => void; onEdit?: () => void; onDelete?: () => void; editDisabledReason?: string; deleteDisabledReason?: string; onProgress?: (recordId: string, itemId: string) => void; busy?: boolean; reviewFooter?: ReactNode };
 type ActionSection = 'tasks' | 'projects' | 'products' | 'alignments';
 const descendants = (node: GoalHierarchyNode): GoalHierarchyNode[] => [node, ...node.children.flatMap(descendants)];
 
@@ -45,12 +48,12 @@ export function actionGroupDetailRecord(record: OkrRecord, records: OkrRecord[],
   };
 }
 
-export function CompanyObjectiveDetail({ record: selectedRecord, records, people, work, workLoading, workError, onRetryWork, onClose, onEdit, onDelete, editDisabledReason, deleteDisabledReason, busy = false }: Props) {
+export function CompanyObjectiveDetail({ record: selectedRecord, records, people, work, workLoading, workError, onRetryWork, onClose, onEdit, onDelete, editDisabledReason, deleteDisabledReason, busy = false, reviewFooter, onProgress }: Props) {
   const ownPersonal = selectedRecord.payload.goalLevel === 'personal' && selectedRecord.payload.origin === 'autonomous';
   const resultLabel = ownPersonal ? 'A' : 'KR';
   const baseRecord = actionGroupDetailRecord(selectedRecord, records, people);
   const record: OkrRecord = ownPersonal ? { ...baseRecord, payload: { ...baseRecord.payload, keyResults: (baseRecord.payload.keyResults || []).flatMap(kr => (kr.executionActions || []).filter(action => action.ownerId === baseRecord.ownerId).map(action => ({ ...action, weight: action.weight ?? 0 }))) } } : baseRecord;
-  const detailRecords = selectedRecord.kind === 'action' || ownPersonal ? [...records.filter(item => item.id !== record.id), record] : records;
+  const detailRecords = [...records.filter(item => item.id !== record.id), record];
   const objective = buildGoalHierarchy(detailRecords, record.periodKey, record.ownerId, people).find(item => item.id === record.id);
   const target = buildMyTargetViewItems([record], [], records, people, record.ownerId)[0];
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -81,7 +84,7 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
     const ownerId = parentAction?.ownerId || parent?.ownerId;
     return title ? `${title}——来源于上级${ownerId ? name(ownerId) : '未知人员'}` : '上级动作已不可用';
   });
-  const source = sources.length ? [...new Set(sources)].join('、') : levelLabel === '公司级' ? `${dayjs(record.periodKey).format('YYYY年MM月')}目标` : null;
+  const source = sources.length ? [...new Set(sources)].join('、') : levelLabel === '公司级' ? `${periodLabel(record.periodKey)}目标` : null;
   return <Drawer open placement="bottom" size="calc(100dvh - 3rem)" rootClassName="company-objective-drawer company-objective-detail-drawer" closable={false} keyboard={!busy} maskClosable={!busy} extra={
     <div className="company-detail-header-actions" role="group" aria-label="目标操作">
       <Tooltip title={onEdit ? '修改' : editDisabledReason || '仅制定人可修改'}><span><Button type="text" aria-label="修改目标" disabled={busy || !onEdit} onClick={onEdit} icon={<PencilIcon/>}/></span></Tooltip>
@@ -90,9 +93,9 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
     </div>
   } title={
     <div className="company-detail-header">
-      <span className="company-detail-header-title">目标详情<span className="company-detail-header-period"> / {dayjs(record.periodKey).format('YYYY年MM月')}</span></span>
+      <span className="company-detail-header-title">目标详情<span className="company-detail-header-period"> / {periodLabel(record.periodKey)}</span></span>
     </div>
-  } onClose={onClose}>
+  } onClose={onClose} footer={reviewFooter}>
     <div className="company-detail-layout">
       <main className="company-detail-main" aria-label="目标与动作" tabIndex={0}>
         <section className={`company-detail-overview${challenge ? ' is-challenge' : ''}`}>
@@ -101,8 +104,7 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
           <div className="company-detail-summary"><div className="company-detail-progress"><Progress type="circle" percent={objective?.progress ?? 0} size="small" showInfo={false}/><span>{objective?.progress ?? 0}%</span></div><span className="company-detail-level">{levelLabel}</span><span className="company-detail-owner" aria-label={`制定人：${name(record.ownerId)}`}><PersonAvatar name={name(record.ownerId)}/>{name(record.ownerId)}</span><span className="company-detail-weight">目标权重:{record.payload.weight ?? 100}%</span></div>
           <div className="company-detail-assignees">{assignees.length ? assignees.map(name).join('、') : '未指定承接人员'}</div>
         </section>
-        {record.changeRequest && <Alert type={record.changeRequest.status === 'returned' ? 'warning' : 'info'} title={record.changeRequest.status === 'pending' ? record.changeRequest.purpose === 'initial' ? '自主目标待上级审核，尚未生效' : '修改待审核，原目标继续生效' : record.changeRequest.status === 'returned' ? `修改已退回：${record.changeRequest.feedback}` : '修改已审核生效'}/>}
-        {record.payload.goalModelVersion === 2 && <p>原计划截止：{record.payload.plannedDeadline || record.payload.deadline || '未设置'}　预计完成：{record.payload.forecastDeadline || '未设置'}　实际完成：{record.payload.actualCompletedAt || '未完成'}</p>}
+        {record.changeRequest && record.changeRequest.purpose !== 'initial' && <Alert type={record.changeRequest.status === 'returned' ? 'warning' : 'info'} title={record.changeRequest.status === 'pending' ? record.changeRequest.purpose === 'delete' ? '删除待审核，原目标继续生效' : '修改待审核，原目标继续生效' : record.changeRequest.status === 'returned' ? `修改已退回：${record.changeRequest.feedback}` : '修改已审核生效'}/>}
         {record.payload.note && <p className="company-detail-note">{record.payload.note}</p>}
         <div className="company-detail-divider" role="separator"/>
         {!objective?.children.length && <Empty description={ownPersonal ? '暂无 A 执行动作' : '暂无 KR 关键结果'}/>}
@@ -129,8 +131,9 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
               ));
               return <span key={id}>@{name(id)}{aligned && <Tooltip title="已对齐此动作"><span className="company-assignee-alignment" aria-label={`${name(id)}已对齐此动作`}><GitBranchIcon/></span></Tooltip>}</span>;
             }) : <span className="is-empty">未指定承接人员</span>}</div></div></div>
-            <div className="company-action-metrics"><div className="company-detail-progress" aria-label={`${resultLabel}${index + 1}进度：${action.progress}%`}><Progress type="circle" percent={action.progress} size="small" showInfo={false}/><span>{action.progress}%</span></div><span aria-label={`${resultLabel}${index + 1}权重：${action.weight}%`}><GraphIcon/>{action.weight}%</span><Tooltip title={action.deadline || '未设置截止日期'}><span aria-label={`${resultLabel}${index + 1}截止日期：${action.deadline || '未设置'}`}><CalendarIcon/>{action.deadline ? dayjs(action.deadline).format('MM-DD') : '未设置'}</span></Tooltip></div></div>
-            {record.payload.goalModelVersion === 2 && <div className="okr-own-actions"><p>原计划：{record.payload.keyResults?.find(kr => kr.id === action.referenceId)?.plannedDeadline || action.deadline || '未设置'}　预计完成：{record.payload.keyResults?.find(kr => kr.id === action.referenceId)?.forecastDeadline || '未设置'}　实际完成：{record.payload.keyResults?.find(kr => kr.id === action.referenceId)?.actualCompletedAt || '未完成'}</p>{(record.payload.keyResults?.find(kr => kr.id === action.referenceId)?.executionActions || []).filter(item => item.ownerId === record.ownerId).map((item, i) => <div key={item.id}>A{i + 1}　{item.title}<p>原计划：{item.plannedDeadline || item.deadline || '未设置'}　预计：{item.forecastDeadline || '未设置'}　实际完成：{item.actualCompletedAt || '未完成'}　进度：{item.progress}%</p>{item.delayReason && <p>延期原因：{item.delayReason}</p>}</div>)}</div>}
+            <div className="company-action-metrics"><Button type="text" onClick={() => onProgress?.(selectedRecord.id, action.referenceId)} className="company-detail-progress" aria-label={`${resultLabel}${index + 1}进度：${action.progress}%`}><Progress type="circle" percent={action.progress} size="small" showInfo={false}/><span>{action.progress}%</span></Button><span aria-label={`${resultLabel}${index + 1}权重：${action.weight}%`}><GraphIcon/>{action.weight}%</span><Tooltip title={action.deadline || '未设置截止日期'}><span aria-label={`${resultLabel}${index + 1}截止日期：${action.deadline || '未设置'}`}><CalendarIcon/>{action.deadline ? dayjs(action.deadline).format('MM-DD') : '未设置'}</span></Tooltip></div></div>
+            {(() => { const kr = record.payload.keyResults?.find(item => item.id === action.referenceId); return kr && ['product', 'delivery'].includes(kr.structureType || '') ? <KrDetailTable rows={krDetails(kr)} label={kr.structureType === 'product' ? '迭代版本' : '项目产品'}/> : null; })()}
+            <div className="company-execution-actions">{(record.payload.keyResults?.find(kr => kr.id === action.referenceId)?.executionActions || []).filter(item => item.ownerId === record.ownerId).map((item, i) => <div key={item.id} className="company-action-content"><div className="company-action-heading"><span className="company-action-number">A{i + 1}</span><div className="company-action-title"><h4>{item.title}</h4></div></div><div className="company-action-metrics"><Button type="text" onClick={() => onProgress?.(selectedRecord.id, item.id)} className="company-detail-progress" aria-label={`A${i + 1}进度：${item.progress}%`}><Progress type="circle" percent={item.progress} size="small" showInfo={false}/><span>{item.progress}%</span></Button><span aria-label={`A${i + 1}权重：${item.weight ?? 0}%`}><GraphIcon/>{item.weight ?? 0}%</span><span aria-label={`A${i + 1}截止日期：${item.deadline || '未设置'}`}><CalendarIcon/>{item.deadline ? dayjs(item.deadline).format('MM-DD') : '未设置'}</span></div></div>)}</div>
             <div className="company-action-tabs"><Button type="text" className="company-action-toggle" aria-label={`${resultLabel}${index + 1}${open ? '收起' : '展开'}关联内容`} aria-expanded={open} aria-controls={`company-action-panel-${action.id}`} icon={open ? <ChevronDownIcon/> : <ChevronRightIcon/>} onClick={() => { if (!activeSection) setSelectedSections(current => ({...current,[action.id]: 'tasks'})); setExpanded(current => ({...current,[action.id]: !current[action.id]})); }}/>{sections.map(section => <Button key={section.key} type="text" aria-label={`${resultLabel}${index + 1}${section.aria}`} aria-pressed={open && activeSection === section.key} className={open && activeSection === section.key ? 'is-active' : ''} onClick={() => selectSection(section.key)}>{section.label}（{section.count}）</Button>)}</div>
             {open && <div className="company-action-expanded" id={`company-action-panel-${action.id}`}>{activeSection === 'projects' || activeSection === 'products' ? (activeSection === 'projects' ? projects : products).length ? (activeSection === 'projects' ? projects : products).map(value => <div className="company-linked-row" key={value}>{value}</div>) : <p>{activeSection === 'projects' ? '暂无关联项目' : '暂无关联产品'}</p> : activeSection === 'alignments' ? alignmentRows.length ? alignmentRows.map(child => <div className="company-linked-row" key={child.id}><span>{child.title}</span><span>{child.ownerName} · {child.progress}%</span></div>) : <p>暂无下级对齐</p> : workLoading ? <Skeleton active paragraph={{rows: 2}}/> : workError ? <Alert type="error" title="关联任务加载失败" action={<Button onClick={onRetryWork}>重试</Button>}/> : tasks.length ? tasks.map(task => <div className="company-linked-row" key={task.id}><span>{task.title}</span><span>{task.ownerName || '未指定'} · {task.status}</span></div>) : <p>暂无可查看的关联任务</p>}</div>}
           </section>;

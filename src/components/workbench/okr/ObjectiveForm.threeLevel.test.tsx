@@ -1,13 +1,41 @@
 // @vitest-environment jsdom
 import React, { createRef } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ObjectiveForm, type ObjectiveFormHandle } from './ObjectiveForm';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
 const people: OkrPerson[] = [{ id: 'user-admin', name: '林志豪', department: '公司', supervisorId: null, rootFlag: 1, version: 0 },{ id: 'manager', name: '主管', jobTitle: '产品主管', department: '研发', supervisorId: 'user-admin', rootFlag: 0, version: 0 },{ id: 'employee', name: '员工', department: '研发', supervisorId: 'manager', rootFlag: 0, version: 0 }];
 const reference: OkrRecord = { id: 'kr', kind: 'action', ownerId: 'user-admin', periodKey: '2026-10', status: 'active', version: 1, payload: { title: '提高增长', deadline: '2026-10-31', assigneeIds: ['manager'], sourceObjectiveId: 'company', sourceKrId: 'kr', sourceVersion: 1, parentObjectiveId: 'company' } };
-const common = { cycle: '2026-10', people, busy: false, unavailable: false, parents: [], threeLevel: true, onCancel: vi.fn() };
+const templateSettings = {defaultView:'list' as const,timeRules:[],validation:{actionWeightTotal:100,maxActions:8,assigneeMultiple:true,keyNodeMultiple:true,resultRequired:true},dictionaries:{productNodes:[],deliveryNodes:[],presalesNodes:[],supportTypes:['客户成功']},templates:[{type:'product',department:'研发',departments:['研发'],fields:[],stages:['产品设计','UI设计','产品开发','测试验收','上线运维']}]};
+const common = { settings:templateSettings, cycle: '2026-10', people, busy: false, unavailable: false, parents: [], threeLevel: true, onCancel: vi.fn() };
 describe('三级目标沿用现有表单', () => {
+  it.each(['product', 'delivery'] as const)('adds a %s detail through multi-select and preserves the existing plan', type => {
+    const ref = createRef<ObjectiveFormHandle>();
+    render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} productLineOptions={['业务']} projectOptions={['业务']} productLineVersionOptions={{业务:['第一条','第二条']}} projectProductOptions={{业务:['第一条','第二条']}} initialPayload={{goalModelVersion:2,goalLevel:'department',title:'计划',keyResults:[{id:'k',title:'计划',structureType:type,businessObject:'业务',weight:100,progress:0,details:[{id:'one',name:'第一条',stage:'UI设计',plannedStartDate:'2026-10-01',plannedEndDate:'2026-10-10'}]}]}} onSave={vi.fn()}/>);
+    fireEvent.mouseDown(screen.getByLabelText(type === 'product' ? 'A1 版本' : 'A1 产品'));
+    fireEvent.click(screen.getByText('第二条',{selector:'.ant-select-item-option-content'}));
+    const krs = ref.current?.snapshot().keyResults;
+    expect(krs).toHaveLength(1);
+    expect(krs?.[0].details).toHaveLength(2);
+    expect(krs?.[0].details?.[0]).toMatchObject({id:'one',stage:'UI设计',plannedStartDate:'2026-10-01',plannedEndDate:'2026-10-10'});
+    expect(screen.getByLabelText('第二条 预计开始时间')).toBeInTheDocument();
+  });
+  it.each(['product', 'delivery'] as const)('edits independent %s detail stages without adding KRs and allows active detail dates', type => {
+    const ref = createRef<ObjectiveFormHandle>();
+    render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" planLocked alignmentActions={[reference]} initialPayload={{ goalModelVersion: 2, goalLevel: 'department', title: '交付计划', keyResults: [{ id: 'k', title: '计划', structureType: type, businessObject: '业务', weight: 100, progress: 0, details: [
+      { id: 'one', name: '第一条', stage: 'UI设计', plannedStartDate: '2026-10-01', plannedEndDate: '2026-10-10' },
+      { id: 'two', name: '第二条', stage: 'UI设计', plannedStartDate: '2026-10-11', plannedEndDate: '2026-10-25' },
+    ] }] }} onSave={vi.fn()}/>);
+    expect(screen.getByLabelText('第一条 预计开始时间')).not.toBeDisabled();
+    expect(screen.getByLabelText('第二条 预计完成时间')).not.toBeDisabled();
+    fireEvent.mouseDown(screen.getByLabelText(`第二条 ${type === 'product' ? '完成阶段' : '推进阶段'}`));
+    fireEvent.click(screen.getByText(type === 'product' ? '产品开发' : '上线交付', { selector: '.ant-select-item-option-content' }));
+    const krs = ref.current?.snapshot().keyResults;
+    expect(krs).toHaveLength(1);
+    expect(krs?.[0].weight).toBe(100);
+    expect(krs?.[0].details?.[0].stage).toBe('UI设计');
+    expect(krs?.[0].details?.[1].stage).toBe(type === 'product' ? '产品开发' : '上线交付');
+  });
   it('company still writes text KR and has no department template fields', () => {
     const ref = createRef<ObjectiveFormHandle>();
     render(<ObjectiveForm {...common} ownerId="user-admin" ownerName="林志豪" root ref={ref} onSave={vi.fn()}/>);
@@ -46,13 +74,14 @@ describe('三级目标沿用现有表单', () => {
     expect(row).toContainElement(screen.getByLabelText('本人A1权重'));
     expect(row).toContainElement(screen.getByLabelText('本人A1计划截止日期'));
   });
-  it('editing an active plan locks dates and requires a change reason', async () => {
-    const ref = createRef<ObjectiveFormHandle>(), save = vi.fn();
+  it('editing keeps KR deadline locked and delegates the modification application', async () => {
+    const ref = createRef<ObjectiveFormHandle>(), save = vi.fn().mockResolvedValue(true);
     render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" root={false} supervisor goalLevel="主管级" planLocked alignmentActions={[reference]} initialPayload={{goalModelVersion:2,goalLevel:'department',title:'部门指标',sourceObjectiveId:'company',sourceKrId:'kr',sourceVersion:1,deadline:'2026-10-25',keyResults:[{id:'k',title:'KR',structureType:'support',businessObject:'支持',action:'处理',result:'完成',weight:100,progress:0,deadline:'2026-10-25'}]}} onSave={save}/>);
     expect(screen.getByLabelText('KR1 截止日期')).toBeDisabled();
-    await act(async () => { expect(await ref.current?.submit()).toBe(false); });
-    expect(screen.getByText('请填写修改原因')).toBeInTheDocument();
-    expect(save).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('修改原因')).not.toBeInTheDocument();
+    expect(screen.queryByText('实际完成时间')).not.toBeInTheDocument();
+    await act(async () => { await ref.current?.submit(); });
+    expect(save).toHaveBeenCalled();
   });
   it('has no challenge type without an assigned source and blocks submission', async () => {
     const ref=createRef<ObjectiveFormHandle>(), save=vi.fn();
@@ -62,19 +91,28 @@ describe('三级目标沿用现有表单', () => {
     expect(ref.current?.snapshot().objectiveType).toBe('target');
     await act(async()=>{expect(await ref.current?.submit()).toBe(false);});expect(save).not.toHaveBeenCalled();
   });
-  it('renders configured KR field structures without a type selector', () => {
-    render(<ObjectiveForm {...common} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} initialPayload={{goalModelVersion:2,goalLevel:'department',title:'交付目标',keyResults:[{id:'one',title:'交付结果',weight:100,progress:0,structureType:'delivery',businessObject:'项目',version:'产品',stage:'交付'}]}} settings={{defaultView:'list',timeRules:[],validation:{actionWeightTotal:100,maxActions:8,assigneeMultiple:true,keyNodeMultiple:false,resultRequired:true},dictionaries:{productNodes:[],deliveryNodes:[],presalesNodes:[],supportTypes:['客户成功']},templates:[{type:'delivery',department:'交付',fields:[]},{type:'support',department:'支撑',fields:[]},{type:'product',department:'产研',fields:[]}]}} onSave={vi.fn()}/>);
-    expect(screen.getByLabelText('A1 项目')).toBeInTheDocument();
-    expect(screen.queryByLabelText('KR1业务类型')).not.toBeInTheDocument();
+  it('blocks new department KRs when only another department has a template', async () => {
+    const ref = createRef<ObjectiveFormHandle>(), save = vi.fn();
+    render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} settings={{...templateSettings, templates:[{type:'product',department:'其他部门',departments:['其他部门'],fields:[],stages:['开发']}]}} onSave={save}/>);
+    expect(screen.getByText('请先为当前部门配置 KR 模板')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name:'添加关键结果'})).toBeDisabled();
+    expect(screen.queryByLabelText('A1 产品')).not.toBeInTheDocument();
+    await act(async () => { expect(await ref.current?.submit()).toBe(false); });
+    expect(save).not.toHaveBeenCalled();
+  });
+  it('uses the department template for every new KR instead of cycling fixed types', () => {
+    const ref = createRef<ObjectiveFormHandle>();
+    render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} initialPayload={{goalModelVersion:2,goalLevel:'department',title:'支撑目标',keyResults:[{id:'one',title:'支撑结果',weight:100,progress:0,businessObject:'客户成功',action:'支持',result:'完成'}]}} settings={{...templateSettings,templates:[{type:'support',department:'研发',departments:['研发'],fields:[],types:['客户成功']},{type:'product',department:'其他部门',departments:['其他部门'],fields:[],stages:['开发']}]}} onSave={vi.fn()}/>);
     fireEvent.click(screen.getByRole('button',{name:'添加关键结果'}));
     expect(screen.getByLabelText('A2 动作')).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText('A2 类型'));
-    fireEvent.click(screen.getByText('客户成功',{selector:'.ant-select-item-option-content'}));
+    fireEvent.click(screen.getAllByText('客户成功',{selector:'.ant-select-item-option-content'})[0]);
     fireEvent.change(screen.getByLabelText('A2 动作'),{target:{value:'支持'}});
     fireEvent.change(screen.getByLabelText('A2 结果'),{target:{value:'完成'}});
     fireEvent.click(screen.getByRole('button',{name:'添加关键结果'}));
-    expect(screen.getByLabelText('A3 版本')).toBeInTheDocument();
-    expect(screen.queryByLabelText('A3 商机')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('A3 动作')).toBeInTheDocument();
+    expect(screen.queryByLabelText('A3 版本')).not.toBeInTheDocument();
+    expect(ref.current?.snapshot().keyResults?.map(kr=>kr.structureType)).toEqual(['support','support','support']);
   });
 
   it('employee autonomous mode allows a short O and only own A without KR inputs', async()=>{
@@ -103,9 +141,10 @@ describe('三级目标沿用现有表单', () => {
     expect(screen.queryByText('本人本月执行动作')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('本人A1进度')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'添加本人动作'}));
-    expect(screen.getByText('请先填写当前已添加的O/KR/A的内容后再继续')).toBeInTheDocument();
+    expect(screen.getByText('请先填写当前已有的O/KRA的内容后再继续')).toBeInTheDocument();
     expect(ref.current?.snapshot().keyResults![0].executionActions).toHaveLength(1);
     fireEvent.change(screen.getByLabelText('本人A1内容'),{target:{value:'设计方案'}});
+    expect(screen.queryByText('请先填写当前已有的O/KRA的内容后再继续')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'添加本人动作'}));
     expect(ref.current?.snapshot().keyResults![0].executionActions).toHaveLength(2);
     fireEvent.click(screen.getByRole('button',{name:'添加关键结果'}));
@@ -131,4 +170,28 @@ describe('三级目标沿用现有表单', () => {
     expect(ref.current?.snapshot().keyResults![0].executionActions![0]).toMatchObject({title:'更新动作',progress:65});
   });
 
+});
+
+it('inherits the source deadline and disables later KR and action calendar dates', async () => {
+  const ref = createRef<ObjectiveFormHandle>();
+  const source = {...reference,payload:{...reference.payload,deadline:'2026-10-20'}};
+  render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[source]} initialPayload={{goalModelVersion:2,goalLevel:'department',title:'部门计划',sourceKrId:'kr',keyResults:[{id:'k',title:'结果',structureType:'support',weight:100,progress:0,assigneeIds:['manager'],executionActions:[{id:'a',ownerId:'manager',title:'动作',progress:0,deadline:'2026-10-15'}]}]}} onSave={vi.fn()}/>);
+  expect(ref.current?.snapshot().deadline).toBe('2026-10-20');
+  expect(ref.current?.snapshot().keyResults?.[0].deadline).toBe('2026-10-20');
+  fireEvent.click(screen.getByLabelText('KR1 截止日期'));
+  fireEvent.focus(screen.getByLabelText('KR1 截止日期'));
+  await waitFor(() => expect(document.querySelector('td[title="2026-10-21"]')).toHaveClass('ant-picker-cell-disabled'));
+  expect(document.querySelector('td[title="2026-10-20"]')).not.toHaveClass('ant-picker-cell-disabled');
+  fireEvent.keyDown(screen.getByLabelText('KR1 截止日期'),{key:'Escape',code:'Escape'});
+  fireEvent.click(screen.getByLabelText('本人A1计划截止日期'));
+  fireEvent.focus(screen.getByLabelText('本人A1计划截止日期'));
+  const visibleDates = [...document.querySelectorAll('td[title="2026-10-21"]')];
+  expect(visibleDates.length).toBeGreaterThan(0);
+  visibleDates.forEach(date => expect(date).toHaveClass('ant-picker-cell-disabled'));
+});
+it('distributes three KR weights as five-percent increments', () => {
+  const ref = createRef<ObjectiveFormHandle>();
+  render(<ObjectiveForm {...common} ref={ref} ownerId="user-admin" ownerName="老板" root initialPayload={{title:'目标',keyResults:[{id:'a',title:'第一条',weight:50,progress:0},{id:'b',title:'第二条',weight:50,progress:0}]}} onSave={vi.fn()}/>);
+  fireEvent.click(screen.getByRole('button',{name:'添加关键结果'}));
+  expect(ref.current?.snapshot().keyResults?.map(kr => kr.weight)).toEqual([35,35,30]);
 });

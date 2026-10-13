@@ -3,8 +3,9 @@ import { apiRequest } from './apiClient';
 export interface OkrPerson { id: string; name: string; department: string; jobTitle?: string; supervisorId: string | null; rootFlag: number; version: number }
 export interface GoalTiming { deadline?: string; plannedDeadline?: string; forecastDeadline?: string; actualStartedAt?: string; actualCompletedAt?: string; delayReason?: string; delayResponsibility?: 'self' | 'dependency' | 'company'; }
 export interface OkrExecutionAction extends GoalTiming { weight?: number; id: string; title: string; ownerId: string; progress: number; }
-export interface OkrGoalChange { id: string; status: 'pending' | 'approved' | 'returned'; purpose?: 'initial' | 'update' | 'alignment'; reason: string; reviewerId: string; payload: OkrPayload; baseVersion: number; requestedAt: string; feedback?: string; reviewedAt?: string; }
-export interface OkrKr extends GoalTiming { structureType?: 'product' | 'delivery' | 'support'; executionActions?: OkrExecutionAction[]; confidence?: number; currentValue?: number; targetValue?: number; id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[]; businessObject?: string; version?: string; stage?: string; action?: string; result?: string }
+export interface OkrGoalChange { id: string; status: 'pending' | 'approved' | 'returned'; purpose?: 'initial' | 'update' | 'alignment' | 'delete'; reason: string; reviewerId: string; payload: OkrPayload; baseVersion: number; requestedAt: string; feedback?: string; reviewedAt?: string; }
+export interface OkrKrDetail { id: string; name: string; stage?: string; plannedStartDate?: string; plannedEndDate?: string; }
+export interface OkrKr extends GoalTiming { details?: OkrKrDetail[]; structureType?: 'product' | 'delivery' | 'support'; executionActions?: OkrExecutionAction[]; confidence?: number; currentValue?: number; targetValue?: number; id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[]; businessObject?: string; version?: string; stage?: string; action?: string; result?: string }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
 export interface OkrReviewItem { workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
 export interface OkrKrReview { objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
@@ -47,7 +48,8 @@ export interface OkrActionPayload {
   /** Sum of the sibling actions in this lower-level breakdown. */
   breakdownWeightTotal?: number;
 }
-export interface OkrRecord { id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; submittedAt?: string; changeRequest?: OkrGoalChange; changeHistory?: OkrGoalChange[]; payload: OkrPayload & Partial<OkrActionPayload> }
+export interface OkrProgressEntry { id: string; itemId: string; operatorId: string; createdAt: string; previousProgress: number; progress: number; status: 'normal' | 'risk' | 'overdue' | 'ahead'; note: string; attachments: Array<{ name: string; data: string }> }
+export interface OkrRecord { progressHistory?: OkrProgressEntry[]; id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; submittedAt?: string; changeRequest?: OkrGoalChange; changeHistory?: OkrGoalChange[]; payload: OkrPayload & Partial<OkrActionPayload> }
 export interface OkrWork {
   productLineId?: string; productLineName?: string; versionId?: string; versionName?: string;
   assigneeId?: string; creatorId?: string; participantIds?: string[]; participantNames?: string[];
@@ -61,13 +63,16 @@ export type OkrTimeRule = {
   shortMonthRule?: 'clamp' | 'reject';
   allowBackfill?: boolean;
 };
-export type OkrTemplate = { department: string; type: string; fields: string[] };
-export interface OkrSettings { version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
+export type OkrTemplate = { department: string; departments?: string[]; type: string; fields: string[]; stages?: string[]; types?: string[] };
+export type OkrCycleType = 'month' | 'quarter' | 'halfYear' | 'year';
+export interface OkrCycleSettings { automatic: boolean; types: OkrCycleType[]; schedules: Record<OkrCycleType, { daysBefore: number; time: string }>; crossAlignment: boolean; periods: string[] }
+export interface OkrConfirmationSettings { enabled: boolean; visiblePending: boolean; actions: ('create' | 'update' | 'delete')[]; types: ('target' | 'challenge')[]; missingSupervisor: 'auto' | 'upper' | 'admin'; selfSupervisor: 'auto' | 'upper'; exemptIds: string[]; companyEditorIds: string[] }
+export interface OkrSettings { cycles?: OkrCycleSettings; administratorIds?: string[]; confirmation?: OkrConfirmationSettings; version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
 const base = '/api/okr';
 export const okrRepository = {
   people: () => apiRequest<OkrPerson[]>(`${base}/people`),
   settings: () => apiRequest<OkrSettings>(`${base}/settings`),
-  saveSettings: (settings: OkrSettings) => apiRequest<OkrSettings>(`${base}/settings`, {method:'PUT', body: JSON.stringify(settings)}),
+  saveSettings: (settings: OkrSettings, viewerId?: string) => apiRequest<OkrSettings>(`${base}/settings`, {method:'PUT', body: JSON.stringify({...settings, viewerId})}),
   records: async (viewerId?: string): Promise<OkrRecord[]> => {
     const query = viewerId ? `?viewerId=${encodeURIComponent(viewerId)}` : '';
     const rows = await apiRequest<Array<Omit<OkrRecord,'payload'> & {payload: string | OkrPayload}>>(`${base}/records${query}`);

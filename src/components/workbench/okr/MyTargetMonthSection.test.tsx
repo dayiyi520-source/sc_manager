@@ -40,6 +40,38 @@ const targets: MyTargetViewItem[] = [
 ];
 
 describe('MyTargetMonthSection', () => {
+  it('opens progress without opening detail and excludes drafts from weighted period progress', () => {
+    const open = vi.fn(), progress = vi.fn();
+    render(<MyTargetMonthSection periodKey="2026-10" targets={[
+      {...targets[1], objectiveWeight:20, progress:25},
+      {...targets[1], id:'second', objectiveWeight:80, progress:75, actions:[]},
+      {...targets[0], objectiveWeight:100, progress:100},
+      {...targets[1], id:'initial', initialPending:true, progress:100, actions:[]},
+    ]} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={open} onProgress={progress}/>);
+    expect(screen.getByLabelText('本周期整体进度：65%')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'查看A1进度'}));
+    expect(progress).toHaveBeenCalledWith('active-target','active-action');
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it.each(['list','card'] as const)('pending %s only offers withdrawal and shows A metrics', async viewMode => {
+    const onDelete=vi.fn(),onOpen=vi.fn();
+    const target={...targets[0],awaitingApproval:true,editable:false,deletable:true,actions:[{...targets[0].actions[0],executionActions:[{id:'a',title:'设计动作',weight:60,progress:25,deadline:'2026-10-20'}]}]};
+    render(<MyTargetMonthSection periodKey="2026-10" targets={[target]} viewMode={viewMode} collapsed={false} onToggle={vi.fn()} onOpenTarget={onOpen} onDeleteTarget={onDelete}/>);
+    expect(screen.queryByLabelText(`编辑目标：${target.title}`)).not.toBeInTheDocument();
+    if (viewMode === 'list') {
+      expect(screen.getByText('60%')).toBeInTheDocument();
+      expect(screen.getByText('10-20')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText('设计动作')).not.toBeInTheDocument();
+      expect(screen.queryByText('10-20')).not.toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByLabelText(`更多操作：${target.title}`));
+    fireEvent.click(await screen.findByRole('menuitem',{name:'撤回'}));
+    expect(onDelete).toHaveBeenCalledWith(target.id);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('excludes the current owner and displays lower record owners rather than assigned managers', () => {
     const people: OkrPerson[] = [
       {id:'manager',name:'陈宇璋',jobTitle:'产品主管',department:'产品部',rootFlag:0,supervisorId:'boss',version:1},

@@ -1,3 +1,4 @@
+import { krDetailContentComplete, krDetailsError, krDetails } from './okrKrDetails';
 import { goalLevel } from './okrGoalRules';
 import type { OkrKr, OkrPayload, OkrPerson, OkrRecord, GoalTiming } from './okrRepository';
 
@@ -34,14 +35,8 @@ export function inheritedGoalPayload(reference: OkrRecord, person: OkrPerson): O
     keyResults: personal ? [{ ...(reference.payload.sourceKrData || reference.payload), id: reference.id, title: reference.payload.title, weight: 100, progress: 0, version: reference.payload.sourceKrData?.version, assigneeIds: [person.id], executionActions: [] } as OkrKr] : [],
   };
 }
-export function goalsWithAssignments(records: OkrRecord[], person?: OkrPerson): OkrRecord[] {
-  if (!person || goalLevel(person) === '公司级') return records;
-  const references = assignedReferences(records, person);
-  const pending = references.filter(reference => !records.some(record => (record.kind === 'objective' || record.kind === 'action') && record.status !== 'deleted' && record.ownerId === person.id && record.periodKey === reference.periodKey && ((record.changeRequest?.status === 'pending' && record.changeRequest.payload.sourceKrId === reference.id) || record.payload.sourceKrId === reference.id || record.payload.parentActionId === reference.id || record.payload.parentKeyResultId === reference.id || record.payload.alignments?.some(alignment => alignment.parentKeyResultId === reference.id)))).map(reference => ({
-    id: `inherited:${person.id}:${reference.periodKey}:${reference.id}`, kind: 'objective' as const, ownerId: person.id, periodKey: reference.periodKey, status: 'draft', version: 0,
-    payload: { ...inheritedGoalPayload(reference, person), title: reference.payload.title },
-  }));
-  return [...records, ...pending];
+export function goalsWithAssignments(records: OkrRecord[], _person?: OkrPerson): OkrRecord[] {
+  return records;
 }
 export function timingError(timing: GoalTiming): string | undefined {
   const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
@@ -61,16 +56,18 @@ export function validateThreeLevelGoal(payload: OkrPayload, ownerId: string): st
   if (!payload.keyResults?.length) return '请至少填写一条关键结果';
   if (payload.goalLevel !== 'company' && payload.origin !== 'autonomous' && (!payload.sourceObjectiveId || !payload.sourceKrId)) return '请先承接指派给本人的关键结果';
   if (payload.keyResults.reduce((sum, kr) => sum + kr.weight, 0) !== 100) return 'KR 权重合计须为 100%';
+  if (!payload.keyResults.some(kr => kr.weight > 20)) return '至少一条 KR 权重须大于 20%';
   for (const kr of payload.keyResults) {
     if (!Number.isInteger(kr.progress) || kr.progress < 0 || kr.progress > 100) return 'KR 进度须为 0–100 的整数';
     if (!kr.title?.trim()) return '请填写每条关键结果名称';
-    if (!Number.isInteger(kr.weight) || kr.weight < 1 || kr.weight > 100) return 'KR 权重须为 1–100 的整数';
+    if (!Number.isInteger(kr.weight) || kr.weight < 5 || kr.weight > 100 || kr.weight % 5 !== 0) return 'KR 权重须为 5% 的倍数';
     if (payload.deadline && kr.deadline && kr.deadline > payload.deadline) return 'KR 计划截止日期不能超过目标原计划';
     if (!kr.deadline) return '请设置每条 KR 的计划截止日期';
     if (payload.goalLevel === 'department') {
       if (!['product', 'delivery', 'support'].includes(kr.structureType || '')) return '请选择 KR 业务类型';
-      if (!kr.businessObject || (kr.structureType === 'support' ? !kr.action || !kr.result : !kr.version || !kr.stage)) return '请填写完整 KR 业务字段';
+      if (!kr.businessObject || (kr.structureType === 'support' ? !kr.action || !kr.result : !krDetailContentComplete(kr))) return '请填写完整 KR 业务字段';
     }
+    const detailError = krDetailsError(kr); if (detailError) return detailError;
     if (payload.goalLevel === 'personal' && !kr.executionActions?.length) return '请填写本人本月执行的 A 动作';
     if ((kr.executionActions || []).length > 20) return '每条 KR 最多填写 20 条本人动作';
     if (new Set((kr.executionActions || []).map(action => action.id)).size !== (kr.executionActions || []).length) return '本人动作编号不能重复';
@@ -96,6 +93,6 @@ export function planChanged(before: OkrPayload, after: OkrPayload): boolean {
   if (before.deadline !== after.deadline) return true;
   return (before.keyResults || []).some(kr => {
     const next = after.keyResults?.find(item => item.id === kr.id);
-    return !!next && (next.deadline !== kr.deadline || (kr.executionActions || []).some(action => { const changed = next.executionActions?.find(item => item.id === action.id); return !!changed && changed.deadline !== action.deadline; }));
+    return !!next && (next.deadline !== kr.deadline || krDetails(kr).some(row => { const changed = krDetails(next).find(item => item.id === row.id); return !!changed && (Boolean(row.plannedStartDate) && changed.plannedStartDate !== row.plannedStartDate || Boolean(row.plannedEndDate) && changed.plannedEndDate !== row.plannedEndDate); }) || (kr.executionActions || []).some(action => { const changed = next.executionActions?.find(item => item.id === action.id); return !!changed && changed.deadline !== action.deadline; }));
   });
 }
