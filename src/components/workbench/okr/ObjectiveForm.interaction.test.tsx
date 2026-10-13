@@ -11,8 +11,7 @@ describe('ObjectiveForm A dragging', () => {
     fireEvent.change(screen.getByLabelText('目标名称'),{target:{value:'完整目标'}});
     fireEvent.click(screen.getByRole('button', { name: '添加关键结果' }));
     fireEvent.change(screen.getByLabelText('A2 名称'), { target: { value: '第二条' } });
-    const firstRow = screen.getByLabelText('拖动 A1');
-    const secondRow = screen.getByLabelText('拖动 A2');
+    const [firstRow, secondRow] = screen.getAllByLabelText('拖动 KR');
     const dataTransfer = { setData: vi.fn(), getData: vi.fn(() => '0'), setDragImage: vi.fn(), effectAllowed: 'none' };
 
     fireEvent.pointerDown(screen.getByLabelText('A1 名称'));
@@ -113,7 +112,6 @@ describe('ObjectiveForm submission requirements', () => {
   it.each([
     { title: '   ', actionTitle: '动作', deadline: '2026-09-30', weight: 100 },
     { title: '目标', actionTitle: '   ', deadline: '2026-09-30', weight: 100 },
-    { title: '目标', actionTitle: '动作', deadline: undefined, weight: 100 },
     { title: '目标', actionTitle: '动作', deadline: '2026-02-30', weight: 100 },
     { title: '目标', actionTitle: '动作', deadline: '2026-09-30', weight: 0 },
     { title: '目标', actionTitle: '动作', deadline: '2026-09-30', weight: 99.5 },
@@ -124,6 +122,15 @@ describe('ObjectiveForm submission requirements', () => {
     await act(async () => expect(await ref.current?.submit()).toBe(false));
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('defaults a new KR deadline to the selected cycle end', async () => {
+    const ref = createRef<ObjectiveFormHandle>();
+    const onSave = vi.fn(async () => true);
+    render(<ObjectiveForm ref={ref} cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={onSave} initialPayload={{ title: '目标', keyResults: [{ id: 'a1', title: '动作', weight: 100, progress: 0 }] }} />);
+    expect(ref.current?.snapshot().keyResults?.[0].deadline).toBe('2026-09-30');
+    await act(async () => expect(await ref.current?.submit()).toBe(true));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ deadline: '2026-09-30' }));
   });
 
   it('defaults appended company objectives to TO and preserves independent O weight on submission', async () => {

@@ -14,11 +14,10 @@ import {
   PanelLeftOpen,
   Target,
   User,
-  Users,
 } from '@/components/common/octicons-compat';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
 
-export type OkrScopeKey = 'my' | 'supervisor' | 'subordinate' | 'department' | 'otherDepartments' | 'confirmation';
+export type OkrScopeKey = 'my' | 'department' | 'company' | 'otherDepartments' | 'confirmation';
 
 export type OkrScopeSelection = {
   scope: OkrScopeKey;
@@ -36,9 +35,8 @@ export type OkrScopeGroup = {
 
 const groupMeta: Array<Pick<OkrScopeGroup, 'key' | 'label' | 'icon'>> = [
   { key: 'my', label: '我的目标', icon: <Target /> },
-  { key: 'supervisor', label: '直属上级', icon: <User /> },
-  { key: 'subordinate', label: '直属下级', icon: <Users /> },
-  { key: 'department', label: '我部门的', icon: <Building /> },
+  { key: 'department', label: '部门目标', icon: <Building /> },
+  { key: 'company', label: '公司目标', icon: <Building /> },
   { key: 'otherDepartments', label: '其他部门', icon: <Building /> },
 ];
 
@@ -51,9 +49,8 @@ export function buildOkrScopeGroups(people: OkrPerson[], currentUserId: string):
   }));
   const membersByScope: Record<OkrScopeKey, OkrPerson[]> = {
     my: [],
-    supervisor: current?.supervisorId ? people.filter(person => person.id === current.supervisorId) : [],
-    subordinate: people.filter(person => person.supervisorId === currentUserId),
-    department: current ? people.filter(person => person.id !== currentUserId && person.department === current.department) : [],
+    department: [],
+    company: [],
     otherDepartments: otherDepartmentPeople,
     confirmation: confirmationMembers(people, currentUserId),
   };

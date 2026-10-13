@@ -1,4 +1,4 @@
-import { periodBounds, periodLabel, periodKeyFor, defaultCycles } from '../../../services/okrPeriods';
+import { periodBounds, periodLabel } from '../../../services/okrPeriods';
 import dayjs from 'dayjs';
 import type { OkrRecord, OkrSettings } from '../../../services/okrRepository';
 
@@ -29,16 +29,13 @@ export function periodMonths(records: OkrRecord[], status: OkrPeriodStatus, curr
   return Array.from(new Set(records.map(recordMonth).filter((month): month is string => Boolean(month && /^\d{4}-\d{2}$/.test(month) && month < current)))).sort().reverse();
 }
 
-export function cycleOptions(records: OkrRecord[], ownerId: string, current = dayjs().format('YYYY-MM'), settings?: OkrSettings) {
-  const months = new Set(Array.from({ length: 12 }, (_, index) => dayjs(current).subtract(index, 'month').format('YYYY-MM')));
-  const cycles = settings?.cycles || defaultCycles();
-  cycles.periods.forEach(key=>months.add(key));
-  cycles.types.forEach(type=>{ months.add(periodKeyFor(type,dayjs(`${current}-01`))); });
-  records.forEach(record => {
-    const month = recordMonth(record);
-    if (month && periodBounds(month)) months.add(month);
-  });
-  months.add(dayjs(`${current}-01`).add(1, 'month').format('YYYY-MM'));
+export function cycleOptions(_records: OkrRecord[], _ownerId: string, current = dayjs().format('YYYY-MM'), _settings?: OkrSettings) {
+  // 目标只允许当前月、下个月和已结束的最近六个月，避免周期配置把历史数据无限展开。
+  const months = new Set([
+    current,
+    dayjs(`${current}-01`).add(1, 'month').format('YYYY-MM'),
+    ...Array.from({ length: 6 }, (_, index) => dayjs(`${current}-01`).subtract(index + 1, 'month').format('YYYY-MM')),
+  ]);
 
   return periodStatusOptions().map(option => ({
     label: option.label,

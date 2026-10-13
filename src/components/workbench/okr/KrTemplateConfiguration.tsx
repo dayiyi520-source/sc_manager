@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Button, Input, Select, Space } from 'antd';
 import type { OkrSettings, OkrTemplate } from '../../../services/okrRepository';
 import { templateDepartments, templateValues } from '../../../services/okrTemplates';
-export const KR_TEMPLATE_LABELS: Record<string,string> = { product:'产研模板',delivery:'交付模板',support:'通用模板' };
+export const KR_TEMPLATE_LABELS: Record<string,string> = { product:'产研KR',delivery:'交付KR',support:'通用KR' };
 export function groupKrTemplates(templates: OkrTemplate[]) {
   const groups: Array<{ departments: string[]; templates: OkrTemplate[] }> = [];
   for (const template of templates) {
@@ -28,12 +28,13 @@ export function KrTemplateConfiguration({settings,departments,busy,onChange}:{se
         update(index,{...group,templates});
       }}/><Button danger disabled={busy} onClick={()=>onChange(groups.flatMap((item,i)=>i===index?[]:item.templates))}>移除配置</Button></div>
       <div className="okr-kr-config-values">{group.templates.filter(template=>template.type).map((template,typeIndex)=>{
-        const label=selected.length===1?'KR模板'+(index+1)+(template.type==='support'?'类型':'阶段'):'KR模板'+(index+1)+KR_TEMPLATE_LABELS[template.type]+(template.type==='support'?'类型':'阶段');
-        return <label key={template.type+':'+typeIndex}><span>{KR_TEMPLATE_LABELS[template.type]} · {template.type==='support'?'可选类型':template.type==='delivery'?'推进阶段':'完成阶段'} <span className="okr-required-marker">*</span></span><Input aria-label={label} value={templateValues(template,settings).join(',')} disabled={busy} placeholder="多个值使用英文逗号隔开" onChange={event=>{
-          const values=event.target.value.split(',');const replacement={...template,...(template.type==='support'?{types:values}:{stages:values})};
+        if (template.type === 'support') return null;
+        const label='KR模板'+(index+1)+KR_TEMPLATE_LABELS[template.type]+'阶段';
+        return <label key={template.type+':'+typeIndex}><span>{KR_TEMPLATE_LABELS[template.type]} · {template.type==='delivery'?'推进阶段':'完成阶段'} <span className="okr-required-marker">*</span></span><Input aria-label={label} value={templateValues(template,settings).join(',')} disabled={busy} placeholder="多个值使用英文逗号隔开" onChange={event=>{
+          const values=event.target.value.split(',');const replacement={...template,stages:values};
           update(index,{...group,templates:group.templates.map(item=>item===template?replacement:item)});
         }}/></label>;
-      })}</div><small>模板支持多选；每种模板的阶段或类型独立保存。</small>
+      })}</div><small>模板支持多选；产研KR和交付KR的阶段独立保存。</small>
     </section>;
   })}<Button disabled={busy} onClick={()=>onChange([...settings.templates,{department:'',departments:[],type:'',fields:[]}])}>添加 KR 模板配置</Button></Space>;
 }

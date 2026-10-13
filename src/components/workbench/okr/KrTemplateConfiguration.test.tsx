@@ -5,16 +5,16 @@ describe('grouped KR configuration',()=>{
  it('shows one department row with multiple types and retains edited values after saving and reopening',async()=>{
  const save=vi.fn(async(_settings:OkrSettings)=>true);const view=render(<OkrSettingsView settings={settings} departments={['产品规划部']} onSave={save}/>);
  expect(screen.getAllByRole('combobox',{name:/KR模板.*模板/})).toHaveLength(1);
- expect(screen.getByLabelText('KR模板1产研模板阶段')).toHaveValue('设计,开发');expect(screen.getByLabelText('KR模板1交付模板阶段')).toHaveValue('实施,验收');expect(screen.getByLabelText('KR模板1通用模板类型')).toHaveValue('内部支持');
- fireEvent.change(screen.getByLabelText('KR模板1产研模板阶段'),{target:{value:'方案, 研发,'}});fireEvent.change(screen.getByLabelText('KR模板1交付模板阶段'),{target:{value:'立项, 交付'}});fireEvent.change(screen.getByLabelText('KR模板1通用模板类型'),{target:{value:'客户支持,部门协作'}});
+ expect(screen.getByLabelText('KR模板1产研KR阶段')).toHaveValue('设计,开发');expect(screen.getByLabelText('KR模板1交付KR阶段')).toHaveValue('实施,验收');expect(screen.queryByLabelText('KR模板1通用KR阶段')).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('KR模板1产研KR阶段'),{target:{value:'方案, 研发,'}});fireEvent.change(screen.getByLabelText('KR模板1交付KR阶段'),{target:{value:'立项, 交付'}});
  await act(async()=>fireEvent.click(screen.getByRole('button',{name:'保存配置'})));expect(save).toHaveBeenCalledOnce();const saved=save.mock.calls[0][0];
- view.unmount();render(<OkrSettingsView settings={saved} departments={['产品规划部']} onSave={save}/>);expect(screen.getByLabelText('KR模板1产研模板阶段')).toHaveValue('方案,研发');expect(screen.getByLabelText('KR模板1交付模板阶段')).toHaveValue('立项,交付');expect(screen.getByLabelText('KR模板1通用模板类型')).toHaveValue('客户支持,部门协作');
+ view.unmount();render(<OkrSettingsView settings={saved} departments={['产品规划部']} onSave={save}/>);expect(screen.getByLabelText('KR模板1产研KR阶段')).toHaveValue('方案,研发');expect(screen.getByLabelText('KR模板1交付KR阶段')).toHaveValue('立项,交付');expect(screen.queryByLabelText('KR模板1通用KR阶段')).not.toBeInTheDocument();
  });
  it('multi-selects another type without adding a department configuration and preserves a toggled-off type',()=>{
  const view=render(<OkrSettingsView settings={{...settings,templates:[settings.templates[0]]}} departments={['产品规划部']} onSave={vi.fn()}/>);
- fireEvent.mouseDown(screen.getByLabelText('KR模板1模板'));fireEvent.click(screen.getByText('通用模板',{selector:'.ant-select-item-option-content'}));
- expect(screen.getAllByLabelText(/部门KR配置/)).toHaveLength(1);fireEvent.change(screen.getByLabelText('KR模板1通用模板类型'),{target:{value:'内部支持'}});
- fireEvent.click(screen.getByText('通用模板',{selector:'.ant-select-item-option-content'}));fireEvent.click(screen.getByText('通用模板',{selector:'.ant-select-item-option-content'}));expect(screen.getByLabelText('KR模板1通用模板类型')).toHaveValue('内部支持');
+ fireEvent.mouseDown(screen.getByLabelText('KR模板1模板'));fireEvent.click(screen.getByText('通用KR',{selector:'.ant-select-item-option-content'}));
+ expect(screen.getAllByLabelText(/部门KR配置/)).toHaveLength(1);expect(screen.queryByLabelText('KR模板1通用KR阶段')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByText('通用KR',{selector:'.ant-select-item-option-content'}));fireEvent.click(screen.getByText('通用KR',{selector:'.ant-select-item-option-content'}));
  });
  it('shows the department goal template catalog and opens the local editor',()=>{
  const save=vi.fn();render(<OkrSettingsView settings={settings} departments={['产品规划部']} onSave={save}/>);fireEvent.click(screen.getByRole('button',{name:'部门目标模板'}));

@@ -190,9 +190,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     if (scopeSelection.personId) return person.id === scopeSelection.personId;
     if (scopeSelection.department) return departmentName(person.department) === departmentName(scopeSelection.department);
     if (selectedScopeGroup === 'my') return person.id === currentUser.id;
-    if (selectedScopeGroup === 'supervisor') return person.id === me?.supervisorId;
-    if (selectedScopeGroup === 'subordinate') return person.supervisorId === currentUser.id;
     if (selectedScopeGroup === 'department') return departmentName(person.department) === departmentName(me?.department || currentUser.department);
+    if (selectedScopeGroup === 'company') return person.rootFlag === 1;
     if (selectedScopeGroup === 'otherDepartments') return otherOwners.has(person.id);
     return false;
   });
@@ -233,9 +232,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   const objectiveDetailRecords = [...new Map([...visibleActionParents, ...records].map(record => [record.id, record])).values()];
   const scopeLabels: Record<OkrScopeSelection['scope'], string> = {
     my: '我的目标',
-    supervisor: '直属上级',
-    subordinate: '直属下级',
-    department: '我部门的',
+    department: '部门目标',
+    company: '公司目标',
     otherDepartments: '其他部门',
     confirmation: '目标确认',
   };

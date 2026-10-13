@@ -36,7 +36,12 @@
 .okr-objective-kind { display: inline-flex; width: 52px; min-width: 52px; min-height: 32px; align-items: center; justify-content: center; border: 1px solid var(--primary); border-radius: 8px; color: var(--primary); font-weight: 600; }
 .okr-objective-krs { border-top: 1px solid var(--border-main); }
 .okr-objective-kr { padding: 10px 0; border-bottom: 1px solid var(--border-main); }
-.okr-objective-kr-title > span { width: 48px; font-weight: 700; }
+.okr-objective-kr-title > .okr-kr-drag { width: 24px; }
+.okr-kr-template-switcher { margin-right: 8px; flex: none; }
+.okr-kr-template-switcher.is-product { --okr-kr-type-color: var(--primary); }
+.okr-kr-template-switcher.is-delivery { --okr-kr-type-color: var(--success); }
+.okr-kr-template-switcher.is-support { --okr-kr-type-color: var(--warning); }
+.okr-kr-template-switcher .ant-segmented-item-selected { color: var(--okr-kr-type-color); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--okr-kr-type-color) 48%, transparent); }
 .okr-objective-kr.is-dragging { opacity: .55; background: color-mix(in srgb, var(--primary) 8%, transparent); }
 .okr-objective-kr.is-drag-over { border-top: 2px solid var(--primary); box-shadow: inset 0 2px 0 var(--primary); }
 .okr-kr-drag { display: inline-flex; width: 24px !important; color: var(--text-muted); cursor: grab; opacity: 0; transition: opacity .15s ease; }

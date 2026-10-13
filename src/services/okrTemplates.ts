@@ -9,7 +9,7 @@ export const departmentTemplates = (settings: OkrSettings | undefined, departmen
   return [...assigned, ...templates.filter(template => !assignedTypes.has(template.type) && templateDepartments(template).some(value => legacyTemplateDepartments[value]?.includes(department || '')))];
 };
 export const templateValues = (template: OkrTemplate, settings: OkrSettings) => template.type === 'support'
-  ? template.types ?? settings.dictionaries.supportTypes
+  ? []
   : template.stages ?? (template.type === 'product' ? settings.dictionaries.productNodes : settings.dictionaries.deliveryNodes);
 
 export function migrateTemplateDepartments(templates: OkrTemplate[], departments: string[]) {
