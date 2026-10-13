@@ -1,0 +1,23 @@
+/* Preserve Ant Design's rows-based textarea height inside the workbench. */
+.tech-shell .okr-weekly-plan-input.ant-input-affix-wrapper {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.okr-weekly-editor > .okr-weekly-section + .okr-weekly-section {
+  margin-top: calc(var(--spacing) * 8);
+}
+.okr-weekly-section > * + * {
+  margin-top: calc(var(--spacing) * 3);
+}
+.okr-weekly-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 2);
+  min-height: calc(var(--spacing) * 8);
+}
+
+.okr-weekly-section-header-title {
+  justify-content: flex-start;
+}

@@ -226,7 +226,13 @@ const WorkOrderInput: React.FC<{ label: string; value: string; placeholder: stri
 
 
 
-export const RequirementPoolView: React.FC = () => {
+interface RequirementPoolViewProps {
+  creationType?: WorkOrderType;
+  onCreated?: (task: RequirementTask) => void;
+  onCancelCreation?: () => void;
+}
+
+export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creationType, onCreated, onCancelCreation }) => {
   const [detailSearch] = useState(() => window.location.search);
   const {
     requirementTasks,
@@ -240,13 +246,13 @@ export const RequirementPoolView: React.FC = () => {
     addToast,
     openPageTab,
   } = useApp();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(Boolean(creationType));
   const [editingMode, setEditingMode] = useState<'returned' | 'reopen' | null>(null);
   const [editingMatter, setEditingMatter] = useState<RequirementTask | null>(null);
   const [closeModalOpen, setCloseModalOpen] = useState(false);
   const [closeSubmitting, setCloseSubmitting] = useState(false);
   const saveInFlight = useRef(false);
-  const [workOrderType, setWorkOrderType] = useState<WorkOrderType | null>(null);
+  const [workOrderType, setWorkOrderType] = useState<WorkOrderType | null>(creationType || null);
   const [selected, setSelected] = useState<RequirementTask | null>(null);
   const [taskCreationKind, setTaskCreationKind] = useState<'requirement' | 'design' | 'bug' | 'presales' | 'delivery' | 'ops' | null>(null);
   const [receiving, setReceiving] = useState(false);
@@ -445,7 +451,7 @@ export const RequirementPoolView: React.FC = () => {
     setSpecialFields({ ...(selected.projectName ? { projectName: selected.projectName } : {}), ...Object.fromEntries(Object.entries(selected.specialFields && typeof selected.specialFields === 'object' ? selected.specialFields : {}).map(([key, value]) => [key, String(value ?? '')])) });
     setTaskCreationKind(null); setCreating(true);
   };
-  const cancelEditing = () => { if (!isSubmitting) { setCreating(false); setEditingMode(null); setEditingMatter(null); setReopenReason(''); } };
+  const cancelEditing = () => { if (!isSubmitting) { setCreating(false); setEditingMode(null); setEditingMatter(null); setReopenReason(''); onCancelCreation?.(); } };
   const onMedia = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []) as File[];
     const allowed = new Set(["text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/pdf"]);
@@ -569,7 +575,7 @@ export const RequirementPoolView: React.FC = () => {
         addToast('success', '事项已重新发起', '已进入待处理，等待负责人接收');
         return;
       }
-      const saved = await addRequirementTask(input);
+      const saved = onCreated ? await addRequirementTask(input, onCreated) : await addRequirementTask(input);
       if (!saved) return;
       setCreating(false);
       setTypeFilter("all");
@@ -1098,7 +1104,7 @@ export const RequirementPoolView: React.FC = () => {
             </form>
         </section>
       )}
-      {!creating && (
+      {!creating && !creationType && (
         <>
           <div className="dark-panel rounded-xl p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3 pb-1">

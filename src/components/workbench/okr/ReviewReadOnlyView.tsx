@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { OkrKrReview } from '../../../services/okrRepository';
 import { EmployeeReviewSupportDialog } from './EmployeeReviewSupportDialog';
-import { Button, Empty, Progress, Tag } from 'antd';
+import { Button, Empty, Progress, Table, Tag } from 'antd';
 import type { PerformanceReview } from '../../../types';
 import { AlertTriangle, CheckCircle, FileText, Target } from '@/components/common/octicons-compat';
 
@@ -22,12 +22,6 @@ const statusColor = {
   submitted: 'processing',
   reviewed: 'success',
 } as const;
-
-const impactLabel = (impact?: string) => ({
-  none: '无明显影响',
-  block: '挤占 KR 投入',
-  support: '支持 KR',
-}[impact || ''] || impact || '无明显影响');
 
 type StoredExtraWork = { content?: string; source?: string; status?: string; hours?: string; impact?: string };
 
@@ -52,7 +46,7 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
     : review.selfScore;
 
   return (
-    <div className="okr-review-readonly" role="region" aria-label={`${review.cycleName}只读详情`}>
+    <div className={`okr-review-readonly${review.type === 'month' ? ' okr-review-readonly-month' : ''}`} role="region" aria-label={`${review.cycleName}只读详情`}>
       <header className="okr-review-readonly-header">
         <div className="okr-review-readonly-heading">
           <div>
@@ -72,24 +66,33 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
       </header>
 
       <section className="okr-review-readonly-metrics" aria-label="复盘概览">
-        <div><Progress type="circle" percent={average} size={56} /><span><b>KR 平均进度</b><small>{average}%</small></span></div>
-        <div><Target /><span><b>自评分</b><small>{review.selfScore} 分</small></span></div>
-        <div><CheckCircle /><span><b>主管评分</b><small>{review.leaderScore == null ? '暂无' : `${review.leaderScore} 分`}</small></span></div>
+        {review.type === 'month' ? <>
+          <div><Progress type="circle" percent={average} size={56}/><span><b>本月整体进度</b><small>{average}%</small></span></div>
+          <div><span><b>本月任务</b><small>{review.monthlyMetrics?.taskCount ?? '—'}</small></span></div>
+          <div><span><b>协同事项</b><small>{review.monthlyMetrics?.collaborationCount ?? '—'}</small></span></div>
+          <div><span><b>总工时</b><small>{review.monthlyMetrics?.totalHours ?? '—'} 小时</small></span></div>
+          <div><span><b>加班时长</b><small>{review.monthlyMetrics?.overtimeHours ?? '—'}</small></span></div>
+        </> : <>
+          <div><Progress type="circle" percent={average} size={56}/><span><b>KR 平均进度</b><small>{average}%</small></span></div>
+          <div><Target/><span><b>自评分</b><small>{review.selfScore} 分</small></span></div>
+          <div><CheckCircle/><span><b>主管评分</b><small>{review.leaderScore == null ? '暂无' : `${review.leaderScore} 分`}</small></span></div>
+        </>}
       </section>
 
-      <section className="okr-review-readonly-section">
+      {review.type === 'week' && <section className="okr-review-readonly-section">
         <div className="okr-review-readonly-title"><FileText /><h3>整体工作摘要</h3></div>
         <p>{review.summary || '暂无摘要内容'}</p>
-      </section>
+      </section>}
 
       <section className="okr-review-readonly-section">
-        <div className="okr-review-readonly-title"><Target /><h3>OKR 目标复盘</h3><span>{krReviews.length} 个 KR</span></div>
+        <div className="okr-review-readonly-title"><Target /><h3>{review.type === 'month' ? '本月目标复盘' : 'OKR 目标复盘'}</h3><span>{krReviews.length} 个 KR</span></div>
+        {review.type === 'month' && <p>{review.summary || '暂无本月总结'}</p>}
         {krReviews.length === 0 ? <Empty description="暂无 KR 复盘" /> : (
           <div className="okr-review-readonly-krs">
             {krReviews.map((kr, index) => (
               <article key={`${kr.keyResultId}-${index}`}>
                 <div className="okr-review-readonly-kr-head">
-                  <strong><span>KR{index + 1}</span>{kr.keyResultTitle}</strong>
+                  <strong><span>{review.type === 'month' ? 'A' : 'KR'}{index + 1}</span>{kr.keyResultTitle}</strong>
                   <div><small>{kr.previousProgress}% → {kr.currentProgress}%</small><Tag color={kr.health === 'normal' ? 'success' : kr.health === 'risk' ? 'warning' : 'error'}>{kr.health === 'normal' ? '正常' : kr.health === 'risk' ? '有风险' : '已阻塞'}</Tag></div>
                 </div>
                 <Progress percent={kr.currentProgress} showInfo={false} size="small" />
@@ -107,21 +110,29 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
 
       <div className="okr-review-readonly-columns">
         <section className="okr-review-readonly-section">
-          <div className="okr-review-readonly-title"><FileText /><h3>非 OKR 额外工作</h3></div>
-          {extraWorkRows.length > 0 ? <div className="okr-review-readonly-extra-list">{extraWorkRows.map((item, index) => <div key={`${item.content}-${index}`}><span><Tag>{item.source || '手工记录'}</Tag><b>{item.content || '未命名工作'}</b></span><small>{item.status || '未填写状态'} · {item.hours ? `${item.hours} 小时` : '未填写耗时'} · {impactLabel(item.impact)}</small></div>)}</div> : <p>{review.extraWork?.description || '暂无额外工作记录'}</p>}
-          {review.extraWork?.impact && <small>对 OKR 的影响：{impactLabel(review.extraWork.impact)}</small>}
+          <div className="okr-review-readonly-title"><FileText /><h3>插播任务</h3></div>
+          {<Table size="small" rowKey="id" pagination={false} dataSource={(review.linkedWorkItems || []).filter(item => review.extraWork?.workIds.includes(item.id))} locale={{ emptyText: <Empty description="暂无关联插播任务" /> }} columns={[
+            { title: '标题', dataIndex: 'title' }, { title: '来源归属', render: (_, item) => item.sourceLabel || '—' },
+            { title: '状态', dataIndex: 'status' }, { title: '任务工时', render: (_, item) => item.actualHours == null ? '—' : `${item.actualHours} 小时` },
+          ]}/>}
+          {extraWorkRows.length > 0 ? <div className="okr-review-readonly-extra-list">{extraWorkRows.map((item, index) => <div key={`${item.content}-${index}`}><span><Tag>{item.source || '手工记录'}</Tag><b>{item.content || '未命名工作'}</b></span><small>{item.status || '未填写状态'} · {item.hours ? `${item.hours} 小时` : '未填写耗时'}</small></div>)}</div> : review.extraWork?.description ? <p>{review.extraWork.description}</p> : review.type !== 'week' ? <p>暂无额外工作记录</p> : null}
         </section>
+        {review.type === 'month' && <section className="okr-review-readonly-section"><div className="okr-review-readonly-title"><FileText/><h3>遇到的问题或者建议</h3></div><p className="whitespace-pre-wrap break-words">{review.suggestions || review.otherNotes || '暂无问题或建议'}</p></section>}
         <section className="okr-review-readonly-section">
-          <div className="okr-review-readonly-title"><CheckCircle /><h3>协助与协同事项</h3></div>
-          {review.assistance?.length ? review.assistance.map((item, index) => <p key={`${item.subject}-${index}`}><b>{item.subject}</b>：{item.result}</p>) : <p>暂无协同事项</p>}
+          <div className="okr-review-readonly-title"><CheckCircle /><h3>{review.type === 'month' ? '需要协助事项' : '协助与协同事项'}</h3></div>
+          {review.assistance?.length ? review.assistance.map((item, index) => <p key={`${item.subject}-${index}`}><b>{item.subject}</b>：{item.result}{item.workId && <small> · {item.assistanceType === '客户诉求' ? '产品需求' : item.assistanceType === '其他问题' ? '其他协同' : item.assistanceType} · {item.expectedAssignee || '—'} · {item.status || '—'}</small>}</p>) : <p>暂无协同事项</p>}
         </section>
       </div>
 
       {review.type === 'week' && <section className="okr-review-readonly-section"><div className="okr-review-readonly-title"><Target/><h3>下周计划</h3></div><p>{review.nextWeekPlan || '暂无下周计划'}</p></section>}
 
-      {review.type === 'month' && (
+      {<section className="okr-review-readonly-section">
+        <div className="okr-review-readonly-title"><FileText /><h3>知识沉淀</h3></div>
+        {review.knowledgeEntries?.length ? review.knowledgeEntries.map(item => <article key={item.id}><b>{item.title}</b><Tag>{item.category}</Tag><p className="whitespace-pre-wrap break-words">{item.summary}</p><p className="whitespace-pre-wrap break-words">{item.content}</p>{item.linkUrl && <p className="break-words">链接地址：{item.linkUrl}</p>}</article>) : <Empty description="暂无知识沉淀" />}
+      </section>}
+
+      {review.type === 'month' && review.nextMonthArrangement && (
         <div className="okr-review-readonly-columns">
-          <section className="okr-review-readonly-section"><div className="okr-review-readonly-title"><FileText /><h3>其他补充</h3></div><p>{review.otherNotes || '暂无其他补充'}</p></section>
           <section className="okr-review-readonly-section"><div className="okr-review-readonly-title"><Target /><h3>下个月安排</h3></div><p>{review.nextMonthArrangement || '暂无下个月安排'}</p></section>
         </div>
       )}

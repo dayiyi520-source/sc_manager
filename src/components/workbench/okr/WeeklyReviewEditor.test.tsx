@@ -57,17 +57,14 @@ describe('review period identity', () => {
     expect(findReviewForPayload(records, 'me', '2026-09-14/2026-09-20', payload)).toBeUndefined();
   });
 
-  it('uses business assistance types and team member search without temporary task creation', () => {
-    render(<WeeklyReviewEditor {...props} teamMembers={[{ id: 'member-1', name: '陈雅婷', department: '产品部', jobTitle: '产品经理' }]} />);
-
+  it('uses the collaboration type menu and the five weekly sections', () => {
+    render(<WeeklyReviewEditor {...props} />);
     expect(screen.queryByRole('button', { name: '临时任务' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '添加协同事项' }));
-
-    expect(screen.getByText('请选择协助类型')).toBeInTheDocument();
-    expect(screen.getByText('请选择期望协助人')).toBeInTheDocument();
-    expect(screen.getByText(/非本月目标任务/)).toBeInTheDocument();
-    expect(screen.getByText('暂无非本月目标工作')).toBeInTheDocument();
-    expect(screen.getByText(/本月目标复盘/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    for (const name of ['产品需求', '线上问题', '售前支持', '交付支持', '其他协同']) expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
+    expect(screen.getByText('2. 插播任务')).toBeInTheDocument();
+    expect(screen.getByText('暂无插播任务')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '新建知识沉淀' })).toBeInTheDocument();
   });
 });
 

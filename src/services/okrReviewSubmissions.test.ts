@@ -30,6 +30,25 @@ describe('persistent review submission rules', () => {
     expect(rows()[0]).toMatchObject({ id: 'draft', status: 'submitted', version: 2, createdAt: draft.createdAt, submittedAt: new Date().toISOString(), payload: { summary: '补交内容' } });
     await expect(update({ version: 2 })).rejects.toThrow('已提交');
   });
+  it('preserves knowledge across draft reads, deletion, submission and reopening', async () => {
+    const first = { id: 'knowledge-1', title: '排查经验', category: '产研规范', content: '检查告警及日志' };
+    const second = { id: 'knowledge-2', title: '交付经验', category: '项目沉淀', content: '确认验收范围' };
+    const created = await create({ ...payload, knowledgeEntries: [first, second] }, false) as { id: string };
+    const read = async () => (await mockApiRequest('/api/okr/records?viewerId=me') as OkrRecord[]).find(row => row.id === created.id)!;
+    expect((await read()).payload.knowledgeEntries).toEqual([first, second]);
+    await mockApiRequest(`/api/okr/records/${created.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'save', version: 0, viewerId: 'me', payload: { ...payload, knowledgeEntries: [second] } }) });
+    expect((await read()).payload.knowledgeEntries).toEqual([second]);
+    await mockApiRequest(`/api/okr/records/${created.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'submit', version: 1, viewerId: 'me' }) });
+    expect(await read()).toMatchObject({ status: 'submitted', payload: { knowledgeEntries: [second] } });
+  });
+  it('preserves monthly suggestions, metric snapshot and associations across draft and submission reads', async () => {
+    const value: OkrPayload = { title: '月报', reviewType: 'month', startDate: '2026-09-01', endDate: '2026-09-30', suggestions: '问题\n建议', monthlyMetrics: { taskCount: 2, collaborationCount: 1, totalHours: 6.5 }, knowledgeEntries: [{ id: 'k', title: '月报经验', category: '产研规范', content: '经验正文' }], assistance: [{ workId: 'c', subject: '需要协调', result: '协调资源' }] };
+    const saved = await create(value, false) as { id: string };
+    const read = async () => (await mockApiRequest('/api/okr/records?viewerId=me') as OkrRecord[]).find(row => row.id === saved.id)!;
+    expect((await read()).payload).toEqual(value);
+    await mockApiRequest(`/api/okr/records/${saved.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'submit', version: 0, viewerId: 'me' }) });
+    expect(await read()).toMatchObject({ status: 'submitted', payload: value });
+  });
   it('blocks closed current dates and disabled backfill without writing', async () => {
     await expect(create({ title: '', reviewType: 'week', startDate: '2026-10-12', endDate: '2026-10-18' })).rejects.toThrow('当前不可填写');
     localStorage.setItem(settingsKey, JSON.stringify({ ...settings, timeRules: [{ ...settings.timeRules[0], allowBackfill: false }] }));

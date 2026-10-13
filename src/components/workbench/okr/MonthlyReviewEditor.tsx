@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Checkbox, Empty, Input, InputNumber, Modal, Progress, Radio, Tag } from 'antd';
+import { Alert, Button, Checkbox, Empty, Input, InputNumber, Modal, Progress, Radio, Tag, Dropdown, Table, Collapse } from 'antd';
 import dayjs from 'dayjs';
-import type { OKRItem } from '../../../types';
+import type { OKRItem, WorkOrderType } from '../../../types';
 import type { OkrKrReview, OkrPayload, OkrRecord } from '../../../services/okrRepository';
-import { AlertTriangle, ChevronDown, FileText, Save, Send, Target } from '@/components/common/octicons-compat';
+import { FileText, Save, Send, Target, Plus } from '@/components/common/octicons-compat';
 import { aggregateKrReview, aggregateMonthlyTasks, eligibleWeeklyReviews, monthPeriod, monthlyEvidenceTimeline, suggestMonthlySummary } from './monthlyReview';
 import { restoreReviewDraftTargets, reconcileReviewDraftTargets, detachedReviewDescription } from './reviewDraftTargets';
 import { reviewEditorState } from '../../../services/okrReviewTemplates';
@@ -12,8 +12,23 @@ import { defaultCollapsedReview } from './evidenceFilters';
 import type { EvidenceViewer } from '../../../services/reviewEvidenceRepository';
 import type { OkrWork } from '../../../services/okrRepository';
 import type { ReviewPeriod } from '../../../services/okrReviewRules';
+import type { OkrReviewAssistance, OkrReviewKnowledge } from '../../../services/okrRepository';
+import { KnowledgeUploadModal } from '../KnowledgeUploadModal';
+import { RequirementPoolView } from '../RequirementPoolView';
+import { workOrderDisplayName } from '../../../utils/workOrderDisplay';
+import { loadMonthlyReviewMetrics, type MonthlyReviewMetrics } from '../../../services/monthlyReviewMetrics';
+import './weeklyReviewEditor.css';
 
-type Health = OkrKrReview['health'];
+const assistanceTypes: WorkOrderType[] = ['客户诉求', '线上问题', '售前支持', '交付支持', '其他问题'];
+const EMPTY_WORK: OkrWork[] = [];
+const historicalExtraDescription = (description: string) => {
+  if (!description.startsWith('[')) return description;
+  try {
+    const rows: unknown = JSON.parse(description);
+    return Array.isArray(rows) ? rows.filter(row => row && typeof row === 'object').map(row => [row.content || '历史工作', row.source, row.status, row.hours ? `${row.hours} 小时` : ''].filter(Boolean).join(' · ')).join('\n') : description;
+  } catch { return description; }
+};
+
 
 interface MonthlyReviewEditorProps {
   key?: React.Key;
@@ -30,7 +45,7 @@ interface MonthlyReviewEditorProps {
   work?: OkrWork[]; viewer?: EvidenceViewer; workLoading?: boolean; workError?: unknown; onRefreshWork?: () => void;
 }
 
-export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSaveDraft, onSubmit, onCancel, recordStatus, initialPayload, periodOverride, work = [], viewer, workLoading, workError, onRefreshWork }: MonthlyReviewEditorProps) {
+export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSaveDraft, onSubmit, onCancel, recordStatus, initialPayload, periodOverride, work = EMPTY_WORK, viewer, workLoading, workError, onRefreshWork }: MonthlyReviewEditorProps) {
   const month = useMemo(() => dayjs(periodOverride?.startDate).startOf('month'), [periodOverride?.startDate]);
   const monthlyOkrs = useMemo(() => okrs.filter(objective => objective.cycle === month.format('YYYY-MM')), [okrs, month]);
   const weeklyReviews = useMemo(() => eligibleWeeklyReviews(records, currentUserId, month), [records, currentUserId, month]);
@@ -51,10 +66,34 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
   }, [currentTargets]);
   const detachedTargets = krs.filter(row => !currentTargets.some(target => target.objectiveId === row.objectiveId && target.keyResultId === row.keyResultId));
   const [selectedKrIds, setSelectedKrIds] = useState(() => initialPayload?.startDate ? initialKrs.filter(item => initialPayload.krReviews?.some(kr => kr.keyResultId === item.keyResultId)).map(item => item.keyResultId) : initialKrs.map(item => item.keyResultId));
-  const [activeKrId, setActiveKrId] = useState(() => initialKrs[0]?.keyResultId || '');
   const [summary, setSummary] = useState(() => initialPayload?.summary || suggestMonthlySummary(weeklyReviews));
-  const [otherNotes, setOtherNotes] = useState(initialPayload?.otherNotes || '');
-  const [nextMonthArrangement, setNextMonthArrangement] = useState(initialPayload?.nextMonthArrangement || '');
+  const [suggestions, setSuggestions] = useState(initialPayload?.suggestions || initialPayload?.otherNotes || '');
+  const [extraWork, setExtraWork] = useState(initialPayload?.extraWork || { workIds: [], description: '', impact: 'none' });
+  const [assistance, setAssistance] = useState<OkrReviewAssistance[]>(initialPayload?.assistance || []);
+  const [knowledgeEntries, setKnowledgeEntries] = useState<OkrReviewKnowledge[]>(initialPayload?.knowledgeEntries || []);
+  const [creationType, setCreationType] = useState<WorkOrderType | null>(null);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [viewingKnowledge, setViewingKnowledge] = useState<OkrReviewKnowledge | null>(null);
+  const [metrics, setMetrics] = useState<MonthlyReviewMetrics>();
+  const [metricsError, setMetricsError] = useState(false);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [metricsRevision, setMetricsRevision] = useState(0);
+  const period = useMemo(() => monthPeriod(month), [month]);
+  useEffect(() => {
+    let active = true;
+    setMetricsLoading(true);
+    setMetricsError(false);
+    if (workLoading || workError) {
+      setMetricsLoading(Boolean(workLoading));
+      setMetricsError(Boolean(workError));
+      return () => { active = false; };
+    }
+    loadMonthlyReviewMetrics(work, period, { id: currentUserId, name: viewer?.name || '' })
+      .then(value => { if (active) setMetrics(value); })
+      .catch(() => { if (active) setMetricsError(true); })
+      .finally(() => { if (active) setMetricsLoading(false); });
+    return () => { active = false; };
+  }, [work, workLoading, workError, period, currentUserId, viewer?.name, metricsRevision]);
   const [syncKrProgress, setSyncKrProgress] = useState(initialPayload?.syncKrProgress ?? true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -63,15 +102,11 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
   const [evidenceItems, setEvidenceItems] = useState(initialPayload?.items || []);
 
   const selectedKrs = krs.filter(item => selectedKrIds.includes(item.keyResultId) && currentTargets.some(target => target.keyResultId === item.keyResultId && target.objectiveId === item.objectiveId));
-  const activeKr = selectedKrs.find(item => item.keyResultId === activeKrId) || selectedKrs[0];
-  const activeExpanded = activeKr && (expandedKrs[activeKr.keyResultId] ?? !defaultCollapsedReview(activeKr));
-  const pickerKr = krs.find(item => item.keyResultId === pickerKrId);
+  const pickerKr = pickerKrId === 'extra' ? { ...extraWork, objectiveId: undefined, keyResultId: undefined } : krs.find(item => item.keyResultId === pickerKrId);
   const sourceKr = monthlyOkrs.flatMap(objective => objective.keyResults).find(item => item.id === pickerKrId);
-  const linkedIds = new Set<string>(krs.flatMap(item => item.workIds));
-  const evidenceWeeks = useMemo(() => activeKr ? monthlyEvidenceTimeline(weeklyReviews, activeKr.keyResultId) : [], [weeklyReviews, activeKr]);
+  const linkedIds = new Set<string>(krs.flatMap(item => item.workIds).concat(extraWork.workIds));
   const otherTasks = useMemo(() => aggregateMonthlyTasks(weeklyReviews), [weeklyReviews]);
-  const achievedCount = selectedKrs.filter(item => item.currentProgress >= 100).length;
-  const riskCount = selectedKrs.filter(item => item.health !== 'normal').length;
+  const metricValue = (value?: number) => metricsLoading ? '加载中' : metricsError || value == null ? '—' : value;
   const overallProgress = selectedKrs.length ? Math.round(selectedKrs.reduce((sum, item) => sum + item.currentProgress, 0) / selectedKrs.length) : 0;
 
   const updateKr = (keyResultId: string, value: Partial<OkrKrReview>) => {
@@ -80,8 +115,6 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
 
   const toggleKr = (keyResultId: string, checked: boolean) => {
     setSelectedKrIds(ids => checked ? Array.from(new Set([...ids, keyResultId])) : ids.filter(id => id !== keyResultId));
-    if (checked) setActiveKrId(keyResultId);
-    else if (activeKrId === keyResultId) setActiveKrId(selectedKrIds.find(id => id !== keyResultId) || '');
   };
 
   const payload = (): OkrPayload => ({
@@ -94,32 +127,32 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
     weeklyReviewIds: weeklyReviews.map(record => record.id),
     krReviews: selectedKrs,
     monthlyOtherTasks: otherTasks,
-    otherNotes: otherNotes.trim(),
-    nextMonthArrangement: nextMonthArrangement.trim(),
+    otherNotes: initialPayload?.otherNotes || '',
+    nextMonthArrangement: initialPayload?.nextMonthArrangement || '',
+    suggestions: suggestions.trim(),
+    knowledgeEntries,
+    monthlyMetrics: !metricsLoading && !metricsError ? metrics : initialPayload?.monthlyMetrics,
     nextMonthPlans: [],
-    assistance: initialPayload?.assistance || [],
-    helpNeeded: initialPayload?.helpNeeded || '',
-    extraWork: initialPayload?.extraWork || { workIds: [], description: '', impact: 'none' },
+    assistance,
+    helpNeeded: assistance.map(row => row.content || row.result).filter(Boolean).join('；') || initialPayload?.helpNeeded || '',
+    extraWork: { ...extraWork, impact: 'none' },
     syncKrProgress,
     items: evidenceItems
   });
 
   const requestSubmit = () => {
     const errors: string[] = [];
-    if (!summary.trim()) errors.push('请填写本月总结');
-    if (selectedKrs.length === 0) errors.push('请至少勾选一个需要复盘的 KR');
     if (selectedKrs.some(item => item.health !== 'normal' && !item.blocker.trim())) errors.push('风险或阻塞 KR 必须填写偏差原因');
-    if (!nextMonthArrangement.trim()) errors.push('请填写下个月安排');
     setValidationErrors(errors);
     if (errors.length === 0) setConfirmOpen(true);
   };
 
   return (
-    <div className="okr-monthly-review" aria-label="月复盘编辑器">
+    <div className="okr-monthly-review okr-weekly-editor" aria-label="月复盘编辑器">
       <header className="okr-monthly-toolbar">
         <div>
           <div className="okr-monthly-title-row"><Tag color="blue">月复盘</Tag><h2>{month.format('YYYY年MM月')}工作复盘</h2><Tag color={editorState.color}>{editorState.label}</Tag></div>
-          <p>汇总当月工作成果、目标进展和后续安排</p>
+          <p>复盘本月目标、工作证据、问题建议与协助事项</p>
         </div>
         <div className="okr-monthly-actions">
           <Button onClick={onCancel}>取消</Button>
@@ -132,84 +165,136 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
       {validationErrors.length > 0 && <Alert type="warning" showIcon closable title="提交前请完成以下内容" description={validationErrors.join('；')} onClose={() => setValidationErrors([])} />}
 
       <section className="okr-monthly-metrics" aria-label="月度概览">
-        <div><Progress type="circle" percent={overallProgress} size={52} /><span><strong>整体进度</strong><small>当前月度总体完成度</small></span></div>
-        <div><Target /><span><strong>KR 达成</strong><b>{achievedCount}/{krs.length}</b><small>已达成 / 总数</small></span></div>
-        <div><AlertTriangle /><span><strong>风险与阻塞</strong><b>{riskCount}</b><small>需要关注的问题</small></span></div>
-        <div><FileText /><span><strong>非 OKR 工作</strong><b>{otherTasks.length}</b><small>本月其他工作项</small></span></div>
+        <div><Progress type="circle" percent={overallProgress} size={52} /><span><strong>本月整体进度</strong></span></div>
+        <div><Target /><span><strong>本月任务</strong><b>{metricValue(metrics?.taskCount)}</b></span></div>
+        <div><FileText /><span><strong>协同事项</strong><b>{metricValue(metrics?.collaborationCount)}</b></span></div>
+        <div><FileText /><span><strong>总工时</strong><b>{metricValue(metrics?.totalHours)}</b></span></div>
+        <div><FileText /><span><strong>加班时长</strong><b>—</b></span></div>
       </section>
 
-      <section className="okr-monthly-panel">
-        <div className="okr-monthly-section-head"><h3>本月总结</h3></div>
-        <Input.TextArea value={summary} onChange={event => setSummary(event.target.value)} autoSize={{ minRows: 4 }} placeholder="总结本月核心成果、业务价值、关键变化与主要问题" />
-      </section>
+      {metricsError && <Alert type="error" showIcon title="月度统计加载失败" description="未能读取完整状态变化记录，请重试。" action={<Button onClick={() => { onRefreshWork?.(); setMetricsRevision(value => value + 1); }}>重试</Button>} />}
+      <section className="okr-weekly-section" aria-label="本月目标复盘">
+        <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />1. 本月目标复盘</h3></div>
+        <div className="okr-monthly-panel">
+        <div className="okr-monthly-section-head"><h4>本月总结</h4></div>
+        <Input.TextArea disabled={busy || !editorState.editable} value={summary} onChange={event => setSummary(event.target.value)} autoSize={{ minRows: 4 }} placeholder="总结本月核心成果、业务价值、关键变化与主要问题" />
+      </div>
 
-      <section className="okr-monthly-kr-layout">
-        <aside className="okr-monthly-okr-tree">
-          <div className="okr-monthly-list-title"><h3>OKR 列表</h3><span>已选 {selectedKrs.length}/{currentTargets.length}</span></div>
-          {monthlyOkrs.length === 0 ? <Empty description="本月暂无 OKR" /> : monthlyOkrs.map((objective, objectiveIndex) => {
-            const objectiveKrs = krs.filter(item => item.objectiveId === objective.id && objective.keyResults.some(kr => kr.id === item.keyResultId));
-            return <div key={objective.id} className="okr-monthly-tree-objective">
-              <div className="okr-monthly-tree-o"><ChevronDown /><b>{objective.primaryLabel || 'O'}{objectiveIndex + 1}</b><span>{objective.objective}</span></div>
-              <div className="okr-monthly-tree-krs">
-                {objectiveKrs.map((kr, krIndex) => {
-                  const checked = selectedKrIds.includes(kr.keyResultId);
-                  return <div key={kr.keyResultId} className={`okr-monthly-tree-kr${activeKr?.keyResultId === kr.keyResultId ? ' is-active' : ''}`}>
-                    <Checkbox checked={checked} onChange={event => toggleKr(kr.keyResultId, event.target.checked)} aria-label={`选择 KR${krIndex + 1}`} />
-                    <button type="button" disabled={!checked} aria-expanded={Boolean(activeKr?.keyResultId === kr.keyResultId && activeExpanded)} onClick={() => { setActiveKrId(kr.keyResultId); setExpandedKrs(current => ({ ...current, [kr.keyResultId]: activeKr?.keyResultId === kr.keyResultId ? !activeExpanded : true })); }}>
-                      <span><b>KR{krIndex + 1}</b>{kr.keyResultTitle}</span>
-                      <Progress percent={kr.currentProgress} showInfo={false} size="small" />
-                      <small>{kr.currentProgress}%</small>
-                    </button>
-                  </div>;
-                })}
+      {monthlyOkrs.length === 0 ? <Empty description="本月暂无 OKR" /> : monthlyOkrs.map((objective, objectiveIndex) => <Collapse key={objective.id} className="okr-review-objective-collapse" defaultActiveKey={[objective.id]} expandIconPosition="end" items={[{
+        key: objective.id,
+        label: <div className="flex items-center gap-2"><Tag color="blue">{objective.primaryLabel || 'O'}{objectiveIndex + 1}</Tag><strong>目标{objectiveIndex + 1}：{objective.objective}</strong></div>,
+        children: <div className="okr-review-a-list grid gap-4 p-4">{krs.filter(kr => kr.objectiveId === objective.id && objective.keyResults.some(target => target.id === kr.keyResultId)).map((kr, index) => {
+          const expanded = expandedKrs[kr.keyResultId] ?? !defaultCollapsedReview(kr);
+          const selected = selectedKrIds.includes(kr.keyResultId);
+          return <Collapse key={kr.keyResultId} className="okr-review-a-collapse" activeKey={expanded && selected ? [kr.keyResultId] : []} expandIconPosition="end" onChange={keys => setExpandedKrs(rows => ({ ...rows, [kr.keyResultId]: Boolean(keys.length) }))} items={[{
+            key: kr.keyResultId,
+            label: <div className="flex items-center gap-3"><span onClick={event => event.stopPropagation()}><Checkbox checked={selected} disabled={busy || !editorState.editable} aria-label={`选择 KR${index + 1}`} onChange={event => toggleKr(kr.keyResultId, event.target.checked)}/></span><strong>A{index + 1}：{kr.keyResultTitle}</strong><Tag>{kr.currentProgress}%</Tag></div>,
+            children: <div className="space-y-4">
+              <div className="okr-monthly-status-row">
+                <div className="okr-monthly-current-progress"><span>本月进度</span><InputNumber min={0} max={100} value={kr.currentProgress} suffix="%" disabled={busy || !editorState.editable} onChange={value => updateKr(kr.keyResultId, { currentProgress: value ?? 0 })}/></div>
+                <div className="okr-monthly-progress-change"><span>进度:</span><span>{kr.previousProgress}% → <strong>{kr.currentProgress}%</strong></span><Progress percent={kr.currentProgress} showInfo={false} size="small"/></div>
+                <div className="okr-monthly-health-control"><span>健康状态:</span><Radio.Group size="small" value={kr.health} disabled={busy || !editorState.editable} onChange={event => updateKr(kr.keyResultId, { health: event.target.value })}><Radio value="normal">正常</Radio><Radio value="risk">有风险</Radio><Radio value="blocked">已阻塞</Radio></Radio.Group></div>
               </div>
-            </div>;
-          })}
-        </aside>
-
-        <div className="okr-monthly-kr-detail">
-          {!activeKr ? <Empty description="请从左侧勾选一个 KR" /> : !activeExpanded ? <div className="space-y-4"><strong>{activeKr.keyResultTitle}</strong><p>{activeKr.currentProgress >= 100 ? "已完成，默认收起" : "本月无变化，默认收起"}</p><Button onClick={() => setExpandedKrs(current => ({ ...current, [activeKr.keyResultId]: true }))}>展开 A</Button></div> : <>
-            <div className="okr-monthly-status-row">
-              <div className="okr-monthly-current-progress"><span>本月进度</span><InputNumber min={0} max={100} value={activeKr.currentProgress} suffix="%" onChange={value => updateKr(activeKr.keyResultId, { currentProgress: value ?? 0 })} /></div>
-              <span className="okr-monthly-status-divider" aria-hidden="true">|</span>
-              <div className="okr-monthly-progress-change"><span>进度:</span><span className="okr-monthly-progress-values">{activeKr.previousProgress}% → <strong>{activeKr.currentProgress}%</strong></span><Progress percent={activeKr.currentProgress} showInfo={false} size="small" /><span className={activeKr.currentProgress >= activeKr.previousProgress ? 'is-positive' : 'is-negative'}>{activeKr.currentProgress >= activeKr.previousProgress ? `+${activeKr.currentProgress - activeKr.previousProgress}%` : `${activeKr.currentProgress - activeKr.previousProgress}%`}</span></div>
-              <span className="okr-monthly-status-divider" aria-hidden="true">|</span>
-              <div className="okr-monthly-health-control"><span>健康状态:</span><Radio.Group value={activeKr.health} size="small" onChange={event => updateKr(activeKr.keyResultId, { health: event.target.value })}><Radio value="normal"><span className="is-normal">正常</span></Radio><Radio value="risk"><span className="is-risk">有风险</span></Radio><Radio value="blocked"><span className="is-blocked">已阻塞</span></Radio></Radio.Group></div>
-            </div>
-
-            {activeKr.health !== 'normal' && <div className="okr-monthly-risk-callout"><AlertTriangle /><div><b>风险原因及所需支持</b><Input.TextArea value={activeKr.blocker} onChange={event => updateKr(activeKr.keyResultId, { blocker: event.target.value })} autoSize={{ minRows: 2 }} placeholder="说明偏差、风险、外部依赖和所需支持" /></div></div>}
-
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3"><h4>本期关联工作证据</h4><Button onClick={() => setPickerKrId(activeKr.keyResultId)}>关联工作证据</Button><Button type="text" onClick={() => setExpandedKrs(current => ({ ...current, [activeKr.keyResultId]: false }))}>收起 A</Button></div>
-              {activeKr.workIds.length ? activeKr.workIds.map(id => {
-                const item = work.find(row => row.id === id);
-                const saved = evidenceItems.find(row => row.workId === id);
-                return <div key={id} className="flex items-center justify-between gap-3"><span>{item?.title || saved?.title || '历史工作证据'}</span><Button type="text" danger onClick={() => { updateKr(activeKr.keyResultId, { workIds: activeKr.workIds.filter(value => value !== id) }); setEvidenceItems(rows => rows.filter(row => row.workId !== id)); }}>移除</Button></div>;
-              }) : <Empty description="暂无关联工作证据"/>}
-            </div>
-
-            <div className="okr-monthly-timeline">
-              <h4>证据记录</h4>
-              {evidenceWeeks.every(week => week.entries.length === 0) ? <p className="okr-monthly-timeline-empty">当月周复盘中暂无关联工作或非 OKR 任务。</p> : evidenceWeeks.map((week, weekIndex) => <div key={week.reviewId} className="okr-monthly-timeline-week">
-                <div className="okr-monthly-timeline-marker"><span />第 {weekIndex + 1} 周<small>{week.startDate.slice(5)} 至 {week.endDate.slice(5)}</small></div>
-                <div className="okr-monthly-timeline-items">
-                  {week.entries.length === 0 ? <p>本周暂无证据记录</p> : week.entries.map(entry => <div key={entry.id}><strong>{entry.title}</strong><span>{entry.progressChange}</span><small>{entry.summary}</small><Tag color={entry.type === '工单' ? 'purple' : entry.type === '任务' ? 'blue' : 'default'}>{entry.type}</Tag></div>)}
-                </div>
-              </div>)}
-            </div>
-          </>}
+              {kr.health !== 'normal' && <Input.TextArea aria-label="风险原因及所需支持" rows={2} value={kr.blocker} disabled={busy || !editorState.editable} onChange={event => updateKr(kr.keyResultId, { blocker: event.target.value })} placeholder="说明偏差、风险、外部依赖和所需支持"/>}
+              <div className="okr-weekly-section-header"><h4>本期关联工作证据</h4><Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5"/>} onClick={() => setPickerKrId(kr.keyResultId)}>关联工作证据</Button></div>
+              <Table size="small" rowKey="workId" pagination={false} dataSource={kr.workIds.map(id => {
+                const live = work.find(item => item.id === id);
+                const saved = evidenceItems.find(item => item.workId === id);
+                return { workId: id, title: live?.title || saved?.title || '历史工作证据', sourceLabel: live ? [live.productLineName, live.versionName].filter(Boolean).join(' / ') : saved?.sourceLabel, status: live?.status || saved?.status, actualHours: live?.actualHours ?? saved?.actualHours };
+              })} locale={{ emptyText: <Empty description="暂无关联工作证据"/> }} columns={[
+                { title: '标题', dataIndex: 'title', ellipsis: true }, { title: '来源归属', render: (_, row) => row.sourceLabel || '—' }, { title: '状态', dataIndex: 'status' },
+                { title: '任务工时', render: (_, row) => row.actualHours == null ? '—' : `${row.actualHours} 小时` },
+                { title: '删除操作', render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} onClick={() => { updateKr(kr.keyResultId, { workIds: kr.workIds.filter(id => id !== row.workId) }); setEvidenceItems(rows => rows.filter(item => item.workId !== row.workId)); }}>删除</Button> },
+              ]}/>
+              <div className="okr-monthly-timeline"><h4>周报证据记录</h4>{monthlyEvidenceTimeline(weeklyReviews, kr.keyResultId).map((week, weekIndex) => <div key={week.reviewId} className="okr-monthly-timeline-week"><div className="okr-monthly-timeline-marker">第 {weekIndex + 1} 周<small>{week.startDate.slice(5)} 至 {week.endDate.slice(5)}</small></div><div className="okr-monthly-timeline-items">{week.entries.length ? week.entries.map(entry => <div key={entry.id}><strong>{entry.title}</strong><span>{entry.progressChange}</span><small>{entry.summary}</small><Tag>{entry.type}</Tag></div>) : <p>本周暂无证据记录</p>}</div></div>)}</div>
+            </div>,
+          }]}/>;
+        })}</div>,
+      }]}/>)}
+      </section>
+      <section className="okr-weekly-section" aria-label="插播任务">
+        <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />2. 插播任务</h3><Button icon={<Plus className="h-3.5 w-3.5" />} disabled={busy || !editorState.editable} onClick={() => setPickerKrId('extra')}>关联工作证据</Button></div>
+        <Table size="small" rowKey="workId" pagination={false} dataSource={extraWork.workIds.map(id => {
+          const live = work.find(item => item.id === id);
+          const saved = evidenceItems.find(item => item.workId === id);
+          return { workId: id, title: live?.title || saved?.title || '历史工作证据', sourceLabel: live ? [live.productLineName, live.versionName].filter(Boolean).join(' / ') : saved?.sourceLabel, status: live?.status || saved?.status, actualHours: live?.actualHours ?? saved?.actualHours };
+        })} locale={{ emptyText: <Empty description="暂无插播任务" /> }} columns={[
+          { title: '标题', dataIndex: 'title', ellipsis: true },
+          { title: '来源归属', render: (_, row) => row.sourceLabel || '—' },
+          { title: '状态', dataIndex: 'status' },
+          { title: '任务工时', render: (_, row) => row.actualHours == null ? '—' : `${row.actualHours} 小时` },
+          { title: '删除操作', render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} onClick={() => { setExtraWork(value => ({ ...value, workIds: value.workIds.filter(id => id !== row.workId) })); setEvidenceItems(rows => rows.filter(item => item.workId !== row.workId)); }}>删除</Button> },
+        ]}/>
+        {extraWork.description && <div className="okr-monthly-panel"><p className="whitespace-pre-wrap">{historicalExtraDescription(extraWork.description)}</p><Button type="text" danger disabled={busy || !editorState.editable} onClick={() => setExtraWork(value => ({ ...value, description: '' }))}>删除历史补充</Button></div>}
+      </section>
+      <section className="okr-weekly-section" aria-label="遇到的问题或者建议">
+        <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />3. 遇到的问题或者建议</h3></div>
+        <Input.TextArea className="okr-weekly-plan-input" aria-label="遇到的问题或者建议" rows={4} maxLength={10000} showCount value={suggestions} onChange={event => setSuggestions(event.target.value)} disabled={busy || !editorState.editable} placeholder="填写本月遇到的问题或者建议" />
+      </section>
+      <section className="okr-weekly-section" aria-label="需要协助事项">
+        <div className="okr-weekly-section-header">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
+            <span>4. 需要协助事项</span>
+          </div>
+          <Dropdown trigger={['click']} disabled={busy || !editorState.editable} menu={{
+            items: assistanceTypes.map(type => ({ key: type, label: workOrderDisplayName(type) })),
+            onClick: ({ key }) => setCreationType(key as WorkOrderType),
+          }}><Button icon={<Plus className="h-3.5 w-3.5" />} disabled={busy || !editorState.editable}>发起协同</Button></Dropdown>
         </div>
+        <Table size="small" rowKey={row => row.workId || row.subject} pagination={false} dataSource={assistance}
+          locale={{ emptyText: <Empty description="暂无需要协助事项" /> }} columns={[
+            { title: '标题', dataIndex: 'subject', ellipsis: true },
+            { title: '事项类型', render: (_, row) => workOrderDisplayName(row.assistanceType) || '—' },
+            { title: '负责人', dataIndex: 'expectedAssignee' },
+            { title: '状态', render: (_, row) => row.status || '未发起' },
+            { title: '删除操作', render: (_, row, index) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`移除协同事项${row.subject}`} onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>删除</Button> },
+          ]}/>
       </section>
 
-      <section className="okr-monthly-bottom-grid">
-        <div className="okr-monthly-panel"><div className="okr-monthly-section-head"><h3>其他补充</h3></div><Input.TextArea value={otherNotes} onChange={event => setOtherNotes(event.target.value)} autoSize={{ minRows: 6 }} placeholder="补充本月未在目标或证据中体现的工作、协同与说明" /></div>
-        <div className="okr-monthly-panel"><div className="okr-monthly-section-head"><h3>下个月安排</h3></div><Input.TextArea value={nextMonthArrangement} onChange={event => setNextMonthArrangement(event.target.value)} autoSize={{ minRows: 6 }} placeholder="填写下个月的重点安排、预期结果和关键节点" /></div>
+      <section className="okr-weekly-section" aria-label="知识沉淀">
+        <div className="okr-weekly-section-header">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
+            <span>5. 知识沉淀</span>
+          </div>
+          <Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setKnowledgeOpen(true)}>新建知识沉淀</Button>
+        </div>
+        <Table size="small" rowKey="id" pagination={false} dataSource={knowledgeEntries}
+          locale={{ emptyText: <Empty description="暂无知识沉淀" /> }} columns={[
+            { title: '标题', ellipsis: true, render: (_, row) => <Button type="link" onClick={() => setViewingKnowledge(row)}>{row.title}</Button> },
+            { title: '分类', dataIndex: 'category' },
+            { title: '内容摘要', dataIndex: 'summary', ellipsis: true },
+            { title: '删除操作', render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
+          ]}/>
       </section>
+      {viewingKnowledge && <Modal open title={viewingKnowledge.title} onCancel={() => setViewingKnowledge(null)} footer={<Button aria-label="关闭知识详情" onClick={() => setViewingKnowledge(null)}>关闭</Button>}>
+        <p>{viewingKnowledge.category} · {viewingKnowledge.subCategory} · {viewingKnowledge.version}</p>
+        <p className="whitespace-pre-wrap break-words">{viewingKnowledge.summary}</p>
+        <p className="whitespace-pre-wrap break-words">{viewingKnowledge.content || '暂无正文'}</p>
+        <p className="break-words">{viewingKnowledge.tags?.join('、')}</p>
+        {viewingKnowledge.linkUrl && <p className="break-words">链接地址：{viewingKnowledge.linkUrl}</p>}
+        {viewingKnowledge.dingtalkUrl && <p className="break-words">钉钉文档：{viewingKnowledge.dingtalkUrl}</p>}
+        {viewingKnowledge.wecomUrl && <p className="break-words">企微文档：{viewingKnowledge.wecomUrl}</p>}
+      </Modal>}
+      {knowledgeOpen && <KnowledgeUploadModal mode="review" isOpen onClose={() => setKnowledgeOpen(false)} onSubmit={doc => {
+        setKnowledgeEntries(rows => [...rows, { ...doc, id: crypto.randomUUID(), title: doc.title || '', category: doc.category || '应知应会' }]);
+      }}/>}
 
-      {pickerKr && <WorkEvidencePicker work={work} viewer={viewer} product={sourceKr?.businessObject} version={sourceKr?.version} {...monthPeriod(month)} selectedIds={pickerKr.workIds} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPickerKrId(null)} onConfirm={ids => {
-        updateKr(pickerKr.keyResultId, { workIds: ids });
+      {creationType && <Modal open title={`新建${workOrderDisplayName(creationType)}`} width={1120} footer={null} closable={false} mask={{ closable: false }} keyboard={false}>
+        <RequirementPoolView creationType={creationType} onCancelCreation={() => setCreationType(null)} onCreated={task => {
+          setAssistance(rows => [...rows, { workId: task.id, subject: task.title, assistanceType: task.workOrderType || creationType,
+            expectedAssignee: task.ownerName || '', status: task.status, expectedDueDate: task.expectedCompleteDate || '',
+            content: task.description || task.title, result: task.description || task.title }]);
+          setCreationType(null);
+        }}/>
+      </Modal>}
+
+      {pickerKr && <WorkEvidencePicker requireProduct={pickerKrId !== 'extra'} work={work} viewer={viewer} product={sourceKr?.businessObject} version={sourceKr?.version} {...monthPeriod(month)} selectedIds={pickerKr.workIds} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPickerKrId(null)} onConfirm={ids => {
+        if (pickerKrId === 'extra') setExtraWork(value => ({ ...value, workIds: ids }));
+        else if (pickerKr.keyResultId) updateKr(pickerKr.keyResultId, { workIds: ids });
         const selectedWork = work.filter(item => ids.includes(item.id));
-        setEvidenceItems(rows => [...rows.filter(item => !pickerKr.workIds.includes(item.workId) || ids.includes(item.workId)), ...selectedWork.filter(item => !rows.some(row => row.workId === item.id)).map(item => ({ workId: item.id, title: item.title, status: item.status, objectiveId: pickerKr.objectiveId, keyResultId: pickerKr.keyResultId, result: '', impact: '' }))]);
+        setEvidenceItems(rows => [...rows.filter(item => !pickerKr.workIds.includes(item.workId) || ids.includes(item.workId)), ...selectedWork.filter(item => !rows.some(row => row.workId === item.id)).map(item => ({ workId: item.id, title: item.title, status: item.status, workType: 'task' as const, sourceLabel: [item.productLineName, item.versionName].filter(Boolean).join(' / '), actualHours: item.actualHours, objectiveId: pickerKr.objectiveId, keyResultId: pickerKr.keyResultId, result: '', impact: '' }))]);
         setPickerKrId(null);
       }}/>}
 

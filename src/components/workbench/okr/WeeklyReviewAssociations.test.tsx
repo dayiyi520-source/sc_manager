@@ -1,0 +1,80 @@
+// @vitest-environment jsdom
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { WeeklyReviewEditor } from './WeeklyReviewEditor';
+import type { OkrPayload } from '../../../services/okrRepository';
+
+vi.mock('../RequirementPoolView', () => ({ RequirementPoolView: ({ creationType, onCreated, onCancelCreation }: any) => <div>
+  <span>创建类型：{creationType}</span>
+  <button onClick={onCancelCreation}>取消创建</button>
+  <button onClick={() => onCreated({ id: 'matter-1', title: '修复线上故障', workOrderType: creationType, ownerName: '张三', status: '待处理' })}>保存事项</button>
+</div> }));
+class Observer { observe() {} unobserve() {} disconnect() {} }
+globalThis.IntersectionObserver = Observer as unknown as typeof IntersectionObserver;
+const props = { okrs: [], work: [], busy: false, workLoading: false, onRefreshWork: vi.fn(), onSaveDraft: vi.fn(async () => true), onSubmit: vi.fn(async () => true), onCancel: vi.fn() };
+
+describe('weekly review associations', () => {
+  it('adds knowledge, saves its full content, reopens it and saves removal', async () => {
+    const save = vi.fn(async (_payload: OkrPayload) => true);
+    const view = render(<WeeklyReviewEditor {...props} onSaveDraft={save}/>);
+    fireEvent.click(screen.getByRole('button', { name: '新建知识沉淀' }));
+    expect(screen.getByRole('button', { name: '确认添加' })).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText('例如：智慧校园平台V3.0产品需求规格说明书'), { target: { value: '故障排查经验' } });
+    fireEvent.change(screen.getByPlaceholderText('简要概括文档核心内容，便于全员高效检索...'), { target: { value: '排查摘要' } });
+    fireEvent.change(screen.getByPlaceholderText('请输入文档链接地址'), { target: { value: 'https://example.com/doc' } });
+    const areas = screen.getAllByRole('textbox').filter(node => node.tagName === 'TEXTAREA');
+    fireEvent.change(areas[areas.length - 1], { target: { value: '先检查告警，再定位日志。' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
+    fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    const saved = save.mock.calls[0][0];
+    expect(saved.knowledgeEntries).toEqual([expect.objectContaining({ title: '故障排查经验', linkUrl: 'https://example.com/doc', summary: '排查摘要', content: '先检查告警，再定位日志。' })]);
+    view.unmount();
+    render(<WeeklyReviewEditor {...props} initialPayload={saved} onSaveDraft={save}/>);
+    fireEvent.click(screen.getByRole('button', { name: '故障排查经验' }));
+    expect(screen.getByText('先检查告警，再定位日志。')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '关闭知识详情' }));
+    fireEvent.click(screen.getByRole('button', { name: '删除知识沉淀故障排查经验' }));
+    fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save.mock.calls[1][0].knowledgeEntries).toEqual([]);
+  });
+
+  it('restores task snapshots and zero hours while removing only the association', async () => {
+    const save = vi.fn(async (_payload: OkrPayload) => true);
+    render(<WeeklyReviewEditor {...props} onSaveDraft={save} initialPayload={{ title: '复盘', extraWork: { workIds: ['task-1'], description: '', impact: 'block' }, items: [{ workId: 'task-1', title: '已关联任务', status: '进行中', sourceLabel: '平台产品 / V2', actualHours: 0, result: '', impact: '' }] }}/>);
+    expect(screen.getByText('已关联任务')).toBeInTheDocument();
+    expect(screen.getByText('平台产品 / V2')).toBeInTheDocument();
+    expect(screen.getByText('0 小时')).toBeInTheDocument();
+    expect(screen.queryByText('对本月目标的影响')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '移除额外工作' }));
+    fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][0].extraWork).toMatchObject({ workIds: [], impact: 'none' });
+    expect(save.mock.calls[0][0].items).toEqual([]);
+  });
+
+  it('opens the selected collaboration form, cancels or associates the created item and removes its link', async () => {
+    const save = vi.fn(async (_payload: OkrPayload) => true);
+    render(<WeeklyReviewEditor {...props} onSaveDraft={save}/>);
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '线上问题' }));
+    expect(screen.getByText('创建类型：线上问题')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '取消创建' }));
+    expect(screen.queryByText('修复线上故障')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '线上问题' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存事项' }));
+    const section = screen.getByRole('region', { name: '需要协助事项' });
+    expect(within(section).getByText('修复线上故障')).toBeInTheDocument();
+    expect(within(section).getByText('张三')).toBeInTheDocument();
+    expect(within(section).getByText('待处理')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][0].assistance).toEqual([expect.objectContaining({ workId: 'matter-1', subject: '修复线上故障', assistanceType: '线上问题', expectedAssignee: '张三', status: '待处理' })]);
+    fireEvent.click(screen.getByRole('button', { name: '移除协同事项修复线上故障' }));
+    fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save.mock.calls[1][0].assistance).toEqual([]);
+  });
+});

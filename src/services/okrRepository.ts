@@ -8,9 +8,10 @@ export interface OkrGoalChange { previousPayload?: OkrPayload; id: string; statu
 export interface OkrKrDetail { id: string; name: string; stage?: string; plannedStartDate?: string; plannedEndDate?: string; }
 export interface OkrKr extends GoalTiming { details?: OkrKrDetail[]; structureType?: 'product' | 'delivery' | 'support'; executionActions?: OkrExecutionAction[]; confidence?: number; currentValue?: number; targetValue?: number; id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[]; businessObject?: string; version?: string; stage?: string; action?: string; result?: string }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
-export interface OkrReviewItem { workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
+export interface OkrReviewItem { sourceLabel?:string; actualHours?:number; workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
 export interface OkrKrReview { viewedEmployeeReviewIds?:string[]; supervisorJudgment?:string; employeeReviewSnapshots?:OkrWeeklyReviewSnapshot[]; objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
-export interface OkrReviewAssistance { subject:string; result:string; assistanceType?:string; expectedAssignee?:string; content?:string; expectedDueDate?:string }
+export interface OkrReviewAssistance { workId?:string; status?:string; subject:string; result:string; assistanceType?:string; expectedAssignee?:string; content?:string; expectedDueDate?:string }
+export interface OkrReviewKnowledge { id:string; title:string; category:string; subCategory?:string; tags?:string[]; version?:string; summary?:string; content?:string; fileType?:string; linkUrl?:string; dingtalkUrl?:string; wecomUrl?:string }
 export interface OkrExtraWork { workIds:string[]; description:string; impact:string; notes?:Record<string,string> }
 export interface OkrMonthlyTask { id:string; content:string; result:string; status:string; sourceReviewId?:string; workId?:string }
 export interface OkrMonthlyPlan { id:string; content:string; objectiveId?:string; keyResultId?:string; plannedDate?:string }
@@ -27,6 +28,8 @@ export interface OkrPayload extends GoalTiming {
 
   reviewMode?: 'completed' | 'structured' | 'monthly' | 'supervisor'; reviewType?: 'week' | 'month'; selfScore?: number;
   krReviews?: OkrKrReview[]; assistance?: OkrReviewAssistance[]; extraWork?: OkrExtraWork; syncKrProgress?: boolean;
+  knowledgeEntries?: OkrReviewKnowledge[];
+  monthlyMetrics?: import('./monthlyReviewMetrics').MonthlyReviewMetrics;
   weeklyReviewIds?: string[]; weeklyReviewSnapshots?: OkrWeeklyReviewSnapshot[];
   monthlyOtherTasks?: OkrMonthlyTask[]; nextMonthPlans?: OkrMonthlyPlan[];
   otherNotes?: string; nextMonthArrangement?: string; nextWeekPlan?: string;
@@ -53,6 +56,7 @@ export interface OkrActionPayload {
 export interface OkrProgressEntry { id: string; itemId: string; operatorId: string; createdAt: string; previousProgress: number; progress: number; status: 'normal' | 'risk' | 'overdue' | 'ahead'; note: string; attachments: Array<{ name: string; data: string }> }
 export interface OkrRecord { progressHistory?: OkrProgressEntry[]; id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; submittedAt?: string; changeRequest?: OkrGoalChange; changeHistory?: OkrGoalChange[]; payload: OkrPayload & Partial<OkrActionPayload> }
 export interface OkrWork {
+  statusChanges?: import('./monthlyReviewMetrics').ReviewStatusChange[];
   productLineId?: string; productLineName?: string; versionId?: string; versionName?: string;
   assigneeId?: string; creatorId?: string; participantIds?: string[]; participantNames?: string[];
   completedAt?: string; statusGroup?: string; id: string; sourceId: string; kind: string; title: string; status: string; ownerName?:string; creatorName?:string; actualHours: number; estimatedHours: number; dueDate: string; createdAt: string; updatedAt: string; sourceWorkOrderIds: string; objectiveId?:string; keyResultId?:string; linkVersion:number }

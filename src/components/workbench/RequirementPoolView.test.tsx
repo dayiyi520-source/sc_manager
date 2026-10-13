@@ -213,6 +213,43 @@ describe('workbench work-order creation layout', () => {
     await waitFor(() => expect(addRequirementTask).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '林志豪', specialFields: expect.objectContaining({ transferToProduct: '不需要' }) })));
   });
 
+  it('embedded creation passes the saved item callback and keeps failed input before retry', async () => {
+    const onCreated = vi.fn();
+    const onCancel = vi.fn();
+    addRequirementTask.mockResolvedValueOnce(false).mockImplementationOnce(async (input, callback) => {
+      callback?.({ ...input, id: 'persisted-matter', status: '待处理' });
+      return true;
+    });
+    render(<RequirementPoolView creationType="客户诉求" onCreated={onCreated} onCancelCreation={onCancel}/>);
+    fireEvent.change(screen.getByLabelText('事项标题 *'), { target: { value: '复盘协助诉求' } });
+    fireEvent.mouseDown(screen.getByLabelText('所属项目 *'));
+    fireEvent.click(await screen.findByText('中标项目甲', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('所属产品 *'));
+    fireEvent.click(await screen.findByText('协同产品', { selector: '.ant-select-item-option-content' }));
+    fireEvent.mouseDown(screen.getByLabelText('是否转产品'));
+    fireEvent.click(await screen.findByText('不需要', { selector: '.ant-select-item-option-content' }));
+    fireEvent.change(screen.getByLabelText('期望完成时间 *'), { target: { value: '2026-10-19' } });
+    fireEvent.keyDown(screen.getByLabelText('期望完成时间 *'), { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(screen.getByLabelText('期望完成时间 *'));
+    fireEvent.change(screen.getByLabelText('诉求来源 *'), { target: { value: '客户反馈' } });
+    fireEvent.click(screen.getByRole('button', { name: '填写事项描述' }));
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    await waitFor(() => expect(addRequirementTask).toHaveBeenCalledTimes(1));
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('事项标题 *')).toHaveValue('复盘协助诉求');
+    fireEvent.click(screen.getByRole('button', { name: '发起协同' }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ id: 'persisted-matter', title: '复盘协助诉求', status: '待处理' })));
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it('embedded creation cancellation returns without saving', () => {
+    const onCancel = vi.fn();
+    render(<RequirementPoolView creationType="线上问题" onCancelCreation={onCancel}/>);
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(addRequirementTask).not.toHaveBeenCalled();
+  });
+
   it('shows indirect tasks with real status and opens their exact detail without matter acceptance', async () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     vi.mocked(loadCollaborationRelatedTasks).mockResolvedValueOnce({ items: [

@@ -90,9 +90,10 @@ export function useOriginalOkr() {
       type:p.reviewType || 'month',reviewMode:p.reviewMode,cycleName:p.title,summary:p.summary || '',selfScore:p.selfScore ?? 0,
       uncompletedReason:p.uncompletedReason || '',suggestions:p.suggestions || '',helpNeeded:p.helpNeeded || '',sendTo:p.sendTo || [],
       createdAt:r.createdAt?.replace('T',' ').slice(0,16) || '—',status:r.status as PerformanceReview['status'],feedback:p.feedback,leaderScore:p.finalScore,
-      linkedWorkItems:(p.items || []).map(i=>({id:i.workId,title:i.title,type:'task',status:i.status})),
-      krReviews:p.krReviews || [], assistance:p.assistance || [], extraWork:p.extraWork, syncKrProgress:p.syncKrProgress,
+      linkedWorkItems:(p.items || []).map(i=>({id:i.workId,title:i.title,type:'task',status:i.status,sourceLabel:i.sourceLabel,actualHours:i.actualHours})),
+      krReviews:p.krReviews || [], assistance:p.assistance || [], extraWork:p.extraWork, knowledgeEntries:p.knowledgeEntries || [], syncKrProgress:p.syncKrProgress,
       weeklyReviewSnapshots:p.weeklyReviewSnapshots || [], monthlyOtherTasks:p.monthlyOtherTasks || [], nextMonthPlans:p.nextMonthPlans || [],
+      monthlyMetrics:p.monthlyMetrics,
       otherNotes:p.otherNotes || '', nextMonthArrangement:p.nextMonthArrangement || '', nextWeekPlan:p.nextWeekPlan || '',
     };
   });

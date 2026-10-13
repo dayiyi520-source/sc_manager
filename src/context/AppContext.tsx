@@ -304,7 +304,7 @@ export interface AppContextType {
   assignRequirementToVersion: (requirementId: string, versionId: string) => Promise<boolean>;
   assignWorkItemToVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string) => Promise<boolean>;
   unassignWorkItemFromVersion: (kind: 'requirement' | 'design' | 'bug' | 'dev' | 'test', itemId: string, versionId: string) => Promise<boolean>;
-  addRequirementTask: (task: Partial<RequirementTask>) => Promise<boolean>;
+  addRequirementTask: (task: Partial<RequirementTask>, onCreated?: (task: RequirementTask) => void) => Promise<boolean>;
   updateRequirementTask: (id: string, updates: Partial<RequirementTask>) => void;
   addDesignTask: (task: Partial<RequirementTask>) => Promise<boolean>;
   updateDesignTask: (id: string, updates: Partial<RequirementTask>) => void;
@@ -552,7 +552,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('success', '招投标复盘已提交', '已沉淀至招投标复盘知识库');
   };
 
-  const addRequirementTask = async (task: Partial<RequirementTask>) => {
+  const addRequirementTask = async (task: Partial<RequirementTask>, onCreated?: (task: RequirementTask) => void) => {
     if (!requirementBackendEnabled) {
       const selectedLocalProduct = task.productLineId ? productLines.find((item) => item.id === task.productLineId) : productLines.find((item) => item.name === task.productLineName) || productLines[0];
       if (!selectedLocalProduct) { addToast('warning', '工单创建失败', '暂无可用的事项归属范围'); return false; }
@@ -560,6 +560,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setRequirementTasks((prev) => [localTask, ...prev]);
       window.dispatchEvent(new CustomEvent('product-task-created', { detail: { source: 'product-task', productLineId: localTask.productLineId, needsCollaboration: localTask.needsCollaboration } }));
       addToast('success', '工单创建成功');
+      onCreated?.(localTask);
       return true;
     }
     const selectedProductLine = task.productLineId
@@ -622,9 +623,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setRequirementTasks((prev) => [newTask, ...prev]);
     try {
-      await requirementRepository.create(newTask);
+      const created = await requirementRepository.create(newTask);
       await requirementQuery.refetch();
       addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);
+      onCreated?.({ ...newTask, id: created.id });
       return true;
     } catch (error) {
       setRequirementTasks((prev) => prev.filter((item) => item.id !== newTask.id));

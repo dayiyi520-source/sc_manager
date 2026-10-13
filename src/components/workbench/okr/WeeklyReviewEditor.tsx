@@ -4,8 +4,8 @@ import {
   Button,
   Checkbox,
   Collapse,
-  DatePicker,
   Empty,
+  Dropdown,
   Input,
   InputNumber,
   Modal,
@@ -25,6 +25,10 @@ import { reviewPeriod } from './simpleReview';
 import { reviewDraftTargets, restoreReviewDraftTargets, reconcileReviewDraftTargets, detachedReviewDescription } from './reviewDraftTargets';
 import { reviewEditorState } from '../../../services/okrReviewTemplates';
 import { WorkEvidencePicker } from './WorkEvidencePicker';
+import { RequirementPoolView } from '../RequirementPoolView';
+import { KnowledgeUploadModal } from '../KnowledgeUploadModal';
+import type { OkrReviewKnowledge } from '../../../services/okrRepository';
+import { workOrderDisplayName } from '../../../utils/workOrderDisplay';
 import { SupervisorObjectiveHeader } from './SupervisorObjectiveHeader';
 import { ReviewRiskCallout } from './ReviewRiskCallout';
 import { employeeActionsForKr } from '../../../services/supervisorSupportPanels';
@@ -34,6 +38,7 @@ import { employeeSupportsForKr, employeeSupportSnapshots, supervisorProgressBase
 import { defaultCollapsedReview } from './evidenceFilters';
 import type { EvidenceViewer } from '../../../services/reviewEvidenceRepository';
 import type { ReviewPeriod } from '../../../services/okrReviewRules';
+import './weeklyReviewEditor.css';
 
 type Health = 'normal' | 'risk' | 'blocked';
 type PickerState = { target: string; selection: string[] } | null;
@@ -58,6 +63,9 @@ export interface KrReviewDraft {
 }
 
 export interface AssistanceDraft {
+  rowId?: string;
+  workId?: string;
+  status?: string;
   subject: string;
   result: string;
   assistanceType: string;
@@ -75,12 +83,6 @@ const statusColor = (status: string) =>
     : status.includes('阻塞') || status.includes('驳回')
     ? 'error'
     : 'processing';
-
-const impactOptions = [
-  { value: 'none', label: '无明显影响' },
-  { value: 'block', label: '挤占 A 投入' },
-  { value: 'support', label: '支持 A' }
-];
 
 const NO_RECORDS: OkrRecord[] = [];
 const NO_PEOPLE: OkrPerson[] = [];
@@ -135,6 +137,10 @@ export function WeeklyReviewEditor({
   const editorState = reviewEditorState(recordStatus);
   const supervisor = template === 'supervisor';
   const rowLabel = supervisor ? 'KR' : 'A';
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [viewingKnowledge, setViewingKnowledge] = useState<OkrReviewKnowledge | null>(null);
+  const [knowledgeEntries, setKnowledgeEntries] = useState<OkrReviewKnowledge[]>(initialPayload?.knowledgeEntries || []);
+  const [creationType, setCreationType] = useState<WorkOrderType | null>(null);
   const [supportTargetId, setSupportTargetId] = useState<string | null>(null);
   const [supportAuthorId, setSupportAuthorId] = useState<string | null>(null);
   const start = dayjs(period.startDate);
@@ -220,8 +226,10 @@ export function WeeklyReviewEditor({
 
   const [assistance, setAssistance] = useState<AssistanceDraft[]>(() => {
     const rows = initialPayload?.assistance || [];
-    if (!rows.length && initialPayload?.helpNeeded) return [{ subject: '需要协同事项', result: initialPayload.helpNeeded, assistanceType: '', expectedAssignee: '', content: initialPayload.helpNeeded, expectedDueDate: '' }];
+    if (!rows.length && initialPayload?.helpNeeded) return [{ rowId: crypto.randomUUID(), subject: '需要协同事项', result: initialPayload.helpNeeded, assistanceType: '', expectedAssignee: '', content: initialPayload.helpNeeded, expectedDueDate: '' }];
     return rows.map(row => ({
+      ...row,
+      rowId: row.workId || crypto.randomUUID(),
       subject: row.subject || '需要协同事项',
       result: row.result || row.content || '',
       assistanceType: row.assistanceType || '',
@@ -316,10 +324,12 @@ export function WeeklyReviewEditor({
         .map(([_, note]) => note)
         .join('；') || kr.evidenceNote
     })),
+    knowledgeEntries,
     helpNeeded: assistance.map(row => row.content.trim()).filter(Boolean).join('；'),
-    assistance: assistance.filter(row => row.content.trim()).map(row => ({ ...row, subject: '需要协同事项', result: row.content.trim() })),
+    assistance: assistance.filter(row => row.workId || row.content.trim()).map(({ rowId: _rowId, ...row }) => ({ ...row, result: row.content.trim() })),
     extraWork: {
       ...extra,
+      impact: 'none',
       description: manualWorks.length ? JSON.stringify(manualWorks) : extra.description
     },
     items: [
@@ -328,6 +338,8 @@ export function WeeklyReviewEditor({
         title: item.title,
         status: item.status,
         workType: workSource(item),
+        sourceLabel: [item.productLineName, item.versionName].filter(Boolean).join(' / ') || '—',
+        actualHours: item.actualHours,
         result: workNotes[item.id] || '',
         impact: ''
       })),
@@ -361,14 +373,19 @@ export function WeeklyReviewEditor({
   // Merged extra work items table data
   const allExtraRows = useMemo(() => {
     const linkedExtra = extra.workIds
-      .map(id => workById.get(id))
+      .map(id => {
+        const live = workById.get(id);
+        if (live) return live;
+        const saved = initialPayload?.items?.find(item => item.workId === id);
+        return saved ? { id, title: saved.title, status: saved.status, actualHours: saved.actualHours, productLineName: saved.sourceLabel } as OkrWork : undefined;
+      })
       .filter((item): item is OkrWork => !!item)
       .map(item => ({
         id: item.id,
         content: item.title,
-        source: workSource(item) === 'ticket' ? '协同事项' : '任务',
+        source: [item.productLineName, item.versionName].filter(Boolean).join(' / ') || '—',
         status: item.status,
-        hours: item.actualHours ? `${item.actualHours} 小时` : '',
+        hours: item.actualHours == null ? '—' : `${item.actualHours} 小时`,
         impact: extra.impact || 'none',
         isManual: false
       }));
@@ -379,10 +396,10 @@ export function WeeklyReviewEditor({
     }));
 
     return [...linkedExtra, ...manualRows];
-  }, [extra, workById, manualWorks]);
+  }, [extra, workById, manualWorks, initialPayload?.items]);
 
   return (
-    <div className="review-document-container max-w-6xl mx-auto space-y-5 text-[var(--text-primary)] pb-10">
+    <div className="review-document-container okr-weekly-editor max-w-6xl mx-auto space-y-5 text-[var(--text-primary)] pb-10">
       <div ref={toolbarSentinelRef} className="okr-review-toolbar-sentinel" aria-hidden="true" />
       {/* 顶部吸顶操作卡 */}
       <div className={`okr-review-sticky-toolbar${toolbarStuck ? ' is-stuck' : ''}`}>
@@ -440,9 +457,9 @@ export function WeeklyReviewEditor({
       )}
 
       {/* ▌ 1. 本月目标复盘 */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]">
+      <section className="okr-weekly-section">
+        <div className="okr-weekly-section-header">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
             <span>1. 本月目标复盘</span>
           </div>
@@ -479,7 +496,12 @@ export function WeeklyReviewEditor({
                 <div className="okr-review-a-list grid gap-4 p-4">
                   {objectiveKrs.map((kr, krIdx) => {
                   const evidence = kr.workIds
-                    .map(id => workById.get(id))
+                    .map(id => {
+        const live = workById.get(id);
+        if (live) return live;
+        const saved = initialPayload?.items?.find(item => item.workId === id);
+        return saved ? { id, title: saved.title, status: saved.status, actualHours: saved.actualHours, productLineName: saved.sourceLabel } as OkrWork : undefined;
+      })
                     .filter((item): item is OkrWork => !!item);
 
                   const collapsed = collapsedKrs[kr.keyResultId] ?? (supervisor ? false : defaultCollapsedReview(kr));
@@ -566,7 +588,7 @@ export function WeeklyReviewEditor({
                             <span className="text-[var(--primary)]">▶</span> 本期关联工作证据
                           </span>
                           <Button
-                            size="small"
+                            size="middle"
                             icon={<Plus className="h-3.5 w-3.5" />}
                             onClick={() => openPicker(kr.keyResultId)}
                           >
@@ -665,17 +687,18 @@ export function WeeklyReviewEditor({
         )}
       </section>
 
-      {/* ▌ 2. 非本月目标任务 */}
-      <section className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]">
+      {/* ▌ 2. 插播任务 */}
+      <section className="okr-weekly-section">
+        <div className="okr-weekly-section-header">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-            <span>2. 非本月目标任务</span>
+            <span>2. 插播任务</span>
           </div>
           <div className="flex items-center gap-2">
             <Button
-              size="small"
+              size="middle"
               icon={<Plus className="h-3.5 w-3.5" />}
+              disabled={busy || !editorState.editable}
               onClick={() => openPicker('extra')}
             >
               关联工作证据
@@ -692,103 +715,20 @@ export function WeeklyReviewEditor({
                 pagination={false}
                 dataSource={allExtraRows}
                 columns={[
+                  { title: '标题', dataIndex: 'content', ellipsis: true },
+                  { title: '来源归属', dataIndex: 'source', ellipsis: true },
+                  { title: '状态', dataIndex: 'status', width: 105 },
+                  { title: '任务工时', dataIndex: 'hours', width: 100 },
                   {
-                    title: '工作内容',
-                    ellipsis: true,
-                    render: (_, row) =>
-                      row.isManual ? (
-                        <Input
-                          size="small"
-                          value={row.content}
-                          onChange={e =>
-                            setManualWorks(rows =>
-                              rows.map(item => (item.id === row.id ? { ...item, content: e.target.value } : item))
-                            )
-                          }
-                          placeholder="填写临时工作内容"
-                        />
-                      ) : (
-                        <span className="text-xs text-[var(--text-primary)]">{row.content}</span>
-                      )
-                  },
-                  {
-                    title: '来源',
+                    title: '删除操作',
                     width: 90,
-                    render: (_, row) => (
-                      <Tag color={row.source === '工单' ? 'purple' : row.source === '任务' ? 'blue' : 'default'}>
-                        {row.source}
-                      </Tag>
-                    )
-                  },
-                  {
-                    title: '当前状态',
-                    width: 105,
-                    render: (_, row) => (
-                      <Select
-                        size="small"
-                        value={row.status}
-                        disabled={!row.isManual}
-                        style={{ width: 95 }}
-                        options={['待处理', '处理中', '已完成', '已阻塞'].map(s => ({ value: s, label: s }))}
-                        onChange={status => {
-                          if (row.isManual) {
-                            setManualWorks(rows =>
-                              rows.map(item => (item.id === row.id ? { ...item, status } : item))
-                            );
-                          }
-                        }}
-                      />
-                    )
-                  },
-                  {
-                    title: '占用时间',
-                    width: 100,
-                    render: (_, row) => (
-                      <Input
-                        size="small"
-                        value={row.hours}
-                        disabled={!row.isManual}
-                        onChange={e => {
-                          if (row.isManual) {
-                            setManualWorks(rows =>
-                              rows.map(item => (item.id === row.id ? { ...item, hours: e.target.value } : item))
-                            );
-                          }
-                        }}
-                        placeholder="如 1.5 天"
-                      />
-                    )
-                  },
-                  {
-                    title: '对本月目标的影响',
-                    width: 170,
-                    render: (_, row) => (
-                      <Select
-                        size="small"
-                        value={row.impact || 'none'}
-                        style={{ width: 160 }}
-                        options={impactOptions}
-                        onChange={impact => {
-                          if (row.isManual) {
-                            setManualWorks(rows =>
-                              rows.map(item => (item.id === row.id ? { ...item, impact } : item))
-                            );
-                          } else {
-                            setExtra(prev => ({ ...prev, impact }));
-                          }
-                        }}
-                      />
-                    )
-                  },
-                  {
-                    title: '操作',
-                    width: 60,
                     render: (_, row) => (
                       <Button
                         type="text"
                         danger
                         size="small"
                         icon={<Trash2 className="h-3.5 w-3.5" />}
+                        disabled={busy || !editorState.editable}
                         aria-label="移除额外工作"
                         title="移除"
                         onClick={() => {
@@ -805,43 +745,77 @@ export function WeeklyReviewEditor({
               />
             </div>
           ) : (
-            <div className="p-4 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-main)] rounded bg-[var(--bg-surface-soft)]">
-              暂无非本月目标工作
-            </div>
+            <Empty description="暂无插播任务" />
           )}
         </div>
       </section>
 
-      <section className="space-y-2" aria-label="下周计划">
-        <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]"><span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" aria-hidden="true"/><span>3. 下周计划</span></div>
-        <Input.TextArea aria-label="下周计划" value={nextWeekPlan} onChange={event => setNextWeekPlan(event.target.value)} autoSize={{ minRows: 3, maxRows: 8 }} maxLength={10000} showCount placeholder="填写下周重点工作、预期结果与关键节点" disabled={busy}/>
+      <section className="okr-weekly-section" aria-label="下周计划">
+        <div className="okr-weekly-section-header okr-weekly-section-header-title text-sm font-semibold text-[var(--text-primary)]"><span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" aria-hidden="true"/><span>3. 下周计划</span></div>
+        <Input.TextArea className="okr-weekly-plan-input" aria-label="下周计划" value={nextWeekPlan} onChange={event => setNextWeekPlan(event.target.value)} rows={4} maxLength={10000} showCount placeholder="填写下周重点工作、预期结果与关键节点" disabled={busy}/>
       </section>
 
-      {/* ▌ 4. 需要协助事项 */}
-      <section className="space-y-2">
-        <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]">
-          <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-          <span>4. 需要协助事项</span>
-        </div>
-
-        <div className="bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-4 shadow-sm">
-          <div className="space-y-3">
-            {assistance.map((row, index) => (
-              <div key={`assistance-${index}`} className="grid grid-cols-1 gap-2 rounded border border-[var(--border-main)] p-3 md:grid-cols-[160px_180px_160px_1fr_auto]">
-                <Select value={row.assistanceType || undefined} placeholder="请选择协助类型" options={assistanceTypes.map(value => ({ value, label: value === '客户诉求' ? '产品需求' : value }))} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, assistanceType: value } : item))} />
-                <Select showSearch allowClear optionFilterProp="label" value={row.expectedAssignee || undefined} placeholder="请选择期望协助人" options={teamMembers.map(member => ({ value: member.name, label: `${member.name} · ${member.jobTitle || member.roleTitle || '未设置职位'}` }))} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, expectedAssignee: value || '' } : item))} />
-                <DatePicker value={row.expectedDueDate ? dayjs(row.expectedDueDate) : null} onChange={value => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, expectedDueDate: value?.format('YYYY-MM-DD') || '' } : item))} placeholder="期望完成日期" />
-                <Input value={row.content} onChange={event => setAssistance(rows => rows.map((item, rowIndex) => rowIndex === index ? { ...item, content: event.target.value, result: event.target.value } : item))} placeholder="说明需要的协助、资源和反馈" />
-                <Button type="text" danger aria-label="移除协同事项" onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>移除</Button>
-              </div>
-            ))}
-            <Button icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setAssistance(rows => [...rows, { subject: '需要协同事项', result: '', assistanceType: '', expectedAssignee: '', content: '', expectedDueDate: '' }])}>添加协同事项</Button>
+      <section className="okr-weekly-section" aria-label="需要协助事项">
+        <div className="okr-weekly-section-header">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
+            <span>4. 需要协助事项</span>
           </div>
+          <Dropdown trigger={['click']} disabled={busy || !editorState.editable} menu={{
+            items: assistanceTypes.map(type => ({ key: type, label: workOrderDisplayName(type) })),
+            onClick: ({ key }) => setCreationType(key as WorkOrderType),
+          }}><Button icon={<Plus className="h-3.5 w-3.5" />} disabled={busy || !editorState.editable}>发起协同</Button></Dropdown>
         </div>
+        <Table size="small" rowKey={row => row.workId || row.rowId!} pagination={false} dataSource={assistance}
+          locale={{ emptyText: <Empty description="暂无需要协助事项" /> }} columns={[
+            { title: '标题', dataIndex: 'subject', ellipsis: true },
+            { title: '事项类型', render: (_, row) => workOrderDisplayName(row.assistanceType) || '—' },
+            { title: '负责人', dataIndex: 'expectedAssignee' },
+            { title: '状态', render: (_, row) => row.status || '未发起' },
+            { title: '删除操作', render: (_, row, index) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`移除协同事项${row.subject}`} onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>删除</Button> },
+          ]}/>
       </section>
+
+      <section className="okr-weekly-section" aria-label="知识沉淀">
+        <div className="okr-weekly-section-header">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
+            <span>5. 知识沉淀</span>
+          </div>
+          <Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setKnowledgeOpen(true)}>新建知识沉淀</Button>
+        </div>
+        <Table size="small" rowKey="id" pagination={false} dataSource={knowledgeEntries}
+          locale={{ emptyText: <Empty description="暂无知识沉淀" /> }} columns={[
+            { title: '标题', ellipsis: true, render: (_, row) => <Button type="link" onClick={() => setViewingKnowledge(row)}>{row.title}</Button> },
+            { title: '分类', dataIndex: 'category' },
+            { title: '内容摘要', dataIndex: 'summary', ellipsis: true },
+            { title: '删除操作', render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
+          ]}/>
+      </section>
+      {viewingKnowledge && <Modal open title={viewingKnowledge.title} onCancel={() => setViewingKnowledge(null)} footer={<Button aria-label="关闭知识详情" onClick={() => setViewingKnowledge(null)}>关闭</Button>}>
+        <p>{viewingKnowledge.category} · {viewingKnowledge.subCategory} · {viewingKnowledge.version}</p>
+        <p className="whitespace-pre-wrap break-words">{viewingKnowledge.summary}</p>
+        <p className="whitespace-pre-wrap break-words">{viewingKnowledge.content || '暂无正文'}</p>
+        <p className="break-words">{viewingKnowledge.tags?.join('、')}</p>
+        {viewingKnowledge.linkUrl && <p className="break-words">链接地址：{viewingKnowledge.linkUrl}</p>}
+        {viewingKnowledge.dingtalkUrl && <p className="break-words">钉钉文档：{viewingKnowledge.dingtalkUrl}</p>}
+        {viewingKnowledge.wecomUrl && <p className="break-words">企微文档：{viewingKnowledge.wecomUrl}</p>}
+      </Modal>}
+      {knowledgeOpen && <KnowledgeUploadModal mode="review" isOpen onClose={() => setKnowledgeOpen(false)} onSubmit={doc => {
+        setKnowledgeEntries(rows => [...rows, { ...doc, id: crypto.randomUUID(), title: doc.title || '', category: doc.category || '应知应会' }]);
+      }}/>}
+
+      {creationType && <Modal open title={`新建${workOrderDisplayName(creationType)}`} width={1120} footer={null} closable={false} mask={{ closable: false }} keyboard={false}>
+        <RequirementPoolView creationType={creationType} onCancelCreation={() => setCreationType(null)} onCreated={task => {
+          setAssistance(rows => [...rows, { workId: task.id, subject: task.title, assistanceType: task.workOrderType || creationType,
+            expectedAssignee: task.ownerName || '', status: task.status, expectedDueDate: task.expectedCompleteDate || '',
+            content: task.description || task.title, result: task.description || task.title }]);
+          setCreationType(null);
+        }}/>
+      </Modal>}
 
       {supportTarget && <EmployeeReviewSupportDialog target={supportTarget} supports={(supportsByKr.get(supportTarget.keyResultId) || []).filter(support => !supportAuthorId || support.record.ownerId === supportAuthorId)} savedSnapshots={(supportTarget.employeeReviewSnapshots || []).filter(snapshot => !supportAuthorId || (snapshot.authorId || snapshot.authorName || snapshot.id) === supportAuthorId)} loading={recordsLoading} error={recordsError} onRetry={onRefreshRecords} onClose={() => { setSupportTargetId(null); setSupportAuthorId(null); }}/>}
-      {picker && <WorkEvidencePicker work={work} viewer={viewer} product={pickerSourceKr?.businessObject} version={pickerSourceKr?.version} startDate={period.startDate} endDate={period.endDate} selectedIds={picker.selection} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPicker(null)} onConfirm={confirmPicker}/>}
+      {picker && <WorkEvidencePicker requireProduct={picker.target !== 'extra'} work={work} viewer={viewer} product={pickerSourceKr?.businessObject} startDate={period.startDate} endDate={period.endDate} selectedIds={picker.selection} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPicker(null)} onConfirm={confirmPicker}/>}
 
       {/* 提交确认弹窗 (带中文界面及OKR系统进度同步勾选) */}
       <Modal

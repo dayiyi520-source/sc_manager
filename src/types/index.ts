@@ -156,8 +156,10 @@ export interface PerformanceReview {
   krReviews?: import('../services/okrRepository').OkrKrReview[];
   assistance?: import('../services/okrRepository').OkrReviewAssistance[];
   extraWork?: import('../services/okrRepository').OkrExtraWork;
+  knowledgeEntries?: import('../services/okrRepository').OkrReviewKnowledge[];
   syncKrProgress?: boolean;
   weeklyReviewSnapshots?: import('../services/okrRepository').OkrWeeklyReviewSnapshot[];
+  monthlyMetrics?: import('../services/monthlyReviewMetrics').MonthlyReviewMetrics;
   monthlyOtherTasks?: import('../services/okrRepository').OkrMonthlyTask[];
   nextMonthPlans?: import('../services/okrRepository').OkrMonthlyPlan[];
   otherNotes?: string;
@@ -166,6 +168,8 @@ export interface PerformanceReview {
 }
 
 export interface ReviewWorkItem {
+  sourceLabel?: string;
+  actualHours?: number;
   id: string;
   title: string;
   type: 'task' | 'ticket' | 'requirement' | 'bug';
@@ -215,6 +219,7 @@ export interface KnowledgeDoc {
   views?: number;
   downloadsCount?: number;
   isFavorited?: boolean;
+  linkUrl?: string;
   dingtalkUrl?: string;
   wecomUrl?: string;
   summary?: string;
