@@ -52,3 +52,12 @@ it.each(profiles)('renders fixed $kind $variant creation fields even when old se
   expect(screen.queryByText('实际工时（小时）')).not.toBeInTheDocument();
   expect(productRepository.workItemFieldConfigurations).not.toHaveBeenCalled();
 });
+
+it.each(['requirement', 'design', 'dev', 'test', 'presales', 'ops', 'delivery'] as const)('offers company scope after department for %s tasks', async kind => {
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} /></QueryClientProvider>);
+  const companyTab = await screen.findByRole('tab', { name: '全公司的·0' });
+  const tabs = screen.getAllByRole('tab');
+  expect(tabs.indexOf(companyTab)).toBe(tabs.findIndex(tab => tab.textContent === '我部门的·0') + 1);
+  fireEvent.click(companyTab);
+  expect(companyTab).toHaveAttribute('aria-selected', 'true');
+});

@@ -53,12 +53,12 @@ describe('ObjectiveForm objective numbering', () => {
     render(<ObjectiveForm cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn(async () => true)}/>);
 
     expect(screen.getByLabelText('目标编号 O1')).toBeInTheDocument();
-    expect(screen.getByLabelText('A1 名称')).toHaveAttribute('placeholder', '输入动作名称：要写工作结果（做到什么），不能只写动作描述（做什么）');
+    expect(screen.getByLabelText('A1 名称')).toHaveAttribute('placeholder', '输入你计划要做的动作描述');
     expect(screen.getByRole('button', { name: '添加关键结果' })).toBeEnabled();
     expect(screen.getByRole('button', { name: /添加目标/ })).toBeEnabled();
     expect(screen.queryByRole('button', { name: '对齐目标' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('目标备注')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('目标名称')).toHaveAttribute('placeholder', '输入目标名称：明确你要达成什么，不写含糊概括的目标');
+    expect(screen.getByLabelText('目标名称')).toHaveAttribute('placeholder', '输入目标名称：明确你要达成什么，不写含糊概括的目标。');
     expect(screen.getByText('2026年09月目标')).toBeInTheDocument();
     expect(screen.getByText('公司级')).toBeInTheDocument();
     expect(screen.getByText('测试...')).toBeInTheDocument();

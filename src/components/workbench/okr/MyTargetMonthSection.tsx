@@ -1,3 +1,5 @@
+import { goalSourceLabel, hasDownstreamAlignment, isPersonalGoal, isAssignedPersonalGoal } from './goalPresentation';
+import { krDetails } from '../../../services/okrKrDetails';
 import { canEditOkr } from '../../../services/okrSettingsPolicy';
 import { periodLabel, periodBounds } from '../../../services/okrPeriods';
 import type { OkrSettings } from '../../../services/okrRepository';
@@ -28,6 +30,9 @@ export type MyTargetActionViewItem = {
 
 export type MyTargetViewItem = {
   id: string;
+  primaryLabel?: 'KR';
+  primaryDetails?: OkrKrDetail[];
+  primaryDetailLabel?: string;
   detailId?: string;
   title: string;
   status: string;
@@ -42,7 +47,7 @@ export type MyTargetViewItem = {
   totalWeight?: number;
   maxDeadline?: string;
   progress: number;
-  objectiveWeight?: number; initialPending?: boolean; savedAt?: string; awaitingApproval?: boolean; autonomous?: boolean;
+  objectiveWeight?: number; initialPending?: boolean; savedAt?: string; awaitingApproval?: boolean; changePurpose?: string; autonomous?: boolean;
   actions: MyTargetActionViewItem[];
 };
 
@@ -117,10 +122,10 @@ export const buildMyTargetViewItems = (
   const ownerName = nameOf(currentUserId);
   const ownerNameOf = (id?: string) => nameOf(id) || '未指定';
   const allRecords = [...new Map([...sourceActions, ...records].map(record => [record.id, record])).values()];
-  const alignmentsFor = (actionId: string, periodKey: string, ownerId: string) => {
-    const active = allRecords.filter(record => record.periodKey === periodKey && record.status !== 'draft' && record.ownerId !== ownerId);
-    const objectives = active.filter(record => record.kind === 'objective' && record.payload.alignments?.some(alignment => alignment.parentKeyResultId === actionId));
-    const children = active.filter(record => record.kind === 'action' && (record.payload.parentActionId === actionId || record.payload.parentKeyResultId === actionId));
+  const alignmentsFor = (actionId: string, periodKey: string, ownerId: string, objectiveId: string) => {
+    const active = allRecords.filter(record => hasDownstreamAlignment(record, objectiveId, actionId, ownerId, periodKey, people));
+    const objectives = active.filter(record => record.kind === 'objective');
+    const children = active.filter(record => record.kind === 'action');
     const groups = new Map<string, OkrRecord[]>();
     children.forEach(record => {
       const key = `${record.ownerId}:${record.payload.parentObjectiveId}`;
@@ -142,10 +147,11 @@ export const buildMyTargetViewItems = (
     progress: Number(record.payload.progress || 0),
     weight: Number(record.payload.weight || 0),
     deadline: record.payload.deadline || '',
-    alignments: alignmentsFor(record.id, record.periodKey, record.ownerId),
+    alignments: alignmentsFor(record.id, record.periodKey, record.ownerId, record.payload.parentObjectiveId || record.id),
   });
   const objectiveTargets = records.filter(record => record.kind === 'objective').map(record => {
-    const ownPersonal = record.payload.goalLevel === 'personal' && record.payload.origin === 'autonomous';
+    const ownPersonal = isPersonalGoal(record);
+    const assignedPersonal = isAssignedPersonalGoal(record);
     const displayActions = ownPersonal ? (record.payload.keyResults || []).flatMap(kr => (kr.executionActions || []).filter(action => action.ownerId === record.ownerId)) : record.payload.keyResults || [];
     const actions: MyTargetActionViewItem[] = displayActions.map(action => ({
       details: 'details' in action ? action.details : undefined, detailLabel: 'structureType' in action && action.structureType === 'delivery' ? '项目产品' : '迭代版本',
@@ -156,7 +162,7 @@ export const buildMyTargetViewItems = (
       progress: Number(action.progress || 0),
       weight: Number(action.weight || 0),
       deadline: action.deadline || '',
-      alignments: alignmentsFor(action.id, record.periodKey, record.ownerId),
+      alignments: ownPersonal ? [] : alignmentsFor(action.id, record.periodKey, record.ownerId, record.id),
     }));
     const sourceId = record.payload.parentObjectiveId || record.payload.alignments?.[0]?.parentObjectiveId;
     const recordOwner = people.find(person => person.id === record.ownerId);
@@ -164,19 +170,22 @@ export const buildMyTargetViewItems = (
     const sourceOwner = nameOf(source?.ownerId || recordOwner?.supervisorId);
     return {
       id: record.id,
+      primaryLabel: assignedPersonal ? 'KR' as const : undefined,
+      primaryDetails: assignedPersonal ? krDetails(record.payload.keyResults?.[0] || { id: '', title: '', weight: 100, progress: 0 }) : undefined,
+      primaryDetailLabel: record.payload.keyResults?.[0]?.structureType === 'delivery' ? '项目产品' : '迭代版本',
       objectiveWeight: record.payload.weight ?? 100, initialPending: record.changeRequest?.purpose === 'initial' && record.changeRequest.status !== 'approved',
       detailId: record.id,
-      alignmentLabel: record.payload.alignments?.map(alignment => [...sourceActions, ...records].find(item => item.id === alignment.parentObjectiveId)?.payload.title).filter(Boolean).join('、') || `${periodLabel(record.periodKey)}目标`,
+      alignmentLabel: goalSourceLabel(record, allRecords, people) || `${periodLabel(record.periodKey)}目标`,
       editable: canEditOkr(record,currentUserId,settings,people) && record.changeRequest?.status !== 'pending',
       deletable: record.changeRequest?.status === 'pending' ? record.ownerId === currentUserId : canEditOkr(record,currentUserId,settings,people) && !record.payload.inherited,
       title: record.payload.title,
-      status: record.status, awaitingApproval: record.changeRequest?.status === 'pending', autonomous: record.payload.origin === 'autonomous',
+      status: record.status, awaitingApproval: record.changeRequest?.status === 'pending', changePurpose: record.changeRequest?.purpose, autonomous: record.payload.origin === 'autonomous',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
       ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
       creatorName: ownerNameOf(record.ownerId),
       levelLabel: goalLevel(recordOwner),
       metaOwnerId: source?.ownerId || recordOwner?.supervisorId || record.ownerId,
-      totalWeight: actions.reduce((sum, action) => sum + action.weight, 0),
+      totalWeight: record.payload.weight ?? 100,
       maxDeadline: record.payload.deadline || latestDeadline(actions.map(action => action.deadline)),
       progress: weightedProgress(actions),
       savedAt: record.createdAt,
@@ -248,7 +257,7 @@ const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submi
   return <div className={`okr-target-action-row${compact ? ' is-compact' : ''}${inlineAssignees ? ' has-inline-assignees' : ''}`}>
     <span className="okr-target-action-index">{action.label || 'A'}{index + 1}</span>
     <div className="okr-target-action-content"><strong title={action.title}>{action.title || '未填写行动描述'}{inlineAssignees && action.assigneeNames.length > 0 && <span className="okr-target-action-assignees-inline"> {action.assigneeNames.map(name => `@${name}`).join(' ')}</span>}</strong>
-      {!compact && !!action.alignments?.length && <Popover trigger={['hover', 'focus']} placement="bottomRight" title="对齐我的" content={<div className="okr-target-alignment-preview" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{action.alignments.map(target => <section key={target.id}><h4 title={target.title}>{target.title}</h4><div className="okr-target-alignment-meta"><Progress type="circle" percent={target.progress} size={24} showInfo={false}/><span>{target.progress}%</span><Tag color="green">{target.levelLabel}</Tag><span>{target.ownerName}</span></div>{target.actions.map((item, i) => <div key={item.id} className={`okr-target-alignment-action${item.linked ? ' is-linked' : ''}`}><span>A{i + 1}</span><span title={item.title}>{item.title}</span>{item.linked && <GitBranchIcon size={14}/>}</div>)}</section>)}</div>}><Button className="okr-target-action-alignment" type="text" aria-label={`A${index + 1}下级对齐`} icon={<GitBranchIcon size={16}/>} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}/></Popover>}
+      {!compact && !!action.alignments?.length && <Popover trigger={['hover', 'focus']} placement="bottomRight" title="对齐我的" content={<div className="okr-target-alignment-preview" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{action.alignments.map(target => <section key={target.id}><h4 title={target.title}>{target.title}</h4><div className="okr-target-alignment-meta"><Progress type="circle" percent={target.progress} size={24} showInfo={false}/><span>{target.progress}%</span><Tag color="green">{target.levelLabel}</Tag><span>{target.ownerName}</span></div>{target.actions.map((item, i) => <div key={item.id} className={`okr-target-alignment-action${item.linked ? ' is-linked' : ''}`}><span>A{i + 1}</span><span title={item.title}>{item.title}</span>{item.linked && <GitBranchIcon size={14}/>}</div>)}</section>)}</div>}><Button className="okr-target-action-alignment" type="text" aria-label={`${action.label || 'A'}${index + 1}下级对齐`} icon={<GitBranchIcon size={16}/>} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}/></Popover>}
     </div>
     {!inlineAssignees && <span title={assigneeLabel(action.assigneeNames)}>{assigneeLabel(action.assigneeNames)}</span>}
     {!compact && <>
@@ -274,10 +283,10 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   return <article className="okr-target-list-item" role="button" tabIndex={0} aria-label={`目标：${target.title}`} onClick={onOpen} onKeyDown={event => { if (event.target === event.currentTarget) openOnKeyboard(event, onOpen); }}>
     <header>
       <div className="okr-target-list-copy">
-        {target.awaitingApproval && <Tag color="processing">待上级审核</Tag>}{target.autonomous && <Tag>自主提出</Tag>}{target.status === 'draft' && <Tag className="okr-target-list-draft">草稿</Tag>}{target.status === 'partial-draft' && <Tag className="okr-target-list-draft">部分草稿</Tag>}
+        {target.autonomous && <Tag>自主提出</Tag>}{target.status === 'draft' && <Tag className="okr-target-list-draft">草稿</Tag>}{target.status === 'partial-draft' && <Tag className="okr-target-list-draft">部分草稿</Tag>}
         <div className={`okr-target-hierarchy${target.alignmentLabel || target.sourceName || target.ownerNames.length ? ' has-links' : ''}`}>
           <span className="okr-target-hierarchy-source"><span className="okr-target-hierarchy-label">{target.alignmentLabel || target.sourceName || '未设置对齐'}</span></span>
-          <div className="okr-target-title-line"><span className="okr-summary-index">O{index + 1}</span><h3>{target.title}</h3></div>
+          <div className="okr-target-title-line"><span className="okr-summary-index">{target.primaryLabel || 'O'}{index + 1}</span><h3>{target.title}</h3></div>
           <div className="okr-target-meta-line"><Tag color="blue">{target.levelLabel || '公司级'}</Tag><span className="okr-target-creator">{target.creatorName || '未指定'}</span><span className="okr-target-weight">{target.totalWeight ?? 0}%</span></div>
           <span className="okr-target-hierarchy-owner"><span className="okr-target-hierarchy-label">承接人员：{assigneeLabel(target.ownerNames)}</span></span>
         </div>
@@ -287,7 +296,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
         <div className="okr-target-list-status"><div><span>进度</span><strong>{target.progress}%</strong></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></div>
       </div>
     </header>
-    <div className="okr-target-actions">{target.actions.length
+    <div className="okr-target-actions">{!!target.primaryDetails?.length && <KrDetailTable rows={target.primaryDetails} label={target.primaryDetailLabel || '迭代版本'}/>} {target.actions.length
       ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees onProgress={onProgress}/>)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>
@@ -299,7 +308,7 @@ const CardTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   const visibleActions = target.actions.filter(action => action.label !== 'A');
   return <article className="okr-target-grid-card" role="button" tabIndex={0} aria-label={`目标卡片：${target.title}`} onClick={onOpen} onKeyDown={event => { if (event.target === event.currentTarget) openOnKeyboard(event, onOpen); }}>
     <header>
-      <div className="okr-target-card-title"><span className="okr-summary-index">O{index + 1}</span><h3 title={target.title}>{target.title}</h3></div>
+      <div className="okr-target-card-title"><span className="okr-summary-index">{target.primaryLabel || 'O'}{index + 1}</span><h3 title={target.title}>{target.title}</h3></div>
       <div className="okr-target-card-head-right">{target.awaitingApproval && <Tag color="processing">待上级审核</Tag>}{target.autonomous && <Tag>自主提出</Tag>}{target.status === 'draft' && <Tag>草稿</Tag>}{target.status === 'partial-draft' && <Tag>部分草稿</Tag>}<TargetToolbar target={target} onEdit={onEdit} onDelete={onDelete} busy={busy}/></div>
     </header>
     <div className="okr-target-meta-line"><Tag color="blue">{target.levelLabel || '公司级'}</Tag><span className="okr-target-creator">{target.creatorName || '未指定'}</span><span className="okr-target-weight">{target.totalWeight ?? 0}%</span></div>

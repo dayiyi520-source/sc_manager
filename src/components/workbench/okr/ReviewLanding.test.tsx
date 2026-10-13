@@ -41,8 +41,17 @@ describe('review landing interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: /可补交的/ }));
     const dialog = screen.getByRole('dialog', { name: '已逾期的总结' });
     expect(within(dialog).getByText('历史周报草稿')).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: /填\s*写/ }));
+    const draftCard = within(dialog).getByText('历史周报草稿').closest('article')!;
+    fireEvent.click(within(draftCard).getByRole('button', { name: /填\s*写/ }));
     expect(props.onOpen).toHaveBeenCalledWith('week', { startDate: '2026-09-07', endDate: '2026-09-13' }, draft);
+  });
+  it('keeps company write actions clickable even outside the configured window or after submission', () => {
+    const closed = { ...settings, timeRules: [{ key: 'weeklyReview', label: '周报', startDay: 5, endDay: 7 }, { key: 'monthlyReview', label: '月报', startDay: 30, endDay: 31 }] };
+    render(<ReviewLanding {...props} exempt settings={closed}/>);
+    expect(screen.getByRole('button', { name: '写周报' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '写月报' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '写周报' }));
+    expect(props.onOpen).toHaveBeenCalled();
   });
   it('uses empty feedback when no records are available', () => {
     render(<ReviewLanding {...props}/>);

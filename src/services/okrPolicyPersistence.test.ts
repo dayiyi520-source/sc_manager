@@ -12,6 +12,10 @@ async function context() {
   return { people, admin, manager, other, settings: await okrRepository.settings() };
 }
 describe('OKR policy persistence and access', () => {
+ it('round trips all department template stages and types after fresh reads',async()=>{
+ const {admin,settings}=await context();settings.templates=[{department:'产品规划部',type:'product',fields:[],stages:['设计','开发']},{department:'产品规划部',type:'delivery',fields:[],stages:['实施','验收']},{department:'产品规划部',type:'support',fields:[],types:['协作','支持']}];
+ await okrRepository.saveSettings(settings,admin.id);const reloaded=await okrRepository.settings();expect(reloaded.templates).toEqual(settings.templates);expect((await okrRepository.settings()).templates).toEqual(settings.templates);
+ });
   it('persists settings, rejects non-administrators and prevents stale overwrites', async () => {
     const { admin, manager, settings } = await context();
     settings.cycles!.crossAlignment = true;

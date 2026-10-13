@@ -90,7 +90,12 @@ export function backfillReviews(records: OkrRecord[], objectives: OKRItem[], own
     const draft = matching.find(record => ['draft', 'returned'].includes(record.status));
     periods.set(`${type}:${period.startDate}`, { ...period, type, title: draft?.payload.title || reviewPeriodTitle(type, period), draft });
   };
-  const cycles = new Set(objectives.filter(objective => ['active', 'submitted', 'reviewed'].includes(objective.status || '') && (objective.ownerId === ownerId || objective.keyResults.some(kr => kr.assigneeIds?.includes(ownerId)))).map(objective => objective.cycle));
+  const cycles = new Set([
+    ...(settings.cycles?.periods || []),
+    ...records.filter(record => record.ownerId === ownerId && record.status !== 'deleted' && ['objective', 'action', 'review'].includes(record.kind)).map(record => record.periodKey),
+    ...mine.flatMap(record => record.payload.startDate ? [record.payload.startDate.slice(0, 7)] : []),
+    ...objectives.filter(objective => objective.ownerId === ownerId && ['active', 'submitted', 'reviewed', 'completed', 'archived'].includes(objective.status || '')).map(objective => objective.cycle),
+  ]);
   for (const cycle of cycles) {
     if (!/^\d{4}-\d{2}$/.test(cycle)) continue;
     const month = dayjs(`${cycle}-01`);

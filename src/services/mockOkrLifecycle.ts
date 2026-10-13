@@ -1,3 +1,4 @@
+import { restoreReturnedInitialDraft } from './okrSubmissionState';
 import { applyProgress, canUpdateProgress, progressSubject } from './okrProgress';
 import { canAlignPeriod } from './okrPeriods';
 import { canEditOkr, confirmationReviewer } from './okrSettingsPolicy';
@@ -28,6 +29,8 @@ function verifySource(payload: OkrPayload, records: OkrRecord[], person: OkrPers
 }
 export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation, records: OkrRecord[], people: OkrPerson[], settings?: OkrSettings): Result | undefined {
   const record = records.find(item => item.id === recordId);
+  const normalized = record && restoreReturnedInitialDraft(record);
+  if (record && normalized !== record) return mutateOkrLifecycle(recordId, body, records.map(item => item.id === recordId ? normalized! : item), people, settings);
   const lifecycleAction = ['approve-change', 'return-change', 'acknowledge-source', 'withdraw-change', 'update-progress'].includes(body.action || '');
   if (!lifecycleAction && body.payload?.goalModelVersion !== 2 && record?.payload.goalModelVersion !== 2) return undefined;
   if (record?.kind === 'review' || body.kind === 'review') return undefined;
@@ -54,8 +57,8 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
       if (body.action === 'approve-change' && change.purpose === 'delete' && records.some(child=>child.status !== 'deleted' && child.payload.sourceObjectiveId===record.id)) throw new Error('目标已有下级承接，不能删除');
       if (body.suggestedSource) { const selected = records.find(source => body.suggestedSource?.startsWith(`${source.id}:`) && source.ownerId === person.id && source.periodKey === record.periodKey && ['active','reviewed'].includes(source.status)); if (!selected) throw new Error('建议对齐来源必须是本月已生效目标'); }
       if (body.action === 'return-change' && !body.feedback?.trim()) throw new Error('请填写退回原因');
-      const reviewed: OkrGoalChange = { ...change, status: body.action === 'approve-change' ? 'approved' : 'returned', reviewedAt: timestamp(), feedback: body.feedback?.trim(), ...(body.suggestedSource ? { payload: { ...change.payload, reviewerSuggestedSource: body.suggestedSource } } : {}) };
-      return replace({ ...record, payload: body.action === 'approve-change' && change.purpose !== 'delete' ? change.payload.goalModelVersion === 2 ? lockGoalPlan(change.payload) : change.payload : record.payload, status: body.action === 'approve-change' && change.purpose === 'delete' ? 'deleted' : body.action === 'approve-change' && change.purpose === 'initial' ? 'active' : record.status, changeRequest: reviewed, changeHistory: [...(record.changeHistory || []), reviewed], version: record.version + 1 });
+      const reviewed: OkrGoalChange = { ...change, previousPayload: change.previousPayload || (change.purpose === 'initial' ? undefined : record.payload), status: body.action === 'approve-change' ? 'approved' : 'returned', reviewedAt: timestamp(), feedback: body.feedback?.trim(), ...(body.suggestedSource ? { payload: { ...change.payload, reviewerSuggestedSource: body.suggestedSource } } : {}) };
+      return replace({ ...record, payload: body.action === 'return-change' && change.purpose === 'initial' ? change.payload : body.action === 'approve-change' && change.purpose !== 'delete' ? change.payload.goalModelVersion === 2 ? lockGoalPlan(change.payload) : change.payload : record.payload, status: body.action === 'return-change' && change.purpose === 'initial' ? 'draft' : body.action === 'approve-change' && change.purpose === 'delete' ? 'deleted' : body.action === 'approve-change' && change.purpose === 'initial' ? 'active' : record.status, changeRequest: reviewed, changeHistory: [...(record.changeHistory || []), reviewed], version: record.version + 1 });
     }
     if (!canEditOkr(record,person.id,settings,people)) throw new Error('只能修改本人目标或已授权的公司级目标');
     if (body.action === 'withdraw-change') {
@@ -100,12 +103,12 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
   if (record && !['draft','submitted'].includes(record.status) && reviewerId) {
     if (!payload.changeReason?.trim()) throw new Error('请填写修改原因');
 
-    const change: OkrGoalChange = { id: crypto.randomUUID(), status: 'pending', purpose: record.payload.sourceKrId !== payload.sourceKrId || record.payload.sourceObjectiveId !== payload.sourceObjectiveId ? 'alignment' : 'update', reason: payload.changeReason.trim(), reviewerId, payload: { ...payload, inherited: false }, baseVersion: record.version, requestedAt: timestamp() };
+    const change: OkrGoalChange = { previousPayload: record.payload, id: crypto.randomUUID(), status: 'pending', purpose: record.payload.sourceKrId !== payload.sourceKrId || record.payload.sourceObjectiveId !== payload.sourceObjectiveId ? 'alignment' : 'update', reason: payload.changeReason.trim(), reviewerId, payload: { ...payload, inherited: false }, baseVersion: record.version, requestedAt: timestamp() };
     return replace({ ...record, changeRequest: change, version: record.version + 1 });
   }
   const next: OkrRecord = { ...record, id: record?.id || crypto.randomUUID(), kind: 'objective', ownerId: owner.id, periodKey: record?.periodKey || body.periodKey || '', status: submission ? 'active' : 'draft', createdAt: record?.createdAt || timestamp(), version: (record?.version ?? -1) + 1, payload: submission ? lockGoalPlan(payload) : { ...payload, inherited: false } };
   if (record && !['draft','submitted'].includes(record.status)) next.payload = { ...payload, plannedDeadline: record.payload.plannedDeadline || record.payload.deadline, inherited: false };
-  if (record && record.status !== 'draft' && expectedLevel === 'company') { next.changeHistory = [...(record.changeHistory || []), { id: crypto.randomUUID(), status: 'approved', reviewerId: person.id, reason: payload.changeReason || '公司目标调整', payload: next.payload, baseVersion: record.version, requestedAt: timestamp(), reviewedAt: timestamp() }]; }
+  if (record && !['draft','submitted'].includes(record.status)) { next.changeHistory = [...(record.changeHistory || []), { id: crypto.randomUUID(), status: 'approved', previousPayload: record.payload, purpose: 'update', reviewerId: person.id, reason: payload.changeReason || '目标内容调整', payload: next.payload, baseVersion: record.version, requestedAt: timestamp(), reviewedAt: timestamp() }]; }
   if (submission && reviewerId && (!record || ['draft','submitted'].includes(record.status))) {
 
     next.status = 'submitted'; next.payload = { ...payload, inherited: false };

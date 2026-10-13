@@ -56,8 +56,24 @@ describe('recent submitted and overdue records', () => {
   });
   it('preserves existing overdue drafts with no current eligible objective', () => {
     const draft = record('draft', 'draft');
-    expect(backfillReviews([draft], [], 'me', settings, dayjs('2026-10-12'))).toEqual([expect.objectContaining({ draft, startDate: '2026-09-07' })]);
+    expect(backfillReviews([draft], [], 'me', settings, dayjs('2026-10-12'))).toEqual(expect.arrayContaining([expect.objectContaining({ draft, startDate: '2026-09-07' })]));
     const disabled = { ...settings, timeRules: [...settings.timeRules, { key: 'monthlyReview', label: '月报', startDay: 1, endDay: 31, allowBackfill: false }].map(rule => ({ ...rule, allowBackfill: false })) };
     expect(backfillReviews([draft], [objective], 'me', disabled, dayjs('2026-10-12'))).toEqual([]);
+  });
+});
+
+ describe('universal backfill discovery', () => {
+  it.each(['employee', 'supervisor', 'boss'])('offers configured overdue periods to %s without requiring a goal', ownerId => {
+    const config = { ...settings, cycles: { automatic: false, types: ['month'] as const, schedules: {}, crossAlignment: false, periods: ['2026-09'] } };
+    const items = backfillReviews([], [], ownerId, config as unknown as OkrSettings, dayjs('2026-10-13'));
+    expect(items.some(item => item.type === 'week' && item.startDate === '2026-09-07')).toBe(true);
+    expect(items.some(item => item.type === 'month' && item.startDate === '2026-09-01')).toBe(true);
+  });
+  it('uses owned monthly records when projection is unavailable without taking periods from another owner', () => {
+    const own: OkrRecord = { id: 'goal', kind: 'objective', ownerId: 'me', status: 'active', version: 0, periodKey: '2026-09', payload: { title: '本人目标' } };
+    const foreign = { ...own, id: 'foreign', ownerId: 'other', periodKey: '2026-08' };
+    const items = backfillReviews([own, foreign], [], 'me', settings, dayjs('2026-10-13'));
+    expect(items.some(item => item.type === 'month' && item.startDate === '2026-09-01')).toBe(true);
+    expect(items.some(item => item.type === 'month' && item.startDate === '2026-08-01')).toBe(false);
   });
 });

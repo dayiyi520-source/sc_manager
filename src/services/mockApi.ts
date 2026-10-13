@@ -6,6 +6,7 @@ import { mutateOkrLifecycle } from './mockOkrLifecycle';
 import { applyCollaborationWorkflow } from './mockCollaborationWorkflow';
 import type { OkrSettings } from './okrRepository';
 import { reviewSubmissionAccess } from './okrReviewRules';
+import { canReadReviewRecord } from './supervisorReview';
 import { handleMockBusinessTasks } from './mockBusinessTasks';
 import { handleMockGoalTemplates, GOAL_TEMPLATE_STORAGE_KEY } from './mockGoalTemplates';
 import { assignedGoalActions, legacyGoalActions } from './okrGoalRules';
@@ -809,7 +810,8 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (clean === '/api/okr/records' && method === 'GET') {
     const viewerId = queryOf(path).get('viewerId');
     const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);
-    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => (!record.changeRequest || record.changeRequest.status !== 'pending' || settings.confirmation?.visiblePending !== false || record.ownerId===viewerId || record.changeRequest.reviewerId===viewerId || isOkrAdmin(viewerId || '',settings,getOkrPeople())) && record.status !== 'deleted' && (record.kind !== 'review' || !viewerId || record.ownerId === viewerId));
+    const reviewPeople = getOkrPeople();
+    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => (!record.changeRequest || record.changeRequest.status !== 'pending' || settings.confirmation?.visiblePending !== false || record.ownerId===viewerId || record.changeRequest.reviewerId===viewerId || isOkrAdmin(viewerId || '',settings,getOkrPeople())) && record.status !== 'deleted' && canReadReviewRecord(record, viewerId, reviewPeople));
   }
   if ((clean === '/api/okr/records' && method === 'POST') || (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH')) {
     const mutation = mutateOkrLifecycle(parts[3], body, read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]), getOkrPeople(), read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings));

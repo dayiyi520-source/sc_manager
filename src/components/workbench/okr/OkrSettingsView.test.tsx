@@ -1,12 +1,21 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OkrSettings } from '../../../services/okrRepository';
 import { OkrSettingsView } from './OkrSettingsView';
+import { message } from 'antd';
+afterEach(async()=>{ await act(async()=>{ message.destroy(); cleanup(); await new Promise(resolve=>setTimeout(resolve,0)); }); });
 
 const settings: OkrSettings = { defaultView: 'list', timeRules: [{ key: 'weeklyReview', label: '周总结', startDay: 1, endDay: 31, allowBackfill: true }], templates: [{department:'研发',departments:['研发'],type:'support',fields:[],types:['支持']}], dictionaries: { productNodes: [], deliveryNodes: [], presalesNodes: [], supportTypes: [] }, validation: { actionWeightTotal: 100, maxActions: 8, assigneeMultiple: true, keyNodeMultiple: true, resultRequired: true } };
 
 describe('weekly review settings', () => {
+ it('saves different KR types for the same department but rejects a duplicate type',async()=>{
+ const onSave=vi.fn(async()=>true);const types=[{department:'研发',departments:['研发'],type:'product',fields:[],stages:['设计']},{department:'研发',departments:['研发'],type:'support',fields:[],types:['支持']}];
+ const view=render(<OkrSettingsView settings={{...settings,templates:types}} departments={['研发']} onSave={onSave}/>);
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'保存配置'}));});expect(onSave).toHaveBeenCalledOnce();
+ view.unmount();onSave.mockClear();render(<OkrSettingsView settings={{...settings,templates:[types[0],types[0]]}} departments={['研发']} onSave={onSave}/>);
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'保存配置'}));});expect(onSave).not.toHaveBeenCalled();
+ });
   it('uses Monday through Sunday selectors, retains monthly dates and saves weekday values', async () => {
     const onSave = vi.fn(async (_settings: OkrSettings) => true);
     render(<OkrSettingsView settings={settings} onSave={onSave}/>);

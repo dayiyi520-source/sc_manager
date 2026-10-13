@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockApiRequest } from './mockApi';
-import type { OkrPayload, OkrRecord, OkrSettings } from './okrRepository';
+import type { OkrPayload, OkrRecord, OkrSettings, OkrPerson } from './okrRepository';
 
 const recordsKey = 'shichuang.frontend.mock.okrRecords';
 const settingsKey = 'shichuang.frontend.mock.okrSettings';
@@ -42,5 +42,21 @@ describe('persistent review submission rules', () => {
     await expect(update({ version: 0 })).rejects.toThrow('刷新');
     await expect(update({ payload: { ...payload, startDate: '2026-09-14', endDate: '2026-09-20' } })).rejects.toThrow('周期');
     expect(rows()[0]).toEqual(draft);
+  });
+});
+
+ describe('review endpoints shared across roles', () => {
+  beforeEach(() => { localStorage.clear(); localStorage.setItem(recordsKey, '[]'); localStorage.setItem(settingsKey, JSON.stringify(settings)); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-13T12:00:00')); });
+  afterEach(() => vi.useRealTimers());
+  it.each(['employee', 'supervisor', 'boss'])('creates and submits backfill through the same record operations for %s', async role => {
+    const people = await mockApiRequest('/api/okr/people') as OkrPerson[];
+    const person = people.find(member => role === 'boss' ? member.rootFlag === 1 : role === 'supervisor' ? member.rootFlag === 0 && member.jobTitle?.includes('主管') : member.rootFlag === 0 && !member.jobTitle?.includes('主管') && !people.some(child => child.supervisorId === member.id));
+    expect(person).toBeDefined();
+    const viewerId = person!.id;
+    const created = await mockApiRequest('/api/okr/records', { method: 'POST', body: JSON.stringify({ kind: 'review', periodKey: `${payload.startDate}/${payload.endDate}`, payload, submit: false, viewerId }) }) as { id: string };
+    expect(rows()[0]).toMatchObject({ ownerId: viewerId, status: 'draft' });
+    await mockApiRequest(`/api/okr/records/${created.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'submit', version: 0, viewerId }) });
+    expect(rows()[0]).toMatchObject({ ownerId: viewerId, status: 'submitted' });
+    await expect(mockApiRequest(`/api/okr/records/${created.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'submit', version: 1, viewerId }) })).rejects.toThrow('已提交');
   });
 });

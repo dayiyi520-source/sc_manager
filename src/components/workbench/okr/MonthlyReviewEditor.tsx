@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, Empty, Input, InputNumber, Modal, Progress, Radio, Tag } from 'antd';
 import dayjs from 'dayjs';
 import type { OKRItem } from '../../../types';
 import type { OkrKrReview, OkrPayload, OkrRecord } from '../../../services/okrRepository';
 import { AlertTriangle, ChevronDown, FileText, Save, Send, Target } from '@/components/common/octicons-compat';
 import { aggregateKrReview, aggregateMonthlyTasks, eligibleWeeklyReviews, monthPeriod, monthlyEvidenceTimeline, suggestMonthlySummary } from './monthlyReview';
-import { mergeCopiedKrReviews } from './reviewCopy';
+import { restoreReviewDraftTargets, reconcileReviewDraftTargets, detachedReviewDescription } from './reviewDraftTargets';
+import { reviewEditorState } from '../../../services/okrReviewTemplates';
 import { WorkEvidencePicker } from './WorkEvidencePicker';
 import { defaultCollapsedReview } from './evidenceFilters';
 import type { EvidenceViewer } from '../../../services/reviewEvidenceRepository';
@@ -23,24 +24,32 @@ interface MonthlyReviewEditorProps {
   onSaveDraft: (payload: OkrPayload) => Promise<boolean>;
   onSubmit: (payload: OkrPayload) => Promise<boolean>;
   onCancel: () => void;
+  recordStatus?: string;
   initialPayload?: OkrPayload;
   periodOverride?: ReviewPeriod;
   work?: OkrWork[]; viewer?: EvidenceViewer; workLoading?: boolean; workError?: unknown; onRefreshWork?: () => void;
 }
 
-export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSaveDraft, onSubmit, onCancel, initialPayload, periodOverride, work = [], viewer, workLoading, workError, onRefreshWork }: MonthlyReviewEditorProps) {
+export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSaveDraft, onSubmit, onCancel, recordStatus, initialPayload, periodOverride, work = [], viewer, workLoading, workError, onRefreshWork }: MonthlyReviewEditorProps) {
   const month = useMemo(() => dayjs(periodOverride?.startDate).startOf('month'), [periodOverride?.startDate]);
   const monthlyOkrs = useMemo(() => okrs.filter(objective => objective.cycle === month.format('YYYY-MM')), [okrs, month]);
   const weeklyReviews = useMemo(() => eligibleWeeklyReviews(records, currentUserId, month), [records, currentUserId, month]);
-  const initialKrs = useMemo(() => mergeCopiedKrReviews(
-    monthlyOkrs.flatMap(objective => objective.keyResults.map(keyResult => ({
-      ...aggregateKrReview(objective.id, keyResult.id, keyResult.content, keyResult.progress, weeklyReviews),
-      currentProgress: keyResult.progress,
-      objectiveTitle: objective.objective
-    }))),
-    initialPayload?.krReviews || []
-  ), [monthlyOkrs, weeklyReviews, initialPayload]);
-  const [krs, setKrs] = useState(() => initialPayload?.startDate ? initialKrs.map(kr => ({ ...kr, ...initialPayload.krReviews?.find(item => item.keyResultId === kr.keyResultId) })) : initialKrs);
+  const currentTargets = useMemo(() => monthlyOkrs.flatMap(objective => objective.keyResults.map(keyResult => ({
+    ...aggregateKrReview(objective.id, keyResult.id, keyResult.content, keyResult.progress, weeklyReviews),
+    currentProgress: keyResult.progress,
+    objectiveTitle: objective.objective
+  }))), [monthlyOkrs, weeklyReviews]);
+  const initialKrs = useMemo(() => restoreReviewDraftTargets(currentTargets, initialPayload), [currentTargets, initialPayload]);
+  const [krs, setKrs] = useState(() => initialKrs);
+  const editorState = reviewEditorState(recordStatus);
+  const lastTargetIds = useRef(new Set(currentTargets.map(row => row.keyResultId)));
+  useEffect(() => {
+    const added = currentTargets.filter(row => !lastTargetIds.current.has(row.keyResultId)).map(row => row.keyResultId);
+    setKrs(previous => reconcileReviewDraftTargets(previous, currentTargets));
+    setSelectedKrIds(previous => [...new Set([...previous, ...added])]);
+    lastTargetIds.current = new Set(currentTargets.map(row => row.keyResultId));
+  }, [currentTargets]);
+  const detachedTargets = krs.filter(row => !currentTargets.some(target => target.objectiveId === row.objectiveId && target.keyResultId === row.keyResultId));
   const [selectedKrIds, setSelectedKrIds] = useState(() => initialPayload?.startDate ? initialKrs.filter(item => initialPayload.krReviews?.some(kr => kr.keyResultId === item.keyResultId)).map(item => item.keyResultId) : initialKrs.map(item => item.keyResultId));
   const [activeKrId, setActiveKrId] = useState(() => initialKrs[0]?.keyResultId || '');
   const [summary, setSummary] = useState(() => initialPayload?.summary || suggestMonthlySummary(weeklyReviews));
@@ -53,17 +62,17 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
   const [pickerKrId, setPickerKrId] = useState<string | null>(null);
   const [evidenceItems, setEvidenceItems] = useState(initialPayload?.items || []);
 
-  const selectedKrs = krs.filter(item => selectedKrIds.includes(item.keyResultId));
-  const activeKr = krs.find(item => item.keyResultId === activeKrId && selectedKrIds.includes(item.keyResultId)) || selectedKrs[0];
+  const selectedKrs = krs.filter(item => selectedKrIds.includes(item.keyResultId) && currentTargets.some(target => target.keyResultId === item.keyResultId && target.objectiveId === item.objectiveId));
+  const activeKr = selectedKrs.find(item => item.keyResultId === activeKrId) || selectedKrs[0];
   const activeExpanded = activeKr && (expandedKrs[activeKr.keyResultId] ?? !defaultCollapsedReview(activeKr));
   const pickerKr = krs.find(item => item.keyResultId === pickerKrId);
   const sourceKr = monthlyOkrs.flatMap(objective => objective.keyResults).find(item => item.id === pickerKrId);
   const linkedIds = new Set<string>(krs.flatMap(item => item.workIds));
   const evidenceWeeks = useMemo(() => activeKr ? monthlyEvidenceTimeline(weeklyReviews, activeKr.keyResultId) : [], [weeklyReviews, activeKr]);
   const otherTasks = useMemo(() => aggregateMonthlyTasks(weeklyReviews), [weeklyReviews]);
-  const achievedCount = krs.filter(item => item.currentProgress >= 100).length;
-  const riskCount = krs.filter(item => item.health !== 'normal').length;
-  const overallProgress = krs.length ? Math.round(krs.reduce((sum, item) => sum + item.currentProgress, 0) / krs.length) : 0;
+  const achievedCount = selectedKrs.filter(item => item.currentProgress >= 100).length;
+  const riskCount = selectedKrs.filter(item => item.health !== 'normal').length;
+  const overallProgress = selectedKrs.length ? Math.round(selectedKrs.reduce((sum, item) => sum + item.currentProgress, 0) / selectedKrs.length) : 0;
 
   const updateKr = (keyResultId: string, value: Partial<OkrKrReview>) => {
     setKrs(rows => rows.map(row => row.keyResultId === keyResultId ? { ...row, ...value } : row));
@@ -109,16 +118,17 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
     <div className="okr-monthly-review" aria-label="月复盘编辑器">
       <header className="okr-monthly-toolbar">
         <div>
-          <div className="okr-monthly-title-row"><Tag color="blue">月复盘</Tag><h2>{month.format('YYYY年MM月')}工作复盘</h2><Tag color="warning">草稿状态</Tag></div>
+          <div className="okr-monthly-title-row"><Tag color="blue">月复盘</Tag><h2>{month.format('YYYY年MM月')}工作复盘</h2><Tag color={editorState.color}>{editorState.label}</Tag></div>
           <p>汇总当月工作成果、目标进展和后续安排</p>
         </div>
         <div className="okr-monthly-actions">
           <Button onClick={onCancel}>取消</Button>
-          <Button icon={<Save className="h-4 w-4" />} loading={busy} onClick={() => onSaveDraft(payload())}>存草稿</Button>
-          <Button type="primary" icon={<Send className="h-4 w-4" />} loading={busy} onClick={requestSubmit}>提交月报</Button>
+          <Button disabled={!editorState.editable || Boolean(detachedTargets.length)} icon={<Save className="h-4 w-4" />} loading={busy} onClick={() => onSaveDraft(payload())}>存草稿</Button>
+          <Button disabled={!editorState.editable || Boolean(detachedTargets.length)} type="primary" icon={<Send className="h-4 w-4" />} loading={busy} onClick={requestSubmit}>提交月报</Button>
         </div>
       </header>
 
+      {detachedTargets.length > 0 && <Alert type="warning" showIcon title="月度目标已变化，请确认失效内容" description={<div className="space-y-2"><p>以下已填写内容暂时保留，请复制需要的信息，再确认移除。确认后可继续保存或提交。</p><pre className="whitespace-pre-wrap break-words font-sans">{detachedReviewDescription(detachedTargets)}</pre></div>} action={<Button onClick={() => setKrs(rows => rows.filter(row => currentTargets.some(target => target.keyResultId === row.keyResultId && target.objectiveId === row.objectiveId)))}>移除失效内容</Button>} />}
       {validationErrors.length > 0 && <Alert type="warning" showIcon closable title="提交前请完成以下内容" description={validationErrors.join('；')} onClose={() => setValidationErrors([])} />}
 
       <section className="okr-monthly-metrics" aria-label="月度概览">
@@ -135,11 +145,11 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
 
       <section className="okr-monthly-kr-layout">
         <aside className="okr-monthly-okr-tree">
-          <div className="okr-monthly-list-title"><h3>OKR 列表</h3><span>已选 {selectedKrIds.length}/{krs.length}</span></div>
+          <div className="okr-monthly-list-title"><h3>OKR 列表</h3><span>已选 {selectedKrs.length}/{currentTargets.length}</span></div>
           {monthlyOkrs.length === 0 ? <Empty description="本月暂无 OKR" /> : monthlyOkrs.map((objective, objectiveIndex) => {
-            const objectiveKrs = krs.filter(item => item.objectiveId === objective.id);
+            const objectiveKrs = krs.filter(item => item.objectiveId === objective.id && objective.keyResults.some(kr => kr.id === item.keyResultId));
             return <div key={objective.id} className="okr-monthly-tree-objective">
-              <div className="okr-monthly-tree-o"><ChevronDown /><b>O{objectiveIndex + 1}</b><span>{objective.objective}</span></div>
+              <div className="okr-monthly-tree-o"><ChevronDown /><b>{objective.primaryLabel || 'O'}{objectiveIndex + 1}</b><span>{objective.objective}</span></div>
               <div className="okr-monthly-tree-krs">
                 {objectiveKrs.map((kr, krIndex) => {
                   const checked = selectedKrIds.includes(kr.keyResultId);
@@ -203,7 +213,7 @@ export function MonthlyReviewEditor({ okrs, records, currentUserId, busy, onSave
         setPickerKrId(null);
       }}/>}
 
-      <Modal open={confirmOpen} title="确认提交月复盘" okText="确认提交" cancelText="返回检查" confirmLoading={busy} onCancel={() => setConfirmOpen(false)} onOk={async () => { if (await onSubmit(payload())) setConfirmOpen(false); }}>
+      <Modal open={confirmOpen} title="确认提交月复盘" okText="确认提交" cancelText="返回检查" confirmLoading={busy} okButtonProps={{ disabled: !editorState.editable || Boolean(detachedTargets.length) }} onCancel={() => setConfirmOpen(false)} onOk={async () => { if (!editorState.editable || detachedTargets.length) return; if (await onSubmit(payload())) setConfirmOpen(false); }}>
         <p>本次复盘已选择 {selectedKrs.length} 个 KR，并自动汇总 {weeklyReviews.length} 周的证据记录。</p>
         <Checkbox checked={syncKrProgress} onChange={event => setSyncKrProgress(event.target.checked)}>将月复盘确认进度同步至 KR</Checkbox>
       </Modal>

@@ -10,6 +10,20 @@ const child: OkrRecord = {id:'child',kind:'action',ownerId:'manager',periodKey:'
 const task = {id:'task',title:'实际任务',objectiveId:'o',keyResultId:'child',status:'已完成'} as OkrWork;
 
 describe('company objective detail', () => {
+  it('renders assigned personal primary KR, inherited detail rows and only owner actions once', async () => {
+    vi.spyOn(okrRepository,'events').mockResolvedValue([]);
+    const people=[{id:'manager',name:'主管甲',department:'产品部',rootFlag:0,supervisorId:'boss',version:1},{id:'staff',name:'成员乙',department:'产品部',rootFlag:0,supervisorId:'manager',version:1}];
+    const parent: OkrRecord={...objective,id:'manager',ownerId:'manager',payload:{title:'主管目标',keyResults:[{id:'shared',title:'原型阶段',weight:100,progress:0}]}};
+    const personal: OkrRecord={...objective,id:'personal',ownerId:'staff',payload:{title:'原型阶段',goalLevel:'personal',origin:'assigned',weight:40,sourceObjectiveId:'manager',sourceKrId:'shared',alignments:[{parentObjectiveId:'manager',parentKeyResultId:'shared'}],keyResults:[{id:'shared',title:'原型阶段',businessObject:'产品甲',structureType:'product',weight:100,progress:0,details:[{id:'d',name:'V1.0',stage:'UI设计',plannedStartDate:'2026-10-01',plannedEndDate:'2026-10-15'}],executionActions:[{id:'mine',ownerId:'staff',title:'绘制交互原型',weight:100,progress:25,deadline:'2026-10-15'},{id:'other',ownerId:'manager',title:'其他人动作',weight:100,progress:0}]}]}};
+    render(<CompanyObjectiveDetail record={personal} records={[parent,personal]} people={people} work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
+    expect(screen.getAllByText('原型阶段')).toHaveLength(1);
+    expect(screen.getByText('产品甲——来源于上级主管甲')).toBeInTheDocument();
+    expect(screen.getByText('V1.0')).toBeInTheDocument();expect(screen.getByText('UI设计')).toBeInTheDocument();
+    expect(screen.getByText('绘制交互原型')).toBeInTheDocument();expect(screen.queryByText('其他人动作')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('A1进度：25%')).toBeInTheDocument();
+    expect(screen.getByText('目标权重:40%')).toBeInTheDocument();
+    await screen.findByText('暂无动态记录');vi.restoreAllMocks();
+  });
   it('keeps legacy manager breakdown data and shows only the actual lower member alignments', async () => {
     vi.spyOn(okrRepository, 'events').mockResolvedValue([]);
     const people = [
@@ -66,7 +80,7 @@ describe('company objective detail', () => {
 
   it('displays real metadata and expands tasks; retries an activity failure', async () => {
     vi.spyOn(okrRepository,'events').mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([]);
-    render(<CompanyObjectiveDetail record={objective} records={[objective,child]} people={[{id:'boss',name:'制定人甲',department:'管理层',rootFlag:1,supervisorId:null,version:1}]} work={[task]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
+    render(<CompanyObjectiveDetail record={objective} records={[objective,child]} people={[{id:'boss',name:'制定人甲',department:'管理层',rootFlag:1,supervisorId:null,version:1},{id:'manager',name:'主管乙',department:'产品部',rootFlag:0,supervisorId:'boss',version:1}]} work={[task]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
     expect(screen.getByLabelText('制定人：制定人甲')).toBeInTheDocument();
     expect(screen.getByText('目标详情')).toBeInTheDocument();
     expect(screen.getByText('/ 2026年10月')).toBeInTheDocument();
@@ -76,7 +90,7 @@ describe('company objective detail', () => {
     expect(screen.getByText('目标权重:40%')).toBeInTheDocument();
     expect(screen.getByRole('separator')).toBeInTheDocument();
     expect(screen.getByRole('main', {name:'目标与动作'})).toHaveAttribute('tabindex', '0');
-    expect(screen.getByRole('complementary', {name:'动态记录'})).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('complementary', {name:'所有记录'})).toHaveAttribute('tabindex', '0');
     expect(screen.getByLabelText('KR1进度：75%')).toBeInTheDocument();
     expect(screen.getByLabelText('KR1权重：100%')).toBeInTheDocument();
     for (const name of ['KR1关联任务', 'KR1项目', 'KR1产品', 'KR1下级对齐']) expect(screen.getByRole('button', {name})).toHaveAttribute('aria-pressed', 'false');
@@ -117,6 +131,16 @@ describe('company objective detail', () => {
     expect(onEdit).toHaveBeenCalledOnce(); expect(onDelete).toHaveBeenCalledOnce(); expect(onClose).toHaveBeenCalledOnce();
     await screen.findByText('暂无动态记录');
     vi.restoreAllMocks();
+  });
+
+  it('inherits personal A business associations and omits assignee placeholders',async()=>{
+    vi.spyOn(okrRepository,'events').mockResolvedValue([]);
+    const record:OkrRecord={...objective,ownerId:'staff',payload:{title:'个人交付',goalLevel:'personal',origin:'assigned',keyResults:[{id:'kr',title:'项目产品计划',structureType:'delivery',businessObject:'项目甲',weight:100,progress:0,details:[{id:'p',name:'产品甲',stage:'交付'}],executionActions:[{id:'own',ownerId:'staff',title:'完成实施',progress:0,weight:100}]}]}};
+    render(<CompanyObjectiveDetail record={record} records={[record]} people={[]} work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
+    expect(screen.getByRole('button',{name:'A1项目'})).toHaveTextContent('项目（1）');expect(screen.getByRole('button',{name:'A1产品'})).toHaveTextContent('产品（1）');
+    expect(document.querySelector('.company-action-assignees')).toBeNull();
+    expect(screen.getByLabelText('A1权重：100%').querySelector('.anticon-pie-chart')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'A1项目'}));expect(screen.getByText('项目甲')).toBeInTheDocument();await screen.findByText('暂无动态记录');vi.restoreAllMocks();
   });
 
   it('shows saved project and product associations beneath the shared toggle', async () => {

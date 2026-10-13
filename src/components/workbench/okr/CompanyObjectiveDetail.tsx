@@ -1,10 +1,14 @@
+import { PieChartOutlined } from '@ant-design/icons';
+import { goalBusinessAssociations } from './goalBusinessAssociations';
+import { GoalActivityTimeline } from './GoalActivityTimeline';
+import { isPersonalGoal, isAssignedPersonalGoal, hasDownstreamAlignment } from './goalPresentation';
 import { periodLabel } from '../../../services/okrPeriods';
 import { KrDetailTable } from './KrDetailTable';
 import { krDetails } from '../../../services/okrKrDetails';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Alert, Button, Drawer, Empty, Progress, Skeleton, Tooltip } from 'antd';
 import dayjs from 'dayjs';
-import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, HistoryIcon, PencilIcon, GitBranchIcon, GraphIcon, TrashIcon, XIcon } from '@primer/octicons-react';
+import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, GitBranchIcon, TrashIcon, XIcon } from '@primer/octicons-react';
 import { PersonAvatar } from '../../common/PersonIdentity';
 import { okrRepository, type OkrPerson, type OkrRecord, type OkrWork } from '../../../services/okrRepository';
 import { buildGoalHierarchy, type GoalHierarchyNode } from './GoalHierarchyView';
@@ -49,25 +53,16 @@ export function actionGroupDetailRecord(record: OkrRecord, records: OkrRecord[],
 }
 
 export function CompanyObjectiveDetail({ record: selectedRecord, records, people, work, workLoading, workError, onRetryWork, onClose, onEdit, onDelete, editDisabledReason, deleteDisabledReason, busy = false, reviewFooter, onProgress }: Props) {
-  const ownPersonal = selectedRecord.payload.goalLevel === 'personal' && selectedRecord.payload.origin === 'autonomous';
+  const ownPersonal = isPersonalGoal(selectedRecord);
+  const assignedPersonal = isAssignedPersonalGoal(selectedRecord);
   const resultLabel = ownPersonal ? 'A' : 'KR';
   const baseRecord = actionGroupDetailRecord(selectedRecord, records, people);
   const record: OkrRecord = ownPersonal ? { ...baseRecord, payload: { ...baseRecord.payload, keyResults: (baseRecord.payload.keyResults || []).flatMap(kr => (kr.executionActions || []).filter(action => action.ownerId === baseRecord.ownerId).map(action => ({ ...action, weight: action.weight ?? 0 }))) } } : baseRecord;
   const detailRecords = [...records.filter(item => item.id !== record.id), record];
   const objective = buildGoalHierarchy(detailRecords, record.periodKey, record.ownerId, people).find(item => item.id === record.id);
-  const target = buildMyTargetViewItems([record], [], records, people, record.ownerId)[0];
+  const target = buildMyTargetViewItems([baseRecord], [], records, people, record.ownerId)[0];
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selectedSections, setSelectedSections] = useState<Record<string, ActionSection>>({});
-  const [events, setEvents] = useState<Array<{action: string; operator: string; createdAt: string}>>([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
-  const [eventsError, setEventsError] = useState(false);
-  const [retry, setRetry] = useState(0);
-  useEffect(() => {
-    let active = true;
-    setEventsLoading(true); setEventsError(false); setEvents([]);
-    void okrRepository.events(record.id).then(result => { if (active) setEvents(result); }).catch(() => { if (active) setEventsError(true); }).finally(() => { if (active) setEventsLoading(false); });
-    return () => { active = false; };
-  }, [record.id, record.version, retry]);
   const challenge = record.payload.objectiveType === 'challenge';
   const name = (id: string) => people.find(person => person.id === id)?.name ?? '未知人员';
   const owner = people.find(person => person.id === record.ownerId);
@@ -84,7 +79,7 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
     const ownerId = parentAction?.ownerId || parent?.ownerId;
     return title ? `${title}——来源于上级${ownerId ? name(ownerId) : '未知人员'}` : '上级动作已不可用';
   });
-  const source = sources.length ? [...new Set(sources)].join('、') : levelLabel === '公司级' ? `${periodLabel(record.periodKey)}目标` : null;
+  const source = assignedPersonal ? target?.alignmentLabel : sources.length ? [...new Set(sources)].join('、') : levelLabel === '公司级' ? `${periodLabel(record.periodKey)}目标` : null;
   return <Drawer open placement="bottom" size="calc(100dvh - 3rem)" rootClassName="company-objective-drawer company-objective-detail-drawer" closable={false} keyboard={!busy} maskClosable={!busy} extra={
     <div className="company-detail-header-actions" role="group" aria-label="目标操作">
       <Tooltip title={onEdit ? '修改' : editDisabledReason || '仅制定人可修改'}><span><Button type="text" aria-label="修改目标" disabled={busy || !onEdit} onClick={onEdit} icon={<PencilIcon/>}/></span></Tooltip>
@@ -100,13 +95,14 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
       <main className="company-detail-main" aria-label="目标与动作" tabIndex={0}>
         <section className={`company-detail-overview${challenge ? ' is-challenge' : ''}`}>
           {source && <div className="company-detail-source">{source}</div>}
-          <div className="company-detail-title"><span className={`company-kind${challenge ? ' is-challenge' : ''}`}>{challenge ? 'TO' : 'CO'}{index || 1}</span><h2>{record.payload.title}</h2></div>
+          <div className="company-detail-title"><span className={`company-kind${challenge ? ' is-challenge' : ''}`}>{assignedPersonal ? 'KR' : challenge ? 'TO' : 'CO'}{index || 1}</span><h2>{record.payload.title}</h2></div>
           <div className="company-detail-summary"><div className="company-detail-progress"><Progress type="circle" percent={objective?.progress ?? 0} size="small" showInfo={false}/><span>{objective?.progress ?? 0}%</span></div><span className="company-detail-level">{levelLabel}</span><span className="company-detail-owner" aria-label={`制定人：${name(record.ownerId)}`}><PersonAvatar name={name(record.ownerId)}/>{name(record.ownerId)}</span><span className="company-detail-weight">目标权重:{record.payload.weight ?? 100}%</span></div>
           <div className="company-detail-assignees">{assignees.length ? assignees.map(name).join('、') : '未指定承接人员'}</div>
         </section>
         {record.changeRequest && record.changeRequest.purpose !== 'initial' && <Alert type={record.changeRequest.status === 'returned' ? 'warning' : 'info'} title={record.changeRequest.status === 'pending' ? record.changeRequest.purpose === 'delete' ? '删除待审核，原目标继续生效' : '修改待审核，原目标继续生效' : record.changeRequest.status === 'returned' ? `修改已退回：${record.changeRequest.feedback}` : '修改已审核生效'}/>}
         {record.payload.note && <p className="company-detail-note">{record.payload.note}</p>}
         <div className="company-detail-divider" role="separator"/>
+        {assignedPersonal && (baseRecord.payload.keyResults || []).map(kr => <KrDetailTable key={kr.id} rows={krDetails(kr)} label={kr.structureType === 'delivery' ? '项目产品' : '迭代版本'}/>)}
         {!objective?.children.length && <Empty description={ownPersonal ? '暂无 A 执行动作' : '暂无 KR 关键结果'}/>}
         {objective?.children.map((action, index) => {
           const tasks = companyActionTasks(action, selectedRecord.kind === 'action' ? selectedRecord.payload.parentObjectiveId || record.id : record.id, work, records);
@@ -120,26 +116,25 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
               progress: Number(records.find(record => record.id === item.id)?.payload.progress || 0),
             }))
           );
-          const projects = [...new Set(linkedActions.filter(item => item.payload.structureType === 'delivery').map(item => item.payload.businessObject?.trim()).filter((value): value is string => !!value))];
-          const products = [...new Set(linkedActions.map(item => item.payload.productLine?.trim()).filter((value): value is string => !!value))];
+          const associations = goalBusinessAssociations(baseRecord, action.referenceId, records, tasks);
+          const projects = [...new Set([...associations.projects, ...linkedActions.filter(item=>item.payload.structureType==='delivery').map(item=>item.payload.businessObject?.trim()).filter((value): value is string=>!!value)])];
+          const products = [...new Set([...associations.products, ...linkedActions.map(item=>item.payload.productLine?.trim()).filter((value): value is string=>!!value)])];
           const selectSection = (section: ActionSection) => { setSelectedSections(current => ({ ...current, [action.id]: section })); setExpanded(current => ({ ...current, [action.id]: activeSection === section ? !current[action.id] : true })); };
           const sections: Array<{key: ActionSection; label: string; count: string | number; aria: string}> = [{key:'tasks',label:'所有任务',count:workLoading ? '加载中' : workError ? '加载失败' : tasks.length,aria:'关联任务'},{key:'projects',label:'项目',count:projects.length,aria:'项目'},{key:'products',label:'产品',count:products.length,aria:'产品'},{key:'alignments',label:'对齐我的',count:alignmentRows.length,aria:'下级对齐'}];
           return <section className="company-action-card" key={action.id}>
-            <div className="company-action-content"><div className="company-action-heading"><span className="company-action-number">{resultLabel}{index + 1}</span><div className="company-action-title"><h4>{action.title}</h4><div className="company-action-assignees">{action.assigneeIds.length ? action.assigneeIds.map(id => {
-              const aligned = records.some(item => item.ownerId === id && item.ownerId !== record.ownerId && item.periodKey === record.periodKey && item.status !== 'draft' && (
-                item.kind === 'objective' ? item.payload.alignments?.some(alignment => alignment.parentKeyResultId === action.referenceId) : item.kind === 'action' && (item.payload.parentActionId === action.referenceId || item.payload.parentKeyResultId === action.referenceId)
-              ));
+            <div className="company-action-content"><div className="company-action-heading"><span className="company-action-number">{resultLabel}{index + 1}</span><div className="company-action-title"><h4>{action.title}</h4>{!ownPersonal && <div className="company-action-assignees">{action.assigneeIds.length ? action.assigneeIds.map(id => {
+              const aligned = records.some(item => item.ownerId === id && hasDownstreamAlignment(item, record.id, action.referenceId, record.ownerId, record.periodKey, people));
               return <span key={id}>@{name(id)}{aligned && <Tooltip title="已对齐此动作"><span className="company-assignee-alignment" aria-label={`${name(id)}已对齐此动作`}><GitBranchIcon/></span></Tooltip>}</span>;
-            }) : <span className="is-empty">未指定承接人员</span>}</div></div></div>
-            <div className="company-action-metrics"><Button type="text" onClick={() => onProgress?.(selectedRecord.id, action.referenceId)} className="company-detail-progress" aria-label={`${resultLabel}${index + 1}进度：${action.progress}%`}><Progress type="circle" percent={action.progress} size="small" showInfo={false}/><span>{action.progress}%</span></Button><span aria-label={`${resultLabel}${index + 1}权重：${action.weight}%`}><GraphIcon/>{action.weight}%</span><Tooltip title={action.deadline || '未设置截止日期'}><span aria-label={`${resultLabel}${index + 1}截止日期：${action.deadline || '未设置'}`}><CalendarIcon/>{action.deadline ? dayjs(action.deadline).format('MM-DD') : '未设置'}</span></Tooltip></div></div>
+            }) : <span className="is-empty">未指定承接人员</span>}</div>}</div></div>
+            <div className="company-action-metrics"><Button type="text" onClick={() => onProgress?.(selectedRecord.id, action.referenceId)} className="company-detail-progress" aria-label={`${resultLabel}${index + 1}进度：${action.progress}%`}><Progress type="circle" percent={action.progress} size="small" showInfo={false}/><span>{action.progress}%</span></Button><span aria-label={`${resultLabel}${index + 1}权重：${action.weight}%`}><PieChartOutlined/>{action.weight}%</span><Tooltip title={action.deadline || '未设置截止日期'}><span aria-label={`${resultLabel}${index + 1}截止日期：${action.deadline || '未设置'}`}><CalendarIcon/>{action.deadline ? dayjs(action.deadline).format('MM-DD') : '未设置'}</span></Tooltip></div></div>
             {(() => { const kr = record.payload.keyResults?.find(item => item.id === action.referenceId); return kr && ['product', 'delivery'].includes(kr.structureType || '') ? <KrDetailTable rows={krDetails(kr)} label={kr.structureType === 'product' ? '迭代版本' : '项目产品'}/> : null; })()}
-            <div className="company-execution-actions">{(record.payload.keyResults?.find(kr => kr.id === action.referenceId)?.executionActions || []).filter(item => item.ownerId === record.ownerId).map((item, i) => <div key={item.id} className="company-action-content"><div className="company-action-heading"><span className="company-action-number">A{i + 1}</span><div className="company-action-title"><h4>{item.title}</h4></div></div><div className="company-action-metrics"><Button type="text" onClick={() => onProgress?.(selectedRecord.id, item.id)} className="company-detail-progress" aria-label={`A${i + 1}进度：${item.progress}%`}><Progress type="circle" percent={item.progress} size="small" showInfo={false}/><span>{item.progress}%</span></Button><span aria-label={`A${i + 1}权重：${item.weight ?? 0}%`}><GraphIcon/>{item.weight ?? 0}%</span><span aria-label={`A${i + 1}截止日期：${item.deadline || '未设置'}`}><CalendarIcon/>{item.deadline ? dayjs(item.deadline).format('MM-DD') : '未设置'}</span></div></div>)}</div>
+            <div className="company-execution-actions">{(record.payload.keyResults?.find(kr => kr.id === action.referenceId)?.executionActions || []).filter(item => item.ownerId === record.ownerId).map((item, i) => <div key={item.id} className="company-action-content"><div className="company-action-heading"><span className="company-action-number">A{i + 1}</span><div className="company-action-title"><h4>{item.title}</h4></div></div><div className="company-action-metrics"><Button type="text" onClick={() => onProgress?.(selectedRecord.id, item.id)} className="company-detail-progress" aria-label={`A${i + 1}进度：${item.progress}%`}><Progress type="circle" percent={item.progress} size="small" showInfo={false}/><span>{item.progress}%</span></Button><span aria-label={`A${i + 1}权重：${item.weight ?? 0}%`}><PieChartOutlined/>{item.weight ?? 0}%</span><span aria-label={`A${i + 1}截止日期：${item.deadline || '未设置'}`}><CalendarIcon/>{item.deadline ? dayjs(item.deadline).format('MM-DD') : '未设置'}</span></div></div>)}</div>
             <div className="company-action-tabs"><Button type="text" className="company-action-toggle" aria-label={`${resultLabel}${index + 1}${open ? '收起' : '展开'}关联内容`} aria-expanded={open} aria-controls={`company-action-panel-${action.id}`} icon={open ? <ChevronDownIcon/> : <ChevronRightIcon/>} onClick={() => { if (!activeSection) setSelectedSections(current => ({...current,[action.id]: 'tasks'})); setExpanded(current => ({...current,[action.id]: !current[action.id]})); }}/>{sections.map(section => <Button key={section.key} type="text" aria-label={`${resultLabel}${index + 1}${section.aria}`} aria-pressed={open && activeSection === section.key} className={open && activeSection === section.key ? 'is-active' : ''} onClick={() => selectSection(section.key)}>{section.label}（{section.count}）</Button>)}</div>
             {open && <div className="company-action-expanded" id={`company-action-panel-${action.id}`}>{activeSection === 'projects' || activeSection === 'products' ? (activeSection === 'projects' ? projects : products).length ? (activeSection === 'projects' ? projects : products).map(value => <div className="company-linked-row" key={value}>{value}</div>) : <p>{activeSection === 'projects' ? '暂无关联项目' : '暂无关联产品'}</p> : activeSection === 'alignments' ? alignmentRows.length ? alignmentRows.map(child => <div className="company-linked-row" key={child.id}><span>{child.title}</span><span>{child.ownerName} · {child.progress}%</span></div>) : <p>暂无下级对齐</p> : workLoading ? <Skeleton active paragraph={{rows: 2}}/> : workError ? <Alert type="error" title="关联任务加载失败" action={<Button onClick={onRetryWork}>重试</Button>}/> : tasks.length ? tasks.map(task => <div className="company-linked-row" key={task.id}><span>{task.title}</span><span>{task.ownerName || '未指定'} · {task.status}</span></div>) : <p>暂无可查看的关联任务</p>}</div>}
           </section>;
         })}
       </main>
-      <aside className="company-detail-events" aria-label="动态记录" tabIndex={0}><h3><HistoryIcon/>动态记录</h3>{eventsLoading ? <Skeleton active/> : eventsError ? <Alert type="error" title="动态记录加载失败" action={<Button onClick={() => setRetry(value => value + 1)}>重试</Button>}/> : events.length ? events.map((event, index) => <div className="company-event" key={`${event.createdAt}-${index}`}><strong>{event.operator}</strong><p>{({create:'创建目标',save:'保存目标',submit:'提交目标',update:'更新目标'} as Record<string,string>)[event.action] || event.action}</p><time>{event.createdAt}</time></div>) : <Empty description="暂无动态记录"/>}</aside>
+      <GoalActivityTimeline record={selectedRecord} people={people}/>
     </div>
   </Drawer>;
 }

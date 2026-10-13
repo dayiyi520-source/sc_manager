@@ -1,11 +1,12 @@
 import type { CurrentUser, Customer, EmployeeOption, Opportunity, ProjectRecord, RequirementTask, TenderBidding } from '../../types';
 
-export type BusinessTaskScope = 'my_owned' | 'my_created' | 'my_department';
+export type BusinessTaskScope = 'my_owned' | 'my_created' | 'my_department' | 'all';
 export const BUSINESS_TASK_SCOPES = [
-  ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_department', '我部门的'],
+  ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_department', '我部门的'], ['all', '全公司的'],
 ] as const;
 
 export function matchesBusinessTaskScope(task: RequirementTask, scope: BusinessTaskScope, user: CurrentUser, employees: EmployeeOption[]) {
+  if (scope === 'all') return true;
   if (scope === 'my_owned') return task.assigneeId ? task.assigneeId === user.id : task.ownerName?.trim() === user.name.trim();
   if (scope === 'my_created') return task.creatorId ? task.creatorId === user.id : task.creatorName?.trim() === user.name.trim();
   if (!user.department?.trim()) return false;

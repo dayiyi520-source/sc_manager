@@ -32,7 +32,7 @@ it.each(['presales', 'delivery'] as const)('shows exact %s columns and the share
   const { container } = mount(kind);
   await screen.findByText('没有符合当前搜索、过滤或分组条件的' + (kind === 'presales' ? '售前任务' : '交付任务'));
   expect(screen.getAllByRole('columnheader').map(header => header.textContent)).toEqual(['标题', '状态', '优先级', '来源归属', ...(kind === 'delivery' ? ['项目阶段'] : []), '负责人', '创建人', '创建时间', '操作']);
-  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(kind === 'delivery' ? ['我负责的·0', '我创建的·0', '我部门的·0', '待审核·0'] : ['我负责的·0', '我创建的·0', '我部门的·0']);
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(kind === 'delivery' ? ['我负责的·0', '我创建的·0', '我部门的·0', '全公司的·0', '待审核·0'] : ['我负责的·0', '我创建的·0', '我部门的·0', '全公司的·0']);
   expect(container.querySelector('.test-case-banana')).toBeNull();
   expect(screen.getByText(/没有符合当前搜索、过滤或分组条件的/).closest('td')).toHaveClass('px-4', 'py-12', 'text-center');
 });
@@ -51,6 +51,11 @@ it('uses complete counts while locally paging and switching scopes', async () =>
   fireEvent.click(screen.getByRole('tab', { name: '我部门的·13' }));
   await screen.findByRole('button', { name: '任务-0' });
   expect(screen.queryByRole('button', { name: '任务-created' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: '全公司的·14' }));
+  fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+  expect(await screen.findByRole('button', { name: '任务-created' })).toBeVisible();
+  fireEvent.click(screen.getByRole('tab', { name: '我负责的·12' }));
+  expect(await screen.findByRole('button', { name: '任务-0' })).toBeVisible();
 });
 it('renders the requested source, stage and missing creator without guessing', async () => {
   vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [task('delivery', { projectName: '智慧校园', customerName: '客户院校', creatorName: undefined, creatorId: undefined, specialFields: { projectStage: 'UAT验收' } })], total: 1, page: 1, pageSize: 200 });

@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
+import type { OkrKrReview } from '../../../services/okrRepository';
+import { EmployeeReviewSupportDialog } from './EmployeeReviewSupportDialog';
 import { Button, Empty, Progress, Tag } from 'antd';
 import type { PerformanceReview } from '../../../types';
 import { AlertTriangle, CheckCircle, FileText, Target } from '@/components/common/octicons-compat';
@@ -42,6 +44,7 @@ const parseExtraWork = (description?: string): StoredExtraWork[] => {
 };
 
 export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyViewProps) {
+  const [supportTarget, setSupportTarget] = useState<OkrKrReview | null>(null);
   const krReviews = review.krReviews || [];
   const extraWorkRows = parseExtraWork(review.extraWork?.description);
   const average = krReviews.length
@@ -81,7 +84,7 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
 
       <section className="okr-review-readonly-section">
         <div className="okr-review-readonly-title"><Target /><h3>OKR 目标复盘</h3><span>{krReviews.length} 个 KR</span></div>
-        {krReviews.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无 KR 复盘" /> : (
+        {krReviews.length === 0 ? <Empty description="暂无 KR 复盘" /> : (
           <div className="okr-review-readonly-krs">
             {krReviews.map((kr, index) => (
               <article key={`${kr.keyResultId}-${index}`}>
@@ -91,10 +94,11 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
                 </div>
                 <Progress percent={kr.currentProgress} showInfo={false} size="small" />
                 <div className="okr-review-readonly-kr-grid">
-                  <div><b>本期成果</b><p>{kr.achievement || '未填写'}</p></div>
+                  <div><b>{review.reviewMode === 'supervisor' ? '主管判断与协调' : '本期成果'}</b><p className="whitespace-pre-wrap break-words">{review.reviewMode === 'supervisor' ? kr.supervisorJudgment || '未填写' : kr.achievement || '未填写'}</p></div>
                   <div><b>风险与阻塞</b><p>{kr.blocker || '无'}</p></div>
                   <div><b>下一步计划</b><p>{kr.nextPlan || '未填写'}</p></div>
                 </div>
+                {review.reviewMode === 'supervisor' && <Button onClick={() => setSupportTarget(kr)}>员工复盘支撑（{kr.employeeReviewSnapshots?.length || 0}）</Button>}
               </article>
             ))}
           </div>
@@ -122,6 +126,7 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
         </div>
       )}
 
+      {supportTarget && <EmployeeReviewSupportDialog target={supportTarget} supports={[]} loading={false} onClose={() => setSupportTarget(null)}/>}
       {review.feedback && <section className="okr-review-readonly-feedback"><AlertTriangle /><div><b>主管批复与评价</b><p>{review.feedback}</p></div></section>}
     </div>
   );

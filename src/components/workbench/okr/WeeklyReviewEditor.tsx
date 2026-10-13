@@ -18,12 +18,19 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import type { EmployeeOption, OKRItem, WorkOrderType } from '../../../types';
-import type { OkrPayload, OkrWork } from '../../../services/okrRepository';
-import { AlertTriangle, Plus, Save, Send, Trash2 } from '@/components/common/octicons-compat';
+import type { OkrPayload, OkrWork, OkrRecord, OkrPerson, OkrWeeklyReviewSnapshot } from '../../../services/okrRepository';
+import { Plus, Save, Send, Trash2 } from '@/components/common/octicons-compat';
 import { workSource } from './workAggregation';
 import { reviewPeriod } from './simpleReview';
-import { mergeCopiedKrReviews } from './reviewCopy';
+import { reviewDraftTargets, restoreReviewDraftTargets, reconcileReviewDraftTargets, detachedReviewDescription } from './reviewDraftTargets';
+import { reviewEditorState } from '../../../services/okrReviewTemplates';
 import { WorkEvidencePicker } from './WorkEvidencePicker';
+import { SupervisorObjectiveHeader } from './SupervisorObjectiveHeader';
+import { ReviewRiskCallout } from './ReviewRiskCallout';
+import { employeeActionsForKr } from '../../../services/supervisorSupportPanels';
+import { SupervisorKrReviewCard } from './SupervisorKrReviewCard';
+import { EmployeeReviewSupportDialog } from './EmployeeReviewSupportDialog';
+import { employeeSupportsForKr, employeeSupportSnapshots, supervisorProgressBaseline } from '../../../services/supervisorReview';
 import { defaultCollapsedReview } from './evidenceFilters';
 import type { EvidenceViewer } from '../../../services/reviewEvidenceRepository';
 import type { ReviewPeriod } from '../../../services/okrReviewRules';
@@ -44,6 +51,9 @@ export interface KrReviewDraft {
   blocker: string;
   nextPlan: string;
   evidenceNote?: string;
+  supervisorJudgment?: string;
+  employeeReviewSnapshots?: OkrWeeklyReviewSnapshot[];
+  viewedEmployeeReviewIds?: string[];
   workIds: string[];
 }
 
@@ -72,7 +82,16 @@ const impactOptions = [
   { value: 'support', label: '支持 A' }
 ];
 
+const NO_RECORDS: OkrRecord[] = [];
+const NO_PEOPLE: OkrPerson[] = [];
+
 interface WeeklyReviewEditorProps {
+  template?: 'employee' | 'supervisor';
+  records?: OkrRecord[];
+  people?: OkrPerson[];
+  recordsLoading?: boolean;
+  recordsError?: unknown;
+  onRefreshRecords?: () => void;
   key?: React.Key;
   okrs: OKRItem[];
   work: OkrWork[];
@@ -87,11 +106,13 @@ interface WeeklyReviewEditorProps {
   reviewerName?: string;
   teamMembers?: EmployeeOption[];
   directSubmit?: boolean;
+  recordStatus?: string;
   initialPayload?: OkrPayload;
   periodOverride?: ReviewPeriod;
 }
 
 export function WeeklyReviewEditor({
+  template = 'employee', records = NO_RECORDS, people = NO_PEOPLE, recordsLoading = false, recordsError, onRefreshRecords,
   okrs,
   work,
   busy,
@@ -105,11 +126,17 @@ export function WeeklyReviewEditor({
   reviewerName,
   teamMembers = [],
   directSubmit = false,
+  recordStatus,
   initialPayload,
   periodOverride
 }: WeeklyReviewEditorProps) {
   const period = useMemo(() => periodOverride || reviewPeriod('week'), [periodOverride]);
-  const periodOkrs = okrs.filter(objective => objective.cycle === period.startDate.slice(0, 7) || objective.cycle === period.endDate.slice(0, 7));
+  const periodOkrs = useMemo(() => okrs.filter(objective => objective.cycle === period.startDate.slice(0, 7) || objective.cycle === period.endDate.slice(0, 7)), [okrs, period.startDate, period.endDate]);
+  const editorState = reviewEditorState(recordStatus);
+  const supervisor = template === 'supervisor';
+  const rowLabel = supervisor ? 'KR' : 'A';
+  const [supportTargetId, setSupportTargetId] = useState<string | null>(null);
+  const [supportAuthorId, setSupportAuthorId] = useState<string | null>(null);
   const start = dayjs(period.startDate);
   const end = dayjs(period.endDate);
 
@@ -150,24 +177,18 @@ export function WeeklyReviewEditor({
     return () => observer.disconnect();
   }, []);
 
-  const [krs, setKrs] = useState<KrReviewDraft[]>(() => {
-    const currentKrs = periodOkrs.flatMap(o =>
-      (o.keyResults || []).map((k, kIdx) => ({
-          objectiveId: o.id,
-          objectiveTitle: o.objective,
-          keyResultId: k.id,
-          keyResultTitle: k.content || (k as { title?: string }).title || `关键结果 ${kIdx + 1}`,
-          previousProgress: k.progress,
-          currentProgress: k.progress,
-          health: 'normal' as Health,
-          achievement: '',
-          blocker: '',
-          nextPlan: '',
-          workIds: []
-        }))
-    );
-    return initialPayload?.startDate ? currentKrs.map(kr => ({ ...kr, ...initialPayload.krReviews?.find(item => item.keyResultId === kr.keyResultId) })) : mergeCopiedKrReviews(currentKrs, initialPayload?.krReviews || []);
-  });
+  const currentTargets = useMemo(() => {
+    const targets = reviewDraftTargets(periodOkrs);
+    return supervisor ? supervisorProgressBaseline(targets, records, viewer?.id || '', period) : targets;
+  }, [periodOkrs, supervisor, records, viewer?.id, period]);
+  const priorTargets = useRef(currentTargets);
+  const [krs, setKrs] = useState<KrReviewDraft[]>(() => restoreReviewDraftTargets(currentTargets, initialPayload));
+  useEffect(() => {
+    const previousTargets = priorTargets.current;
+    setKrs(previous => reconcileReviewDraftTargets(previous, currentTargets, previousTargets));
+    priorTargets.current = currentTargets;
+  }, [currentTargets]);
+  const detachedTargets = krs.filter(row => !currentTargets.some(target => target.objectiveId === row.objectiveId && target.keyResultId === row.keyResultId));
 
   const [workNotes, setWorkNotes] = useState<Record<string, string>>(() => Object.fromEntries((initialPayload?.items || []).map(item => [item.workId, item.result || ''])));
 
@@ -225,8 +246,8 @@ export function WeeklyReviewEditor({
   );
 
   const selectedKrs = useMemo(
-    () => (selectedObjectiveIds.length ? krs.filter(kr => selectedObjectiveIds.includes(kr.objectiveId)) : krs),
-    [krs, selectedObjectiveIds]
+    () => krs.filter(kr => currentTargets.some(target => target.keyResultId === kr.keyResultId && target.objectiveId === kr.objectiveId)),
+    [krs, currentTargets]
   );
 
   const objectiveGroups = useMemo(() => {
@@ -235,10 +256,15 @@ export function WeeklyReviewEditor({
     return list
       .map(objective => ({
         objective,
-        krs: krs.filter(kr => kr.objectiveId === objective.id)
+        krs: krs.filter(kr => kr.objectiveId === objective.id && objective.keyResults.some(target => target.id === kr.keyResultId))
       }))
       .filter(group => group.krs.length > 0);
   }, [okrs, selectedObjectiveIds, krs]);
+
+  const supportsByKr = useMemo(() => new Map(selectedKrs.map(kr => [kr.keyResultId,
+    supervisor ? employeeSupportsForKr(records, people, viewer?.id || '', kr, period) : []
+  ])), [selectedKrs, supervisor, records, people, viewer?.id, period]);
+  const supportTarget = krs.find(kr => kr.keyResultId === supportTargetId);
 
   const selectedWorks = useMemo(
     () => [...linkedIds].map(id => workById.get(id)).filter((item): item is OkrWork => !!item),
@@ -251,7 +277,7 @@ export function WeeklyReviewEditor({
       errors.push('尚未配置直属上级，无法确定审批人');
     }
     if (selectedKrs.some(kr => kr.health !== 'normal' && !kr.blocker.trim())) {
-      errors.push('风险或阻塞状态的 A 必须填写原因');
+      errors.push(`风险或阻塞状态的 ${rowLabel} 必须填写原因`);
     }
     setValidationErrors(errors);
     if (errors.length === 0) setSubmitModalOpen(true);
@@ -263,21 +289,28 @@ export function WeeklyReviewEditor({
       .map((kr, idx) => ({ ...kr, krIndex: idx + 1 }))
       .filter(kr => kr.currentProgress !== kr.previousProgress);
     if (changes.length === 0) return '暂无进度变动';
-    return changes.map(c => `A${c.krIndex} ${c.previousProgress}% -> ${c.currentProgress}%`).join('，');
-  }, [krs]);
+    return changes.map(c => `${rowLabel}${c.krIndex} ${c.previousProgress}% -> ${c.currentProgress}%`).join('，');
+  }, [krs, rowLabel]);
 
   const payload = (): OkrPayload => ({
     title: reviewTitle,
     startDate: period.startDate,
     endDate: period.endDate,
     reviewType: 'week',
-    reviewMode: 'structured',
+    reviewMode: supervisor ? 'supervisor' : 'structured',
     selfScore,
     summary: initialPayload?.summary || '',
     nextWeekPlan: nextWeekPlan.trim(),
     syncKrProgress: sync,
     krReviews: selectedKrs.map(kr => ({
       ...kr,
+      ...(supervisor ? {
+        supervisorJudgment: (kr.supervisorJudgment || '').trim(),
+        employeeReviewSnapshots: (() => {
+          const live = employeeSupportSnapshots(supportsByKr.get(kr.keyResultId) || []);
+          return live.concat((kr.employeeReviewSnapshots || []).filter(snapshot => !live.some(row => row.id === snapshot.id)));
+        })(),
+      } : {}),
       evidenceNote: Object.entries(workNotes)
         .filter(([wid]) => kr.workIds.includes(wid))
         .map(([_, note]) => note)
@@ -361,8 +394,8 @@ export function WeeklyReviewEditor({
             <h2 className="text-base font-bold text-[var(--text-primary)] m-0">
               {cycleTitle}
             </h2>
-            <Tag color="warning" className="text-xs rounded m-0">
-              草稿状态
+            <Tag color={editorState.color} className="text-xs rounded m-0">
+              {editorState.label}
             </Tag>
             <span className="text-[11px] text-[var(--text-muted)] font-mono hidden lg:inline">
               ({syncChangesText})
@@ -374,6 +407,7 @@ export function WeeklyReviewEditor({
             </Button>
             <Button
               icon={<Save className="h-4 w-4" />}
+              disabled={!editorState.editable || Boolean(detachedTargets.length) || (supervisor && (recordsLoading || Boolean(recordsError)))}
               loading={busy}
               onClick={() => onSaveDraft(payload())}
             >
@@ -382,6 +416,7 @@ export function WeeklyReviewEditor({
             <Button
               type="primary"
               icon={<Send className="h-4 w-4" />}
+              disabled={!editorState.editable || Boolean(detachedTargets.length) || (supervisor && (recordsLoading || Boolean(recordsError)))}
               loading={busy}
               onClick={requestSubmit}
             >
@@ -391,6 +426,8 @@ export function WeeklyReviewEditor({
         </div>
       </div>
 
+      {supervisor && recordsError ? <Alert type="error" showIcon title="员工复盘加载失败，已保留填写内容" action={<Button onClick={onRefreshRecords}>重试</Button>}/> : null}
+      {detachedTargets.length > 0 && <Alert type="warning" showIcon title="月度目标已变化，请确认失效内容" description={<div className="space-y-2"><p>以下已填写内容暂时保留，请复制需要的信息，再确认移除。确认后可继续保存或提交。</p><pre className="whitespace-pre-wrap break-words font-sans">{detachedReviewDescription(detachedTargets)}</pre></div>} action={<Button onClick={() => setKrs(rows => rows.filter(row => currentTargets.some(target => target.keyResultId === row.keyResultId && target.objectiveId === row.objectiveId)))}>移除失效内容</Button>} />}
       {validationErrors.length > 0 && (
         <Alert
           type="warning"
@@ -430,9 +467,9 @@ export function WeeklyReviewEditor({
               }}
               items={[{
                 key: objective.id,
-                label: (
+                label: supervisor ? <SupervisorObjectiveHeader objective={objective} reviews={objectiveKrs} index={oIdx}/> : (
                   <div className="flex items-center gap-2.5">
-                    <Tag color="blue" className="m-0">O{oIdx + 1}</Tag>
+                    <Tag color="blue" className="m-0">{objective.primaryLabel || 'O'}{oIdx + 1}</Tag>
                     <span className="font-semibold text-[var(--text-primary)] text-sm">
                       目标{oIdx + 1}：{objective.objective}
                     </span>
@@ -445,12 +482,18 @@ export function WeeklyReviewEditor({
                     .map(id => workById.get(id))
                     .filter((item): item is OkrWork => !!item);
 
-                  const collapsed = collapsedKrs[kr.keyResultId] ?? defaultCollapsedReview(kr);
+                  const collapsed = collapsedKrs[kr.keyResultId] ?? (supervisor ? false : defaultCollapsedReview(kr));
                   return (
                     <Collapse key={kr.keyResultId} className="okr-review-a-collapse" activeKey={collapsed ? [] : [kr.keyResultId]} expandIconPosition="end" onChange={keys => setCollapsedKrs(current => ({ ...current, [kr.keyResultId]: !keys.length }))} items={[{
                       key: kr.keyResultId,
-                      label: <div className="flex flex-wrap items-center gap-3"><strong>A{krIdx + 1}：{kr.keyResultTitle}</strong><Tag>{kr.currentProgress}%</Tag>{defaultCollapsedReview(kr) && kr.currentProgress < 100 ? <Tag>本周无变化</Tag> : null}</div>,
-                      children: <div className="space-y-4">
+                      label: <div className="flex flex-wrap items-center gap-3"><strong>{rowLabel}{krIdx + 1}：{kr.keyResultTitle}</strong><Tag>{supervisor ? `${kr.previousProgress}% → ${kr.currentProgress}%` : `${kr.currentProgress}%`}</Tag>{defaultCollapsedReview(kr) && kr.currentProgress < 100 ? <Tag>本周无变化</Tag> : null}</div>,
+                      children: supervisor ? <SupervisorKrReviewCard review={kr} employeeActions={employeeActionsForKr(records, people, viewer?.id || '', kr, period)} supports={supportsByKr.get(kr.keyResultId) || []}
+                        busy={busy} editable={editorState.editable} supportLoading={recordsLoading} supportError={recordsError} onRetry={onRefreshRecords}
+                        onUpdate={patch => update(kr.keyResultId, patch)} onEmployeeSupport={(authorId, reportIds) => {
+                          setSupportTargetId(kr.keyResultId); setSupportAuthorId(authorId);
+                          update(kr.keyResultId, { viewedEmployeeReviewIds: [...new Set([...(kr.viewedEmployeeReviewIds || []), ...reportIds])] });
+                        }}/> : <div className="space-y-4">
+                      {objective.keyResults.find(target => target.id === kr.keyResultId)?.parentKeyResultTitle && <p className="text-xs text-[var(--text-muted)]">所属 KR：{objective.keyResults.find(target => target.id === kr.keyResultId)?.parentKeyResultTitle}</p>}
 
 
                       {/* Progress & Health */}
@@ -514,20 +557,7 @@ export function WeeklyReviewEditor({
                         </div>
                       </div>
 
-                      {kr.health !== 'normal' && (
-                        <div className="okr-review-risk-callout">
-                          <AlertTriangle />
-                          <div>
-                            <b>风险原因及所需支持</b>
-                            <Input.TextArea
-                              value={kr.blocker}
-                              onChange={e => update(kr.keyResultId, { blocker: e.target.value })}
-                              autoSize={{ minRows: 2, maxRows: 5 }}
-                              placeholder="说明风险或阻塞原因、外部依赖和所需支持"
-                            />
-                          </div>
-                        </div>
-                      )}
+                      {kr.health !== 'normal' && <ReviewRiskCallout value={kr.blocker} onChange={value => update(kr.keyResultId, { blocker: value })}/>}
 
                       {/* Evidence Section */}
                       <div className="space-y-2.5">
@@ -810,6 +840,7 @@ export function WeeklyReviewEditor({
         </div>
       </section>
 
+      {supportTarget && <EmployeeReviewSupportDialog target={supportTarget} supports={(supportsByKr.get(supportTarget.keyResultId) || []).filter(support => !supportAuthorId || support.record.ownerId === supportAuthorId)} savedSnapshots={(supportTarget.employeeReviewSnapshots || []).filter(snapshot => !supportAuthorId || (snapshot.authorId || snapshot.authorName || snapshot.id) === supportAuthorId)} loading={recordsLoading} error={recordsError} onRetry={onRefreshRecords} onClose={() => { setSupportTargetId(null); setSupportAuthorId(null); }}/>}
       {picker && <WorkEvidencePicker work={work} viewer={viewer} product={pickerSourceKr?.businessObject} version={pickerSourceKr?.version} startDate={period.startDate} endDate={period.endDate} selectedIds={picker.selection} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPicker(null)} onConfirm={confirmPicker}/>}
 
       {/* 提交确认弹窗 (带中文界面及OKR系统进度同步勾选) */}
@@ -817,7 +848,9 @@ export function WeeklyReviewEditor({
         open={submitModalOpen}
         title="确认提交周报"
         onCancel={() => setSubmitModalOpen(false)}
+        okButtonProps={{ disabled: !editorState.editable || Boolean(detachedTargets.length) || (supervisor && (recordsLoading || Boolean(recordsError))) }}
         onOk={async () => {
+          if (!editorState.editable || detachedTargets.length || (supervisor && (recordsLoading || recordsError))) return;
           if (await onSubmit(payload())) setSubmitModalOpen(false);
         }}
         confirmLoading={busy}
@@ -839,12 +872,12 @@ export function WeeklyReviewEditor({
                 <h4>目标{objectiveIndex + 1}：{objective.objective}</h4>
                 {objectiveKrs.map((kr, krIndex) => (
                   <div key={kr.keyResultId} className="okr-review-submit-kr">
-                    <span>A{krIndex + 1}：{kr.keyResultTitle}</span>
+                    <span>{rowLabel}{krIndex + 1}：{kr.keyResultTitle}</span>
                     <span className="font-mono">{kr.previousProgress}% → <strong>{kr.currentProgress}%</strong></span>
                   </div>
                 ))}
               </section>
-            )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有需要提交的未完成 A" />}
+            )) : <Empty description={`没有需要提交的${rowLabel}`} />}
           </div>
           <div className="pt-2 border-t border-[var(--border-main)]">
             <Checkbox checked={sync} onChange={e => setSync(e.target.checked)}>

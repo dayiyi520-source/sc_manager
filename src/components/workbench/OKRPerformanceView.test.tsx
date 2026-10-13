@@ -6,6 +6,9 @@ import dayjs from 'dayjs';
 import type { OkrRecord } from '../../services/okrRepository';
 import type { OKRItem } from '../../types';
 
+class ReviewIntersectionObserver { observe() {} unobserve() {} disconnect() {} }
+globalThis.IntersectionObserver = ReviewIntersectionObserver as unknown as typeof IntersectionObserver;
+
 const objectiveRecord: OkrRecord = {
   id: 'objective-1',
   kind: 'objective',
@@ -112,9 +115,10 @@ const okrState = {
 vi.mock('./okr/useOriginalOkr', () => ({ useOriginalOkr: () => okrState }));
 vi.mock('./okr/OkrProvider', () => ({ OkrProvider: ({ children }: { children: ReactNode }) => children }));
 let currentUser = { id: 'boss', name: '老板', department: '管理层' };
+const reviewToast = vi.hoisted(() => vi.fn());
 
 vi.mock('../../context/AppContext', () => ({
-  useApp: () => ({ currentUser, addToast: vi.fn() }),
+  useApp: () => ({ currentUser, addToast: reviewToast }),
   useAppNavigationContext: () => ({ openPageTab: vi.fn() }),
 }));
 
@@ -173,6 +177,24 @@ describe('OKRPerformanceView target navigation', () => {
     expect(okrState.updateOkr).not.toHaveBeenCalled();
   }, 15000);
 
+  it.each(['manager','employee'])('confirms weights for multiple saved %s primary targets before submission', async ownerId => {
+    currentUser={id:ownerId,name:'本人',department:'产品部'};
+    if(ownerId==='employee') okrState.people=[...defaultPeople,{id:'employee',name:'本人',department:'产品部',rootFlag:0,supervisorId:'manager',version:1}];
+    okrState.records=draftRecords.map(record=>({...record,ownerId,payload:{...record.payload,goalModelVersion:2,goalLevel:ownerId==='manager'?'department':'personal',weight:100}}));
+    okrState.okrs=draftOkrs.map(item=>({...item,ownerId}));
+    render(<OKRPerformanceView/>);
+    fireEvent.click(screen.getByRole('button',{name:'提 交'}));
+    const dialog=(await screen.findByText(ownerId==='manager'?'确认目标权重':'确认主 KR 权重')).closest('[role="dialog"]') as HTMLElement;
+    expect(okrState.submitOkrDraft).not.toHaveBeenCalled();expect(okrState.updateOkr).not.toHaveBeenCalled();
+    const label=ownerId==='manager'?'O':'KR';
+    expect(within(dialog).getByLabelText(label+'2权重')).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText(label+'1权重'),{target:{value:'70'}});
+    fireEvent.click(within(dialog).getByRole('button',{name:'确认并提交'}));
+    await waitFor(()=>expect(okrState.updateOkr).toHaveBeenCalledTimes(2));
+    expect(okrState.updateOkr).toHaveBeenNthCalledWith(1,'draft-objective-1',expect.objectContaining({weight:70}),true);
+    expect(okrState.updateOkr).toHaveBeenNthCalledWith(2,'draft-objective-2',expect.objectContaining({weight:30}),true);
+  });
+
   it('confirms before deleting a manager legacy goal', async () => {
     currentUser = { id: 'manager', name: '主管', department: '产品部' };
     okrState.records = [objectiveRecord, actionParent];
@@ -206,6 +228,30 @@ describe('OKRPerformanceView target navigation', () => {
     await waitFor(() => expect(okrState.deleteOkr).toHaveBeenCalledWith('objective-1'));
   }, 15000);
 
+  it('submits only the edited personal draft when another draft exists',async()=>{
+    currentUser={id:'staff',name:'员工',department:'产品部'};
+    okrState.people=[...defaultPeople,{id:'staff',name:'员工',department:'产品部',rootFlag:0,supervisorId:'manager',version:1}];
+    const drafts=draftRecords.map((record,index)=>({...record,ownerId:'staff',payload:{title:'个人草稿'+(index+1),goalLevel:'personal' as const,goalModelVersion:2 as const,origin:'autonomous' as const,weight:50,deadline:'2026-09-30',keyResults:[{id:'container'+index,title:'个人草稿'+(index+1),weight:100,progress:0,deadline:'2026-09-30',assigneeIds:['staff'],executionActions:[{id:'a'+index,ownerId:'staff',title:'执行任务'+index,weight:100,progress:0,deadline:'2026-09-25'}]}]}}));
+    okrState.records=drafts;okrState.okrs=draftOkrs.map((item,index)=>({...item,ownerId:'staff',objective:'个人草稿'+(index+1)}));
+    render(<OKRPerformanceView/>);
+    fireEvent.click(screen.getByLabelText('编辑目标：个人草稿1'));
+    fireEvent.click(await screen.findByRole('button',{name:'提交目标'}));
+    await waitFor(()=>expect(okrState.updateOkr).toHaveBeenCalledWith('draft-objective-1',expect.objectContaining({title:'个人草稿1'}),true));
+    expect(okrState.updateOkr).toHaveBeenCalledTimes(1);expect(screen.queryByText('确认主 KR 权重')).not.toBeInTheDocument();
+  });
+
+  it('routes reviewer requests to the confirmation workspace instead of my-goal alerts', async () => {
+    const request: OkrRecord={...objectiveRecord,id:'manager-request',ownerId:'manager',payload:{title:'主管原目标'},changeRequest:{id:'request',status:'pending',purpose:'update',reason:'调整指标',reviewerId:'boss',baseVersion:1,requestedAt:'2026-09-15',payload:{title:'主管调整目标',weight:100,keyResults:[]}}};
+    okrState.records=[objectiveRecord,request];
+    render(<OKRPerformanceView/>);
+    expect(screen.queryByText(/主管的目标修改待审核/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('待确认目标 1 项')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'目标确认'}));
+    expect(await screen.findByLabelText('目标确认工作区')).toBeInTheDocument();
+    expect(screen.getByRole('heading',{name:'主管调整目标'})).toBeInTheDocument();
+    expect(screen.queryByRole('heading',{name:'提升年度经营质量'})).not.toBeInTheDocument();
+  });
+
   it('opens reviews directly without the former primary tabs or goal sidebar', () => {
     render(<ReviewSummaryView />);
     expect(screen.getByRole('tab', { name: '写复盘总结' })).toBeInTheDocument();
@@ -213,6 +259,39 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.queryByRole('tab', { name: /月度目标/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: '目标范围导航' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /写周报/ })).toBeInTheDocument();
+  });
+
+  it.each(['写周报', '写月报'])('tells the company root they are exempt when clicking %s', action => {
+    render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('button', { name: action }));
+    expect(reviewToast).toHaveBeenCalledWith('info', '你无需写复盘总结');
+    expect(screen.queryByRole('button', { name: '提交周报' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '提交月报' })).not.toBeInTheDocument();
+    expect(screen.queryByText('老板周报模板待配置')).not.toBeInTheDocument();
+  });
+
+  it('opens the supervisor KR template with support, evidence and coordination fields', () => {
+    currentUser = { id: 'manager', name: '主管', department: '产品部' };
+    okrState.reviewableOkrs = [{ ...okr, ownerId: 'manager' }];
+    render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('button', { name: '写周报' }));
+    expect(screen.getByText('KR1：改善重点客户交付')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /员工复盘支撑/ })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '改善重点客户交付主管判断与协调' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '提交周报' })).toBeInTheDocument();
+  });
+
+  it('keeps employee writing pending and exits it when the active person changes', () => {
+    currentUser = { id: 'manager', name: '员工', department: '产品部' };
+    okrState.people = defaultPeople.map(person => person.id === 'manager' ? { ...person, jobTitle: '产品经理' } : person);
+    const { rerender } = render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('button', { name: '写周报' }));
+    expect(screen.getByText('待填写')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '提交周报' })).toBeInTheDocument();
+    currentUser = { id: 'boss', name: '老板', department: '管理层' };
+    rerender(<ReviewSummaryView/>);
+    expect(screen.getByRole('button', { name: '写周报' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '提交周报' })).not.toBeInTheDocument();
   });
 
   it('opens the requested goal editor once when navigating from reviews', () => {
@@ -295,7 +374,7 @@ describe('OKRPerformanceView target navigation', () => {
     expect(container.querySelector('.okr-action-breakdown-page')).not.toBeInTheDocument();
   });
 
-  it('opens every pending assignment and allows another independent goal in the same editor', () => {
+  it('opens every pending assignment and confirms weights without saving on cancel', async () => {
     currentUser = {id:'manager',name:'主管',department:'产品部'};
     okrState.records = [{ ...objectiveRecord, payload: { ...objectiveRecord.payload, keyResults: ['a1','a2'].map(id => ({id,title:id,weight:50,progress:0,assigneeIds:['manager']})) } }];
     render(<OKRPerformanceView/>);
@@ -306,6 +385,13 @@ describe('OKRPerformanceView target navigation', () => {
     fireEvent.click(within(editor).getByRole('button',{name:'添加目标'}));
     expect(screen.getAllByLabelText('目标名称')).toHaveLength(2);
     expect(screen.queryByRole('button',{name:'选择对齐'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'提交主管确认'}));
+    const confirmation=(await screen.findByText('确认目标权重')).closest('[role="dialog"]') as HTMLElement;
+    expect(within(confirmation).getByLabelText('O2权重')).toBeDisabled();
+    expect(okrState.saveObjective).not.toHaveBeenCalled();
+    fireEvent.click(within(confirmation).getByRole('button',{name:/取\s*消/}));
+    expect(screen.getAllByLabelText('目标名称')).toHaveLength(2);
+    expect(okrState.saveObjective).not.toHaveBeenCalled();
   });
 
   it('allows a supervisor without assignments to create an autonomous goal', () => {
@@ -511,6 +597,14 @@ describe('OKRPerformanceView target navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: '其他部门' }));
     expect(screen.queryByText('专家顾问草稿目标')).not.toBeInTheDocument();
   });
+
+  it('excludes organization department when session department is stale',()=>{
+ currentUser={id:'manager',name:'主管',department:'旧部门'};
+ const own={...objectiveRecord,id:'own-org',ownerId:'same',payload:{...objectiveRecord.payload,title:'同部门目标'}};const other={...objectiveRecord,id:'other-org',ownerId:'other',payload:{...objectiveRecord.payload,title:'跨部门目标'}};
+ okrState.people=[...defaultPeople,{id:'same',name:'同部门成员',department:' 产品部 ',supervisorId:'manager',rootFlag:0,version:1},{id:'other',name:'外部门成员',department:'交付部',supervisorId:'boss',rootFlag:0,version:1}];
+ okrState.records=[own,other];okrState.okrs=[{...okr,id:own.id,ownerId:own.ownerId,objective:own.payload.title},{...okr,id:other.id,ownerId:other.ownerId,objective:other.payload.title}];render(<OKRPerformanceView/>);
+ fireEvent.click(screen.getByRole('button',{name:'其他部门'}));expect(screen.queryByLabelText('目标：同部门目标')).not.toBeInTheDocument();expect(screen.getByLabelText('目标：跨部门目标')).toBeInTheDocument();
+ });
 
   it('keeps the other-department summary and narrows it for a selected department', () => {
     const consultantTarget = { ...objectiveRecord, id: 'consultant-target', ownerId: 'consultant', payload: { ...objectiveRecord.payload, title: '专家顾问目标' } };

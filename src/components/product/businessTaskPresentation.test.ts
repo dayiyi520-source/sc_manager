@@ -4,7 +4,11 @@ import type { CurrentUser, Customer, Opportunity, ProjectRecord, TenderBidding, 
 const user: CurrentUser = { id: 'u1', name: '张三', avatar: '', role: 'admin', roleTitle: '管理员', department: '交付部' };
 const task = (value: Partial<RequirementTask> = {}): RequirementTask => ({ id: '1', title: '任务', status: '待处理', priority: '中', ownerName: '张三', creatorName: '李四', department: '交付部', versionName: '', productLineName: '', estimatedHours: 0, dueDate: '', ...value });
 describe('business task presentation', () => {
-  it('exposes exactly the three requested scopes', () => expect(BUSINESS_TASK_SCOPES.map(scope => scope[1])).toEqual(['我负责的', '我创建的', '我部门的']));
+  it('exposes company scope immediately after department scope', () => expect(BUSINESS_TASK_SCOPES.map(scope => scope[1])).toEqual(['我负责的', '我创建的', '我部门的', '全公司的']));
+  it('includes other departments and missing ownership in company scope', () => {
+    expect(matchesBusinessTaskScope(task({ department: '销售部', assigneeId: 'u2' }), 'all', user, [])).toBe(true);
+    expect(matchesBusinessTaskScope(task({ department: undefined, creatorName: undefined }), 'all', { ...user, department: '' }, [])).toBe(true);
+  });
   it('prefers stable identity over a matching name', () => {
     expect(matchesBusinessTaskScope(task({ assigneeId: 'u2' }), 'my_owned', user, [])).toBe(false);
     expect(matchesBusinessTaskScope(task({ assigneeId: 'u1', ownerName: '旧姓名' }), 'my_owned', user, [])).toBe(true);

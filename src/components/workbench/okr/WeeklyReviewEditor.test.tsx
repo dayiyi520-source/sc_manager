@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { WeeklyReviewEditor } from './WeeklyReviewEditor';
-import { findReviewForPayload, isReviewableObjective, reviewableObjectivesFor } from './useOriginalOkr';
+import { findReviewForPayload } from './useOriginalOkr';
 import type { OkrPayload, OkrRecord } from '../../../services/okrRepository';
 
 class IntersectionObserverMock {
@@ -57,23 +57,6 @@ describe('review period identity', () => {
     expect(findReviewForPayload(records, 'me', '2026-09-14/2026-09-20', payload)).toBeUndefined();
   });
 
-  it('includes an assigned key result from the organization root in weekly and monthly review targets', () => {
-    const objective = {
-      id: 'root-objective', cycle: '2026-09', ownerId: 'root', ownerName: '林志豪', department: '管理部', category: 'supervisor' as const,
-      objective: '本月经营目标', weight: 100, progress: 20, deadline: '2026-09-30', status: 'active' as const,
-      keyResults: [{ id: 'a-1', content: '负责交付动作', progress: 20, weight: 100, deadline: '2026-09-30', assigneeIds: ['chen'] }]
-    };
-    expect(isReviewableObjective(objective, 'chen')).toBe(true);
-    expect(isReviewableObjective(objective, 'other')).toBe(false);
-    expect(reviewableObjectivesFor([{
-      ...objective,
-      keyResults: [
-        ...objective.keyResults,
-        { id: 'a-2', content: '售前动作', progress: 0, weight: 100, deadline: '2026-09-30', assigneeIds: ['sales'] }
-      ]
-    }], 'chen')[0].keyResults.map(keyResult => keyResult.content)).toEqual(['负责交付动作']);
-  });
-
   it('uses business assistance types and team member search without temporary task creation', () => {
     render(<WeeklyReviewEditor {...props} teamMembers={[{ id: 'member-1', name: '陈雅婷', department: '产品部', jobTitle: '产品经理' }]} />);
 
@@ -85,5 +68,17 @@ describe('review period identity', () => {
     expect(screen.getByText(/非本月目标任务/)).toBeInTheDocument();
     expect(screen.getByText('暂无非本月目标工作')).toBeInTheDocument();
     expect(screen.getByText(/本月目标复盘/)).toBeInTheDocument();
+  });
+});
+
+ describe('weekly review creation status', () => {
+  it('starts pending before the first draft save', () => {
+    render(<WeeklyReviewEditor {...props} />);
+    expect(screen.getByText('待填写')).toBeInTheDocument();
+    expect(screen.queryByText('草稿状态')).not.toBeInTheDocument();
+  });
+  it.each([['draft', '草稿'], ['returned', '已退回']])('restores persisted %s state', (recordStatus, label) => {
+    render(<WeeklyReviewEditor {...props} recordStatus={recordStatus} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 });

@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { Alert, Button, Descriptions, Input, Modal, Space, Tag, Typography, Select } from 'antd';
 import { okrRepository, type OkrRecord, type OkrPerson } from '../../../services/okrRepository';
 
-export function GoalChangePanel({ records, people, viewerId, onRefresh, work, workLoading, workError, onRetryWork }: { work: OkrWork[]; workLoading: boolean; workError: Error | null; onRetryWork: () => void; records: OkrRecord[]; people: OkrPerson[]; viewerId: string; onRefresh: () => Promise<unknown> }) {
+export function GoalChangePanel({ showRequests = true, records, people, viewerId, onRefresh, work, workLoading, workError, onRetryWork }: { showRequests?: boolean; work: OkrWork[]; workLoading: boolean; workError: Error | null; onRetryWork: () => void; records: OkrRecord[]; people: OkrPerson[]; viewerId: string; onRefresh: () => Promise<unknown> }) {
   const [review, setReview] = useState<OkrRecord>();
   const [suggestedSource, setSuggestedSource] = useState('');
   const [feedback, setFeedback] = useState('');
@@ -14,7 +14,7 @@ export function GoalChangePanel({ records, people, viewerId, onRefresh, work, wo
   const [error, setError] = useState('');
   const [showDetail, setShowDetail] = useState(false);
   const [showSource, setShowSource] = useState<OkrRecord>();
-  const requests = records.filter(record => record.changeRequest?.status === 'pending' && record.changeRequest.reviewerId === viewerId);
+  const requests = showRequests ? records.filter(record => record.changeRequest?.status === 'pending' && record.changeRequest.reviewerId === viewerId) : [];
   const sync = records.filter(record => record.ownerId === viewerId && !record.payload.inherited && record.payload.sourceObjectiveId && records.find(source => source.id === record.payload.sourceObjectiveId)?.version !== record.payload.sourceVersion);
   const mutate = async (record: OkrRecord, action: string) => {
     if (busy) return;

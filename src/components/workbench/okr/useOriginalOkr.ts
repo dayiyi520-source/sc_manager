@@ -10,6 +10,7 @@ import { productRepository } from '../../../services/productRepository';
 import { teamRepository } from '../../../services/teamRepository';
 import { loadReviewEvidence } from '../../../services/reviewEvidenceRepository';
 import { reviewSubmissionAccess } from '../../../services/okrReviewRules';
+import { monthlyReviewTargets } from '../../../services/okrReviewTargets';
 import { assignedGoalActions, legacyGoalActions } from '../../../services/okrGoalRules';
 import type { EmployeeOption, OKRItem, PerformanceReview } from '../../../types';
 
@@ -22,20 +23,6 @@ export const findReviewForPayload = (records: OkrRecord[], ownerId: string, peri
     && record.payload.startDate === payload.startDate
     && record.payload.endDate === payload.endDate
   ));
-
-export const isReviewableObjective = (objective: OKRItem, userId: string) => (
-  ['active', 'reviewed'].includes(objective.status || '')
-  && (objective.ownerId === userId
-  || objective.keyResults.some(keyResult => keyResult.assigneeIds?.includes(userId))
-  )
-);
-
-export const reviewableObjectivesFor = (okrs: OKRItem[], userId: string) => okrs.flatMap(objective => {
-  if (!isReviewableObjective(objective, userId)) return [];
-  if (objective.ownerId === userId) return [objective];
-  const assignedKeyResults = objective.keyResults.filter(keyResult => keyResult.assigneeIds?.includes(userId));
-  return assignedKeyResults.length ? [{ ...objective, keyResults: assignedKeyResults }] : [];
-});
 
 export function useOriginalOkr() {
   const {currentUser, addToast} = useApp();
@@ -96,11 +83,11 @@ export function useOriginalOkr() {
       keyResults:(r.payload.keyResults || []).map(k=>({id:k.id,content:k.title,progress:k.progress,weight:k.weight,deadline:k.deadline || '',assigneeIds:k.assigneeIds,businessObject:k.businessObject,version:k.version})),
     };
   });
-  const reviewableOkrs = reviewableObjectivesFor(okrs, currentUser.id);
+  const reviewableOkrs = useMemo(() => monthlyReviewTargets(rawRecords, currentUser.id, people), [rawRecords, currentUser.id, peopleQuery.data, teamMembersQuery.data]);
   const performances: (PerformanceReview & {authorId:string})[] = all.filter(r=>r.kind==='review').map(r=>{
     const owner = people.find(p=>p.id===r.ownerId), p=r.payload;
     return {id:r.id,version:r.version,authorId:r.ownerId,author:owner?.name || '人员已停用',authorDept:owner?.department || '',
-      type:p.reviewType || 'month',cycleName:p.title,summary:p.summary || '',selfScore:p.selfScore ?? 0,
+      type:p.reviewType || 'month',reviewMode:p.reviewMode,cycleName:p.title,summary:p.summary || '',selfScore:p.selfScore ?? 0,
       uncompletedReason:p.uncompletedReason || '',suggestions:p.suggestions || '',helpNeeded:p.helpNeeded || '',sendTo:p.sendTo || [],
       createdAt:r.createdAt?.replace('T',' ').slice(0,16) || '—',status:r.status as PerformanceReview['status'],feedback:p.feedback,leaderScore:p.finalScore,
       linkedWorkItems:(p.items || []).map(i=>({id:i.workId,title:i.title,type:'task',status:i.status})),

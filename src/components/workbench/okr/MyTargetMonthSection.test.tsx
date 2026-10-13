@@ -125,7 +125,7 @@ describe('MyTargetMonthSection', () => {
     const people: OkrPerson[] = [{ id: 'boss', name: '林志豪', department: '管理部', supervisorId: null, rootFlag: 1, version: 1 }];
     const parent: OkrRecord = { id: 'parent-objective', kind: 'objective', ownerId: 'boss', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '来源目标' } };
     const child: OkrRecord = { ...parent, id: 'child-objective', payload: { title: '当前目标', alignments: [{ parentObjectiveId: parent.id }] } };
-    expect(buildMyTargetViewItems([child], [], [parent], people, 'boss')[0].alignmentLabel).toBe('来源目标');
+    expect(buildMyTargetViewItems([child], [], [parent], people, 'boss')[0].alignmentLabel).toBe('来源目标——来源于上级林志豪');
     expect(buildMyTargetViewItems([parent], [], [], people, 'boss')[0].alignmentLabel).toBe('2026年09月目标');
     expect(buildMyTargetViewItems([child], [], [parent], people, 'another-user')[0].editable).toBe(false);
   });
@@ -138,7 +138,7 @@ describe('MyTargetMonthSection', () => {
     expect(result[0].actions[0].alignments).toHaveLength(1);
     expect(result[0].actions[0].alignments?.[0].actions).toEqual([{ id: 'child', title: '交付设计方案', linked: true }]);
     render(<MyTargetMonthSection periodKey="2026-09" targets={result} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()}/>);
-    fireEvent.mouseEnter(screen.getByRole('button', { name: 'A1下级对齐' }));
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'KR1下级对齐' }));
     await waitFor(() => expect(screen.getByText('交付设计方案')).toBeInTheDocument());
     expect(screen.getByText('对齐我的')).toBeInTheDocument();
   });

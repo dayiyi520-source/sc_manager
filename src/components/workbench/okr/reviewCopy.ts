@@ -18,6 +18,8 @@ export function createReviewCopyDraft(source: OkrPayload): OkrPayload {
     krReviews: (source.krReviews || []).map(review => ({
       ...review,
       workIds: [],
+      employeeReviewSnapshots: [],
+      viewedEmployeeReviewIds: [],
       evidenceNote: '',
     })),
     extraWork: source.extraWork
@@ -33,6 +35,9 @@ export function mergeCopiedKrReviews(current: OkrKrReview[], copied: OkrKrReview
     return {
       ...review,
       currentProgress: source.currentProgress,
+      supervisorJudgment: source.supervisorJudgment,
+      employeeReviewSnapshots: [],
+      viewedEmployeeReviewIds: [],
       health: source.health,
       achievement: source.achievement,
       blocker: source.blocker,

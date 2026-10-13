@@ -1,4 +1,4 @@
-.company-objective-drawer, .company-copy-modal {
+.company-objective-drawer, .company-copy-modal, .okr-weight-confirmation {
   --company-space-sm: .5rem;
   --company-space-md: 1rem;
   --company-space-lg: 1.5rem;
@@ -259,3 +259,25 @@
 .company-execution-actions { display: grid; gap: 8px; padding-block: 8px; }
 .company-action-metrics { gap: 8px; }
 .company-objective-form .okr-personal-kr-details { margin-inline-start: var(--okr-result-indent); }
+
+.okr-weight-confirmation-rows { display: grid; gap: var(--company-space-md); padding-block: var(--company-space-md); }
+.okr-weight-confirmation-row { display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem; gap: var(--company-space-md); align-items: center; }
+.okr-weight-confirmation-row > div { display: flex; gap: var(--company-space-sm); min-width: 0; }
+.okr-weight-confirmation-row > div > span:last-child { overflow-wrap: anywhere; }
+.okr-weight-confirmation-label { flex: none; color: var(--text-muted); }
+.okr-weight-confirmation-row .ant-input-number { width: 100%; }
+.okr-weight-confirmation .ant-alert { margin-block: var(--company-space-sm); }
+
+/* Match the inherited KR text edge, including the marker-to-title gap. */
+.company-objective-form .okr-source-heading > .is-personal-alignment,
+.company-objective-form .okr-personal-kr-details { margin-inline-start: calc(var(--okr-result-indent) + var(--company-space-sm)); }
+.company-objective-form .okr-objective-title .ant-typography { min-width: 0; overflow-wrap: anywhere; }
+
+.company-objective-detail-drawer .company-action-metrics { column-gap: calc(var(--spacing) * 12); row-gap: calc(var(--spacing) * 2); }
+
+.supervisor-objective-form .supervisor-action-fields { grid-template-columns: minmax(10rem, .75fr) repeat(2, minmax(0, 1fr)); }
+.supervisor-action-fields .okr-kr-template-select { grid-column: 1; }
+.supervisor-action-fields:has(.okr-kr-template-select + .ant-select + .ant-input) { grid-template-columns: minmax(10rem, .75fr) repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .supervisor-objective-form .supervisor-action-fields { grid-template-columns: minmax(0, 1fr); } }
+
+@media (max-width: 900px) { .supervisor-objective-form .supervisor-action-fields:has(.okr-kr-template-select + .ant-select + .ant-input) { grid-template-columns: minmax(0, 1fr); } }

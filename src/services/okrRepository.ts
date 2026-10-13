@@ -1,19 +1,21 @@
+import { restoreReturnedInitialDraft } from './okrSubmissionState';
 import { apiRequest } from './apiClient';
 
 export interface OkrPerson { id: string; name: string; department: string; jobTitle?: string; supervisorId: string | null; rootFlag: number; version: number }
 export interface GoalTiming { deadline?: string; plannedDeadline?: string; forecastDeadline?: string; actualStartedAt?: string; actualCompletedAt?: string; delayReason?: string; delayResponsibility?: 'self' | 'dependency' | 'company'; }
 export interface OkrExecutionAction extends GoalTiming { weight?: number; id: string; title: string; ownerId: string; progress: number; }
-export interface OkrGoalChange { id: string; status: 'pending' | 'approved' | 'returned'; purpose?: 'initial' | 'update' | 'alignment' | 'delete'; reason: string; reviewerId: string; payload: OkrPayload; baseVersion: number; requestedAt: string; feedback?: string; reviewedAt?: string; }
+export interface OkrGoalChange { previousPayload?: OkrPayload; id: string; status: 'pending' | 'approved' | 'returned'; purpose?: 'initial' | 'update' | 'alignment' | 'delete'; reason: string; reviewerId: string; payload: OkrPayload; baseVersion: number; requestedAt: string; feedback?: string; reviewedAt?: string; }
 export interface OkrKrDetail { id: string; name: string; stage?: string; plannedStartDate?: string; plannedEndDate?: string; }
 export interface OkrKr extends GoalTiming { details?: OkrKrDetail[]; structureType?: 'product' | 'delivery' | 'support'; executionActions?: OkrExecutionAction[]; confidence?: number; currentValue?: number; targetValue?: number; id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[]; businessObject?: string; version?: string; stage?: string; action?: string; result?: string }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
 export interface OkrReviewItem { workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
-export interface OkrKrReview { objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
+export interface OkrKrReview { viewedEmployeeReviewIds?:string[]; supervisorJudgment?:string; employeeReviewSnapshots?:OkrWeeklyReviewSnapshot[]; objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
 export interface OkrReviewAssistance { subject:string; result:string; assistanceType?:string; expectedAssignee?:string; content?:string; expectedDueDate?:string }
 export interface OkrExtraWork { workIds:string[]; description:string; impact:string; notes?:Record<string,string> }
 export interface OkrMonthlyTask { id:string; content:string; result:string; status:string; sourceReviewId?:string; workId?:string }
 export interface OkrMonthlyPlan { id:string; content:string; objectiveId?:string; keyResultId?:string; plannedDate?:string }
 export interface OkrWeeklyReviewSnapshot {
+  authorId?:string; authorName?:string;
   id:string; title:string; startDate:string; endDate:string; status:string; summary?:string;
   krReviews:OkrKrReview[]; assistance:OkrReviewAssistance[]; extraWork?:OkrExtraWork; items:OkrReviewItem[];
 }
@@ -23,7 +25,7 @@ export interface OkrPayload extends GoalTiming {
   origin?: 'assigned' | 'autonomous'; reviewerSuggestedSource?: string;
   inherited?: boolean; changeReason?: string;
 
-  reviewMode?: 'completed' | 'structured' | 'monthly'; reviewType?: 'week' | 'month'; selfScore?: number;
+  reviewMode?: 'completed' | 'structured' | 'monthly' | 'supervisor'; reviewType?: 'week' | 'month'; selfScore?: number;
   krReviews?: OkrKrReview[]; assistance?: OkrReviewAssistance[]; extraWork?: OkrExtraWork; syncKrProgress?: boolean;
   weeklyReviewIds?: string[]; weeklyReviewSnapshots?: OkrWeeklyReviewSnapshot[];
   monthlyOtherTasks?: OkrMonthlyTask[]; nextMonthPlans?: OkrMonthlyPlan[];
@@ -76,7 +78,7 @@ export const okrRepository = {
   records: async (viewerId?: string): Promise<OkrRecord[]> => {
     const query = viewerId ? `?viewerId=${encodeURIComponent(viewerId)}` : '';
     const rows = await apiRequest<Array<Omit<OkrRecord,'payload'> & {payload: string | OkrPayload}>>(`${base}/records${query}`);
-    return rows.map(r => ({...r, payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload}));
+    return rows.map(r => restoreReturnedInitialDraft({...r, payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload}));
   },
   work: (ownerId: string) => apiRequest<OkrWork[]>(`${base}/work?ownerId=${encodeURIComponent(ownerId)}`),
   actionParents: (periodKey: string, viewerId?: string) => apiRequest<OkrRecord[]>(`${base}/actions/parents?periodKey=${encodeURIComponent(periodKey)}${viewerId ? `&viewerId=${encodeURIComponent(viewerId)}` : ''}`),

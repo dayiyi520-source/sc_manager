@@ -99,6 +99,8 @@ export interface PageTab {
 
 // OKR 与 绩效
 export interface OKRItem {
+  executionStatus?: 'ahead' | 'normal' | 'risk' | 'overdue';
+  primaryLabel?: 'O' | 'KR';
   id: string;
   cycle: string; // 如 "2026-09", "2026-08"
   ownerId: string;
@@ -125,10 +127,14 @@ export interface OKRItem {
     assigneeIds?: string[];
     businessObject?: string;
     version?: string;
+    executionStatus?: 'ahead' | 'normal' | 'risk' | 'overdue';
+    parentKeyResultId?: string;
+    parentKeyResultTitle?: string;
   }[];
 }
 
 export interface PerformanceReview {
+  reviewMode?: import('../services/okrRepository').OkrPayload['reviewMode'];
   id: string;
   version?: number;
   type: 'week' | 'month';

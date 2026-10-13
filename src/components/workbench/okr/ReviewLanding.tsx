@@ -8,6 +8,7 @@ import { backfillReviews, currentReviewPeriod, recentSubmittedReviews, reviewWri
 import './reviewLanding.css';
 
 type Props = {
+  exempt?: boolean;
   records: OkrRecord[];
   objectives: OKRItem[];
   ownerId: string;
@@ -22,7 +23,7 @@ type Props = {
   onViewReview: (id: string) => void;
 };
 
-export function ReviewLanding({ records, objectives, ownerId, settings, loading = false, settingsLoading = false, settingsError, busy = false, onRetry, onOpen, onViewAll, onViewReview }: Props) {
+export function ReviewLanding({ records, objectives, ownerId, settings, loading = false, settingsLoading = false, settingsError, busy = false, exempt = false, onRetry, onOpen, onViewAll, onViewReview }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [now, setNow] = useState(() => dayjs());
   useEffect(() => {
@@ -43,8 +44,9 @@ export function ReviewLanding({ records, objectives, ownerId, settings, loading 
     const access = reviewWriteAccess(settings, type, now);
     const existing = records.find(record => record.kind === 'review' && record.ownerId === ownerId && record.payload.reviewType === type && record.payload.startDate === period.startDate && record.payload.endDate === period.endDate && record.status !== 'deleted');
     const alreadySubmitted = existing && ['active', 'submitted', 'reviewed'].includes(existing.status);
-    const reason = settingsError ? '填写日期配置加载失败，请重试' : settingsLoading || !settings ? '正在加载填写日期配置' : alreadySubmitted ? '本周期已提交，可在我的复盘列表查看' : access.reason;
-    return <Tooltip title={reason || undefined}><span tabIndex={blocked || !access.allowed || Boolean(alreadySubmitted) ? 0 : undefined} aria-label={reason || undefined}><Button type={type === 'week' ? 'primary' : 'default'} disabled={blocked || !access.allowed || Boolean(alreadySubmitted)} onClick={() => onOpen(type, period, existing)} icon={<CalendarIcon/>}>{type === 'week' ? '写周报' : '写月报'}</Button></span></Tooltip>;
+    const disabled = exempt ? busy : blocked || !access.allowed || Boolean(alreadySubmitted);
+    const reason = exempt ? '你无需写复盘总结' : settingsError ? '填写日期配置加载失败，请重试' : settingsLoading || !settings ? '正在加载填写日期配置' : alreadySubmitted ? '本周期已提交，可在我的复盘列表查看' : access.reason;
+    return <Tooltip title={reason || undefined}><span tabIndex={disabled ? 0 : undefined} aria-label={reason || undefined}><Button type={type === 'week' ? 'primary' : 'default'} disabled={disabled} onClick={() => onOpen(type, period, existing)} icon={<CalendarIcon/>}>{type === 'week' ? '写周报' : '写月报'}</Button></span></Tooltip>;
   };
   return <div className="review-landing">
     {settingsError ? <Alert type="error" showIcon title="填写日期配置加载失败" action={<Button size="small" onClick={onRetry}>重试</Button>}/> : null}
