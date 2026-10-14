@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Drawer, Input, Modal, Select, Switch, Tabs, Tag, message } from 'antd';
 import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
@@ -16,6 +17,9 @@ const normalizeStates = (item: WorkItemTemplateType | null): EditableWorkflowSta
 };
 
 export const WorkItemModuleView: React.FC = () => {
+  const queryClient = useQueryClient();
+  const syncConsumers = async () => { await Promise.all(['product-lines', 'product-work-item-types', 'unified-task-page', 'design-tasks', 'product-bugs', 'product-dev-tasks', 'requirements'].map(key => queryClient.invalidateQueries({ queryKey: [key] }))); };
+
   const [items, setItems] = useState<WorkItemTemplateType[]>([]);
   const [categories, setCategories] = useState<WorkItemCategoryDefinition[]>([]);
   const [category, setCategory] = useState<ProductLineWorkItemCategory>('需求');
@@ -52,7 +56,7 @@ export const WorkItemModuleView: React.FC = () => {
     try {
       if (editing) await productRepository.updateWorkItemTemplateType(editing.id, { name: name.trim(), description, enabled, isDefault: enabled && isDefault });
       else { const apiCategory = categoryKey(createCategory); const definition = buildWorkflowDefinition(states.map((state) => ({ ...state, name: state.name.trim(), stage: apiCategory }))); await productRepository.createWorkItemTemplateType({ category: createCategory, name: name.trim(), description, enabled, isDefault: enabled && isDefault, workflow: { category: apiCategory, name: `${name.trim()}状态配置`, definition } }); }
-      message.success(editing ? '模板已保存' : '类型已创建'); setOpen(false); await load();
+      message.success(editing ? '模板已保存' : '类型已创建'); setOpen(false); await syncConsumers(); await load();
     } catch (error) { message.error(error instanceof Error ? error.message : '保存失败'); }
     finally { setSaving(false); }
   };
@@ -60,12 +64,12 @@ export const WorkItemModuleView: React.FC = () => {
     if (!stateItem || saving) return;
     const invalid = validateWorkflowStates(states); if (invalid) { message.warning(invalid); return; }
     setSaving(true);
-    try { const apiCategory = categoryKey(stateItem.category); const definition = buildWorkflowDefinition(states.map((state) => ({ ...state, name: state.name.trim(), stage: apiCategory }))); await productRepository.updateWorkItemTemplateWorkflow(stateItem.id, { category: apiCategory, name: `${stateItem.name}状态配置`, definition, revision: stateItem.workflow?.revision }); message.success('状态配置已保存'); setStateItem(null); await load(); }
+    try { const apiCategory = categoryKey(stateItem.category); const definition = buildWorkflowDefinition(states.map((state) => ({ ...state, name: state.name.trim(), stage: apiCategory }))); await productRepository.updateWorkItemTemplateWorkflow(stateItem.id, { category: apiCategory, name: `${stateItem.name}状态配置`, definition, revision: stateItem.workflow?.revision }); message.success('状态配置已保存'); setStateItem(null); await syncConsumers(); await load(); }
     catch (error) { message.error(error instanceof Error ? error.message : '保存失败'); }
     finally { setSaving(false); }
   };
-  const toggle = async (item: WorkItemTemplateType, checked: boolean) => { setSaving(true); try { await productRepository.updateWorkItemTemplateType(item.id, { enabled: checked }); await load(); } catch (error) { message.error(error instanceof Error ? error.message : '状态更新失败'); } finally { setSaving(false); } };
-  const remove = (item: WorkItemTemplateType) => Modal.confirm({ title: `删除「${item.name}」？`, content: '删除后新建产品不会再继承该类型，已有产品不受影响。', okButtonProps: { danger: true }, onOk: async () => { try { await productRepository.deleteWorkItemTemplateType(item.id); message.success('类型已删除'); await load(); } catch (error) { message.error(error instanceof Error ? error.message : '删除失败'); throw error; } } });
+  const toggle = async (item: WorkItemTemplateType, checked: boolean) => { setSaving(true); try { await productRepository.updateWorkItemTemplateType(item.id, { enabled: checked }); await syncConsumers(); await load(); } catch (error) { message.error(error instanceof Error ? error.message : '状态更新失败'); } finally { setSaving(false); } };
+  const remove = (item: WorkItemTemplateType) => Modal.confirm({ title: `删除「${item.name}」？`, content: '删除后新建产品不会再继承该类型，产品工作项设置同步移除该模板，历史任务将匹配可用类型。', okButtonProps: { danger: true }, onOk: async () => { try { await productRepository.deleteWorkItemTemplateType(item.id); message.success('类型已删除'); await syncConsumers(); await load(); } catch (error) { message.error(error instanceof Error ? error.message : '删除失败'); throw error; } } });
 
   return <div className="mx-auto w-full max-w-4xl space-y-4 text-xs">
     <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">工作项模版</h3><p className="mt-1 text-[var(--text-muted)]">按工作项分类维护类型名称、描述和启用状态。</p></div><Button type="primary" icon={<PlusOutlined />} disabled={loading || saving || !categoryOptions.some((item) => item.enabled)} onClick={openCreate}>新增类型</Button></div>

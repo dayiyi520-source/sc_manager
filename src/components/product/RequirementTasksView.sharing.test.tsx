@@ -6,10 +6,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RequirementTasksView, WorkOrderPicker } from './RequirementTasksView';
 import { useApp } from '../../context/AppContext';
 import { productRepository } from '../../services/productRepository';
+import { readSession } from '../../services/session';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
-vi.mock('../../services/session', () => ({ readSession: () => null }));
+vi.mock('../../services/session', () => ({ readSession: vi.fn(() => null) }));
 vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../services/requirementRepository', () => ({ requirementRepository: { workOrderCandidates: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../services/productRepository', () => ({ productRepository: {
@@ -30,6 +31,7 @@ vi.mock('./WorkItemCreatePanel', async () => ({ WorkItemDetailHeader: () => null
 const addToast = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(readSession).mockReturnValue(null);
   vi.mocked(productRepository.workItems).mockReset().mockResolvedValue({ page: { items: [], total: 0 } } as never);
   sessionStorage.clear();
   window.history.replaceState(null, '', '/manager/app/crm_presales_tasks?detailId=shared-task');
@@ -282,6 +284,7 @@ it('shows fixed independent defect types and the requested bug creation fields',
   window.history.replaceState(null, '', '/app/prod_bugs');
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" /></QueryClientProvider>);
   fireEvent.click(await screen.findByRole('button', { name: '新建' }));
+  expect(screen.getByText('验证者').closest('.ant-form-item')).toHaveStyle({ order: '1' });
   expect(screen.queryByText('期望结果')).not.toBeInTheDocument();
   expect(screen.queryByText('支撑项')).not.toBeInTheDocument();
   expect(screen.queryByText('子任务')).not.toBeInTheDocument();
@@ -292,4 +295,27 @@ it('shows fixed independent defect types and the requested bug creation fields',
   expect(typeItem.querySelector('input')).not.toBeDisabled();
   fireEvent.mouseDown(typeItem.querySelector('input')!);
   for (const label of ['系统缺陷','样式缺陷','线上故障','安全漏洞']) expect(screen.getByText(label, { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
+});
+
+
+it('filters defects awaiting my verification and offers the full company scope in order', async () => {
+  vi.mocked(readSession).mockReturnValue({ user: { id: 'qa' } } as never);
+  window.history.replaceState(null, '', '/app/prod_bugs');
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), currentUser: { id: 'qa', name: '测试人员', department: '测试部' }, productLines: [{ id: 'line', name: '产品' }] } as unknown as ReturnType<typeof useApp>);
+  const records = [
+    { id: 'mine', title: '待我验证缺陷', verifierId: 'qa', status: { name: '已修复' } },
+    { id: 'closed', title: '已关闭缺陷', verifierId: 'qa', status: { name: '已关闭' } },
+    { id: 'other', title: '他人验证缺陷', verifierId: 'other', status: { name: '已修复' } }
+  ].map(task => ({ ...task, category: 'bug', productLineId: 'line', assigneeName: '测试人员', createdAt: '2026-10-01', priority: '中' }));
+  vi.mocked(productRepository.workItems).mockResolvedValue({ page: { items: records, total: records.length } } as never);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" /></QueryClientProvider>);
+  const pending = await screen.findByRole('tab', { name: '待我验证的·1' });
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['我负责的·3', '我创建的·0', '待我验证的·1', '我部门的·0', '全公司的·3']);
+  fireEvent.click(pending);
+  expect(await screen.findByText('待我验证缺陷')).toBeVisible();
+  expect(screen.queryByText('已关闭缺陷')).not.toBeInTheDocument();
+  expect(screen.queryByText('他人验证缺陷')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: '全公司的·3' }));
+  expect(await screen.findByText('已关闭缺陷')).toBeVisible();
+  expect(screen.getByText('他人验证缺陷')).toBeVisible();
 });

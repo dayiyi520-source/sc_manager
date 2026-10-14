@@ -32,7 +32,7 @@ it('keeps creation dates required when configuration loading fails, without chan
 
 it('keeps bug creation and detail properties ordered and removes legacy relation fields', () => {
   const { result } = renderHook(() => useWorkItemFieldConfig('bug', 'CREATE'));
-  expect(result.current.fields.filter(field => field.sort >= 0).sort((a,b) => a.sort - b.sort).map(field => field.fieldCode)).toEqual(['assignee','priority','productLine','version','taskType','plannedStartDate','plannedEndDate','expectedCompleteDate','estimatedHours','attachments']);
+  expect(result.current.fields.filter(field => field.sort >= 0).sort((a,b) => a.sort - b.sort).map(field => field.fieldCode)).toEqual(['assignee','verifier','priority','productLine','version','taskType','plannedStartDate','plannedEndDate','expectedCompleteDate','estimatedHours','attachments']);
   for (const code of ['expectedGoal','children','support','hours','actualHours']) expect(result.current.visible(code)).toBe(false);
   expect(result.current.visible('relatedTasks')).toBe(true);
 });
