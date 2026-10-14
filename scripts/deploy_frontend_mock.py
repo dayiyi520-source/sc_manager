@@ -41,10 +41,9 @@ def main():
         raise SystemExit('Incorrect frontend base path.')
     js = '\n'.join(path.read_text(encoding='utf-8') for path in (dist / 'assets').glob('*.js'))
     for required in ['demo-preview-', 'demo-presales-', 'demo-delivery-']:
-        # Business IDs are generated as demo- + kind; check their source data labels instead.
-        if required == 'demo-preview-' and required not in js:
-            raise SystemExit('Product Mock data missing from artifact.')
-    if '智慧校园二期建设方案梳理' not in js or '智慧校园项目启动资料准备' not in js:
+        if required not in js:
+            raise SystemExit('Business Mock data missing from artifact: ' + required)
+    if '智慧校园客户方案梳理' not in js or '项目启动资料准备' not in js:
         raise SystemExit('Business Mock task data missing from artifact.')
     (dist / 'mock-data').mkdir(exist_ok=True)
     (dist / 'mock-service').mkdir(exist_ok=True)
