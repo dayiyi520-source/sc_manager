@@ -1076,6 +1076,17 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   }
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'activities' && method === 'GET') return [];
 
+  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'iteration-timeline' && method === 'GET') {
+    const line = getProductLines().find((product) => product.id === parts[2]);
+    if (!line) return [];
+    return getWorkItems()
+      .filter((item) => item.productLineId === line.id && !item.deleted && !item.deleteFlag)
+      .map((item) => ({
+        ...unifiedWorkItem(item),
+        versionName: item.versionName || line.versions?.find((version) => version.id === item.versionId)?.name || '',
+      }));
+  }
+
   if (clean.startsWith('/api/work-items/') && parts.length === 3 && method === 'GET') {
     const found = getWorkItems().filter((item) => !item.deleted && !item.deleteFlag).map(unifiedWorkItem).find((item) => item.id === parts[2]);
     return found || null;

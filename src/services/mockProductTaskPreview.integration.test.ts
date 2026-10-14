@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, expect, it } from 'vitest';
 import { mockApiRequest } from './mockApi';
-import { MOCK_USERS } from '../data/mockSnapshot';
+import { MOCK_PRODUCT_LINES, MOCK_USERS } from '../data/mockSnapshot';
 import { PRODUCT_PREVIEW_SEED_VERSION } from '../data/mockProductTaskPreview';
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
 it('ships three owned and created samples for each product task category to a new browser', async () => {
@@ -26,4 +26,20 @@ it('preserves browser edits and manual records without duplicating seeded produc
   expect(saved.find((item: { id: string }) => item.id === 'demo-preview-dev-1').title).toBe('已编辑的演示任务');
   expect(saved.find((item: { id: string }) => item.id === 'manual-record').title).toBe('手动记录');
   expect(localStorage.getItem(key + '.previewSeedVersion')).toBe(PRODUCT_PREVIEW_SEED_VERSION);
+});
+
+it('returns active product work items for the product iteration timeline', async () => {
+  const product = MOCK_PRODUCT_LINES.find((item) => item.versions?.length) || MOCK_PRODUCT_LINES[0];
+  const version = product.versions?.[0];
+  localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify([
+    { id: 'timeline-active', title: '迭代任务', category: 'dev', productLineId: product.id, versionId: version?.id, status: '处理中' },
+    { id: 'timeline-deleted', title: '已归档任务', category: 'dev', productLineId: product.id, versionId: version?.id, deleted: true, status: '处理中' },
+  ]));
+
+  const result = await mockApiRequest(`/api/product-lines/${product.id}/iteration-timeline`);
+
+  expect(result).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'timeline-active', productLineId: product.id, versionId: version?.id, versionName: version?.name || '' }),
+  ]));
+  expect(result).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: 'timeline-deleted' })]));
 });
