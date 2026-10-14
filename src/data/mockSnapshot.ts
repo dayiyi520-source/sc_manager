@@ -1,3 +1,4 @@
+import directorySnapshot from './mockCustomerDirectory.json';
 import collaborationTypes from './mockCollaborationTypes.json';
 import type { ApprovalFlow, Contract, CurrentUser, Customer, DefectBug, DeliveryMapProject, FollowUpRecord, Lead, Opportunity, ProductLine, RequirementTask, TeamMember, VersionIteration } from '../types';
 import type { TestCase, TestCaseDirectory, TestPlan } from '../types/testManagement';
@@ -261,33 +262,13 @@ export const MOCK_TEST_TASKS = workItems.filter((row) => text(row.category_) ===
 export const MOCK_BUGS: DefectBug[] = workItems.filter((row) => text(row.category_) === 'bug').map((row) => ({ id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_), status: text(row.status_name_), severity: text(row.severity_), type: text(row.task_type_name_) || '缺陷', ownerName: text(row.assignee_name_), creatorName: text(row.creator_name_), verifierName: text(row.verifier_name_), productLineId: text(row.product_line_id_), productLineName: productNameById.get(text(row.product_line_id_)) || '', versionName: versionNameById.get(text(row.version_id_)) || '', linkedTaskId: text(row.requirement_id_) || undefined, createdAt: text(row.create_time_) }));
 
 const activeRows = (table: keyof typeof MOCK_DATABASE) => rows(table).filter((row) => Number(row.delete_flag_ || 0) === 0);
-const customerNameById = new Map(activeRows('t_crm_customer').map((row) => [text(row.id_), text(row.name_)]));
-const opportunityNameById = new Map(activeRows('t_crm_opportunity').map((row) => [text(row.id_), text(row.name_)]));
+const customerNameById = new Map(directorySnapshot.customers.map((row) => [row.id, row.name]));
+const opportunityNameById = new Map(directorySnapshot.opportunities.map((row) => [row.id, row.name]));
 
-export const MOCK_CUSTOMERS: Customer[] = activeRows('t_crm_customer').map((row) => ({
-  id: text(row.id_), name: text(row.name_), code: text(row.code_), type: text(row.type_), level: (text(row.level_) || 'C级-培育') as Customer['level'],
-  contactName: text(row.contact_name_), contactPhone: text(row.contact_phone_), contactTitle: text(row.contact_title_), contactEmail: text(row.contact_email_) || undefined,
-  annualBudget: Number(row.annual_budget_ || 0), activeProjectsCount: 0, potentialOppsCount: activeRows('t_crm_opportunity').filter((item) => text(item.customer_id_) === text(row.id_)).length,
-  source: (text(row.source_) || '主动开发') as Customer['source'], lastFollowUp: date(row.update_time_ || row.create_time_), tags: Array.isArray(row.tags_) ? row.tags_.map(text) : [],
-  address: text(row.address_), industry: text(row.industry_), scale: text(row.scale_), schoolLevel: text(row.school_level_) || undefined, schoolNature: text(row.school_nature_) || undefined,
-  schoolType: text(row.school_type_) || undefined, ownership: text(row.ownership_) || undefined, region: text(row.region_) || undefined, status: text(row.status_) || undefined,
-  createdAt: date(row.create_time_), version: Number(row.version_ || 0),
-}));
-
-export const MOCK_LEADS: Lead[] = activeRows('t_crm_lead').map((row) => ({
-  id: text(row.id_), name: text(row.name_), customerId: text(row.customer_id_), customerName: customerNameById.get(text(row.customer_id_)) || '', schoolContact: text(row.school_contact_),
-  contactPhone: text(row.contact_phone_) || undefined, department: text(row.department_), ownerName: text(row.owner_name_), source: text(row.source_) as Lead['source'],
-  products: Array.isArray(row.products_) ? row.products_.map(text) : [], status: text(row.status_) as Lead['status'], latestFollowUpAt: date(row.update_time_) || undefined,
-  convertedOpportunityId: text(row.converted_opportunity_id_) || undefined, createdAt: date(row.create_time_), version: Number(row.version_ || 0),
-}));
-
-export const MOCK_OPPORTUNITIES: Opportunity[] = activeRows('t_crm_opportunity').map((row) => ({
-  id: text(row.id_), name: text(row.name_), type: text(row.type_), customerId: text(row.customer_id_), customerName: customerNameById.get(text(row.customer_id_)) || '',
-  leadId: text(row.lead_id_) || undefined, stage: text(row.stage_) as Opportunity['stage'], status: text(row.status_) || '跟进中', amount: Number(row.amount_ || 0),
-  relatedProduct: text(row.related_product_), isTrial: Boolean(row.is_trial_), deadline: date(row.deadline_), expectedCloseDate: date(row.expected_close_date_) || undefined,
-  winRate: Number(row.win_rate_ || 0) || undefined, keyDecision: text(row.key_decision_) || undefined, ownerName: text(row.owner_name_), collaborators: Array.isArray(row.collaborators_) ? row.collaborators_.map(text) : [],
-  source: text(row.source_), probability: Number(row.probability_ || 0), remarks: text(row.remarks_), createdAt: date(row.create_time_), version: Number(row.version_ || 0),
-}));
+// 三类档案统一采用当前菜单的持久 Mock 数据，保留导出供历史任务引用。
+export const MOCK_CUSTOMERS = directorySnapshot.customers as Customer[];
+export const MOCK_LEADS = directorySnapshot.leads as Lead[];
+export const MOCK_OPPORTUNITIES = directorySnapshot.opportunities as Opportunity[];
 
 export const MOCK_FOLLOW_UPS: FollowUpRecord[] = activeRows('t_crm_follow_up').map((row) => ({
   id: text(row.id_), customerId: text(row.customer_id_), customerName: customerNameById.get(text(row.customer_id_)) || '', opportunityId: text(row.opportunity_id_) || undefined,

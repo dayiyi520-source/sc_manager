@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useApp } from '../../../context/AppContext';
-import { crmRepository } from '../../../services/crmRepository';
+import { customerDirectoryRepository } from '../../../services/customerDirectoryRepository';
 import { projectDeliveryMap, deliveryProjectNames, deliveryProductsByProject, deliveryStagesByProduct } from '../../../services/projectDeliveryMap';
 import { okrRepository, type OkrPayload, type OkrRecord, type OkrSettings } from '../../../services/okrRepository';
 import { productRepository } from '../../../services/productRepository';
@@ -36,7 +36,7 @@ export function useOriginalOkr() {
   const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>loadReviewEvidence(currentUser),retry:false});
   const productLinesQuery = useQuery({queryKey:['okr',currentUser.id,'product-lines'],queryFn:()=>productRepository.productLines(),retry:false});
   const deliveryProjects = projectDeliveryMap();
-  const opportunitiesQuery = useQuery({queryKey:['okr',currentUser.id,'opportunities'],queryFn:()=>crmRepository.opportunities({page:1,pageSize:100}),retry:false});
+  const opportunitiesQuery = useQuery({queryKey:['okr',currentUser.id,'opportunities'],queryFn:()=>customerDirectoryRepository.opportunities({page:1,pageSize:100}),retry:false});
   const actionParents = useQuery({
     queryKey:['okr',currentUser.id,'action-parents'],
     queryFn:async()=>{

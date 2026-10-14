@@ -1,5 +1,6 @@
+import { directoryCustomers, directoryLeads, directoryOpportunities, directoryProjects } from '../services/customerDirectoryData';
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { crmRepository } from '../services/crmRepository';
+import { customerDirectoryRepository } from '../services/customerDirectoryRepository';
 import { requirementRepository } from '../services/requirementRepository';
 import { productRepository } from '../services/productRepository';
 import { useSessionState } from './modules/useSessionState';
@@ -99,6 +100,9 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     title: '客户与商机',
     icon: 'Users',
     subMenus: [
+      { id: 'crm_customers', title: '客户档案', mainMenuId: 'crm', icon: 'Users' },
+      { id: 'crm_leads', title: '线索管理', mainMenuId: 'crm', icon: 'FileSpreadsheet' },
+      { id: 'crm_opportunities', title: '商机管理', mainMenuId: 'crm', icon: 'Target' },
       { id: 'crm_presales_tasks', title: '售前任务', mainMenuId: 'crm', icon: 'ListTodo' }
     ]
   },
@@ -391,7 +395,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [requirementPool, setRequirementPool] = useState<RequirementPoolItem[]>([]);
   const [requirementTaskDraft, setRequirementTaskDraft] = useState<RequirementTaskDraft | null>(null);
   const [approvals, setApprovals] = useState<ApprovalFlow[]>(MOCK_APPROVALS);
-  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [projects, setProjects] = useState<ProjectItem[]>(directoryProjects());
   const [servers, setServers] = useState<ServerNode[]>([]);
   const { okrs, setOkrs, performances, setPerformances } = useOkrState(currentUser, dataMode === 'remote');
   const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>([]);
@@ -407,16 +411,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [invoiceApprovals, setInvoiceApprovals] = useState<InvoiceApprovalRecord[]>([]);
 
   // 所有领域共用同一数据模式，避免本地回退会话误请求后端。
-  const crmEnabled = dataMode === 'remote';
+  const crmEnabled = dataMode === 'remote' || import.meta.env.VITE_MOCK_MODE !== 'false';
   const requirementBackendEnabled = dataMode === 'remote';
   const productConfigEnabled = requirementBackendEnabled || import.meta.env.VITE_MOCK_MODE !== 'false';
   const { leadQuery, customerQuery, opportunityQuery, biddingQuery, engagementQuery, followUpQuery, contractQuery } = useCrmQueries(crmSessionToken, crmEnabled);
   const { requirementQuery, designQuery, productLineQuery, bugQuery, devTaskQuery } = useProductQueries(crmSessionToken, requirementBackendEnabled, productConfigEnabled);
 
   // Remote success is authoritative, including an empty result. Demo data is only used in local mode.
-  useEffect(()=>{ if (!crmEnabled) setCustomers(MOCK_CUSTOMERS); else if (customerQuery.isSuccess) setCustomers(customerQuery.data?.items || []); },[crmEnabled,customerQuery.data,customerQuery.isSuccess]);
-  useEffect(()=>{ if (!crmEnabled) setLeads(MOCK_LEADS); else if (leadQuery.isSuccess) setLeads(leadQuery.data?.items || []); },[crmEnabled,leadQuery.data,leadQuery.isSuccess]);
-  useEffect(()=>{ if (!crmEnabled) setOpportunities(MOCK_OPPORTUNITIES); else if (opportunityQuery.isSuccess) setOpportunities(opportunityQuery.data?.items || []); },[crmEnabled,opportunityQuery.data,opportunityQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setCustomers(directoryCustomers()); else if (customerQuery.isSuccess) setCustomers(customerQuery.data?.items || []); },[crmEnabled,customerQuery.data,customerQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setLeads(directoryLeads()); else if (leadQuery.isSuccess) setLeads(leadQuery.data?.items || []); },[crmEnabled,leadQuery.data,leadQuery.isSuccess]);
+  useEffect(()=>{ if (!crmEnabled) setOpportunities(directoryOpportunities()); else if (opportunityQuery.isSuccess) setOpportunities(opportunityQuery.data?.items || []); },[crmEnabled,opportunityQuery.data,opportunityQuery.isSuccess]);
   useEffect(()=>{ if (!crmEnabled) setBiddings([]); else if (biddingQuery.isSuccess) setBiddings((biddingQuery.data?.items || []) as TenderBidding[]); },[crmEnabled,biddingQuery.data,biddingQuery.isSuccess]);
   useEffect(()=>{ if (!crmEnabled) setWinningEngagements([]); else if (engagementQuery.isSuccess) setWinningEngagements((engagementQuery.data?.items || []).map((item: any) => ({ ...item, bidCode: item.biddingId || '', projectName: item.name, amount: 0, commRecords: [], timeline: [], relatedFiles: [], createdAt: item.createdAt || '' }))); },[crmEnabled,engagementQuery.data,engagementQuery.isSuccess]);
   useEffect(()=>{ if (!crmEnabled) setFollowUps(MOCK_FOLLOW_UPS); else if (followUpQuery.isSuccess) setFollowUps(followUpQuery.data?.items || []); },[crmEnabled,followUpQuery.data,followUpQuery.isSuccess]);
@@ -451,12 +455,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Helper Actions
   const addCustomer = (cust: Partial<Customer>) => {
-    crmRepository.createCustomer(cust).then(result=>refreshCrm().then(()=>addToast('success','客户建档成功',`客户编号：${result.code}`))).catch(error=>addToast('error','客户建档失败',error.message));
+    customerDirectoryRepository.createCustomer(cust).then(result=>refreshCrm().then(()=>addToast('success','客户建档成功',`客户编号：${result.code}`))).catch(error=>addToast('error','客户建档失败',error.message));
   };
 
   const addOpportunity = (opp: Partial<Opportunity>) => {
     if (crmEnabled) {
-      crmRepository.createOpportunity({...opp,ownerName:opp.ownerName||currentUser.name}).then(()=>refreshCrm().then(()=>addToast('success','商机录入成功'))).catch(error=>addToast('error','商机录入失败',error.message));
+      customerDirectoryRepository.createOpportunity({...opp,ownerName:opp.ownerName||currentUser.name}).then(()=>refreshCrm().then(()=>addToast('success','商机录入成功'))).catch(error=>addToast('error','商机录入失败',error.message));
       return;
     }
     const newOpportunity: Opportunity = {
@@ -490,16 +494,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast('success', '跟进记录已登记');
       return;
     }
-    crmRepository.createFollowUp({...rec,ownerName:currentUser.name}).then(()=>refreshCrm().then(()=>addToast('success','跟进记录已登记'))).catch(error=>addToast('error','跟进记录保存失败',error.message));
+    customerDirectoryRepository.createFollowUp({...rec,ownerName:currentUser.name}).then(()=>refreshCrm().then(()=>addToast('success','跟进记录已登记'))).catch(error=>addToast('error','跟进记录保存失败',error.message));
   };
 
   const addContract = (contract: Partial<Contract>) => {
-    crmRepository.createContract({...contract,ownerName:contract.ownerName||currentUser.name}).then(result=>refreshCrm().then(()=>addToast('success','合同建立成功',`编号：${result.code}`))).catch(error=>addToast('error','合同建立失败',error.message));
+    customerDirectoryRepository.createContract({...contract,ownerName:contract.ownerName||currentUser.name}).then(result=>refreshCrm().then(()=>addToast('success','合同建立成功',`编号：${result.code}`))).catch(error=>addToast('error','合同建立失败',error.message));
   };
 
   const addBidding = (bid: Partial<TenderBidding>) => {
     if (crmEnabled && bid.opportunityId) {
-      crmRepository.updateBidding(bid.opportunityId, bid as Record<string, unknown>).then(() => refreshCrm()).then(() => addToast('success', '��Ͷ���ݼ�ͬ����')).catch(error => addToast('error', '��Ͷ���ݼ�ͬ��ʧ��', error.message));
+      customerDirectoryRepository.updateBidding(bid.opportunityId, bid as Record<string, unknown>).then(() => refreshCrm()).then(() => addToast('success', '��Ͷ���ݼ�ͬ����')).catch(error => addToast('error', '��Ͷ���ݼ�ͬ��ʧ��', error.message));
       return;
     }
     const newBid: TenderBidding = {
@@ -1095,17 +1099,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCustomer = (id: string, updates: Partial<Customer>) => {
-    crmRepository.updateCustomer(id,updates).then(()=>refreshCrm()).then(()=>addToast('info','客户档案已更新')).catch(error=>addToast('error','客户更新失败',error.message));
+    customerDirectoryRepository.updateCustomer(id,updates).then(()=>refreshCrm()).then(()=>addToast('info','客户档案已更新')).catch(error=>addToast('error','客户更新失败',error.message));
   };
 
   const updateOpportunity = (id: string, updates: Partial<Opportunity>) => {
-    crmRepository.updateOpportunity(id,updates).then(()=>refreshCrm().then(()=>addToast('info','商机信息已更新'))).catch(error=>addToast('error','商机更新失败',error.message));
+    customerDirectoryRepository.updateOpportunity(id,updates).then(()=>refreshCrm().then(()=>addToast('info','商机信息已更新'))).catch(error=>addToast('error','商机更新失败',error.message));
   };
 
   const advanceOpportunityStage = (id: string) => {
     const stages: Opportunity['stage'][] = ['需求确认', '方案设计', '招投标', '商务谈判', '签约赢单'];
     const current=opportunities.find(item=>item.id===id); if(!current)return; const currentIdx=stages.indexOf(current.stage); const nextStage=stages[Math.min(stages.length-1,currentIdx+1)];
-    crmRepository.transitionOpportunity(id,nextStage,current.version).then(()=>refreshCrm().then(()=>addToast('success','商机阶段已成功推进'))).catch(error=>addToast('error','阶段推进失败',error.message));
+    customerDirectoryRepository.transitionOpportunity(id,nextStage,current.version).then(()=>refreshCrm().then(()=>addToast('success','商机阶段已成功推进'))).catch(error=>addToast('error','阶段推进失败',error.message));
   };
 
   const addPartner = (partner: Partial<Partner>) => {
@@ -1136,14 +1140,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updatePartner = (id: string, updates: Partial<Partner>) => setPartners((items) => items.map((item) => item.id === id ? { ...item, ...updates } : item));
 
   const updateContract = (id: string, updates: Partial<Contract>) => {
-    crmRepository.updateContract(id,updates).then(()=>refreshCrm()).then(()=>addToast('info','合同状态已更新')).catch(error=>addToast('error','合同更新失败',error.message));
+    customerDirectoryRepository.updateContract(id,updates).then(()=>refreshCrm()).then(()=>addToast('info','合同状态已更新')).catch(error=>addToast('error','合同更新失败',error.message));
   };
 
   const updateBiddingProject = (id: string, updates: Partial<TenderBidding>) => {
     if (crmEnabled) {
       const current = biddings.find((item) => item.id === id);
       if (current?.opportunityId) {
-        crmRepository.updateBidding(current.opportunityId, updates as Record<string, unknown>).then(() => refreshCrm()).then(() => addToast('info', '��Ͷ���Ŀ�Ѹ���')).catch(error => addToast('error', '��Ͷ���Ŀ����ʧ��', error.message));
+        customerDirectoryRepository.updateBidding(current.opportunityId, updates as Record<string, unknown>).then(() => refreshCrm()).then(() => addToast('info', '��Ͷ���Ŀ�Ѹ���')).catch(error => addToast('error', '��Ͷ���Ŀ����ʧ��', error.message));
         return;
       }
     }
@@ -1155,7 +1159,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateBiddingLifecycle = async (opportunityId: string, updates: Record<string, unknown>) => {
     if (!crmEnabled) return;
-    await crmRepository.updateBidding(opportunityId, updates);
+    await customerDirectoryRepository.updateBidding(opportunityId, updates);
     await refreshCrm();
   };
 
@@ -1498,7 +1502,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: lead.createdAt || new Date().toISOString().slice(0, 10)
     };
     if (crmEnabled) {
-      crmRepository.createLead(newLead).then(() => refreshCrm()).then(() => addToast('success', '线索已创建', newLead.name)).catch((error) => addToast('error', '线索创建失败', error instanceof Error ? error.message : '请稍后重试'));
+      customerDirectoryRepository.createLead(newLead).then(() => refreshCrm()).then(() => addToast('success', '线索已创建', newLead.name)).catch((error) => addToast('error', '线索创建失败', error instanceof Error ? error.message : '请稍后重试'));
     } else {
       setLeads((prev) => [newLead, ...prev]);
       addToast('success', '线索已创建', newLead.name);
@@ -1507,7 +1511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateLead = (id: string, updates: Partial<Lead>) => {
     if (crmEnabled) {
-      crmRepository.updateLead(id, updates)
+      customerDirectoryRepository.updateLead(id, updates)
         .then(() => leadQuery.refetch())
         .then(() => addToast('info', '��������Ѹ���'))
         .catch((error) => addToast('error', '��������ʧ��', error instanceof Error ? error.message : '���Ժ�����'));
@@ -1544,7 +1548,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const opportunityId = `opp-from-${lead.id}-${Date.now()}`;
     if (crmEnabled) {
-      crmRepository.convertLead(id, opportunity).then(() => refreshCrm()).then(() => addToast('success', '线索已转为商机', lead.name)).catch((error) => addToast('error', '线索转商机失败', error instanceof Error ? error.message : '请稍后重试'));
+      customerDirectoryRepository.convertLead(id, opportunity).then(() => refreshCrm()).then(() => addToast('success', '线索已转为商机', lead.name)).catch((error) => addToast('error', '线索转商机失败', error instanceof Error ? error.message : '请稍后重试'));
     } else {
       addOpportunity({ ...opportunity, id: opportunityId });
       setLeads((prev) => prev.map((item) => (item.id === id ? { ...item, status: '转商机', convertedOpportunityId: opportunityId, convertedAt: new Date().toISOString() } : item)));

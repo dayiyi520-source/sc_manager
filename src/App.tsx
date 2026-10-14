@@ -1,3 +1,4 @@
+import { CustomerDirectoryView } from './components/customer/CustomerDirectoryView';
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { AppProvider, MENU_GROUPS, useApp } from './context/AppContext';
 import { useAppNavigation } from './hooks/useAppNavigation';
@@ -22,7 +23,6 @@ const lazyNamed = (loader: () => Promise<Record<string, unknown>>, exportName: s
 const MyTasksView = lazyNamed(() => import('./components/workbench/MyTasksView'), 'MyTasksView');
 const TrainingCenterView = lazyNamed(() => import('./components/training/TrainingCenterView'), 'TrainingCenterView');
 const KnowledgeBaseView = lazyNamed(() => import('./components/workbench/KnowledgeBaseView'), 'KnowledgeBaseView');
-const CRMDashboardView = lazyNamed(() => import('./components/crm/CRMDashboardView'), 'CRMDashboardView');
 const RequirementTasksView = lazyNamed(() => import('./components/product/RequirementTasksView'), 'RequirementTasksView');
 const DesignTasksView = lazyNamed(() => import('./components/product/DesignTasksView'), 'DesignTasksView');
 const TestAndDefectView = lazyNamed(() => import('./components/product/TestAndDefectView'), 'TestAndDefectView');
@@ -30,18 +30,7 @@ const RequirementPoolView = lazyNamed(() => import('./components/workbench/Requi
 const OKRPerformanceView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'OKRPerformanceView');
 const ReviewSummaryView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'ReviewSummaryView');
 
-// CRM Views
-const CRMCustomersView = lazyNamed(() => import('./components/crm/CRMCustomersView'), 'CRMCustomersView');
-const CRMLeadsView = lazyNamed(() => import('./components/crm/CRMLeadsView'), 'CRMLeadsView');
-const CRMOpportunitiesView = lazyNamed(() => import('./components/crm/CRMOpportunitiesView'), 'CRMOpportunitiesView');
-const CRMVisitsView = lazyNamed(() => import('./components/crm/CRMVisitsView'), 'CRMVisitsView');
-const CRMFollowupsView = lazyNamed(() => import('./components/crm/CRMFollowupsView'), 'CRMFollowupsView');
-const CRMPartnersView = lazyNamed(() => import('./components/crm/CRMPartnersView'), 'CRMPartnersView');
-const CRMTenderView = lazyNamed(() => import('./components/crm/CRMTenderView'), 'CRMTenderView');
-const CRMBiddingView = lazyNamed(() => import('./components/crm/CRMBiddingView'), 'CRMBiddingView');
-const CRMWinningEngagementView = lazyNamed(() => import('./components/crm/CRMWinningEngagementView'), 'CRMWinningEngagementView');
-const CRMBidReviewView = lazyNamed(() => import('./components/crm/CRMBidReviewView'), 'CRMBidReviewView');
-const CRMContractsView = lazyNamed(() => import('./components/crm/CRMContractsView'), 'CRMContractsView');
+// 客户与商机只读档案
 
 // Product & Dev Views
 const ProductPlanningView = lazyNamed(() => import('./components/product/ProductPlanningView'), 'ProductPlanningView');
@@ -59,8 +48,6 @@ const InvoiceManagementView = lazyNamed(() => import('./components/comprehensive
 const PaymentCollectionManagementView = lazyNamed(() => import('./components/comprehensive/PaymentCollectionManagementView'), 'PaymentCollectionManagementView');
 
 // Operation & Project Views
-const ProjectManagementView = lazyNamed(() => import('./components/project/ProjectManagementView'), 'ProjectManagementView');
-const MilestoneScheduleView = lazyNamed(() => import('./components/project/MilestoneScheduleView'), 'MilestoneScheduleView');
 const ProjectDeliveryMapView = lazyNamed(() => import('./components/project/ProjectDeliveryMapView'), 'ProjectDeliveryMapView');
 
 // Finance Views
@@ -110,34 +97,12 @@ const MainContent: React.FC = () => {
       case 'know_base':
         return <KnowledgeBaseView />;
 
-      // CRM
-      case 'crm_dashboard':
-        return <CRMDashboardView />;
       case 'crm_customers':
-        return <CRMCustomersView />;
+        return <CustomerDirectoryView kind="customers" />;
       case 'crm_leads':
-        return <CRMLeadsView />;
+        return <CustomerDirectoryView kind="leads" />;
       case 'crm_opportunities':
-        return <CRMOpportunitiesView />;
-      case 'crm_visits':
-        return <CRMVisitsView />;
-      case 'crm_followups':
-        return <CRMFollowupsView />;
-      case 'crm_partners':
-        return <CRMPartnersView />;
-      case 'crm_tender':
-      case 'crm_tenders':
-        return <CRMTenderView />;
-      case 'crm_bidding':
-        return <CRMBiddingView />;
-      case 'crm_winning_engagement':
-      case 'crm_winning':
-        return <CRMWinningEngagementView />;
-      case 'crm_bidding_review':
-      case 'crm_bid_review':
-        return <CRMBidReviewView />;
-      case 'crm_contracts':
-        return <CRMContractsView />;
+        return <CustomerDirectoryView kind="opportunities" />;
       case 'crm_presales_tasks':
       case 'crm_presales_tickets':
         return <RequirementTasksView itemLabel="售前任务" taskKind="presales" />;
@@ -191,10 +156,10 @@ const MainContent: React.FC = () => {
         return <ProjectDeliveryMapView />;
       case 'proj_list':
       case 'ops_projects':
-        return <ProjectManagementView />;
+        return <ProjectDeliveryMapView />;
       case 'proj_config':
       case 'ops_milestones':
-        return <MilestoneScheduleView />;
+        return <ProjectDeliveryMapView />;
       case 'proj_delivery_tickets':
       case 'proj_delivery_tasks':
         return <RequirementTasksView itemLabel="交付任务" taskKind="delivery" />;
@@ -229,7 +194,7 @@ const MainContent: React.FC = () => {
         {/* Dynamic View Component */}
         {String(routedTabId).startsWith('crm_') && (crmLoading || crmError) && (
           <div role={crmError ? 'alert' : 'status'} className={`flex items-center justify-between gap-3 border px-4 py-3 text-xs ${crmError ? 'border-[var(--danger)]/40 bg-[var(--danger)]/10 text-[var(--text-primary)]' : 'border-[var(--warning)]/40 bg-[var(--warning)]/10 text-[var(--text-primary)]'}`}>
-            <span>{crmError ? `CRM 数据加载失败：${crmError}` : '正在同步 CRM 数据...'}</span>
+            <span>{crmError ? `客户与商机数据加载失败：${crmError}` : '正在同步客户与商机数据...'}</span>
             {crmError && <button type="button" className="border border-current px-3 py-1 font-semibold hover:bg-[var(--bg-elevated)]" onClick={() => retryCrm().catch((error) => addToast('error', '重试失败', error instanceof Error ? error.message : '请稍后再试'))}>重试</button>}
           </div>
         )}

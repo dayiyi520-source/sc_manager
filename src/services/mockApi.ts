@@ -1,3 +1,4 @@
+import { customerDirectoryRequest } from './customerDirectoryData';
 import { mockStateEndpoint } from './mockStateEndpoint';
 import { createOkrFilePersistence } from './okrFilePersistence';
 import savedOkrState from '../data/mockOkrState.json';
@@ -453,6 +454,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   const clean = path.split('?')[0];
   const parts = clean.split('/').filter(Boolean);
   const body = bodyOf(init);
+  if (clean.startsWith('/api/customer-directory/')) return customerDirectoryRequest(path, method);
   if (parts[0] === 'api' && ['presales-tasks', 'delivery-tasks', 'ops-tasks'].includes(parts[1])) {
     return handleMockBusinessTasks(path, method, body, { activities: taskActivities, record: recordTaskActivity, changes: recordTaskChanges, validateCompletion });
   }
