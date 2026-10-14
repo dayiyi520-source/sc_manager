@@ -12,7 +12,7 @@ import { autonomousGoalPayload, assignedReferences, inheritedGoalPayload } from 
 import { GoalConfirmationWorkspace } from './okr/GoalConfirmationWorkspace';
 import { GoalChangePanel } from './okr/GoalChangePanel';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Drawer, Empty, Input, Modal, Progress, Cascader, Select, Spin, Tag, Tabs, Flex, Typography, Tooltip } from 'antd';
+import { Alert, Button, Checkbox, Drawer, Empty, Input, Modal, Progress, Cascader, Select, Spin, Tag, Tabs, Flex, Typography, Tooltip } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
@@ -106,7 +106,9 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   const [draftToSubmit, setDraftToSubmit] = useState<string | null>(null);
   const [okrDraftToSubmit, setOkrDraftToSubmit] = useState<string | null>(null);
   const [receivedSearch, setReceivedSearch] = useState('');
-  const [receivedFilter, setReceivedFilter] = useState<'pending'|'reviewed'|'all'>('pending');
+  const [receivedSidebarCollapsed, setReceivedSidebarCollapsed] = useState(false);
+  const [receivedFilter, setReceivedFilter] = useState<'received'|'viewable'>('received');
+  const [receivedUnreadOnly, setReceivedUnreadOnly] = useState(false);
   const [selectedReceivedId, setSelectedReceivedId] = useState<string | null>(null);
   const [myReviewFilter, setMyReviewFilter] = useState<'all'|'week'|'month'>('all');
   const [myYear, setMyYear] = useState(dayjs().format('YYYY'));
@@ -145,6 +147,10 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     setReviewDraftId(null);
     setReviewPeriodOverride(undefined);
     setReviewDetailId(null);
+    setSelectedReceivedId(null);
+    setReceivedFilter('received');
+    setReceivedUnreadOnly(false);
+    setReceivedSearch('');
     setScopeSelection({ scope: 'my' });
     setObjectiveForms([]);
     setActionFormOpen(false);
@@ -213,16 +219,28 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
       : performance.authorId !== currentUser.id
   ));
   const subordinateIds = new Set(people.filter(person => person.supervisorId === currentUser.id).map(person => person.id));
-  const receivedPerformances = performances.filter(performance => subordinateIds.has(performance.authorId) && performance.status !== 'draft');
-  const receivedFiltered = receivedPerformances.filter(performance => {
+  const receivedPerformances = performances.filter(performance => subordinateIds.has(performance.authorId) && ['submitted', 'reviewed', 'active'].includes(performance.status));
+  const viewablePerformances = performances.filter(performance => performance.authorId !== currentUser.id && ['submitted', 'reviewed', 'active'].includes(performance.status));
+  const receivedFiltered = (receivedFilter === 'received' ? receivedPerformances : viewablePerformances).filter(performance => {
     const matchesSearch = !receivedSearch || `${performance.author}${performance.cycleName}${performance.summary}`.toLowerCase().includes(receivedSearch.toLowerCase());
-    const matchesStatus = receivedFilter === 'all' || (receivedFilter === 'pending' ? performance.status === 'submitted' : performance.status === 'reviewed');
-    return matchesSearch && matchesStatus;
+    const matchesUnread = !receivedUnreadOnly || !records.find(record => record.id === performance.id)?.viewedBy?.includes(currentUser.id);
+    return matchesSearch && matchesUnread;
   });
-  const selectedReceived = receivedFiltered.find(performance => performance.id === selectedReceivedId) || receivedFiltered[0];
+  const selectedReceived = receivedFiltered.find(performance => performance.id === selectedReceivedId);
+  const receivedUnreadCount = receivedPerformances.filter(performance => !records.find(record => record.id === performance.id)?.viewedBy?.includes(currentUser.id)).length;
+  const receivedRecord = selectedReceived ? records.find(record => record.id === selectedReceived.id && record.kind === 'review') : undefined;
+  const openReceivedReview = async (id: string) => {
+    try {
+      await okrRepository.markViewed(id, currentUser.id);
+      setSelectedReceivedId(id);
+      setReceivedUnreadOnly(false);
+      await refresh();
+    } catch (error) { addToast('error', error instanceof Error ? error.message : '复盘打开失败，请重试'); }
+  };
   const myYearPerformances = performances.filter(performance => performance.authorId === currentUser.id && (myReviewFilter === 'all' || performance.type === myReviewFilter) && performance.createdAt.startsWith(myYear));
   const myPerformances = filterReviewsByMonth(myYearPerformances, selectedReviewMonth);
   const detailReview = performances.find(performance => performance.id === reviewDetailId && performance.authorId === currentUser.id);
+  const detailReviewRecord = records.find(record => record.id === reviewDetailId && record.kind === 'review' && record.ownerId === currentUser.id);
   const copiedReview = records.find(record => record.id === copiedReviewId && record.kind === 'review');
   const copiedInitialPayload = copiedReview ? createReviewCopyDraft(copiedReview.payload) : records.find(record => record.id === reviewDraftId && record.kind === 'review' && record.ownerId === currentUser.id)?.payload;
   const selectedOkrRecord = records.find(record => record.id === selectedOkrRecordId && (record.kind === 'objective' || record.kind === 'action'));
@@ -289,6 +307,30 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     setReviewType(type);
     setReviewSubTab('write');
     setIsReviewFormOpen(true);
+  };
+
+  const openReviewDetail = (id: string) => {
+    const record = records.find(item => item.id === id && item.kind === 'review' && item.ownerId === currentUser.id);
+    if (record && ['draft', 'returned'].includes(record.status)) {
+      const type = record.payload.reviewType === 'month' ? 'month' : 'week';
+      const startDate = record.payload.startDate || (type === 'month' ? `${record.periodKey.slice(0, 7)}-01` : record.periodKey);
+      openReviewForm(type, { startDate, endDate: record.payload.endDate || (type === 'month' ? dayjs(startDate).endOf('month') : dayjs(startDate).add(6, 'day')).format('YYYY-MM-DD') }, record);
+      return;
+    }
+    setReviewDetailId(id);
+  };
+
+  const renderReviewDetail = (record: OkrRecord, onCancel: () => void, onCopy?: () => void) => {
+    const owner = people.find(person => person.id === record.ownerId);
+    const type = record.payload.reviewType === 'week' ? 'week' : 'month';
+    const startDate = record.payload.startDate || (type === 'month' ? `${record.periodKey.slice(0, 7)}-01` : record.periodKey.split('/')[0]);
+    const period = { startDate, endDate: record.payload.endDate || (type === 'month' ? dayjs(startDate).endOf('month') : dayjs(startDate).add(6, 'day')).format('YYYY-MM-DD') };
+    const common = { template: record.payload.reviewMode === 'supervisor' ? 'supervisor' as const : 'employee' as const,
+      recordStatus: record.status, initialPayload: record.payload, periodOverride: period, okrs: reviewableOkrs,
+      records, people, viewer: { id: record.ownerId, name: owner?.name || '人员已停用', department: owner?.department || '' },
+      work, busy, onCancel, onCopy, onSaveDraft: async () => false, onSubmit: async () => false };
+    return type === 'week' ? <WeeklyReviewEditor key={`weekly-detail-${record.id}`} {...common} workLoading={false} onRefreshWork={refreshWork}/>
+      : <MonthlyReviewEditor key={`monthly-detail-${record.id}`} {...common} currentUserId={record.ownerId}/>;
   };
 
   const canAppendGoal = () => {
@@ -722,13 +764,13 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
             items={[
               {key:'write',label:'写复盘总结'},
               {key:'my',label:`我的复盘列表 (${performances.filter(p=>p.authorId===currentUser.id).length})`},
-              {key:'received',label:`我收到的复盘 (${receivedPerformances.length})`},
+              {key:'received',label:`看他人的复盘 (${viewablePerformances.length})`},
             ]}
           />
 
           {/* Subtab: 写总结 */}
           {reviewSubTab === 'write' && !isReviewFormOpen && (
-            <ReviewLanding exempt={reviewTemplate === 'boss'} records={records} objectives={reviewableOkrs} ownerId={currentUser.id} settings={settings} settingsLoading={settingsLoading} settingsError={settingsError} loading={loading} busy={busy} onRetry={() => void refresh()} onOpen={openReviewForm} onViewAll={() => { setMyReviewFilter('all'); setSelectedReviewMonth(null); setMyYear(dayjs().format('YYYY')); setReviewDetailId(null); setReviewSubTab('my'); }} onViewReview={id => { const review = performances.find(item => item.id === id); setMyReviewFilter('all'); setSelectedReviewMonth(null); if (review && dayjs(review.createdAt).isValid()) setMyYear(dayjs(review.createdAt).format('YYYY')); setReviewDetailId(id); setReviewSubTab('my'); }}/>
+            <ReviewLanding exempt={reviewTemplate === 'boss'} records={records} objectives={reviewableOkrs} ownerId={currentUser.id} settings={settings} settingsLoading={settingsLoading} settingsError={settingsError} loading={loading} busy={busy} onRetry={() => void refresh()} onOpen={openReviewForm} onViewAll={() => { setMyReviewFilter('all'); setSelectedReviewMonth(null); setMyYear(dayjs().format('YYYY')); setReviewDetailId(null); setReviewSubTab('my'); }} onViewReview={id => { const review = performances.find(item => item.id === id); setMyReviewFilter('all'); setSelectedReviewMonth(null); if (review && dayjs(review.createdAt).isValid()) setMyYear(dayjs(review.createdAt).format('YYYY')); setReviewSubTab('my'); openReviewDetail(id); }}/>
 
           )}
 
@@ -743,7 +785,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
           )}
 
           {reviewSubTab === 'my' && (
-            detailReview ? <ReviewReadOnlyView review={detailReview} onBack={() => setReviewDetailId(null)} onCopy={() => openCopiedReview(detailReview.id, detailReview.type)} /> :
+            detailReview && detailReviewRecord ? renderReviewDetail(detailReviewRecord, () => setReviewDetailId(null), () => openCopiedReview(detailReview.id, detailReview.type))
+            : detailReview ? <ReviewReadOnlyView review={detailReview} onBack={() => setReviewDetailId(null)} onCopy={() => openCopiedReview(detailReview.id, detailReview.type)} /> :
             <div className="okr-my-reviews space-y-5">
               <div className="okr-review-filter-tabs">
                 {(['all','week','month'] as const).map(filter => <button key={filter} className={myReviewFilter === filter ? 'is-active' : ''} onClick={() => setMyReviewFilter(filter)}>{filter === 'all' ? '全部' : filter === 'week' ? '周报' : '月报'}</button>)}
@@ -770,25 +813,32 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
                 })}
               </div>
               {myPerformances.length === 0 ? <div className="review-empty-state okr-review-empty"><Empty description={selectedReviewMonth ? `${Number(selectedReviewMonth.slice(5))}月暂无复盘` : '暂无历史复盘'} /></div> : <div className="okr-my-review-grid">
-                {myPerformances.map(perf => <MyReviewCard key={perf.id} review={perf} onView={() => setReviewDetailId(perf.id)} onCopy={() => openCopiedReview(perf.id, perf.type)} onSubmit={() => setDraftToSubmit(perf.id)}/>)}
+                {myPerformances.map(perf => <MyReviewCard key={perf.id} review={perf} onView={() => openReviewDetail(perf.id)} onCopy={() => openCopiedReview(perf.id, perf.type)} onSubmit={() => setDraftToSubmit(perf.id)}/>)}
               </div>}
             </div>
           )}
 
           {reviewSubTab === 'received' && (
             <div className="okr-received-reviews">
-              <div className="okr-received-layout">
-                <aside className="okr-received-list">
-                  <div className="okr-received-list-tools"><Input prefix={<Search />} placeholder="搜索成员或周期" value={receivedSearch} onChange={event => setReceivedSearch(event.target.value)} /><div>{(['pending','reviewed','all'] as const).map(filter => <button key={filter} className={receivedFilter === filter ? 'is-active' : ''} onClick={() => setReceivedFilter(filter)}>{filter === 'pending' ? '待我查看' : filter === 'reviewed' ? '已查看' : '全部'}</button>)}</div></div>
-                  {receivedFiltered.length === 0 ? <div className="okr-received-list-empty"><Empty description="暂无收到的复盘" /></div> : receivedFiltered.map(perf => <button type="button" key={perf.id} className={`okr-received-list-item${selectedReceived?.id === perf.id ? ' is-active' : ''}`} onClick={() => setSelectedReceivedId(perf.id)}><span className="okr-avatar">{perf.author.slice(0, 1)}</span><span><b>{perf.author}</b><small>{perf.authorDept} · {perf.cycleName}</small><em>{perf.summary || '暂无摘要'}</em></span><Tag color={perf.status === 'reviewed' ? 'success' : 'warning'}>{perf.status === 'reviewed' ? '已查看' : '待查看'}</Tag></button>)}
-                </aside>
-                <section className="okr-received-detail">
-                  {!selectedReceived ? <div className="okr-received-detail-empty"><Empty description="请选择一份复盘" /></div> : <>
-                    <div className="okr-received-detail-head"><div><Tag color={selectedReceived.type === 'week' ? 'blue' : 'purple'}>{selectedReceived.type === 'week' ? '周报复盘' : '月报复盘'}</Tag><h2>{selectedReceived.cycleName}</h2><p>提交时间：{selectedReceived.createdAt}　|　复盘人：{selectedReceived.author}　|　{selectedReceived.authorDept}</p></div></div>
-                    <div className="okr-received-summary-row">{(selectedReceived.krReviews || []).slice(0, 3).map(kr => <div key={kr.keyResultId}><span>复盘前</span><Progress percent={kr.previousProgress} showInfo={false} /><b>{kr.previousProgress}%</b><span>本期</span><Progress percent={kr.currentProgress} showInfo={false} status={kr.health === 'blocked' ? 'exception' : undefined} /><b>{kr.currentProgress}%</b><Tag color={kr.health === 'normal' ? 'success' : kr.health === 'risk' ? 'warning' : 'error'}>{kr.health === 'normal' ? '正常' : kr.health === 'risk' ? '有风险' : '已阻塞'}</Tag></div>)}</div>
-                    {(selectedReceived.krReviews || []).map((kr, index) => <div className="okr-received-section" key={kr.keyResultId}><div className="okr-received-section-title"><CheckCircle /><h3>本期成果</h3><strong>KR{index + 1} {kr.keyResultTitle}</strong></div><p>{kr.achievement || '暂无成果说明'}</p>{kr.blocker && <div className="okr-received-risk"><AlertTriangle /><span>{kr.blocker}</span></div>}<div className="okr-received-next"><b>下一步计划</b><span>{kr.nextPlan || '暂无计划'}</span></div></div>)}
-                    <div className="okr-received-two-col"><div className="okr-received-section"><div className="okr-received-section-title"><FileText /><h3>非 OKR 额外工作</h3></div><p>{selectedReceived.extraWork?.description || '暂无额外工作记录'}</p></div><div className="okr-received-section"><div className="okr-received-section-title"><Target /><h3>协助与协同事项</h3></div>{selectedReceived.assistance?.length ? selectedReceived.assistance.map(item => <p key={item.subject}>{item.subject}：{item.result}</p>) : <p>暂无协同事项</p>}</div></div>
+              <div className={`okr-received-layout${receivedSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}>
+                <aside className="okr-received-list" aria-label="他人复盘列表">
+                  {!receivedSidebarCollapsed && <>
+                    <div className="okr-received-list-tools">
+                      <Input prefix={<Search />} placeholder="搜索成员或周期" value={receivedSearch} onChange={event => { setReceivedSearch(event.target.value); setSelectedReceivedId(null); }} />
+                      <div className="okr-received-filter-row"><div className="okr-received-filter-pills">{(['received', 'viewable'] as const).map(filter => <button type="button" key={filter} aria-pressed={receivedFilter === filter} className={receivedFilter === filter ? 'is-active' : ''} onClick={() => { setReceivedFilter(filter); setReceivedUnreadOnly(false); setSelectedReceivedId(null); }}>{filter === 'received' ? '我收到的' : '可以看的'}</button>)}</div>
+                        {receivedFilter === 'received' && <Checkbox checked={receivedUnreadOnly} onChange={event => { setReceivedUnreadOnly(event.target.checked); setSelectedReceivedId(null); }}>未读 ({receivedUnreadCount})</Checkbox>}
+                      </div>
+                    </div>
+                    <div className="okr-received-list-scroll">
+                    {loading ? <Spin/> : error ? <Alert type="error" showIcon title="复盘加载失败" action={<Button onClick={() => void refresh()}>重试</Button>}/> : receivedFiltered.length === 0 ? <div className="okr-received-list-empty"><Empty description={receivedUnreadOnly ? '暂无未读复盘' : '暂无可查看的复盘'} /></div> : receivedFiltered.map(perf => <button type="button" key={perf.id} className={`okr-received-list-item${selectedReceived?.id === perf.id ? ' is-active' : ''}`} onClick={() => void openReceivedReview(perf.id)}><span className="okr-avatar">{perf.author.slice(0, 1)}</span><span><b>{perf.author}</b><small>{perf.authorDept} · {perf.cycleName}</small><em>{perf.summary || '暂无摘要'}</em></span><Tag color={records.find(record => record.id === perf.id)?.viewedBy?.includes(currentUser.id) ? 'default' : 'processing'}>{records.find(record => record.id === perf.id)?.viewedBy?.includes(currentUser.id) ? '已读' : '未读'}</Tag></button>)}
+                    </div>
                   </>}
+                  <div className="okr-received-list-footer">
+                    <Button type="text" block aria-label={receivedSidebarCollapsed ? '展开复盘列表' : '收起复盘列表'} aria-expanded={!receivedSidebarCollapsed} onClick={() => setReceivedSidebarCollapsed(value => !value)}>{receivedSidebarCollapsed ? <ChevronRight size={16}/> : <>〈 收起列表</>}</Button>
+                  </div>
+                </aside>
+                <section className="okr-received-detail" aria-label="他人复盘详情" tabIndex={0}>
+                  {receivedRecord ? renderReviewDetail(receivedRecord, () => setSelectedReceivedId(null)) : <div className="okr-received-detail-empty"><Empty description="请选择一份复盘" /></div>}
                 </section>
               </div>
             </div>

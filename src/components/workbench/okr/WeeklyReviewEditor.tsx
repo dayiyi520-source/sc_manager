@@ -112,6 +112,7 @@ interface WeeklyReviewEditorProps {
   onSaveDraft: (payload: OkrPayload) => Promise<boolean>;
   onSubmit: (payload: OkrPayload) => Promise<boolean>;
   onCancel: () => void;
+  onCopy?: () => void;
   viewer?: EvidenceViewer;
   reviewerName?: string;
   teamMembers?: EmployeeOption[];
@@ -131,7 +132,7 @@ export function WeeklyReviewEditor({
   onRefreshWork,
   onSaveDraft,
   onSubmit,
-  onCancel,
+  onCancel, onCopy,
   viewer,
   reviewerName,
   teamMembers = [],
@@ -142,8 +143,24 @@ export function WeeklyReviewEditor({
 }: WeeklyReviewEditorProps) {
   const monthly = reviewType === 'month';
   const period = useMemo(() => periodOverride || reviewPeriod('week'), [periodOverride]);
-  const periodOkrs = useMemo(() => okrs.filter(objective => objective.cycle === period.startDate.slice(0, 7) || objective.cycle === period.endDate.slice(0, 7)), [okrs, period.startDate, period.endDate]);
   const editorState = reviewEditorState(recordStatus);
+  const readOnly = !editorState.editable;
+  const periodOkrs = useMemo(() => {
+    if (!readOnly) return okrs.filter(objective => objective.cycle === period.startDate.slice(0, 7) || objective.cycle === period.endDate.slice(0, 7));
+    const snapshots: OKRItem[] = [];
+    for (const row of initialPayload?.krReviews || []) {
+      let objective = snapshots.find(item => item.id === row.objectiveId);
+      if (!objective) {
+        objective = { id: row.objectiveId, cycle: period.startDate.slice(0, 7), ownerId: viewer?.id || '',
+          ownerName: viewer?.name || '', department: viewer?.department || '', category: 'my', primaryLabel: template === 'supervisor' ? 'O' : 'KR',
+          objective: row.objectiveTitle, progress: 0, weight: 100, deadline: period.endDate, keyResults: [] };
+        snapshots.push(objective);
+      }
+      objective.keyResults.push({ id: row.keyResultId, content: row.keyResultTitle, progress: row.currentProgress,
+        weight: 100, deadline: objective.deadline, parentKeyResultDetails: row.detailRows });
+    }
+    return snapshots;
+  }, [okrs, period.startDate, period.endDate, readOnly, template, initialPayload?.krReviews, viewer?.id, viewer?.name, viewer?.department]);
   const supervisor = template === 'supervisor';
   const rowLabel = supervisor ? 'KR' : 'A';
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
@@ -178,7 +195,7 @@ export function WeeklyReviewEditor({
   const [picker, setPicker] = useState<PickerState>(null);
   const toolbarSentinelRef = useRef<HTMLDivElement>(null);
   const [toolbarStuck, setToolbarStuck] = useState(false);
-  const selectedObjectiveIds = useMemo(() => periodOkrs.map(o => o.id), [okrs, period.startDate, period.endDate]);
+  const selectedObjectiveIds = useMemo(() => periodOkrs.map(o => o.id), [periodOkrs]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
@@ -194,16 +211,18 @@ export function WeeklyReviewEditor({
   }, []);
 
   const currentTargets = useMemo(() => {
+    if (readOnly) return initialPayload?.krReviews || [];
     const targets = reviewDraftTargets(periodOkrs);
     return supervisor ? targets.map(target => departmentKrAggregation(periodOkrs.find(objective => objective.id === target.objectiveId)!, target, records, people, viewer?.id || '', period, reviewType)) : employeeReviewBaseline(targets, records, viewer?.id || '', period.startDate);
-  }, [periodOkrs, supervisor, records, people, viewer?.id, period, reviewType]);
+  }, [periodOkrs, supervisor, records, people, viewer?.id, period, reviewType, readOnly, initialPayload?.krReviews]);
   const priorTargets = useRef(currentTargets);
-  const [krs, setKrs] = useState<KrReviewDraft[]>(() => restoreReviewDraftTargets(currentTargets, initialPayload));
+  const [krs, setKrs] = useState<KrReviewDraft[]>(() => readOnly ? currentTargets : restoreReviewDraftTargets(currentTargets, initialPayload));
   useEffect(() => {
+    if (readOnly) return;
     const previousTargets = priorTargets.current;
     setKrs(previous => reconcileReviewDraftTargets(previous, currentTargets, previousTargets));
     priorTargets.current = currentTargets;
-  }, [currentTargets]);
+  }, [currentTargets, readOnly]);
   const detachedTargets = krs.filter(row => !currentTargets.some(target => target.objectiveId === row.objectiveId && target.keyResultId === row.keyResultId));
 
   const [workNotes, setWorkNotes] = useState<Record<string, string>>(() => Object.fromEntries((initialPayload?.items || []).map(item => [item.workId, item.result || ''])));
@@ -249,7 +268,7 @@ export function WeeklyReviewEditor({
     }));
   });
 
-  const liveDepartmentContent = useMemo(() => supervisor ? departmentContentSnapshots(records, people, viewer?.id || '', period, reviewType) : [], [supervisor, records, people, viewer?.id, period, reviewType]);
+  const liveDepartmentContent = useMemo(() => supervisor && !readOnly ? departmentContentSnapshots(records, people, viewer?.id || '', period, reviewType) : [], [supervisor, readOnly, records, people, viewer?.id, period, reviewType]);
   const departmentContent = liveDepartmentContent.concat((initialPayload?.departmentContentSnapshots || []).filter(snapshot => !liveDepartmentContent.some(row => row.id === snapshot.id)));
   const displayedAssistance = [...new Map(assistance.concat(departmentContent.flatMap(snapshot => snapshot.assistance.map((row, index) => ({ ...row, rowId: `employee:${snapshot.id}:${index}`, content: row.content || row.result, subject: row.subject, sourceEmployee: snapshot.authorName })))).map(row => [row.workId || row.rowId!, row])).values()];
   const displayedKnowledge = knowledgeEntries.concat(departmentContent.flatMap(snapshot => (snapshot.knowledgeEntries || []).map(row => ({ ...row, id: `employee:${snapshot.authorId}:${row.id}`, sourceEmployee: snapshot.authorName }))));
@@ -272,8 +291,20 @@ export function WeeklyReviewEditor({
     [krs, currentTargets, supervisor]
   );
 
+  const metricRecords = useMemo(() => {
+    if (!readOnly) return records;
+    const snapshots = selectedKrs.flatMap(kr => kr.employeeReviewSnapshots || []).concat(initialPayload?.departmentContentSnapshots || []);
+    const savedRecords = new Map<string, OkrRecord>();
+    for (const snapshot of snapshots) {
+      savedRecords.set(snapshot.id, { id: snapshot.id, kind: 'review', ownerId: snapshot.authorId || snapshot.id,
+        status: snapshot.status, version: 0, periodKey: snapshot.startDate,
+        payload: { ...snapshot, title: snapshot.title, reviewType } });
+    }
+    return [...savedRecords.values()];
+  }, [readOnly, records, selectedKrs, initialPayload?.departmentContentSnapshots, reviewType]);
+
   const objectiveGroups = useMemo(() => {
-    const list = okrs.filter(o => selectedObjectiveIds.includes(o.id));
+    const list = periodOkrs.filter(o => selectedObjectiveIds.includes(o.id));
 
     return list
       .map(objective => ({
@@ -281,11 +312,11 @@ export function WeeklyReviewEditor({
         krs: selectedKrs.filter(kr => kr.objectiveId === objective.id && objective.keyResults.some(target => target.id === kr.keyResultId))
       }))
       .filter(group => group.krs.length > 0);
-  }, [okrs, selectedObjectiveIds, selectedKrs]);
+  }, [periodOkrs, selectedObjectiveIds, selectedKrs]);
 
   const supportsByKr = useMemo(() => new Map(selectedKrs.map(kr => [kr.keyResultId,
-    supervisor ? employeeSupportsForKr(records, people, viewer?.id || '', kr, period, reviewType) : []
-  ])), [selectedKrs, supervisor, records, people, viewer?.id, period, reviewType]);
+    supervisor && !readOnly ? employeeSupportsForKr(records, people, viewer?.id || '', kr, period, reviewType) : []
+  ])), [selectedKrs, supervisor, readOnly, records, people, viewer?.id, period, reviewType]);
   const supportTarget = krs.find(kr => kr.keyResultId === supportTargetId);
 
   const selectedWorks = useMemo(
@@ -388,7 +419,7 @@ export function WeeklyReviewEditor({
   const allExtraRows = useMemo(() => {
     const linkedExtra = extra.workIds
       .map(id => {
-        const live = workById.get(id);
+        const live = readOnly ? undefined : workById.get(id);
         if (live) return live;
         const saved = initialPayload?.items?.find(item => item.workId === id);
         return saved ? { id, title: saved.title, status: saved.status, actualHours: saved.actualHours, productLineName: saved.sourceLabel } as OkrWork : undefined;
@@ -424,7 +455,7 @@ export function WeeklyReviewEditor({
       return rows.map((row, index) => ({ id: `employee:${snapshot.authorId}:${row.id || index}`, content: row.content || '历史补充工作', source: row.source || '手工记录', status: row.status || '未填写', hours: row.hours || '—', impact: '', isManual: false, sourceEmployee: snapshot.authorName || '人员已停用' }));
     });
     return [...new Map([...employeeRows, ...employeeManualRows, ...linkedExtra, ...manualRows].map(row => [row.id, row])).values()];
-  }, [extra, workById, manualWorks, initialPayload?.items, departmentContent]);
+  }, [extra, workById, manualWorks, initialPayload?.items, departmentContent, readOnly]);
 
   return (
     <div className="review-document-container okr-weekly-editor max-w-6xl mx-auto space-y-5 text-[var(--text-primary)] pb-10">
@@ -447,6 +478,7 @@ export function WeeklyReviewEditor({
             <Button onClick={onCancel}>
               取消
             </Button>
+            {readOnly ? onCopy && <Button type="primary" onClick={onCopy}>复制为本期</Button> : <>
             <Button
               icon={<Save className="h-4 w-4" />}
               disabled={!editorState.editable || Boolean(detachedTargets.length) || (supervisor && (recordsLoading || Boolean(recordsError)))}
@@ -463,12 +495,12 @@ export function WeeklyReviewEditor({
               onClick={requestSubmit}
             >
               {monthly ? '提交月报' : '提交周报'}
-            </Button>
+            </Button></>}
           </div>
         </div>
       </div>
 
-      {overview || (supervisor && <SupervisorReviewMetrics objectives={periodOkrs} reviews={selectedKrs} records={records} people={people} supervisorId={viewer?.id || ''} period={period} loading={recordsLoading} error={recordsError}/>)}
+      {overview || (supervisor && <SupervisorReviewMetrics objectives={periodOkrs} reviews={selectedKrs} records={metricRecords} people={people} supervisorId={viewer?.id || ''} period={period} loading={recordsLoading} error={recordsError}/>)}
 
       {supervisor && recordsError ? <Alert type="error" showIcon title="员工复盘加载失败，已保留填写内容" action={<Button onClick={onRefreshRecords}>重试</Button>}/> : null}
       {detachedTargets.length > 0 && <Alert type="warning" showIcon title="月度目标已变化，请确认失效内容" description={<div className="space-y-2"><p>以下已填写内容暂时保留，请复制需要的信息，再确认移除。确认后可继续保存或提交。</p><pre className="whitespace-pre-wrap break-words font-sans">{detachedReviewDescription(detachedTargets)}</pre></div>} action={<Button onClick={() => setKrs(rows => rows.filter(row => currentTargets.some(target => target.keyResultId === row.keyResultId && target.objectiveId === row.objectiveId)))}>移除失效内容</Button>} />}
@@ -517,7 +549,7 @@ export function WeeklyReviewEditor({
                     <span className="font-semibold text-[var(--text-primary)] text-sm">
                       {supervisor || objective.primaryLabel !== 'KR' ? `目标${oIdx + 1}：` : ''}{objective.objective}
                     </span>
-                    {!supervisor && objective.primaryLabel === 'KR' && <Tag className="m-0">{objective.keyResults[0]?.parentKeyResultProgress ?? objective.progress}%</Tag>}
+                    {!supervisor && objective.primaryLabel === 'KR' && !readOnly && <Tag className="m-0">{objective.keyResults[0]?.parentKeyResultProgress ?? objective.progress}%</Tag>}
                   </div>
                 ),
                 children: (
@@ -525,7 +557,7 @@ export function WeeklyReviewEditor({
                   {objectiveKrs.map((kr, krIdx) => {
                   const evidence = kr.workIds
                     .map(id => {
-        const live = workById.get(id);
+        const live = readOnly ? undefined : workById.get(id);
         if (live) return live;
         const saved = initialPayload?.items?.find(item => item.workId === id);
         return saved ? { id, title: saved.title, status: saved.status, actualHours: saved.actualHours, productLineName: saved.sourceLabel } as OkrWork : undefined;
@@ -534,19 +566,19 @@ export function WeeklyReviewEditor({
 
                   const action = objective.keyResults.find(target => target.id === kr.keyResultId);
                   const details = !supervisor ? action?.parentKeyResultDetails || [] : [];
-                  const personalProgress = details.length ? Math.round(details.reduce((total, detail) => total + (kr.detailProgress?.find(row => row.id === detail.id)?.currentProgress ?? 0), 0) / details.length) : kr.currentProgress;
+                  const personalProgress = readOnly ? kr.currentProgress : details.length ? Math.round(details.reduce((total, detail) => total + (kr.detailProgress?.find(row => row.id === detail.id)?.currentProgress ?? 0), 0) / details.length) : kr.currentProgress;
                   const asOf = dayjs(period.endDate).isBefore(dayjs(), 'day') ? period.endDate : dayjs().format('YYYY-MM-DD');
-                  const health = !supervisor ? employeeReviewHealth(personalProgress, action?.plannedStartDate || `${objective.cycle}-01`, action?.deadline || dayjs(objective.cycle).endOf('month').format('YYYY-MM-DD'), asOf) : null;
+                  const health = !supervisor && readOnly ? initialPayload?.krReviews?.find(row => row.keyResultId === kr.keyResultId)?.executionHealth || (kr.health === 'risk' ? '风险' : kr.health === 'blocked' ? '逾期' : '正常') : !supervisor ? employeeReviewHealth(personalProgress, action?.plannedStartDate || `${objective.cycle}-01`, action?.deadline || dayjs(objective.cycle).endOf('month').format('YYYY-MM-DD'), asOf) : null;
                   const collapsed = collapsedKrs[kr.keyResultId] ?? (supervisor ? true : defaultCollapsedReview(kr));
                   return (
                     <Collapse key={kr.keyResultId} className="okr-review-a-collapse" activeKey={collapsed ? [] : [kr.keyResultId]} expandIconPosition="end" onChange={keys => setCollapsedKrs(current => ({ ...current, [kr.keyResultId]: !keys.length }))} items={[{
                       key: kr.keyResultId,
                       label: supervisor ? <div className="min-w-0 space-y-2 w-full"><strong className="block truncate" title={kr.keyResultTitle}>KR{krIdx + 1}：{kr.keyResultTitle}</strong><div className="flex items-center gap-3"><Progress percent={kr.currentProgress} showInfo={false} size="small"/><span>{kr.currentProgress}%</span></div><div className="text-xs text-[var(--text-muted)]">员工支撑 {new Set(kr.contributors?.map(row => row.authorId)).size} 人 · 工作证据 {employeeEvidenceForKr(supportsByKr.get(kr.keyResultId) || [], kr.employeeReviewSnapshots || []).length} 项</div></div> : <div className="flex flex-wrap items-center gap-3"><strong>{supervisor ? `KR${krIdx + 1}：` : '我的计划：'}{kr.keyResultTitle}</strong><Tag>{supervisor ? `${kr.previousProgress}% → ${kr.currentProgress}%` : `${personalProgress}%`}</Tag>{!supervisor && <Tag color={health === '超预期' ? 'success' : health === '风险' ? 'warning' : health === '逾期' ? 'error' : undefined}>{health || '暂无预期'}</Tag>}{defaultCollapsedReview(kr) && kr.currentProgress < 100 ? <Tag>本周无变化</Tag> : null}</div>,
-                      children: supervisor ? <SupervisorKrReviewCard review={kr} employeeActions={employeeActionsForKr(records, people, viewer?.id || '', kr, period)} supports={supportsByKr.get(kr.keyResultId) || []}
+                      children: supervisor ? <SupervisorKrReviewCard review={kr} employeeActions={readOnly ? [] : employeeActionsForKr(records, people, viewer?.id || '', kr, period)} supports={supportsByKr.get(kr.keyResultId) || []}
                         busy={busy} editable={editorState.editable} supportLoading={recordsLoading} supportError={recordsError} onRetry={onRefreshRecords}
                         onUpdate={patch => update(kr.keyResultId, patch)} onEmployeeSupport={(authorId, reportIds) => {
                           setSupportTargetId(kr.keyResultId); setSupportAuthorId(authorId);
-                          update(kr.keyResultId, { viewedEmployeeReviewIds: [...new Set([...(kr.viewedEmployeeReviewIds || []), ...reportIds])] });
+                          if (!readOnly) update(kr.keyResultId, { viewedEmployeeReviewIds: [...new Set([...(kr.viewedEmployeeReviewIds || []), ...reportIds])] });
                         }}/> : <div className="space-y-4">
                       {details.length ? <EmployeeReviewDetailTable rows={details} productName={action?.businessObject} progress={kr.detailProgress || []} disabled={busy || !editorState.editable}
                         onChange={detailProgress => update(kr.keyResultId, { detailProgress })}/> : <div className="flex flex-wrap items-center gap-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-card)] p-3 text-xs text-[var(--text-body)]">
@@ -567,6 +599,7 @@ export function WeeklyReviewEditor({
                           <Button
                             size="middle"
                             icon={<Plus className="h-3.5 w-3.5" />}
+                            disabled={busy || readOnly}
                             onClick={() => openPicker(kr.keyResultId)}
                           >
                             关联工作证据
@@ -585,7 +618,7 @@ export function WeeklyReviewEditor({
                                 { title: '来源归属', render: (_, item) => [item.productLineName, item.versionName].filter(Boolean).join(' / ') || '—', ellipsis: true },
                                 { title: '状态', dataIndex: 'status', width: 105 },
                                 { title: '任务工时', render: (_, item) => completedActualHours(item) == null ? '—' : `${completedActualHours(item)} 小时`, width: 100 },
-                                { title: '操作', width: 90, render: (_, item) => <Button type="text" danger size="small" icon={<Trash2 className="h-3.5 w-3.5"/>} disabled={busy || !editorState.editable} aria-label="移除关联工作" onClick={() => removeWork(kr.keyResultId, item.id)}/> },
+                                { title: '操作', hidden: readOnly, width: 90, render: (_, item) => <Button type="text" danger size="small" icon={<Trash2 className="h-3.5 w-3.5"/>} disabled={busy || !editorState.editable} aria-label="移除关联工作" onClick={() => removeWork(kr.keyResultId, item.id)}/> },
                               ]}
                             />
                           </div>
@@ -642,7 +675,7 @@ export function WeeklyReviewEditor({
                   { title: '状态', dataIndex: 'status', width: 105 },
                   { title: '任务工时', dataIndex: 'hours', width: 100 },
                   {
-                    title: '操作',
+                    title: '操作', hidden: readOnly,
                     width: 90,
                     render: (_, row) => (
                       <Button
@@ -701,7 +734,7 @@ export function WeeklyReviewEditor({
             { title: '事项类型', render: (_, row) => workOrderDisplayName(row.assistanceType) || '—' },
             { title: '负责人', dataIndex: 'expectedAssignee' },
             { title: '状态', render: (_, row) => row.status || '未发起' },
-            { title: '删除操作', render: (_, row, index) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`移除协同事项${row.subject}`} onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>删除</Button> },
+            { title: '删除操作', hidden: readOnly, render: (_, row, index) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`移除协同事项${row.subject}`} onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>删除</Button> },
             ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || '主管本人' }] : []),
           ].filter(column => !supervisor || column.title !== '删除操作')}/> : <Empty description="暂无需要协助事项"/>}
         </div>
@@ -721,7 +754,7 @@ export function WeeklyReviewEditor({
             { title: '标题', ellipsis: true, render: (_, row) => <Button type="link" onClick={() => setViewingKnowledge(row)}>{row.title}</Button> },
             { title: '分类', dataIndex: 'category' },
             { title: '内容摘要', dataIndex: 'summary', ellipsis: true },
-            { title: '删除操作', render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
+            { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
             ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || '主管本人' }] : []),
           ].filter(column => !supervisor || column.title !== '删除操作')}/> : <Empty description="暂无知识沉淀"/>}
         </div>

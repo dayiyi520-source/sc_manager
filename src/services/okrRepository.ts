@@ -57,7 +57,7 @@ export interface OkrActionPayload {
   breakdownWeightTotal?: number;
 }
 export interface OkrProgressEntry { id: string; itemId: string; operatorId: string; createdAt: string; previousProgress: number; progress: number; status: 'normal' | 'risk' | 'overdue' | 'ahead'; note: string; attachments: Array<{ name: string; data: string }> }
-export interface OkrRecord { progressHistory?: OkrProgressEntry[]; id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; submittedAt?: string; changeRequest?: OkrGoalChange; changeHistory?: OkrGoalChange[]; payload: OkrPayload & Partial<OkrActionPayload> }
+export interface OkrRecord { viewedBy?: string[]; progressHistory?: OkrProgressEntry[]; id: string; kind: 'objective' | 'review' | 'action'; ownerId: string; periodKey: string; status: string; version: number; createdAt?: string; submittedAt?: string; changeRequest?: OkrGoalChange; changeHistory?: OkrGoalChange[]; payload: OkrPayload & Partial<OkrActionPayload> }
 export interface OkrWork {
   statusChanges?: import('./monthlyReviewMetrics').ReviewStatusChange[];
   productLineId?: string; productLineName?: string; versionId?: string; versionName?: string;
@@ -81,6 +81,7 @@ export interface OkrObjectiveTitleTemplate { krTypes?: OkrTemplateKrType[]; id: 
 export interface OkrSettings { objectiveTitleTemplates?: OkrObjectiveTitleTemplate[]; cycles?: OkrCycleSettings; administratorIds?: string[]; confirmation?: OkrConfirmationSettings; version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
 const base = '/api/okr';
 export const okrRepository = {
+  markViewed: (id: string, viewerId: string) => apiRequest<void>(`${base}/records/${encodeURIComponent(id)}/viewed`, { method: 'POST', body: JSON.stringify({ viewerId }) }),
   people: () => apiRequest<OkrPerson[]>(`${base}/people`),
   settings: () => apiRequest<OkrSettings>(`${base}/settings`),
   saveSettings: (settings: OkrSettings, viewerId?: string) => apiRequest<OkrSettings>(`${base}/settings`, {method:'PUT', body: JSON.stringify({...settings, viewerId})}),

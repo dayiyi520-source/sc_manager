@@ -14,6 +14,27 @@ const initialPayload: OkrPayload = { title: '月报', suggestions: '问题\n建�
   knowledgeEntries: [{ id: 'k', title: '排查经验', category: '产研规范', content: '经验正文' }] };
 
 describe('personal monthly editor', () => {
+  it('explains missing knowledge titles and saves the entry after the title is filled', async () => {
+    const save = vi.fn(async (_payload: OkrPayload) => true);
+    const view = render(<MonthlyReviewEditor {...props} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
+    fireEvent.click(screen.getByRole('button', { name: '新建知识沉淀' }));
+    fireEvent.change(screen.getByPlaceholderText('简要概括文档核心内容，便于全员高效检索...'), { target: { value: '月度经验摘要' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('请输入文档名称');
+    expect(screen.getByRole('textbox', { name: '文档名称' })).toHaveFocus();
+    fireEvent.change(screen.getByRole('textbox', { name: '文档名称' }), { target: { value: '  月度排查经验  ' } });
+    expect(screen.getByRole('textbox', { name: '文档名称' })).toHaveAttribute('aria-invalid', 'false');
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
+    expect(screen.getByRole('button', { name: '月度排查经验' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    const saved = save.mock.calls[0][0];
+    expect(saved.knowledgeEntries).toEqual([expect.objectContaining({ title: '月度排查经验', summary: '月度经验摘要' })]);
+    view.unmount();
+    render(<MonthlyReviewEditor {...props} initialPayload={saved} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
+    expect(screen.getByRole('button', { name: '月度排查经验' })).toBeInTheDocument();
+  });
+
   it('shows month, department and default empty cards without table headers', () => {
     render(<MonthlyReviewEditor {...props} viewer={{ id: 'me', name: '本人', department: '产品部' }} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
     expect(screen.getByText('月报')).toBeInTheDocument();
@@ -115,7 +136,40 @@ describe('personal monthly editor', () => {
     const submit = vi.fn(async (_payload: OkrPayload) => true);
     render(<MonthlyReviewEditor {...props} initialPayload={initialPayload} onSaveDraft={vi.fn(async () => true)} onSubmit={submit}/>);
     fireEvent.click(screen.getByRole('button', { name: '提交月报' }));
+    const confirmation = screen.getByRole('dialog', { name: '提交月报确认' });
+    expect(within(confirmation).getByText('确认提交 2026 年 10 月的个人月报吗？')).toBeInTheDocument();
+    expect(within(confirmation).getByText(/本份月报不可直接修改/)).toBeInTheDocument();
+    expect(screen.queryByText(/自动汇总/)).not.toBeInTheDocument();
+    expect(submit).not.toHaveBeenCalled();
+    fireEvent.click(within(confirmation).getByRole('button', { name: '返回检查' }));
+    expect(submit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '提交月报' }));
     fireEvent.click(screen.getByRole('button', { name: '确认提交' }));
     await waitFor(() => expect(submit).toHaveBeenCalledWith(expect.objectContaining({ suggestions: '问题\n建议', knowledgeEntries: initialPayload.knowledgeEntries })));
+  });
+
+  it('shows submitted snapshots in the monthly layout even after goals and live work change', async () => {
+    const onCopy = vi.fn();
+    const saved: OkrPayload = { ...initialPayload, startDate: '2026-10-01', endDate: '2026-10-31',
+      monthlyMetrics: { taskCount: 7, collaborationCount: 2, totalHours: 16 },
+      krReviews: [{ objectiveId: 'removed', objectiveTitle: '原月度目标', keyResultId: 'removed-action', keyResultTitle: '已保存的个人计划', previousProgress: 0, currentProgress: 80,
+        executionHealth: '超预期', health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: ['t'],
+        detailRows: [{ id: 'detail', name: '原产品', version: 'V1.0', stage: '产品设计' }], detailProgress: [{ id: 'detail', previousProgress: 0, currentProgress: 80 }] }] };
+    render(<MonthlyReviewEditor {...props} recordStatus="submitted" initialPayload={saved} work={[{ id: 't', title: '后续改名任务', actualHours: 99 } as OkrWork]}
+      onCopy={onCopy} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
+    expect(screen.getByText('我的计划：已保存的个人计划')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('我的计划：已保存的个人计划'));
+    expect(screen.getByText('原产品')).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton')).toHaveValue('80');
+    expect(screen.getByRole('spinbutton')).toBeDisabled();
+    expect(screen.queryByText('后续改名任务')).not.toBeInTheDocument();
+    expect(screen.getAllByText('已关联任务').length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getByText('16')).toBeInTheDocument());
+    expect(screen.queryByText('月度目标已变化，请确认失效内容')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '提交月报' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '删除操作' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '复制为本期' }));
+    expect(onCopy).toHaveBeenCalledOnce();
   });
 });

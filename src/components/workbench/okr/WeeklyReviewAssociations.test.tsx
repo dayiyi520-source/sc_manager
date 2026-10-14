@@ -14,11 +14,38 @@ globalThis.IntersectionObserver = Observer as unknown as typeof IntersectionObse
 const props = { okrs: [], work: [], busy: false, workLoading: false, onRefreshWork: vi.fn(), onSaveDraft: vi.fn(async () => true), onSubmit: vi.fn(async () => true), onCancel: vi.fn() };
 
 describe('weekly review associations', () => {
+  it('keeps submitted goals and evidence as saved and exposes only copy and cancel actions', () => {
+    const onCopy = vi.fn();
+    const payload: OkrPayload = { title: '历史周报', reviewType: 'week', startDate: '2026-09-14', endDate: '2026-09-20', nextWeekPlan: '已存计划',
+      krReviews: [{ objectiveId: 'removed', objectiveTitle: '原目标', keyResultId: 'a', keyResultTitle: '原个人计划', previousProgress: 0, currentProgress: 40, executionHealth: '正常', health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: ['work'] }],
+      items: [{ workId: 'work', title: '保存时的工作证据', status: '已完成', actualHours: 8, result: '', impact: '' }] };
+    render(<WeeklyReviewEditor {...props} recordStatus="submitted" initialPayload={payload} periodOverride={{ startDate: '2026-09-14', endDate: '2026-09-20' }}
+      work={[{ id: 'work', title: '后续改名', status: '已完成', actualHours: 99 } as any]} onCopy={onCopy}/>);
+    expect(screen.getByText('原目标')).toBeInTheDocument();
+    expect(screen.getByText('我的计划：原个人计划')).toBeInTheDocument();
+    expect(screen.getByText('保存时的工作证据')).toBeInTheDocument();
+    expect(screen.queryByText('后续改名')).not.toBeInTheDocument();
+    expect(screen.queryByText('月度目标已变化，请确认失效内容')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '下周计划' })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: '关联工作证据' }).every(button => button.hasAttribute('disabled'))).toBe(true);
+    expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '提交周报' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '移除关联工作' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '复制为本期' }));
+    expect(onCopy).toHaveBeenCalledOnce();
+  });
+
   it('adds knowledge, saves its full content, reopens it and saves removal', async () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
     const view = render(<WeeklyReviewEditor {...props} onSaveDraft={save}/>);
     fireEvent.click(screen.getByRole('button', { name: '新建知识沉淀' }));
-    expect(screen.getByRole('button', { name: '确认添加' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('请输入文档名称');
+    expect(screen.getByRole('textbox', { name: '文档名称' })).toHaveFocus();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: '文档名称' }), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
+    expect(screen.getByRole('textbox', { name: '文档名称' })).toHaveAttribute('aria-invalid', 'true');
     fireEvent.change(screen.getByPlaceholderText('例如：智慧校园平台V3.0产品需求规格说明书'), { target: { value: '故障排查经验' } });
     fireEvent.change(screen.getByPlaceholderText('简要概括文档核心内容，便于全员高效检索...'), { target: { value: '排查摘要' } });
     fireEvent.change(screen.getByPlaceholderText('请输入文档链接地址'), { target: { value: 'https://example.com/doc' } });

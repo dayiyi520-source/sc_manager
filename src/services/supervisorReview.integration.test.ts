@@ -26,4 +26,29 @@ describe('supervisor review record visibility', () => {
     const rows = await mockApiRequest('/api/okr/records?viewerId=manager') as OkrRecord[];
     expect(rows[0]).toMatchObject({ status: 'draft', payload: { reviewMode: 'supervisor', krReviews: [{ supervisorJudgment: '调整后的判断', employeeReviewSnapshots: [{ authorName: '员工' }] }] } });
   });
+  it('persists per-viewer read state without changing review status, version or content', async () => {
+    const people = await mockApiRequest('/api/okr/people') as OkrPerson[];
+    const manager = people.find(person => person.rootFlag === 0 && people.some(child => child.supervisorId === person.id))!;
+    const employee = people.find(person => person.supervisorId === manager.id)!;
+    const review: OkrRecord = { id: 'read-review', kind: 'review', ownerId: employee.id, status: 'reviewed', version: 3, periodKey: '2026-10', payload: { title: '已提交月报', reviewType: 'month' } };
+    localStorage.setItem(key, JSON.stringify([review]));
+    const mark = (viewerId: string) => mockApiRequest('/api/okr/records/read-review/viewed', { method: 'POST', body: JSON.stringify({ viewerId }) });
+    await mark(manager.id);
+    await mark(manager.id);
+    let rows = JSON.parse(localStorage.getItem(key)!) as OkrRecord[];
+    expect(rows).toEqual([{ ...review, viewedBy: [manager.id] }]);
+    expect(rows[0].viewedBy).not.toContain(employee.id);
+    await mark(employee.id);
+    rows = JSON.parse(localStorage.getItem(key)!) as OkrRecord[];
+    expect(rows[0].viewedBy).toEqual([manager.id, employee.id]);
+    await expect(mark('unknown-viewer')).rejects.toThrow('无查看权限');
+    const other = people.find(person => person.id !== employee.id && person.id !== manager.id)!;
+    await expect(mark(other.id)).rejects.toThrow('无查看权限');
+    for (const status of ['draft', 'returned', 'deleted'] as const) {
+      localStorage.setItem(key, JSON.stringify([{ ...review, status }]));
+      await expect(mark(manager.id)).rejects.toThrow('无查看权限');
+      expect(JSON.parse(localStorage.getItem(key)!)).toEqual([{ ...review, status }]);
+    }
+  });
+
 });

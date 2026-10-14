@@ -51,16 +51,36 @@ interface MonthlyReviewEditorProps {
   onSubmit: (payload: OkrPayload) => Promise<boolean>;
   onCancel: () => void;
   recordStatus?: string;
+  onCopy?: () => void;
   initialPayload?: OkrPayload;
   periodOverride?: ReviewPeriod;
   work?: OkrWork[]; viewer?: EvidenceViewer; workLoading?: boolean; workError?: unknown; onRefreshWork?: () => void;
 }
 
-export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOPLE, recordsLoading = false, recordsError, onRefreshRecords, okrs, records, currentUserId, busy, onSaveDraft, onSubmit, onCancel, recordStatus, initialPayload, periodOverride, work = EMPTY_WORK, viewer, workLoading, workError, onRefreshWork }: MonthlyReviewEditorProps) {
-  const month = useMemo(() => dayjs(periodOverride?.startDate).startOf('month'), [periodOverride?.startDate]);
-  const monthlyOkrs = useMemo(() => okrs.filter(objective => objective.cycle === month.format('YYYY-MM')), [okrs, month]);
+export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOPLE, recordsLoading = false, recordsError, onRefreshRecords, okrs, records, currentUserId, busy, onSaveDraft, onSubmit, onCancel, onCopy, recordStatus, initialPayload, periodOverride, work = EMPTY_WORK, viewer, workLoading, workError, onRefreshWork }: MonthlyReviewEditorProps) {
+  const editorState = reviewEditorState(recordStatus);
+  const readOnly = !editorState.editable;
+  const month = useMemo(() => dayjs(periodOverride?.startDate || initialPayload?.startDate).startOf('month'), [periodOverride?.startDate, initialPayload?.startDate]);
+  const monthlyOkrs = useMemo(() => {
+    if (!readOnly) return okrs.filter(objective => objective.cycle === month.format('YYYY-MM'));
+    // Submitted reports show their saved plans, including goals that were later removed.
+    const snapshots: OKRItem[] = [];
+    for (const row of initialPayload?.krReviews || []) {
+      let objective = snapshots.find(item => item.id === row.objectiveId);
+      if (!objective) {
+        objective = { id: row.objectiveId, cycle: month.format('YYYY-MM'), ownerId: currentUserId,
+          ownerName: viewer?.name || '', department: viewer?.department || '', category: 'my', primaryLabel: 'KR',
+          objective: row.objectiveTitle, progress: 0, weight: 100, deadline: month.endOf('month').format('YYYY-MM-DD'), keyResults: [] };
+        snapshots.push(objective);
+      }
+      objective.keyResults.push({ id: row.keyResultId, content: row.keyResultTitle, progress: row.currentProgress,
+        weight: 100, deadline: objective.deadline, parentKeyResultDetails: row.detailRows });
+    }
+    return snapshots;
+  }, [okrs, month, readOnly, template, initialPayload?.krReviews, currentUserId, viewer?.name, viewer?.department]);
   const weeklyReviews = useMemo(() => eligibleWeeklyReviews(records, currentUserId, month), [records, currentUserId, month]);
   const currentTargets = useMemo(() => monthlyOkrs.flatMap(objective => objective.keyResults.map(keyResult => {
+    if (readOnly) return initialPayload!.krReviews!.find(row => row.objectiveId === objective.id && row.keyResultId === keyResult.id)!;
     const latest = [...weeklyReviews].reverse().flatMap(record => record.payload.krReviews || [])
       .find(row => row.objectiveId === objective.id && row.keyResultId === keyResult.id);
     const target = aggregateKrReview(objective.id, keyResult.id, keyResult.content, 0, weeklyReviews);
@@ -68,17 +88,17 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
     return { ...target,
       detailProgress: latest?.detailProgress?.map(row => ({ ...row, previousProgress: row.currentProgress })),
       objectiveTitle: objective.objective };
-  })), [monthlyOkrs, weeklyReviews, template, records, people, currentUserId, month]);
-  const initialKrs = useMemo(() => restoreReviewDraftTargets(currentTargets, initialPayload), [currentTargets, initialPayload]);
+  })), [monthlyOkrs, weeklyReviews, template, records, people, currentUserId, month, readOnly, initialPayload]);
+  const initialKrs = useMemo(() => readOnly ? currentTargets : restoreReviewDraftTargets(currentTargets, initialPayload), [currentTargets, initialPayload, readOnly]);
   const [krs, setKrs] = useState(() => initialKrs);
-  const editorState = reviewEditorState(recordStatus);
   const lastTargetIds = useRef(new Set(currentTargets.map(row => row.keyResultId)));
   useEffect(() => {
+    if (readOnly) return;
     const added = currentTargets.filter(row => !lastTargetIds.current.has(row.keyResultId)).map(row => row.keyResultId);
     setKrs(previous => reconcileReviewDraftTargets(previous, currentTargets));
     setSelectedKrIds(previous => [...new Set([...previous, ...added])]);
     lastTargetIds.current = new Set(currentTargets.map(row => row.keyResultId));
-  }, [currentTargets]);
+  }, [currentTargets, readOnly]);
   const detachedTargets = krs.filter(row => !currentTargets.some(target => target.objectiveId === row.objectiveId && target.keyResultId === row.keyResultId));
   const [selectedKrIds, setSelectedKrIds] = useState(() => initialPayload?.startDate ? initialKrs.filter(item => initialPayload.krReviews?.some(kr => kr.keyResultId === item.keyResultId)).map(item => item.keyResultId) : initialKrs.map(item => item.keyResultId));
   const [suggestions, setSuggestions] = useState(initialPayload?.suggestions || initialPayload?.otherNotes || '');
@@ -94,6 +114,12 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
   const [metricsRevision, setMetricsRevision] = useState(0);
   const period = useMemo(() => monthPeriod(month), [month]);
   useEffect(() => {
+    if (readOnly) {
+      setMetrics(initialPayload?.monthlyMetrics);
+      setMetricsLoading(false);
+      setMetricsError(false);
+      return;
+    }
     let active = true;
     setMetricsLoading(true);
     setMetricsError(false);
@@ -107,7 +133,7 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
       .catch(() => { if (active) setMetricsError(true); })
       .finally(() => { if (active) setMetricsLoading(false); });
     return () => { active = false; };
-  }, [work, workLoading, workError, period, currentUserId, viewer?.name, metricsRevision]);
+  }, [work, workLoading, workError, period, currentUserId, viewer?.name, metricsRevision, readOnly, template, initialPayload?.monthlyMetrics]);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [expandedKrs, setExpandedKrs] = useState<Record<string, boolean>>({});
@@ -121,11 +147,13 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
   const otherTasks = useMemo(() => aggregateMonthlyTasks(weeklyReviews), [weeklyReviews]);
   const metricValue = (value?: number) => metricsLoading ? '加载中' : metricsError || value == null ? '—' : value;
   const planProgress = (row: OkrKrReview) => {
+    if (readOnly) return row.currentProgress;
     const action = monthlyOkrs.find(objective => objective.id === row.objectiveId)?.keyResults.find(kr => kr.id === row.keyResultId);
     const details = action?.parentKeyResultDetails || [];
     return details.length ? Math.round(details.reduce((sum, detail) => sum + (row.detailProgress?.find(item => item.id === detail.id)?.currentProgress ?? 0), 0) / details.length) : row.currentProgress;
   };
   const planHealth = (row: OkrKrReview) => {
+    if (readOnly) return row.executionHealth || (row.health === 'risk' ? '风险' : row.health === 'blocked' ? '逾期' : '正常');
     const objective = monthlyOkrs.find(item => item.id === row.objectiveId);
     const action = objective?.keyResults.find(item => item.id === row.keyResultId);
     const today = dayjs().isBefore(month.endOf('month'), 'day') ? dayjs() : month.endOf('month');
@@ -178,7 +206,7 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
         <div><FileText /><span><strong>加班时长</strong><b>—</b></span></div>
       </section>);
   if (template === 'supervisor') return <WeeklyReviewEditor template="supervisor" reviewType="month" overview={<>{monthlyOverview}{metricsError && <Alert type="error" showIcon title="月度统计加载失败" action={<Button onClick={() => { onRefreshWork?.(); setMetricsRevision(value => value + 1); }}>重试</Button>}/>}</>} records={records} people={people} recordsLoading={recordsLoading} recordsError={recordsError} onRefreshRecords={onRefreshRecords}
-    periodOverride={period} initialPayload={initialPayload} recordStatus={recordStatus} okrs={okrs} work={work} viewer={viewer} busy={busy} workLoading={Boolean(workLoading)} workError={workError} onRefreshWork={onRefreshWork || (() => {})} onCancel={onCancel} directSubmit
+    periodOverride={period} initialPayload={initialPayload} recordStatus={recordStatus} okrs={okrs} work={work} viewer={viewer} busy={busy} workLoading={Boolean(workLoading)} workError={workError} onRefreshWork={onRefreshWork || (() => {})} onCancel={onCancel} onCopy={onCopy} directSubmit
     onSaveDraft={payload => onSaveDraft({ ...payload, monthlyMetrics: metricsError || metricsLoading ? initialPayload?.monthlyMetrics : metrics })}
     onSubmit={payload => onSubmit({ ...payload, monthlyMetrics: metricsError || metricsLoading ? initialPayload?.monthlyMetrics : metrics })}/>;
   return (
@@ -189,8 +217,10 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
         </div>
         <div className="okr-monthly-actions">
           <Button onClick={onCancel}>取消</Button>
-          <Button disabled={!editorState.editable || Boolean(detachedTargets.length)} icon={<Save className="h-4 w-4" />} loading={busy} onClick={() => onSaveDraft(payload())}>存草稿</Button>
-          <Button disabled={!editorState.editable || Boolean(detachedTargets.length)} type="primary" icon={<Send className="h-4 w-4" />} loading={busy} onClick={requestSubmit}>提交月报</Button>
+          {readOnly ? onCopy && <Button type="primary" onClick={onCopy}>复制为本期</Button> : <>
+            <Button disabled={Boolean(detachedTargets.length)} icon={<Save className="h-4 w-4" />} loading={busy} onClick={() => onSaveDraft(payload())}>存草稿</Button>
+            <Button disabled={Boolean(detachedTargets.length)} type="primary" icon={<Send className="h-4 w-4" />} loading={busy} onClick={requestSubmit}>提交月报</Button>
+          </>}
         </div>
       </header>
 
@@ -204,7 +234,7 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
         <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />1. 本月目标复盘</h3></div>
       {monthlyOkrs.length === 0 ? <Empty description="本月暂无 OKR" /> : monthlyOkrs.map((objective, objectiveIndex) => <Collapse key={objective.id} className="okr-review-objective-collapse" defaultActiveKey={[objective.id]} expandIconPosition="end" items={[{
         key: objective.id,
-        label: <div className="flex items-center gap-2"><Tag color="blue">{objective.primaryLabel || 'O'}{objectiveIndex + 1}</Tag><strong>{objective.primaryLabel === 'KR' ? '' : `目标${objectiveIndex + 1}：`}{objective.objective}</strong>{objective.primaryLabel === 'KR' && <Tag>{objective.keyResults[0]?.parentKeyResultProgress ?? objective.progress}%</Tag>}</div>,
+        label: <div className="flex items-center gap-2"><Tag color="blue">{objective.primaryLabel || 'O'}{objectiveIndex + 1}</Tag><strong>{objective.primaryLabel === 'KR' ? '' : `目标${objectiveIndex + 1}：`}{objective.objective}</strong>{objective.primaryLabel === 'KR' && !readOnly && <Tag>{objective.keyResults[0]?.parentKeyResultProgress ?? objective.progress}%</Tag>}</div>,
         children: <div className="okr-review-a-list grid gap-4 p-4">{krs.filter(kr => kr.objectiveId === objective.id && objective.keyResults.some(target => target.id === kr.keyResultId)).map((kr, index) => {
           const expanded = expandedKrs[kr.keyResultId] ?? !defaultCollapsedReview(kr);
           const selected = selectedKrIds.includes(kr.keyResultId);
@@ -226,13 +256,13 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
               {(health === '风险' || health === '逾期') && <ReviewRiskCallout value={kr.blocker} onChange={value => updateKr(kr.keyResultId, { blocker: value })} disabled={busy || !editorState.editable} label={`${kr.keyResultTitle}风险原因及所需支持`}/>}
               <div className="okr-weekly-section-header"><h4>本期关联工作证据</h4><Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5"/>} onClick={() => setPickerKrId(kr.keyResultId)}>关联工作证据</Button></div>
               {kr.workIds.length > 0 ? <div className="border border-[var(--border-main)] rounded overflow-hidden bg-[var(--bg-card)]"><Table size="small" rowKey="workId" pagination={false} dataSource={kr.workIds.map(id => {
-                const live = work.find(item => item.id === id);
+                const live = readOnly ? undefined : work.find(item => item.id === id);
                 const saved = evidenceItems.find(item => item.workId === id);
                 return { workId: id, title: live?.title || saved?.title || '历史工作证据', sourceLabel: live ? [live.productLineName, live.versionName].filter(Boolean).join(' / ') : saved?.sourceLabel, status: live?.status || saved?.status, actualHours: live?.actualHours ?? saved?.actualHours };
               })} locale={{ emptyText: <Empty description="暂无关联工作证据"/> }} columns={[
                 { title: '标题', dataIndex: 'title', ellipsis: true }, { title: '来源归属', render: (_, row) => row.sourceLabel || '—' }, { title: '状态', dataIndex: 'status' },
                 { title: '任务工时', render: (_, row) => row.actualHours == null ? '—' : `${row.actualHours} 小时` },
-                { title: '删除操作', render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} onClick={() => { updateKr(kr.keyResultId, { workIds: kr.workIds.filter(id => id !== row.workId) }); setEvidenceItems(rows => rows.filter(item => item.workId !== row.workId)); }}>删除</Button> },
+                { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} onClick={() => { updateKr(kr.keyResultId, { workIds: kr.workIds.filter(id => id !== row.workId) }); setEvidenceItems(rows => rows.filter(item => item.workId !== row.workId)); }}>删除</Button> },
               ]}/></div> : <div className="p-3 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-main)] rounded bg-[var(--bg-card)]">(暂未关联本期工作证据)</div>}
 
             </div>,
@@ -244,7 +274,7 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
         <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />2. 插播任务</h3><Button icon={<Plus className="h-3.5 w-3.5" />} disabled={busy || !editorState.editable} onClick={() => setPickerKrId('extra')}>关联工作证据</Button></div>
         <div className="bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-4 shadow-sm">
         {extraWork.workIds.length > 0 ? <div className="border border-[var(--border-main)] rounded overflow-hidden"><Table size="small" rowKey="workId" pagination={false} dataSource={extraWork.workIds.map(id => {
-          const live = work.find(item => item.id === id);
+          const live = readOnly ? undefined : work.find(item => item.id === id);
           const saved = evidenceItems.find(item => item.workId === id);
           return { workId: id, title: live?.title || saved?.title || '历史工作证据', sourceLabel: live ? [live.productLineName, live.versionName].filter(Boolean).join(' / ') : saved?.sourceLabel, status: live?.status || saved?.status, actualHours: live?.actualHours ?? saved?.actualHours };
         })} locale={{ emptyText: <Empty description="暂无插播任务" /> }} columns={[
@@ -252,7 +282,7 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
           { title: '来源归属', render: (_, row) => row.sourceLabel || '—' },
           { title: '状态', dataIndex: 'status' },
           { title: '任务工时', render: (_, row) => row.actualHours == null ? '—' : `${row.actualHours} 小时` },
-          { title: '删除操作', render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} onClick={() => { setExtraWork(value => ({ ...value, workIds: value.workIds.filter(id => id !== row.workId) })); setEvidenceItems(rows => rows.filter(item => item.workId !== row.workId)); }}>删除</Button> },
+          { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} onClick={() => { setExtraWork(value => ({ ...value, workIds: value.workIds.filter(id => id !== row.workId) })); setEvidenceItems(rows => rows.filter(item => item.workId !== row.workId)); }}>删除</Button> },
         ]}/></div> : <Empty description="暂无插播任务" />}
         {extraWork.description && <div className="okr-monthly-panel"><p className="whitespace-pre-wrap">{historicalExtraDescription(extraWork.description)}</p><Button type="text" danger disabled={busy || !editorState.editable} onClick={() => setExtraWork(value => ({ ...value, description: '' }))}>删除历史补充</Button></div>}
         </div>
@@ -279,7 +309,7 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
             { title: '事项类型', render: (_, row) => workOrderDisplayName(row.assistanceType) || '—' },
             { title: '负责人', dataIndex: 'expectedAssignee' },
             { title: '状态', render: (_, row) => row.status || '未发起' },
-            { title: '删除操作', render: (_, row, index) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`移除协同事项${row.subject}`} onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>删除</Button> },
+            { title: '删除操作', hidden: readOnly, render: (_, row, index) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`移除协同事项${row.subject}`} onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>删除</Button> },
           ]}/> : <Empty description="暂无需要协助事项" />}
         </div>
       </section>
@@ -298,7 +328,7 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
             { title: '标题', ellipsis: true, render: (_, row) => <Button type="link" onClick={() => setViewingKnowledge(row)}>{row.title}</Button> },
             { title: '分类', dataIndex: 'category' },
             { title: '内容摘要', dataIndex: 'summary', ellipsis: true },
-            { title: '删除操作', render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
+            { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
           ]}/> : <Empty description="暂无知识沉淀" />}
         </div>
       </section>
@@ -332,9 +362,9 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
         setPickerKrId(null);
       }}/>}
 
-      <Modal open={confirmOpen} title="确认提交月复盘" okText="确认提交" cancelText="返回检查" confirmLoading={busy} okButtonProps={{ disabled: !editorState.editable || Boolean(detachedTargets.length) }} onCancel={() => setConfirmOpen(false)} onOk={async () => { if (!editorState.editable || detachedTargets.length) return; if (await onSubmit(payload())) setConfirmOpen(false); }}>
-        <p>本次复盘已选择 {selectedKrs.length} 个 KR，并自动汇总 {weeklyReviews.length} 周的证据记录。</p>
-        <p>个人计划进度记录在月复盘中，不自动修改共享 KR 进度。</p>
+      <Modal open={confirmOpen} title="提交月报确认" okText="确认提交" cancelText="返回检查" confirmLoading={busy} okButtonProps={{ disabled: !editorState.editable || Boolean(detachedTargets.length) }} onCancel={() => setConfirmOpen(false)} onOk={async () => { if (!editorState.editable || detachedTargets.length) return; if (await onSubmit(payload())) setConfirmOpen(false); }}>
+        <p>确认提交 {month.year()} 年 {month.month() + 1} 月的个人月报吗？</p>
+        <p>提交后将进入主管评价流程，本份月报不可直接修改。需要调整内容，请返回检查。</p>
       </Modal>
     </div>
   );

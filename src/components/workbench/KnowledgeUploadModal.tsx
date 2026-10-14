@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { Button, Col, Form, Input, Modal, Row, Select } from 'antd';
+import type { InputRef } from 'antd';
 import { KnowledgeDoc, KnowledgePrimaryCategory } from '../../types';
 
 interface KnowledgeUploadModalProps {
@@ -16,6 +17,10 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
   onSubmit
 }) => {
   const [title, setTitle] = useState('');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const titleId = useId();
+  const titleRef = useRef<InputRef>(null);
+  const titleInvalid = submitAttempted && !title.trim();
   const [category, setCategory] = useState<KnowledgePrimaryCategory>('应知应会');
   const [subCategory, setSubCategory] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -28,7 +33,11 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
   if (!isOpen) return null;
 
   const handleSubmit = () => {
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      setSubmitAttempted(true);
+      titleRef.current?.focus();
+      return;
+    }
 
     const tags = tagsInput
       .split(/[,，\s]+/)
@@ -54,9 +63,13 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
   };
 
   return <Modal open={isOpen} onCancel={onClose} title={mode === 'review' ? '新建知识沉淀' : '上传 / 沉淀企业知识文档'} width={720}
-    footer={<><Button onClick={onClose}>取消</Button><Button type="primary" disabled={!title.trim()} onClick={handleSubmit}>{mode === 'review' ? '确认添加' : '确认发布沉淀'}</Button></>}>
+    footer={<><Button onClick={onClose}>取消</Button><Button type="primary" onClick={handleSubmit}>{mode === 'review' ? '确认添加' : '确认发布沉淀'}</Button></>}>
     <Form layout="vertical">
-      <Form.Item label="文档名称" required><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：智慧校园平台V3.0产品需求规格说明书" /></Form.Item>
+      <Form.Item label="文档名称" htmlFor={titleId} required validateStatus={titleInvalid ? 'error' : undefined}
+        help={titleInvalid ? <span id={`${titleId}-error`} role="alert">请输入文档名称</span> : undefined}>
+        <Input id={titleId} ref={titleRef} aria-required="true" aria-invalid={titleInvalid} aria-describedby={titleInvalid ? `${titleId}-error` : undefined}
+          value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：智慧校园平台V3.0产品需求规格说明书" />
+      </Form.Item>
       <Row gutter={16}>
         <Col span={12}><Form.Item label="一级分类" required><Select value={category} onChange={setCategory} options={['应知应会', '产研规范', '产品沉淀', '项目沉淀', '售前文档', '行业洞察'].map(value => ({ value, label: value }))}/></Form.Item></Col>
         <Col span={12}><Form.Item label="二级子分类 / 专业领域"><Input value={subCategory} onChange={e => setSubCategory(e.target.value)} placeholder="例如：研发规范、产品设计文档、行业知识" /></Form.Item></Col>

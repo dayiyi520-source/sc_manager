@@ -859,6 +859,15 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const error=validatePolicy(input as OkrSettings,people); if(error) throw new Error(error);
     const saved=normalizedPolicy({...input,version:(current.version ?? 0)+1} as OkrSettings,people); write(KEYS.okrSettings,saved); return saved;
   }
+  if (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && parts[4] === 'viewed' && method === 'POST') {
+    const records = read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]);
+    const record = records.find(row => row.id === parts[3] && row.kind === 'review');
+    if (!body.viewerId || !getOkrPeople().some(person => person.id === body.viewerId) || !record || !['submitted', 'reviewed', 'active'].includes(record.status) || !canReadReviewRecord(record, body.viewerId, getOkrPeople())) throw new Error('复盘不存在或无查看权限');
+    if (!record.viewedBy?.includes(body.viewerId)) {
+      write(KEYS.okrRecords, records.map(row => row.id === record.id ? { ...row, viewedBy: [...(row.viewedBy || []), body.viewerId] } : row));
+    }
+    return null;
+  }
   if (clean === '/api/okr/records' && method === 'GET') {
     const viewerId = queryOf(path).get('viewerId');
     const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);

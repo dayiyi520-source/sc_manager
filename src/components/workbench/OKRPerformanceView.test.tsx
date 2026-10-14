@@ -3,8 +3,9 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import dayjs from 'dayjs';
+import { okrRepository } from '../../services/okrRepository';
 import type { OkrRecord } from '../../services/okrRepository';
-import type { OKRItem } from '../../types';
+import type { OKRItem, PerformanceReview } from '../../types';
 
 class ReviewIntersectionObserver { observe() {} unobserve() {} disconnect() {} }
 globalThis.IntersectionObserver = ReviewIntersectionObserver as unknown as typeof IntersectionObserver;
@@ -84,7 +85,7 @@ const okrState = {
   records: [objectiveRecord],
   okrs: [okr],
   reviewableOkrs: [okr],
-  performances: [],
+  performances: [] as (PerformanceReview & { authorId: string })[],
   people: defaultPeople,
   work: [],
   actionParents: [actionParent],
@@ -138,13 +139,14 @@ describe('OKRPerformanceView target navigation', () => {
     okrState.records = [objectiveRecord];
     okrState.okrs = [okr];
     okrState.reviewableOkrs = [okr];
+    okrState.performances = [];
     okrState.people = defaultPeople;
     okrState.actionParents = [actionParent];
     okrState.settings.defaultView = 'list';
     currentUser = { id: 'boss', name: '老板', department: '管理层' };
   });
 
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
   it.each(['list', 'card'])('opens the manager breakdown itself from %s instead of the upstream company goal', async view => {
     currentUser = {id:'manager',name:'主管',department:'产品部'};
@@ -266,6 +268,110 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.queryByRole('tab', { name: /月度目标/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: '目标范围导航' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /写周报/ })).toBeInTheDocument();
+  });
+
+  it.each(['draft', 'submitted'] as const)('opens an employee monthly %s from the list in the monthly layout', async status => {
+    currentUser = { id: 'staff', name: '员工', department: '产品部' };
+    okrState.people = [...defaultPeople, { id: 'staff', name: '员工', department: '产品部', supervisorId: 'manager', rootFlag: 0, version: 1 }];
+    const record: OkrRecord = { id: 'personal-month', ownerId: 'staff', kind: 'review', periodKey: '2026-09', version: 1, status,
+      payload: { title: '个人月报', reviewType: 'month', reviewMode: 'monthly', startDate: '2026-09-01', endDate: '2026-09-30', suggestions: '已保存的问题建议' } };
+    okrState.records = [record];
+    okrState.reviewableOkrs = [];
+    okrState.performances = [{ id: record.id, authorId: 'staff', type: 'month', reviewMode: 'monthly', cycleName: '个人月报', author: '员工', authorDept: '产品部',
+      summary: '', uncompletedReason: '', suggestions: '', helpNeeded: '', sendTo: [], selfScore: 0, createdAt: '2026-09-15', status }];
+    render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('tab', { name: /我的复盘列表/ }));
+    fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
+    expect(screen.getByLabelText('月复盘编辑器')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '2026年第9月 月报-产品部' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toHaveValue('已保存的问题建议');
+    if (status === 'draft') {
+      expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+      await waitFor(() => expect(okrState.saveReviewDraft).toHaveBeenCalledWith(expect.objectContaining({ startDate: '2026-09-01', suggestions: '已保存的问题建议' })));
+    } else {
+      expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toBeDisabled();
+      expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '提交月报' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '复制为本期' }));
+      expect(screen.getByRole('button', { name: '存草稿' })).toBeEnabled();
+      expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toBeEnabled();
+    }
+  });
+
+  it.each(['draft', 'submitted'] as const)('opens an employee weekly %s from the list in the monthly layout', async status => {
+    currentUser = { id: 'staff', name: '员工', department: '产品部' };
+    okrState.people = [...defaultPeople, { id: 'staff', name: '员工', department: '产品部', supervisorId: 'manager', rootFlag: 0, version: 1 }];
+    const record: OkrRecord = { id: 'personal-week', ownerId: 'staff', kind: 'review', periodKey: '2026-09-14', version: 1, status,
+      payload: { title: '个人周报', reviewType: 'week', reviewMode: 'structured', startDate: '2026-09-14', endDate: '2026-09-20', nextWeekPlan: '已保存的下周计划' } };
+    okrState.records = [record];
+    okrState.reviewableOkrs = [];
+    okrState.performances = [{ id: record.id, authorId: 'staff', type: 'week', reviewMode: 'structured', cycleName: '个人周报', author: '员工', authorDept: '产品部',
+      summary: '', uncompletedReason: '', suggestions: '', helpNeeded: '', sendTo: [], selfScore: 0, createdAt: '2026-09-15', status }];
+    render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('tab', { name: /我的复盘列表/ }));
+    fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
+    expect(screen.getByRole('heading', { name: '2026年第 37 周 (09.14 - 09.20)' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '下周计划' })).toHaveValue('已保存的下周计划');
+    if (status === 'draft') {
+      expect(screen.getByRole('textbox', { name: '下周计划' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+      await waitFor(() => expect(okrState.saveReviewDraft).toHaveBeenCalledWith(expect.objectContaining({ startDate: '2026-09-14', nextWeekPlan: '已保存的下周计划' })));
+    } else {
+      expect(screen.getByRole('textbox', { name: '下周计划' })).toBeDisabled();
+      expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '提交周报' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '复制为本期' }));
+      expect(screen.getByRole('button', { name: '存草稿' })).toBeEnabled();
+      expect(screen.getByRole('textbox', { name: '下周计划' })).toBeEnabled();
+    }
+  });
+
+  it.each([['week', 'structured'], ['month', 'monthly'], ['week', 'supervisor'], ['month', 'supervisor']] as const)('opens received %s %s in the new read-only layout and records reading separately', async (type, mode) => {
+    currentUser = { id: 'boss', name: '老板', department: '管理层' };
+    const record: OkrRecord = { id: 'received', ownerId: 'manager', kind: 'review', periodKey: '2026-09', version: 2, status: 'reviewed',
+      payload: { title: '收到的复盘', reviewType: type, reviewMode: mode, startDate: type === 'week' ? '2026-09-14' : '2026-09-01', endDate: type === 'week' ? '2026-09-20' : '2026-09-30',
+        nextWeekPlan: '保存的计划', suggestions: '保存的问题', krReviews: [{ objectiveId: 'removed', objectiveTitle: '历史目标', keyResultId: 'removed-kr', keyResultTitle: '历史计划', previousProgress: 10, currentProgress: 42, health: 'normal', achievement: '历史成果', blocker: '', nextPlan: '', workIds: [] }] } };
+    okrState.records = [record];
+    okrState.reviewableOkrs = [];
+    okrState.performances = [{ id: record.id, authorId: record.ownerId, type, reviewMode: mode, cycleName: '收到的复盘', author: '主管', authorDept: '产品部', summary: '', uncompletedReason: '', suggestions: '', helpNeeded: '', sendTo: [], selfScore: 0, createdAt: '2026-09-15', status: 'reviewed' }];
+    const markViewed = vi.spyOn(okrRepository, 'markViewed').mockImplementation(async () => { record.viewedBy = ['boss']; });
+    render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('tab', { name: /看他人的复盘/ }));
+    expect(screen.getByRole('checkbox', { name: '未读 (1)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: /主管.*收到的复盘/ }));
+    await waitFor(() => expect(document.querySelector(type === 'month' && mode !== 'supervisor' ? '.okr-monthly-review' : '.okr-weekly-editor')).toBeInTheDocument());
+    expect(markViewed).toHaveBeenCalledWith('received', 'boss');
+    expect(screen.getByRole('checkbox', { name: '未读 (0)' })).not.toBeChecked();
+    expect(screen.getByText(/历史目标/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '复制为本期' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
+    expect(record.status).toBe('reviewed');
+    fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
+    expect(screen.getByText('请选择一份复盘')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '可以看的' }));
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /主管.*收到的复盘/ })).toBeInTheDocument();
+    markViewed.mockRestore();
+  });
+
+  it.each([['week', 'submitted'], ['month', 'submitted'], ['week', 'draft'], ['month', 'draft']] as const)('opens my department %s %s in the new layout', (type, status) => {
+    currentUser = { id: 'manager', name: '主管', department: '产品部' };
+    const record: OkrRecord = { id: 'department', ownerId: 'manager', kind: 'review', periodKey: '2026-09', version: 1, status, payload: { title: '部门复盘', reviewType: type, reviewMode: 'supervisor', startDate: type === 'week' ? '2026-09-14' : '2026-09-01', endDate: type === 'week' ? '2026-09-20' : '2026-09-30' } };
+    okrState.records = [record];
+    okrState.performances = [{ id: record.id, authorId: record.ownerId, type, reviewMode: 'supervisor', cycleName: '部门复盘', author: '主管', authorDept: '产品部', summary: '', uncompletedReason: '', suggestions: '', helpNeeded: '', sendTo: [], selfScore: 0, createdAt: '2026-09-15', status }];
+    render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('tab', { name: /我的复盘列表/ }));
+    fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
+    expect(document.querySelector('.okr-weekly-editor')).toBeInTheDocument();
+    if (status === 'submitted') {
+      expect(screen.getByRole('button', { name: '复制为本期' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
+    } else {
+      expect(screen.getByRole('button', { name: '存草稿' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '复制为本期' })).not.toBeInTheDocument();
+    }
   });
 
   it.each(['写周报', '写月报'])('tells the company root they are exempt when clicking %s', action => {

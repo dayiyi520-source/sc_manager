@@ -39,9 +39,9 @@ describe('portable goal/review mock persistence',()=>{
    return new Response(JSON.stringify(file));
   }) as unknown as typeof fetch;
   localStorage.clear();const first=createOkrFilePersistence(localStorage,request);
-  await first.run(async()=>{localStorage.setItem(key,JSON.stringify([record('goal'),record('weekly','review')]));return true;});
+  await first.run(async()=>{localStorage.setItem(key,JSON.stringify([record('goal'),{...record('weekly','review'),viewedBy:['manager']}]));return true;});
   localStorage.clear();const second=createOkrFilePersistence(localStorage,request);
-  await second.run(async()=>expect(JSON.parse(localStorage.getItem(key)!)).toHaveLength(2));
+  await second.run(async()=>{expect(JSON.parse(localStorage.getItem(key)!)).toHaveLength(2);expect(JSON.parse(localStorage.getItem(key)!)[1].viewedBy).toEqual(['manager']);});
   fail=true;await expect(second.run(async()=>{localStorage.setItem(key,JSON.stringify([record('lost')]));})).rejects.toThrow('保存失败');
   expect(JSON.parse(localStorage.getItem(key)!)).toHaveLength(2);expect(file.okrRecords.map(r=>r.id)).toEqual(['goal','weekly']);
   fail=false;await second.run(async()=>true);
