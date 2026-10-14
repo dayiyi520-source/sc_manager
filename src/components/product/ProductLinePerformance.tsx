@@ -10,8 +10,8 @@ const categoryLabels: Record<TaskCategory | 'bug', string> = { requirement: '产
 const chartColors = { new: 'var(--primary)', done: 'var(--success)', stock: 'var(--warning)', inProgress: 'var(--active-text)', overdue: 'var(--danger)' };
 const isTerminal = (item: UnifiedWorkItem) => item.status?.group === 'COMPLETED' || item.status?.group === 'CANCELLED';
 const isCompleted = (item: UnifiedWorkItem) => Boolean(item.status?.successful || item.status?.group === 'COMPLETED');
-const isTask = (item: UnifiedWorkItem): item is UnifiedWorkItem & { category: TaskCategory } => TASK_CATEGORIES.includes(item.category as TaskCategory) && item.sourceType !== 'WORK_ORDER' && !item.parentWorkItemId;
-const isDefect = (item: UnifiedWorkItem) => item.category === 'bug' && !item.parentWorkItemId;
+const isTask = (item: UnifiedWorkItem): item is UnifiedWorkItem & { category: TaskCategory } => TASK_CATEGORIES.includes(item.category as TaskCategory) && item.sourceType !== 'WORK_ORDER';
+const isDefect = (item: UnifiedWorkItem) => item.category === 'bug';
 const isStock = (item: UnifiedWorkItem) => !isTerminal(item);
 const dateKey = (value?: string | null) => value ? value.slice(0, 10) : '';
 const parseDate = (value?: string | null) => value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;

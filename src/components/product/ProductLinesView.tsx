@@ -15,7 +15,7 @@ import { ProductLine } from '../../types';
 import { ProductLineDetailView, type ProductLineSettingsSection } from './ProductLineDetailView';
 import { normalizeProductWebsiteUrl } from './productWebsite';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
-import { formatVersionPublishedAt, latestReleasedVersion, productLineDisplayStatus } from './productLinePresentation';
+import { formatVersionPublishedAt, latestReleasedVersion, productLineDisplayStatus, productPrimaryOwner } from './productLinePresentation';
 import { Pagination } from '../common/Pagination';
 import { normalizeResponsibilityNames, responsibilitySummary } from './productResponsibilityPresentation';
 
@@ -27,8 +27,7 @@ export const productLineVersionCount = (productLineId: string, items: Array<{ pr
 
 export const productLineMemberCount = (productLine: ProductLine) => new Set([
   ...(productLine.members || []).map((member) => typeof member === 'string' ? member : member.name),
-  productLine.owner,
-  productLine.ownerName,
+  productPrimaryOwner(productLine),
   productLine.requirementOwner,
   ...normalizeResponsibilityNames(productLine.requirementOwnerSecondary),
   productLine.techOwner,
@@ -40,7 +39,7 @@ export const productLineMemberCount = (productLine: ProductLine) => new Set([
 export const matchesProductLineFilters = (line: ProductLine, query: string, owner: string, status: string, displayedStatus: string) => {
   const keyword = query.trim().toLowerCase();
   return (!keyword || line.name.toLowerCase().includes(keyword) || line.code?.toLowerCase().includes(keyword))
-    && (!owner || (line.ownerName || line.owner || '') === owner)
+    && (!owner || productPrimaryOwner(line) === owner)
     && (!status || displayedStatus === status);
 };
 
@@ -122,7 +121,7 @@ export const ProductLinesView: React.FC = () => {
   const displayStatus = productLineDisplayStatus;
   const filteredLines = sortedProductLines.filter((line) => matchesProductLineFilters(line, searchQuery, ownerFilter, statusFilter, displayStatus(line)));
   const pagedLines = filteredLines.slice((page - 1) * pageSize, page * pageSize);
-  const ownerFilterOptions = [...new Set(productLines.map((line) => line.ownerName || line.owner || '').filter(Boolean))].sort().map((name) => ({ label: name, value: name }));
+  const ownerFilterOptions = [...new Set(productLines.map(productPrimaryOwner).filter(Boolean))].sort().map((name) => ({ label: name, value: name }));
   const statusFilterOptions = ['空闲中', '迭代中'].map((status) => ({ label: status, value: status }));
 
   // Helper to compute statistics for each card

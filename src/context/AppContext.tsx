@@ -63,6 +63,7 @@ import {
   MOCK_USERS,
   MOCK_VERSIONS,
 } from '../data/mockSnapshot';
+import { normalizeProductPrimaryOwner, productPrimaryOwner } from '../components/product/productLinePresentation';
 
 export type ToastItem = WorkspaceToast;
 
@@ -437,8 +438,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(()=>{ if (designQuery.isSuccess) setDesignTasks((designQuery.data?.items || []).map((task) => ({ ...task, status: normalizeRequirementStatus(task.status), versionId: task.versionId || '', versionName: task.versionName || '' }))); },[designQuery.data,designQuery.isSuccess]);
   useEffect(() => {
     if (!Array.isArray(productLineQuery.data)) return;
-    setProductLines(productLineQuery.data);
-    const remoteVersions = productLineQuery.data.flatMap((line) => (line.versions || []).map((version) => ({ ...version, productLineId: line.id, productLineName: line.name })));
+    const normalizedLines = productLineQuery.data.map((line) => normalizeProductPrimaryOwner(line));
+    setProductLines(normalizedLines);
+    const remoteVersions = normalizedLines.flatMap((line) => (line.versions || []).map((version) => ({ ...version, productLineId: line.id, productLineName: line.name })));
     setVersions(remoteVersions);
   }, [productLineQuery.data]);
   useEffect(()=>{ if (bugQuery.isSuccess) setBugs((bugQuery.data?.items || []) as DefectBug[]); },[bugQuery.data,bugQuery.isSuccess]);
@@ -1168,7 +1170,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast('error', '产品保存失败', '当前未连接后端服务，数据未保存');
       return false;
     }
-    const ownerName = line.ownerName || line.owner || currentUser.name;
+    const ownerName = line.requirementOwner || productPrimaryOwner(line) || currentUser.name;
     const newLine: ProductLine = {
       id: `pl-${Date.now()}`,
       name: line.name || '新建产品',
@@ -1179,10 +1181,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ownerUserId: line.ownerUserId,
       website: line.website,
       subProducts: line.subProducts || [],
-      productOwner: line.productOwner || '',
+      productOwner: ownerName,
       technicalOwner: line.technicalOwner || '',
-      requirementOwner: line.requirementOwner || '',
-      requirementOwnerUserId: line.requirementOwnerUserId,
+      requirementOwner: line.requirementOwner || ownerName,
+      requirementOwnerUserId: line.requirementOwnerUserId || line.ownerUserId,
       requirementOwnerSecondary: line.requirementOwnerSecondary || '',
       requirementOwnerSecondaryUserId: line.requirementOwnerSecondaryUserId,
       techOwner: line.techOwner || '',
@@ -1198,7 +1200,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       sort: line.sort ?? 0,
       coverColor: 'from-blue-600 to-indigo-700',
       coverUrl: line.coverUrl,
-      members: line.members?.length ? line.members : line.ownerUserId ? [{ id: `mem-${Date.now()}`, userId: line.ownerUserId, name: ownerName, role: '管理员' }] : [],
+      members: line.members?.length ? line.members : (line.requirementOwnerUserId || line.ownerUserId) ? [{ id: `mem-${Date.now()}`, userId: line.requirementOwnerUserId || line.ownerUserId || '', name: ownerName, role: '管理员' }] : [],
       products: line.products || [],
       currentVersion: line.currentVersion || '',
       totalRequirements: line.totalRequirements ?? 0,
@@ -1258,7 +1260,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       name: v.name || '新建迭代版本',
       productLineId: v.productLineId || (productLines[0]?.id ?? 'pl-1'),
       productLineName: v.productLineName || (productLines[0]?.name ?? '师创智联协同OS'),
-      ownerName: v.ownerName || productLines.find((line) => line.id === v.productLineId)?.ownerName || productLines.find((line) => line.id === v.productLineId)?.owner || '',
+      ownerName: v.ownerName || productPrimaryOwner(productLines.find((line) => line.id === v.productLineId) || {}),
       startDate: v.startDate || '',
       endDate: v.endDate || '',
       releaseDate: v.releaseDate || '',

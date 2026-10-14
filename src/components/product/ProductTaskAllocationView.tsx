@@ -15,8 +15,8 @@ export const loadProductTaskAllocation = async (lines: ProductLine[], kind: 'des
   };
   const results = await Promise.all(lines.map(async (line) => {
     const [requirements, downstream] = await Promise.all([load(line.id, 'requirement'), load(line.id, kind)]);
-    return requirements.filter((task) => !task.parentWorkItemId && (task.needsCollaboration ?? ['dev', 'test']).includes(kind)).map((task) => {
-      const allocatedTask = downstream.find((child) => child.requirementId === task.id || child.parentWorkItemId === task.id);
+    return requirements.filter((task) => (task.needsCollaboration ?? ['dev', 'test']).includes(kind)).map((task) => {
+      const allocatedTask = downstream.find((child) => child.requirementId === task.id);
       const version = line.versions?.find((item) => item.id === task.versionId);
       return { ...task, productName: line.name, productLineName: line.name, versionName: version?.name || task.versionName || '', versionCode: version?.code || '', allocated: Boolean(allocatedTask), allocatedTask };
     });

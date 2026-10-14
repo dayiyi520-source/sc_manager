@@ -8,7 +8,6 @@ import { VersionIterationView } from './VersionIterationView';
 const appMocks = vi.hoisted(() => ({
   versions: [] as Array<Record<string, unknown>>,
   workItemTypes: vi.fn().mockResolvedValue([{ id: 'type-test', category: '测试', name: '功能测试', enabled: true, isDefault: true }]),
-  childTypeRules: vi.fn().mockResolvedValue([]),
   createWorkItem: vi.fn().mockResolvedValue({ id: 'created-1' }),
   workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }),
   researchStatusTemplates: vi.fn().mockResolvedValue([
@@ -32,7 +31,7 @@ const appMocks = vi.hoisted(() => ({
   updateDesignTask: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock('../../services/productRepository', () => ({ productRepository: { iterationTimeline: appMocks.iterationTimeline, researchStatusTemplates: appMocks.researchStatusTemplates, workItemTypes: appMocks.workItemTypes, childTypeRules: appMocks.childTypeRules, createWorkItem: appMocks.createWorkItem, workItems: appMocks.workItems, workItemDetail: appMocks.workItemDetail, requirementSummary: appMocks.requirementSummary, workItemRelations: appMocks.workItemRelations } }));
+vi.mock('../../services/productRepository', () => ({ productRepository: { iterationTimeline: appMocks.iterationTimeline, researchStatusTemplates: appMocks.researchStatusTemplates, workItemTypes: appMocks.workItemTypes, createWorkItem: appMocks.createWorkItem, workItems: appMocks.workItems, workItemDetail: appMocks.workItemDetail, requirementSummary: appMocks.requirementSummary, workItemRelations: appMocks.workItemRelations } }));
 vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.fn().mockResolvedValue([{ id: 'member-1', name: '王丽' }, { id: 'member-2', name: '李明' }]) } }));
 
 vi.mock('../../context/AppContext', () => ({

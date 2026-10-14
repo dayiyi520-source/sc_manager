@@ -32,17 +32,13 @@ describe('产品迭代甘特图界面', () => {
     for (const title of ['独立设计任务', '独立研发任务', '独立测试任务']) {
       expect(screen.getByRole('button', { name: title })).toBeTruthy();
     }
-    expect(screen.queryByText('设计子任务')).toBeNull();
+    expect(screen.getByRole('button', { name: '设计子任务' })).toBeTruthy();
     expect(document.querySelectorAll('.iteration-stage').length).toBeGreaterThan(2);
     expect(document.querySelectorAll('.iteration-stage-placeholder').length).toBeGreaterThan(2);
     expect(screen.getAllByText('产品开发 · 排期不完整').length).toBeGreaterThan(0);
     expect(screen.getAllByText('测试验收 · 排期不完整').length).toBeGreaterThan(0);
     expect(document.body.textContent).not.toContain('%');
     expect(screen.queryByRole('progressbar')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '收起 V1.0' }));
-    expect(screen.queryByRole('button', { name: '产品任务一' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '展开 V1.0' }));
-    expect(screen.getByText('产品任务一')).toBeTruthy();
   });
   it('无排期时保留四个灰色占位，部分排期的阶段标灰而不是完整彩条', async () => {
     vi.mocked(productRepository.iterationTimeline).mockResolvedValue([]);
@@ -61,6 +57,17 @@ describe('产品迭代甘特图界面', () => {
     expect(document.querySelectorAll('.iteration-stage-placeholder')).toHaveLength(3);
     expect(document.querySelector('.iteration-stage.iteration-stage-incomplete')).toBeTruthy();
     expect(document.querySelectorAll('.iteration-stage:not(.iteration-stage-incomplete)')).toHaveLength(0);
+  });
+
+  it('兼容只有版本名称的任务，并把不存在父任务的记录作为顶层任务显示', async () => {
+    vi.mocked(productRepository.iterationTimeline).mockResolvedValue([
+      { id: 'legacy', code: 'LEGACY', title: '旧版本任务', category: 'dev', productLineId: 'p', versionName: '秋季版本 V1.0', plannedStartDate: '2026-09-10', plannedEndDate: '2026-09-12' },
+      { id: 'orphan', code: 'ORPHAN', title: '孤儿任务', category: 'test', productLineId: 'p', versionId: 'v', parentWorkItemId: 'missing-parent', plannedStartDate: '2026-09-10', plannedEndDate: '2026-09-12' },
+    ]);
+    mount();
+    fireEvent.click(await screen.findByRole('tab', { name: '任务视角' }));
+    expect(screen.getByRole('button', { name: '旧版本任务' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '孤儿任务' })).toBeTruthy();
   });
   it('接口失败显示重试并重新读取', async () => {
     vi.mocked(productRepository.iterationTimeline).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([]);

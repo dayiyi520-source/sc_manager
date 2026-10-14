@@ -7,6 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { ProductLine, VersionIteration } from '../../types';
 import { teamRepository } from '../../services/teamRepository';
 import { employeeSelectOptions } from '../common/PersonIdentity';
+import { productPrimaryOwner } from './productLinePresentation';
 
 interface CreateVersionModalProps {
   isOpen: boolean;
@@ -44,7 +45,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
   const [selectedProductLineId, setSelectedProductLineId] = useState(productLine?.id || '');
   const [versionName, setVersionName] = useState(editingVersion?.name || '');
   const [versionCode, setVersionCode] = useState(editingVersion?.code || '');
-  const [versionOwner, setVersionOwner] = useState(editingVersion?.ownerName || productLine?.ownerName || productLine?.owner || '');
+  const [versionOwner, setVersionOwner] = useState(editingVersion?.ownerName || (productLine ? productPrimaryOwner(productLine) : '') || '');
   const [startDate, setStartDate] = useState(editingVersion?.startDate || '');
   const [endDate, setEndDate] = useState(editingVersion?.endDate || '');
   const [content, setContent] = useState(editingVersion?.content || editingVersion?.changelog || '');
@@ -55,11 +56,11 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
     setVersionName(editingVersion?.name || '');
     setVersionCode(editingVersion?.code || '');
     setSelectedProductLineId(productLine?.id || editingVersion?.productLineId || '');
-    setVersionOwner(editingVersion?.ownerName || productLine?.ownerName || productLine?.owner || '');
+    setVersionOwner(editingVersion?.ownerName || (productLine ? productPrimaryOwner(productLine) : '') || '');
     setStartDate(editingVersion?.startDate || '');
     setEndDate(editingVersion?.endDate || '');
     setContent(editingVersion?.content || editingVersion?.changelog || '');
-  }, [editingVersion, isOpen, productLine?.id, productLine?.name, productLine?.owner, productLine?.ownerName]);
+  }, [editingVersion, isOpen, productLine?.id, productLine?.name, productLine?.requirementOwner, productLine?.owner, productLine?.ownerName, productLine?.productOwner]);
 
   if (!isOpen) return null;
 
@@ -126,7 +127,7 @@ export const CreateVersionModal: React.FC<CreateVersionModalProps> = ({ isOpen, 
               if (!line) return;
               setSelectedProductLineId(line.id);
               const lineMembers = line.members || [];
-              const defaultOwner = line.ownerName || line.owner || '';
+              const defaultOwner = productPrimaryOwner(line);
               const ownerIsMember = lineMembers.some((member) => typeof member === 'string' ? member === defaultOwner : member.name === defaultOwner);
               if (!editingVersion) setVersionOwner(ownerIsMember ? defaultOwner : '');
             }}

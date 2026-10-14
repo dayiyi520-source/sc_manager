@@ -35,7 +35,7 @@ export const TestPlanWorkspace: React.FC<{ productLineFilter?: string; onDetailC
     const results = await Promise.all(lines.map(async (line) => {
       const first = await productRepository.workItems(line.id, 'test'); const items = [...first.page.items];
       for (let currentPage = 2; items.length < first.page.total; currentPage += 1) { const next = await productRepository.workItems(line.id, 'test', '', { page: currentPage }); if (!next.page.items.length) break; items.push(...next.page.items); }
-      return items.filter((item) => !item.parentWorkItemId);
+      return items;
     }));
     return results.flat();
   }, retry: false });

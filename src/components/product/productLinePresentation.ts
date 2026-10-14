@@ -2,6 +2,15 @@ import type { ProductLine } from '../../types';
 
 type ProductLineVersion = NonNullable<ProductLine['versions']>[number];
 
+/** 产品主责任人是产品层旧负责人字段的唯一显示来源。 */
+export const productPrimaryOwner = (productLine: Partial<Pick<ProductLine, 'requirementOwner' | 'ownerName' | 'owner' | 'productOwner'>>) =>
+  productLine.requirementOwner || productLine.ownerName || productLine.owner || productLine.productOwner || '';
+
+export const normalizeProductPrimaryOwner = <T extends Partial<Pick<ProductLine, 'requirementOwner' | 'ownerName' | 'owner' | 'productOwner'>>>(productLine: T): T => {
+  const owner = productPrimaryOwner(productLine);
+  return { ...productLine, ownerName: owner, owner: owner, productOwner: owner };
+};
+
 export type IterationStatus = '待开始' | '进行中' | '已完成';
 export const ITERATION_STATUSES: IterationStatus[] = ['待开始', '进行中', '已完成'];
 

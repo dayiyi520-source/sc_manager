@@ -1,5 +1,5 @@
 {
-  "revision": 1,
+  "revision": 2,
   "okrRecords": [
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
@@ -2877,6 +2877,542 @@
           "feedback": ""
         }
       ]
+    },
+    {
+      "id": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+      "kind": "objective",
+      "ownerId": "user-admin",
+      "periodKey": "2026-10",
+      "status": "active",
+      "createdAt": "2026-10-12T12:19:58.622Z",
+      "version": 1,
+      "payload": {
+        "title": "全力保障今年储备项目落地，强化产品竞争力为明年打下基础",
+        "goalModelVersion": 2,
+        "goalLevel": "company",
+        "inherited": false,
+        "changeReason": "",
+        "objectiveType": "target",
+        "alignments": [],
+        "weight": 100,
+        "note": "",
+        "keyResults": [
+          {
+            "id": "814a1bea-c828-45b9-ab4f-eea736a6186f",
+            "title": "做好存量客户挖掘、新增客户拓展、合作伙伴商机赋能落地，三手抓拉动营收；确保公司销售额与营收目标推进。",
+            "weight": 25,
+            "progress": 0,
+            "assigneeIds": [
+              "user-sales"
+            ],
+            "deadline": "2026-10-31",
+            "plannedDeadline": "2026-10-31"
+          },
+          {
+            "id": "985d0591-f75f-459a-8305-db119837a19a",
+            "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "weight": 25,
+            "progress": 0,
+            "assigneeIds": [
+              "user-product"
+            ],
+            "deadline": "2026-10-31",
+            "plannedDeadline": "2026-10-31"
+          },
+          {
+            "id": "3c1fd277-0266-4d7a-abae-43f4c186aac8",
+            "title": "高质量完成产品交互设计落地与样式走查把关工作，持续打磨统一产品交互风格，推进 AI 辅助设计真正落地应用。",
+            "weight": 25,
+            "progress": 0,
+            "assigneeIds": [
+              "9a35d30f-2952-41ca-9ae0-7a2685556f7f"
+            ],
+            "deadline": "2026-10-31",
+            "plannedDeadline": "2026-10-31"
+          },
+          {
+            "id": "3353c72d-9c93-4f11-8855-ac4a839734a8",
+            "title": "落地产研共建机制，推动研发深度前置参与产品需求工作；各产品和项目条线按既定时间节点高质量上线，严控线上bug率，提升运维质量。真正走通AI赋能场景的产研一体化模式，真正提升研发人效。",
+            "weight": 25,
+            "progress": 0,
+            "assigneeIds": [
+              "user-tech"
+            ],
+            "deadline": "2026-10-31",
+            "plannedDeadline": "2026-10-31"
+          }
+        ],
+        "deadline": "2026-10-31",
+        "plannedDeadline": "2026-10-31"
+      }
+    },
+    {
+      "id": "77330933-d53b-4a79-8a8c-7a34a31c3906",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-12T13:02:36.918Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "12",
+        "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+        "sourceObjectiveId": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+        "sourceKrId": "985d0591-f75f-459a-8305-db119837a19a",
+        "sourceVersion": 1,
+        "alignments": [
+          {
+            "parentObjectiveId": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+            "parentKeyResultId": "985d0591-f75f-459a-8305-db119837a19a"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "01fa689b-3789-4249-ab15-1f640fe0df6d",
+            "title": "接口诊断产品线 · 1.0.0 · 产品开发",
+            "weight": 100,
+            "progress": 0,
+            "deadline": "2026-10-31",
+            "details": [
+              {
+                "id": "abee1dab-ba7b-4702-a46b-4b42f9f10337",
+                "name": "1.0.0",
+                "stage": "产品开发",
+                "plannedStartDate": "2026-10-12",
+                "plannedEndDate": "2026-10-13"
+              }
+            ],
+            "businessObject": "接口诊断产品线",
+            "version": "1.0.0",
+            "stage": "产品开发",
+            "structureType": "product"
+          }
+        ],
+        "changeReason": "",
+        "objectiveType": "target",
+        "note": ""
+      }
+    },
+    {
+      "id": "fdf29ffa-a771-40fa-be3d-2d76d309dddd",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-12T14:12:08.268Z",
+      "version": 4,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "师创内关管理后台产品设计",
+        "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+        "sourceObjectiveId": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+        "sourceKrId": "985d0591-f75f-459a-8305-db119837a19a",
+        "sourceVersion": 1,
+        "alignments": [
+          {
+            "parentObjectiveId": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+            "parentKeyResultId": "985d0591-f75f-459a-8305-db119837a19a"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "88abca6d-4459-42b7-995a-2ee558c3faea",
+            "title": "师创云平台 · V1.0.0 · 需求设计",
+            "weight": 50,
+            "progress": 0,
+            "structureType": "product",
+            "deadline": "2026-10-20",
+            "details": [
+              {
+                "id": "dec18a1f-a8b8-4c42-82ec-76d183b84ee6",
+                "name": "V1.0.0",
+                "stage": "需求设计",
+                "plannedStartDate": "2026-10-12",
+                "plannedEndDate": "2026-10-15"
+              }
+            ],
+            "businessObject": "师创云平台",
+            "version": "V1.0.0",
+            "stage": "需求设计",
+            "assigneeIds": [
+              "user-product-member",
+              "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
+            ],
+            "plannedDeadline": "2026-10-20"
+          },
+          {
+            "id": "22296963-3ae5-431a-8fb3-3354374f36d3",
+            "title": "接口诊断产品线 · 1.0.0 · UI设计",
+            "weight": 50,
+            "progress": 0,
+            "deadline": "2026-10-21",
+            "structureType": "product",
+            "details": [
+              {
+                "id": "5d1f5b99-0f74-409e-92aa-140b3d795a27",
+                "name": "1.0.0",
+                "stage": "UI设计",
+                "plannedStartDate": "2026-10-15",
+                "plannedEndDate": "2026-10-18"
+              }
+            ],
+            "businessObject": "接口诊断产品线",
+            "version": "1.0.0",
+            "stage": "UI设计",
+            "assigneeIds": [
+              "user-product-member",
+              "user-product"
+            ],
+            "executionActions": [
+              {
+                "id": "27a36422-2916-446e-9c56-cdcf17701cf8",
+                "ownerId": "user-product",
+                "title": "辅助毛景强进行设计",
+                "progress": 0,
+                "weight": 100,
+                "deadline": "2026-10-18",
+                "plannedDeadline": "2026-10-18"
+              }
+            ],
+            "plannedDeadline": "2026-10-21"
+          }
+        ],
+        "changeReason": "",
+        "objectiveType": "target",
+        "note": "",
+        "plannedDeadline": "2026-10-31"
+      },
+      "changeRequest": {
+        "id": "b32949ae-8f89-4542-9623-e8f2f379d602",
+        "status": "approved",
+        "purpose": "initial",
+        "reviewerId": "user-admin",
+        "reason": "自主目标首次提交",
+        "payload": {
+          "goalModelVersion": 2,
+          "goalLevel": "department",
+          "origin": "assigned",
+          "inherited": false,
+          "title": "师创内关管理后台产品设计",
+          "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+          "sourceObjectiveId": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+          "sourceKrId": "985d0591-f75f-459a-8305-db119837a19a",
+          "sourceVersion": 1,
+          "alignments": [
+            {
+              "parentObjectiveId": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+              "parentKeyResultId": "985d0591-f75f-459a-8305-db119837a19a"
+            }
+          ],
+          "weight": 100,
+          "deadline": "2026-10-31",
+          "keyResults": [
+            {
+              "id": "88abca6d-4459-42b7-995a-2ee558c3faea",
+              "title": "师创云平台 · V1.0.0 · 需求设计",
+              "weight": 50,
+              "progress": 0,
+              "structureType": "product",
+              "deadline": "2026-10-20",
+              "details": [
+                {
+                  "id": "dec18a1f-a8b8-4c42-82ec-76d183b84ee6",
+                  "name": "V1.0.0",
+                  "stage": "需求设计",
+                  "plannedStartDate": "2026-10-12",
+                  "plannedEndDate": "2026-10-15"
+                }
+              ],
+              "businessObject": "师创云平台",
+              "version": "V1.0.0",
+              "stage": "需求设计",
+              "assigneeIds": [
+                "user-product-member",
+                "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
+              ]
+            },
+            {
+              "id": "22296963-3ae5-431a-8fb3-3354374f36d3",
+              "title": "接口诊断产品线 · 1.0.0 · UI设计",
+              "weight": 50,
+              "progress": 0,
+              "deadline": "2026-10-21",
+              "structureType": "product",
+              "details": [
+                {
+                  "id": "5d1f5b99-0f74-409e-92aa-140b3d795a27",
+                  "name": "1.0.0",
+                  "stage": "UI设计",
+                  "plannedStartDate": "2026-10-15",
+                  "plannedEndDate": "2026-10-18"
+                }
+              ],
+              "businessObject": "接口诊断产品线",
+              "version": "1.0.0",
+              "stage": "UI设计",
+              "assigneeIds": [
+                "user-product-member",
+                "user-product"
+              ],
+              "executionActions": [
+                {
+                  "id": "27a36422-2916-446e-9c56-cdcf17701cf8",
+                  "ownerId": "user-product",
+                  "title": "辅助毛景强进行设计",
+                  "progress": 0,
+                  "weight": 100,
+                  "deadline": "2026-10-18"
+                }
+              ]
+            }
+          ],
+          "changeReason": "",
+          "objectiveType": "target",
+          "note": ""
+        },
+        "baseVersion": 2,
+        "requestedAt": "2026-10-12T14:14:20.890Z",
+        "reviewedAt": "2026-10-12T14:21:33.893Z",
+        "feedback": ""
+      },
+      "changeHistory": [
+        {
+          "id": "b32949ae-8f89-4542-9623-e8f2f379d602",
+          "status": "approved",
+          "purpose": "initial",
+          "reviewerId": "user-admin",
+          "reason": "自主目标首次提交",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "师创内关管理后台产品设计",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+            "sourceKrId": "985d0591-f75f-459a-8305-db119837a19a",
+            "sourceVersion": 1,
+            "alignments": [
+              {
+                "parentObjectiveId": "c80592cc-100a-4b92-b84a-9ba45f1692db",
+                "parentKeyResultId": "985d0591-f75f-459a-8305-db119837a19a"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "88abca6d-4459-42b7-995a-2ee558c3faea",
+                "title": "师创云平台 · V1.0.0 · 需求设计",
+                "weight": 50,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-20",
+                "details": [
+                  {
+                    "id": "dec18a1f-a8b8-4c42-82ec-76d183b84ee6",
+                    "name": "V1.0.0",
+                    "stage": "需求设计",
+                    "plannedStartDate": "2026-10-12",
+                    "plannedEndDate": "2026-10-15"
+                  }
+                ],
+                "businessObject": "师创云平台",
+                "version": "V1.0.0",
+                "stage": "需求设计",
+                "assigneeIds": [
+                  "user-product-member",
+                  "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
+                ]
+              },
+              {
+                "id": "22296963-3ae5-431a-8fb3-3354374f36d3",
+                "title": "接口诊断产品线 · 1.0.0 · UI设计",
+                "weight": 50,
+                "progress": 0,
+                "deadline": "2026-10-21",
+                "structureType": "product",
+                "details": [
+                  {
+                    "id": "5d1f5b99-0f74-409e-92aa-140b3d795a27",
+                    "name": "1.0.0",
+                    "stage": "UI设计",
+                    "plannedStartDate": "2026-10-15",
+                    "plannedEndDate": "2026-10-18"
+                  }
+                ],
+                "businessObject": "接口诊断产品线",
+                "version": "1.0.0",
+                "stage": "UI设计",
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "executionActions": [
+                  {
+                    "id": "27a36422-2916-446e-9c56-cdcf17701cf8",
+                    "ownerId": "user-product",
+                    "title": "辅助毛景强进行设计",
+                    "progress": 0,
+                    "weight": 100,
+                    "deadline": "2026-10-18"
+                  }
+                ]
+              }
+            ],
+            "changeReason": "",
+            "objectiveType": "target",
+            "note": ""
+          },
+          "baseVersion": 2,
+          "requestedAt": "2026-10-12T14:14:20.890Z",
+          "reviewedAt": "2026-10-12T14:21:33.893Z",
+          "feedback": ""
+        }
+      ]
+    },
+    {
+      "id": "46fcc434-f2da-4a36-a2fc-66e10d91aa78",
+      "kind": "objective",
+      "ownerId": "user-product-member",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-13T13:18:34.727Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "师创云平台 · V1.0.0 · 需求设计",
+        "sourceTitle": "师创云平台 · V1.0.0 · 需求设计",
+        "sourceObjectiveId": "fdf29ffa-a771-40fa-be3d-2d76d309dddd",
+        "sourceKrId": "88abca6d-4459-42b7-995a-2ee558c3faea",
+        "sourceVersion": 3,
+        "alignments": [
+          {
+            "parentObjectiveId": "fdf29ffa-a771-40fa-be3d-2d76d309dddd",
+            "parentKeyResultId": "88abca6d-4459-42b7-995a-2ee558c3faea"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-20",
+        "keyResults": [
+          {
+            "id": "88abca6d-4459-42b7-995a-2ee558c3faea",
+            "title": "师创云平台 · V1.0.0 · 需求设计",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "product",
+            "deadline": "2026-10-20",
+            "details": [
+              {
+                "id": "dec18a1f-a8b8-4c42-82ec-76d183b84ee6",
+                "name": "V1.0.0",
+                "stage": "需求设计",
+                "plannedStartDate": "2026-10-12",
+                "plannedEndDate": "2026-10-15"
+              }
+            ],
+            "businessObject": "师创云平台",
+            "version": "V1.0.0",
+            "stage": "需求设计",
+            "assigneeIds": [
+              "user-product-member"
+            ],
+            "plannedDeadline": "2026-10-20",
+            "executionActions": [
+              {
+                "id": "b9716648-7d58-44f9-9ac8-2da0f72ed34d",
+                "ownerId": "user-product-member",
+                "title": "测试1",
+                "weight": 100,
+                "progress": 0
+              }
+            ]
+          }
+        ],
+        "changeReason": "",
+        "objectiveType": "target",
+        "note": ""
+      }
+    },
+    {
+      "id": "ead7c948-26df-4f1e-b8eb-3298d940711d",
+      "kind": "objective",
+      "ownerId": "user-product-member",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-13T13:18:34.853Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "接口诊断产品线 · 1.0.0 · UI设计",
+        "sourceTitle": "接口诊断产品线 · 1.0.0 · UI设计",
+        "sourceObjectiveId": "fdf29ffa-a771-40fa-be3d-2d76d309dddd",
+        "sourceKrId": "22296963-3ae5-431a-8fb3-3354374f36d3",
+        "sourceVersion": 3,
+        "alignments": [
+          {
+            "parentObjectiveId": "fdf29ffa-a771-40fa-be3d-2d76d309dddd",
+            "parentKeyResultId": "22296963-3ae5-431a-8fb3-3354374f36d3"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-21",
+        "keyResults": [
+          {
+            "id": "22296963-3ae5-431a-8fb3-3354374f36d3",
+            "title": "接口诊断产品线 · 1.0.0 · UI设计",
+            "weight": 100,
+            "progress": 0,
+            "deadline": "2026-10-21",
+            "structureType": "product",
+            "details": [
+              {
+                "id": "5d1f5b99-0f74-409e-92aa-140b3d795a27",
+                "name": "1.0.0",
+                "stage": "UI设计",
+                "plannedStartDate": "2026-10-15",
+                "plannedEndDate": "2026-10-18"
+              }
+            ],
+            "businessObject": "接口诊断产品线",
+            "version": "1.0.0",
+            "stage": "UI设计",
+            "assigneeIds": [
+              "user-product-member"
+            ],
+            "executionActions": [
+              {
+                "id": "53ae0cc7-5006-4a1b-bdc6-3aaed8c4d36d",
+                "ownerId": "user-product-member",
+                "title": "测试2",
+                "weight": 100,
+                "progress": 0
+              }
+            ],
+            "plannedDeadline": "2026-10-21"
+          }
+        ],
+        "changeReason": "",
+        "objectiveType": "target",
+        "note": ""
+      }
     }
   ],
   "okrPeople": [

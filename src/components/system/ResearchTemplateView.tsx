@@ -4,16 +4,14 @@ import { DeleteOutlined, EditOutlined, PlusOutlined, UndoOutlined } from '@ant-d
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { WorkItemModuleView } from './WorkItemModuleView';
 import { NotificationSettingsPanel } from '../product/NotificationSettingsPanel';
-import { AutomationRulesPanel } from '../product/AutomationRulesPanel';
 import { WorkItemCategoryPanel } from './WorkItemCategoryPanel';
 import { productRepository, type ArchivedProductLine, type ProductRoleTemplate } from '../../services/productRepository';
 import { useApp } from '../../context/AppContext';
 
-type Section = 'dictionary' | 'work-items' | 'roles' | 'notifications' | 'automation' | 'archive';
+type Section = 'dictionary' | 'work-items' | 'roles' | 'notifications' | 'archive';
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'dictionary', label: '工作项分类' }, { id: 'work-items', label: '工作项模版' },
   { id: 'roles', label: '角色与职责' }, { id: 'notifications', label: '通知与提醒' },
-  { id: 'automation', label: '自动化配置' },
   { id: 'archive', label: '归档' }
 ];
 
@@ -123,7 +121,7 @@ const RolesPanel = () => {
 export const ResearchTemplateView: React.FC = () => {
   const [section, setSection] = useState<Section>('work-items');
   return <div className="research-template-view space-y-5 animate-in fade-in duration-200">
-    <header className="border-b border-[var(--border-main)] pb-3"><h1 className="text-lg font-bold text-[var(--text-primary)]">产研模板</h1><p className="mt-1 text-xs text-[var(--text-muted)]">预设新产品的工作项、通知和自动化配置。</p></header>
+    <header className="border-b border-[var(--border-main)] pb-3"><h1 className="text-lg font-bold text-[var(--text-primary)]">产研模板</h1><p className="mt-1 text-xs text-[var(--text-muted)]">预设新产品的工作项、通知和角色配置。</p></header>
     <div className="grid min-h-[520px] grid-cols-1 border border-[var(--border-main)] bg-[var(--bg-surface)] md:grid-cols-[190px_minmax(0,1fr)]">
       <nav aria-label="产研模板菜单" className="flex gap-1 overflow-x-auto border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:block md:overflow-visible md:border-b-0 md:border-r">
         <div className="mb-4 hidden border-b border-[var(--border-main)] px-3 pb-4 select-none md:block"><h2 className="text-base font-bold text-[var(--text-primary)]">产研模板</h2><p className="mt-2 text-xs text-[var(--text-muted)]">新产品初始配置</p></div>
@@ -134,7 +132,6 @@ export const ResearchTemplateView: React.FC = () => {
         {section === 'work-items' && <WorkItemModuleView />}
         {section === 'roles' && <RolesPanel />}
         {section === 'notifications' && <NotificationSettingsPanel scope="template" />}
-        {section === 'automation' && <AutomationRulesPanel scope="template" />}
         {section === 'archive' && <ArchivePanel />}
       </section>
     </div>

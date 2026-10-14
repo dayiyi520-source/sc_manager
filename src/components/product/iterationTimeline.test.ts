@@ -36,6 +36,6 @@ describe('产品迭代甘特图计算', () => {
   it('只聚合当前产品任务的后代和关联任务，不跨版本串入', () => {
     const root = task('r');
     const items = [root, task('d', { category: 'design', parentWorkItemId: 'r', versionId: null }), task('sub', { category: 'dev', parentWorkItemId: 'd', versionId: null }), task('test', { category: 'test', requirementId: 'r' }), task('other', { category: 'dev', parentWorkItemId: 'r', versionId: 'v2' }), task('unrelated')];
-    expect(productTaskItems(root, items).map((item) => item.id)).toEqual(['r', 'd', 'sub', 'test']);
+    expect(productTaskItems(root, items).map((item) => item.id)).toEqual(['r', 'test']);
   });
 });

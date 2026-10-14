@@ -42,7 +42,7 @@ import { WorkItemCreatePanel } from './WorkItemCreatePanel';
 import { WorkItemBatchBar } from './WorkItemBatchBar';
 import { ProductNavigation } from './ProductNavigation';
 import { ITERATION_STATUSES, normalizeVersionStatus } from './productLinePresentation';
-import { parentWorkItemId, workItemHierarchy, workItemKey } from './workItemHierarchy';
+const workItemKey = (item: PlanningItem) => `${item.kind}:${item.id}`;
 
 type ViewMode = 'list' | 'planning';
 type DetailSection = 'info' | 'workItems';
@@ -255,14 +255,8 @@ const BugRows: React.FC<{ items: DefectBug[]; onOpen: (item: DefectBug) => void 
   </div>
 );
 
-const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<string, PlanningItem[]>; groupBy: TaskGroupBy; selectedIds: string[]; onSelectionChange: (ids: string[]) => void; onOpen: (item: PlanningItem) => void; onOperation: (key: string, item: PlanningItem) => void; employees: string[]; onUpdated: () => void; fieldVisible?: (item: PlanningItem, code: string) => boolean }> = ({ items, childrenByParent, groupBy, selectedIds, onSelectionChange, onOpen, onOperation, employees, onUpdated, fieldVisible = (_item: PlanningItem, _code: string) => true }) => {
-  const [expanded, setExpanded] = useState<string[]>([]);
-  const rows: Array<{ item: PlanningItem; depth: number }> = [];
-  const append = (item: PlanningItem, depth = 0) => {
-    rows.push({ item, depth });
-    if (expanded.includes(workItemKey(item))) (childrenByParent.get(workItemKey(item)) || []).forEach((child) => append(child, depth + 1));
-  };
-  items.forEach((item) => append(item));
+const WorkItemRows: React.FC<{ items: PlanningItem[]; groupBy: TaskGroupBy; selectedIds: string[]; onSelectionChange: (ids: string[]) => void; onOpen: (item: PlanningItem) => void; onOperation: (key: string, item: PlanningItem) => void; employees: string[]; onUpdated: () => void; fieldVisible?: (item: PlanningItem, code: string) => boolean }> = ({ items, groupBy, selectedIds, onSelectionChange, onOpen, onOperation, employees, onUpdated, fieldVisible = (_item: PlanningItem, _code: string) => true }) => {
+  const rows = items.map((item) => ({ item, depth: 0 }));
   return (
   <div className="overflow-x-auto">
     <table className="w-full min-w-[1040px] text-left">
@@ -285,16 +279,13 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<stri
           const group = normalizedTaskGroupValue(item, groupBy);
           const previous = rows.slice(0, index).reverse().find((row) => row.depth === 0)?.item;
           const previousGroup = previous && normalizedTaskGroupValue(previous, groupBy);
-          const children = childrenByParent.get(workItemKey(item)) || [];
-          const open = expanded.includes(workItemKey(item));
           const operationMenu = { items: [{ key: 'copy', icon: <CopyOutlined />, label: '复制任务' }, { type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: '归档', danger: true }], onClick: ({ key }: { key: string }) => onOperation(key, item) };
           return <React.Fragment key={workItemKey(item)}>{depth === 0 && groupBy !== 'none' && (index === 0 || group !== previousGroup) && <tr className="bg-[var(--bg-surface-soft)]"><td colSpan={10} className="px-4 py-2 font-semibold text-[var(--text-body)]">{group} · {items.filter((entry) => normalizedTaskGroupValue(entry, groupBy) === group).length}</td></tr>}
           <tr className="hover:bg-[var(--bg-surface-soft)]">
             <td className="px-4 py-3"><input type="checkbox" aria-label={`选择迭代任务：${item.title}`} checked={selectedIds.includes(`${item.kind}:${item.id}`)} onChange={(event) => onSelectionChange(event.target.checked ? [...selectedIds, `${item.kind}:${item.id}`] : selectedIds.filter((id) => id !== `${item.kind}:${item.id}`))} className="h-4 w-4 accent-[var(--primary)]" /></td>
             <td className="max-w-[360px] px-3 py-3">
-              <div className="flex items-center gap-2" style={{ paddingLeft: depth * 24 }}>
-                {children.length > 0 ? <button type="button" aria-label={`${open ? '收起' : '展开'}${item.title}`} aria-expanded={open} onClick={() => setExpanded((current) => open ? current.filter((key) => key !== workItemKey(item)) : [...current, workItemKey(item)])} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--primary)]">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button> : <span className="w-4 shrink-0" />}
-                {depth > 0 && <span className="text-[var(--text-muted)]">└─</span>}<span aria-label={planningKindLabel[item.kind]} title={planningKindLabel[item.kind]}>{planningKindIcon[item.kind]}</span><button type="button" onClick={() => onOpen(item)} className="block min-w-0 max-w-full truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">{item.title}</button>
+              <div className="flex items-center gap-2">
+                <span className="w-4 shrink-0" /><span aria-label={planningKindLabel[item.kind]} title={planningKindLabel[item.kind]}>{planningKindIcon[item.kind]}</span><button type="button" onClick={() => onOpen(item)} className="block min-w-0 max-w-full truncate text-left font-medium text-[var(--primary)] hover:text-[var(--primary-hover)]">{item.title}</button>
               </div>
             </td>
             <td className="px-3 py-3"><VersionWorkItemCell item={item} field="status" onUpdated={onUpdated} employees={employees} /></td>
@@ -319,7 +310,7 @@ const VersionWorkItemCell: React.FC<{ item: PlanningItem; field: 'status' | 'own
   const [busy, setBusy] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
   const source = item.source as RequirementTask;
-  const editable = Boolean(item.productLineId && Number.isInteger(source.revision) && !source.hasChildren);
+  const editable = Boolean(item.productLineId && Number.isInteger(source.revision));
   const open = async () => {
     if (!editable) return;
     if (field === 'owner') { setOptions(employees.map((name) => ({ value: name, label: name }))); setEditing(true); return; }
@@ -368,28 +359,19 @@ const VersionWorkItemCell: React.FC<{ item: PlanningItem; field: 'status' | 'own
   return <>{contextHolder}{editing ? <Select autoFocus showSearch optionFilterProp="label" aria-label={`${item.title}${field === 'status' ? '状态' : '负责人'}`} className="min-w-32" placeholder="请选择" options={options} onChange={(value) => void change(value)} onBlur={() => setEditing(false)} loading={busy} /> : <button type="button" onClick={() => void open()} disabled={!editable || busy} title={editable ? `修改${field === 'status' ? '状态' : '负责人'}` : '当前任务不可编辑'} className="inline-flex min-h-8 items-center text-left disabled:cursor-default">{field === 'status' ? <StatusTag status={item.status} /> : <PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" />}</button>}</>;
 };
 
-const PlanningTree: React.FC<{ items: PlanningItem[]; matches?: PlanningItem[]; selectedIds?: string[]; onSelect?: (item: PlanningItem) => void; onOpen: (item: PlanningItem) => void; onDrag: (event: React.DragEvent, item: PlanningItem) => void; onDragEnd: () => void; busy?: boolean }> = ({ items, matches, selectedIds, onSelect, onOpen, onDrag, onDragEnd, busy }) => {
-  const [expanded, setExpanded] = useState<string[]>([]);
-  const tree = workItemHierarchy<PlanningItem>(items, matches);
-  const renderItem = (item: PlanningItem, depth = 0): React.ReactNode => {
-    const key = workItemKey(item);
-    const children = tree.children.get(key) || [];
-    const open = expanded.includes(key);
-    const plannable = !parentWorkItemId(item);
-    return <React.Fragment key={key}>
-      <div draggable={plannable && !busy} onDragStart={(event) => onDrag(event, item)} onDragEnd={onDragEnd} aria-label={plannable ? `拖动工作项：${item.title}` : `子任务：${item.title}`} className={`mb-1 border-b border-[var(--border-main)] px-3 py-3 hover:bg-[var(--bg-surface-soft)] ${plannable && !busy ? 'cursor-grab' : ''}`} style={{ paddingLeft: 12 + depth * 24 }}>
-        <div className="flex items-center gap-2">
-          {onSelect && plannable && <input type="checkbox" aria-label={`选择工作项：${item.title}`} checked={selectedIds?.includes(`${item.kind}:${item.id}`) || false} onChange={() => onSelect(item)} className="h-4 w-4 shrink-0 accent-[var(--primary)]" />}
-          {children.length ? <button type="button" aria-label={`${open ? '收起' : '展开'}${item.title}`} aria-expanded={open} onClick={() => setExpanded((current) => open ? current.filter((value) => value !== key) : [...current, key])} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--primary)]">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button> : <span className="w-4 shrink-0" />}
-          {depth > 0 && <span className="text-[var(--text-muted)]">└─</span>}<span className="shrink-0">{planningKindIcon[item.kind]}</span><button type="button" onClick={() => onOpen(item)} title={item.title} className="min-w-0 flex-1 truncate text-left font-medium text-[var(--text-primary)] hover:text-[var(--primary)]">{item.title}</button>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-3 pl-6 text-[11px] text-[var(--text-muted)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" /><span>{item.estimatedHours}h</span><StatusTag status={item.priority} /><StatusTag status={item.status} /></div>
-      </div>
-      {open && children.map((child) => renderItem(child, depth + 1))}
-    </React.Fragment>;
-  };
-  return <>{tree.roots.map((item) => renderItem(item))}</>;
-};
+const PlanningTree: React.FC<{ items: PlanningItem[]; selectedIds?: string[]; onSelect?: (item: PlanningItem) => void; onOpen: (item: PlanningItem) => void; onDrag: (event: React.DragEvent, item: PlanningItem) => void; onDragEnd: () => void; busy?: boolean }> = ({ items, selectedIds, onSelect, onOpen, onDrag, onDragEnd, busy }) => <>{items.map((item) => {
+  const key = workItemKey(item);
+  return <div key={key} draggable={!busy} onDragStart={(event) => onDrag(event, item)} onDragEnd={onDragEnd} aria-label={`拖动工作项：${item.title}`} className={`mb-1 border-b border-[var(--border-main)] px-3 py-3 hover:bg-[var(--bg-surface-soft)] ${!busy ? 'cursor-grab' : ''}`}>
+    <div className="flex items-center gap-2">
+      {onSelect && <input type="checkbox" aria-label={`选择工作项：${item.title}`} checked={selectedIds?.includes(`${item.kind}:${item.id}`) || false} onChange={() => onSelect(item)} className="h-4 w-4 shrink-0 accent-[var(--primary)]" />}
+      <span className="w-4 shrink-0" /><span className="shrink-0">{planningKindIcon[item.kind]}</span><button type="button" onClick={() => onOpen(item)} title={item.title} className="min-w-0 flex-1 truncate text-left font-medium text-[var(--text-primary)] hover:text-[var(--primary)]">{item.title}</button>
+    </div>
+    <div className="mt-2 flex flex-wrap items-center gap-3 pl-6 text-[11px] text-[var(--text-muted)]"><PersonIdentity name={item.ownerName} emptyLabel="未分配" variant="list" /><span>{item.estimatedHours}h</span><StatusTag status={item.priority} /><StatusTag status={item.status} /></div>
+  </div>;
+})}</>;
+
+
+
 
 export const VersionIterationView: React.FC = () => {
   const {
@@ -673,9 +655,7 @@ export const VersionIterationView: React.FC = () => {
     const matchesOwner = !planningOwners.length || planningOwners.includes(item.ownerName);
     return !item.versionId && !item.versionName && matchesLine && matchesText && matchesKind && matchesStatus && matchesPriority && matchesOwner;
   }), [planningItems, planningKinds, planningOwners, planningPriorities, planningQuery, planningStatuses, productLineFilter]);
-  const unplannedCandidates = planningItems.filter((item) => !item.versionId && !item.versionName && (productLineFilter === 'all' || item.productLineId === productLineFilter));
-  const unplannedRoots = workItemHierarchy(unplannedCandidates, unplannedWorkItems).roots;
-  const plannableRoots = unplannedRoots.filter((item) => !parentWorkItemId(item));
+  const unplannedRoots = unplannedWorkItems;
 
   const plannedWorkItems = useMemo(() => {
     const result = new Map<string, PlanningItem[]>();
@@ -772,7 +752,6 @@ export const VersionIterationView: React.FC = () => {
   const renderProductNavigation = () => <ProductNavigation productLines={productLines} value={productLineFilter} onChange={setProductLineFilter} />;
 
   const assignPlanningItem = async (item: PlanningItem, version: VersionIteration) => {
-    if (parentWorkItemId(item)) { addToast('warning', '请通过主任务规划子任务'); return; }
     if (assigningRequirementId) return;
     setAssigningRequirementId(item.id);
     const saved = item.kind === 'requirement' && !assignWorkItemToVersion
@@ -785,7 +764,6 @@ export const VersionIterationView: React.FC = () => {
   };
 
   const unassignPlanningItem = async (item: PlanningItem, version: VersionIteration) => {
-    if (parentWorkItemId(item)) { addToast('warning', '请通过主任务移出子任务'); return; }
     const saved = await unassignWorkItemFromVersion?.(item.kind, item.id, version.id);
     if (saved) { setWorkItemsReloadKey((value) => value + 1); addToast('success', '工作项已移出迭代', item.title); }
   };
@@ -832,7 +810,6 @@ export const VersionIterationView: React.FC = () => {
         title: createTitle.trim(),
         description: createDescription,
         priority: createPriority
-        ,parentWorkItemId: childParentItem?.id
       });
       setCreateTaskKind(null);
       setChildParentItem(null);
@@ -1048,8 +1025,8 @@ export const VersionIterationView: React.FC = () => {
       : [...new Set(filteredItems.map((item) => normalizedTaskGroupValue(item, taskGroupBy)))].map((value) => ({ value, count: filteredItems.filter((item) => normalizedTaskGroupValue(item, taskGroupBy) === value).length }));
     const effectiveTaskGroupValue = taskGroupBy === 'none' ? '' : taskGroupEntries.some((entry) => entry.value === taskGroupSelection) ? taskGroupSelection : taskGroupEntries[0]?.value || '';
     const visibleTaskItems = taskGroupBy === 'none' || !effectiveTaskGroupValue ? filteredItems : filteredItems.filter((item) => normalizedTaskGroupValue(item, taskGroupBy) === effectiveTaskGroupValue);
-    const taskTree = workItemHierarchy(selectedItems, visibleTaskItems);
-    const pagedItems = taskTree.roots.slice((taskPage - 1) * taskPageSize, taskPage * taskPageSize);
+    const taskTree = { roots: selectedItems, children: new Map<string, PlanningItem[]>() };
+    const pagedItems = visibleTaskItems.slice((taskPage - 1) * taskPageSize, taskPage * taskPageSize);
     const emptyTaskFilters = (): UnifiedFilterState => ({ title: '', status: [], owner: [], creator: [], customer: [], version: [], cc: [], createdAt: ['', ''], plannedStartDate: ['', ''], operators: {}, dateOperators: {} });
     const appliedTaskFilterLabels = [
       taskFilters.title.trim() ? { key: 'title', text: `标题：${taskFilters.title.trim()}` } : null,
@@ -1188,8 +1165,8 @@ export const VersionIterationView: React.FC = () => {
                 </div>}
                 <div ref={setTaskFilterTarget} className="empty:hidden" />
                 {testItemsError && <Alert type="warning" showIcon title="测试任务加载失败，其他任务仍可查看" description="请稍后重试。" action={<Button size="small" onClick={() => setTestItemsReloadKey((value) => value + 1)}>重试</Button>} />}
-                <div className="overflow-hidden rounded-lg border border-[var(--border-main)]"><WorkItemBatchBar targets={selectedItems.filter((item) => selectedTaskIds.includes(`${item.kind}:${item.id}`)).map((item) => ({ id: item.id, category: item.kind, productLineId: item.productLineId, revision: (item.source as RequirementTask).revision }))} versions={versions.map((version) => ({ value: version.id, label: version.name, productLineId: version.productLineId }))} employees={directoryOwnerNames.map((name) => ({ value: name, label: name }))} onCancel={() => setSelectedTaskIds([])} onComplete={() => { setWorkItemsReloadKey((value) => value + 1); setTestItemsReloadKey((value) => value + 1); }} />{filteredItems.length ? <WorkItemRows items={pagedItems} childrenByParent={taskTree.children} groupBy={taskGroupBy} selectedIds={selectedTaskIds} onSelectionChange={setSelectedTaskIds} onOperation={(key, item) => void operatePlanningItem(key, item)} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'test' ? openTestTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} employees={directoryOwnerNames} fieldVisible={iterationFieldVisible} onUpdated={() => setWorkItemsReloadKey((value) => value + 1)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无匹配工作项" description="当前迭代无对应任务，请调整筛选条件或新建任务。" />}</div>
-                <Pagination total={taskTree.roots.length} page={taskPage} pageSize={taskPageSize} onPageChange={setTaskPage} onPageSizeChange={(size) => { setTaskPageSize(size); setTaskPage(1); }} />
+                <div className="overflow-hidden rounded-lg border border-[var(--border-main)]"><WorkItemBatchBar targets={selectedItems.filter((item) => selectedTaskIds.includes(`${item.kind}:${item.id}`)).map((item) => ({ id: item.id, category: item.kind, productLineId: item.productLineId, revision: (item.source as RequirementTask).revision }))} versions={versions.map((version) => ({ value: version.id, label: version.name, productLineId: version.productLineId }))} employees={directoryOwnerNames.map((name) => ({ value: name, label: name }))} onCancel={() => setSelectedTaskIds([])} onComplete={() => { setWorkItemsReloadKey((value) => value + 1); setTestItemsReloadKey((value) => value + 1); }} />{filteredItems.length ? <WorkItemRows items={pagedItems} groupBy={taskGroupBy} selectedIds={selectedTaskIds} onSelectionChange={setSelectedTaskIds} onOperation={(key, item) => void operatePlanningItem(key, item)} onOpen={(item) => item.kind === 'requirement' ? openRequirement(item.source as RequirementTask) : item.kind === 'design' ? openDesignTask(item.source as RequirementTask) : item.kind === 'test' ? openTestTask(item.source as RequirementTask) : item.kind === 'bug' ? openBug(item.source as DefectBug) : openDevTask(item.source as DevTask)} employees={directoryOwnerNames} fieldVisible={iterationFieldVisible} onUpdated={() => setWorkItemsReloadKey((value) => value + 1)} /> : <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无匹配工作项" description="当前迭代无对应任务，请调整筛选条件或新建任务。" />}</div>
+              <Pagination total={visibleTaskItems.length} page={taskPage} pageSize={taskPageSize} onPageChange={setTaskPage} onPageSizeChange={(size) => { setTaskPageSize(size); setTaskPage(1); }} />
               </div>}
             </>
           ) : <EmptyState icon={<GitBranch className="h-5 w-5" />} title="暂无迭代" description="创建一个迭代后即可查看详情。" />}
@@ -1207,9 +1184,9 @@ export const VersionIterationView: React.FC = () => {
               <input
                 type="checkbox"
                 aria-label="全选待迭代任务"
-                checked={plannableRoots.length > 0 && plannableRoots.every((item) => selectedPlanningItemIds.includes(`${item.kind}:${item.id}`))}
+                checked={unplannedWorkItems.length > 0 && unplannedWorkItems.every((item) => selectedPlanningItemIds.includes(`${item.kind}:${item.id}`))}
                 onChange={() => {
-                  const visibleIds = plannableRoots.map((item) => `${item.kind}:${item.id}`);
+                  const visibleIds = unplannedWorkItems.map((item) => `${item.kind}:${item.id}`);
                   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedPlanningItemIds.includes(id));
                   setSelectedPlanningItemIds((current) => allSelected
                     ? current.filter((id) => !visibleIds.includes(id))
@@ -1235,7 +1212,7 @@ export const VersionIterationView: React.FC = () => {
           </div>}
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          <PlanningTree items={unplannedCandidates} matches={unplannedWorkItems} selectedIds={selectedPlanningItemIds} onSelect={(item) => setSelectedPlanningItemIds((current) => current.includes(`${item.kind}:${item.id}`) ? current.filter((value) => value !== `${item.kind}:${item.id}`) : [...current, `${item.kind}:${item.id}`])} onOpen={openWorkItemDetail} busy={Boolean(assigningRequirementId)} onDrag={(event, item) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", JSON.stringify({ id: item.id, kind: item.kind })); setDraggedWorkItem(item); }} onDragEnd={() => { setDraggedWorkItem(null); setDropTargetVersionId(null); }} />
+          <PlanningTree items={unplannedWorkItems} selectedIds={selectedPlanningItemIds} onSelect={(item) => setSelectedPlanningItemIds((current) => current.includes(`${item.kind}:${item.id}`) ? current.filter((value) => value !== `${item.kind}:${item.id}`) : [...current, `${item.kind}:${item.id}`])} onOpen={openWorkItemDetail} busy={Boolean(assigningRequirementId)} onDrag={(event, item) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", JSON.stringify({ id: item.id, kind: item.kind })); setDraggedWorkItem(item); }} onDragEnd={() => { setDraggedWorkItem(null); setDropTargetVersionId(null); }} />
           {unplannedWorkItems.length === 0 && <EmptyState icon={<ListTodo className="h-5 w-5" />} title="暂无待迭代任务" description="所有工作项都已加入迭代。" />}
         </div>
       </section>

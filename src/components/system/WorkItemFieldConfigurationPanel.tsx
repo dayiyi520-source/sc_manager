@@ -27,11 +27,11 @@ const DEFAULT_SELECT_OPTIONS: Record<string, Array<{ value: string; label: strin
 };
 
 const SCENES: Array<{ key: WorkItemFieldScene; label: string }> = [
-  { key: 'CREATE', label: '新建任务字段' }, { key: 'CREATE_CHILD', label: '新建子任务字段' },
+  { key: 'CREATE', label: '新建任务字段' },
   { key: 'LIST', label: '列表字段' }, { key: 'ITERATION', label: '迭代任务字段' }, { key: 'DETAIL', label: '详情页字段' }
 ];
 const LEFT_FIXED_FIELDS = new Set(['title', 'creator', 'createdAt', 'updater', 'updatedAt', 'expectedGoal', 'description']);
-const LEFT_RELATION_FIELDS = new Set(['relations', 'collaborationItems', 'relatedTasks', 'children', 'support', 'hours']);
+const LEFT_RELATION_FIELDS = new Set(['relations', 'collaborationItems', 'relatedTasks', 'support', 'hours']);
 const LEGACY_FIELD_CODES = new Set(['requirement']);
 
 export const WorkItemFieldConfigurationPanel: React.FC<{ categories: WorkItemCategoryDefinition[] }> = ({ categories }) => {

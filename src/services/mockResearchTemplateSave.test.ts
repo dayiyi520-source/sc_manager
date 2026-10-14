@@ -34,9 +34,9 @@ it('连续保存携带上次成功版本，重新加载以文件结果覆盖旧�
   expect((await mockApiRequest('/api/work-item-template'))[0].name).toBe('第二次');
 });
 
-it('产品通知、自动化和状态流程写入文件，刷新恢复且不影响其他产品或全局模板', async () => {
+it('产品通知和状态流程写入文件，刷新恢复且不影响其他产品或全局模板', async () => {
   let file: Record<string, any> = { productLines: [
-    { id: 'p1', name: '演示一', versions: [], workItemTypes: [{ id: 't1', name: '类型一', category: '需求' }] },
+    { id: 'p1', name: '演示一', versions: [], workItemTypes: [{ id: 't1', name: '类型一', category: '需求', enabled: true }] },
     { id: 'p2', name: '演示二', versions: [] },
   ], researchNotifications: { marker: '全局通知' } };
   const request = vi.fn(async (_path: string, init?: RequestInit) => {
@@ -47,18 +47,15 @@ it('产品通知、自动化和状态流程写入文件，刷新恢复且不影�
   let { mockApiRequest } = await import('./mockApi');
   const save = (path: string, body: unknown, method = 'PUT') => mockApiRequest(path, { method, body: JSON.stringify(body) });
   await save('/api/product-lines/p1/notification-settings', { marker: '产品通知' });
-  await save('/api/product-lines/p1/automation-rules/setting', { enabled: false });
-  const rule = await save('/api/product-lines/p1/automation-rules', { name: '演示规则', enabled: true }, 'POST');
-  await save(`/api/product-lines/p1/automation-rules/${rule.id}`, { name: '已修改规则', revision: 0 });
-  const workflow = await save('/api/product-lines/p1/work-item-types/t1/workflows', { category: 'requirement', name: '状态配置', definition: { states: [{ key: 'pending', name: '待处理' }] } }, 'POST');
+  const [{ id: typeId }] = await mockApiRequest('/api/product-lines/p1/work-item-types');
+  const workflow = await save(`/api/product-lines/p1/work-item-types/${typeId}/workflows`, { category: 'requirement', name: '状态配置', definition: { states: [{ key: 'pending', name: '待处理' }] } }, 'POST');
   await save(`/api/product-lines/p1/workflows/${workflow.id}/publish`, { revision: 0 }, 'POST');
   localStorage.clear(); vi.resetModules();
   ({ mockApiRequest } = await import('./mockApi'));
   expect(await mockApiRequest('/api/product-lines/p1/notification-settings')).toEqual({ marker: '产品通知' });
   expect(await mockApiRequest('/api/product-lines/p2/notification-settings')).toEqual({ marker: '全局通知' });
   expect(await mockApiRequest('/api/notification-template')).toEqual({ marker: '全局通知' });
-  expect(await mockApiRequest('/api/product-lines/p1/automation-rules')).toMatchObject({ enabled: false, rules: expect.arrayContaining([expect.objectContaining({ name: '已修改规则' })]) });
-  expect(await mockApiRequest('/api/product-lines/p1/work-item-types/t1/workflows')).toEqual([expect.objectContaining({ status: 'PUBLISHED', definition: workflow.definition })]);
+  expect(await mockApiRequest(`/api/product-lines/p1/work-item-types/${typeId}/workflows`)).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'PUBLISHED', definition: workflow.definition })]));
 });
 
 it('历史演示类型固定为五类，兼容旧缓存并保留有效类型', async () => {

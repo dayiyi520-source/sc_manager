@@ -61,17 +61,8 @@ export const versionGroup = (version: VersionIteration) => ({ '待开始': 'NOT_
 
 export function productTaskItems(root: UnifiedWorkItem, items: UnifiedWorkItem[]): UnifiedWorkItem[] {
   const selected = new Set([root.id]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const item of items) {
-      // An explicit version on a descendant always wins over its parent's version.
-      if (item.versionId && item.versionId !== root.versionId) continue;
-      if (!selected.has(item.id) && ((item.parentWorkItemId && selected.has(item.parentWorkItemId)) || item.requirementId === root.id)) {
-        selected.add(item.id);
-        changed = true;
-      }
-    }
-  }
+  items.forEach((item) => {
+    if (item.id !== root.id && item.versionId === root.versionId && item.requirementId === root.id) selected.add(item.id);
+  });
   return items.filter((item) => selected.has(item.id));
 }

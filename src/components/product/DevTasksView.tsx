@@ -222,7 +222,7 @@ export const DevTasksView: React.FC = () => {
           className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
-          创建研发子任务
+          创建研发任务
         </button>
       </div>
 
@@ -429,7 +429,6 @@ export const DevTasksView: React.FC = () => {
           {createFields.visible('description') && <div className="col-span-2"><label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">任务描述</label><RichTextEditor editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} /></div>}
           <WorkItemRelationTabs items={[
             ...((createFields.visible('relations') || createFields.visible('requirement')) ? [{ key: 'relations', label: '关联对象', count: 0, description: '创建后可继续关联产品任务和协同事项。', content: <div><label className="mb-2 block text-xs font-medium text-[var(--text-primary)]">关联需求任务</label><Cascader showSearch allowClear value={formRequirementId ? [formRequirementId] : undefined} onChange={(value: any) => (title) => setFormRequirementId(requirementTasks.find((task) => task.title === title)?.id || '')(value?.[0] || '')} options={requirementTasks.map((task) => task.title).map((opt: any) => typeof opt === 'string' ? { label: opt, value: opt } : opt)} placeholder="请选择关联需求任务" className="w-full" /></div> }] : []),
-            ...(createFields.visible('children') ? [{ key: 'children', label: '子任务', count: 0, description: '创建后可在详情页新增或关联子任务。' }] : []),
             ...(createFields.visible('support') ? [{ key: 'support', label: '支撑项', count: 0, description: '创建后可在详情页关联测试计划等支撑事项。' }] : []),
             ...(createFields.visible('hours') ? [{ key: 'hours', label: '工时', count: 0, description: '创建后可在详情页登记工时并查看统计。' }] : []),
           ]} />

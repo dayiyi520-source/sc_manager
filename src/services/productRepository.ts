@@ -11,7 +11,7 @@ type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
 export type WorkItemCategoryKey = string;
 export type WorkItemAssociations = { designVariant?: 'product' | 'project' | 'other'; designProjectName?: string; designSourceDepartment?: string } & Pick<UnifiedWorkItem, 'projectId' | 'projectName' | 'needsCollaboration' | 'relatedTaskIds' | 'sourceWorkOrderIds' | 'sourceWorkOrderTitles'>;
 export type WorkItemCategoryDefinition = { id: string; code: WorkItemCategoryKey; name: string; displayName: string; iconKey: string; capabilityType: 'STANDARD' | 'TEST_CASE'; sort: number; enabled: boolean; builtIn: boolean; revision: number };
-export type WorkItemFieldScene = 'CREATE' | 'CREATE_CHILD' | 'LIST' | 'ITERATION' | 'DETAIL';
+export type WorkItemFieldScene = 'CREATE' | 'LIST' | 'ITERATION' | 'DETAIL';
 export type WorkItemFieldConfiguration = { fieldCode: string; label: string; description?: string; fieldType: string; visible: boolean; required: boolean; editable?: boolean; defaultValue?: string | string[] | number | boolean | null; sort: number; locked: boolean };
 export type WorkItemFieldConfigurationSet = { categoryCode: string; scenes: Array<{ scene: WorkItemFieldScene; fields: WorkItemFieldConfiguration[] }> };
 export type WorkItemWorkflow = {
@@ -50,14 +50,6 @@ export type WorkItemStatusOption = {
 export type WorkItemTransitionOptions = {
   revision: number; actions: WorkItemTransitionAction[]; statuses: WorkItemStatusOption[];
 };
-export type AutomationRule = {
-  id: string; name: string; enabled: boolean; triggerType: 'STATUS_CHANGED'; triggerTypeId: string;
-  triggerStateKey: string; conditionType: 'NONE' | 'TASK_TYPE' | 'PRIORITY' | 'MULTI'; conditionValue?: string | null;
-  conditions?: Array<Record<string, unknown>>; actionType: 'CREATE_SUBTASK' | 'DERIVE_PARENT_STATUS' | 'DISPATCH_REQUIREMENT_TASKS' | 'SET_ACTUAL_START_TIME' | 'MULTI';
-  actions?: Array<Record<string, unknown>>; actionConfig: Record<string, unknown> | string;
-  revision: number; updatedAt?: string;
-};
-export type AutomationLog = { id: string; ruleId: string; ruleName?: string; workItemId: string; workItemTitle?: string; result: string; detail?: string; createdAt: string };
 export type NotificationEvent = 'ASSIGNED' | 'STATUS_CHANGED' | 'COMMENTED' | 'DELETED' | 'REPLIED' | 'MENTIONED' | 'CC_ADDED' | 'PARTICIPANT_ADDED';
 export type NotificationRule = { event: NotificationEvent; recipients: string[]; channels: Array<'IN_APP' | 'DINGTALK'> };
 export type NotificationSettings = { categories: Array<{ categoryCode: string; rules: NotificationRule[] }> };
@@ -114,7 +106,6 @@ export const productRepository = {
   updateProductLineMember: (id: string, memberId: string, body: Pick<ProductLineMember, 'role'>) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(body) }),
   removeProductLineMember: (id: string, memberId: string) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'DELETE' }),
   workItemTypes: (id: string, category?: ProductLineWorkItemCategory) => apiRequest<ProductLineWorkItemType[]>(`/api/product-lines/${id}/work-item-types${category ? `?category=${encodeURIComponent(category)}` : ''}`),
-  childTypeRules: (id: string) => apiRequest<Array<{ parentTypeId: string; childTypeId: string; enabled: boolean }>>(`/api/product-lines/${id}/child-type-rules`),
   createWorkItemType: (id: string, body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'> & { workflow: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> }) => apiRequest<{ id: string; workflowId: string }>(`/api/product-lines/${id}/work-item-types`, { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItemType: (id: string, typeId: string, body: Partial<Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'>>) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteWorkItemType: (id: string, typeId: string) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'DELETE' }),
@@ -122,17 +113,6 @@ export const productRepository = {
   createTypeWorkflow: (id: string, typeId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'>) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/work-item-types/${typeId}/workflows`, { method: 'POST', body: JSON.stringify({ ...body, revision: 0 }) }),
   updateTypeWorkflow: (id: string, typeId: string, workflowId: string, body: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> & { revision: number }) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/work-item-types/${typeId}/workflows/${workflowId}`, { method: 'PUT', body: JSON.stringify(body) }),
   publishWorkflow: (id: string, workflowId: string, revision: number) => apiRequest<WorkItemWorkflow>(`/api/product-lines/${id}/workflows/${workflowId}/publish`, { method: 'POST', body: JSON.stringify({ revision }) }),
-  automationRules: (id: string, keyword = '') => apiRequest<{ enabled: boolean; rules: AutomationRule[] }>(`/api/product-lines/${id}/automation-rules?keyword=${encodeURIComponent(keyword)}`),
-  automationTemplate: () => apiRequest<{ enabled: boolean; rules: AutomationRule[] }>('/api/automation-template/rules'),
-  createAutomationTemplateRule: (body: Omit<AutomationRule, 'id' | 'revision' | 'updatedAt'>) => apiRequest<AutomationRule>('/api/automation-template/rules', { method: 'POST', body: JSON.stringify(body) }),
-  updateAutomationTemplateRule: (ruleId: string, body: Omit<AutomationRule, 'id' | 'updatedAt'>) => apiRequest<AutomationRule>(`/api/automation-template/rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(body) }),
-  deleteAutomationTemplateRule: (ruleId: string) => apiRequest<void>(`/api/automation-template/rules/${ruleId}`, { method: 'DELETE' }),
-  updateAutomationTemplateSetting: (enabled: boolean) => apiRequest<{ enabled: boolean }>('/api/automation-template/setting', { method: 'PUT', body: JSON.stringify({ enabled }) }),
-  createAutomationRule: (id: string, body: Omit<AutomationRule, 'id' | 'revision' | 'updatedAt'>) => apiRequest<AutomationRule>(`/api/product-lines/${id}/automation-rules`, { method: 'POST', body: JSON.stringify(body) }),
-  updateAutomationRule: (id: string, ruleId: string, body: Omit<AutomationRule, 'id' | 'updatedAt'>) => apiRequest<AutomationRule>(`/api/product-lines/${id}/automation-rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(body) }),
-  deleteAutomationRule: (id: string, ruleId: string) => apiRequest<void>(`/api/product-lines/${id}/automation-rules/${ruleId}`, { method: 'DELETE' }),
-  updateAutomationSetting: (id: string, enabled: boolean) => apiRequest<{ enabled: boolean }>(`/api/product-lines/${id}/automation-rules/setting`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
-  automationLogs: (id: string) => apiRequest<AutomationLog[]>(`/api/product-lines/${id}/automation-rules/logs`),
   workItemDetail: (lineId: string, id: string) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(lineId)}`),
   workItemReview: (lineId: string, id: string) => apiRequest<WorkItemReview | null>(`/api/work-items/${id}/review?productLineId=${encodeURIComponent(lineId)}`),
   saveWorkItemReview: (lineId: string, id: string, review: WorkItemReview) => apiRequest<WorkItemReview>(`/api/work-items/${id}/review?productLineId=${encodeURIComponent(lineId)}`, { method: 'PUT', body: JSON.stringify(review) }),
@@ -140,7 +120,7 @@ export const productRepository = {
   commentWorkItem: (lineId: string, id: string, content: string) => apiRequest<void>(`/api/work-items/${id}/comments?productLineId=${encodeURIComponent(lineId)}`, { method: 'POST', body: JSON.stringify({ content }) }),
   batchWorkItems: (body: { targets: Array<{ productLineId: string; id: string; revision: number }>; operation: string; value?: string; participants?: string[] }) => apiRequest<number>('/api/work-items/batch', { method: 'POST', body: JSON.stringify(body) }),
   workItems: (productLineId: string, category = '', keyword = '', values: { page?: number; pageSize?: number } = {}) => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number; page?: number; pageSize?: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=${values.page || 1}&pageSize=${values.pageSize || 100}`),
-  createWorkItem: (body: WorkItemAssociations & { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; severity?: string; type?: string; env?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; requirementId?: string; customerId?: string; customerName?: string; parentWorkItemId?: string; assigneeId?: string; verifierId?: string; verifierName?: string; ccNames?: string[]; media?: RequirementMedia[]; priority: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
+  createWorkItem: (body: WorkItemAssociations & { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; severity?: string; type?: string; env?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; requirementId?: string; customerId?: string; customerName?: string; assigneeId?: string; verifierId?: string; verifierName?: string; ccNames?: string[]; media?: RequirementMedia[]; priority: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItem: (productLineId: string, id: string, body: WorkItemAssociations & { productLineId?: string; title?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; assigneeName?: string; verifierId?: string; verifierName?: string; priority?: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number; completionReview?: TaskCompletionReview; revision: number }) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}`, { method: 'PUT', body: JSON.stringify(body) }),
   workItemTransitions: (productLineId: string, id: string) => apiRequest<WorkItemTransitionOptions>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`),
   transitionWorkItem: (productLineId: string, id: string, body: { edgeKey: string; revision: number; reason?: string; actualHours?: number; completionReview?: TaskCompletionReview }) => apiRequest<Record<string, any>>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`, { method: 'POST', body: JSON.stringify(body) }),

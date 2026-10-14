@@ -66,8 +66,6 @@ const KEYS = {
   researchFields: 'shichuang.frontend.mock.researchFields',
   researchTypes: 'shichuang.frontend.mock.researchTypes',
   researchNotifications: 'shichuang.frontend.mock.researchNotifications',
-  researchAutomation: 'shichuang.frontend.mock.researchAutomation',
-  researchAutomationSetting: 'shichuang.frontend.mock.researchAutomationSetting',
   workItems: 'shichuang.frontend.mock.workItems',
   opsTasks: 'shichuang.frontend.mock.opsTasks',
   taskActivities: 'shichuang.frontend.mock.taskActivities',
@@ -258,7 +256,7 @@ const DETAIL_FIELD_DEFINITIONS: Record<string, Array<[string, string, string, st
     ['title', '标题', 'text', '详情页顶部任务标题，可点击修改', true], ['creator', '创建人', 'user', '任务创建人，只读', false], ['createdAt', '创建时间', 'date', '任务创建时间，只读', false], ['updater', '更新人', 'user', '最近一次修改人，只读', false], ['updatedAt', '更新时间', 'date', '最近一次修改时间，只读', false],
     ['expectedGoal', '期望结果', 'text', '任务完成后预期达到的结果', true], ['parent', '主任务', 'relation', '当前任务所属的父任务，只读', false], ['description', '任务描述', 'text', '左侧描述区，可进入富文本编辑', true], ['status', '当前状态', 'select', '右侧基础字段中的任务状态', true], ['assignee', '负责人', 'user', '右侧基础字段中的负责人', true], ['priority', '优先级', 'select', '右侧基础字段中的优先级', true],
     ['productLine', '归属产品', 'relation', '任务所属产品或产品线', true], ['version', '迭代版本', 'relation', '任务关联的迭代版本', true], ['plannedStartDate', '计划开始时间', 'date', '任务计划开始日期', true], ['dueDate', '计划完成时间', 'date', '任务计划完成日期', true], ['expectedCompleteDate', '期望完成时间', 'date', '业务期望完成日期', true],
-    ['customer', '关联客户', 'relation', '任务关联的客户对象', true], ['participants', '参与人', 'user', '需要同步或关注任务的成员', true], ['estimatedHours', '预计工时', 'number', '任务预计投入的小时数', true], ['actualHours', '实际工时', 'number', '任务实际投入的小时数', true], ['taskType', '任务类型', 'select', '工作项所属类型', true], ['relations', '关联对象', 'section', '详情页下方的关联产品任务和协同事项', true], ['children', '子任务', 'section', '详情页下方的子任务列表', true], ['support', '支撑项', 'section', '详情页下方关联的测试计划等支撑事项', true], ['hours', '工时', 'section', '详情页下方的工时汇总和统计', true],
+    ['customer', '关联客户', 'relation', '任务关联的客户对象', true], ['participants', '参与人', 'user', '需要同步或关注任务的成员', true], ['estimatedHours', '预计工时', 'number', '任务预计投入的小时数', true], ['actualHours', '实际工时', 'number', '任务实际投入的小时数', true], ['taskType', '任务类型', 'select', '工作项所属类型', true], ['relations', '关联对象', 'section', '详情页下方的关联产品任务和协同事项', true], ['support', '支撑项', 'section', '创建后关联测试计划等支撑事项', true], ['hours', '工时', 'section', '创建后登记和统计工时', true],
   ],
   dev: [['repo', '代码仓库', 'text', '研发任务关联的代码仓库地址或名称', true], ['branch', '特性分支', 'text', '研发任务对应的代码分支', true]],
   bug: [['severity', '严重程度', 'select', '缺陷影响范围和紧急程度', true], ['type', '缺陷类型', 'select', '缺陷所属的问题类型', true], ['env', '所属环境', 'select', '缺陷出现或验证的运行环境', true]],
@@ -300,7 +298,6 @@ const FIELD_METADATA: Record<string, { label: string; fieldType: string; descrip
   estimatedHours: { label: '预计工时', fieldType: 'number', description: '任务预计投入的小时数' },
   actualHours: { label: '实际工时', fieldType: 'number', description: '任务实际投入的小时数' },
   relations: { label: '关联对象', fieldType: 'section', description: '关联产品任务和协同事项' },
-  children: { label: '子任务', fieldType: 'section', description: '创建后维护子任务' },
   support: { label: '支撑项', fieldType: 'section', description: '创建后关联测试计划等支撑事项' },
   hours: { label: '工时', fieldType: 'section', description: '创建后登记和统计工时' },
   repo: { label: '代码仓库', fieldType: 'text', description: '研发任务关联的代码仓库' },
@@ -315,9 +312,9 @@ const REQUIRED_FIELD_CODES = new Set(['title', 'status', 'assignee']);
 const DETAIL_SYSTEM_FIELD_CODES = new Set(['creator', 'createdAt', 'updater', 'updatedAt']);
 // 历史配置中曾使用 requirement 作为独立关联字段，现统一由 relations 关系区承载。
 const LEGACY_FIELD_CODES = new Set(['requirement']);
-const CREATE_ASSOCIATION_FIELD_CODES = ['collaborationItems', 'relatedTasks', 'children', 'support', 'hours'];
+const CREATE_ASSOCIATION_FIELD_CODES = ['collaborationItems', 'relatedTasks', 'support', 'hours'];
 const CREATE_COMMON_FIELD_CODES = ['title', 'expectedGoal', 'description', 'productLine', 'taskType', 'assignee', 'priority', 'plannedStartDate', 'plannedEndDate', 'version', 'project', 'cc', 'estimatedHours', 'actualHours', 'attachments'];
-const DEFAULT_HIDDEN_CREATE_FIELD_CODES = new Set(['expectedGoal', 'hours', 'collaborationItems', 'children', 'cc']);
+const DEFAULT_HIDDEN_CREATE_FIELD_CODES = new Set(['expectedGoal', 'hours', 'collaborationItems', 'cc']);
 const DEFAULT_HIDDEN_DETAIL_FIELD_CODES = new Set(['support', 'participants', 'taskType']);
 const defaultFieldVisible = (scene: string, fieldCode: string) => scene === 'CREATE'
   ? !DEFAULT_HIDDEN_CREATE_FIELD_CODES.has(fieldCode)
@@ -325,7 +322,7 @@ const defaultFieldVisible = (scene: string, fieldCode: string) => scene === 'CRE
 const normalizeTemplateField = (field: any) => {
   const metadata = FIELD_METADATA[field.fieldCode];
   const detailSystemField = field.scene === 'DETAIL' && DETAIL_SYSTEM_FIELD_CODES.has(field.fieldCode);
-  const creationDate = (field.scene === 'CREATE' || field.scene === 'CREATE_CHILD') && (field.fieldCode === 'plannedStartDate' || field.fieldCode === 'plannedEndDate');
+  const creationDate = field.scene === 'CREATE' && (field.fieldCode === 'plannedStartDate' || field.fieldCode === 'plannedEndDate');
   const locked = REQUIRED_FIELD_CODES.has(field.fieldCode) || detailSystemField || creationDate;
   return {
     ...(metadata ? { ...field, ...metadata } : field),
@@ -343,12 +340,12 @@ const templateFields = () => {
   const categories = [...new Set(['requirement', 'design', 'dev', 'test', 'bug', ...templateCategories().map((item: any) => item.code)])].filter((code) => code !== 'case');
   // New categories inherit the common field contract until customized independently.
   categories.forEach((code) => {
-    ['CREATE', 'CREATE_CHILD', 'LIST', 'ITERATION'].forEach((scene) => {
+    ['CREATE', 'LIST', 'ITERATION'].forEach((scene) => {
       if (base.some((field) => field.categoryCode === code && field.scene === scene)) return;
       base.push(...base.filter((field) => field.categoryCode === 'requirement' && field.scene === scene).map((field) => ({ ...field, categoryCode: code })));
     });
   });
-  const createScenes = ['CREATE', 'CREATE_CHILD'];
+  const createScenes = ['CREATE'];
   const baseWithCreateAssociations = [...base];
   createScenes.forEach((scene) => {
     if (!baseWithCreateAssociations.some((field) => field.categoryCode === 'requirement' && field.scene === scene && field.fieldCode === 'needsCollaboration')) baseWithCreateAssociations.push({ categoryCode: 'requirement', scene, fieldCode: 'needsCollaboration', ...FIELD_METADATA.needsCollaboration, visible: true, required: false, editable: true, defaultValue: ['dev', 'test'], sort: 12, locked: false });
@@ -391,7 +388,6 @@ const productTypes = (product: ProductLine | undefined): any[] => {
   return types.map(row => ({ id: row.id_, name: row.name_, category: row.category_, enabled: Boolean(row.enabled_), isDefault: Boolean(row.is_default_), revision: Number(row.version_ || 0), workflows: workflows.filter(flow => flow.task_type_id_ === row.id_ && !flow.delete_flag_).map(flow => ({ id: flow.id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: flow.name_, revision: Number(flow.version_ || 0), status: flow.status_, workflowVersion: flow.workflow_version_, definition: flow.definition_ })).length ? workflows.filter(flow => flow.task_type_id_ === row.id_ && !flow.delete_flag_).map(flow => ({ id: flow.id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: flow.name_, revision: Number(flow.version_ || 0), status: flow.status_, workflowVersion: flow.workflow_version_, definition: flow.definition_ })) : [defaultProductWorkflow({ id: row.id_, name: row.name_, category: row.category_ })] }));
 };
 const templateNotifications = () => read(KEYS.researchNotifications, databaseRows('t_notification_template')[0]?.config_ || { categories: [] });
-const templateAutomation = () => ({ enabled: read(KEYS.researchAutomationSetting, Boolean(databaseRows('t_automation_template_setting')[0]?.enabled_ ?? true)), rules: read(KEYS.researchAutomation, databaseRows('t_automation_template_rule').map((row) => ({ id: row.id_, name: row.name_, enabled: Boolean(row.enabled_), triggerType: row.trigger_type_, triggerTypeId: row.trigger_type_id_, triggerStateKey: row.trigger_state_key_, conditionType: row.condition_type_, conditionValue: row.condition_value_, actionType: row.action_type_, actions: row.actions_ || [], conditions: row.conditions_ || [], actionConfig: row.action_config_ || {}, revision: Number(row.version_ || 0), updatedAt: row.update_time_ }))) });
 const unifiedWorkItem = (item: any) => ({
   ...item,
   taskTypeId: item.taskTypeId || item.workItemTypeId,
@@ -997,11 +993,6 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (parts[1] === 'work-item-template' && parts[2] === 'types' && parts[3] && method === 'DELETE') { write(KEYS.researchTypes, templateTypes().filter((item: any) => item.id !== parts[3])); return null; }
   if (clean === '/api/notification-template' && method === 'GET') return templateNotifications();
   if (clean === '/api/notification-template' && method === 'PUT') { write(KEYS.researchNotifications, body); return body; }
-  if (clean === '/api/automation-template/rules' && method === 'GET') return templateAutomation();
-  if (clean === '/api/automation-template/rules' && method === 'POST') { const rule = { ...body, id: id('automation'), revision: 0, updatedAt: now() }; const next = [...templateAutomation().rules, rule]; write(KEYS.researchAutomation, next); return rule; }
-  if (parts[1] === 'automation-template' && parts[2] === 'rules' && parts[3] && method === 'PUT') { const rules = templateAutomation().rules; const index = rules.findIndex((rule: any) => rule.id === parts[3]); if (index >= 0) { rules[index] = { ...rules[index], ...body, revision: rules[index].revision + 1, updatedAt: now() }; write(KEYS.researchAutomation, rules); return rules[index]; } }
-  if (parts[1] === 'automation-template' && parts[2] === 'rules' && parts[3] && method === 'DELETE') { write(KEYS.researchAutomation, templateAutomation().rules.filter((rule: any) => rule.id !== parts[3])); return null; }
-  if (clean === '/api/automation-template/setting' && method === 'PUT') { const enabled = Boolean(body.enabled); write(KEYS.researchAutomationSetting, enabled); return { enabled }; }
   // 产品级配置在真实系统中由全局产研模板继承；纯前端演示保持同样的读取关系。
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && !parts[4] && method === 'GET') {
     const category = queryOf(path).get('category') || '';
@@ -1053,9 +1044,9 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     write(KEYS.productLines, products);
     return { id: createdId };
   }
-  if (parts[1] === 'product-lines' && parts[2] && ['notification-settings', 'automation-rules', 'workflows'].includes(parts[3])) {
+  if (parts[1] === 'product-lines' && parts[2] && ['notification-settings', 'workflows'].includes(parts[3])) {
     const products = getProductLines();
-    const product = products.find((item) => item.id === parts[2]) as (ProductLine & { notificationSettings?: any; automation?: { enabled: boolean; rules: any[] } }) | undefined;
+    const product = products.find((item) => item.id === parts[2]) as (ProductLine & { notificationSettings?: any }) | undefined;
     if (!product) throw new Error('产品不存在');
     if (parts[3] === 'notification-settings') {
       if (method === 'GET') return product.notificationSettings ?? templateNotifications();
@@ -1063,34 +1054,6 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       product.notificationSettings = body;
       write(KEYS.productLines, products);
       return body;
-    }
-    if (parts[3] === 'automation-rules') {
-      if (parts[4] === 'logs' && method === 'GET') return [];
-      const automation = product.automation ?? structuredClone(templateAutomation());
-      if (method === 'GET') {
-        const keyword = (queryOf(path).get('keyword') || '').toLowerCase();
-        return { enabled: automation.enabled, rules: automation.rules.filter((rule: any) => !keyword || rule.name.toLowerCase().includes(keyword)) };
-      }
-      let result: any;
-      if (parts[4] === 'setting' && method === 'PUT') {
-        automation.enabled = Boolean(body.enabled);
-        result = { enabled: automation.enabled };
-      } else if (!parts[4] && method === 'POST') {
-        result = { ...body, id: id('automation'), revision: 0, updatedAt: now() };
-        automation.rules.push(result);
-      } else {
-        const index = automation.rules.findIndex((rule: any) => rule.id === parts[4]);
-        if (index < 0) throw new Error('自动化规则不存在');
-        if (method === 'DELETE') automation.rules.splice(index, 1);
-        else if (method === 'PUT') {
-          if (body.revision !== automation.rules[index].revision) throw new Error('自动化规则已更新，请刷新后重试');
-          result = { ...automation.rules[index], ...body, revision: automation.rules[index].revision + 1, updatedAt: now() };
-          automation.rules[index] = result;
-        } else throw new Error('不支持的自动化操作');
-      }
-      product.automation = automation;
-      write(KEYS.productLines, products);
-      return result ?? null;
     }
     const type = product.workItemTypes?.find((item: any) => item.workflow?.id === parts[4] || item.workflows?.some((workflow: any) => workflow.id === parts[4])) as any;
     const workflow = type?.workflows?.find((item: any) => item.id === parts[4]) ?? type?.workflow;
@@ -1207,10 +1170,9 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const currentKey = states.find((state: any) => state.key === current.statusKey)?.key || states.find((state: any) => state.name === current.status)?.key;
     let role = '';
     try { role = JSON.parse(sessionStorage.getItem('shichuang.session') || 'null')?.user?.role || ''; } catch { /* 无效会话不可变更状态 */ }
-    const hasChildren = current.hasChildren || items.some((item) => item.parentWorkItemId === current.id && !item.deleted && !item.deleteFlag);
     const edges = (workflow?.definition?.transitions || []).filter((edge: any) => edge.from === currentKey && states.some((state: any) => state.key === edge.to));
     const actions = edges.map((edge: any) => {
-      const reasons = [...(hasChildren ? ['含子任务的父任务不可直接修改状态'] : []), ...(edge.roles?.length && !edge.roles.includes(role) ? ['当前角色无权执行此流转'] : []), ...(edge.approvalTasks?.length ? ['该流转需要审批'] : [])];
+      const reasons = [...(edge.roles?.length && !edge.roles.includes(role) ? ['当前角色无权执行此流转'] : []), ...(edge.approvalTasks?.length ? ['该流转需要审批'] : [])];
       return { edgeKey: edge.key, name: edge.name, to: edge.to, requiredFields: edge.requiredFields || [], allowed: !reasons.length, reasons };
     });
     const revision = Number(current.revision || 0);
@@ -1295,8 +1257,6 @@ const templateRoutes: Record<string, string> = {
   '/api/work-item-field-configurations': 'researchFields',
   '/api/work-item-template': 'researchTypes',
   '/api/notification-template': 'researchNotifications',
-  '/api/automation-template/rules': 'researchAutomation',
-  '/api/automation-template/setting': 'researchAutomationSetting',
 };
 const templateFileEndpoint = mockStateEndpoint('research-template');
 let templateFile: Record<string, unknown> = {};
