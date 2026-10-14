@@ -17,7 +17,7 @@ describe('goal confirmation workspace',()=>{
  it('submits approval and renders an empty pending workspace after refreshed data',async()=>{
  const update=vi.spyOn(okrRepository,'update').mockResolvedValue(undefined);
  const view=render(<GoalConfirmationWorkspace {...props}/>);
- expect(screen.getByRole('heading',{name:'调整目标'})).toBeInTheDocument();expect(screen.getByText('原目标',{selector:'.is-before'})).toBeInTheDocument();
+ expect(screen.getByRole('heading',{name:'调整目标'})).toBeInTheDocument();expect(document.querySelector('.okr-confirmation-change-card')).toBeInTheDocument();expect(document.querySelector('.okr-confirmation-objective-card .okr-confirmation-status')).toHaveTextContent('待确认');expect(screen.queryByLabelText('目标修改对比')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'查看明细'}));expect(screen.getByText('原目标',{selector:'.is-before'})).toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'提 交'}));
  await waitFor(()=>expect(update).toHaveBeenCalledWith(record,'approve-change',{feedback:''},'manager'));
  await waitFor(()=>expect(props.onRefresh).toHaveBeenCalled());

@@ -1,0 +1,49 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createOkrFilePersistence } from './okrFilePersistence';
+import { migrateLegacyOkrState, saveOkrState, type OkrFileState } from '../../scripts/mock-okr-state-plugin';
+import seed from '../data/mockOkrState.json';
+import type { OkrRecord } from './okrRepository';
+const record=(id:string,kind:OkrRecord['kind']='objective',ownerId='manager'):OkrRecord=>({id,kind,ownerId,periodKey:'2026-10',status:'draft',version:0,payload:{title:id}});
+const state=():OkrFileState=>({...seed as unknown as OkrFileState,revision:0,okrRecords:[]});
+const key='shichuang.frontend.mock.okrRecords';
+describe('portable goal/review mock persistence',()=>{
+ it('atomically saves goals and reviews and rejects concurrent overwrites',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'okr-state-'));const file=join(dir,'state.json');
+  try{writeFileSync(file,JSON.stringify(state()));const saved=saveOkrState(file,{...state(),okrRecords:[record('goal'),record('review','review')]},0);
+  expect(saved.revision).toBe(1);expect(JSON.parse(readFileSync(file,'utf8')).okrRecords).toHaveLength(2);
+  expect(()=>saveOkrState(file,state(),0)).toThrow('其他页面');expect(JSON.parse(readFileSync(file,'utf8')).okrRecords).toHaveLength(2);
+  }finally{rmSync(dir,{recursive:true});}
+ });
+ it('cleans only legacy boss reviews during migration and retains new file-backed reviews',()=>{
+  const initial=migrateLegacyOkrState(state(),{okrRecords:[record('boss-old','review','user-admin'),record('goal'),record('staff','review')]});
+  expect(initial.okrRecords.map(r=>r.id)).toEqual(['goal','staff']);
+  const migrated=migrateLegacyOkrState({...initial,revision:1,okrRecords:[...initial.okrRecords,record('boss-new','review','user-admin')]},{okrRecords:[record('boss-old','review','user-admin'),record('another')]});
+  expect(migrated.okrRecords.map(r=>r.id)).toEqual(['goal','staff','boss-new','another']);
+ });
+ it('migrates newer legacy goals and template settings without downgrading file records',()=>{
+  const current={...state(),revision:1,okrSettings:{...state().okrSettings,version:1},okrRecords:[{...record('goal'),version:2}]};
+  const next=migrateLegacyOkrState(current,{okrSettings:{...current.okrSettings,version:3,objectiveTitleTemplates:[{id:'o',title:'本部门目标',department:'产品部',enabled:true,guidance:''}]},okrRecords:[{...record('goal'),version:1},record('new')]});
+  expect(next.okrRecords.find(row=>row.id==='goal')?.version).toBe(2);
+  expect(next.okrRecords).toHaveLength(2);expect(next.okrSettings.version).toBe(3);
+ });
+ it('restores persisted records in a fresh browser and rolls back failed writes',async()=>{
+  let file=state();let fail=false;
+  const request=vi.fn(async (_url:unknown, init?:RequestInit)=>{
+   if(fail&&init?.method==='PUT') return new Response(JSON.stringify({message:'保存失败'}),{status:409});
+   if(init?.method==='POST'){const b=JSON.parse(String(init.body));file={...migrateLegacyOkrState(file,b.legacy),revision:file.revision+1};}
+   if(init?.method==='PUT'){const b=JSON.parse(String(init.body));file={...b.state,revision:file.revision+1};}
+   return new Response(JSON.stringify(file));
+  }) as unknown as typeof fetch;
+  localStorage.clear();const first=createOkrFilePersistence(localStorage,request);
+  await first.run(async()=>{localStorage.setItem(key,JSON.stringify([record('goal'),record('weekly','review')]));return true;});
+  localStorage.clear();const second=createOkrFilePersistence(localStorage,request);
+  await second.run(async()=>expect(JSON.parse(localStorage.getItem(key)!)).toHaveLength(2));
+  fail=true;await expect(second.run(async()=>{localStorage.setItem(key,JSON.stringify([record('lost')]));})).rejects.toThrow('保存失败');
+  expect(JSON.parse(localStorage.getItem(key)!)).toHaveLength(2);expect(file.okrRecords.map(r=>r.id)).toEqual(['goal','weekly']);
+  fail=false;await second.run(async()=>true);
+ });
+});

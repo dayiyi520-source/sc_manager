@@ -28,6 +28,19 @@ describe('三级目标承接与本人执行', () => {
     expect(result.records.at(-1)?.payload).toMatchObject({ goalLevel: 'personal', title: reference.payload.title, inherited: false });
     expect(() => mutateOkrLifecycle(undefined, { kind: 'objective', viewerId: 'employee', periodKey: '2026-10', payload: { ...payload, title: '自己改O' }, submit: true }, saved.records, people)).toThrow('只能填写本人 A');
   });
+  it('submits a personal action change for review without changing the inherited KR', () => {
+    const saved=createDepartment();
+    const reference=assignedReferences(saved.records,people[2])[0];
+    const inherited=inheritedGoalPayload(reference,people[2]);
+    const initial={...inherited,keyResults:inherited.keyResults?.map(kr=>({...kr,executionActions:[{id:'a',ownerId:'employee',title:'原计划',progress:0,deadline:'2026-10-22'}]}))};
+    const created=mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'employee',periodKey:'2026-10',payload:initial,submit:true},saved.records,people)!;
+    const original=created.records.at(-1)!;
+    const modified={...original.payload,changeReason:'本月计划调整',keyResults:original.payload.keyResults?.map(kr=>({...kr,executionActions:kr.executionActions?.map(action=>({...action,title:'调整后的计划'}))}))};
+    const result=mutateOkrLifecycle(original.id,{action:'save',viewerId:'employee',version:original.version,payload:modified},created.records,people)!;
+    expect(result.records.at(-1)?.changeRequest?.status).toBe('pending');
+    expect(result.records.at(-1)?.changeRequest?.payload.keyResults?.[0].title).toBe(original.payload.keyResults?.[0].title);
+    expect(result.records.at(-1)?.changeRequest?.payload.keyResults?.[0].executionActions?.[0].title).toBe('调整后的计划');
+  });
   it('persists incomplete drafts without validating them as submitted goals', () => {
     const payload = { ...department(), keyResults: [{ ...department().keyResults![0], title: '', businessObject: '' }] };
     const result = mutateOkrLifecycle(undefined, { kind: 'objective', viewerId: 'manager', periodKey: '2026-10', payload, submit: false }, [company], people)!;
@@ -95,4 +108,31 @@ describe('KR 权重与上级日期约束', () => {
     goal.keyResults![0].executionActions![0].deadline = '2026-11-01';
     expect(() => mutateOkrLifecycle(undefined, { kind: 'objective', viewerId: 'manager', periodKey: '2026-10', payload: goal, submit }, [company], people)).toThrow('截止');
   });
+});
+
+it('submits a generic department KR with content and result without a business object or details', () => {
+  const payload = { ...department(), keyResults: [{ ...department().keyResults![0], title: '完成内部协作并通过验收', structureType: 'support' as const, businessObject: undefined, version: undefined, stage: undefined, details: undefined, action: '完成内部协作', result: '通过验收' }] };
+  expect(validateThreeLevelGoal(payload, 'manager')).toBeUndefined();
+  const result = mutateOkrLifecycle(undefined, { kind: 'objective', viewerId: 'manager', periodKey: '2026-10', payload, submit: true }, [company], people)!;
+  expect(result.records.at(-1)?.payload.keyResults?.[0]).toMatchObject({ structureType: 'support', action: '完成内部协作', result: '通过验收' });
+  expect(result.records.at(-1)?.payload.keyResults?.[0].details).toBeUndefined();
+  expect(validateThreeLevelGoal({ ...payload, keyResults: [{ ...payload.keyResults[0], result: '  ' }] }, 'manager')).toContain('完整 KR');
+});
+
+it('lets a supervisor create only their own autonomous personal goal and preserves department validation', () => {
+ const personal:OkrPayload={goalModelVersion:2,goalLevel:'personal',origin:'autonomous',title:'本人本月工作',weight:100,deadline:'2026-10-25',keyResults:[{id:'mine',title:'本人本月工作',weight:100,progress:0,deadline:'2026-10-25',assigneeIds:['manager'],executionActions:[{id:'a',ownerId:'manager',title:'完成个人计划',weight:100,progress:0,deadline:'2026-10-25'}]}]};
+ const created=mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:personal,submit:true},[company],people)!;
+ expect(created.records.at(-1)?.ownerId).toBe('manager');
+ expect(created.records.at(-1)?.payload.goalLevel).toBe('personal');
+ expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'employee',periodKey:'2026-10',payload:{...personal,goalLevel:'department'},submit:true},[company],people)).toThrow('目标层级');
+ expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:{...personal,keyResults:personal.keyResults?.map(kr=>({...kr,assigneeIds:['employee'],executionActions:kr.executionActions?.map(a=>({...a,ownerId:'employee'}))}))},submit:true},[company],people)).toThrow('只能填写');
+});
+
+it('aligns supervisor personal goals to their department and rejects company/other-department sources',()=>{
+ const dept={...company,id:'dept',ownerId:'manager',payload:{...department(),origin:'autonomous' as const,sourceObjectiveId:undefined,sourceKrId:undefined,sourceVersion:undefined}};
+ const personal:OkrPayload={goalModelVersion:2,goalLevel:'personal',origin:'autonomous',title:'个人执行',weight:100,deadline:'2026-10-20',sourceObjectiveId:'dept',sourceKrId:'department-kr',sourceVersion:1,keyResults:[{id:'mine',title:'个人执行',weight:100,progress:0,deadline:'2026-10-20',assigneeIds:['manager'],executionActions:[{id:'a',ownerId:'manager',title:'执行动作',weight:100,progress:0,deadline:'2026-10-20'}]}]};
+ expect(mutateOkrLifecycle(undefined,{viewerId:'manager',kind:'objective',periodKey:'2026-10',payload:personal,submit:true},[company,dept],people)?.records.at(-1)?.payload.sourceObjectiveId).toBe('dept');
+ expect(()=>mutateOkrLifecycle(undefined,{viewerId:'manager',kind:'objective',periodKey:'2026-10',payload:{...personal,sourceObjectiveId:'company',sourceKrId:'company-kr'},submit:true},[company,dept],people)).toThrow('本部门');
+ const other={...dept,ownerId:'other'};const directory=[...people,{...people[1],id:'other',department:'其他部门'}];
+ expect(()=>mutateOkrLifecycle(undefined,{viewerId:'manager',kind:'objective',periodKey:'2026-10',payload:personal,submit:true},[other],directory)).toThrow('本部门');
 });

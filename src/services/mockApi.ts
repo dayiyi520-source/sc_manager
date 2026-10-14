@@ -1,3 +1,5 @@
+import { createOkrFilePersistence } from './okrFilePersistence';
+import savedOkrState from '../data/mockOkrState.json';
 import { syncProductTemplates, migrateWorkItems } from './workItemTemplateSync';
 import { submitDepartmentReview } from './departmentReviewAggregation';
 import { normalizedPolicy, validatePolicy, isOkrAdmin, canEditOkr, confirmationReviewer } from './okrSettingsPolicy';
@@ -10,7 +12,6 @@ import type { OkrSettings } from './okrRepository';
 import { reviewSubmissionAccess } from './okrReviewRules';
 import { canReadReviewRecord } from './supervisorReview';
 import { handleMockBusinessTasks } from './mockBusinessTasks';
-import { handleMockGoalTemplates, GOAL_TEMPLATE_STORAGE_KEY } from './mockGoalTemplates';
 import { assignedGoalActions, legacyGoalActions } from './okrGoalRules';
 import collaborationTypes from '../data/mockCollaborationTypes.json';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
@@ -48,7 +49,6 @@ import type {
 } from '../types/testManagement';
 
 const KEYS = {
-  goalTemplates: GOAL_TEMPLATE_STORAGE_KEY,
   testReports: TEST_REPORT_STORAGE_KEY,
   snapshot: 'shichuang.frontend.mock.snapshotVersion',
   members: 'shichuang.frontend.mock.teamMembers',
@@ -75,7 +75,7 @@ const KEYS = {
 
 // 每次导入新数据库快照时，淘汰浏览器里由旧演示数据留下的本地状态。
 if (typeof window !== 'undefined' && localStorage.getItem(KEYS.snapshot) !== MOCK_SNAPSHOT_VERSION) {
-  Object.values(KEYS).filter((key) => key !== KEYS.snapshot).forEach((key) => localStorage.removeItem(key));
+  Object.values(KEYS).filter((key) => key !== KEYS.snapshot && ![KEYS.okrRecords, KEYS.okrSettings, KEYS.okrPeople].includes(key)).forEach((key) => localStorage.removeItem(key));
   localStorage.removeItem(KEYS.workItems + '.previewSeedVersion');
   localStorage.setItem(KEYS.snapshot, MOCK_SNAPSHOT_VERSION);
 }
@@ -84,7 +84,8 @@ const now = () => new Date().toISOString();
 const text = (value: unknown) => value == null ? '' : String(value);
 const read = <T>(key: string, fallback: T): T => {
   const templateKey = key.replace('shichuang.frontend.mock.', '');
-  const seed = Object.prototype.hasOwnProperty.call(savedResearchTemplate, templateKey) ? (savedResearchTemplate as Record<string, unknown>)[templateKey] as T : fallback;
+  const savedState = templateKey.startsWith('okr') ? savedOkrState : savedResearchTemplate;
+  const seed = Object.prototype.hasOwnProperty.call(savedState, templateKey) ? (savedState as Record<string, unknown>)[templateKey] as T : fallback;
   try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : seed; } catch { return seed; }
 };
 const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
@@ -848,7 +849,6 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     write(KEYS.workItems, items);
     return items[index];
   }
-  if (clean === '/api/okr/goal-templates' || clean.startsWith('/api/okr/goal-templates/')) return handleMockGoalTemplates(clean, method, body, MOCK_USERS.find(user => user.role === 'admin')?.id);
   if (clean === '/api/okr/people' && method === 'GET') return getOkrPeople();
   if (clean === '/api/okr/settings' && method === 'GET') { const settings=normalizedPolicy(read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings),getOkrPeople()); write(KEYS.okrSettings,settings); return settings; }
   if (clean === '/api/okr/settings' && method === 'PUT') {
@@ -1306,7 +1306,12 @@ async function templateFileRequest(init?: RequestInit): Promise<Record<string, u
   return result;
 }
 
+let okrFilePersistence: ReturnType<typeof createOkrFilePersistence> | undefined;
 export async function mockApiRequest(path: string, init: RequestInit = {}): Promise<any> {
+  if (path.split('?')[0].startsWith('/api/okr/') && import.meta.env.MODE !== 'test') {
+    okrFilePersistence ??= createOkrFilePersistence(localStorage);
+    return okrFilePersistence.run(() => handleMockApiRequest(path, init));
+  }
   if (!import.meta.env.DEV || import.meta.env.MODE === 'test') return handleMockApiRequest(path, init);
   if (!templateReady) {
     templateReady = templateFileRequest().then((data) => {

@@ -121,7 +121,9 @@ describe('三级目标沿用现有表单', () => {
     expect(screen.queryByRole('button', { name: '添加本人动作' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('计划动作内容')).toHaveAttribute('placeholder', '输入你计划要做的动作内容');
     expect(screen.queryByLabelText(/本人A1|A1/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/权重|截止日期/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('KR1 权重')).toBeDisabled();
+    expect(screen.getByLabelText('KR1 截止日期')).toHaveValue('2026-10-31');
+    expect(screen.getByLabelText('KR1 截止日期')).toBeDisabled();
     expect(ref.current?.snapshot().keyResults?.[0].executionActions).toHaveLength(1);
     expect(ref.current?.snapshot().keyResults?.[0].executionActions?.[0]).toMatchObject({ ownerId: 'employee', weight: 100, deadline: '2026-10-31' });
   });
@@ -171,7 +173,7 @@ describe('三级目标沿用现有表单', () => {
     expect(screen.queryByLabelText('A1 名称')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('A1 承接人员')).not.toBeInTheDocument();
     expect(screen.getByLabelText('计划动作内容')).toHaveValue('例行维护');
-    expect(screen.getByText('动作 权重合计 100%')).toBeInTheDocument();
+    expect(screen.queryByText('动作 权重合计 100%')).not.toBeInTheDocument();
     expect(screen.queryByText(/KR 权重合计/)).not.toBeInTheDocument();
     expect(ref.current?.snapshot()).toMatchObject({origin:'autonomous',goalLevel:'personal',objectiveType:'challenge',deadline:'2026-10-25'});
     await act(async()=>{expect(await ref.current?.submit()).toBe(true);});
@@ -195,7 +197,9 @@ describe('三级目标沿用现有表单', () => {
     expect(screen.getByText('部门O：提升产品交付质量——来源于上级主管')).toBeInTheDocument();
     expect(screen.getByLabelText('计划动作内容')).toHaveAttribute('placeholder','输入你计划要做的动作内容');
     expect(screen.queryByText('KR1')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/A1|权重|截止日期/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/A1/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('KR1 权重')).toBeDisabled();
+    expect(screen.getByLabelText('KR1 截止日期')).toBeDisabled();
     expect(screen.queryByRole('button',{name:'添加本人动作'})).not.toBeInTheDocument();
     expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument();
   });
@@ -269,10 +273,10 @@ it('keeps the empty KR subtable as a disabled display-only placeholder', () => {
 it('selects only enabled O titles for the supervisor department without replacing KR content', () => {
   const ref = createRef<ObjectiveFormHandle>();
   render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} settings={{ ...templateSettings, objectiveTitleTemplates: [{ id: 'title', department: '研发', title: '完成重点产品迭代', guidance: '填写本月的产品交付范围', enabled: true }, { id: 'other', department: '交付', title: '其他部门目标', guidance: '', enabled: true }, { id: 'off', department: '研发', title: '停用目标', guidance: '', enabled: false }] }} onSave={vi.fn()}/>);
-  fireEvent.mouseDown(screen.getByLabelText('选择O标题模板'));
+  fireEvent.click(screen.getByRole('button', {name:'导入O模板'}));
   expect(screen.queryByText('其他部门目标')).not.toBeInTheDocument();
   expect(screen.queryByText('停用目标')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByText('完成重点产品迭代', { selector: '.ant-select-item-option-content' }));
+  fireEvent.click(screen.getByText('完成重点产品迭代', { selector: '.ant-dropdown-menu-title-content' }));
   expect(ref.current?.snapshot().title).toBe('完成重点产品迭代');
   expect(ref.current?.snapshot().keyResults).toHaveLength(1);
   expect(screen.getByText('填写本月的产品交付范围')).toBeInTheDocument();
@@ -281,8 +285,8 @@ it('selects only enabled O titles for the supervisor department without replacin
 it('retains template KR types after editing the O title and restricts the type menu', async () => {
   const ref = createRef<ObjectiveFormHandle>();
   render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} settings={{ ...templateSettings, objectiveTitleTemplates: [{ id: 'title-support', department: '研发', title: '协作提升', guidance: '', enabled: true, krTypes: ['support'] }] }} onSave={vi.fn()}/>);
-  fireEvent.mouseDown(screen.getByLabelText('选择O标题模板'));
-  fireEvent.click(screen.getByText('协作提升', { selector: '.ant-select-item-option-content' }));
+  fireEvent.click(screen.getByRole('button', {name:'导入O模板'}));
+  fireEvent.click(screen.getByText('协作提升', { selector: '.ant-dropdown-menu-title-content' }));
   fireEvent.change(screen.getByLabelText('目标名称'), { target: { value: '本月具体协作目标' } });
   expect(ref.current?.snapshot()).toMatchObject({ title: '本月具体协作目标', objectiveTitleTemplateId: 'title-support', objectiveTemplateKrTypes: ['support'], keyResults: [{ structureType: 'support' }] });
   fireEvent.click(screen.getByRole('button', { name: 'KR类型' }));
@@ -291,8 +295,8 @@ it('retains template KR types after editing the O title and restricts the type m
 it('rejects an incompatible O template without discarding filled KR content', () => {
   const ref = createRef<ObjectiveFormHandle>();
   render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} initialPayload={{ goalModelVersion: 2, goalLevel: 'department', title: '版本交付', keyResults: [{ id: 'k', title: '已有交付结果', structureType: 'product', weight: 100, progress: 0, details: [{ id: 'v', name: '产品甲', version: 'V1', stage: 'UI设计' }] }] }} settings={{ ...templateSettings, objectiveTitleTemplates: [{ id: 'support', department: '研发', title: '协作提升', guidance: '', enabled: true, krTypes: ['support'] }] }} onSave={vi.fn()}/>);
-  fireEvent.mouseDown(screen.getByLabelText('选择O标题模板'));
-  fireEvent.click(screen.getByText('协作提升', { selector: '.ant-select-item-option-content' }));
+  fireEvent.click(screen.getByRole('button', {name:'导入O模板'}));
+  fireEvent.click(screen.getByText('协作提升', { selector: '.ant-dropdown-menu-title-content' }));
   expect(screen.getByText('已有 KR 不受该 O 模板支持，请先调整 KR 或选择其他模板')).toBeInTheDocument();
   expect(ref.current?.snapshot().title).toBe('版本交付');
   expect(ref.current?.snapshot().keyResults?.[0].details?.[0]).toMatchObject({ name: '产品甲', version: 'V1' });
@@ -310,4 +314,14 @@ it('submits a new supervisor own-personal target with one action and self owners
  fireEvent.change(screen.getByLabelText('计划动作内容'),{target:{value:'完成个人工作'}});
  await act(async()=>{expect(await ref.current?.submit()).toBe(true);});
  expect(save).toHaveBeenCalledWith(expect.objectContaining({goalLevel:'personal',title:'本人月度计划',keyResults:[expect.objectContaining({title:'本人月度计划',assigneeIds:['manager']})]}));
+});
+
+it('shows department alignment choices when a supervisor creates a personal goal', async()=>{
+ const department:OkrRecord={...reference,id:'department',kind:'objective',ownerId:'manager',payload:{goalLevel:'department',title:'本人部门目标',keyResults:[{id:'dept-kr',title:'部门KR',weight:100,progress:0}]}};
+ const company:OkrRecord={...department,id:'company',ownerId:'user-admin',payload:{...department.payload,goalLevel:'company',title:'公司目标'}};
+ render(<ObjectiveForm {...common} ownerId="manager" ownerName="主管" root={false} supervisor goalLevel="个人级" initialPayload={{goalModelVersion:2,goalLevel:'personal',origin:'autonomous',title:'个人计划'}} okrRecords={[department,company]} onSave={vi.fn()}/>);
+ fireEvent.click(screen.getByRole('button',{name:'选择对齐'}));
+ expect(await screen.findByText('部门目标已生效目标')).toBeInTheDocument();
+ expect(screen.getByText('O · 本人部门目标')).toBeInTheDocument();
+ expect(screen.queryByText('O · 公司目标')).not.toBeInTheDocument();
 });

@@ -1266,6 +1266,6 @@
 .okr-confirmation-change-header .okr-confirmation-change-toggle { margin-left:auto; }
 .okr-confirmation-objective-card { position:relative; padding-top:calc(var(--spacing) * 4); }
 .okr-confirmation-status { position:absolute; top:calc(var(--spacing) * 3); right:var(--confirmation-space); z-index:1; }
-.okr-confirmation-objective-card .okr-target-list-right { justify-content:flex-end; padding-top:calc(var(--spacing) * 9); }
-.okr-confirmation-objective-card .okr-target-list-status { align-self:end; padding-bottom:calc(var(--spacing) * 8); }
+.okr-confirmation-objective-card .okr-target-list-right { justify-content:flex-end; padding-top:calc(var(--spacing) * 15); }
+.okr-confirmation-objective-card .okr-target-list-status { align-self:start; }
 .okr-confirmation-card > footer { border:1px solid var(--border-main); border-radius:calc(var(--spacing) * 2); background:var(--bg-surface); }

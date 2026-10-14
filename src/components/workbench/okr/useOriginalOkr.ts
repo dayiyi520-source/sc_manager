@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useApp } from '../../../context/AppContext';
 import { crmRepository } from '../../../services/crmRepository';
+import { projectDeliveryMap, deliveryProjectNames, deliveryProductsByProject, deliveryStagesByProduct } from '../../../services/projectDeliveryMap';
 import { okrRepository, type OkrPayload, type OkrRecord, type OkrSettings } from '../../../services/okrRepository';
 import { productRepository } from '../../../services/productRepository';
 import { teamRepository } from '../../../services/teamRepository';
@@ -34,7 +35,7 @@ export function useOriginalOkr() {
   const teamMembersQuery = useQuery<EmployeeOption[]>({queryKey:['team-member-options'],queryFn:teamRepository.options,retry:false});
   const work = useQuery({queryKey:['okr',currentUser.id,'work'],queryFn:()=>loadReviewEvidence(currentUser),retry:false});
   const productLinesQuery = useQuery({queryKey:['okr',currentUser.id,'product-lines'],queryFn:()=>productRepository.productLines(),retry:false});
-  const projectsQuery = useQuery({queryKey:['okr',currentUser.id,'projects'],queryFn:()=>crmRepository.projects({page:1,pageSize:100}),retry:false});
+  const deliveryProjects = projectDeliveryMap();
   const opportunitiesQuery = useQuery({queryKey:['okr',currentUser.id,'opportunities'],queryFn:()=>crmRepository.opportunities({page:1,pageSize:100}),retry:false});
   const actionParents = useQuery({
     queryKey:['okr',currentUser.id,'action-parents'],
@@ -49,7 +50,7 @@ export function useOriginalOkr() {
   const people = (peopleQuery.data || []).map(person => ({ ...person, department: teamMembersQuery.data?.find(member => member.id === person.id)?.department || person.department, jobTitle: teamMembersQuery.data?.find(member => member.id === person.id)?.jobTitle || teamMembersQuery.data?.find(member => member.id === person.id)?.roleTitle || person.jobTitle }));
   const productLineOptions = (productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => line.name);
   const productLineVersionOptions = Object.fromEntries((productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => [line.name, (line.versions || []).map(version => String(version.code || version.name || '')).filter(Boolean)]));
-  const projectOptions = (projectsQuery.data?.items || []).map(project => String(project.name || '')).filter(Boolean);
+  const projectOptions = deliveryProjectNames(deliveryProjects);
   const namesFrom = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.flatMap(item => namesFrom(item));
     if (typeof value === 'string' && value.trim().startsWith('[')) {
@@ -61,12 +62,13 @@ export function useOriginalOkr() {
     }
     return typeof value === 'string' && value.trim() ? [value] : [];
   };
-  const projectProductOptions = Object.fromEntries((projectsQuery.data?.items || []).map(project => [String(project.name || ''), [...new Set(namesFrom([project.productName, project.productLineName, project.relatedProduct, project.product, project.productNameList, project.products]))]]));
+  const projectProductOptions = deliveryProductsByProject(deliveryProjects);
+  const projectProductStageOptions = deliveryStagesByProduct(deliveryProjects);
   const opportunityOptions = (opportunitiesQuery.data?.items || []).map(opportunity => {
     const item = opportunity as typeof opportunity & Record<string, unknown>;
     return { value: String(item.name || ''), label: String(item.name || ''), products: [...new Set(namesFrom([item.relatedProduct, item.product, item.products]))] };
   }).filter(item => item.value);
-  const businessOptionsError = productLinesQuery.error || projectsQuery.error || opportunitiesQuery.error;
+  const businessOptionsError = productLinesQuery.error || opportunitiesQuery.error;
   const rawRecords = records.data || [];
   const me = people.find(p=>p.id===currentUser.id);
   const all = useMemo(() => goalsWithAssignments(rawRecords, me), [rawRecords, currentUser.id, me?.supervisorId, me?.jobTitle, me?.name]);
@@ -197,7 +199,7 @@ export function useOriginalOkr() {
   const saveSettings = async (settings: OkrSettings) => { setBusy(true); try { await okrRepository.saveSettings(settings, currentUser.id); await client.invalidateQueries({queryKey:['okr','settings']}); addToast('success','OKR 配置已保存'); return true; } catch(error) { addToast('error',error instanceof Error ? error.message : '配置保存失败'); return false; } finally { setBusy(false); } };
   return {records:all,okrs,reviewableOkrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending || settingsQuery.isPending,
     error:records.error || peopleQuery.error || settingsQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
-    productLineOptions,productLineVersionOptions,projectOptions,projectProductOptions,opportunityOptions,businessOptionsLoading:productLinesQuery.isPending || projectsQuery.isPending || opportunitiesQuery.isPending,
+    productLineOptions,productLineVersionOptions,projectOptions,projectProductOptions,projectProductStageOptions,opportunityOptions,businessOptionsLoading:productLinesQuery.isPending || opportunitiesQuery.isPending,
     businessOptionsError:businessOptionsError instanceof Error ? businessOptionsError.message : businessOptionsError ? '业务数据加载失败' : undefined,
     actionParents:derivedActionParents,actionParentsLoading:actionParents.isPending,actionParentsError:actionParents.error,saveActions,
     saveObjective:(period:string,payload:OkrPayload)=>save('objective',period,payload),

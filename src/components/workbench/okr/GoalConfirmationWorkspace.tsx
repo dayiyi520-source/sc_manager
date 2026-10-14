@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Empty, Input, Radio, Select, Skeleton, Switch, Tag } from 'antd';
+import { ChevronDownIcon, ChevronRightIcon } from '@primer/octicons-react';
 import { PersonAvatar } from '../../common/PersonIdentity';
 import { periodLabel } from '../../../services/okrPeriods';
 import { okrRepository, type OkrPerson, type OkrRecord, type OkrWork } from '../../../services/okrRepository';
@@ -16,13 +17,14 @@ export function GoalConfirmationWorkspace({ records, people, viewerId, selectedM
   const [defaultMemberId] = useState(() => (members.find(person => requests.some(record => record.ownerId === person.id)) || members[0])?.id);
   const member = members.find(person => person.id === (selectedMemberId || defaultMemberId)) || members[0];
   const [comparison, setComparison] = useState(true);
+  const [expandedChanges, setExpandedChanges] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<'pending' | 'all'>('pending');
   const [decisions, setDecisions] = useState<Record<string, 'approve' | 'return'>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string>();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [detail, setDetail] = useState<OkrRecord>();
-  useEffect(() => { setFilter('pending'); setDetail(undefined); }, [viewerId, selectedMemberId]);
+  useEffect(() => { setFilter('pending'); setDetail(undefined); setExpandedChanges({}); }, [viewerId, selectedMemberId]);
   const memberRecords = requests.filter(record => record.ownerId === member?.id);
   const availableCycles = [...new Set(records.filter(record => record.kind === 'objective' && record.ownerId === member?.id && record.changeRequest?.status === 'pending').map(record => record.periodKey))].sort().reverse();
   const effectiveCycles = selectedCycles || availableCycles;
@@ -55,9 +57,11 @@ export function GoalConfirmationWorkspace({ records, people, viewerId, selectedM
           const change=record.changeRequest; const pending=pendingIds.has(record.id); const proposed=pending && change ? {...record,payload:change.payload} : record;
           const differences=change && change.purpose!=='initial' ? goalDifferences(record.payload,change.payload,people) : [];
           return <article className="okr-confirmation-card" key={record.id} aria-label={'确认目标：'+proposed.payload.title}>
-            <div className="okr-confirmation-card-heading"><span>{change?.purpose==='initial'?'新增目标':change?.purpose==='delete'?'删除目标':change?.purpose==='alignment'?'调整对齐':'修改目标'}</span><Tag color={pending?'processing':change?.status==='returned'?'warning':'success'}>{pending?'待确认':change?.status==='returned'?'建议修改':'已确认'}</Tag></div>
-            {comparison && pending && differences.length>0 && <section className="okr-confirmation-differences" aria-label="目标修改对比">{differences.map(row=><div key={row.id}><strong>{row.label}</strong><span className="is-before">{row.before}</span><span aria-hidden="true">→</span><span className="is-after">{row.after}</span></div>)}</section>}
-            <MyTargetMonthSection periodKey={cycle} targets={buildMyTargetViewItems([proposed],[],records,people,record.ownerId)} viewMode="list" collapsed={false} onToggle={()=>{}} onOpenTarget={()=>setDetail(proposed)}/>
+            <section className="okr-confirmation-change-card"><div className="okr-confirmation-change-header"><strong>{change?.purpose==='initial'?'新增目标':change?.purpose==='delete'?'删除目标':change?.purpose==='alignment'?'调整对齐':'修改信息'}</strong>{(change?.purpose==='update' || change?.purpose==='alignment') && <Button type="text" className="okr-confirmation-change-toggle" aria-expanded={expandedChanges[record.id] || false} aria-controls={`okr-confirmation-changes-${record.id}`} onClick={() => setExpandedChanges(current => ({...current,[record.id]:!current[record.id]}))}>查看明细 {expandedChanges[record.id] ? <ChevronDownIcon/> : <ChevronRightIcon/>}</Button>}</div>
+              {expandedChanges[record.id] && (differences.length ? <section id={`okr-confirmation-changes-${record.id}`} className="okr-confirmation-differences" aria-label="目标修改对比">{differences.map(row => <div key={row.id}><strong>{row.label}</strong><span className={comparison ? 'is-before' : ''}>{row.before}</span><span aria-hidden="true">→</span><span className={comparison ? 'is-after' : ''}>{row.after}</span></div>)}</section> : <p>本次无可见内容变化，请核对修改原因。</p>)}
+            </section>
+            <section className="okr-confirmation-objective-card"><Tag className="okr-confirmation-status" color={pending?'processing':change?.status==='returned'?'warning':'success'}>{pending?'待确认':change?.status==='returned'?'建议修改':'已确认'}</Tag><MyTargetMonthSection periodKey={cycle} targets={buildMyTargetViewItems([proposed],[],records,people,record.ownerId)} viewMode="list" collapsed={false} onToggle={()=>{}} onOpenTarget={()=>setDetail(proposed)}/></section>
+
             {pending && <footer><Radio.Group aria-label={proposed.payload.title+'确认操作'} value={decisions[record.id]||'approve'} disabled={!!busyId} onChange={event=>{setDecisions(current=>({...current,[record.id]:event.target.value}));setErrors(current=>({...current,[record.id]:''}));}}><Radio value="approve">确认目标</Radio><Radio value="return">建议修改</Radio></Radio.Group><Button type="primary" disabled={!!busyId && busyId!==record.id} loading={busyId===record.id} onClick={()=>void submit(record)}>提交</Button>
               {decisions[record.id]==='return' && <Input.TextArea aria-label="修改建议" aria-required rows={3} maxLength={1000} placeholder="填写需要调整的内容" value={notes[record.id]||''} disabled={!!busyId} onChange={event=>setNotes(current=>({...current,[record.id]:event.target.value}))}/>}
               {errors[record.id] && <Alert type="error" title={errors[record.id]} showIcon action={<Button disabled={!!busyId} onClick={()=>void onRefresh()}>刷新目标</Button>}/>}

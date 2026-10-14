@@ -1,9 +1,10 @@
 import { otherDepartmentPeople as getOtherDepartmentPeople, departmentName } from './departmentScope';
 import { confirmationMembers, confirmationRequests } from './goalConfirmation';
+import { goalLevel } from '../../../services/okrGoalRules';
 import { ChecklistIcon } from '@primer/octicons-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Badge, Button, Input, Tooltip } from 'antd';
+import { Badge, Button, Dropdown, Input, Tooltip } from 'antd';
 import {
   Building,
   ChevronDown,
@@ -17,7 +18,7 @@ import {
 } from '@/components/common/octicons-compat';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
 
-export type OkrScopeKey = 'my' | 'department' | 'company' | 'otherDepartments' | 'confirmation';
+export type OkrScopeKey = 'my' | 'department' | 'company' | 'myDepartment' | 'otherDepartments' | 'confirmation';
 
 export type OkrScopeSelection = {
   scope: OkrScopeKey;
@@ -37,6 +38,7 @@ const groupMeta: Array<Pick<OkrScopeGroup, 'key' | 'label' | 'icon'>> = [
   { key: 'my', label: '我的目标', icon: <Target /> },
   { key: 'department', label: '部门目标', icon: <Building /> },
   { key: 'company', label: '公司目标', icon: <Building /> },
+  { key: 'myDepartment', label: '我部门的', icon: <Building /> },
   { key: 'otherDepartments', label: '其他部门', icon: <Building /> },
 ];
 
@@ -51,10 +53,11 @@ export function buildOkrScopeGroups(people: OkrPerson[], currentUserId: string):
     my: [],
     department: [],
     company: [],
+    myDepartment: people.filter(person => person.id !== currentUserId && departmentName(person.department) === departmentName(current?.department)),
     otherDepartments: otherDepartmentPeople,
     confirmation: confirmationMembers(people, currentUserId),
   };
-  const meta = [...groupMeta, ...(current && (current.rootFlag === 1 || current.id === 'user-admin' || current.name === '林志豪' || current.jobTitle?.includes('主管')) ? [{ key: 'confirmation' as const, label: '目标确认', icon: <ChecklistIcon/> }] : [])];
+  const meta = [...groupMeta, ...(goalLevel(current) !== '个人级' ? [{ key: 'confirmation' as const, label: '目标确认', icon: <ChecklistIcon/> }] : [])];
   return meta.map(group => ({ ...group, members: membersByScope[group.key], ...(group.key === 'otherDepartments' ? { departmentGroups } : {}) }));
 }
 
@@ -65,7 +68,7 @@ type Props = {
   selection: OkrScopeSelection;
   defaultExpandMembers?: boolean;
   onSelect: (selection: OkrScopeSelection) => void;
-  onAddTarget: () => void;
+  onAddTarget: (level?: 'personal' | 'department') => void;
   addTargetDisabled?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -88,7 +91,7 @@ export function OkrScopeSidebar({ people, records = [], currentUserId, selection
   return <aside className={`okr-scope-sidebar${collapsed ? ' is-collapsed' : ''}`} aria-label="目标范围导航">
     <div className="okr-scope-search">
       <Input value={query} onChange={event => setQuery(event.target.value)} prefix={<Search />} allowClear placeholder="搜索人名" aria-label="搜索人名" />
-      <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} disabled={addTargetDisabled || !currentUser} onClick={onAddTarget} /></Tooltip>
+      {goalLevel(currentUser) === '主管级' ? <Dropdown trigger={['click']} disabled={addTargetDisabled} menu={{items:[{key:'department',label:'部门目标'},{key:'personal',label:'我的目标'}],onClick:({key})=>onAddTarget(key as 'personal'|'department')}}><Button type="primary" icon={<Plus/>} aria-label="添加目标选项" disabled={addTargetDisabled}/></Dropdown> : <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} disabled={addTargetDisabled || !currentUser} onClick={()=>onAddTarget()} /></Tooltip>}
     </div>
     <nav className="okr-scope-groups">
       {groups.map(group => {

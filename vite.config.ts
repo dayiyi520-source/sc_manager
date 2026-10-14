@@ -1,3 +1,4 @@
+import { mockOkrStatePlugin } from './scripts/mock-okr-state-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -103,7 +104,7 @@ export default defineConfig(() => {
     || (templatePreviewPort ? 'http://127.0.0.1:8084' : researchPort ? 'http://127.0.0.1:8082' : 'http://127.0.0.1:8081');
   return {
     base: process.env.VITE_BASE_PATH || '/',
-    plugins: [mockResearchTemplatePlugin(), devApiMockPlugin(), react(), tailwindcss()],
+    plugins: [mockOkrStatePlugin(), mockResearchTemplatePlugin(), devApiMockPlugin(), react(), tailwindcss()],
     test: {
       environment: 'node',
       globals: true,

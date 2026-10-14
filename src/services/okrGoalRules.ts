@@ -17,3 +17,14 @@ export function assignedGoalActions(records: OkrRecord[], person?: OkrPerson): O
       ? [{ ...record, payload: { ...record.payload, parentObjectiveId: record.id, parentActionId: record.id, parentKeyResultId: record.id } }] : [];
   });
 }
+
+export const ownerGoalLevel = (person: OkrPerson | undefined, payload: OkrRecord['payload']) => goalLevel(person) === '主管级' && payload.goalLevel === 'personal' ? '个人级' : goalLevel(person);
+
+export function autonomousAlignmentSource(source: OkrRecord, person: OkrPerson | undefined, personal: boolean, people: OkrPerson[]): boolean {
+  if (!person) return false;
+  if (personal && goalLevel(person) === '主管级') {
+    const owner = people.find(item => item.id === source.ownerId);
+    return source.kind === 'objective' && source.payload.goalLevel !== 'personal' && goalLevel(owner) === '主管级' && Boolean(person.department?.trim()) && owner?.department?.trim() === person.department.trim();
+  }
+  return source.ownerId === person.supervisorId;
+}

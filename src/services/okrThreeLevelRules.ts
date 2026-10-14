@@ -21,8 +21,8 @@ export function upstreamReadiness(records: OkrRecord[], person: OkrPerson | unde
   const source = records.filter(record => record.ownerId === person.supervisorId && record.periodKey === period && record.kind !== 'review' && record.status !== 'deleted');
   return source.some(record => ['active','reviewed'].includes(record.status)) ? '上级目标已生效，当前没有指派给你的 KR，可自主提出目标' : '上级本月目标尚未生效，可先制定自主目标';
 }
-export function autonomousGoalPayload(person: OkrPerson): OkrPayload {
-  return { goalModelVersion: 2, goalLevel: goalLevel(person) === '个人级' ? 'personal' : 'department', origin: 'autonomous', title: '', objectiveType: 'challenge', weight: 100, keyResults: [] };
+export function autonomousGoalPayload(person: OkrPerson, level?: 'personal' | 'department'): OkrPayload {
+  return { goalModelVersion: 2, goalLevel: level || (goalLevel(person) === '个人级' ? 'personal' : 'department'), origin: 'autonomous', title: '', objectiveType: 'challenge', weight: 100, keyResults: [] };
 }
 export function inheritedGoalPayload(reference: OkrRecord, person: OkrPerson): OkrPayload {
   const personal = goalLevel(person) === '个人级';
@@ -65,7 +65,7 @@ export function validateThreeLevelGoal(payload: OkrPayload, ownerId: string): st
     if (!kr.deadline) return '请设置每条 KR 的计划截止日期';
     if (payload.goalLevel === 'department') {
       if (!['product', 'delivery', 'support'].includes(kr.structureType || '')) return '请选择 KR 业务类型';
-      if (!kr.businessObject || (kr.structureType === 'support' ? !kr.action || !kr.result : !krDetailContentComplete(kr))) return '请填写完整 KR 业务字段';
+      if (kr.structureType === 'support' ? !kr.action?.trim() || !kr.result?.trim() : !kr.businessObject?.trim() || !krDetailContentComplete(kr)) return '请填写完整 KR 业务字段';
     }
     const detailError = krDetailsError(kr); if (detailError) return detailError;
     if (payload.goalLevel === 'personal' && !kr.executionActions?.length) return '请填写本人本月执行的 A 动作';

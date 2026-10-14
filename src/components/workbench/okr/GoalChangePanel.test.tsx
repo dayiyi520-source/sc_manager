@@ -13,7 +13,7 @@ describe('目标修改审核与同步反馈', () => {
   render(<GoalChangePanel work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} records={[pending]} people={[]} viewerId="boss" onRefresh={refresh}/>);
   fireEvent.click(screen.getByRole('button',{name:'查看修改'}));
   const dialog = (await screen.findByText('审核目标修改',{selector:'.ant-modal-title'})).closest('[role=dialog]') as HTMLElement;
-  expect(within(dialog).getByText(/目标内容：原指标 → 新指标/)).toBeInTheDocument();
+  expect(within(dialog).getByLabelText('修改信息')).toHaveTextContent('原指标');expect(within(dialog).getByLabelText('修改信息')).toHaveTextContent('新指标');
   expect(within(dialog).getByText('指标调整')).toBeInTheDocument();
   expect(within(dialog).getByRole('button',{name:'查看目标详情'})).toBeInTheDocument();
   fireEvent.click(within(dialog).getByRole('button',{name:'退回修改'}));
@@ -41,6 +41,16 @@ describe('目标修改审核与同步反馈', () => {
   const {container}=render(<GoalChangePanel work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} records={[pending]} people={[]} viewerId="another" onRefresh={vi.fn()}/>);
   expect(container).toBeEmptyDOMElement();
  });
+ it('compares a saved source snapshot without treating the employee action as a source change', async () => {
+  const originalKr={id:'source-kr',title:'交付结果',weight:100,progress:0,details:[{id:'d',name:'产品甲',version:'V1',stage:'设计',plannedStartDate:'2026-10-01',plannedEndDate:'2026-10-20'}]};
+  const source={...pending,id:'company',ownerId:'boss',version:3,changeRequest:undefined,payload:{title:'公司O',keyResults:[{...originalKr,details:[{...originalKr.details[0],version:'V2',stage:'开发',plannedEndDate:'2026-10-25'}]}]}};
+  const own={...pending,changeRequest:undefined,payload:{...pending.payload,sourceObjectiveId:'company',sourceKrId:'source-kr',sourceVersion:1,sourceTitle:'交付结果',sourceKrData:originalKr}};
+  render(<GoalChangePanel work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} records={[source,own]} people={[]} viewerId="manager" onRefresh={vi.fn()}/>);
+  fireEvent.click(screen.getByRole('button',{name:'查看来源变更'}));
+  const summary=await screen.findByLabelText('上级来源变化');
+  expect(summary).toHaveTextContent('V1');expect(summary).toHaveTextContent('V2');expect(summary).toHaveTextContent('设计');expect(summary).toHaveTextContent('开发');expect(summary).toHaveTextContent('2026-10-25');
+  expect(summary).not.toHaveTextContent('本人动作');
+ });
  it('requires explicit confirmation before syncing an updated source', async () => {
   const source={...pending,id:'company',ownerId:'boss',version:3,changeRequest:undefined,payload:{title:'公司O',keyResults:[{id:'source-kr',title:'新公司KR',weight:100,progress:0}]}};
   const own={...pending,changeRequest:undefined,payload:{...pending.payload,sourceObjectiveId:'company',sourceKrId:'source-kr',sourceVersion:1,sourceTitle:'旧公司KR'}};
@@ -48,7 +58,7 @@ describe('目标修改审核与同步反馈', () => {
   render(<GoalChangePanel work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} records={[source,own]} people={[]} viewerId="manager" onRefresh={refresh}/>);
   fireEvent.click(screen.getByRole('button',{name:'查看来源变更'}));
   const dialog=(await screen.findByText('确认上级目标同步',{selector:'.ant-modal-title'})).closest('[role=dialog]') as HTMLElement;
-  expect(within(dialog).getByText('此前关联：旧公司KR')).toBeInTheDocument(); expect(update).not.toHaveBeenCalled();
+  expect(within(dialog).getByLabelText('上级来源变化')).toHaveTextContent('旧公司KR');expect(within(dialog).getByLabelText('上级来源变化')).toHaveTextContent('新公司KR'); expect(update).not.toHaveBeenCalled();
   fireEvent.click(within(dialog).getByRole('button',{name:'确认已核对'}));
   await waitFor(()=>expect(update).toHaveBeenCalledWith(own,'acknowledge-source',{feedback:''},'manager'));
  });

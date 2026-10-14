@@ -2,19 +2,19 @@ import { restoreReturnedInitialDraft } from './okrSubmissionState';
 import { applyProgress, canUpdateProgress, progressSubject } from './okrProgress';
 import { canAlignPeriod } from './okrPeriods';
 import { canEditOkr, confirmationReviewer } from './okrSettingsPolicy';
-import { goalLevel } from './okrGoalRules';
+import { goalLevel, autonomousAlignmentSource } from './okrGoalRules';
 import { lockGoalPlan, validateThreeLevelGoal, sourceKeyResults } from './okrThreeLevelRules';
 import type { OkrPayload, OkrPerson, OkrRecord, OkrGoalChange, OkrSettings } from './okrRepository';
 
 interface Mutation { action?: string; kind?: string; viewerId?: string; version?: number; periodKey?: string; submit?: boolean; payload?: OkrPayload; feedback?: string; suggestedSource?: string; itemId?: string; progress?: number; progressStatus?: 'normal' | 'risk' | 'overdue' | 'ahead'; note?: string; attachments?: Array<{ name: string; data: string }>; }
 interface Result { records: OkrRecord[]; value: unknown }
 const timestamp = () => new Date().toISOString();
-function verifySource(payload: OkrPayload, records: OkrRecord[], person: OkrPerson, period: string, settings?: OkrSettings) {
+function verifySource(payload: OkrPayload, records: OkrRecord[], person: OkrPerson, period: string, settings?: OkrSettings, people: OkrPerson[] = []) {
   if (payload.goalLevel === 'company') return;
   if (payload.origin === 'autonomous') {
     if (!payload.sourceObjectiveId) return;
-    const source = records.find(item => item.id === payload.sourceObjectiveId && canAlignPeriod(period,item.periodKey,settings?.cycles?.crossAlignment) && item.ownerId === person.supervisorId && ['active','reviewed'].includes(item.status));
-    if (!source || (source.changeRequest?.purpose === 'initial' && source.changeRequest.status !== 'approved') || (payload.sourceKrId && !sourceKeyResults(source).some(kr => kr.id === payload.sourceKrId))) throw new Error('只能对齐同周期或包含当前周期的直属上级已生效 O 或 KR');
+    const source = records.find(item => item.id === payload.sourceObjectiveId && canAlignPeriod(period,item.periodKey,settings?.cycles?.crossAlignment) && autonomousAlignmentSource(item, person, payload.goalLevel === 'personal', people) && ['active','reviewed'].includes(item.status));
+    if (!source || (source.changeRequest?.purpose === 'initial' && source.changeRequest.status !== 'approved') || (payload.sourceKrId && !sourceKeyResults(source).some(kr => kr.id === payload.sourceKrId))) throw new Error(payload.goalLevel === 'personal' && goalLevel(person) === '主管级' ? '只能对齐本部门主管已生效的部门 O 或 KR' : '只能对齐同周期或包含当前周期的直属上级已生效 O 或 KR');
     const deadline = (payload.sourceKrId ? sourceKeyResults(source).find(kr => kr.id === payload.sourceKrId)?.deadline : undefined) || source.payload.deadline;
     if (deadline && (payload.deadline && payload.deadline > deadline || payload.keyResults?.some(kr => kr.deadline && kr.deadline > deadline || kr.executionActions?.some(action => action.deadline && action.deadline > deadline)))) throw new Error('下级计划截止日期不能超过上级截止日期');
     if (source.version !== payload.sourceVersion) throw new Error('关联来源已更新，请核对后重新选择');
@@ -92,10 +92,10 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
   if (!payload || payload.goalModelVersion !== 2) throw new Error('目标数据无效');
   const owner = record ? people.find(p=>p.id===record.ownerId)! : person;
   const expectedLevel = goalLevel(owner) === '公司级' ? 'company' : goalLevel(owner) === '主管级' ? 'department' : 'personal';
-  if (payload.goalLevel !== expectedLevel) throw new Error('目标层级与本人组织角色不匹配');
+  if (payload.goalLevel !== expectedLevel && !(expectedLevel === 'department' && payload.goalLevel === 'personal' && payload.origin === 'autonomous')) throw new Error('目标层级与本人组织角色不匹配');
   const submission = record ? body.action === 'submit' || !['draft','submitted'].includes(record.status) : body.submit !== false;
   if (submission) { const error = validateThreeLevelGoal(payload, owner.id); if (error) throw new Error(error); }
-  verifySource(payload, records, owner, record?.periodKey || body.periodKey || '', settings);
+  verifySource(payload, records, owner, record?.periodKey || body.periodKey || '', settings, people);
   if (record && !['draft','submitted'].includes(record.status) && (payload.deadline !== record.payload.deadline || record.payload.keyResults?.some(kr => { const next = payload.keyResults?.find(item => item.id === kr.id); return next && next.deadline !== kr.deadline; }))) throw new Error('目标及 KR 原计划日期已锁定');
   if (record && record.payload.goalModelVersion === 2 && records.some(child => child.status !== 'deleted' && child.payload.sourceObjectiveId === record.id && !payload.keyResults?.some(kr => kr.id === child.payload.sourceKrId))) throw new Error('已有下级承接的 KR 不能移除，请先处理承接关系');
   if (payload.sourceKrId && records.some(item => item.id !== record?.id && item.status !== 'deleted' && item.kind === 'objective' && item.ownerId === person.id && item.periodKey === (record?.periodKey || body.periodKey) && (item.payload.sourceKrId === payload.sourceKrId || (item.changeRequest?.status === 'pending' && item.changeRequest.payload.sourceKrId === payload.sourceKrId)))) throw new Error('该指派已承接或正在关联确认，请继续编辑已有目标');
