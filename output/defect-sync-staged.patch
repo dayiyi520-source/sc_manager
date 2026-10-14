@@ -1,0 +1,587 @@
+diff --git a/docs/prd/V1.0.0.md b/docs/prd/V1.0.0.md
+index 7e42c63..133bee2 100644
+--- a/docs/prd/V1.0.0.md
++++ b/docs/prd/V1.0.0.md
+@@ -214,7 +214,14 @@
+ - **目标与边界**：让有任务访问权限的人员通过独立菜单查看售前、交付任务；本次新增入口、范围筛选、列表字段、本地验收样例及两个任务的关联区域约束，不新增业务审批、批量维护或业务状态。
+ - **角色与前置条件**：沿用现有管理员、销售总监、产品经理、技术负责人等角色的任务访问和维护权限；用户已登录，任务及其关联对象处于可访问范围。任务负责人和创建人以人员身份判断，历史记录仅有姓名时按姓名匹配。
+ - **原型入口与界面说明**：从“客户与商机”进入“售前任务”，从“项目管理”进入“交付任务”；两个大类各显示上述一个子菜单。原型基准为本次已确认的任务列表结构及用户提供的其他任务列表空状态参考图，原型截图待补充。
+-- **任务操作与缺陷字段补充**：售前、交付、运维及缺陷任务列表的更多操作仅提供复制任务和归档，不提供添加子任务或复制并关联；复制生成独立任务，归档后从列表移除。产品、设计、研发、测试任务状态候选按当前有效流程展示，保留权限、允许的流转方向及完成校验；绑定失效须明确报错，不以仅显示当前状态冒充完整候选。缺陷新建移除期望结果、子任务、支撑项和工时关联入口，保留协同事项并增加关联任务；基础字段依次为负责人、优先级、关联产品、关联版本、缺陷类型、计划开始时间、计划完成时间、期望完成时间、预计工时、附件；详情在预计工时之后、附件之前显示实际工时。缺陷类型固定为系统缺陷、样式缺陷、线上故障、安全漏洞，默认系统缺陷，可在未选择产品时选择，切换产品不重置类型；已有缺陷可修改类型并保存，历史工时与关系保留，取消编辑不修改记录。
++- **任务操作与缺陷字段补充**：售前、交付、运维及缺陷任务列表的更多操作仅提供复制任务和归档，不提供添加子任务或复制并关联；复制生成独立任务，归档后从列表移除。产品、设计、研发、测试任务状态候选按当前有效流程展示，保留权限、允许的流转方向及完成校验；绑定失效须明确报错，不以仅显示当前状态冒充完整候选。缺陷新建移除期望结果、子任务、支撑项和工时关联入口，保留协同事项并增加关联任务；基础字段依次为负责人、验证者、优先级、关联产品、关联版本、缺陷类型、计划开始时间、计划完成时间、期望完成时间、预计工时、附件；详情在预计工时之后、附件之前显示实际工时。缺陷类型固定为系统缺陷、样式缺陷、线上故障、安全漏洞，默认系统缺陷，可在未选择产品时选择，切换产品不重置类型；已有缺陷可修改类型并保存，历史工时与关系保留，取消编辑不修改记录。 缺陷新建与详情的验证者使用在职成员，详情修改后立即保存并回显；历史缺陷保留有效验证者，缺失或失效验证者补齐为在职测试成员，无可用测试成员时使用在职成员，无在职成员时保留未分配并提示选择。缺陷范围依次为我负责的、我创建的、待我验证的、我部门的、全公司的；待我验证仅显示当前用户为验证者且处于已修复、待验证、待验收、待确认或验证中的缺陷，已关闭及未修复缺陷不进入该范围，标签计数与列表使用相同规则，全公司范围仍受产品访问权限约束。系统工作项模板变更同步到各产品工作项设置，历史任务修复类型和流程绑定，优先保留模板内有效状态，无法对应的历史状态分配到有效状态，重复加载不得重新分配；模板禁用后产品同步禁用，当前流程的权限、方向及完成校验继续生效。验证者保存失败保留原值并提示错误，任务过期版本拒绝覆盖；空列表使用平台统一空状态。
++
++| 页面 | 展示名称 | 展现方式 | 业务用途 | 变更类型 |
++| --- | --- | --- | --- | --- |
++| 缺陷新建、缺陷详情 | 验证者 | 负责人下方的在职人员单选，支持姓名搜索 | 指定缺陷修复结果的验证责任人，详情允许修改 | 新增 |
++| 缺陷列表 | 待我验证的 | 我创建的之后的范围标签，显示匹配数量 | 查看本人负责验证且已进入验证阶段的缺陷 | 新增 |
++| 缺陷列表 | 全公司的 | 我部门的之后的范围标签，显示匹配数量 | 查看当前有权访问产品中的全部缺陷 | 新增 |
++
+ - **项目交付地图补充**：有项目访问权限的管理员、销售总监、产品经理和技术负责人可从“项目管理”进入“项目交付地图”，查看项目与客户院校的交付阶段全景；页面默认展示5条本地验收项目/客户院校数据，每个项目可包含多个产品及其阶段节点；项目/客户院校列按项目纵向合并单元格展示，产品列和阶段列分别对应每一条产品记录。用户可按项目或客户院校、阶段名称、产品和项目状态筛选并主动搜索，页面展示未开始、进行中、已完成三种状态及对应日期；搜索期间显示加载反馈，搜索无匹配时保留筛选区并显示官方空状态及清除筛选入口，重置后恢复全部项目。长项目名、客户院校名、产品名和负责人信息不得撑破布局；项目、产品或阶段数据为空时保持页面结构稳定。项目交付地图仅新增可视化查询能力，不改变交付任务的创建、编辑、审批和状态流转。
+ - **查询与筛选**：仅显示“我负责的”“我创建的”“我部门的”三个范围标签，默认“我负责的”，每项显示数量，零条显示0。负责人为当前用户的任务进入我负责的；创建人为当前用户的任务进入我创建的；任务归属部门与当前用户一致的任务进入我部门的，归属部门缺失时采用负责人所属部门，无部门或不能确定负责人部门时不扩大范围。数量统计当前任务类型全部可访问记录，按任务去重，不受当前分页、临时搜索、过滤或分组影响，切换范围后回到第一页；新增、负责人或归属变更成功后刷新。现有搜索、过滤、分组与分页方式沿用。
+ - **展示字段**：售前任务依次展示标题、状态、优先级、来源归属、负责人、创建人、创建时间、操作；交付任务依次展示标题、状态、优先级、来源归属、项目阶段、负责人、创建人、创建时间、操作。
+diff --git a/docs/superpowers/plans/2026-10-14-defect-verifier-workflow-sync.md b/docs/superpowers/plans/2026-10-14-defect-verifier-workflow-sync.md
+new file mode 100644
+index 0000000..f992887
+--- /dev/null
++++ b/docs/superpowers/plans/2026-10-14-defect-verifier-workflow-sync.md
+@@ -0,0 +1,13 @@
++# 缺陷验证者与工作项模板同步实施计划
++
++**Goal:** 支持真实验证者、个人验证筛选及全公司范围，修复产品与模板状态流程不一致。
++**Architecture:** 复用共享任务表单与 API 契约，使用幂等迁移同步产品模板和历史任务绑定。
++**Tech Stack:** React、Ant Design、现有 Mock 持久化与 Vitest。
++
++- [x] 表单验证者紧跟负责人，使用在职成员 ID 与姓名，历史缺陷补齐。
++- [x] 缺陷标签加入待我验证和全公司，计数与筛选共用同一规则。
++- [x] 产品同步系统模板，保留有效状态，修复失效类型和流程；重复读取不得改写用户状态。
++- [x] 验证无可用成员、模板状态被移除、并发保存与重复迁移边界。
++- [x] 更新对应 PRD、运行相关测试和构建，仅提交本次变更。
++
++验证记录：相关测试、类型检查和构建完成；PRD 校验仍报既有字段类型术语及登记数量不一致。
+diff --git a/src/components/product/RequirementTasksView.sharing.test.tsx b/src/components/product/RequirementTasksView.sharing.test.tsx
+index 713b3bf..7bdbb10 100644
+--- a/src/components/product/RequirementTasksView.sharing.test.tsx
++++ b/src/components/product/RequirementTasksView.sharing.test.tsx
+@@ -6,10 +6,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+ import { RequirementTasksView, WorkOrderPicker } from './RequirementTasksView';
+ import { useApp } from '../../context/AppContext';
+ import { productRepository } from '../../services/productRepository';
++import { readSession } from '../../services/session';
+ import { copyToClipboard } from '../../utils/copyToClipboard';
+ 
+ vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }));
+-vi.mock('../../services/session', () => ({ readSession: () => null }));
++vi.mock('../../services/session', () => ({ readSession: vi.fn(() => null) }));
+ vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.fn().mockResolvedValue([]) } }));
+ vi.mock('../../services/requirementRepository', () => ({ requirementRepository: { workOrderCandidates: vi.fn().mockResolvedValue([]) } }));
+ vi.mock('../../services/productRepository', () => ({ productRepository: {
+@@ -30,6 +31,7 @@ vi.mock('./WorkItemCreatePanel', async () => ({ WorkItemDetailHeader: () => null
+ const addToast = vi.fn();
+ beforeEach(() => {
+   vi.clearAllMocks();
++  vi.mocked(readSession).mockReturnValue(null);
+   vi.mocked(productRepository.workItems).mockReset().mockResolvedValue({ page: { items: [], total: 0 } } as never);
+   sessionStorage.clear();
+   window.history.replaceState(null, '', '/manager/app/crm_presales_tasks?detailId=shared-task');
+@@ -282,6 +284,7 @@ it('shows fixed independent defect types and the requested bug creation fields',
+   window.history.replaceState(null, '', '/app/prod_bugs');
+   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" /></QueryClientProvider>);
+   fireEvent.click(await screen.findByRole('button', { name: '新建' }));
++  expect(screen.getByText('验证者').closest('.ant-form-item')).toHaveStyle({ order: '1' });
+   expect(screen.queryByText('期望结果')).not.toBeInTheDocument();
+   expect(screen.queryByText('支撑项')).not.toBeInTheDocument();
+   expect(screen.queryByText('子任务')).not.toBeInTheDocument();
+@@ -293,3 +296,26 @@ it('shows fixed independent defect types and the requested bug creation fields',
+   fireEvent.mouseDown(typeItem.querySelector('input')!);
+   for (const label of ['系统缺陷','样式缺陷','线上故障','安全漏洞']) expect(screen.getByText(label, { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
+ });
++
++
++it('filters defects awaiting my verification and offers the full company scope in order', async () => {
++  vi.mocked(readSession).mockReturnValue({ user: { id: 'qa' } } as never);
++  window.history.replaceState(null, '', '/app/prod_bugs');
++  vi.mocked(useApp).mockReturnValue({ ...useApp(), currentUser: { id: 'qa', name: '测试人员', department: '测试部' }, productLines: [{ id: 'line', name: '产品' }] } as unknown as ReturnType<typeof useApp>);
++  const records = [
++    { id: 'mine', title: '待我验证缺陷', verifierId: 'qa', status: { name: '已修复' } },
++    { id: 'closed', title: '已关闭缺陷', verifierId: 'qa', status: { name: '已关闭' } },
++    { id: 'other', title: '他人验证缺陷', verifierId: 'other', status: { name: '已修复' } }
++  ].map(task => ({ ...task, category: 'bug', productLineId: 'line', assigneeName: '测试人员', createdAt: '2026-10-01', priority: '中' }));
++  vi.mocked(productRepository.workItems).mockResolvedValue({ page: { items: records, total: records.length } } as never);
++  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" /></QueryClientProvider>);
++  const pending = await screen.findByRole('tab', { name: '待我验证的·1' });
++  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['我负责的·3', '我创建的·0', '待我验证的·1', '我部门的·0', '全公司的·3']);
++  fireEvent.click(pending);
++  expect(await screen.findByText('待我验证缺陷')).toBeVisible();
++  expect(screen.queryByText('已关闭缺陷')).not.toBeInTheDocument();
++  expect(screen.queryByText('他人验证缺陷')).not.toBeInTheDocument();
++  fireEvent.click(screen.getByRole('tab', { name: '全公司的·3' }));
++  expect(await screen.findByText('已关闭缺陷')).toBeVisible();
++  expect(screen.getByText('他人验证缺陷')).toBeVisible();
++});
+diff --git a/src/components/product/RequirementTasksView.tsx b/src/components/product/RequirementTasksView.tsx
+index 8663a05..dbf76df 100644
+--- a/src/components/product/RequirementTasksView.tsx
++++ b/src/components/product/RequirementTasksView.tsx
+@@ -1,3 +1,4 @@
++import { isPendingVerification } from '../../services/workItemTemplateSync';
+ import { BUSINESS_TASK_SCOPES, businessTaskSource, matchesBusinessTaskScope } from './businessTaskPresentation';
+ import { loadBusinessTasks } from '../../services/businessTaskRepository';
+ import { designGroupOf, designTypeLabel, designVariantOf } from './designTaskPresentation';
+@@ -247,7 +248,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+     return addRequirementTask(task);
+   };
+   const productTaskScope = isCommercialTask || taskKind === 'requirement' || taskKind === 'design' || taskKind === 'dev' || taskKind === 'test' || taskKind === 'bug' || taskKind === 'ops';
+-  const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created' | 'my_participated' | 'my_department' | 'my_pending_review'>(productTaskScope ? 'my_owned' : initialScope);
++  const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created' | 'my_participated' | 'my_department' | 'my_pending_review' | 'my_verification'>(productTaskScope ? 'my_owned' : initialScope);
+   useEffect(() => { if (productTaskScope) setActiveTab('my_owned'); }, [productTaskScope, taskKind]);
+   const [searchQuery, setSearchQuery] = useState('');
+   const [searchOpen, setSearchOpen] = useState(false);
+@@ -469,6 +470,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+           expectedGoal: updates.expectedGoal,
+           versionId: updates.versionId,
+           assigneeName: updates.ownerName,
++          verifierId: updates.verifierId,
++          verifierName: updates.verifierName,
+           priority: updates.priority ? apiPriority(updates.priority) : undefined,
+           plannedStartDate: updates.plannedStartDate,
+           plannedEndDate: updates.dueDate,
+@@ -927,6 +930,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+   const [formActualHours, setFormActualHours] = useState<number | ''>('');
+   const [formRequirementType, setFormRequirementType] = useState('');
+   const [configuredWorkItemTypes, setConfiguredWorkItemTypes] = useState<ProductLineWorkItemType[]>([]);
++  const [formVerifierId, setFormVerifierId] = useState('');
+   const [formCcNames, setFormCcNames] = useState<string[]>([]);
+   const [formPlannedStartDate, setFormPlannedStartDate] = useState('');
+   const [formExpectedCompleteDate, setFormExpectedCompleteDate] = useState('');
+@@ -1006,6 +1010,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+     setFormTarget('');
+     setFormDueDate('');
+     setFormOwnerName('');
++    setFormVerifierId(employeeOptions.find(employee => employee.id === currentUser.id)?.id || '');
+     setFormPriority('中');
+     setFormVersionName('');
+     setFormCustomerName('');
+@@ -1057,6 +1062,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+     if (creationContext.relatedProductTask) setSelectedRequirementTaskIds([creationContext.relatedProductTask.id]);
+     setFormVersionName(version?.name || '');
+     setFormOwnerName(ownerName || '');
++    setFormVerifierId(employeeOptions.find(employee => employee.id === currentUser.id)?.id || '');
+     setFormTitle(creationContext.title || '');
+   }, [creationContext, creationIntentKey, productLines, versions, employeeOptions, designVariant, projects, currentUser.department]);
+ 
+@@ -1128,6 +1134,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+     setFormTarget(task.expectedGoal || '');
+     setFormDueDate(task.dueDate);
+     setFormOwnerName(task.ownerName);
++    setFormVerifierId(task.verifierId || employeeOptions.find(employee => employee.name === task.verifierName)?.id || '');
+     setFormPriority(normalizePriority(task.priority) as RequirementTask['priority']);
+     setFormVersionName(task.versionName);
+     setFormCustomerName(task.projectId || projects.find((project) => project.name === task.designProjectName)?.id || '');
+@@ -1196,7 +1203,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+     const businessCustomer = customers.find((customer) => customer.id === formBusinessCustomer || customer.name === formBusinessCustomer);
+     const businessSource = [...opportunities, ...biddings].find((item) => item.id === formBusinessSource || item.name === formBusinessSource || (item as any).projectName === formBusinessSource);
+     const designProject = taskKind === 'design' && designVariant === 'project' ? projects.find((project) => project.id === formCustomerName) : undefined;
+-    const associationValues = { ...(isBusinessTask ? { customerId: businessCustomer?.id || formBusinessCustomer, customerName: businessCustomer?.name || formBusinessCustomer, specialFields: taskKind === 'presales' ? { opportunityId: businessSource?.id, opportunityName: (businessSource as any)?.name, biddingId: (businessSource as any)?.id, biddingName: (businessSource as any)?.name } : { projectStage: '' } } : {}), ...(taskKind === 'design' ? { designVariant: designVariant as DesignTaskVariant, designProjectName: designProject?.name || '', designSourceDepartment: formSourceDepartment } : {}), projectId: designProject?.id || (taskKind === 'design' && designVariant === 'project' ? '' : formCustomerName), projectName: designProject?.name || projectName, needsCollaboration: taskKind === 'requirement' ? needsCollaboration : undefined, relatedTaskIds: taskKind === 'requirement' && !editingTask ? [] : selectedRequirementTaskIds, sourceWorkOrderIds: selectedWorkOrderIds, sourceWorkOrderTitles: selectedWorkOrderIds.map((id) => collaborationCandidates.find((item) => item.id === id)?.title || (creationContext?.sourceWorkOrder?.id === id ? creationContext.sourceWorkOrder.title : id)), ...(creationContext?.sourceWorkOrder ? { requirementId: creationContext.sourceWorkOrder.id, sourceType: 'WORK_ORDER' } : {}) };
++    const associationValues = { ...(taskKind === 'bug' ? { verifierId: formVerifierId, verifierName: employeeOptions.find(employee => employee.id === formVerifierId)?.name || '' } : {}), ...(isBusinessTask ? { customerId: businessCustomer?.id || formBusinessCustomer, customerName: businessCustomer?.name || formBusinessCustomer, specialFields: taskKind === 'presales' ? { opportunityId: businessSource?.id, opportunityName: (businessSource as any)?.name, biddingId: (businessSource as any)?.id, biddingName: (businessSource as any)?.name } : { projectStage: '' } } : {}), ...(taskKind === 'design' ? { designVariant: designVariant as DesignTaskVariant, designProjectName: designProject?.name || '', designSourceDepartment: formSourceDepartment } : {}), projectId: designProject?.id || (taskKind === 'design' && designVariant === 'project' ? '' : formCustomerName), projectName: designProject?.name || projectName, needsCollaboration: taskKind === 'requirement' ? needsCollaboration : undefined, relatedTaskIds: taskKind === 'requirement' && !editingTask ? [] : selectedRequirementTaskIds, sourceWorkOrderIds: selectedWorkOrderIds, sourceWorkOrderTitles: selectedWorkOrderIds.map((id) => collaborationCandidates.find((item) => item.id === id)?.title || (creationContext?.sourceWorkOrder?.id === id ? creationContext.sourceWorkOrder.title : id)), ...(creationContext?.sourceWorkOrder ? { requirementId: creationContext.sourceWorkOrder.id, sourceType: 'WORK_ORDER' } : {}) };
+     const requiredValues: Record<string, unknown> = { source: formBusinessSource, customer: formBusinessCustomer, productLine: formProductLineName, sourceDepartment: formSourceDepartment, taskType: formRequirementType, assignee: formOwnerName, priority: formPriority, project: formCustomerName, expectedGoal: formTarget, description: formDescription, plannedStartDate: formPlannedStartDate, plannedEndDate: formDueDate, expectedCompleteDate: formExpectedCompleteDate, version: formVersionName, cc: formCcNames, attachments: formMedia, estimatedHours: formEstimatedHours, collaborationItems: selectedWorkOrderIds, relatedTasks: selectedRequirementTaskIds, needsCollaboration };
+     const missingField = createFields.fields.find((field) => field.visible && field.required && !(taskKind === 'requirement' && !editingTask && field.fieldCode === 'relatedTasks') && field.fieldCode in requiredValues && (Array.isArray(requiredValues[field.fieldCode]) ? !(requiredValues[field.fieldCode] as unknown[]).length : requiredValues[field.fieldCode] == null || requiredValues[field.fieldCode] === ''));
+     if (missingField) { addToast('warning', `请填写${missingField.label}`); return false; }
+@@ -1239,7 +1246,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+           productLineId: selectedProductLine.id,
+           category: unifiedCategory,
+           taskTypeId: selectedWorkItemType.id,
+-          ...(taskKind === 'bug' ? { type: formRequirementType } : {}),
++          ...(taskKind === 'bug' ? { type: formRequirementType, verifierId: formVerifierId, verifierName: employeeOptions.find(employee => employee.id === formVerifierId)?.name } : {}),
+           title: formTitle.trim(),
+           description: formDescription,
+           descriptionHtml: formDescriptionHtml,
+@@ -1316,6 +1323,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+ 
+   const unifiedTask = (item: UnifiedWorkItem, fallback?: RequirementTask): RequirementTask => ({
+     ...((fallback || {}) as RequirementTask),
++    verifierId: String(item.verifierId ?? fallback?.verifierId ?? ''),
++    verifierName: String(item.verifierName ?? fallback?.verifierName ?? ''),
+     projectId: item.projectId ?? fallback?.projectId,
+     projectName: item.projectName ?? fallback?.projectName,
+     relatedTaskIds: item.relatedTaskIds ?? fallback?.relatedTaskIds,
+@@ -1355,6 +1364,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+ 
+   const storedTask = (item: Record<string, unknown>, fallback?: RequirementTask): RequirementTask => ({
+     ...((fallback || {}) as RequirementTask),
++    verifierId: String(item.verifierId ?? fallback?.verifierId ?? ''),
++    verifierName: String(item.verifierName ?? fallback?.verifierName ?? ''),
+     projectId: String(item.projectId ?? fallback?.projectId ?? ''),
+     projectName: String(item.projectName ?? fallback?.projectName ?? ''),
+     relatedTaskIds: Array.isArray(item.relatedTaskIds) ? item.relatedTaskIds as string[] : fallback?.relatedTaskIds,
+@@ -1619,6 +1630,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+   ];
+   const categoryMatch = (task: RequirementTask, tab: typeof activeTab) => {
+     if (tab === 'all') return true;
++    if (tab === 'my_verification') return isPendingVerification(task, currentUser);
+     if (tab === 'my_pending_review') return task.status === '待审核';
+     if (isCommercialTask && tab !== 'my_participated') return matchesBusinessTaskScope(task, tab as 'my_owned' | 'my_created' | 'my_department', currentUser, employeeOptions);
+     if (tab === 'my_owned') return task.ownerName.trim() === currentUser.name.trim();
+@@ -1676,6 +1688,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+     my_created: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_created')).length : remoteEnabled && taskKind !== 'ops' && !isCommercialTask && activeTab === 'my_created' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_created')).length,
+     my_participated: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_participated')).length : remoteEnabled && activeTab === 'my_participated' ? serverPageQuery.data?.total || 0 : productLineTasks.filter((task) => categoryMatch(task, 'my_participated')).length,
+     my_department: unifiedCategory ? productLineTasks.filter((task) => !task.parentWorkItemId && categoryMatch(task, 'my_department')).length : productLineTasks.filter((task) => categoryMatch(task, 'my_department')).length,
++    my_verification: productLineTasks.filter(task => !task.parentWorkItemId && categoryMatch(task, 'my_verification')).length,
+     my_pending_review: productLineTasks.filter((task) => categoryMatch(task, 'my_pending_review')).length
+   };
+   const getGroupValue = (task: RequirementTask) => {
+@@ -1854,7 +1867,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+           {/* 分类 */}
+           <div role="tablist" aria-label={`${itemLabel}范围`} className="requirement-scope-tabs inline-flex h-10 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">
+-            {(productTaskScope ? [...BUSINESS_TASK_SCOPES.filter(([value]) => taskKind !== 'bug' || value !== 'all'), ...(isDeliveryReview ? [['my_pending_review', '待审核']] as const : [])] : [['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_participated', '我参与的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={!showProductTasks && activeTab === value} onClick={() => { setShowProductTasks(false); setActiveTab(value); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{isCommercialTask && !commercialTasksQuery.data ? '—' : tabCounts[value]}</button>)}
++            {(productTaskScope ? [...(taskKind === 'bug' ? [['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_verification', '待我验证的'], ['my_department', '我部门的'], ['all', '全公司的']] as const : BUSINESS_TASK_SCOPES), ...(isDeliveryReview ? [['my_pending_review', '待审核']] as const : [])] : [['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_participated', '我参与的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={!showProductTasks && activeTab === value} onClick={() => { setShowProductTasks(false); setActiveTab(value); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{isCommercialTask && !commercialTasksQuery.data ? '—' : tabCounts[value]}</button>)}
+             {(taskKind === 'dev' || taskKind === 'test' || taskKind === 'design') && <button type="button" role="tab" aria-selected={showProductTasks} onClick={() => { setShowProductTasks(true); setFilterOpen(false); setGroupOpen(false); setSearchOpen(false); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">待分配任务·{productTasksQuery.data?.length || 0}</button>}
+           </div>
+ 
+@@ -1997,6 +2010,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+               {detailVisible('taskType') && <Form.Item style={{ order: detailFields.order('taskType') }} label={detailCategory === 'bug' ? '缺陷类型' : '任务类型'}>{detailCategory === 'bug' ? <Select value={['系统缺陷', '样式缺陷', '线上故障', '安全漏洞'].includes(selectedTask.requirementType || '') ? selectedTask.requirementType : '系统缺陷'} options={['系统缺陷', '样式缺陷', '线上故障', '安全漏洞'].map(value => ({ value, label: value }))} onChange={requirementType => void saveDetailUpdates({ requirementType })}/> : <Input value={taskKind === 'design' ? designVariantMeta[detailVariant].label : detailWorkItemTypes.find((item) => item.id === selectedTask.workItemTypeId)?.name || selectedTask.requirementType || '未设置'} readOnly />}</Form.Item>}
+               {taskKind === 'requirement' && detailVisible('needsCollaboration') && <Form.Item style={{ order: detailFields.order('needsCollaboration') }} label="需要协同"><Checkbox.Group value={selectedTask.needsCollaboration || []} options={[{ label: '设计', value: 'design' }, { label: '开发', value: 'dev' }, { label: '测试', value: 'test' }]} onChange={(values) => { if (!values.length) { addToast('warning', '请至少选择一项需要协同'); return; } void saveDetailUpdates({ needsCollaboration: values as Array<'design' | 'dev' | 'test'> }); }} /></Form.Item>}
+               {detailVisible('assignee') && <Form.Item style={{ order: detailFields.order('assignee') }} label="负责人"><Select disabled={!detailEditable('assignee')} showSearch optionFilterProp="label" value={selectedTask.ownerName || undefined} onChange={(ownerName) => void saveDetailUpdates({ ownerName })} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>}
++              {taskKind === 'bug' && <Form.Item style={{ order: detailFields.order('verifier') }} label="验证者"><Select showSearch optionFilterProp="label" disabled={!detailEditable('verifier')} value={selectedTask.verifierId || undefined} options={employeeOptions.map(employee => ({ value: employee.id, label: employee.name }))} onChange={verifierId => void saveDetailUpdates({ verifierId, verifierName: employeeOptions.find(employee => employee.id === verifierId)?.name || '' })} placeholder="请选择验证者" /></Form.Item>}
+               {detailVisible('priority') && <Form.Item style={{ order: detailFields.order('priority') }} label="优先级"><Select disabled={!detailEditable('priority')} value={normalizePriority(selectedTask.priority)} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} onChange={(priority) => void saveDetailUpdates({ priority: priority as RequirementTask['priority'] })} /></Form.Item>}
+               {detailVisible('plannedStartDate') && <Form.Item style={{ order: detailFields.order('plannedStartDate') }} label="计划开始时间"><DatePicker disabled={!detailEditable('plannedStartDate')} value={selectedTask.plannedStartDate ? dayjs(selectedTask.plannedStartDate) : null} onChange={(date) => void saveDetailUpdates({ plannedStartDate: date ? date.format('YYYY-MM-DD') : '' })} className="w-full" placeholder="请选择日期" /></Form.Item>}
+               {detailVisible('dueDate') && <Form.Item style={{ order: detailFields.order('dueDate') }} label="计划完成时间"><DatePicker disabled={!detailEditable('dueDate')} value={selectedTask.dueDate ? dayjs(selectedTask.dueDate) : null} onChange={(date) => void saveDetailUpdates({ dueDate: date ? date.format('YYYY-MM-DD') : '' })} className="w-full" placeholder="请选择日期" /></Form.Item>}
+@@ -2228,6 +2242,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
+           {(taskKind === 'ops' || (!isCommercialTask && createFields.visible('productLine'))) && <Form.Item style={{ order: taskKind === 'ops' ? -1 : createFields.order('productLine') }} label="关联产品" required={taskKind !== 'ops' && createFields.required('productLine')}><Select disabled={taskKind === 'ops' && !formCustomerName} showSearch allowClear={!createFields.required('productLine')} optionFilterProp="label" value={formProductLineName || undefined} onChange={(value) => { setFormProductLineName(value || ''); setFormVersionName(''); if (taskKind !== 'design' && taskKind !== 'bug') setFormRequirementType(''); }} options={productLines.map((line) => ({ label: line.name, value: line.name }))} placeholder="请选择关联产品" /></Form.Item>}
+           {(taskKind !== 'ops' && (taskKind === 'design' || createFields.visible('taskType'))) && <Form.Item style={{ order: createFields.order('taskType') }} label={taskKind === 'bug' ? '缺陷类型' : '任务类型'} required={createFields.required('taskType')}><Select showSearch optionFilterProp="label" value={formRequirementType || undefined} onChange={setFormRequirementType} options={taskKind === 'bug' ? ['系统缺陷', '样式缺陷', '线上故障', '安全漏洞'].map(value => ({ label: value, value })) : taskKind === 'design' ? [{ label: currentDesignVariant.label, value: currentDesignVariant.defaultType }] : configuredWorkItemTypes.map((item) => ({ label: item.name, value: item.name }))} disabled={taskKind === 'design' || (taskKind !== 'bug' && !configuredWorkItemTypes.length)} placeholder={configuredWorkItemTypes.length ? `请选择${itemLabel}类型` : '请先在产品工作项设置中启用类型'} /></Form.Item>}
+           {createFields.visible('assignee') && <Form.Item style={{ order: createFields.order('assignee') }} label="负责人" required={createFields.required('assignee')}><Select showSearch optionFilterProp="label" value={formOwnerName || undefined} onChange={setFormOwnerName} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>}
++          {taskKind === 'bug' && <Form.Item style={{ order: createFields.order('verifier') }} label="验证者"><Select showSearch optionFilterProp="label" value={formVerifierId || undefined} onChange={setFormVerifierId} options={employeeOptions.map(employee => ({ value: employee.id, label: employee.name }))} placeholder="请选择验证者" /></Form.Item>}
+           {createFields.visible('priority') && <Form.Item style={{ order: createFields.order('priority') }} label="优先级" required={createFields.required('priority')}><Select value={formPriority || undefined} onChange={(value) => setFormPriority(value)} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>}
+           {createFields.visible('plannedStartDate') && <Form.Item style={{ order: createFields.order('plannedStartDate') }} label="计划开始时间" required={createFields.required('plannedStartDate')}><DatePicker value={formPlannedStartDate ? dayjs(formPlannedStartDate) : null} onChange={(date) => setFormPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>}
+           {createFields.visible('plannedEndDate') && <Form.Item style={{ order: createFields.order('plannedEndDate') }} label="计划完成时间" required={createFields.required('plannedStartDate')}><DatePicker value={formDueDate ? dayjs(formDueDate) : null} onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>}
+diff --git a/src/components/product/fixedTaskFields.ts b/src/components/product/fixedTaskFields.ts
+index e7608c8..ad78aab 100644
+--- a/src/components/product/fixedTaskFields.ts
++++ b/src/components/product/fixedTaskFields.ts
+@@ -1,14 +1,14 @@
+ import type { WorkItemFieldConfiguration, WorkItemFieldScene } from '../../services/productRepository';
+ import type { DesignVariant } from './designTaskPresentation';
+ 
+-const labels: Record<string, string> = { source: '关联商机/投标项', customer: '关联客户', title: '标题', taskType: '任务类型', assignee: '负责人', priority: '优先级', productLine: '关联产品', version: '迭代版本', project: '关联项目', sourceDepartment: '来源部门', needsCollaboration: '需要协同', plannedStartDate: '计划开始时间', plannedEndDate: '计划完成时间', expectedCompleteDate: '期望完成时间', estimatedHours: '预计工时', actualHours: '实际工时', attachments: '附件' };
++const labels: Record<string, string> = { source: '关联商机/投标项', customer: '关联客户', title: '标题', taskType: '任务类型', assignee: '负责人', verifier: '验证者', priority: '优先级', productLine: '关联产品', version: '迭代版本', project: '关联项目', sourceDepartment: '来源部门', needsCollaboration: '需要协同', plannedStartDate: '计划开始时间', plannedEndDate: '计划完成时间', expectedCompleteDate: '期望完成时间', estimatedHours: '预计工时', actualHours: '实际工时', attachments: '附件' };
+ const aliases: Record<string, string> = { dueDate: 'plannedEndDate' };
+ export const fixedTaskFields = (category: string, scene: WorkItemFieldScene, variant: DesignVariant = 'product') => {
+   const strict = ['requirement', 'design', 'dev', 'test', 'bug', ...['ops', 'presales', 'delivery']].includes(category);
+   const detail = scene === 'DETAIL';
+   const list = scene === 'LIST' || scene === 'ITERATION';
+   const ownership = category === 'design' ? variant === 'product' ? ['productLine', 'version'] : variant === 'project' ? ['project', 'productLine'] : ['sourceDepartment', 'productLine'] : category === 'ops' ? ['project', 'productLine'] : category === 'presales' ? ['source', 'customer'] : category === 'delivery' ? ['project', 'customer'] : category === 'bug' ? ['productLine', 'version', 'taskType'] : ['productLine', 'version', 'project'];
+-  const propertyCodes = [...(category === 'requirement' ? ['needsCollaboration'] : category === 'design' ? ['taskType'] : []), 'assignee', 'priority', ...ownership, 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', ...(detail ? ['actualHours'] : []), 'attachments'];
++  const propertyCodes = [...(category === 'requirement' ? ['needsCollaboration'] : category === 'design' ? ['taskType'] : []), 'assignee', ...(category === 'bug' ? ['verifier'] : []), 'priority', ...ownership, 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', ...(detail ? ['actualHours'] : []), 'attachments'];
+   const codes = ['title', 'description', 'collaborationItems', ...(!detail && category !== 'requirement' || detail && ['design', 'bug', 'ops', 'presales', 'delivery'].includes(category) ? ['relatedTasks'] : []), ...(detail ? ['creator', 'createdAt', 'updater', 'updatedAt'] : []), ...propertyCodes];
+   const requiredCodes = ['title', 'assignee', 'priority', 'plannedStartDate', 'plannedEndDate', ...(category === 'design' ? ['taskType', variant === 'product' ? 'productLine' : variant === 'project' ? 'project' : 'sourceDepartment'] : category === 'ops' ? [] : category === 'presales' ? ['source', 'customer'] : category === 'delivery' ? ['project', 'customer'] : ['productLine', 'version']), ...(category === 'requirement' ? ['needsCollaboration'] : [])];
+   const fields: WorkItemFieldConfiguration[] = codes.map((fieldCode) => ({ fieldCode, label: labels[fieldCode] || fieldCode, fieldType: 'text', visible: true, required: requiredCodes.includes(fieldCode), editable: true, locked: false, sort: propertyCodes.indexOf(fieldCode) }));
+diff --git a/src/components/product/useWorkItemFieldConfig.test.ts b/src/components/product/useWorkItemFieldConfig.test.ts
+index 0486d1d..106a48a 100644
+--- a/src/components/product/useWorkItemFieldConfig.test.ts
++++ b/src/components/product/useWorkItemFieldConfig.test.ts
+@@ -32,7 +32,7 @@ it('keeps creation dates required when configuration loading fails, without chan
+ 
+ it('keeps bug creation and detail properties ordered and removes legacy relation fields', () => {
+   const { result } = renderHook(() => useWorkItemFieldConfig('bug', 'CREATE'));
+-  expect(result.current.fields.filter(field => field.sort >= 0).sort((a,b) => a.sort - b.sort).map(field => field.fieldCode)).toEqual(['assignee','priority','productLine','version','taskType','plannedStartDate','plannedEndDate','expectedCompleteDate','estimatedHours','attachments']);
++  expect(result.current.fields.filter(field => field.sort >= 0).sort((a,b) => a.sort - b.sort).map(field => field.fieldCode)).toEqual(['assignee','verifier','priority','productLine','version','taskType','plannedStartDate','plannedEndDate','expectedCompleteDate','estimatedHours','attachments']);
+   for (const code of ['expectedGoal','children','support','hours','actualHours']) expect(result.current.visible(code)).toBe(false);
+   expect(result.current.visible('relatedTasks')).toBe(true);
+ });
+diff --git a/src/components/system/WorkItemModuleView.tsx b/src/components/system/WorkItemModuleView.tsx
+index 90b5f47..b5d0851 100644
+--- a/src/components/system/WorkItemModuleView.tsx
++++ b/src/components/system/WorkItemModuleView.tsx
+@@ -1,3 +1,4 @@
++import { useQueryClient } from '@tanstack/react-query';
+ import React, { useEffect, useMemo, useState } from 'react';
+ import { Button, Drawer, Input, Modal, Select, Switch, Tabs, Tag, message } from 'antd';
+ import { ApartmentOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+@@ -16,6 +17,9 @@ const normalizeStates = (item: WorkItemTemplateType | null): EditableWorkflowSta
+ };
+ 
+ export const WorkItemModuleView: React.FC = () => {
++  const queryClient = useQueryClient();
++  const syncConsumers = async () => { await Promise.all(['product-lines', 'product-work-item-types', 'unified-task-page', 'design-tasks', 'product-bugs', 'product-dev-tasks', 'requirements'].map(key => queryClient.invalidateQueries({ queryKey: [key] }))); };
++
+   const [items, setItems] = useState<WorkItemTemplateType[]>([]);
+   const [categories, setCategories] = useState<WorkItemCategoryDefinition[]>([]);
+   const [category, setCategory] = useState<ProductLineWorkItemCategory>('需求');
+@@ -52,7 +56,7 @@ export const WorkItemModuleView: React.FC = () => {
+     try {
+       if (editing) await productRepository.updateWorkItemTemplateType(editing.id, { name: name.trim(), description, enabled, isDefault: enabled && isDefault });
+       else { const apiCategory = categoryKey(createCategory); const definition = buildWorkflowDefinition(states.map((state) => ({ ...state, name: state.name.trim(), stage: apiCategory }))); await productRepository.createWorkItemTemplateType({ category: createCategory, name: name.trim(), description, enabled, isDefault: enabled && isDefault, workflow: { category: apiCategory, name: `${name.trim()}状态配置`, definition } }); }
+-      message.success(editing ? '模板已保存' : '类型已创建'); setOpen(false); await load();
++      message.success(editing ? '模板已保存' : '类型已创建'); setOpen(false); await syncConsumers(); await load();
+     } catch (error) { message.error(error instanceof Error ? error.message : '保存失败'); }
+     finally { setSaving(false); }
+   };
+@@ -60,12 +64,12 @@ export const WorkItemModuleView: React.FC = () => {
+     if (!stateItem || saving) return;
+     const invalid = validateWorkflowStates(states); if (invalid) { message.warning(invalid); return; }
+     setSaving(true);
+-    try { const apiCategory = categoryKey(stateItem.category); const definition = buildWorkflowDefinition(states.map((state) => ({ ...state, name: state.name.trim(), stage: apiCategory }))); await productRepository.updateWorkItemTemplateWorkflow(stateItem.id, { category: apiCategory, name: `${stateItem.name}状态配置`, definition, revision: stateItem.workflow?.revision }); message.success('状态配置已保存'); setStateItem(null); await load(); }
++    try { const apiCategory = categoryKey(stateItem.category); const definition = buildWorkflowDefinition(states.map((state) => ({ ...state, name: state.name.trim(), stage: apiCategory }))); await productRepository.updateWorkItemTemplateWorkflow(stateItem.id, { category: apiCategory, name: `${stateItem.name}状态配置`, definition, revision: stateItem.workflow?.revision }); message.success('状态配置已保存'); setStateItem(null); await syncConsumers(); await load(); }
+     catch (error) { message.error(error instanceof Error ? error.message : '保存失败'); }
+     finally { setSaving(false); }
+   };
+-  const toggle = async (item: WorkItemTemplateType, checked: boolean) => { setSaving(true); try { await productRepository.updateWorkItemTemplateType(item.id, { enabled: checked }); await load(); } catch (error) { message.error(error instanceof Error ? error.message : '状态更新失败'); } finally { setSaving(false); } };
+-  const remove = (item: WorkItemTemplateType) => Modal.confirm({ title: `删除「${item.name}」？`, content: '删除后新建产品不会再继承该类型，已有产品不受影响。', okButtonProps: { danger: true }, onOk: async () => { try { await productRepository.deleteWorkItemTemplateType(item.id); message.success('类型已删除'); await load(); } catch (error) { message.error(error instanceof Error ? error.message : '删除失败'); throw error; } } });
++  const toggle = async (item: WorkItemTemplateType, checked: boolean) => { setSaving(true); try { await productRepository.updateWorkItemTemplateType(item.id, { enabled: checked }); await syncConsumers(); await load(); } catch (error) { message.error(error instanceof Error ? error.message : '状态更新失败'); } finally { setSaving(false); } };
++  const remove = (item: WorkItemTemplateType) => Modal.confirm({ title: `删除「${item.name}」？`, content: '删除后新建产品不会再继承该类型，产品工作项设置同步移除该模板，历史任务将匹配可用类型。', okButtonProps: { danger: true }, onOk: async () => { try { await productRepository.deleteWorkItemTemplateType(item.id); message.success('类型已删除'); await syncConsumers(); await load(); } catch (error) { message.error(error instanceof Error ? error.message : '删除失败'); throw error; } } });
+ 
+   return <div className="mx-auto w-full max-w-4xl space-y-4 text-xs">
+     <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">工作项模版</h3><p className="mt-1 text-[var(--text-muted)]">按工作项分类维护类型名称、描述和启用状态。</p></div><Button type="primary" icon={<PlusOutlined />} disabled={loading || saving || !categoryOptions.some((item) => item.enabled)} onClick={openCreate}>新增类型</Button></div>
+diff --git a/src/services/mockApi.ts b/src/services/mockApi.ts
+index 541aff7..c07abb7 100644
+--- a/src/services/mockApi.ts
++++ b/src/services/mockApi.ts
+@@ -1,3 +1,4 @@
++import { syncProductTemplates, migrateWorkItems } from './workItemTemplateSync';
+ import { submitDepartmentReview } from './departmentReviewAggregation';
+ import { normalizedPolicy, validatePolicy, isOkrAdmin, canEditOkr, confirmationReviewer } from './okrSettingsPolicy';
+ import { withBusinessWorkItemCategories } from './businessWorkItemCategories';
+ import { productTaskPreviewSamples, PRODUCT_PREVIEW_SEED_VERSION } from '../data/mockProductTaskPreview';
+@@ -113,7 +114,8 @@ const readWorkItems = () => {
+   }
+   return tasks;
+ };
+-const getWorkItems = () => readWorkItems().map((item) => {
++const getWorkItems = () => {
++ const items = readWorkItems().map((item) => {
+   if (!item.plannedStartDate && Number(item.estimatedHours || 0) > 0) { const offset = Math.abs(String(item.id).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)) % 12; item = { ...item, plannedStartDate: `2026-10-${String(1 + offset).padStart(2, '0')}`, plannedEndDate: `2026-10-${String(3 + offset).padStart(2, '0')}` }; }
+   const snapshot = snapshotWorkItems.get(item.id);
+   item = { ...item, workItemTypeId: item.workItemTypeId || snapshot?.task_type_id_, workflowId: item.workflowId || snapshot?.workflow_id_, statusKey: item.statusKey || snapshot?.status_key_ };
+@@ -125,6 +127,10 @@ const getWorkItems = () => readWorkItems().map((item) => {
+   return item.category === 'requirement' && migratedType && !['客户诉求', '线上问题', '售前支持', '交付支持', '其他问题'].includes(item.workOrderType)
+     ? { ...item, workOrderType: migratedType } : item;
+ });
++ const migrated = migrateWorkItems(items, getProductLines(), getMembers());
++ if (JSON.stringify(migrated) !== JSON.stringify(items)) write(KEYS.workItems, migrated);
++ return migrated;
++};
+ const workItemSummary = (task: Record<string, any>, taskType?: string): RequirementWorkItem => ({
+   id: String(task.id),
+   requirementId: String(task.requirementId),
+@@ -178,13 +184,18 @@ const defaultCases = (): TestCase[] => MOCK_TEST_CASES.map((item) => ({ ...item,
+ const getCases = () => read<TestCase[]>(KEYS.cases, defaultCases());
+ const getPlans = () => read<TestPlan[]>(KEYS.plans, MOCK_TEST_PLANS.map((item) => ({ ...item, cases: [...item.cases] })));
+ const getMembers = () => read(KEYS.members, MOCK_TEAM_MEMBERS.map((item) => ({ ...item })));
+-const getProductLines = (): ProductLine[] => read<ProductLine[]>(KEYS.productLines, MOCK_PRODUCT_LINES.map((item) => ({ ...item, versions: [...(item.versions || [])] }))).map((product) => {
++const getProductLines = (): ProductLine[] => {
++ const products = read<ProductLine[]>(KEYS.productLines, MOCK_PRODUCT_LINES.map((item) => ({ ...item, versions: [...(item.versions || [])] }))).map((product) => {
+   const snapshotVersions = MOCK_PRODUCT_LINES.find((item) => item.id === product.id)?.versions || [];
+   return { ...product, versions: product.versions?.map((version) => ({
+     ...version,
+     releaseDate: version.releaseDate || snapshotVersions.find((item) => item.id === version.id)?.releaseDate || '',
+   })) };
+ });
++ const synced = syncProductTemplates(products, templateTypes());
++ if (JSON.stringify(synced) !== JSON.stringify(products)) write(KEYS.productLines, synced);
++ return synced;
++};
+ 
+ const versionReviewSeeds = (products: ProductLine[], members: EmployeeOption[]): VersionReview[] => products.flatMap((product, productIndex) => (product.versions || []).slice(0, 1).map((version) => {
+   const first = members[productIndex % Math.max(members.length, 1)];
+@@ -1090,6 +1101,11 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
+     return found || null;
+   }
+   if (parts[1] === 'work-items' && parts[2] && parts.length === 3 && method === 'PUT') {
++    if (body.verifierId != null) {
++      const verifier = getEmployeeOptions().find(employee => employee.id === body.verifierId);
++      if (!verifier) throw new Error('验证者不存在或已停用');
++      body.verifierName = verifier.name;
++    }
+     const items = getWorkItems();
+     const index = items.findIndex((item) => item.id === parts[2]);
+     if (index < 0) {
+@@ -1120,11 +1136,12 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
+     if (!product || !type || !type.enabled || categoryCode(type.category) !== body.category) throw new Error('产品或工作项类型不可用，请刷新后重试');
+     const items = getWorkItems(); const existing = items.find((item) => item.requestId && item.requestId === body.requestId);
+     if (existing) return unifiedWorkItem(existing);
++    if (body.category === 'bug' && body.verifierId && !getEmployeeOptions().some(employee => employee.id === body.verifierId)) throw new Error('验证者不存在或已停用');
+     const owner = getEmployeeOptions().find((employee) => employee.id === body.assigneeId);
+     const workflow = (type.workflows || (type.workflow ? [type.workflow] : [])).find((flow: any) => flow.status === 'PUBLISHED');
+     const initial = workflow?.definition?.states?.find((state: any) => state.initial && state.enabled !== false);
+     if (!initial) throw new Error('当前工作项类型未配置已发布的初始状态');
+-    const task = { ...body, id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: initial.name, statusKey: initial.key, workflowId: workflow.id, statusColor: initial.color, revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: body.category === 'bug' ? body.type || '系统缺陷' : type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
++    const task = { ...body, verifierName: getEmployeeOptions().find(employee => employee.id === body.verifierId)?.name || '', id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: initial.name, statusKey: initial.key, workflowId: workflow.id, statusColor: initial.color, revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: body.category === 'bug' ? body.type || '系统缺陷' : type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
+     write(KEYS.workItems, [task, ...items]);
+     attachWorkItemToRequirement(task, type.name);
+     recordTaskActivity(task.id, product.id, 'WORK_ITEM_CREATED', { title: task.title });
+diff --git a/src/services/productRepository.ts b/src/services/productRepository.ts
+index b930e77..60aa30a 100644
+--- a/src/services/productRepository.ts
++++ b/src/services/productRepository.ts
+@@ -32,6 +32,7 @@ export type WorkItemTemplateType = ProductLineWorkItemType & {
+   workflow?: WorkItemWorkflow & { templateTypeId?: string | null };
+ };
+ export type UnifiedWorkItem = {
++  verifierId?: string; verifierName?: string;
+   projectId?: string; projectName?: string; needsCollaboration?: Array<'design' | 'dev' | 'test'>; relatedTaskIds?: string[]; sourceWorkOrderIds?: string[]; sourceWorkOrderTitles?: string[];
+   id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;
+   requirementId?: string | null; requirementTitle?: string | null; requirementInitiatorName?: string | null; customerId?: string | null; customerName?: string | null; assigneeName?: string; sourceType?: string; status?: { name?: string; group?: string; successful?: boolean };
+@@ -139,8 +140,8 @@ export const productRepository = {
+   commentWorkItem: (lineId: string, id: string, content: string) => apiRequest<void>(`/api/work-items/${id}/comments?productLineId=${encodeURIComponent(lineId)}`, { method: 'POST', body: JSON.stringify({ content }) }),
+   batchWorkItems: (body: { targets: Array<{ productLineId: string; id: string; revision: number }>; operation: string; value?: string; participants?: string[] }) => apiRequest<number>('/api/work-items/batch', { method: 'POST', body: JSON.stringify(body) }),
+   workItems: (productLineId: string, category = '', keyword = '', values: { page?: number; pageSize?: number } = {}) => apiRequest<{ page: { items: UnifiedWorkItem[]; total: number; page?: number; pageSize?: number } }>(`/api/work-items?productLineId=${encodeURIComponent(productLineId)}&category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}&page=${values.page || 1}&pageSize=${values.pageSize || 100}`),
+-  createWorkItem: (body: WorkItemAssociations & { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; severity?: string; type?: string; env?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; requirementId?: string; customerId?: string; customerName?: string; parentWorkItemId?: string; assigneeId?: string; ccNames?: string[]; media?: RequirementMedia[]; priority: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
+-  updateWorkItem: (productLineId: string, id: string, body: WorkItemAssociations & { productLineId?: string; title?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; assigneeName?: string; priority?: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number; completionReview?: TaskCompletionReview; revision: number }) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}`, { method: 'PUT', body: JSON.stringify(body) }),
++  createWorkItem: (body: WorkItemAssociations & { requestId: string; productLineId: string; category: WorkItemCategoryKey; taskTypeId: string; title: string; severity?: string; type?: string; env?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; requirementId?: string; customerId?: string; customerName?: string; parentWorkItemId?: string; assigneeId?: string; verifierId?: string; verifierName?: string; ccNames?: string[]; media?: RequirementMedia[]; priority: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number }) => apiRequest<Record<string, any>>('/api/work-items', { method: 'POST', body: JSON.stringify(body) }),
++  updateWorkItem: (productLineId: string, id: string, body: WorkItemAssociations & { productLineId?: string; title?: string; description?: string; descriptionHtml?: string; expectedGoal?: string; versionId?: string; assigneeName?: string; verifierId?: string; verifierName?: string; priority?: string; plannedStartDate?: string; plannedEndDate?: string; expectedCompleteDate?: string; estimatedHours?: number; actualHours?: number; completionReview?: TaskCompletionReview; revision: number }) => apiRequest<Record<string, any>>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}`, { method: 'PUT', body: JSON.stringify(body) }),
+   workItemTransitions: (productLineId: string, id: string) => apiRequest<WorkItemTransitionOptions>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`),
+   transitionWorkItem: (productLineId: string, id: string, body: { edgeKey: string; revision: number; reason?: string; actualHours?: number; completionReview?: TaskCompletionReview }) => apiRequest<Record<string, any>>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`, { method: 'POST', body: JSON.stringify(body) }),
+   deleteWorkItem: (productLineId: string, id: string, revision: number) => apiRequest<void>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}&revision=${revision}`, { method: 'DELETE' }),
+diff --git a/src/services/workItemTemplateSync.integration.test.ts b/src/services/workItemTemplateSync.integration.test.ts
+new file mode 100644
+index 0000000..c5e446d
+--- /dev/null
++++ b/src/services/workItemTemplateSync.integration.test.ts
+@@ -0,0 +1,41 @@
++// @vitest-environment jsdom
++import { beforeEach, expect, it } from 'vitest';
++import { mockApiRequest } from './mockApi';
++const key = (name: string) => `shichuang.frontend.mock.${name}`;
++beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
++it('migrates persistent historical defects to real employees and synchronized workflow bindings', async () => {
++  const products = await mockApiRequest('/api/product-lines');
++  const members = await mockApiRequest('/api/team-members/options');
++  const all = (await Promise.all(products.map((product: any) => mockApiRequest(`/api/work-items?productLineId=${product.id}&category=bug&pageSize=1000`)))).flatMap((result: any) => result.page.items);
++  expect(all.length).toBeGreaterThan(0);
++  const stored = JSON.parse(localStorage.getItem(key('workItems'))!);
++  const productCopies = JSON.parse(localStorage.getItem(key('productLines'))!);
++  for (const bug of all) {
++    const task = stored.find((task: any) => task.id === bug.id);
++    expect(task.verifierId).toBeTruthy();
++    expect(members.some((member: any) => member.id === task.verifierId && member.name === task.verifierName)).toBe(true);
++    const product = productCopies.find((product: any) => product.id === task.productLineId);
++    const type = product.workItemTypes.find((type: any) => type.id === task.taskTypeId);
++    expect(type.workflows.some((flow: any) => flow.id === task.workflowId && flow.definition.states.some((state: any) => state.key === task.statusKey))).toBe(true);
++    expect((await mockApiRequest(`/api/work-items/${task.id}/transitions?productLineId=${task.productLineId}`)).statuses.length).toBeGreaterThan(1);
++  }
++  const bug = stored.find((task: any) => task.id === all[0].id);
++  const replacement = members.find((member: any) => member.id !== bug.verifierId);
++  const saved = await mockApiRequest(`/api/work-items/${bug.id}?productLineId=${bug.productLineId}`, { method: 'PUT', body: JSON.stringify({ revision: bug.revision, verifierId: replacement.id, verifierName: '忽略客户端姓名' }) });
++  expect(saved).toMatchObject({ verifierId: replacement.id, verifierName: replacement.name });
++  await mockApiRequest(`/api/work-items?productLineId=${bug.productLineId}&category=bug`);
++  expect(JSON.parse(localStorage.getItem(key('workItems'))!).find((task: any) => task.id === bug.id)).toMatchObject({ verifierId: replacement.id, verifierName: replacement.name });
++  await expect(mockApiRequest(`/api/work-items/${bug.id}?productLineId=${bug.productLineId}`, { method: 'PUT', body: JSON.stringify({ revision: saved.revision, verifierId: 'invalid' }) })).rejects.toThrow('验证者不存在或已停用');
++});
++it('copies subsequent system workflow edits to product settings without manual resaving', async () => {
++  const types = await mockApiRequest('/api/work-item-template');
++  const template = types.find((type: any) => type.category === '缺陷');
++  const first = await mockApiRequest('/api/product-lines');
++  const definition = { ...template.workflow.definition, states: template.workflow.definition.states.map((state: any, index: number) => index === 0 ? { ...state, name: '新待处理' } : state) };
++  await mockApiRequest(`/api/work-item-template/types/${template.id}/workflow`, { method: 'PUT', body: JSON.stringify({ definition }) });
++  const updated = await mockApiRequest('/api/product-lines');
++  for (const product of updated) {
++    expect(product.workItemTypes.find((type: any) => type.sourceTemplateId === template.id).workflows[0].definition).toEqual(definition);
++  }
++  expect(updated[0].workItemTypes.find((type: any) => type.sourceTemplateId === template.id).id).toBe(first[0].workItemTypes.find((type: any) => type.sourceTemplateId === template.id).id);
++});
+diff --git a/src/services/workItemTemplateSync.test.ts b/src/services/workItemTemplateSync.test.ts
+new file mode 100644
+index 0000000..7473fad
+--- /dev/null
++++ b/src/services/workItemTemplateSync.test.ts
+@@ -0,0 +1,45 @@
++import { describe, it, expect } from 'vitest';
++import { syncProductTemplates, migrateWorkItems, isPendingVerification } from './workItemTemplateSync';
++const definition = { states: [{ key: 'todo', name: '待处理', enabled: true }, { key: 'fixed', name: '已修复', enabled: true }, { key: 'done', name: '已关闭', enabled: true }], transitions: [{ key: 'fix', from: 'todo', to: 'fixed' }] };
++const templates = [{ id: 'system-bug', name: '系统缺陷', category: '缺陷', enabled: true, workflow: { id: 'global-flow', status: 'PUBLISHED', definition } }];
++const members = [{ id: 'qa', name: '真实测试成员', status: 'enabled', jobTitle: '测试工程师' }, { id: 'disabled', name: '已离职', status: 'disabled' }];
++describe('product templates and historical defect migration', () => {
++  it('updates every product workflow and preserves matching type identity', () => {
++    const products = syncProductTemplates([{ id: 'p', workItemTypes: [{ id: 'existing', name: '系统缺陷', category: '缺陷', workflows: [{ id: 'existing-flow', status: 'PUBLISHED', definition: { states: [] } }] }] }, { id: 'p2' }], templates);
++    expect(products[0].workItemTypes[0]).toMatchObject({ id: 'existing', workflows: [{ id: 'existing-flow', definition }] });
++    expect(products[1].workItemTypes[0].workflows[0].definition).toEqual(definition);
++    expect(syncProductTemplates(products, templates)).toEqual(products);
++  });
++  it('repairs deleted bindings, preserves valid state, and persists real enabled verifier', () => {
++    const products = syncProductTemplates([{ id: 'p' }], templates);
++    const migrated = migrateWorkItems([{ id: 'b', category: 'bug', productLineId: 'p', workflowId: 'removed', taskTypeId: 'removed', status: '已修复', statusKey: 'old', verifierId: 'disabled', revision: 2 }], products, members);
++    expect(migrated[0]).toMatchObject({ status: '已修复', statusKey: 'fixed', verifierId: 'qa', verifierName: '真实测试成员', revision: 3 });
++    expect(migrated[0].workflowId).toBe(products[0].workItemTypes[0].workflows[0].id);
++    expect(migrateWorkItems(migrated, products, members)).toEqual(migrated);
++  });
++  it('redistributes invalid historical states once and honors future state changes', () => {
++    const products = syncProductTemplates([{ id: 'p' }], templates);
++    const migrated = migrateWorkItems(Array.from({ length: 9 }, (_, index) => ({ id: `bug-${index}`, category: 'bug', productLineId: 'p', status: '失效状态' })), products, members);
++    expect(new Set(migrated.map(task => task.statusKey)).size).toBe(3);
++    migrated[0] = { ...migrated[0], status: '已关闭', statusKey: 'done' };
++    expect(migrateWorkItems(migrated, products, members)).toEqual(migrated);
++  });
++  it('respects disabled templates and refreshes definitions on subsequent edits', () => {
++    const first = syncProductTemplates([{ id: 'p' }], templates);
++    const updated = syncProductTemplates(first, [{ ...templates[0], enabled: false, workflow: { ...templates[0].workflow, definition: { ...definition, states: definition.states.slice(1) } } }]);
++    expect(updated[0].workItemTypes[0].enabled).toBe(false);
++    expect(updated[0].workItemTypes[0].workflows[0].definition.states).toHaveLength(2);
++  });
++  it('does not fabricate employees when none are enabled', () => {
++    const task = { id: 'bug', category: 'bug', status: '已修复' };
++    expect(migrateWorkItems([task], [], [])).toEqual([task]);
++  });
++  it('filters assigned defects waiting for verification by identity and excludes closed bugs', () => {
++    const user = { id: 'qa', name: '真实测试成员' };
++    expect(isPendingVerification({ verifierId: 'qa', status: '已修复' }, user)).toBe(true);
++    expect(isPendingVerification({ verifierId: 'other', verifierName: user.name, status: '已修复' }, user)).toBe(false);
++    expect(isPendingVerification({ verifierName: user.name, status: '待验证' }, user)).toBe(true);
++    expect(isPendingVerification({ verifierId: 'qa', status: '已关闭' }, user)).toBe(false);
++    expect(isPendingVerification({ verifierId: 'qa', status: '处理中' }, user)).toBe(false);
++  });
++});
+diff --git a/src/services/workItemTemplateSync.ts b/src/services/workItemTemplateSync.ts
+new file mode 100644
+index 0000000..a8001d3
+--- /dev/null
++++ b/src/services/workItemTemplateSync.ts
+@@ -0,0 +1,49 @@
++/** Idempotent migration of product template copies and historical task bindings. */
++const categoryCode = (category: string) => ({ 产品: 'requirement', 需求: 'requirement', 设计: 'design', 研发: 'dev', 测试: 'test', 缺陷: 'bug' } as Record<string, string>)[category] || category;
++export function syncProductTemplates(products: any[], templates: any[]) {
++  const available = templates.filter(type => type.workflow?.definition?.states?.some((state: any) => state.enabled !== false));
++  const signature = JSON.stringify(available);
++  return products.map(product => {
++    if (product.workItemTemplateSignature === signature) return product;
++    const previous = product.workItemTypes || [];
++    const inherited = available.map(template => {
++      const existing = previous.find((type: any) => type.sourceTemplateId === template.id || type.id === template.id || (type.name === template.name && categoryCode(type.category) === categoryCode(template.category)));
++      const typeId = existing?.id || `template-${product.id}-${template.id}`;
++      const workflowId = existing?.workflows?.find((flow: any) => flow.status === 'PUBLISHED')?.id || existing?.workflow?.id || `workflow-${typeId}`;
++      return { ...template, id: typeId, sourceTemplateId: template.id, workflow: undefined, revision: Number(existing?.revision || 0) + 1,
++        workflows: [{ ...template.workflow, id: workflowId, taskTypeId: typeId, category: categoryCode(template.category), status: 'PUBLISHED' }] };
++    });
++    const categories = new Set(available.map(type => categoryCode(type.category)));
++    const custom = previous.filter((type: any) => !type.sourceTemplateId && (!type.name || !categories.has(categoryCode(type.category))));
++    return { ...product, workItemTypes: [...inherited, ...custom], workItemTemplateSignature: signature };
++  });
++}
++export function migrateWorkItems(tasks: any[], products: any[], members: any[]) {
++  const enabledMembers = members.filter(member => member.status === 'enabled');
++  return tasks.map(task => {
++    let next = task;
++    const seed = [...String(task.id)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
++    const types = products.find(product => product.id === task.productLineId)?.workItemTypes || [];
++    const candidates = types.filter((type: any) => type.enabled !== false && (categoryCode(type.category) === task.category || (!type.category && type.id === (task.taskTypeId || task.workItemTypeId))));
++    const type = candidates.find((type: any) => type.id === (task.taskTypeId || task.workItemTypeId)) || candidates.find((type: any) => type.name === (task.type || task.requirementType || task.taskType)) || candidates.find((type: any) => type.isDefault) || candidates[0];
++    const workflow = type?.sourceTemplateId ? type.workflows?.find((flow: any) => flow.status === 'PUBLISHED') : undefined;
++    const states = workflow?.definition?.states?.filter((state: any) => state.enabled !== false) || [];
++    if (states.length) {
++      const statusName = typeof task.status === 'string' ? task.status : task.status?.name;
++      const state = states.find((state: any) => state.name === statusName) || states.find((state: any) => state.key === task.statusKey) || states[seed % states.length];
++      if (task.taskTypeId !== type.id || task.workItemTypeId !== type.id || task.workflowId !== workflow.id || task.statusKey !== state.key || statusName !== state.name) {
++        next = { ...next, taskTypeId: type.id, workItemTypeId: type.id, workflowId: workflow.id, statusKey: state.key, status: state.name, revision: Number(task.revision || 0) + 1 };
++      }
++    }
++    if (task.category === 'bug' && enabledMembers.length) {
++      const testers = enabledMembers.filter(member => /测试|质量/.test(member.jobTitle || ''));
++      const pool = testers.length ? testers : enabledMembers;
++      const verifier = enabledMembers.find(member => task.verifierId ? member.id === task.verifierId : member.name === task.verifierName) || pool[seed % pool.length];
++      if (task.verifierId !== verifier.id || task.verifierName !== verifier.name) next = { ...next, verifierId: verifier.id, verifierName: verifier.name };
++    }
++    return next;
++  });
++}
++export function isPendingVerification(task: { verifierId?: string; verifierName?: string; status: string }, user: { id: string; name: string }) {
++  return (task.verifierId ? task.verifierId === user.id : task.verifierName?.trim() === user.name.trim()) && ['已修复', '待验证', '待验收', '待确认', '验证中'].includes(task.status);
++}
+diff --git a/src/types/index.ts b/src/types/index.ts
+index e82362e..a47f347 100644
+--- a/src/types/index.ts
++++ b/src/types/index.ts
+@@ -563,6 +563,8 @@ export interface RequirementTask {
+   status: '待受理' | '待处理' | '处理中' | '待验收' | '已退回' | '已完成' | '已关闭' | '已搁置' | '已驳回' | '设计中' | '研发中' | '测试中' | '已发布' | '已挂起' | string;
+   priority: '紧急' | '高' | '中' | '低' | 'P0-紧急阻断' | 'P1-高优' | 'P2-普通' | 'P2-标准' | 'P3-低优' | string;
+   ownerName: string;
++  verifierId?: string;
++  verifierName?: string;
+   assigneeId?: string;
+   creatorName?: string;
+   creatorId?: string;
+@@ -793,6 +795,7 @@ export interface DefectBug {
+   creator?: string;
+   reporter?: string;
+   assignee?: string;
++  verifierId?: string;
+   verifierName?: string;
+   productLineId?: string;
+   productLineName: string;

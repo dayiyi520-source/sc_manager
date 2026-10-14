@@ -4678,8 +4678,190 @@
                   }
                 ]
               }
+            },
+            {
+              "category": "bug",
+              "name": "系统缺陷状态配置",
+              "definition": {
+                "states": [
+                  {
+                    "key": "status_pending",
+                    "name": "待开始",
+                    "group": "NOT_STARTED",
+                    "initial": true,
+                    "successful": false,
+                    "enabled": true,
+                    "stage": "dev",
+                    "color": "neutral"
+                  },
+                  {
+                    "key": "status_in_progress",
+                    "name": "进行中",
+                    "group": "IN_PROGRESS",
+                    "initial": false,
+                    "successful": false,
+                    "enabled": true,
+                    "stage": "dev",
+                    "color": "blue"
+                  },
+                  {
+                    "key": "status_completed",
+                    "name": "已完成",
+                    "group": "COMPLETED",
+                    "initial": false,
+                    "successful": true,
+                    "enabled": true,
+                    "stage": "dev",
+                    "color": "green"
+                  },
+                  {
+                    "key": "status_cancelled",
+                    "name": "已取消",
+                    "group": "CANCELLED",
+                    "initial": false,
+                    "successful": false,
+                    "enabled": true,
+                    "stage": "dev",
+                    "color": "neutral"
+                  }
+                ],
+                "transitions": [
+                  {
+                    "key": "move_status_pending_status_in_progress",
+                    "from": "status_pending",
+                    "to": "status_in_progress",
+                    "name": "进入进行中",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "requiredFields": []
+                  },
+                  {
+                    "key": "move_status_in_progress_status_completed",
+                    "from": "status_in_progress",
+                    "to": "status_completed",
+                    "name": "进入已完成",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "requiredFields": []
+                  },
+                  {
+                    "key": "move_status_in_progress_status_cancelled",
+                    "from": "status_in_progress",
+                    "to": "status_cancelled",
+                    "name": "进入已取消",
+                    "roles": [
+                      "admin",
+                      "product_manager",
+                      "tech_lead"
+                    ],
+                    "requiredFields": []
+                  }
+                ]
+              },
+              "revision": 1,
+              "id": "workflow-1791966697726-335cc",
+              "taskTypeId": "878406b3-fb57-4f13-8c5b-297775a7de40",
+              "status": "PUBLISHED",
+              "workflowVersion": 3
             }
-          ]
+          ],
+          "workflow": {
+            "category": "bug",
+            "name": "系统缺陷状态配置",
+            "definition": {
+              "states": [
+                {
+                  "key": "status_pending",
+                  "name": "待开始",
+                  "group": "NOT_STARTED",
+                  "initial": true,
+                  "successful": false,
+                  "enabled": true,
+                  "stage": "dev",
+                  "color": "neutral"
+                },
+                {
+                  "key": "status_in_progress",
+                  "name": "进行中",
+                  "group": "IN_PROGRESS",
+                  "initial": false,
+                  "successful": false,
+                  "enabled": true,
+                  "stage": "dev",
+                  "color": "blue"
+                },
+                {
+                  "key": "status_completed",
+                  "name": "已完成",
+                  "group": "COMPLETED",
+                  "initial": false,
+                  "successful": true,
+                  "enabled": true,
+                  "stage": "dev",
+                  "color": "green"
+                },
+                {
+                  "key": "status_cancelled",
+                  "name": "已取消",
+                  "group": "CANCELLED",
+                  "initial": false,
+                  "successful": false,
+                  "enabled": true,
+                  "stage": "dev",
+                  "color": "neutral"
+                }
+              ],
+              "transitions": [
+                {
+                  "key": "move_status_pending_status_in_progress",
+                  "from": "status_pending",
+                  "to": "status_in_progress",
+                  "name": "进入进行中",
+                  "roles": [
+                    "admin",
+                    "product_manager",
+                    "tech_lead"
+                  ],
+                  "requiredFields": []
+                },
+                {
+                  "key": "move_status_in_progress_status_completed",
+                  "from": "status_in_progress",
+                  "to": "status_completed",
+                  "name": "进入已完成",
+                  "roles": [
+                    "admin",
+                    "product_manager",
+                    "tech_lead"
+                  ],
+                  "requiredFields": []
+                },
+                {
+                  "key": "move_status_in_progress_status_cancelled",
+                  "from": "status_in_progress",
+                  "to": "status_cancelled",
+                  "name": "进入已取消",
+                  "roles": [
+                    "admin",
+                    "product_manager",
+                    "tech_lead"
+                  ],
+                  "requiredFields": []
+                }
+              ]
+            },
+            "revision": 1,
+            "id": "workflow-1791966697726-335cc",
+            "taskTypeId": "878406b3-fb57-4f13-8c5b-297775a7de40",
+            "status": "PUBLISHED",
+            "workflowVersion": 3
+          }
         },
         {
           "id": "8a5ea198-cef3-4449-b56f-0518189aeb4c",

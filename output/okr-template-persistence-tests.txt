@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 D:/project/manager_admin_frontend
+
+ ✓ src/services/okrPolicyPersistence.test.ts (5 tests) 24ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  13:39:59
+   Duration  2.72s (transform 1.21s, setup 168ms, collect 1.41s, tests 24ms, environment 750ms, prepare 108ms)
+

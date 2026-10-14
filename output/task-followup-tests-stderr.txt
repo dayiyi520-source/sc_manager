@@ -1,0 +1,35 @@
+
+<--- Last few GCs --->
+
+[13120:000001CE76E2C000]  3767444 ms: Mark-Compact 3966.5 (4161.3) -> 3892.3 (4160.8) MB, pooled: 30 MB, 1624.09 / 0.00 ms  (average mu = 0.344, current mu = 0.327) allocation failure; scavenge might not succeed
+[13120:000001CE76E2C000]  3769857 ms: Mark-Compact 3967.0 (4160.8) -> 3892.9 (4158.8) MB, pooled: 32 MB, 1626.71 / 0.00 ms  (average mu = 0.335, current mu = 0.326) allocation failure; scavenge might not succeed
+
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 00007FF65ACE50BF node::OnFatalError+1343
+ 2: 00007FF65990DD27 v8::Function::NewInstance+423
+ 3: 00007FF65970E567 X509_STORE_get_lookup_certs+54423
+ 4: 00007FF659712274 X509_STORE_get_lookup_certs+70052
+ 5: 00007FF6597211DC v8::internal::StrongRootAllocatorBase::deallocate_impl+16604
+ 6: 00007FF659720A1B v8::internal::StrongRootAllocatorBase::deallocate_impl+14619
+ 7: 00007FF65B007DED node::AsyncResource::CallbackScope::CallbackScope+2124541
+ 8: 00007FF65970C030 X509_STORE_get_lookup_certs+44896
+ 9: 00007FF65972688A X509_STORE_set_cleanup+5098
+10: 00007FF659732D26 uv_timer_set_repeat+20694
+11: 00007FF659303937 v8::CodeEvent::GetFunctionName+131959
+12: 000001CE2FE775FA 
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: Channel closed
+ ❯ target.send node:internal/child_process:794:16
+ ❯ ProcessWorker.send node_modules/.pnpm/tinypool@1.1.1/node_modules/tinypool/dist/index.js:140:41
+ ❯ MessagePort.<anonymous> node_modules/.pnpm/tinypool@1.1.1/node_modules/tinypool/dist/index.js:149:62
+ ❯ [nodejs.internal.kHybridDispatch] node:internal/event_target:856:20
+ ❯ MessagePort.<anonymous> node:internal/per_context/messageport:23:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_IPC_CHANNEL_CLOSED' }
+
+
+
