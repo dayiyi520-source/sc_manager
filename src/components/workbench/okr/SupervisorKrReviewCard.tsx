@@ -1,17 +1,16 @@
+import { CircleIcon, CheckCircleIcon, AlertIcon, ClockIcon } from '@primer/octicons-react';
 import './supervisorReview.css';
-import { Alert, Button, Collapse, Empty, Input, InputNumber, Radio, Spin, Tag } from 'antd';
+import { Alert, Button, Collapse, Empty, Spin, Table, Tag } from 'antd';
 import type { OkrKrReview } from '../../../services/okrRepository';
 import type { EmployeeReviewSupport } from '../../../services/supervisorReview';
 import type { EmployeeActionGroup } from '../../../services/supervisorSupportPanels';
 import { employeeEvidenceForKr } from '../../../services/supervisorSupportPanels';
-import { ReviewRiskCallout } from './ReviewRiskCallout';
 
 export function SupervisorKrReviewCard({ review, employeeActions, supports, busy, editable, supportLoading, supportError, onRetry, onUpdate, onEmployeeSupport }: {
   review: OkrKrReview; employeeActions: EmployeeActionGroup[]; supports: EmployeeReviewSupport[];
   busy: boolean; editable: boolean; supportLoading: boolean; supportError?: unknown; onRetry?: () => void;
   onUpdate: (patch: Partial<OkrKrReview>) => void; onEmployeeSupport: (authorId: string, reportIds: string[]) => void;
 }) {
-  const disabled = busy || !editable;
   const snapshots = review.employeeReviewSnapshots || [];
   const viewed = new Set(review.viewedEmployeeReviewIds || []);
   const sourceReports = [
@@ -27,12 +26,15 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
   const count = (value: number) => supportLoading || supportError ? '—' : value;
   const error = supportError ? <Alert type="error" showIcon title="员工复盘加载失败" action={<Button onClick={onRetry}>重试</Button>}/> : null;
   return <section className="space-y-4" aria-label={`主管 KR 复盘：${review.keyResultTitle}`}>
-    <div className="okr-supervisor-kr-change flex flex-wrap items-center gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-card)] p-4 text-xs">
-      <span>KR 变化：<strong>{review.previousProgress}% → {review.currentProgress}%</strong></span>
-      <label className="flex items-center gap-2"><span className="shrink-0 whitespace-nowrap">本期进度</span><InputNumber aria-label={`${review.keyResultTitle}本期进度`} min={0} max={100} precision={0} suffix="%" value={review.currentProgress} disabled={disabled} onChange={value => onUpdate({ currentProgress: value ?? 0 })}/></label>
-      <Radio.Group value={review.health} disabled={disabled} onChange={event => onUpdate({ health: event.target.value })} aria-label={`${review.keyResultTitle}健康状态`}><Radio value="normal">正常</Radio><Radio value="risk">有风险</Radio><Radio value="blocked">已阻塞</Radio></Radio.Group>
-    </div>
-    {review.health !== 'normal' && <ReviewRiskCallout value={review.blocker} label={`${review.keyResultTitle}风险原因`} disabled={disabled} onChange={value => onUpdate({ blocker: value })}/>}
+    <Table size="small" rowKey="id" pagination={false} scroll={{ x: true }} dataSource={review.detailRows?.length ? review.detailRows : [{ id: review.keyResultId, name: review.keyResultTitle }]} columns={[
+      { title: review.detailRows?.length ? '产品' : 'KR名称', dataIndex: 'name', ellipsis: true },
+      ...(review.detailRows?.length ? [{ title: '迭代版本', dataIndex: 'version' }, { title: '达成阶段', dataIndex: 'stage' }, { title: '开始时间', dataIndex: 'plannedStartDate' }, { title: '结束时间', dataIndex: 'plannedEndDate' }] : []),
+      { title: '进度', render: (_, row) => { const value = review.detailProgress?.find(item => item.id === row.id); return `${value?.previousProgress ?? 0}% → ${value?.currentProgress ?? 0}%`; } },
+      ...[...new Map((review.contributors || []).map(item => [item.authorId, item.authorName])).entries()].map(([authorId, authorName]) => ({ title: authorName, key: `employee:${authorId}`, render: (_: unknown, row: { id: string }) => {
+        const value = review.contributors?.find(item => item.authorId === authorId && item.detailId === row.id);
+        return value ? `${value.previousProgress}% → ${value.currentProgress}%` : '—';
+      } })),
+    ]}/>
     <div className="okr-supervisor-support-divider" aria-hidden="true"/>
     <div className="okr-supervisor-support-panels space-y-4">
       <Collapse defaultActiveKey={['employees']} expandIconPosition="end" items={[{
@@ -41,10 +43,16 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
           const reports = sourceReports.filter(report => report.authorId === group.authorId);
           const unread = reports.some(report => report.status !== 'reviewed' && !viewed.has(report.id));
           return <article key={group.authorId} className="okr-supervisor-employee-row">
-            <div className="min-w-0 space-y-2"><strong>{group.authorName}</strong>{group.actions.map(action => <p key={`${action.objectiveId}:${action.id}`} className="break-words text-[var(--text-muted)]">个人 A：{action.title} · 当前进度{action.progress}%</p>)}</div>
+            <div className="min-w-0 space-y-2"><strong>{group.authorName}</strong>{group.actions.map(action => {
+              const saved = reports.flatMap(report => report.contributions).find(row => row.objectiveId === action.objectiveId && row.keyResultId === action.id);
+              const health = saved?.executionHealth;
+              const Icon = health === '超预期' ? CheckCircleIcon : health === '正常' ? CircleIcon : health === '风险' ? AlertIcon : ClockIcon;
+              const color = health === '超预期' ? 'var(--success)' : health === '风险' ? 'var(--warning)' : health === '逾期' ? 'var(--danger)' : 'var(--text-muted)';
+              return <div key={`${action.objectiveId}:${action.id}`} className="flex flex-wrap items-center gap-2"><p className="break-words text-[var(--text-muted)]">个人动作：{action.title} · 当前进度{saved?.currentProgress ?? action.progress}%</p><span className="inline-flex items-center gap-1" style={{ color }}><Icon/>{health || '状态未记录'}</span></div>;
+            })}</div>
             <div className="flex shrink-0 flex-wrap items-center gap-2"><Tag color={!reports.length ? 'default' : unread ? 'warning' : 'success'}>{!reports.length ? '未提交' : unread ? '待查看' : '已查看'}</Tag><Button type="link" disabled={busy || !reports.length || supportLoading} onClick={() => onEmployeeSupport(group.authorId, reports.map(report => report.id))}>查看本期复盘</Button></div>
           </article>;
-        })}</div> : <Empty description="暂无对齐的员工 A"/>}</Spin>,
+        })}</div> : <Empty description="暂无对齐的员工动作"/>}</Spin>,
       }]}/>
       <Collapse defaultActiveKey={['evidence']} expandIconPosition="end" items={[{
         key: 'evidence', label: <div className="okr-supervisor-panel-title"><strong>关联工作证据</strong><span>{count(evidence.length)}项</span></div>,
@@ -56,6 +64,6 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
         </article>)}</div> : <Empty description="暂无员工关联工作证据"/>}</Spin>,
       }]}/>
     </div>
-    <label className="block space-y-2"><span className="text-sm font-semibold">主管判断与协调</span><Input.TextArea className="okr-supervisor-judgment" aria-label={`${review.keyResultTitle}主管判断与协调`} placeholder="填写对 KR 进展的判断、需要协调的资源与后续安排" value={review.supervisorJudgment || ''} disabled={disabled} maxLength={10000} showCount rows={4} onChange={event => onUpdate({ supervisorJudgment: event.target.value })}/></label>
+
   </section>;
 }

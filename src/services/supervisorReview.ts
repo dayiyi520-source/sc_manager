@@ -9,7 +9,7 @@ export function canReadReviewRecord(record: OkrRecord, viewerId: string | null, 
   return submitted.has(record.status) && people.some(person => person.id === record.ownerId && person.supervisorId === viewerId);
 }
 
-export function employeeSupportsForKr(records: OkrRecord[], people: OkrPerson[], supervisorId: string, target: Pick<OkrKrReview, 'objectiveId' | 'keyResultId'>, period: ReviewPeriod): EmployeeReviewSupport[] {
+export function employeeSupportsForKr(records: OkrRecord[], people: OkrPerson[], supervisorId: string, target: Pick<OkrKrReview, 'objectiveId' | 'keyResultId'>, period: ReviewPeriod, reviewType: 'week' | 'month' = 'week'): EmployeeReviewSupport[] {
   const directReports = new Map(people.filter(person => person.id !== supervisorId && person.supervisorId === supervisorId).map(person => [person.id, person]));
   const linked = (goal: OkrRecord) => goal.payload.sourceObjectiveId === target.objectiveId && goal.payload.sourceKrId === target.keyResultId
     || goal.payload.alignments?.some(link => link.parentObjectiveId === target.objectiveId && link.parentKeyResultId === target.keyResultId)
@@ -18,7 +18,7 @@ export function employeeSupportsForKr(records: OkrRecord[], people: OkrPerson[],
   const unique = new Map<string, EmployeeReviewSupport>();
   for (const record of records) {
     if (record.kind !== 'review' || !submitted.has(record.status) || !directReports.has(record.ownerId)
-      || record.payload.reviewType !== 'week' || record.payload.startDate !== period.startDate || record.payload.endDate !== period.endDate) continue;
+      || record.payload.reviewType !== reviewType || record.payload.startDate !== period.startDate || record.payload.endDate !== period.endDate) continue;
     const contributions = (record.payload.krReviews || []).filter(row => {
       const source = sources.get(row.objectiveId) || sources.get(row.keyResultId);
       if (!source) {

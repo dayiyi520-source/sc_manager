@@ -86,12 +86,15 @@ export function useOriginalOkr() {
   const reviewableOkrs = useMemo(() => monthlyReviewTargets(rawRecords, currentUser.id, people), [rawRecords, currentUser.id, peopleQuery.data, teamMembersQuery.data]);
   const performances: (PerformanceReview & {authorId:string})[] = all.filter(r=>r.kind==='review').map(r=>{
     const owner = people.find(p=>p.id===r.ownerId), p=r.payload;
+    const departmentSnapshots = p.departmentContentSnapshots || [];
+    const extraWorkIds = [...new Set([...(p.extraWork?.workIds || []), ...departmentSnapshots.flatMap(snapshot => snapshot.extraWork?.workIds || [])])];
+    const displayedItems = [...new Map([...(p.items || []), ...departmentSnapshots.flatMap(snapshot => snapshot.items)].map(item => [item.workId, item])).values()];
     return {id:r.id,version:r.version,authorId:r.ownerId,author:owner?.name || '人员已停用',authorDept:owner?.department || '',
       type:p.reviewType || 'month',reviewMode:p.reviewMode,cycleName:p.title,summary:p.summary || '',selfScore:p.selfScore ?? 0,
       uncompletedReason:p.uncompletedReason || '',suggestions:p.suggestions || '',helpNeeded:p.helpNeeded || '',sendTo:p.sendTo || [],
       createdAt:r.createdAt?.replace('T',' ').slice(0,16) || '—',status:r.status as PerformanceReview['status'],feedback:p.feedback,leaderScore:p.finalScore,
-      linkedWorkItems:(p.items || []).map(i=>({id:i.workId,title:i.title,type:'task',status:i.status,sourceLabel:i.sourceLabel,actualHours:i.actualHours})),
-      krReviews:p.krReviews || [], assistance:p.assistance || [], extraWork:p.extraWork, knowledgeEntries:p.knowledgeEntries || [], syncKrProgress:p.syncKrProgress,
+      linkedWorkItems:displayedItems.map(i=>({id:i.workId,title:i.title,type:i.workType === 'ticket' ? 'ticket' : 'task',status:i.status,sourceLabel:i.sourceLabel,actualHours:i.actualHours})),
+      krReviews:p.krReviews || [], assistance:[...new Map([...(p.assistance || []), ...departmentSnapshots.flatMap(snapshot => snapshot.assistance)].map((row,index) => [row.workId || `unlinked:${index}`,row])).values()], extraWork:p.extraWork ? {...p.extraWork,workIds:extraWorkIds} : {workIds:extraWorkIds,description:'',impact:'none'}, knowledgeEntries:[...(p.knowledgeEntries || []), ...departmentSnapshots.flatMap(snapshot => (snapshot.knowledgeEntries || []).map(row => ({...row,id:`${snapshot.authorId}:${row.id}`})))], syncKrProgress:p.syncKrProgress,
       weeklyReviewSnapshots:p.weeklyReviewSnapshots || [], monthlyOtherTasks:p.monthlyOtherTasks || [], nextMonthPlans:p.nextMonthPlans || [],
       monthlyMetrics:p.monthlyMetrics,
       otherNotes:p.otherNotes || '', nextMonthArrangement:p.nextMonthArrangement || '', nextWeekPlan:p.nextWeekPlan || '',

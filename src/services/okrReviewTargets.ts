@@ -20,9 +20,10 @@ export function monthlyReviewTargets(records: OkrRecord[], userId: string, peopl
       return actions.map(action => ({
         id: action.id, content: action.title, progress: action.progress,
         weight: action.weight ?? 100, deadline: action.deadline || '', assigneeIds: [userId],
-        businessObject: kr.businessObject, version: kr.version,
+        businessObject: kr.businessObject, version: kr.version, details: supervisor ? kr.details : undefined,
         executionStatus: [...(record.progressHistory || [])].reverse().find(entry => entry.itemId === action.id)?.status,
         parentKeyResultId: supervisor ? undefined : kr.id, parentKeyResultTitle: supervisor ? undefined : kr.title,
+        parentKeyResultProgress: supervisor ? undefined : kr.progress, parentKeyResultDetails: supervisor ? undefined : kr.details, plannedStartDate: action.actualStartedAt || kr.actualStartedAt,
       }));
     });
     return {
@@ -54,6 +55,7 @@ export function monthlyReviewTargets(records: OkrRecord[], userId: string, peopl
           weight: record.payload.weight ?? 100, deadline: record.payload.deadline || '', assigneeIds: [userId],
           businessObject: parent?.businessObject, version: parent?.version,
           parentKeyResultId: parent?.id, parentKeyResultTitle: parent?.title,
+          parentKeyResultProgress: parent?.progress, parentKeyResultDetails: parent?.details, plannedStartDate: record.payload.actualStartedAt || parent?.actualStartedAt,
         };
       }),
     });

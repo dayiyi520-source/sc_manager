@@ -1,3 +1,4 @@
+import { submitDepartmentReview } from './departmentReviewAggregation';
 import { normalizedPolicy, validatePolicy, isOkrAdmin, canEditOkr, confirmationReviewer } from './okrSettingsPolicy';
 import { withBusinessWorkItemCategories } from './businessWorkItemCategories';
 import { productTaskPreviewSamples, PRODUCT_PREVIEW_SEED_VERSION } from '../data/mockProductTaskPreview';
@@ -874,7 +875,9 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);
     const reviewerId = record.kind === 'objective' && body.submit !== false && owner && settings.confirmation ? confirmationReviewer(owner,'create',record.payload,settings,getOkrPeople()) : undefined;
     if (reviewerId) record = {...record,status:'submitted',changeRequest:{id:id('change'),purpose:'initial',status:'pending',reason:'目标首次提交',reviewerId,payload:record.payload,baseVersion:0,requestedAt:now()}};
-    write(KEYS.okrRecords, [...records, record]);
+    const department = record.kind === 'review' && body.submit !== false ? submitDepartmentReview(record.payload, ownerId, records, getOkrPeople()) : { records, payload: record.payload };
+    record = { ...record, payload: department.payload };
+    write(KEYS.okrRecords, [...department.records, record]);
     return { id: record.id };
   }
   if (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH') {
@@ -893,9 +896,10 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
         const access = reviewSubmissionAccess(read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings), payload);
         if (!access.allowed) throw new Error(access.reason);
       }
-      records[index] = { ...record, payload, status: body.action === 'submit' ? 'submitted' : record.status, ...(body.action === 'submit' ? { submittedAt: now() } : {}), version: record.version + 1 };
-      write(KEYS.okrRecords, records);
-      return records[index];
+      const department = body.action === 'submit' ? submitDepartmentReview(payload, record.ownerId, records, getOkrPeople()) : { records, payload };
+      const next = { ...record, payload: department.payload, status: body.action === 'submit' ? 'submitted' : record.status, ...(body.action === 'submit' ? { submittedAt: now() } : {}), version: record.version + 1 };
+      write(KEYS.okrRecords, department.records.map(row => row.id === record.id ? next : row));
+      return next;
     }
     if (record.kind === 'objective' || record.kind === 'action') {
       if (!body.viewerId || !canEditOkr(record,body.viewerId,read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings),getOkrPeople())) throw new Error('只能修改本人目标或已授权的公司级目标');

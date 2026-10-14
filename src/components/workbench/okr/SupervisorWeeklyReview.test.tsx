@@ -6,6 +6,7 @@ import type { OKRItem } from '../../../types';
 import { WeeklyReviewEditor } from './WeeklyReviewEditor';
 import { ReviewReadOnlyView } from './ReviewReadOnlyView';
 import { createReviewCopyDraft } from './reviewCopy';
+import { supervisorReviewMetrics } from './SupervisorReviewMetrics';
 class Observer { observe() {} disconnect() {} unobserve() {} }
 globalThis.IntersectionObserver = Observer as unknown as typeof IntersectionObserver;
 const period = { startDate: '2026-10-12', endDate: '2026-10-18' };
@@ -18,111 +19,85 @@ const support: OkrRecord = { id: 'employee-review', ownerId: 'employee', kind: '
 const baseProps = { template: 'supervisor' as const, people: [manager, employee], viewer: { id: 'manager', name: '主管', department: '产品部' }, periodOverride: period, okrs: [objective], work: [], busy: false, workLoading: false, reviewerName: '老板', onCancel: vi.fn(), onRefreshWork: vi.fn(), onSubmit: vi.fn(async () => true) };
 
 describe('supervisor weekly review', () => {
-  it('uses collapsible counted left-aligned panels and automatically computes the two-line O summary', () => {
+  it('shows department metrics and six sections and saves the restored summary and plan', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
-    render(<WeeklyReviewEditor {...baseProps} records={[goal, support]} onSaveDraft={save}/>);
-    const card = screen.getByRole('region', { name: '主管 KR 复盘：部门 KR' });
-    expect(screen.getByText('KR1：部门 KR')).toBeInTheDocument();
-    expect(screen.queryByText('目标1：部门月度目标')).not.toBeInTheDocument();
-    expect(screen.getByTitle('部门月度目标')).toHaveClass('okr-supervisor-objective-title');
-    expect(screen.getByLabelText('目标权重 100%')).toBeInTheDocument();
-    expect(screen.getByLabelText('目标进度 40% → 40%')).toBeInTheDocument();
-    expect(within(card).getByText('1人相关 · 1份待查看')).toBeInTheDocument();
-    expect(within(card).getByRole('button', { name: /员工复盘支撑/ })).toHaveAttribute('aria-expanded', 'true');
-    expect(within(card).getByRole('button', { name: /关联工作证据/ })).toHaveAttribute('aria-expanded', 'true');
-    const judgment = within(card).getByRole('textbox', { name: '部门 KR主管判断与协调' });
-    fireEvent.change(judgment, { target: { value: ' 优先协调测试资源 ' } });
+    render(<WeeklyReviewEditor {...baseProps} records={[goal, support]} initialPayload={{ title: '草稿', summary: '原总结', nextWeekPlan: '原计划' }} onSaveDraft={save}/>);
+    expect(screen.getByText('部门周报')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '部门月目标进度' })).getByText('0% → 60%')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '员工已提交' })).getByText('1/1')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '待确认风险' })).getByText('0')).toBeInTheDocument();
+    for (const title of ['1. 部门月目标复盘', '2. 插播任务', '3. 部门补充总结', '4. 部门下周计划', '5. 需要协助的事项', '6. 知识沉淀']) expect(screen.getByText(title)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '部门补充总结' })).toHaveValue('原总结');
+    fireEvent.change(screen.getByRole('textbox', { name: '部门补充总结' }), { target: { value: ' 新总结 ' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '部门下周计划' }), { target: { value: ' 新计划 ' } });
     fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
-    expect(save.mock.calls[0][0]).toMatchObject({ reviewMode: 'supervisor', krReviews: [{ keyResultId: 'manager-kr', supervisorJudgment: '优先协调测试资源', employeeReviewSnapshots: [{ id: 'employee-review', authorName: '员工', krReviews: [{ evidenceNote: '已完成关键验证' }] }] }] });
+    expect(save.mock.calls[0][0]).toMatchObject({ summary: '新总结', nextWeekPlan: '新计划' });
   });
-  it('expands/collapses each panel independently and views an employee report without losing judgment', () => {
-    const save = vi.fn(async (_payload: OkrPayload) => true);
-    render(<WeeklyReviewEditor {...baseProps} records={[goal, support]} onSaveDraft={save}/>);
-    fireEvent.change(screen.getByRole('textbox', { name: '部门 KR主管判断与协调' }), { target: { value: '保留判断' } });
-    const panel = screen.getByRole('button', { name: /员工复盘支撑/ });
-    fireEvent.click(panel);
-    expect(panel).toHaveAttribute('aria-expanded', 'false');
-    expect(within(screen.getByRole('region', { name: '主管 KR 复盘：部门 KR' })).getByRole('button', { name: /关联工作证据/ })).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(panel);
+  it('deduplicates submitted employees and pending risks and filters periods, drafts and other teams', () => {
+    const riskReport = { ...support, payload: { ...support.payload, krReviews: [{ ...contribution, health: 'risk' as const }] } };
+    const target = { ...contribution, objectiveId: objective.id, keyResultId: objective.keyResults[0].id };
+    const records = [goal, riskReport, riskReport, { ...support, id: 'duplicate-person' }, { ...support, id: 'draft', status: 'draft', ownerId: 'employee2' }, { ...support, id: 'past', ownerId: 'employee2', payload: { ...support.payload, startDate: '2026-10-05' } }, { ...support, id: 'other-team', ownerId: 'outsider' }];
+    const people = [manager, employee, { ...employee, id: 'employee2' }, { ...employee, id: 'outsider', supervisorId: 'other' }];
+    expect(supervisorReviewMetrics([objective], [target], records, people, manager.id, period)).toMatchObject({ submitted: 1, total: 2, pendingRisks: 1 });
+    expect(supervisorReviewMetrics([objective], [{ ...target, viewedEmployeeReviewIds: [riskReport.id] }], records, people, manager.id, period).pendingRisks).toBe(0);
+    expect(supervisorReviewMetrics([], [], [], [], manager.id, period)).toEqual({ previousProgress: 0, currentProgress: 0, submitted: 0, total: 0, pendingRisks: 0 });
+  });
+  it('weights department progress by objective and KR weights', () => {
+    const targets = [{ ...contribution, objectiveId: objective.id, keyResultId: objective.keyResults[0].id, previousProgress: 20, currentProgress: 40 }, { ...contribution, objectiveId: 'o2', keyResultId: 'kr2', previousProgress: 60, currentProgress: 80 }];
+    const objectives = [{ ...objective, weight: 25 }, { ...objective, id: 'o2', weight: 75, keyResults: [{ ...objective.keyResults[0], id: 'kr2' }] }];
+    expect(supervisorReviewMetrics(objectives, targets, [], [], manager.id, period)).toMatchObject({ previousProgress: 50, currentProgress: 70 });
+  });
+  it('updates pending risks after viewing support and shows loading/error instead of zero', () => {
+    const riskReport = { ...support, payload: { ...support.payload, krReviews: [{ ...contribution, health: 'blocked' as const, blocker: '依赖延期' }] } };
+    const { rerender } = render(<WeeklyReviewEditor {...baseProps} records={[goal, riskReport]} onSaveDraft={vi.fn(async () => true)}/>);
+    expect(within(screen.getByRole('region', { name: '待确认风险' })).getByText('1')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('KR1：部门 KR'));
     fireEvent.click(screen.getByRole('button', { name: '查看本期复盘' }));
-    const dialog = screen.getByRole('dialog', { name: '员工复盘支撑' });
-    expect(within(dialog).getByText('员工 · 员工本周复盘')).toBeInTheDocument();
-    expect(within(dialog).getByText('工作证据说明：已完成关键验证')).toBeInTheDocument();
-    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: /关\s*闭/ }));
-    expect(screen.getByText('1人相关 · 0份待查看')).toBeInTheDocument();
-    expect(screen.getByText('已查看')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('保留判断')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
-    expect(save.mock.calls[0][0].krReviews?.[0].viewedEmployeeReviewIds).toEqual(['employee-review']);
-    expect(screen.queryByRole('dialog', { name: '关联工作证据' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '待确认风险' })).getByText('0')).toBeInTheDocument();
+    rerender(<WeeklyReviewEditor {...baseProps} records={[]} recordsLoading onSaveDraft={vi.fn(async () => true)}/>);
+    expect(screen.getByLabelText('部门周报指标')).toHaveAttribute('aria-busy', 'true');
+    expect(within(screen.getByRole('region', { name: '待确认风险' })).queryByText('0')).not.toBeInTheDocument();
+    rerender(<WeeklyReviewEditor {...baseProps} records={[]} recordsError={new Error('断网')} onSaveDraft={vi.fn(async () => true)}/>);
+    expect(within(screen.getByRole('region', { name: '待确认风险' })).getByText('加载失败')).toBeInTheDocument();
   });
-  it('shows empty/error support feedback and can retry', () => {
-    const retry = vi.fn();
-    const { rerender } = render(<WeeklyReviewEditor {...baseProps} records={[]} onSaveDraft={vi.fn(async () => true)} onRefreshRecords={retry}/>);
-    expect(screen.getByText('暂无对齐的员工 A')).toBeInTheDocument();
-    expect(screen.getByText('暂无员工关联工作证据')).toBeInTheDocument();
-    rerender(<WeeklyReviewEditor {...baseProps} records={[]} recordsError={new Error('断网')} onSaveDraft={vi.fn(async () => true)} onRefreshRecords={retry}/>);
-    expect(screen.getAllByText('员工复盘加载失败')).toHaveLength(2);
-    fireEvent.click(screen.getAllByRole('button', { name: /重\s*试/ })[0]);
-    expect(retry).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: /存草稿/ })).toBeDisabled();
+  it('disables summary and plan for submitted records', () => {
+    render(<WeeklyReviewEditor {...baseProps} records={[]} recordStatus="submitted" onSaveDraft={vi.fn(async () => true)}/>);
+    expect(screen.getByRole('textbox', { name: '部门补充总结' })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: '部门下周计划' })).toBeDisabled();
   });
-  it.each(['有风险', '已阻塞'])('matches employee risk styling and places it before the support divider for %s', status => {
+  it('defaults to the progress card, expands a calculated employee table and removes manual judgment', () => {
     render(<WeeklyReviewEditor {...baseProps} records={[goal, support]} onSaveDraft={vi.fn(async () => true)}/>);
-    fireEvent.click(screen.getByRole('radio', { name: status }));
-    const risk = screen.getByText('风险原因及所需支持').closest('.okr-review-risk-callout')!;
-    expect(risk).toBeInTheDocument();
-    const changes = document.querySelector('.okr-supervisor-kr-change')!;
-    const divider = document.querySelector('.okr-supervisor-support-divider')!;
-    expect(changes.compareDocumentPosition(risk) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(risk.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByLabelText('目标状态：风险')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '提交周报' }));
-    expect(screen.getByText('风险或阻塞状态的 KR 必须填写原因')).toBeInTheDocument();
+    expect(screen.getByText('员工支撑 1 人 · 工作证据 0 项')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '主管 KR 复盘：部门 KR' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('KR1：部门 KR'));
+    expect(screen.getByRole('columnheader', { name: 'KR名称' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^员工$/ })).toBeInTheDocument();
+    expect(screen.getByText('个人动作：员工 A · 当前进度60%')).toBeInTheDocument();
+    expect(screen.queryByText('主管判断与协调')).not.toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
   });
-  it('includes aligned employee A without a report and only employee-linked evidence in the read-only evidence section', () => {
-    const extraPerson = { ...employee, id: 'employee2', name: '第二员工' };
-    const extraGoal = { ...goal, id: 'employee2-goal', ownerId: 'employee2', payload: { ...goal.payload, keyResults: [{ ...goal.payload.keyResults![0], executionActions: [{ id: 'employee2-a', ownerId: 'employee2', title: '没有提交的 A', progress: 30 }] }] } };
-    const evidenceSupport = { ...support, payload: { ...support.payload, krReviews: [{ ...contribution, workIds: ['task', 'ticket'] }], items: [{ workId: 'task', title: '员工关联任务', status: '已完成', workType: 'task' as const, result: '通过验收', impact: '' }, { workId: 'ticket', title: '员工关联事项', status: '处理中', workType: 'ticket' as const, result: '', impact: '' }, { workId: 'other', title: '不应展示的任务', status: '处理中', result: '', impact: '' }] } };
-    render(<WeeklyReviewEditor {...baseProps} people={[manager, employee, extraPerson]} records={[goal, extraGoal, evidenceSupport]} onSaveDraft={vi.fn(async () => true)}/>);
-    expect(screen.getByText('2人相关 · 1份待查看')).toBeInTheDocument();
-    expect(screen.getByText('个人 A：没有提交的 A · 当前进度30%')).toBeInTheDocument();
-    expect(screen.getByText('未提交')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /关联工作证据.*2项/ })).toBeInTheDocument();
-    expect(screen.getByText('员工关联任务')).toBeInTheDocument();
-    expect(screen.getByText('员工关联事项')).toBeInTheDocument();
-    expect(screen.queryByText('不应展示的任务')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('员工关联任务进展说明')).not.toBeInTheDocument();
+  it('uses employee names as columns and shows saved action health with an icon', () => {
+    const member = { ...employee, name: '张三' };
+    const report = { ...support, payload: { ...support.payload, krReviews: [{ ...contribution, executionHealth: '风险' as const }] } };
+    render(<WeeklyReviewEditor {...baseProps} people={[manager, member]} records={[goal, report]} onSaveDraft={vi.fn(async () => true)}/>);
+    fireEvent.click(screen.getByText('KR1：部门 KR'));
+    expect(screen.getByRole('columnheader', { name: '张三' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^员工$/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('本周未提交')).not.toBeInTheDocument();
+    const status = screen.getByText('风险', { selector: 'span' });
+    expect(status.querySelector('svg')).toBeInTheDocument();
   });
-  it('shows changes since the prior submitted week and follows untouched live progress without losing judgment', () => {
+  it('merges employee extra work, assistance and knowledge without deletion and saves their source snapshot', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
-    const old: OkrRecord = { ...support, id: 'previous', ownerId: 'manager', payload: { ...support.payload, startDate: '2026-10-05', endDate: '2026-10-11', krReviews: [{ ...contribution, objectiveId: 'manager-o', keyResultId: 'manager-kr', currentProgress: 25 }] } };
-    const records = [old];
-    const { rerender } = render(<WeeklyReviewEditor {...baseProps} records={records} onSaveDraft={save}/>);
-    expect(within(screen.getByRole('region', { name: '主管 KR 复盘：部门 KR' })).getByText('25% → 40%')).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: '部门 KR主管判断与协调' }), { target: { value: '保留主管判断' } });
-    rerender(<WeeklyReviewEditor {...baseProps} records={records} okrs={[{ ...objective, keyResults: [{ ...objective.keyResults[0], progress: 50 }] }]} onSaveDraft={save}/>);
+    const report = { ...support, payload: { ...support.payload, extraWork: { workIds: ['extra-task'], description: '', impact: 'none' }, items: [{ workId: 'extra-task', title: '员工插播任务', status: '已完成', actualHours: 2, result: '', impact: '' }], assistance: [{ workId: 'help', subject: '员工协助', result: '需要支持' }], knowledgeEntries: [{ id: 'knowledge', title: '员工经验', category: '应知应会' }] } };
+    render(<WeeklyReviewEditor {...baseProps} records={[goal, report]} onSaveDraft={save}/>);
+    expect(screen.getByText('员工插播任务')).toBeInTheDocument();
+    expect(screen.getByText('员工协助')).toBeInTheDocument();
+    expect(screen.getByText('员工经验')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '删除操作' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '移除额外工作' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
-    expect(save.mock.calls[0][0].krReviews?.[0]).toMatchObject({ previousProgress: 25, currentProgress: 50, supervisorJudgment: '保留主管判断' });
-  });
-  it('restores per-KR judgment and historical support; copying keeps judgment but clears evidence', () => {
-    const payload: OkrPayload = { title: '主管周报', reviewType: 'week', reviewMode: 'supervisor', ...period, krReviews: [{ ...contribution, objectiveId: 'manager-o', objectiveTitle: '部门月度目标', keyResultId: 'manager-kr', keyResultTitle: '部门 KR', supervisorJudgment: '已保存判断', viewedEmployeeReviewIds: ['employee-review'], employeeReviewSnapshots: [{ id: 'employee-review', authorName: '员工', title: '历史员工周报', ...period, status: 'submitted', krReviews: [contribution], assistance: [], items: [] }] }] };
-    const copy = createReviewCopyDraft(payload);
-    expect(copy.krReviews?.[0]).toMatchObject({ supervisorJudgment: '已保存判断', viewedEmployeeReviewIds: [], employeeReviewSnapshots: [] });
-    render(<WeeklyReviewEditor {...baseProps} records={[]} initialPayload={payload} recordStatus="draft" onSaveDraft={vi.fn(async () => true)}/>);
-    expect(screen.getByDisplayValue('已保存判断')).toBeInTheDocument();
-    expect(screen.getByText('1人相关 · 0份待查看')).toBeInTheDocument();
-    expect(screen.getByText('已查看')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '查看本期复盘' }));
-    expect(screen.getByText('员工 · 历史员工周报')).toBeInTheDocument();
-  });
-  it('retains supervisor judgment and employee evidence in the read-only submitted detail', () => {
-    render(<ReviewReadOnlyView onBack={vi.fn()} onCopy={vi.fn()} review={{ id: 'r', authorId: 'manager', author: '主管', authorDept: '产品部', type: 'week', reviewMode: 'supervisor', cycleName: '主管周报', summary: '', uncompletedReason: '', selfScore: 90, suggestions: '', helpNeeded: '', sendTo: [], createdAt: '', status: 'submitted', krReviews: [{ ...contribution, supervisorJudgment: '协调后的判断', employeeReviewSnapshots: [{ id: 'employee-review', authorName: '员工', title: '员工支撑', ...period, status: 'submitted', krReviews: [contribution], assistance: [], items: [] }] }] }}/>);
-    expect(screen.getByText('主管判断与协调')).toBeInTheDocument();
-    expect(screen.getByText('协调后的判断')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '员工复盘支撑（1）' }));
-    expect(screen.getByText('员工 · 员工支撑')).toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(save.mock.calls[0][0].departmentContentSnapshots).toHaveLength(1);
+    expect(save.mock.calls[0][0].departmentContentSnapshots?.[0].knowledgeEntries?.[0].title).toBe('员工经验');
   });
 });

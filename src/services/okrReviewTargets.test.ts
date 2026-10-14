@@ -9,7 +9,7 @@ const personal: OkrRecord = { id: 'personal', kind: 'objective', ownerId: 'me', 
 describe('live monthly review targets', () => {
   it('reads personal A with current title, progress, product and version from the monthly record', () => {
     const [target] = monthlyReviewTargets([personal], 'me', [employee]);
-    expect(target).toMatchObject({ id: 'personal', cycle: '2026-10', primaryLabel: 'KR', objective: '当前月度目标', keyResults: [{ id: 'a', content: '本人实际 A', progress: 40, businessObject: '产品甲', version: 'V2', parentKeyResultId: 'kr', parentKeyResultTitle: '承接 KR' }] });
+    expect(target).toMatchObject({ id: 'personal', cycle: '2026-10', primaryLabel: 'KR', objective: '当前月度目标', keyResults: [{ id: 'a', content: '本人实际 A', progress: 40, businessObject: '产品甲', version: 'V2', parentKeyResultId: 'kr', parentKeyResultTitle: '承接 KR', parentKeyResultProgress: 30 }] });
     const changed = { ...personal, payload: { ...personal.payload, title: '修改后的月度目标' } };
     expect(monthlyReviewTargets([changed], 'me', [employee])[0].objective).toBe('修改后的月度目标');
   });

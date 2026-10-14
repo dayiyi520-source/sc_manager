@@ -40,12 +40,12 @@ describe('weekly review associations', () => {
     expect(save.mock.calls[1][0].knowledgeEntries).toEqual([]);
   });
 
-  it('restores task snapshots and zero hours while removing only the association', async () => {
+  it('restores task snapshots without showing unsubmitted hours while removing only the association', async () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
     render(<WeeklyReviewEditor {...props} onSaveDraft={save} initialPayload={{ title: '复盘', extraWork: { workIds: ['task-1'], description: '', impact: 'block' }, items: [{ workId: 'task-1', title: '已关联任务', status: '进行中', sourceLabel: '平台产品 / V2', actualHours: 0, result: '', impact: '' }] }}/>);
     expect(screen.getByText('已关联任务')).toBeInTheDocument();
     expect(screen.getByText('平台产品 / V2')).toBeInTheDocument();
-    expect(screen.getByText('0 小时')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.queryByText('对本月目标的影响')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '移除额外工作' }));
     fireEvent.click(screen.getByRole('button', { name: '存草稿' }));

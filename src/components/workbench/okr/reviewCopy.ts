@@ -4,6 +4,8 @@ export function createReviewCopyDraft(source: OkrPayload): OkrPayload {
   return {
     ...source,
     title: '',
+    departmentContentSnapshots: [],
+    departmentObjectiveVersions: undefined,
     startDate: undefined,
     endDate: undefined,
     feedback: undefined,

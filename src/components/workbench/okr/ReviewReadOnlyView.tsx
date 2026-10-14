@@ -1,5 +1,7 @@
+import { ModernReviewReadOnlyView } from './ModernReviewReadOnlyView';
 import React, { useState } from 'react';
 import type { OkrKrReview } from '../../../services/okrRepository';
+import { completedActualHours } from './reviewActualHours';
 import { EmployeeReviewSupportDialog } from './EmployeeReviewSupportDialog';
 import { Button, Empty, Progress, Table, Tag } from 'antd';
 import type { PerformanceReview } from '../../../types';
@@ -45,6 +47,7 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
     ? Math.round(krReviews.reduce((sum, kr) => sum + kr.currentProgress, 0) / krReviews.length)
     : review.selfScore;
 
+  if (['structured', 'monthly', 'supervisor'].includes(review.reviewMode || '')) return <ModernReviewReadOnlyView review={review} onBack={onBack} onCopy={onCopy}/>;
   return (
     <div className={`okr-review-readonly${review.type === 'month' ? ' okr-review-readonly-month' : ''}`} role="region" aria-label={`${review.cycleName}只读详情`}>
       <header className="okr-review-readonly-header">
@@ -80,8 +83,8 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
       </section>
 
       {review.type === 'week' && <section className="okr-review-readonly-section">
-        <div className="okr-review-readonly-title"><FileText /><h3>整体工作摘要</h3></div>
-        <p>{review.summary || '暂无摘要内容'}</p>
+        <div className="okr-review-readonly-title"><FileText /><h3>{review.reviewMode === 'supervisor' ? '部门补充总结' : '整体工作摘要'}</h3></div>
+        <p className="whitespace-pre-wrap break-words">{review.summary || '暂无摘要内容'}</p>
       </section>}
 
       <section className="okr-review-readonly-section">
@@ -93,7 +96,7 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
               <article key={`${kr.keyResultId}-${index}`}>
                 <div className="okr-review-readonly-kr-head">
                   <strong><span>{review.type === 'month' ? 'A' : 'KR'}{index + 1}</span>{kr.keyResultTitle}</strong>
-                  <div><small>{kr.previousProgress}% → {kr.currentProgress}%</small><Tag color={kr.health === 'normal' ? 'success' : kr.health === 'risk' ? 'warning' : 'error'}>{kr.health === 'normal' ? '正常' : kr.health === 'risk' ? '有风险' : '已阻塞'}</Tag></div>
+                  <div><small>{kr.previousProgress}% → {kr.currentProgress}%</small><Tag color={kr.health === 'normal' ? 'success' : kr.health === 'risk' ? 'warning' : 'error'}>{kr.health === 'normal' ? '正常' : kr.health === 'risk' ? review.reviewMode === 'structured' ? '风险' : '有风险' : review.reviewMode === 'structured' ? '逾期' : '已阻塞'}</Tag></div>
                 </div>
                 <Progress percent={kr.currentProgress} showInfo={false} size="small" />
                 <div className="okr-review-readonly-kr-grid">
@@ -113,7 +116,7 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
           <div className="okr-review-readonly-title"><FileText /><h3>插播任务</h3></div>
           {<Table size="small" rowKey="id" pagination={false} dataSource={(review.linkedWorkItems || []).filter(item => review.extraWork?.workIds.includes(item.id))} locale={{ emptyText: <Empty description="暂无关联插播任务" /> }} columns={[
             { title: '标题', dataIndex: 'title' }, { title: '来源归属', render: (_, item) => item.sourceLabel || '—' },
-            { title: '状态', dataIndex: 'status' }, { title: '任务工时', render: (_, item) => item.actualHours == null ? '—' : `${item.actualHours} 小时` },
+            { title: '状态', dataIndex: 'status' }, { title: '任务工时', render: (_, item) => completedActualHours({ status: item.status, actualHours: item.actualHours, kind: item.type === 'task' ? 'task' : 'collaboration' }) == null ? '—' : `${item.actualHours} 小时` },
           ]}/>}
           {extraWorkRows.length > 0 ? <div className="okr-review-readonly-extra-list">{extraWorkRows.map((item, index) => <div key={`${item.content}-${index}`}><span><Tag>{item.source || '手工记录'}</Tag><b>{item.content || '未命名工作'}</b></span><small>{item.status || '未填写状态'} · {item.hours ? `${item.hours} 小时` : '未填写耗时'}</small></div>)}</div> : review.extraWork?.description ? <p>{review.extraWork.description}</p> : review.type !== 'week' ? <p>暂无额外工作记录</p> : null}
         </section>

@@ -270,14 +270,15 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.queryByText('老板周报模板待配置')).not.toBeInTheDocument();
   });
 
-  it('opens the supervisor KR template with support, evidence and coordination fields', () => {
+  it('opens the supervisor calculated KR template with employee support and no manual judgment', () => {
     currentUser = { id: 'manager', name: '主管', department: '产品部' };
     okrState.reviewableOkrs = [{ ...okr, ownerId: 'manager' }];
     render(<ReviewSummaryView/>);
     fireEvent.click(screen.getByRole('button', { name: '写周报' }));
     expect(screen.getByText('KR1：改善重点客户交付')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('KR1：改善重点客户交付'));
     expect(screen.getByRole('button', { name: /员工复盘支撑/ })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: '改善重点客户交付主管判断与协调' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '改善重点客户交付主管判断与协调' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '提交周报' })).toBeInTheDocument();
   });
 
