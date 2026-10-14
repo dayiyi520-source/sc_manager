@@ -1,3 +1,4 @@
+import { normalizeObjectiveTitleTemplates, validateObjectiveTitleTemplates } from './okrObjectiveTitleTemplates';
 import type { OkrConfirmationSettings, OkrPerson, OkrRecord, OkrSettings } from './okrRepository';
 import { defaultCycles, materializePeriods } from './okrPeriods';
 export const defaultConfirmation = (): OkrConfirmationSettings => ({ enabled:true,visiblePending:true,actions:['create','update'],types:['target','challenge'],missingSupervisor:'admin',selfSupervisor:'auto',exemptIds:[],companyEditorIds:[] });
@@ -25,6 +26,8 @@ export function confirmationReviewer(owner: OkrPerson, action: 'create'|'update'
   return administrator;
 }
 export function validatePolicy(settings: OkrSettings, people: OkrPerson[]) {
+  const titleError = validateObjectiveTitleTemplates(normalizeObjectiveTitleTemplates(settings));
+  if (titleError) return titleError;
   const known = new Set(people.map(p=>p.id));
   if (!settings.administratorIds?.length || settings.administratorIds.some(id=>!known.has(id))) return '至少保留一名有效的 OKR 管理员';
   if (settings.confirmation && [...settings.confirmation.exemptIds,...settings.confirmation.companyEditorIds].some(id=>!known.has(id))) return '所选人员已失效，请重新选择';

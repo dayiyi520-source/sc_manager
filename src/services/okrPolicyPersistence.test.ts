@@ -57,3 +57,11 @@ describe('OKR policy persistence and access', () => {
     expect(await okrRepository.records(manager.id)).toEqual([]);
   });
 });
+
+it('persists individual O title templates through settings and rejects duplicate titles', async () => {
+  const { admin, settings } = await context();
+  settings.objectiveTitleTemplates = [{ id: 'o-title', department: '产品规划部', title: '完成重点产品迭代', guidance: '填写本月交付范围', enabled: true, krTypes: ['product', 'support'] }];
+  const saved = await okrRepository.saveSettings(settings, admin.id);
+  expect((await okrRepository.settings()).objectiveTitleTemplates).toEqual(settings.objectiveTitleTemplates);
+  await expect(okrRepository.saveSettings({ ...saved, objectiveTitleTemplates: [...saved.objectiveTitleTemplates!, { ...saved.objectiveTitleTemplates![0], id: 'duplicate' }] }, admin.id)).rejects.toThrow('相同 O 标题');
+});

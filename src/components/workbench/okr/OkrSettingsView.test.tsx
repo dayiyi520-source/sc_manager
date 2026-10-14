@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OkrSettings } from '../../../services/okrRepository';
 import { OkrSettingsView } from './OkrSettingsView';
@@ -9,13 +9,6 @@ afterEach(async()=>{ await act(async()=>{ message.destroy(); cleanup(); await ne
 const settings: OkrSettings = { defaultView: 'list', timeRules: [{ key: 'weeklyReview', label: '周总结', startDay: 1, endDay: 31, allowBackfill: true }], templates: [{department:'研发',departments:['研发'],type:'support',fields:[],types:['支持']}], dictionaries: { productNodes: [], deliveryNodes: [], presalesNodes: [], supportTypes: [] }, validation: { actionWeightTotal: 100, maxActions: 8, assigneeMultiple: true, keyNodeMultiple: true, resultRequired: true } };
 
 describe('weekly review settings', () => {
- it('saves different KR types for the same department but rejects a duplicate type',async()=>{
- const onSave=vi.fn(async()=>true);const types=[{department:'研发',departments:['研发'],type:'product',fields:[],stages:['设计']},{department:'研发',departments:['研发'],type:'support',fields:[],types:['支持']}];
- const view=render(<OkrSettingsView settings={{...settings,templates:types}} departments={['研发']} onSave={onSave}/>);
- await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'保存配置'}));});expect(onSave).toHaveBeenCalledOnce();
- view.unmount();onSave.mockClear();render(<OkrSettingsView settings={{...settings,templates:[types[0],types[0]]}} departments={['研发']} onSave={onSave}/>);
- await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'保存配置'}));});expect(onSave).not.toHaveBeenCalled();
- });
   it('uses Monday through Sunday selectors, retains monthly dates and saves weekday values', async () => {
     const onSave = vi.fn(async (_settings: OkrSettings) => true);
     render(<OkrSettingsView settings={settings} onSave={onSave}/>);
@@ -42,45 +35,88 @@ describe('weekly review settings', () => {
   });
 });
 
-it('keeps comma input intact and saves department scopes and per-template stages/types', async () => {
-  const onSave = vi.fn(async (_settings: OkrSettings) => true);
-  render(<OkrSettingsView settings={{...settings, templates:[{department:'研发',departments:['研发','设计'],type:'product',fields:[],stages:['原阶段']},{department:'交付',departments:['交付'],type:'delivery',fields:[],stages:['交付']},{department:'支撑',departments:['支撑'],type:'support',fields:[],types:[]}]}} departments={['研发','设计','交付','支撑']} onSave={onSave}/>);
-  expect(screen.getByRole('button',{name:'KR模板'})).toBeInTheDocument();
-  const stages = screen.getByLabelText('KR模板1阶段');
-  fireEvent.change(stages,{target:{value:'设计,'}});
-  expect(stages).toHaveValue('设计,');
-  fireEvent.change(stages,{target:{value:'设计, 开发,测试'}});
-  fireEvent.change(screen.getByLabelText('KR模板3类型'),{target:{value:'客户支持,内部支持'}});
-  await act(async () => { fireEvent.click(screen.getByRole('button',{name:'保存配置'})); });
-  expect(onSave).toHaveBeenCalledOnce();
-  expect(onSave.mock.calls[0][0].templates[0]).toMatchObject({departments:['研发','设计'],stages:['设计','开发','测试']});
-  expect(onSave.mock.calls[0][0].templates[2].types).toEqual(['客户支持','内部支持']);
-});
-
-it('starts a new configuration without selecting a department or template and requires generic types', () => {
-  const onSave = vi.fn(async (_settings: OkrSettings) => true);
-  render(<OkrSettingsView settings={settings} departments={['研发','交付']} onSave={onSave}/>);
-  fireEvent.click(screen.getByRole('button',{name:'添加 KR 模板配置'}));
-  expect(screen.getByText('请选择部门')).toBeInTheDocument();
-  expect(screen.getByText('请选择kr模板')).toBeInTheDocument();
-  fireEvent.mouseDown(screen.getByLabelText('KR模板2部门'));
-  expect(screen.queryByText('产研部门',{selector:'.ant-select-item-option-content'})).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
-  expect(onSave).not.toHaveBeenCalled();
-});
-it('rejects empty types for a generic template', () => {
+const template = { id: 'o', department: '研发', title: '原目标', guidance: '', enabled: true, krTypes: ['support'] as Array<'support'> };
+const chooseKr = (index: number, label: string) => {
+  fireEvent.mouseDown(screen.getByLabelText(`第${index}条KR模板`));
+  fireEvent.click(screen.getAllByText(label, { selector: '.ant-select-item-option-content' }).at(-1)!);
+  fireEvent.click(document.querySelector('.ant-modal-title')!);
+};
+it('uses a batch modal and saves multiple O titles directly with multiselect KR types', async () => {
   const onSave = vi.fn(async (_settings: OkrSettings) => true);
   render(<OkrSettingsView settings={settings} departments={['研发']} onSave={onSave}/>);
-  fireEvent.change(screen.getByLabelText('KR模板1类型'),{target:{value:''}});
-  fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
-  expect(onSave).not.toHaveBeenCalled();
-});
-
-it('saves unrelated policy settings without inventing missing legacy template stages', async () => {
-  const onSave = vi.fn(async (_settings: OkrSettings) => true);
-  render(<OkrSettingsView settings={{...settings,templates:[{department:'研发',type:'product',fields:[]}]}} onSave={onSave}/>);
-  fireEvent.click(screen.getByRole('button',{name:'周期设置'}));
-  await act(async () => { fireEvent.click(screen.getByRole('button',{name:'保存配置'})); });
+  expect(screen.getByRole('heading', { name: 'OKR模板' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '添加O模板' }));
+  expect(document.querySelector('.ant-modal')).toBeInTheDocument();
+  expect(document.querySelector('.ant-drawer')).not.toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByLabelText('模板适用部门'));
+  fireEvent.click(screen.getByText('研发', { selector: '.ant-select-item-option-content' }));
+  fireEvent.change(screen.getByLabelText('第1条O标题'), { target: { value: '版本交付' } });
+  chooseKr(1, '产研 KR'); chooseKr(1, '通用 KR');
+  fireEvent.click(screen.getByRole('button', { name: '继续添加O标题' }));
+  fireEvent.change(screen.getByLabelText('第2条O标题'), { target: { value: '质量提升' } });
+  chooseKr(2, '通用 KR');
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '提交模板' })); });
   expect(onSave).toHaveBeenCalledOnce();
-  expect(onSave.mock.calls[0][0].templates[0].stages).toEqual([]);
+  expect(onSave.mock.calls[0][0].objectiveTitleTemplates).toEqual([
+    expect.objectContaining({ department: '研发', title: '版本交付', krTypes: ['product', 'support'] }),
+    expect.objectContaining({ department: '研发', title: '质量提升', krTypes: ['support'] }),
+  ]);
+  expect(screen.getByRole('button', { name: '编辑质量提升' })).toBeInTheDocument();
+});
+it('validates every row and preserves a failed batch for retry', async () => {
+  const onSave = vi.fn(async (_settings: OkrSettings) => false);
+  render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} departments={['研发']} onSave={onSave}/>);
+  fireEvent.click(screen.getByRole('button', { name: '编辑原目标' }));
+  fireEvent.change(screen.getByLabelText('第1条O标题'), { target: { value: '新目标' } });
+  fireEvent.click(screen.getByRole('button', { name: '继续添加O标题' }));
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '提交模板' })); });
+  expect(onSave).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('第1条O标题')).toHaveValue('新目标');
+  fireEvent.click(screen.getByRole('button', { name: '移除第2条O模板' }));
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '提交模板' })); });
+  expect(screen.getByText('保存失败，请重试，当前内容已保留')).toBeInTheDocument();
+  expect(screen.getByLabelText('第1条O标题')).toHaveValue('新目标');
+  expect(screen.getByRole('button', { name: '编辑原目标' })).toBeInTheDocument();
+});
+it('deletes a saved row directly after confirmation and keeps it when saving fails', async () => {
+  const onSave = vi.fn(async (_settings: OkrSettings) => false);
+  render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} onSave={onSave}/>);
+  fireEvent.click(screen.getByRole('button', { name: '删除原目标' }));
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^删\s*除$/ })); });
+  expect(onSave.mock.calls[0][0].objectiveTitleTemplates).toEqual([]);
+  expect(screen.getByRole('button', { name: '编辑原目标' })).toBeInTheDocument();
+  expect(screen.getByText('保存失败，请重试，当前内容已保留')).toBeInTheDocument();
+});
+it('saves edits directly while preserving saved settings from other tabs', async () => {
+  const onSave = vi.fn(async (_settings: OkrSettings) => true);
+  render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} onSave={onSave}/>);
+  fireEvent.click(screen.getByRole('button', { name: '默认视图' }));
+  expect(screen.getByRole('button', { name: '保存配置' })).toBeInTheDocument();
+  fireEvent.mouseDown(screen.getAllByRole('combobox')[0]);
+  fireEvent.click(screen.getByText('卡片视图', { selector: '.ant-select-item-option-content' }));
+  fireEvent.click(screen.getByRole('button', { name: 'OKR模板' }));
+  fireEvent.click(screen.getByRole('button', { name: '编辑原目标' }));
+  fireEvent.change(screen.getByLabelText('第1条O标题'), { target: { value: '新目标' } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '提交模板' })); });
+  expect(onSave.mock.calls[0][0].defaultView).toBe('list');
+  expect(onSave.mock.calls[0][0].objectiveTitleTemplates?.[0].title).toBe('新目标');
+});
+it('read-only users cannot add, edit or delete templates', () => {
+  render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} readOnly onSave={vi.fn(async () => true)}/>);
+  expect(screen.getByRole('button', { name: '添加O模板' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '编辑原目标' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '删除原目标' })).toBeDisabled();
+});
+it('locks duplicate submissions until the batch save finishes', async () => {
+  let resolveSave!: (value: boolean) => void;
+  const onSave = vi.fn(() => new Promise<boolean>(resolve => { resolveSave = resolve; }));
+  render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} onSave={onSave}/>);
+  fireEvent.click(screen.getByRole('button', { name: '编辑原目标' }));
+  fireEvent.click(screen.getByRole('button', { name: '提交模板' }));
+  fireEvent.click(screen.getByRole('button', { name: '提交模板' }));
+  expect(onSave).toHaveBeenCalledOnce();
+  expect(screen.getByLabelText('第1条O标题')).toBeDisabled();
+  await act(async () => { resolveSave(true); });
+  await waitFor(() => expect(screen.getByRole('button', { name: '编辑原目标' })).toBeEnabled());
 });

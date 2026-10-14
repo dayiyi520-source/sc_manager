@@ -1,5 +1,5 @@
 import collaborationTypes from './mockCollaborationTypes.json';
-import type { ApprovalFlow, Contract, CurrentUser, Customer, DefectBug, FollowUpRecord, Lead, Opportunity, ProductLine, RequirementTask, TeamMember, VersionIteration } from '../types';
+import type { ApprovalFlow, Contract, CurrentUser, Customer, DefectBug, DeliveryMapProject, FollowUpRecord, Lead, Opportunity, ProductLine, RequirementTask, TeamMember, VersionIteration } from '../types';
 import type { TestCase, TestCaseDirectory, TestPlan } from '../types/testManagement';
 import { MOCK_DATABASE, MOCK_SNAPSHOT_VERSION } from './mockDatabaseSnapshot';
 
@@ -13,6 +13,57 @@ const json = <T>(value: unknown, fallback: T): T => {
 };
 
 export { MOCK_SNAPSHOT_VERSION, MOCK_DATABASE };
+
+export const MOCK_PROJECT_DELIVERY_MAP: DeliveryMapProject[] = [
+  {
+    id: 'delivery-project-001', name: '智慧校园一体化平台建设项目', customerName: '深圳职业技术大学', customerTags: ['钱钧达', '周琪'],
+    products: [
+      { id: 'delivery-product-001', name: '院校门户系统', ownerName: '钱钧达', stages: [
+        { id: 'd001-s1', name: '项目移交', status: 'completed', dateLabel: '03-01 ~ 03-12' }, { id: 'd001-s2', name: '项目启动', status: 'completed', dateLabel: '03-13 ~ 03-20' }, { id: 'd001-s3', name: '需求确认', status: 'completed', dateLabel: '03-21 ~ 04-08' }, { id: 'd001-s4', name: '系统部署', status: 'ongoing', dateLabel: '预计 05-16' }, { id: 'd001-s5', name: '系统培训', status: 'pending', dateLabel: '未开始' }, { id: 'd001-s6', name: '试运行', status: 'pending', dateLabel: '未开始' }, { id: 'd001-s7', name: '项目初验', status: 'pending', dateLabel: '未开始' }, { id: 'd001-s8', name: '项目终验', status: 'pending', dateLabel: '未开始' }, { id: 'd001-s9', name: '运维跟踪', status: 'pending', dateLabel: '未开始' }
+      ] },
+      { id: 'delivery-product-002', name: 'AI校园大脑', ownerName: '杨文', stages: [
+        { id: 'd002-s1', name: '项目移交', status: 'completed', dateLabel: '03-01 ~ 03-12' }, { id: 'd002-s2', name: '项目启动', status: 'completed', dateLabel: '03-13 ~ 03-20' }, { id: 'd002-s3', name: '系统部署', status: 'ongoing', dateLabel: '预计 05-16' }, { id: 'd002-s4', name: '培训会议', status: 'pending', dateLabel: '未开始' }, { id: 'd002-s5', name: '项目初验', status: 'pending', dateLabel: '未开始' }, { id: 'd002-s6', name: '项目终验', status: 'pending', dateLabel: '未开始' }, { id: 'd002-s7', name: '运维跟踪', status: 'pending', dateLabel: '未开始' }
+      ] },
+      { id: 'delivery-product-003', name: '教师教学档案袋', ownerName: '刘格', stages: [
+        { id: 'd003-s1', name: '项目移交', status: 'completed', dateLabel: '03-01 ~ 03-12' }, { id: 'd003-s2', name: '项目启动', status: 'completed', dateLabel: '03-13 ~ 03-20' }, { id: 'd003-s3', name: '系统部署', status: 'ongoing', dateLabel: '预计 05-16' }, { id: 'd003-s4', name: '项目验终', status: 'pending', dateLabel: '未开始' }
+      ] }
+    ]
+  },
+  {
+    id: 'delivery-project-002', name: '在线精品课程资源库建设项目', customerName: '金华职业技术大学', customerTags: ['李妍'],
+    products: [
+      { id: 'delivery-product-004', name: '教师教学档案袋', ownerName: '钱钧达', stages: [
+        { id: 'd004-s1', name: '项目移交', status: 'completed', dateLabel: '03-01 ~ 03-12' }, { id: 'd004-s2', name: '项目启动', status: 'completed', dateLabel: '03-13 ~ 03-20' }, { id: 'd004-s3', name: '系统部署', status: 'ongoing', dateLabel: '预计 05-16' }, { id: 'd004-s4', name: '培训会议', status: 'pending', dateLabel: '未开始' }, { id: 'd004-s5', name: '项目初验', status: 'pending', dateLabel: '未开始' }, { id: 'd004-s6', name: '项目终验', status: 'pending', dateLabel: '未开始' }, { id: 'd004-s7', name: '运维跟踪', status: 'pending', dateLabel: '未开始' }
+      ] },
+      { id: 'delivery-product-005', name: '项目管理', ownerName: '杨文', stages: [
+        { id: 'd005-s1', name: '项目移交', status: 'completed', dateLabel: '03-01 ~ 03-12' }, { id: 'd005-s2', name: '项目启动', status: 'completed', dateLabel: '03-13 ~ 03-20' }, { id: 'd005-s3', name: '需求确认', status: 'completed', dateLabel: '03-21 ~ 04-08' }, { id: 'd005-s4', name: '系统部署', status: 'ongoing', dateLabel: '预计 05-16' }, { id: 'd005-s5', name: '系统培训', status: 'pending', dateLabel: '未开始' }, { id: 'd005-s6', name: '试运行', status: 'pending', dateLabel: '未开始' }, { id: 'd005-s7', name: '项目初验', status: 'pending', dateLabel: '未开始' }, { id: 'd005-s8', name: '项目终验', status: 'pending', dateLabel: '未开始' }, { id: 'd005-s9', name: '运维跟踪', status: 'pending', dateLabel: '未开始' }
+      ] }
+    ]
+  },
+  {
+    id: 'delivery-project-003', name: '智慧实训基地升级项目', customerName: '浙江工业职业技术学院', customerTags: ['陈思远', '王璐'],
+    products: [{ id: 'delivery-product-006', name: '实训资源管理平台', ownerName: '陈思远', stages: [
+      { id: 'd006-s1', name: '项目移交', status: 'completed', dateLabel: '04-02 ~ 04-10' }, { id: 'd006-s2', name: '项目启动', status: 'completed', dateLabel: '04-11 ~ 04-18' }, { id: 'd006-s3', name: '需求确认', status: 'ongoing', dateLabel: '预计 05-06' }, { id: 'd006-s4', name: '系统部署', status: 'pending', dateLabel: '未开始' }, { id: 'd006-s5', name: '项目初验', status: 'pending', dateLabel: '未开始' }, { id: 'd006-s6', name: '项目终验', status: 'pending', dateLabel: '未开始' }
+    ] }]
+  },
+  {
+    id: 'delivery-project-004', name: '产教融合协同平台建设项目', customerName: '宁波城市职业技术学院', customerTags: ['周扬'],
+    products: [{ id: 'delivery-product-007', name: '产教融合平台', ownerName: '周扬', stages: [
+      { id: 'd007-s1', name: '项目移交', status: 'completed', dateLabel: '02-18 ~ 02-28' }, { id: 'd007-s2', name: '项目启动', status: 'completed', dateLabel: '03-01 ~ 03-08' }, { id: 'd007-s3', name: '需求确认', status: 'completed', dateLabel: '03-09 ~ 03-22' }, { id: 'd007-s4', name: '系统部署', status: 'ongoing', dateLabel: '预计 04-30' }, { id: 'd007-s5', name: '系统培训', status: 'pending', dateLabel: '未开始' }, { id: 'd007-s6', name: '项目初验', status: 'pending', dateLabel: '未开始' }, { id: 'd007-s7', name: '运维跟踪', status: 'pending', dateLabel: '未开始' }
+    ] }]
+  },
+  {
+    id: 'delivery-project-005', name: '数字校园运营服务项目', customerName: '温州科技职业学院', customerTags: ['赵宁', '许悦'],
+    products: [
+      { id: 'delivery-product-008', name: '校园运营驾驶舱', ownerName: '赵宁', stages: [
+        { id: 'd008-s1', name: '项目移交', status: 'completed', dateLabel: '01-10 ~ 01-18' }, { id: 'd008-s2', name: '项目启动', status: 'completed', dateLabel: '01-19 ~ 01-26' }, { id: 'd008-s3', name: '系统部署', status: 'ongoing', dateLabel: '预计 03-16' }, { id: 'd008-s4', name: '试运行', status: 'pending', dateLabel: '未开始' }, { id: 'd008-s5', name: '项目终验', status: 'pending', dateLabel: '未开始' }, { id: 'd008-s6', name: '运维跟踪', status: 'pending', dateLabel: '未开始' }
+      ] },
+      { id: 'delivery-product-009', name: '数据治理服务', ownerName: '许悦', stages: [
+        { id: 'd009-s1', name: '项目移交', status: 'completed', dateLabel: '01-10 ~ 01-18' }, { id: 'd009-s2', name: '项目启动', status: 'ongoing', dateLabel: '预计 02-02' }, { id: 'd009-s3', name: '需求确认', status: 'pending', dateLabel: '未开始' }, { id: 'd009-s4', name: '系统部署', status: 'pending', dateLabel: '未开始' }, { id: 'd009-s5', name: '项目初验', status: 'pending', dateLabel: '未开始' }
+      ] }
+    ]
+  }
+];
 
 export const MOCK_TEAM_MEMBERS: TeamMember[] = rows('t_sys_user')
   .filter((row) => text(row.tenant_id_) === 'local-tenant' && Number(row.delete_flag_ || 0) === 0)

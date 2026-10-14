@@ -61,6 +61,7 @@ const PaymentCollectionManagementView = lazyNamed(() => import('./components/com
 // Operation & Project Views
 const ProjectManagementView = lazyNamed(() => import('./components/project/ProjectManagementView'), 'ProjectManagementView');
 const MilestoneScheduleView = lazyNamed(() => import('./components/project/MilestoneScheduleView'), 'MilestoneScheduleView');
+const ProjectDeliveryMapView = lazyNamed(() => import('./components/project/ProjectDeliveryMapView'), 'ProjectDeliveryMapView');
 
 // Finance Views
 
@@ -186,6 +187,8 @@ const MainContent: React.FC = () => {
       case 'comp_payment':
         return <PaymentCollectionManagementView />;
       // Project
+      case 'proj_delivery_map':
+        return <ProjectDeliveryMapView />;
       case 'proj_list':
       case 'ops_projects':
         return <ProjectManagementView />;

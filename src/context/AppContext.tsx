@@ -107,6 +107,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     title: '项目管理',
     icon: 'FolderKanban',
     subMenus: [
+      { id: 'proj_delivery_map', title: '项目交付地图', mainMenuId: 'project', icon: 'Compass' },
       { id: 'proj_delivery_tasks', title: '交付任务', mainMenuId: 'project', icon: 'CheckSquare' }
     ]
   },

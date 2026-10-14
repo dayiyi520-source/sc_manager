@@ -2415,3 +2415,63 @@ html:not(.dark) .tech-main .notification-category-tabs .ant-tabs-tab-btn[role="t
   font-size: 12px;
   font-weight: 400;
 }
+
+/* Project delivery map */
+.delivery-map-page { color: var(--text-body); min-width: 0; }
+.delivery-map-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 8px 0 20px; }
+.delivery-map-eyebrow { margin: 0 0 6px; color: var(--primary); font: 600 11px/16px var(--font-mono-code); letter-spacing: 0; }
+.delivery-map-heading h1 { margin: 0; color: var(--text-primary); font-size: 24px; line-height: 32px; font-weight: 700; }
+.delivery-map-description { margin: 8px 0 0; color: var(--text-muted); font-size: 12px; line-height: 20px; }
+.delivery-map-summary { display: flex; gap: 16px; color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+.delivery-map-summary strong { color: var(--text-primary); font-size: 18px; line-height: 24px; }
+.delivery-map-filter-panel, .delivery-map-table-shell { background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 8px; box-shadow: 0 8px 24px color-mix(in srgb, var(--color-black) 10%, transparent); }
+.delivery-map-filter-panel { padding: 16px; margin-bottom: 16px; }
+.delivery-map-filter-grid { display: grid; grid-template-columns: minmax(200px, 1.2fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(160px, 1fr) auto; gap: 8px; align-items: center; }
+.delivery-map-filter-grid .ant-input-affix-wrapper, .delivery-map-filter-grid .ant-select { width: 100%; }
+.delivery-map-filter-actions { display: flex; gap: 8px; }
+.delivery-map-legend { display: flex; justify-content: flex-end; gap: 16px; margin-top: 14px; color: var(--text-muted); font-size: 12px; }
+.delivery-map-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.delivery-map-legend-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+.delivery-map-legend-dot.delivery-stage-completed { background: var(--success); }
+.delivery-map-legend-dot.delivery-stage-ongoing { background: var(--primary); }
+.delivery-map-legend-dot.delivery-stage-pending { background: var(--border-strong); }
+.delivery-map-table-scroll { overflow-x: auto; }
+.delivery-map-table { min-width: 1180px; }
+.delivery-map-table-header { display: grid; grid-template-columns: 224px 162px minmax(794px, 1fr); }
+.delivery-project-group { display: grid; grid-template-columns: 224px 162px minmax(794px, 1fr); border-bottom: 1px solid var(--border-main); }
+.delivery-map-product-row { display: grid; grid-column: 2 / -1; grid-template-columns: 162px minmax(794px, 1fr); min-height: 112px; border-top: 1px solid var(--border-main); }
+.delivery-map-table-header { min-height: 48px; align-items: center; color: var(--text-primary); background: var(--bg-surface-soft); border-bottom: 1px solid var(--border-main); font-size: 12px; font-weight: 700; }
+.delivery-map-table-header > div, .delivery-project-group > div, .delivery-map-product-row > div { padding: 0 16px; }
+.delivery-map-table-row { min-height: 112px; border-bottom: 1px solid var(--border-main); }
+.delivery-map-table-row:last-child { border-bottom: 0; }
+.delivery-map-project-cell, .delivery-map-product-cell, .delivery-map-stage-cell { min-width: 0; border-right: 1px solid var(--border-main); }
+.delivery-map-stage-cell { display: flex; align-items: center; overflow: hidden; }
+.delivery-map-project-cell { display: flex; flex-direction: column; justify-content: center; gap: 4px; background: color-mix(in srgb, var(--bg-surface-soft) 42%, transparent); }
+.delivery-project-icon { color: var(--primary); font-size: 20px; line-height: 24px; }
+.delivery-project-name, .delivery-project-customer, .delivery-product-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delivery-project-name { color: var(--text-primary); font-size: 13px; font-weight: 700; }
+.delivery-project-customer { color: var(--text-muted); font-size: 12px; }
+.delivery-project-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.delivery-project-tags .ant-tag, .delivery-map-product-cell .ant-tag { margin-inline-end: 0; font-size: 11px; line-height: 20px; }
+.delivery-map-product-cell { display: flex; align-items: center; gap: 10px; }
+.delivery-product-mark { width: 12px; height: 12px; flex: 0 0 12px; border-radius: 2px; background: var(--primary); box-shadow: 4px 0 0 color-mix(in srgb, var(--primary) 35%, transparent); }
+.delivery-product-name { max-width: 118px; margin-bottom: 6px; color: var(--text-primary); font-size: 12px; font-weight: 600; }
+.delivery-map-stage-track { display: flex; align-items: center; min-width: max-content; padding: 0 0; }
+.delivery-stage-node { position: relative; flex: 0 0 auto; }
+.delivery-stage-card { position: relative; z-index: 1; display: flex; height: 82px; flex-direction: column; align-items: center; justify-content: space-between; padding: 8px 6px 7px; border: 1px solid var(--border-main); border-radius: 10px; background: var(--bg-surface); transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
+.delivery-stage-node:hover .delivery-stage-card, .delivery-stage-node:focus-within .delivery-stage-card { transform: translateY(-2px); border-color: var(--primary); box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 14%, transparent); }
+.delivery-stage-node.delivery-stage-completed .delivery-stage-card { border-color: color-mix(in srgb, var(--success) 68%, var(--border-main)); background: color-mix(in srgb, var(--success) 10%, var(--bg-surface)); }
+.delivery-stage-node.delivery-stage-ongoing .delivery-stage-card { border-color: color-mix(in srgb, var(--primary) 78%, var(--border-main)); background: color-mix(in srgb, var(--primary) 12%, var(--bg-surface)); }
+.delivery-stage-name { max-width: 100%; overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 700; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.delivery-stage-status { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: var(--border-strong); font-size: 16px; font-weight: 700; }
+.delivery-stage-completed .delivery-stage-status { color: var(--success); }
+.delivery-stage-ongoing .delivery-stage-status { color: var(--primary); }
+.delivery-stage-pending .delivery-stage-status { color: var(--border-strong); }
+.delivery-stage-date { color: var(--text-muted); font-size: 11px; line-height: 16px; white-space: nowrap; }
+.delivery-stage-connector { position: absolute; z-index: 0; top: 50%; right: -1px; width: 14px; height: 1px; background: var(--border-strong); }
+.delivery-stage-completed .delivery-stage-connector { background: var(--success); }
+.delivery-stage-ongoing .delivery-stage-connector { background: var(--primary); }
+.delivery-map-feedback { display: flex; min-height: 360px; align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); font-size: 12px; }
+.delivery-map-empty { flex-direction: column; gap: 12px; }
+.delivery-map-empty .ant-empty { margin: 0; }
+@media (max-width: 920px) { .delivery-map-heading { align-items: flex-start; flex-direction: column; gap: 12px; } .delivery-map-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .delivery-map-filter-actions { grid-column: 1 / -1; } .delivery-map-legend { justify-content: flex-start; } }

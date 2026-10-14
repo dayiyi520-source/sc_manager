@@ -35,6 +35,7 @@ import {
   MOCK_OKR_SETTINGS,
 } from '../data/mockSnapshot';
 import type { ProductLine, RequirementTask, RequirementWorkItem, VersionIteration } from '../types';
+import type { SaveVersionReviewInput, VersionReview, VersionReviewListItem } from '../types/versionReview';
 import { normalizeVersionStatus } from '../components/product/productLinePresentation';
 import type { AttachmentMetadata, CurrentUser, EmployeeOption } from '../types';
 import type {
@@ -67,6 +68,7 @@ const KEYS = {
   opsTasks: 'shichuang.frontend.mock.opsTasks',
   taskActivities: 'shichuang.frontend.mock.taskActivities',
   attachments: 'shichuang.frontend.mock.attachments',
+  versionReviews: 'shichuang.frontend.mock.versionReviews',
 };
 
 // 每次导入新数据库快照时，淘汰浏览器里由旧演示数据留下的本地状态。
@@ -183,6 +185,22 @@ const getProductLines = (): ProductLine[] => read<ProductLine[]>(KEYS.productLin
     releaseDate: version.releaseDate || snapshotVersions.find((item) => item.id === version.id)?.releaseDate || '',
   })) };
 });
+
+const versionReviewSeeds = (products: ProductLine[], members: EmployeeOption[]): VersionReview[] => products.flatMap((product, productIndex) => (product.versions || []).slice(0, 1).map((version) => {
+  const first = members[productIndex % Math.max(members.length, 1)];
+  const second = members[(productIndex + 1) % Math.max(members.length, 1)];
+  const participantIds = [first?.id, second?.id].filter(Boolean) as string[];
+  return { id: `mock-version-review-${productIndex + 1}`, productLineId: product.id, productLineName: product.name, versionId: version.id, versionName: version.name, meetingTopic: `${version.name}版本发布评审`, reviewType: ['产品内部审核', '技术内部审核', '产品跨部门审核'][productIndex % 3], initiatorName: first?.name || '林志豪', participantNames: participantIds.map(id => members.find(member => member.id === id)?.name || '').filter(Boolean).join('、'), meetingTime: `2026-10-${String(8 + productIndex).padStart(2, '0')} 14:00:00`, reviewDate: `2026-10-${String(8 + productIndex).padStart(2, '0')}`, conclusion: productIndex % 3 === 2 ? '有条件通过' : '通过', summary: '版本功能、测试结果和上线风险已完成评估。', agendaConclusion: '核心功能符合发布要求，按计划推进版本发布。', remainingIssues: productIndex % 2 ? '补充上线后的监控指标。' : '', relatedTaskIds: [], attachments: [], status: 'SUBMITTED', participantCount: participantIds.length, revision: 0, createdAt: `2026-10-${String(7 + productIndex).padStart(2, '0')}T06:00:00.000Z`, updatedAt: `2026-10-${String(8 + productIndex).padStart(2, '0')}T08:00:00.000Z`, participants: participantIds.map(id => ({ id, name: members.find(member => member.id === id)?.name || id })) };
+}));
+const getVersionReviews = (): VersionReview[] => read<VersionReview[]>(KEYS.versionReviews, versionReviewSeeds(getProductLines(), getEmployeeOptions()));
+const versionReviewListItem = (review: VersionReview): VersionReviewListItem => ({ ...review });
+const mergeVersionReview = (current: VersionReview, input: SaveVersionReviewInput, products: ProductLine[], members: EmployeeOption[], status: VersionReview['status']): VersionReview => {
+  const product = products.find(item => item.id === input.productLineId) || products.find(item => item.id === current.productLineId);
+  const version = product?.versions?.find(item => item.id === input.versionId) || product?.versions?.find(item => item.id === current.versionId);
+  const participants = (input.participantIds || []).map(id => ({ id, name: members.find(member => member.id === id)?.name || id }));
+  return { ...current, ...input, productLineId: product?.id, productLineName: product?.name, versionId: version?.id, versionName: version?.name, participants, participantNames: participants.map(item => item.name).join('、'), participantCount: participants.length, status, revision: current.revision + 1, updatedAt: now() };
+};
+
 const getOkrPeople = () => {
   const cached = read(KEYS.okrPeople, MOCK_OKR_PEOPLE);
   return MOCK_OKR_PEOPLE.map((person) => {
@@ -423,6 +441,28 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (parts[0] === 'api' && ['presales-tasks', 'delivery-tasks', 'ops-tasks'].includes(parts[1])) {
     return handleMockBusinessTasks(path, method, body, { activities: taskActivities, record: recordTaskActivity, changes: recordTaskChanges, validateCompletion });
   }
+  if (parts[1] === 'version-reviews' || (parts[1] === 'product-lines' && parts[3] === 'versions' && parts[5] === 'reviews')) {
+    const reviews = getVersionReviews(); const products = getProductLines(); const members = getEmployeeOptions();
+    const lineId = parts[1] === 'version-reviews' ? '' : parts[2]; const versionId = parts[1] === 'version-reviews' ? '' : parts[4];
+    if (parts[1] === 'version-reviews' && method === 'GET') return reviews.map(versionReviewListItem);
+    const scoped = reviews.filter(item => (!lineId || item.productLineId === lineId) && (!versionId || item.versionId === versionId));
+    if (parts[1] === 'product-lines' && parts[5] === 'reviews' && !parts[6] && method === 'GET') return scoped.map(versionReviewListItem);
+    if (parts[1] === 'product-lines' && parts[5] === 'reviews' && !parts[6] && method === 'POST') {
+      const created = mergeVersionReview({ id: id('version-review'), productLineId: lineId, versionId, revision: 0, status: 'DRAFT', participantCount: 0, participants: [], createdAt: now(), updatedAt: now() } as VersionReview, body as SaveVersionReviewInput, products, members, 'DRAFT');
+      write(KEYS.versionReviews, [...reviews, created]); return created;
+    }
+    if (parts[6] === 'submit' && method === 'POST') {
+      const created = mergeVersionReview({ id: id('version-review'), productLineId: lineId, versionId, revision: 0, status: 'DRAFT', participantCount: 0, participants: [], createdAt: now(), updatedAt: now() } as VersionReview, body as SaveVersionReviewInput, products, members, 'SUBMITTED');
+      write(KEYS.versionReviews, [...reviews, created]); return created;
+    }
+    const reviewId = parts[6]; const current = reviews.find(item => item.id === reviewId);
+    if (!current) throw new Error('版本评审不存在');
+    if (parts[5] === 'reviews' && parts[7] === 'submit' && ['POST', 'PUT'].includes(method)) { if (method === 'POST' && body.revision !== undefined && body.revision !== current.revision) throw new Error('版本评审已被更新，请刷新后重试'); const updated = mergeVersionReview(current, method === 'PUT' ? body as SaveVersionReviewInput : { ...current, participantIds: (current.participants || []).map(item => item.id) } as SaveVersionReviewInput, products, members, 'SUBMITTED'); const next = reviews.map(item => item.id === reviewId ? updated : item); write(KEYS.versionReviews, next); return updated; }
+    if (parts[5] === 'reviews' && method === 'GET') return current;
+    if (parts[5] === 'reviews' && method === 'PUT') { if (body.revision !== current.revision) throw new Error('版本评审已被更新，请刷新后重试'); const updated = mergeVersionReview(current, body as SaveVersionReviewInput, products, members, 'DRAFT'); write(KEYS.versionReviews, reviews.map(item => item.id === reviewId ? updated : item)); return updated; }
+    if (parts[5] === 'reviews' && method === 'DELETE') { if (body.revision !== current.revision) throw new Error('版本评审已被更新，请刷新后重试'); write(KEYS.versionReviews, reviews.filter(item => item.id !== reviewId)); return null; }
+  }
+
   if (parts.includes('test-reports')) {
     let session: { user?: { name?: string } } | null = null;
     try { session = JSON.parse(sessionStorage.getItem('shichuang.session') || 'null'); } catch { /* 兼容失效的本地会话。 */ }

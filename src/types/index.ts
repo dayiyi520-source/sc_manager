@@ -86,6 +86,7 @@ export type SubMenuId =
   | 'proj_list'
   | 'proj_config'
   | 'proj_delivery_tasks'
+  | 'proj_delivery_map'
   | 'proj_ops_tasks'
   | 'proj_delivery_tickets';
 
@@ -130,6 +131,9 @@ export interface OKRItem {
     executionStatus?: 'ahead' | 'normal' | 'risk' | 'overdue';
     parentKeyResultId?: string;
     parentKeyResultTitle?: string;
+    parentKeyResultProgress?: number;
+    parentKeyResultDetails?: import('../services/okrRepository').OkrKrDetail[];
+    plannedStartDate?: string;
   }[];
 }
 
@@ -891,6 +895,30 @@ export interface ProjectRecord {
   membersCount?: number;
 }
 export type ProjectItem = ProjectRecord;
+
+export type DeliveryMapStageStatus = 'completed' | 'ongoing' | 'pending';
+
+export interface DeliveryMapStage {
+  id: string;
+  name: string;
+  status: DeliveryMapStageStatus;
+  dateLabel: string;
+}
+
+export interface DeliveryMapProduct {
+  id: string;
+  name: string;
+  ownerName: string;
+  stages: DeliveryMapStage[];
+}
+
+export interface DeliveryMapProject {
+  id: string;
+  name: string;
+  customerName: string;
+  customerTags: string[];
+  products: DeliveryMapProduct[];
+}
 
 export interface Milestone {
   id: string;

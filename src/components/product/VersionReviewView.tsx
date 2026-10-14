@@ -47,19 +47,20 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
   const employees = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: creating || Boolean(selectedId), retry: false });
   const tasks = useQuery({ queryKey: ['version-review-tasks', selectedLineId || lineId], queryFn: () => productRepository.workItems(selectedLineId || lineId), enabled: Boolean(selectedLineId || lineId) && (creating || Boolean(selectedId)), retry: false });
   const current = detail.data;
+  const safeCurrent = useMemo(() => current ? { ...current, participants: Array.isArray(current.participants) ? current.participants : [], attachments: Array.isArray(current.attachments) ? current.attachments : [] } : undefined, [current]);
   const editing = creating || Boolean(selectedId);
-  const readOnly = current?.status === 'SUBMITTED';
+  const readOnly = safeCurrent?.status === 'SUBMITTED';
 
   useEffect(() => {
-    if (!current) return;
+    if (!safeCurrent) return;
     form.setFieldsValue({
-      meetingTopic: current.meetingTopic, reviewType: current.reviewType, productLineId: scope.lineId, versionId: scope.versionId,
-      meetingTime: current.meetingTime ? dayjs(current.meetingTime) : current.reviewDate ? dayjs(current.reviewDate) : undefined,
-      participantIds: current.participants.map((item) => item.id), relatedTaskIds: current.relatedTaskIds || [],
-      conclusion: current.conclusion, agendaConclusion: current.agendaConclusion || current.summary,
-      remainingIssues: current.remainingIssues || current.remainingRisks, attachments: current.attachments || []
+      meetingTopic: safeCurrent.meetingTopic, reviewType: safeCurrent.reviewType, productLineId: scope.lineId, versionId: scope.versionId,
+      meetingTime: safeCurrent.meetingTime ? dayjs(safeCurrent.meetingTime) : safeCurrent.reviewDate ? dayjs(safeCurrent.reviewDate) : undefined,
+      participantIds: safeCurrent.participants.map((item) => item.id), relatedTaskIds: safeCurrent.relatedTaskIds || [],
+      conclusion: safeCurrent.conclusion, agendaConclusion: safeCurrent.agendaConclusion || safeCurrent.summary,
+      remainingIssues: safeCurrent.remainingIssues || safeCurrent.remainingRisks, attachments: safeCurrent.attachments
     });
-  }, [current, form, scope.lineId, scope.versionId]);
+  }, [safeCurrent, form, scope.lineId, scope.versionId]);
 
   const employeeOptions = useMemo(() => employeeSelectOptions(employees.data || []), [employees.data]);
   const taskItems = ((tasks.data as { page?: { items?: UnifiedWorkItem[] } } | undefined)?.page?.items || []) as UnifiedWorkItem[];

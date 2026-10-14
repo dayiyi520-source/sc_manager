@@ -33,7 +33,7 @@ describe('design task navigation', () => {
   it('exposes the requested business task menus and keeps retired entries hidden', () => {
     expect(MENU_GROUPS.find((group) => group.id === 'crm')).toMatchObject({ title: '客户与商机', subMenus: [{ id: 'crm_presales_tasks', title: '售前任务' }] });
     expect(MENU_GROUPS.find((group) => group.id === 'approval')).toBeUndefined();
-    expect(MENU_GROUPS.find((group) => group.id === 'project')).toMatchObject({ title: '项目管理', subMenus: [{ id: 'proj_delivery_tasks', title: '交付任务' }] });
+    expect(MENU_GROUPS.find((group) => group.id === 'project')).toMatchObject({ title: '项目管理', subMenus: expect.arrayContaining([expect.objectContaining({ id: 'proj_delivery_map', title: '项目交付地图' }), expect.objectContaining({ id: 'proj_delivery_tasks', title: '交付任务' })]) });
     expect(MENU_GROUPS.find((group) => group.id === 'workbench')?.subMenus.some((menu) => menu.id === 'wb_knowledge')).toBe(false);
     const product = MENU_GROUPS.find((group) => group.id === 'product')!.subMenus;
     expect(product.some((menu) => menu.id === 'prod_reviews' || menu.id === 'prod_planning')).toBe(false);
