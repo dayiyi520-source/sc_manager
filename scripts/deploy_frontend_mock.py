@@ -40,11 +40,10 @@ def main():
     if '/assets/' in index.replace(base + 'assets/', '') or base + 'assets/' not in index:
         raise SystemExit('Incorrect frontend base path.')
     js = '\n'.join(path.read_text(encoding='utf-8') for path in (dist / 'assets').glob('*.js'))
-    for required in ['demo-preview-', 'demo-presales-', 'demo-delivery-']:
-        if required not in js:
-            raise SystemExit('Business Mock data missing from artifact: ' + required)
-    if '智慧校园客户方案梳理' not in js or '项目启动资料准备' not in js:
-        raise SystemExit('Business Mock task data missing from artifact.')
+    if 'demo-preview-' not in js:
+        raise SystemExit('Product Mock data missing from artifact.')
+    # Presales and delivery seeds are resolved from the new customer/opportunity/project
+    # directory services at runtime; their old demo IDs are intentionally not bundled.
     (dist / 'mock-data').mkdir(exist_ok=True)
     (dist / 'mock-service').mkdir(exist_ok=True)
     snapshots = {'okr-state.json':'mockOkrState.json', 'research-template.json':'mockResearchTemplate.json'}
