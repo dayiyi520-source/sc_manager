@@ -56,6 +56,8 @@ import { copyToClipboard } from '../../utils/copyToClipboard';
 import { employeeSelectOptions } from "../common/PersonIdentity";
 import { isWorkOrderInScope, ownerDepartment, REQUIREMENT_SCOPES, type RequirementScope } from './requirementScope';
 import { WorkItemCategoryIcon } from '../product/WorkItemCategoryIcon';
+import { directoryCustomers, directoryOpportunities, directoryProjects } from '../../services/customerDirectoryData';
+import { projectDeliveryMap } from '../../services/projectDeliveryMap';
 export { isWorkOrderInScope } from './requirementScope';
 
 const statuses: RequirementTask["status"][] = [
@@ -246,6 +248,25 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     addToast,
     openPageTab,
   } = useApp();
+  const projectOptions = useMemo(() => directoryProjects(), []);
+  const customerOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return [...directoryCustomers(), ...customers].filter((item) => {
+      const key = item.id || item.name;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [customers]);
+  const opportunityOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return [...directoryOpportunities(), ...opportunities].filter((item) => {
+      const key = item.id || item.name;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [opportunities]);
   const [creating, setCreating] = useState(Boolean(creationType));
   const [editingMode, setEditingMode] = useState<'returned' | 'reopen' | null>(null);
   const [editingMatter, setEditingMatter] = useState<RequirementTask | null>(null);
@@ -372,13 +393,17 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   }, []);
 
   const currentWorkOrderType = selected?.workOrderType || selected?.taskType || selected?.requirementType || "通用/其他";
-  const selectedProject = biddings.find((item) => (item.projectName || item.name) === specialFields.projectName);
-  const selectedRelatedOpportunity = opportunities.find((item) => item.id === (workOrderType === "售前支持" ? specialFields.opportunityId : selectedProject?.opportunityId));
+  const selectedProject = projectOptions.find((item) => item.name === specialFields.projectName || item.id === specialFields.projectId);
+  const selectedDeliveryProject = projectDeliveryMap().find((item) => item.id === selectedProject?.id);
+  const selectedRelatedOpportunity = opportunityOptions.find((item) => item.id === (workOrderType === "售前支持" ? specialFields.opportunityId : selectedProject?.opportunityId));
   const relatedProducts = [selectedRelatedOpportunity?.relatedProduct || ""];
+  const projectProducts = selectedDeliveryProject?.products.map((item) => item.name) || [];
   const hasProductSource = workOrderType === "售前支持" ? Boolean(selectedRelatedOpportunity) : Boolean(selectedProject);
+  const projectProductLines = projectProducts.length ? productLines.filter((line) => projectProducts.includes(line.name) || projectProducts.includes(line.id)) : [];
   const sourceProductLines = hasProductSource ? productLines.filter((line) => relatedProducts.some((value) => value === line.id || value === line.name || line.products?.some((item) => item.id === value || item.name === value))) : [];
+  const availableSourceProductLines = workOrderType === "售前支持" ? sourceProductLines : projectProductLines;
   const savedProduct = editingMatter && productLineId === (editingMatter.productLineId || productLines.find(line => line.name === editingMatter.productLineName)?.id) ? productLines.find(line => line.id === productLineId) : undefined;
-  const availableProductLines = savedProduct && !sourceProductLines.some(line => line.id === savedProduct.id) ? [...sourceProductLines, savedProduct] : sourceProductLines;
+  const availableProductLines = savedProduct && !availableSourceProductLines.some(line => line.id === savedProduct.id) ? [...availableSourceProductLines, savedProduct] : availableSourceProductLines;
   const creationProduct = availableProductLines.find((line) => line.id === productLineId);
   const primaryOwnerId = creationProduct?.requirementOwnerUserId;
   const primaryOwnerName = creationProduct?.requirementOwner;
@@ -543,8 +568,8 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       addToast("warning", missingParameter ? "请完成所有必填业务参数" : `请补充标题、负责人、${requiresProduct ? "所属产品、" : ""}期望完成时间和事项描述`);
       return;
     }
-    const customer = customers.find((item) => item.id === customerId)
-      || customers.find((item) => item.name.trim().toLocaleLowerCase() === customerQuery.trim().toLocaleLowerCase());
+    const customer = customerOptions.find((item) => item.id === customerId)
+      || customerOptions.find((item) => item.name.trim().toLocaleLowerCase() === customerQuery.trim().toLocaleLowerCase());
     saveInFlight.current = true;
     setIsSubmitting(true);
     try {
@@ -1029,10 +1054,10 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {workOrderType === "其他问题" && <WorkOrderSelect label="协助类型 *" value={specialFields.problemType || ""} options={["方向研讨", "费用缴纳", "开票/邮寄", "资料获取", "物料支持", "意见反馈", "其他"]} placeholder="请选择协助类型" onChange={(value) => setSpecialFields((current) => ({ ...current, problemType: value }))} />}
       {workOrderType === "其他问题" && creationOwnerField}
-      {(workOrderType === "客户诉求" || workOrderType === "线上问题" || workOrderType === "交付支持" || workOrderType === "其他问题") && <SearchSelect label={`所属项目${workOrderType === "其他问题" ? "" : " *"}`} value={specialFields.projectName || ""} options={biddings.filter((item) => item.result === "中标" || item.status === "中标").map((item) => item.projectName || item.name || "")} placeholder="输入项目名称搜索并选择" onChange={(value) => { setSpecialFields((current) => ({ ...current, projectName: value })); changeCreationProduct(""); }} />}
+      {(workOrderType === "客户诉求" || workOrderType === "线上问题" || workOrderType === "交付支持" || workOrderType === "其他问题") && <SearchSelect label={`所属项目${workOrderType === "其他问题" ? "" : " *"}`} value={specialFields.projectName || ""} options={projectOptions.map((item) => item.name)} placeholder="输入项目名称搜索并选择" onChange={(value) => { const project = projectOptions.find((item) => item.name === value); const customer = customerOptions.find((item) => item.id === project?.customerId || item.name === project?.customerName); setSpecialFields((current) => ({ ...current, projectName: value, projectId: project?.id || "", ...(customer ? { customerId: customer.id, customerName: customer.name } : {}) })); setCustomerId(customer?.id || ""); setCustomerQuery(customer?.name || ""); changeCreationProduct(""); }} />}
       {workOrderType === "售前支持" && <label className="work-order-field text-xs text-[var(--text-muted)]">
         所属商机 *
-        <Select aria-label="所属商机 *" allowClear showSearch optionFilterProp="label" className="w-full" placeholder="输入商机名称" value={specialFields.opportunityId || undefined} options={opportunities.map((item) => ({ label: item.name, value: item.id }))} onChange={(id) => { const opportunity = opportunities.find((item) => item.id === id); setSpecialFields((current) => ({ ...current, opportunityName: opportunity?.name || "", opportunityId: opportunity?.id || "", relatedType: opportunity ? "opportunity" : "" })); changeCreationProduct(""); }} />
+        <Select aria-label="所属商机 *" allowClear showSearch optionFilterProp="label" className="w-full" placeholder="输入商机名称" value={specialFields.opportunityId || undefined} options={opportunityOptions.map((item) => ({ label: item.name, value: item.id }))} onChange={(id) => { const opportunity = opportunityOptions.find((item) => item.id === id); const customer = customerOptions.find((item) => item.id === opportunity?.customerId || item.name === opportunity?.customerName); setSpecialFields((current) => ({ ...current, opportunityName: opportunity?.name || "", opportunityId: opportunity?.id || "", relatedType: opportunity ? "opportunity" : "", ...(customer ? { customerId: customer.id, customerName: customer.name } : {}) })); setCustomerId(customer?.id || ""); setCustomerQuery(customer?.name || ""); changeCreationProduct(""); }} />
       </label>}
       <WorkOrderSelect label={`所属产品${workOrderType === "其他问题" ? "" : " *"}`} value={creationProduct?.name || ""} options={availableProductLines.map((item) => item.name)} disabled={!hasProductSource || availableProductLines.length === 0} placeholder={!hasProductSource ? workOrderType === "售前支持" ? "请先选择所属商机" : "请先选择所属项目" : availableProductLines.length ? "请选择所属产品" : "所选项目或关联对象暂无产品"} onChange={(value) => changeCreationProduct(availableProductLines.find((item) => item.name === value)?.id || "")} />
       {workOrderType !== "其他问题" && creationOwnerField}

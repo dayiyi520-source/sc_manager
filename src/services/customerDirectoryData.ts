@@ -14,6 +14,11 @@ export const directoryLeads = () => snapshot.leads.map(row => ({ ...row, custome
 export const directoryOpportunities = () => snapshot.opportunities.map(row => ({ ...row, customerName: directoryCustomers().find(customer => customer.id === row.customerId)?.name || row.customerName, ownerName: memberName(row.ownerId), presalesOwnerName: memberName(row.presalesOwnerId) })) as Array<Opportunity & { ownerId: string; presalesOwnerId: string; presalesOwnerName: string; grade: string; unfollowedDays: number }>;
 export const directoryProjects = (): ProjectItem[] => projectDeliveryMap().map(project => ({ id: project.id, code: project.id, name: project.name, customerName: project.customerName, customerId: directoryCustomers().find(customer => customer.name === project.customerName)?.id, stage: '项目立项', progress: project.products.flatMap(product => product.stages).filter(stage => stage.status === 'completed').length / Math.max(1, project.products.flatMap(product => product.stages).length) * 100, pmName: project.products[0]?.ownerName || '', startDate: '' }));
 
+export const directoryProjectById = (id?: string) => id ? directoryProjects().find(project => project.id === id) : undefined;
+export const directoryLeadById = (id?: string) => id ? directoryLeads().find(lead => lead.id === id) : undefined;
+export const directoryOpportunityById = (id?: string) => id ? directoryOpportunities().find(opportunity => opportunity.id === id) : undefined;
+export const directoryCustomerById = (id?: string) => id ? directoryCustomers().find(customer => customer.id === id) : undefined;
+
 export function customerDirectoryRequest(path: string, method: string) {
   if (method !== 'GET') throw new Error('档案仅支持查看');
   const url = new URL(path, 'http://mock.local');

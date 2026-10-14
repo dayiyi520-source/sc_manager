@@ -14,6 +14,7 @@ describe('客户与商机统一数据源', () => {
       expect(page.total).toBeGreaterThan(0);
     }
     expect(directoryProjects().map(row => row.id)).toEqual(projectDeliveryMap().map(row => row.id));
+    expect(directoryProjects().every(row => row.customerId && directoryCustomers().some(customer => customer.id === row.customerId && customer.name === row.customerName))).toBe(true);
     expect(directoryCustomers()).toEqual(MOCK_CUSTOMERS);
   });
   it('searches only names and paginates filtered results', async () => {

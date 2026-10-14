@@ -2,6 +2,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { mockApiRequest } from './mockApi';
 import { MOCK_SNAPSHOT_VERSION } from '../data/mockSnapshot';
+import { directoryCustomers, directoryOpportunities, directoryProjects } from './customerDirectoryData';
+import { projectDeliveryMap } from './projectDeliveryMap';
 import type { RequirementTask } from '../types';
 import type { PageResult } from './apiClient';
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
@@ -44,6 +46,16 @@ describe('local commercial task routes', () => {
     expect(new Set(result.items.map(item => item.status)).size).toBeGreaterThan(3);
     expect(result.items.every(item => item.ownerName && item.creatorName && item.createdAt && item.projectName && item.customerName)).toBe(true);
     expect((await mockApiRequest('/api/' + kind + '-tasks') as PageResult<RequirementTask>).items).toEqual(result.items);
+  });
+  it('derives task business associations from the new directory and delivery-map sources', async () => {
+    const presales = await mockApiRequest('/api/presales-tasks') as PageResult<RequirementTask>;
+    const delivery = await mockApiRequest('/api/delivery-tasks') as PageResult<RequirementTask>;
+    const customers = new Set(directoryCustomers().map(item => item.id));
+    const opportunities = new Set(directoryOpportunities().map(item => item.id));
+    const projects = new Set(directoryProjects().map(item => item.id));
+    expect(presales.items.every(item => customers.has(item.customerId || '') && projects.has(item.projectId || '') && item.customerName && item.projectName)).toBe(true);
+    expect(delivery.items.every(item => projects.has(item.projectId || '') && item.customerName)).toBe(true);
+    expect(delivery.items.every(item => projectDeliveryMap().some(project => project.id === item.projectId && project.name === item.projectName && project.customerName === item.customerName))).toBe(true);
   });
   it('persists creation and edits while protecting identity and creation information', async () => {
     const created = await create('presales', '新增售前任务');

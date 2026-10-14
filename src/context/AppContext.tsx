@@ -440,7 +440,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!Array.isArray(productLineQuery.data)) return;
     const normalizedLines = productLineQuery.data.map((line) => normalizeProductPrimaryOwner(line));
     setProductLines(normalizedLines);
-    const remoteVersions = normalizedLines.flatMap((line) => (line.versions || []).map((version) => ({ ...version, productLineId: line.id, productLineName: line.name })));
+    const remoteVersions = normalizedLines.flatMap((line) => (line.versions || []).map((version) => ({
+      ...version,
+      ownerName: version.ownerName || productPrimaryOwner(line),
+      productLineId: line.id,
+      productLineName: line.name,
+    })));
     setVersions(remoteVersions);
   }, [productLineQuery.data]);
   useEffect(()=>{ if (bugQuery.isSuccess) setBugs((bugQuery.data?.items || []) as DefectBug[]); },[bugQuery.data,bugQuery.isSuccess]);

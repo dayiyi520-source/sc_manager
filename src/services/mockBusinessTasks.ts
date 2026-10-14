@@ -1,5 +1,6 @@
 import { BUSINESS_TASK_SEED_VERSION, MOCK_DELIVERY_TASKS, MOCK_PRESALES_TASKS } from '../data/mockBusinessTasks';
-import { MOCK_DATABASE, MOCK_SNAPSHOT_VERSION, MOCK_USERS } from '../data/mockSnapshot';
+import { MOCK_SNAPSHOT_VERSION, MOCK_USERS } from '../data/mockSnapshot';
+import { directoryProjects } from './customerDirectoryData';
 import { SESSION_KEY } from './sessionStorage';
 import type { RequirementTask } from '../types';
 
@@ -14,20 +15,14 @@ const text = (value: unknown) => value == null ? '' : String(value);
 const storageKey = (kind: Kind) => 'shichuang.frontend.mock.' + kind + 'Tasks';
 const statusFlow = (kind: Kind) => kind === 'delivery' ? ['待处理', '处理中', '待审核', '已完成'] : ['待处理', '处理中', '已完成'];
 function initialTasks(kind: Kind): RequirementTask[] {
+  const projects = directoryProjects();
+  const firstProject = projects[0];
+  const secondProject = projects[1] || firstProject;
   if (kind === 'ops') return [
-    { id: 'demo-ops-1', code: 'OP-DEMO-001', title: '运维巡检与告警规则复核', description: '检查生产环境运行指标和告警规则。', status: '处理中', priority: '高', ownerName: '管理员', assigneeId: 'u-admin', creatorName: '管理员', creatorId: 'u-admin', department: '产研部门', projectId: 'project-1', projectName: '统一身份认证升级', productLineName: '', versionName: '', dueDate: '2026-10-20', plannedStartDate: '2026-10-12', estimatedHours: 8, actualHours: 2, createdAt: '2026-10-08T09:00:00+08:00' },
-    { id: 'demo-ops-2', code: 'OP-DEMO-002', title: '数据库备份恢复演练', description: '完成备份恢复演练并记录结果。', status: '待处理', priority: '中', ownerName: '毛景强', assigneeId: 'u-002', creatorName: '管理员', creatorId: 'u-admin', department: '产研部门', projectId: 'project-2', projectName: '实训教学系统', productLineName: '', versionName: '', dueDate: '2026-10-22', plannedStartDate: '2026-10-13', estimatedHours: 6, actualHours: 0, createdAt: '2026-10-09T09:00:00+08:00' }
+    { id: 'demo-ops-1', code: 'OP-DEMO-001', title: '运维巡检与告警规则复核', description: '检查生产环境运行指标和告警规则。', status: '处理中', priority: '高', ownerName: '管理员', assigneeId: 'u-admin', creatorName: '管理员', creatorId: 'u-admin', department: '产研部门', projectId: firstProject?.id, projectName: firstProject?.name, customerId: firstProject?.customerId, customerName: firstProject?.customerName, productLineName: '', versionName: '', dueDate: '2026-10-20', plannedStartDate: '2026-10-12', estimatedHours: 8, actualHours: 2, createdAt: '2026-10-08T09:00:00+08:00' },
+    { id: 'demo-ops-2', code: 'OP-DEMO-002', title: '数据库备份恢复演练', description: '完成备份恢复演练并记录结果。', status: '待处理', priority: '中', ownerName: '毛景强', assigneeId: 'u-002', creatorName: '管理员', creatorId: 'u-admin', department: '产研部门', projectId: secondProject?.id, projectName: secondProject?.name, customerId: secondProject?.customerId, customerName: secondProject?.customerName, productLineName: '', versionName: '', dueDate: '2026-10-22', plannedStartDate: '2026-10-13', estimatedHours: 6, actualHours: 0, createdAt: '2026-10-09T09:00:00+08:00' }
   ];
-  const rows = MOCK_DATABASE[kind === 'presales' ? 't_crm_presales_task' : 't_project_delivery_task'] as unknown as Array<Record<string, unknown>>;
-  return rows.filter(row => !Number(row.delete_flag_ || 0)).map(row => ({
-    id: text(row.id_), code: text(row.code_), title: text(row.title_), description: text(row.description_),
-    status: text(row.status_) || '待处理', priority: text(row.priority_) || '中', ownerName: text(row.owner_name_),
-    assigneeId: text(row.assignee_id_) || undefined, creatorId: text(row.create_by_) || undefined,
-    creatorName: text(row.creator_name_) || MOCK_USERS.find(user => user.id === row.create_by_)?.name,
-    department: text(row.department_), productLineName: text(row.product_line_name_), versionName: text(row.version_name_),
-    projectId: text(row.project_id_), projectName: text(row.project_name_), customerName: text(row.customer_name_),
-    specialFields: text(row.special_fields_), createdAt: text(row.create_time_), dueDate: text(row.due_date_), estimatedHours: Number(row.estimated_hours_ || 0)
-  }));
+  return [];
 }
 function read(kind: Kind): RequirementTask[] {
   const versionKey = storageKey(kind) + '.snapshotVersion';

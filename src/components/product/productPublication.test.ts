@@ -32,4 +32,9 @@ describe('product publication snapshot', () => {
     expect(latestReleasedVersion({ versions: [{ id: 'draft', name: '草稿', status: '进行中', endDate: '2026-10-09' }] })).toBeUndefined();
     expect(latestReleasedVersion({ versions: [] })).toBeUndefined();
   });
+
+  it('falls back to the product primary owner when a legacy version owner is empty', () => {
+    expect(MOCK_VERSIONS.every((version) => version.ownerName.trim().length > 0)).toBe(true);
+    expect(MOCK_PRODUCT_LINES.flatMap((product) => product.versions || []).every((version) => version.ownerName?.trim())).toBe(true);
+  });
 });
