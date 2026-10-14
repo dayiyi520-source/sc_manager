@@ -81,12 +81,19 @@ export function handleMockBusinessTasks(path: string, method: string, body: Reco
   if (parts[3]) throw new Error('不支持的任务操作');
   if (method === 'GET') {
     if (task) return task;
+    const visibleTasks = tasks.filter(item => !(item as RequirementTask & { archived?: boolean }).archived);
     const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
     const pageSize = Math.min(200, Math.max(1, Number(url.searchParams.get('pageSize')) || 20));
-    return { items: tasks.slice((page - 1) * pageSize, page * pageSize), total: tasks.length, page, pageSize };
+    return { items: visibleTasks.slice((page - 1) * pageSize, page * pageSize), total: visibleTasks.length, page, pageSize };
+  }
+  if (method === 'DELETE' && task) {
+    write(kind, tasks.map(item => item.id === taskId ? { ...item, archived: true } : item));
+    audit.record(taskId, task.productLineId || '', 'WORK_ITEM_ARCHIVED', { title: task.title });
+    return null;
   }
   if (method === 'POST' && !taskId) {
     if (!text(body.title).trim()) throw new Error('任务标题不能为空');
+    if (kind === 'ops' && !text(body.projectId).trim()) throw new Error('请选择关联项目');
     let user = MOCK_USERS[0];
     try { user = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')?.user || user; } catch { /* 失效本地会话使用演示账号。 */ }
     const created: RequirementTask = {

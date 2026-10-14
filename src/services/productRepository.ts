@@ -144,7 +144,6 @@ export const productRepository = {
   workItemTransitions: (productLineId: string, id: string) => apiRequest<WorkItemTransitionOptions>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`),
   transitionWorkItem: (productLineId: string, id: string, body: { edgeKey: string; revision: number; reason?: string; actualHours?: number; completionReview?: TaskCompletionReview }) => apiRequest<Record<string, any>>(`/api/work-items/${id}/transitions?productLineId=${encodeURIComponent(productLineId)}`, { method: 'POST', body: JSON.stringify(body) }),
   deleteWorkItem: (productLineId: string, id: string, revision: number) => apiRequest<void>(`/api/work-items/${id}?productLineId=${encodeURIComponent(productLineId)}&revision=${revision}`, { method: 'DELETE' }),
-  createWorkItemRelation: (productLineId: string, id: string, targetId: string) => apiRequest<Record<string, unknown>>(`/api/work-items/${id}/relations?productLineId=${encodeURIComponent(productLineId)}`, { method: 'POST', body: JSON.stringify({ targetId, type: 'RELATES_TO', scope: 'FINISH' }) }),
   workItemRelations: (productLineId: string, id: string) => apiRequest<{ relations: Array<{ id: string; sourceId: string; targetId: string; type: string; scope?: string; revision?: number }> }>(`/api/work-items/${id}/relations?productLineId=${encodeURIComponent(productLineId)}`),
   requirementSummary: (productLineId: string, requirementId: string) => apiRequest<{ requirement?: UnifiedWorkItem; linkedItems: UnifiedWorkItem[] }>(`/api/requirements/${encodeURIComponent(requirementId)}/summary?productLineId=${encodeURIComponent(productLineId)}`),
   productLineActivities: (id: string) => apiRequest<ProductLine['activities']>(`/api/product-lines/${id}/activities`),
@@ -166,6 +165,7 @@ export const productRepository = {
   reviewBusinessTask: (id: string, action: 'approve' | 'reject', comment?: string) => apiRequest<void>(`/api/delivery-tasks/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify({ action, comment }) }),
   businessTaskActivities: (kind: BusinessTaskKind, id: string) => apiRequest<Record<string, unknown>[]>(`${businessTaskPath(kind)}/${id}/activities`),
   commentBusinessTask: (kind: BusinessTaskKind, id: string, content: string) => apiRequest<void>(`${businessTaskPath(kind)}/${id}/comments`, { method: 'POST', body: JSON.stringify({ content }) }),
+  archiveBusinessTask: (kind: BusinessTaskKind, id: string) => apiRequest<void>(`${businessTaskPath(kind)}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   createBusinessTask: (kind: BusinessTaskKind, body: Partial<RequirementTask>) => apiRequest<{ id: string; code: string }>(businessTaskPath(kind), { method: 'POST', body: JSON.stringify(body) }),
   updateBusinessTask: (kind: BusinessTaskKind, id: string, body: Record<string, unknown>) => apiRequest<void>(`${businessTaskPath(kind)}/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   ,testCaseDirectories: (lineId: string) => apiRequest<TestCaseDirectory[]>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories`)

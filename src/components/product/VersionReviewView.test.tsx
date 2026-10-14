@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   versionReview: vi.fn(),
   workItems: vi.fn(),
   createAndSubmitVersionReview: vi.fn(),
+  updateAndSubmitVersionReview: vi.fn(),
 }));
 
 vi.mock('../../services/productRepository', () => ({ productRepository: {
@@ -21,7 +22,7 @@ vi.mock('../../services/productRepository', () => ({ productRepository: {
   createVersionReview: vi.fn(),
   createAndSubmitVersionReview: mocks.createAndSubmitVersionReview,
   updateVersionReview: vi.fn(),
-  updateAndSubmitVersionReview: vi.fn(),
+  updateAndSubmitVersionReview: mocks.updateAndSubmitVersionReview,
   submitVersionReview: vi.fn(),
   deleteVersionReview: vi.fn(),
   workItems: mocks.workItems,
@@ -49,7 +50,7 @@ describe('VersionReviewView', () => {
     expect(screen.getByRole('columnheader', { name: '评审类型' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '发起人' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '参与人' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '详情' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '编辑' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /删除/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '参与人数' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '结论' })).not.toBeInTheDocument();
@@ -96,4 +97,21 @@ describe('VersionReviewView', () => {
     expect(await screen.findByLabelText('所属产品')).toHaveAttribute('disabled');
     expect(screen.getByText('星河平台')).toBeInTheDocument();
   });
+});
+
+
+it('edits submitted reviews and returns to the list after successful submission', async () => {
+  mocks.versionReview.mockResolvedValue({ id:'review-1', meetingTopic:'秋季版本评审会', reviewType:'产品内部审核', meetingTime:'2026-10-14T06:00:00.000Z', status:'SUBMITTED', revision:1, participants:[{id:'member',name:'参与人'}], conclusion:'通过', agendaConclusion:'已通过', attachments:[] });
+  mocks.updateAndSubmitVersionReview.mockResolvedValue({ id:'review-1', revision:2 });
+  const view = renderView();
+  fireEvent.click(await screen.findByRole('button', { name:'编辑' }));
+  const title = await screen.findByLabelText('会议主题');
+  await waitFor(() => expect(title).toHaveValue('秋季版本评审会'));
+  expect(title).toBeEnabled();
+  fireEvent.change(title, { target:{ value:'修改会议' } });
+  fireEvent.click(screen.getByRole('button', { name:/提交评审/ }));
+  await waitFor(() => expect(mocks.updateAndSubmitVersionReview).toHaveBeenCalled());
+  expect(await screen.findByRole('button', { name:/新建评审/ })).toBeInTheDocument();
+  expect(screen.queryByLabelText('会议主题')).not.toBeInTheDocument();
+  view.unmount();
 });

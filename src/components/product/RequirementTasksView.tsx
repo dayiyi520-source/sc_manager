@@ -9,7 +9,7 @@ import { collaborationCandidatesFor } from '../../utils/collaborationCandidates'
 import { normalizeTaskActivity, taskActivitySummary, formatTaskActivityTime } from '../../utils/taskActivity';
 import { DetailCopyButton } from '../common/DetailCopyButton';
 import { Badge, Button, Checkbox, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popover, Segmented, Select, Tag, Tooltip, Upload } from 'antd';
-import { ApartmentOutlined, CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
+import { CopyOutlined, DeleteOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
@@ -419,8 +419,9 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         priority: item.priority || '',
         expectedGoal: '',
         description: '',
-        requirementType: item.requirementType,
+        requirementType: item.category === 'bug' ? (item as UnifiedWorkItem & { type?: string }).type || item.requirementType : item.requirementType,
         workItemTypeId: item.taskTypeId || undefined,
+        workflowId: item.workflowId || undefined,
         parentWorkItemId: item.parentWorkItemId || undefined,
         versionId: item.versionId || undefined,
         versionName: versions.find((version) => version.id === item.versionId)?.name || '',
@@ -462,6 +463,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       try {
         const saved = await productRepository.updateWorkItem(productLineId, id, {
           title: updates.title,
+          ...(detailCategory === 'bug' && updates.requirementType ? { type: updates.requirementType } : {}),
           description: updates.description,
           descriptionHtml: updates.descriptionHtml,
           expectedGoal: updates.expectedGoal,
@@ -964,7 +966,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     const localItems = (line.workItemTypes || []).filter((item) => item.category === configuredCategory && item.enabled);
     const applyItems = (items: ProductLineWorkItemType[]) => {
       setConfiguredWorkItemTypes(items);
-      if (!editingTask) setFormRequirementType((current) => taskKind === 'design' ? designVariantMeta[designVariant].defaultType : preferredWorkItemTypeName(items, current));
+      if (!editingTask && taskKind !== 'bug') setFormRequirementType((current) => taskKind === 'design' ? designVariantMeta[designVariant].defaultType : preferredWorkItemTypeName(items, current));
     };
     if (localItems.length) { applyItems(localItems); return; }
     let active = true;
@@ -1016,7 +1018,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     setFormProductLineName(taskKind === 'ops' ? '' : selectedProduct?.name || '');
     setFormEstimatedHours('');
     setFormActualHours('');
-    setFormRequirementType(taskKind === 'design' ? openingVariantMeta.defaultType : '');
+    setFormRequirementType(taskKind === 'bug' ? '系统缺陷' : taskKind === 'design' ? openingVariantMeta.defaultType : '');
     setFormCcNames([]);
     setFormPlannedStartDate('');
     setFormExpectedCompleteDate('');
@@ -1174,7 +1176,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       return;
     }
     const selectedProductLine = productLines.find((line) => line.name === formProductLineName);
-    const selectedWorkItemType = configuredWorkItemTypes.find((item) => (taskKind === 'design' ? designTypeLabel(item.name) : item.name) === formRequirementType);
+    const selectedWorkItemType = configuredWorkItemTypes.find((item) => (taskKind === 'design' ? designTypeLabel(item.name) : item.name) === formRequirementType) || (taskKind === 'bug' ? configuredWorkItemTypes.find(item => item.isDefault) || configuredWorkItemTypes[0] : undefined);
     const designWithoutProduct = taskKind === 'design' && designVariant !== 'product';
     if (configuredCategory && !designWithoutProduct && (!selectedProductLine || !selectedWorkItemType)) {
       addToast('warning', '请选择产品及其已启用的工作项子类型');
@@ -1237,6 +1239,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           productLineId: selectedProductLine.id,
           category: unifiedCategory,
           taskTypeId: selectedWorkItemType.id,
+          ...(taskKind === 'bug' ? { type: formRequirementType } : {}),
           title: formTitle.trim(),
           description: formDescription,
           descriptionHtml: formDescriptionHtml,
@@ -1361,7 +1364,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     designVariant: (item.designVariant || fallback?.designVariant) as RequirementTask['designVariant'],
     designProjectName: String(item.designProjectName ?? item.projectName ?? fallback?.designProjectName ?? ''),
     designSourceDepartment: String(item.designSourceDepartment ?? fallback?.designSourceDepartment ?? ''),
-    requirementType: String(item.requirementType ?? fallback?.requirementType ?? ''),
+    requirementType: String((item.category === 'bug' ? item.type : undefined) ?? item.requirementType ?? fallback?.requirementType ?? ''),
     expectedCompleteDate: String(item.expectedCompleteDate ?? fallback?.expectedCompleteDate ?? ''),
     media: Array.isArray(item.media) ? item.media as RequirementMedia[] : fallback?.media,
     id: String(item.id || ''),
@@ -1510,12 +1513,21 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       value={options?.statuses.find((status) => status.current)?.key || task.statusKey || 'current'}
       loading={transitionLoadingId === task.id}
       options={statuses.map((status) => ({ label: status.name, value: status.key, disabled: !status.current && !status.allowed, title: status.reasons.join('；') }))}
-      onOpenChange={(open) => { if (open) void loadTransitionOptions(task); }}
+      onFocus={() => { void loadTransitionOptions(task); }}
+      onOpenChange={(open) => { if (open) void loadTransitionOptions(task, true); }}
       onChange={(statusKey) => requestTaskTransition(task, statusKey)}
     />;
   };
 
-  const copyTask = async (task: RequirementTask, linked: boolean) => {
+  const copyTask = async (task: RequirementTask) => {
+    if (isBusinessTask) {
+      try {
+        await productRepository.createBusinessTask(taskKind, { ...task, title: `${task.title} - 副本`, status: '待处理', actualHours: 0, relatedTaskIds: [], sourceWorkOrderIds: [] });
+        if (isCommercialTask) await commercialTasksQuery.refetch(); else setBusinessTasks((await productRepository.businessTasks(taskKind)).items);
+        addToast('success', '任务已复制');
+      } catch (error) { addToast('error', '复制任务失败', error instanceof Error ? error.message : '请稍后重试'); }
+      return;
+    }
     const category = ['requirement', 'design', 'dev', 'test', 'bug'].includes(String(task.category)) ? task.category as 'requirement' | 'design' | 'dev' | 'test' | 'bug' : unifiedCategory;
     if (!task.productLineId || !task.workItemTypeId || !category) { addToast('warning', '该任务尚未绑定产品子类型，无法复制'); return; }
     try {
@@ -1536,25 +1548,25 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         estimatedHours: Number(task.estimatedHours || 0),
         actualHours: 0
       });
-      if (linked) await productRepository.createWorkItemRelation(task.productLineId, task.id, String(created.id));
       await unifiedQuery.refetch();
-      addToast('success', linked ? '任务已复制并建立关联' : '任务已复制');
-    } catch (error) { addToast('error', linked ? '复制并关联失败' : '复制任务失败', error instanceof Error ? error.message : '请稍后重试'); }
+      addToast('success', '任务已复制');
+    } catch (error) { addToast('error', '复制任务失败', error instanceof Error ? error.message : '请稍后重试'); }
   };
 
   const refreshTaskLists = async () => {
-    await Promise.all([...(isCommercialTask ? [commercialTasksQuery.refetch()] : [unifiedQuery.refetch()]), ...['requirements', 'design-tasks', 'product-dev-tasks', 'product-bugs', 'product-recycle-bin'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))]);
+    await Promise.all([...(isCommercialTask ? [commercialTasksQuery.refetch()] : isBusinessTask ? [productRepository.businessTasks(taskKind).then(result => setBusinessTasks(result.items))] : [unifiedQuery.refetch()]), ...['requirements', 'design-tasks', 'product-dev-tasks', 'product-bugs', 'product-recycle-bin'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))]);
   };
 
   const deleteTask = (task: RequirementTask) => {
-    if (!task.productLineId || task.revision == null) { addToast('warning', '该任务不是统一工作项，暂不能从此处归档'); return; }
+    if (!isBusinessTask && (!task.productLineId || task.revision == null)) { addToast('warning', '该任务不是统一工作项，暂不能从此处归档'); return; }
     Modal.confirm({
       title: `归档任务“${task.title}”？`,
       content: '归档后任务将从当前列表移除，可在产品配置的归档任务中恢复。',
       okText: '归档', cancelText: '取消', okButtonProps: { danger: true },
       onOk: async () => {
         try {
-          await productRepository.deleteWorkItem(task.productLineId!, task.id, task.revision!);
+          if (isBusinessTask) await productRepository.archiveBusinessTask(taskKind, task.id);
+          else await productRepository.deleteWorkItem(task.productLineId!, task.id, task.revision!);
           if (selectedTask?.id === task.id) setSelectedTask(null);
           await refreshTaskLists();
           addToast('success', '任务已归档');
@@ -1565,18 +1577,12 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
 
   const operationMenu = (task: RequirementTask) => ({
     items: [
-      ...(!unifiedCategory ? [{ key: 'child', icon: <PlusOutlined />, label: '添加子任务' }, { key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' }] : []),
-      ...(isDeliveryReview && task.status === '待审核' ? [{ key: 'approve', label: '审核通过' }, { key: 'reject', label: '审核驳回' }] : []),
       { key: 'copy', icon: <CopyOutlined />, label: '复制任务' },
-      ...(unifiedCategory === 'bug' ? [{ key: 'copy-link', icon: <ApartmentOutlined />, label: '复制并关联' }] : []),
       { type: 'divider' as const },
       { key: 'delete', icon: <DeleteOutlined />, danger: true, label: '归档' }
     ],
     onClick: ({ key }: { key: string }) => {
-      if (key === 'child') openChildModal(task);
-      if (key === 'copy-link') void copyTask(task, true);
-      if (key === 'copy') void copyTask(task, false);
-      if ((key === 'approve' || key === 'reject') && isDeliveryReview) void productRepository.reviewBusinessTask(task.id, key === 'approve' ? 'approve' : 'reject').then(() => void commercialTasksQuery.refetch()).then(() => addToast('success', key === 'approve' ? '任务已审核通过' : '任务已驳回')).catch((error) => addToast('error', '审核失败', error instanceof Error ? error.message : '请稍后重试'));
+      if (key === 'copy') void copyTask(task);
       if (key === 'delete') deleteTask(task);
     }
   });
@@ -1988,14 +1994,14 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
             <Form layout="horizontal" labelCol={{ flex: '112px' }} wrapperCol={{ flex: 1 }} labelAlign="left" className="requirement-create-properties requirement-detail-properties" style={{ display: 'flex', flexDirection: 'column' }} disabled={Boolean(selectedTask.hasChildren)}>
               {detailVisible('productLine') && <Form.Item style={{ order: detailFields.order('productLine') }} label="关联产品"><Select disabled={!detailEditable('productLine')} showSearch optionFilterProp="label" value={selectedTask.productLineName || undefined} options={productLines.map((line) => ({ label: line.name, value: line.name }))} onChange={(productLineName) => void saveDetailUpdates({ productLineName, productLineId: productLines.find((line) => line.name === productLineName)?.id, versionName: '' })} placeholder="未设置" /></Form.Item>}
               {detailVisible('status') && <Form.Item style={{ order: detailFields.order('status') }} label="当前状态">{taskStatusControl(selectedTask, detailEditable('status'), Boolean(selectedTask.hasChildren))}</Form.Item>}
-              {detailVisible('taskType') && <Form.Item style={{ order: detailFields.order('taskType') }} label="任务类型"><Input value={taskKind === 'design' ? designVariantMeta[detailVariant].label : detailWorkItemTypes.find((item) => item.id === selectedTask.workItemTypeId)?.name || selectedTask.requirementType || '未设置'} readOnly /></Form.Item>}
+              {detailVisible('taskType') && <Form.Item style={{ order: detailFields.order('taskType') }} label={detailCategory === 'bug' ? '缺陷类型' : '任务类型'}>{detailCategory === 'bug' ? <Select value={['系统缺陷', '样式缺陷', '线上故障', '安全漏洞'].includes(selectedTask.requirementType || '') ? selectedTask.requirementType : '系统缺陷'} options={['系统缺陷', '样式缺陷', '线上故障', '安全漏洞'].map(value => ({ value, label: value }))} onChange={requirementType => void saveDetailUpdates({ requirementType })}/> : <Input value={taskKind === 'design' ? designVariantMeta[detailVariant].label : detailWorkItemTypes.find((item) => item.id === selectedTask.workItemTypeId)?.name || selectedTask.requirementType || '未设置'} readOnly />}</Form.Item>}
               {taskKind === 'requirement' && detailVisible('needsCollaboration') && <Form.Item style={{ order: detailFields.order('needsCollaboration') }} label="需要协同"><Checkbox.Group value={selectedTask.needsCollaboration || []} options={[{ label: '设计', value: 'design' }, { label: '开发', value: 'dev' }, { label: '测试', value: 'test' }]} onChange={(values) => { if (!values.length) { addToast('warning', '请至少选择一项需要协同'); return; } void saveDetailUpdates({ needsCollaboration: values as Array<'design' | 'dev' | 'test'> }); }} /></Form.Item>}
               {detailVisible('assignee') && <Form.Item style={{ order: detailFields.order('assignee') }} label="负责人"><Select disabled={!detailEditable('assignee')} showSearch optionFilterProp="label" value={selectedTask.ownerName || undefined} onChange={(ownerName) => void saveDetailUpdates({ ownerName })} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>}
               {detailVisible('priority') && <Form.Item style={{ order: detailFields.order('priority') }} label="优先级"><Select disabled={!detailEditable('priority')} value={normalizePriority(selectedTask.priority)} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} onChange={(priority) => void saveDetailUpdates({ priority: priority as RequirementTask['priority'] })} /></Form.Item>}
               {detailVisible('plannedStartDate') && <Form.Item style={{ order: detailFields.order('plannedStartDate') }} label="计划开始时间"><DatePicker disabled={!detailEditable('plannedStartDate')} value={selectedTask.plannedStartDate ? dayjs(selectedTask.plannedStartDate) : null} onChange={(date) => void saveDetailUpdates({ plannedStartDate: date ? date.format('YYYY-MM-DD') : '' })} className="w-full" placeholder="请选择日期" /></Form.Item>}
               {detailVisible('dueDate') && <Form.Item style={{ order: detailFields.order('dueDate') }} label="计划完成时间"><DatePicker disabled={!detailEditable('dueDate')} value={selectedTask.dueDate ? dayjs(selectedTask.dueDate) : null} onChange={(date) => void saveDetailUpdates({ dueDate: date ? date.format('YYYY-MM-DD') : '' })} className="w-full" placeholder="请选择日期" /></Form.Item>}
               {detailVisible('expectedCompleteDate') && <Form.Item style={{ order: detailFields.order('expectedCompleteDate') }} label="期望完成时间"><DatePicker disabled={!detailEditable('expectedCompleteDate')} value={selectedTask.expectedCompleteDate ? dayjs(selectedTask.expectedCompleteDate) : null} onChange={(date) => void saveDetailUpdates({ expectedCompleteDate: date ? date.format('YYYY-MM-DD') : '' })} className="w-full" placeholder="请选择日期" /></Form.Item>}
-              {detailVisible('version') && <Form.Item style={{ order: detailFields.order('version') }} label="迭代版本"><Select disabled={!detailEditable('version')} showSearch allowClear optionFilterProp="label" value={selectedTask.versionName || undefined} options={versions.filter((v) => !v.productLineName || v.productLineName === selectedTask.productLineName).map((v) => ({ label: v.name, value: v.name }))} onChange={(versionName) => void saveDetailUpdates({ versionName: versionName || '', versionId: versions.find((v) => v.name === versionName)?.id })} placeholder="未设置" /></Form.Item>}
+              {detailVisible('version') && <Form.Item style={{ order: detailFields.order('version') }} label={detailCategory === 'bug' ? '关联版本' : '迭代版本'}><Select disabled={!detailEditable('version')} showSearch allowClear optionFilterProp="label" value={selectedTask.versionName || undefined} options={versions.filter((v) => !v.productLineName || v.productLineName === selectedTask.productLineName).map((v) => ({ label: v.name, value: v.name }))} onChange={(versionName) => void saveDetailUpdates({ versionName: versionName || '', versionId: versions.find((v) => v.name === versionName)?.id })} placeholder="未设置" /></Form.Item>}
               {taskKind === 'presales' && detailVisible('source') && <Form.Item style={{ order: detailFields.order('source') }} label="关联商机/投标项"><span>{businessTaskSource(selectedTask, 'presales', { opportunities, biddings }).ownership}</span></Form.Item>}
               {isCommercialTask && detailVisible('customer') && <Form.Item style={{ order: detailFields.order('customer') }} label="关联客户"><Select disabled={!detailEditable('customer')} showSearch value={selectedTask.customerId || selectedTask.customerName || undefined} options={customers.map((item) => ({ label: item.name, value: item.id }))} onChange={(customerId) => void saveDetailUpdates({ customerId, customerName: customers.find((item) => item.id === customerId)?.name || '' })} placeholder="未关联" /></Form.Item>}
               {taskKind === 'design' && detailVisible('sourceDepartment') && <Form.Item style={{ order: detailFields.order('sourceDepartment') }} label="来源部门"><Select showSearch value={selectedTask.designSourceDepartment || selectedTask.department || undefined} options={Array.from(new Set([...employeeOptions.map((item) => item.department).filter(Boolean), selectedTask.designSourceDepartment || selectedTask.department || ''])).filter(Boolean).map((value) => ({ label: value, value }))} onChange={(designSourceDepartment) => void saveDetailUpdates({ designSourceDepartment })} /></Form.Item>}
@@ -2192,7 +2198,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           {childFields.visible('description') && <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={childDescriptionEditor} value={childDescription} htmlValue={childDescriptionHtml} onInput={(text, html) => { setChildDescription(text); setChildDescriptionHtml(html); }} placeholder="补充子任务范围、交付物和注意事项" /></Form.Item>}
           <WorkItemRelationTabs items={[
             ...(childFields.visible('collaborationItems') ? [{ key: 'collaborationItems', label: '协同事项', count: childCollaborationIds.length, content: <WorkOrderPicker onNavigate={navigateWorkOrderCandidate} candidates={collaborationCandidates} selectedIds={childCollaborationIds} onChange={setChildCollaborationIds} placeholder="请选择协同事项" /> }] : []),
-            ...(childFields.visible('relatedTasks') ? [{ key: 'relatedTasks', label: '关联任务', count: childRelatedTaskIds.length, content: <WorkOrderPicker relationMode={['design', 'dev', 'test'].includes(taskKind) ? 'productTask' : 'workOrder'} onNavigate={navigateWorkOrderCandidate} candidates={taskCandidates} selectedIds={childRelatedTaskIds} onChange={setChildRelatedTaskIds} placeholder="请选择关联任务" /> }] : []),
+            ...(childFields.visible('relatedTasks') ? [{ key: 'relatedTasks', label: '关联任务', count: childRelatedTaskIds.length, content: <WorkOrderPicker relationMode={['design', 'dev', 'test', 'bug'].includes(taskKind) ? 'productTask' : 'workOrder'} onNavigate={navigateWorkOrderCandidate} candidates={taskCandidates} selectedIds={childRelatedTaskIds} onChange={setChildRelatedTaskIds} placeholder="请选择关联任务" /> }] : []),
             ...(childFields.visible('children') ? [{ key: 'children', label: '子任务', count: 0, description: '创建后可继续拆解下级子任务。' }] : []),
             ...(childFields.visible('support') ? [{ key: 'support', label: '支撑项', count: 0, description: '创建后可在详情页关联测试计划等支撑事项。' }] : []),
             ...(childFields.visible('hours') ? [{ key: 'hours', label: '工时', count: 0, description: '创建后可在详情页登记工时并查看统计。' }] : []),
@@ -2219,15 +2225,15 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           {taskKind === 'delivery' && <Form.Item style={{ order: createFields.order('project') }} label="关联项目" required><Select showSearch value={formCustomerName || undefined} onChange={setFormCustomerName} options={projects.map((item) => ({ label: item.name, value: item.id }))} placeholder="请选择关联项目" /></Form.Item>}
           {taskKind === 'design' && designVariant === 'project' && <Form.Item style={{ order: createFields.order('project') }} label="关联项目" required><Select showSearch value={formCustomerName || undefined} onChange={setFormCustomerName} options={projects.map((item) => ({ label: item.name, value: item.id }))} placeholder="请选择关联项目" /></Form.Item>}
           {isCommercialTask && <Form.Item style={{ order: createFields.order('customer') }} label="关联客户" required><Select showSearch value={formBusinessCustomer || undefined} onChange={setFormBusinessCustomer} options={customers.map((item) => ({ label: item.name, value: item.id }))} placeholder="请选择关联客户" /></Form.Item>}
-          {(taskKind === 'ops' || (!isCommercialTask && createFields.visible('productLine'))) && <Form.Item style={{ order: taskKind === 'ops' ? -1 : createFields.order('productLine') }} label="关联产品" required={taskKind !== 'ops' && createFields.required('productLine')}><Select disabled={taskKind === 'ops' && !formCustomerName} showSearch allowClear={!createFields.required('productLine')} optionFilterProp="label" value={formProductLineName || undefined} onChange={(value) => { setFormProductLineName(value || ''); setFormVersionName(''); if (taskKind !== 'design') setFormRequirementType(''); }} options={productLines.map((line) => ({ label: line.name, value: line.name }))} placeholder="请选择关联产品" /></Form.Item>}
-          {(taskKind !== 'ops' && (taskKind === 'design' || createFields.visible('taskType'))) && <Form.Item style={{ order: createFields.order('taskType') }} label="任务类型" required={createFields.required('taskType')}><Select showSearch optionFilterProp="label" value={formRequirementType || undefined} onChange={setFormRequirementType} options={taskKind === 'design' ? [{ label: currentDesignVariant.label, value: currentDesignVariant.defaultType }] : configuredWorkItemTypes.map((item) => ({ label: item.name, value: item.name }))} disabled={taskKind === 'design' || !configuredWorkItemTypes.length} placeholder={configuredWorkItemTypes.length ? `请选择${itemLabel}类型` : '请先在产品工作项设置中启用类型'} /></Form.Item>}
+          {(taskKind === 'ops' || (!isCommercialTask && createFields.visible('productLine'))) && <Form.Item style={{ order: taskKind === 'ops' ? -1 : createFields.order('productLine') }} label="关联产品" required={taskKind !== 'ops' && createFields.required('productLine')}><Select disabled={taskKind === 'ops' && !formCustomerName} showSearch allowClear={!createFields.required('productLine')} optionFilterProp="label" value={formProductLineName || undefined} onChange={(value) => { setFormProductLineName(value || ''); setFormVersionName(''); if (taskKind !== 'design' && taskKind !== 'bug') setFormRequirementType(''); }} options={productLines.map((line) => ({ label: line.name, value: line.name }))} placeholder="请选择关联产品" /></Form.Item>}
+          {(taskKind !== 'ops' && (taskKind === 'design' || createFields.visible('taskType'))) && <Form.Item style={{ order: createFields.order('taskType') }} label={taskKind === 'bug' ? '缺陷类型' : '任务类型'} required={createFields.required('taskType')}><Select showSearch optionFilterProp="label" value={formRequirementType || undefined} onChange={setFormRequirementType} options={taskKind === 'bug' ? ['系统缺陷', '样式缺陷', '线上故障', '安全漏洞'].map(value => ({ label: value, value })) : taskKind === 'design' ? [{ label: currentDesignVariant.label, value: currentDesignVariant.defaultType }] : configuredWorkItemTypes.map((item) => ({ label: item.name, value: item.name }))} disabled={taskKind === 'design' || (taskKind !== 'bug' && !configuredWorkItemTypes.length)} placeholder={configuredWorkItemTypes.length ? `请选择${itemLabel}类型` : '请先在产品工作项设置中启用类型'} /></Form.Item>}
           {createFields.visible('assignee') && <Form.Item style={{ order: createFields.order('assignee') }} label="负责人" required={createFields.required('assignee')}><Select showSearch optionFilterProp="label" value={formOwnerName || undefined} onChange={setFormOwnerName} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>}
           {createFields.visible('priority') && <Form.Item style={{ order: createFields.order('priority') }} label="优先级" required={createFields.required('priority')}><Select value={formPriority || undefined} onChange={(value) => setFormPriority(value)} options={['紧急', '高', '中', '低'].map((value) => ({ label: value, value }))} placeholder="请选择优先级" /></Form.Item>}
           {createFields.visible('plannedStartDate') && <Form.Item style={{ order: createFields.order('plannedStartDate') }} label="计划开始时间" required={createFields.required('plannedStartDate')}><DatePicker value={formPlannedStartDate ? dayjs(formPlannedStartDate) : null} onChange={(date) => setFormPlannedStartDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>}
           {createFields.visible('plannedEndDate') && <Form.Item style={{ order: createFields.order('plannedEndDate') }} label="计划完成时间" required={createFields.required('plannedStartDate')}><DatePicker value={formDueDate ? dayjs(formDueDate) : null} onChange={(date) => setFormDueDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>}
           {createFields.visible('expectedCompleteDate') && <Form.Item style={{ order: createFields.order('expectedCompleteDate') }} label="期望完成时间" required={createFields.required('expectedCompleteDate')}><DatePicker value={formExpectedCompleteDate ? dayjs(formExpectedCompleteDate) : null} onChange={(date) => setFormExpectedCompleteDate(date ? date.format('YYYY-MM-DD') : '')} className="w-full" placeholder="请选择日期" /></Form.Item>}
           {taskKind === 'design' && createFields.visible('sourceDepartment') && <Form.Item style={{ order: createFields.order('sourceDepartment') }} label="来源部门" required><Select showSearch value={formSourceDepartment || undefined} onChange={setFormSourceDepartment} options={designSourceOptions} placeholder="请选择来源部门" /></Form.Item>}
-          {createFields.visible('version') && <Form.Item style={{ order: createFields.order('version') }} label="迭代版本" required={createFields.required('version')}><Select showSearch allowClear optionFilterProp="label" value={formVersionName || undefined} onChange={(value) => setFormVersionName(value || '')} options={versions.filter((version) => !version.productLineName || version.productLineName === formProductLineName).map((version) => ({ label: version.name, value: version.name }))} placeholder="暂不关联" /></Form.Item>}
+          {createFields.visible('version') && <Form.Item style={{ order: createFields.order('version') }} label={taskKind === 'bug' ? '关联版本' : '迭代版本'} required={createFields.required('version')}><Select showSearch allowClear optionFilterProp="label" value={formVersionName || undefined} onChange={(value) => setFormVersionName(value || '')} options={versions.filter((version) => !version.productLineName || version.productLineName === formProductLineName).map((version) => ({ label: version.name, value: version.name }))} placeholder="暂不关联" /></Form.Item>}
           {taskKind !== 'design' && createFields.visible('project') && <Form.Item style={{ order: taskKind === 'ops' ? -2 : createFields.order('project') }} label="关联项目" required={taskKind === 'ops' || createFields.required('project')}><Select showSearch allowClear optionFilterProp="label" value={formCustomerName || undefined} onChange={(value) => { setFormCustomerName(value || ''); if (taskKind === 'ops') { setFormProductLineName(''); setFormVersionName(''); } }} options={projects.map((project) => ({ label: project.name, value: project.id }))} placeholder="请选择关联项目" /></Form.Item>}
           {taskKind === 'requirement' && createFields.visible('needsCollaboration') && <Form.Item style={{ order: createFields.order('needsCollaboration') }} label="需要协同" required={createFields.required('needsCollaboration')}><Checkbox.Group value={needsCollaboration} options={[{ label: '设计', value: 'design' }, { label: '开发', value: 'dev' }, { label: '测试', value: 'test' }]} onChange={(values) => setNeedsCollaboration(values as Array<'design' | 'dev' | 'test'>)} /></Form.Item>}
           {createFields.visible('cc') && <Form.Item style={{ order: createFields.order('cc') }} label="参与人" required={createFields.required('cc')}><Select mode="multiple" showSearch allowClear optionFilterProp="label" value={formCcNames} onChange={setFormCcNames} options={employeeNameOptions} placeholder="搜索姓名或职位" /></Form.Item>}
@@ -2241,11 +2247,11 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       >
         <Form layout="vertical" className="w-full" data-work-item-form>
           {createFields.visible('title') && <Form.Item label="标题" required={createFields.required('title')}><Input value={formTitle} onChange={(event) => setFormTitle(event.target.value)} placeholder="例如：支持达梦DM8数据库读写分离与主备秒级切换" /></Form.Item>}
-          {!['requirement','design','dev','test'].includes(taskKind) && createFields.visible('expectedGoal') && <Form.Item label="期望结果" required={createFields.required('expectedGoal')}><Input.TextArea rows={3} value={formTarget} onChange={(event) => setFormTarget(event.target.value)} placeholder="请填写任务完成后的预期结果" /></Form.Item>}
+          {!['requirement','design','dev','test','bug'].includes(taskKind) && createFields.visible('expectedGoal') && <Form.Item label="期望结果" required={createFields.required('expectedGoal')}><Input.TextArea rows={3} value={formTarget} onChange={(event) => setFormTarget(event.target.value)} placeholder="请填写任务完成后的预期结果" /></Form.Item>}
           {createFields.visible('description') && <Form.Item label="任务描述"><RichTextEditor size="work-order" editor={descriptionEditor} value={formDescription} htmlValue={formDescriptionHtml} onInput={(text, html) => { setFormDescription(text); setFormDescriptionHtml(html); }} onBlur={() => { /* auto-save description */ }} placeholder="详细记录需求背景、业务场景和实现说明..." /></Form.Item>}
           <WorkItemRelationTabs items={[
             ...((isCommercialTask || createFields.visible('collaborationItems')) ? [{ key: 'collaborationItems', label: '协同事项', count: selectedWorkOrderIds.length, content: <WorkOrderPicker candidates={collaborationCandidates} selectedIds={selectedWorkOrderIds} onChange={setSelectedWorkOrderIds} onNavigate={navigateWorkOrderCandidate} placeholder="请选择协同事项" /> }] : []),
-            ...((taskKind === 'design' || taskKind === 'dev' || taskKind === 'test' || isCommercialTask) && (isCommercialTask || createFields.visible('relatedTasks')) ? [{ key: 'relatedTasks', label: '关联任务', count: selectedRequirementTaskIds.length, content: <WorkOrderPicker relationMode={['design', 'dev', 'test'].includes(taskKind) ? 'productTask' : 'workOrder'} candidates={creationTaskCandidates.filter((item) => item.id !== editingTask?.id)} selectedIds={selectedRequirementTaskIds} onChange={setSelectedRequirementTaskIds} onNavigate={navigateWorkOrderCandidate} placeholder="请选择关联任务" /> }] : []),
+            ...((taskKind === 'design' || taskKind === 'dev' || taskKind === 'test' || taskKind === 'bug' || isCommercialTask) && (isCommercialTask || createFields.visible('relatedTasks')) ? [{ key: 'relatedTasks', label: '关联任务', count: selectedRequirementTaskIds.length, content: <WorkOrderPicker relationMode={['design', 'dev', 'test', 'bug'].includes(taskKind) ? 'productTask' : 'workOrder'} candidates={creationTaskCandidates.filter((item) => item.id !== editingTask?.id)} selectedIds={selectedRequirementTaskIds} onChange={setSelectedRequirementTaskIds} onNavigate={navigateWorkOrderCandidate} placeholder="请选择关联任务" /> }] : []),
             ...(!isCommercialTask && (taskKind !== 'requirement' || editingTask) && createFields.visible('children') ? [{ key: 'children', label: '子任务', count: 0, description: '创建后可在详情页新增或关联子任务。' }] : []),
             ...(!isCommercialTask && (taskKind !== 'requirement' || editingTask) && createFields.visible('support') ? [{ key: 'support', label: '支撑项', count: 0, description: '创建后可在详情页关联测试计划等支撑事项。' }] : []),
             ...(!isCommercialTask && (taskKind !== 'requirement' || editingTask) && createFields.visible('hours') ? [{ key: 'hours', label: '工时', count: 0, description: '创建后可在详情页登记工时并查看统计。' }] : []),

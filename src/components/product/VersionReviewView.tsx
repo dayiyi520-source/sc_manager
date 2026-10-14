@@ -41,7 +41,6 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
   const line = productLines.find((item) => item.id === (selectedLineId || lineId));
   const versions = line?.versions || [];
   const hasScope = Boolean(scope.lineId && scope.versionId);
-  const reviews = useQuery({ queryKey: ['version-reviews', scope.lineId, scope.versionId], queryFn: () => productRepository.versionReviews(scope.lineId, scope.versionId), enabled: hasScope, retry: false });
   const globalReviews = useQuery({ queryKey: ['version-reviews', 'all'], queryFn: productRepository.allVersionReviews, retry: false });
   const detail = useQuery({ queryKey: ['version-review', scope.lineId, scope.versionId, selectedId], queryFn: () => productRepository.versionReview(scope.lineId, scope.versionId, selectedId), enabled: hasScope && Boolean(selectedId), retry: false });
   const employees = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, enabled: creating || Boolean(selectedId), retry: false });
@@ -49,7 +48,6 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
   const current = detail.data;
   const safeCurrent = useMemo(() => current ? { ...current, participants: Array.isArray(current.participants) ? current.participants : [], attachments: Array.isArray(current.attachments) ? current.attachments : [] } : undefined, [current]);
   const editing = creating || Boolean(selectedId);
-  const readOnly = safeCurrent?.status === 'SUBMITTED';
 
   useEffect(() => {
     if (!safeCurrent) return;
@@ -79,11 +77,10 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
     setSaving(true); setActionError('');
     try {
       const nextScope = { lineId: values.productLineId, versionId: values.versionId };
-      const saved = creating
-        ? await productRepository.createAndSubmitVersionReview(nextScope.lineId, nextScope.versionId, payload(values))
-        : await productRepository.updateAndSubmitVersionReview(scope.lineId, scope.versionId, current!.id, payload(values));
-      setScope(nextScope); setCreating(false); setSelectedId(saved.id);
-      await Promise.all([reviews.refetch(), globalReviews.refetch(), detail.refetch()]);
+      if (creating) await productRepository.createAndSubmitVersionReview(nextScope.lineId, nextScope.versionId, payload(values));
+      else await productRepository.updateAndSubmitVersionReview(scope.lineId, scope.versionId, current!.id, payload(values));
+      await globalReviews.refetch();
+      backToList();
       message.success('版本评审已提交');
     } catch (reason) { setActionError(reason instanceof Error ? reason.message : '版本评审保存失败，表单内容已保留'); }
     finally { setSaving(false); }
@@ -110,10 +107,10 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
     {editing ? <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button icon={<ArrowLeftOutlined />} onClick={backToList}>返回评审列表</Button>
-        <div className="flex gap-2">{!readOnly && <Button type="primary" icon={<CheckOutlined />} loading={saving} onClick={() => void submitForm()}>提交评审</Button>}</div>
+        <div className="flex gap-2">{<Button type="primary" icon={<CheckOutlined />} loading={saving} onClick={() => void submitForm()}>提交评审</Button>}</div>
       </div>
       {actionError && <Alert type="error" showIcon title={actionError} closable onClose={() => setActionError('')} />}
-      {detail.isError && !creating ? <Alert type="error" showIcon title="版本评审加载失败" action={<Button onClick={() => detail.refetch()}>重试</Button>} /> : !creating && !current ? <div className="flex min-h-56 items-center justify-center"><Spin /></div> : <Form form={form} layout="vertical" disabled={readOnly} className="grid gap-x-4 md:grid-cols-2">
+      {detail.isError && !creating ? <Alert type="error" showIcon title="版本评审加载失败" action={<Button onClick={() => detail.refetch()}>重试</Button>} /> : !creating && !current ? <div className="flex min-h-56 items-center justify-center"><Spin /></div> : <Form form={form} layout="vertical" disabled={saving} className="grid gap-x-4 md:grid-cols-2">
         <Form.Item name="meetingTopic" label="会议主题" rules={[{ required: true, whitespace: true, message: '请输入会议主题' }]}><Input placeholder="请输入会议主题" maxLength={200} /></Form.Item>
         <Form.Item name="reviewType" label="会议类型" rules={[{ required: true, message: '请选择会议类型' }]}><Select placeholder="请选择会议类型" options={['产品内部审核', '产品跨部门审核', '技术内部审核', '需求方案评估会议'].map((value) => ({ value, label: value }))} /></Form.Item>
         <Form.Item name="productLineId" label="所属产品" rules={[{ required: true, message: '请选择所属产品' }]}><Select showSearch optionFilterProp="label" placeholder="请选择产品" disabled={Boolean(fixedLineId) || Boolean(selectedId)} options={productLines.map((item) => ({ value: item.id, label: item.name }))} onChange={() => form.setFieldValue('versionId', undefined)} /></Form.Item>
@@ -140,7 +137,7 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
         { title: '发起人', dataIndex: 'initiatorName', width: 120 },
         { title: '参与人', dataIndex: 'participantNames', width: 220, ellipsis: true, render: (value) => value || '--' },
         { title: '评审时间', dataIndex: 'meetingTime', width: 160, render: (value, item) => value || item.reviewDate || '--' },
-        { title: '操作', key: 'actions', width: 150, render: (_, item) => <div className="flex gap-1"><Button type="link" size="small" onClick={(event) => { event.stopPropagation(); openReview(item); }}>详情</Button><Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={(event) => { event.stopPropagation(); void remove(item); }}>删除</Button></div> }
+        { title: '操作', key: 'actions', width: 150, render: (_, item) => <div className="flex gap-1"><Button type="link" size="small" onClick={(event) => { event.stopPropagation(); openReview(item); }}>编辑</Button><Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={(event) => { event.stopPropagation(); void remove(item); }}>删除</Button></div> }
       ]} />
     </div>}
   </div>;

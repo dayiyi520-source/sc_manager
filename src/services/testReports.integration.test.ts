@@ -13,8 +13,18 @@ describe('测试报告保存与下载', () => {
     localStorage.setItem('shichuang.frontend.mock.productLines', JSON.stringify([{ id: 'line-1', name: '产品', versions: [{ id: 'version-1', name: '迭代' }] }]));
     localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify([{ id: 'task-1', productLineId: 'line-1', versionId: 'version-1', title: '测试任务' }]));
     localStorage.setItem('shichuang.frontend.mock.testPlans', JSON.stringify([{ id: 'plan-1', workItemId: 'task-1', name: '测试计划', cases: [{ testCaseId: 'case-1' }], revision: 0 }]));
+    localStorage.setItem(TEST_REPORT_STORAGE_KEY, JSON.stringify([]));
   });
   const create = () => productRepository.createVersionTestReport('line-1', 'version-1', { name: '保存验收报告', reportType: '功能测试', attachments: [{ name: '截图.png', url: 'data:image/png;base64,AAAA' }] });
+
+  it('local mock mode seeds five persisted test reports', async () => {
+    const lines = Array.from({ length: 5 }, (_, index) => ({ id: `seed-line-${index}`, name: `产品${index + 1}`, versions: [{ id: `seed-version-${index}`, name: `版本${index + 1}` }] }));
+    localStorage.setItem('shichuang.frontend.mock.productLines', JSON.stringify(lines));
+    localStorage.removeItem(TEST_REPORT_STORAGE_KEY);
+    const reports = await productRepository.testReports();
+    expect(reports).toHaveLength(5);
+    expect(JSON.parse(localStorage.getItem(TEST_REPORT_STORAGE_KEY)!)).toHaveLength(5);
+  });
 
   it('新建后重新读取仍存在，可编辑空计划报告，删除不影响计划', async () => {
     const created = await create();

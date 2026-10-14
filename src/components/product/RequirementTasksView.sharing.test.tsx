@@ -236,8 +236,7 @@ it.each(['requirement', 'design', 'dev', 'test', 'bug'] as const)('offers archiv
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} /></QueryClientProvider>);
   fireEvent.click(await screen.findByRole('button', { name: '操作验收任务' }));
   expect(await screen.findByText('归档')).toBeInTheDocument();
-  if (kind !== 'bug') expect(screen.queryByText('复制并关联')).not.toBeInTheDocument();
-  else expect(screen.getByText('复制并关联')).toBeInTheDocument();
+  expect(screen.queryByText('复制并关联')).not.toBeInTheDocument();
   expect(screen.queryByRole('menuitem', { name: /添加子任务/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('menuitem', { name: /复盘总结/ })).not.toBeInTheDocument();
 });
@@ -277,4 +276,20 @@ it('opens operations creation from a matter with its associated project and coll
   await screen.findByText('新建运维任务');
   expect(screen.getByRole('button', { name: '协同事项 · 1' })).toBeVisible();
   expect(screen.getByText('关联项目').closest('.ant-form-item')).toHaveTextContent('归属项目');
+});
+
+it('shows fixed independent defect types and the requested bug creation fields', async () => {
+  window.history.replaceState(null, '', '/app/prod_bugs');
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: '新建' }));
+  expect(screen.queryByText('期望结果')).not.toBeInTheDocument();
+  expect(screen.queryByText('支撑项')).not.toBeInTheDocument();
+  expect(screen.queryByText('子任务')).not.toBeInTheDocument();
+  expect(screen.getByText(/关联任务/)).toBeInTheDocument();
+  const typeItem = [...document.querySelectorAll('.requirement-new-properties .ant-form-item')].find(item => item.textContent?.includes('缺陷类型'))!;
+  expect(typeItem).toBeTruthy();
+  expect(typeItem.textContent).toContain('系统缺陷');
+  expect(typeItem.querySelector('input')).not.toBeDisabled();
+  fireEvent.mouseDown(typeItem.querySelector('input')!);
+  for (const label of ['系统缺陷','样式缺陷','线上故障','安全漏洞']) expect(screen.getByText(label, { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
 });

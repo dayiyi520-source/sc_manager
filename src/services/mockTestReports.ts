@@ -4,12 +4,25 @@ import type { SaveVersionTestReportInput, VersionTestReport } from '../types/tes
 type StoredReport = SaveVersionTestReportInput & { id: string; productLineId: string; versionId: string; creatorName: string; createdAt: string; updatedAt: string; revision: number };
 export const TEST_REPORT_STORAGE_KEY = 'shichuang.frontend.mock.testReports';
 
+const seedReports = (lines: ProductLine[], creatorName: string): StoredReport[] => {
+  const targets = lines.flatMap(line => (line.versions || []).map(version => ({ line, version }))).slice(0, 5);
+  return targets.map(({ line, version }, index) => ({
+    id: `mock-test-report-${index + 1}`, productLineId: line.id, versionId: version.id, creatorName,
+    name: `${version.name}测试报告`, reportType: (['功能测试', '安全测试', '回归测试'] as const)[index % 3],
+    summary: '本轮测试已完成，核心场景验证通过，遗留问题已完成跟踪。',
+    attachments: [{ name: `${version.name}-测试报告.txt`, url: `data:text/plain;charset=utf-8,${encodeURIComponent(`产品：${line.name}\n版本：${version.name}\n报告类型：${['功能测试', '安全测试', '回归测试'][index % 3]}\n测试结论：核心场景验证通过，遗留问题已完成跟踪。\n此报告为本地演示样例。`)}` }],
+    createdAt: `2026-10-${String(5 + index).padStart(2, '0')}T06:00:00.000Z`, updatedAt: `2026-10-${String(5 + index).padStart(2, '0')}T08:00:00.000Z`, revision: 0
+  }));
+};
+
 export function handleMockTestReports(path: string, method: string, body: Record<string, any>, lines: ProductLine[], creatorName: string) {
   const parts = path.split('?')[0].split('/').filter(Boolean).map(decodeURIComponent);
   const globalList = parts.length === 2 && parts[1] === 'test-reports' && method === 'GET';
   const scoped = parts[1] === 'product-lines' && parts[3] === 'versions' && parts[5] === 'test-reports';
   if (!globalList && !scoped) return undefined;
-  const reports: StoredReport[] = JSON.parse(localStorage.getItem(TEST_REPORT_STORAGE_KEY) || '[]');
+  const storedReports = localStorage.getItem(TEST_REPORT_STORAGE_KEY);
+  const reports: StoredReport[] = storedReports ? JSON.parse(storedReports) : seedReports(lines, creatorName);
+  if (!storedReports && reports.length) localStorage.setItem(TEST_REPORT_STORAGE_KEY, JSON.stringify(reports));
   const line = scoped ? lines.find((item) => item.id === parts[2]) : undefined;
   const version = line?.versions?.find((item) => item.id === parts[4]);
   if (scoped && (!line || !version)) throw new Error('产品或迭代不存在，请重新选择');

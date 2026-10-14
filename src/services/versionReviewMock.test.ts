@@ -21,7 +21,9 @@ describe('mock version review persistence', () => {
     expect(detail.participants).toHaveLength(2);
     const afterReload = await mockApiRequest('/api/version-reviews') as Array<{ id: string }>;
     expect(afterReload.some(item => item.id === created.id)).toBe(true);
-    await mockApiRequest(`/api/product-lines/${product!.id}/versions/${product!.versions[0].id}/reviews/${created.id}`, { method: 'DELETE', body: JSON.stringify({ revision: 1 }) });
+    const updated = await mockApiRequest(`/api/product-lines/${product!.id}/versions/${product!.versions[0].id}/reviews/${created.id}/submit`, { method: 'PUT', body: JSON.stringify({ ...input, meetingTopic: '编辑后评审', revision: 1 }) });
+    expect(updated.meetingTopic).toBe('编辑后评审');
+    await mockApiRequest(`/api/product-lines/${product!.id}/versions/${product!.versions[0].id}/reviews/${created.id}`, { method: 'DELETE', body: JSON.stringify({ revision: updated.revision }) });
     const afterDelete = await mockApiRequest('/api/version-reviews') as Array<{ id: string }>;
     expect(afterDelete.some(item => item.id === created.id)).toBe(false);
   });

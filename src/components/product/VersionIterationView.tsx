@@ -287,7 +287,7 @@ const WorkItemRows: React.FC<{ items: PlanningItem[]; childrenByParent: Map<stri
           const previousGroup = previous && normalizedTaskGroupValue(previous, groupBy);
           const children = childrenByParent.get(workItemKey(item)) || [];
           const open = expanded.includes(workItemKey(item));
-          const operationMenu = { items: [{ key: 'copy', icon: <CopyOutlined />, label: '复制任务' }, ...(item.kind === 'bug' ? [{ key: 'copy-link', icon: <CopyOutlined />, label: '复制并关联' }] : []), { type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: '归档', danger: true }], onClick: ({ key }: { key: string }) => onOperation(key, item) };
+          const operationMenu = { items: [{ key: 'copy', icon: <CopyOutlined />, label: '复制任务' }, { type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: '归档', danger: true }], onClick: ({ key }: { key: string }) => onOperation(key, item) };
           return <React.Fragment key={workItemKey(item)}>{depth === 0 && groupBy !== 'none' && (index === 0 || group !== previousGroup) && <tr className="bg-[var(--bg-surface-soft)]"><td colSpan={10} className="px-4 py-2 font-semibold text-[var(--text-body)]">{group} · {items.filter((entry) => normalizedTaskGroupValue(entry, groupBy) === group).length}</td></tr>}
           <tr className="hover:bg-[var(--bg-surface-soft)]">
             <td className="px-4 py-3"><input type="checkbox" aria-label={`选择迭代任务：${item.title}`} checked={selectedIds.includes(`${item.kind}:${item.id}`)} onChange={(event) => onSelectionChange(event.target.checked ? [...selectedIds, `${item.kind}:${item.id}`] : selectedIds.filter((id) => id !== `${item.kind}:${item.id}`))} className="h-4 w-4 accent-[var(--primary)]" /></td>
@@ -868,7 +868,7 @@ export const VersionIterationView: React.FC = () => {
       addToast('warning', '工作项缺少产品，无法操作');
       return;
     }
-    if (key === 'copy' || key === 'copy-link') {
+    if (key === 'copy') {
       const category = item.kind === 'requirement' || item.kind === 'design' || item.kind === 'dev' || item.kind === 'test' || item.kind === 'bug' ? item.kind : undefined;
       const taskTypeId = String(source.workItemTypeId || source.taskTypeId || '');
       if (!category || !taskTypeId) {
@@ -886,7 +886,6 @@ export const VersionIterationView: React.FC = () => {
           versionId: item.versionId || selectedVersion?.id || undefined,
           priority: String(source.priority || 'P2')
         });
-        if (key === 'copy-link') await productRepository.createWorkItemRelation(productLineId, item.id, String(created.id));
         const createdItem = { ...created, category, productLineId, taskTypeId, versionId: item.versionId || selectedVersion?.id, title: `${item.title} - 副本`, status: created.status || { name: item.status }, priority: item.priority, assigneeName: item.ownerName, creatorName: item.creatorName, estimatedHours: 0, actualHours: 0 } as UnifiedWorkItem;
         setRecentItems((current) => [createdItem, ...current]);
         addToast('success', '任务已复制');

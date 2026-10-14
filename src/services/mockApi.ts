@@ -1124,7 +1124,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const workflow = (type.workflows || (type.workflow ? [type.workflow] : [])).find((flow: any) => flow.status === 'PUBLISHED');
     const initial = workflow?.definition?.states?.find((state: any) => state.initial && state.enabled !== false);
     if (!initial) throw new Error('当前工作项类型未配置已发布的初始状态');
-    const task = { ...body, id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: initial.name, statusKey: initial.key, workflowId: workflow.id, statusColor: initial.color, revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
+    const task = { ...body, id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: initial.name, statusKey: initial.key, workflowId: workflow.id, statusColor: initial.color, revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: body.category === 'bug' ? body.type || '系统缺陷' : type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
     write(KEYS.workItems, [task, ...items]);
     attachWorkItemToRequirement(task, type.name);
     recordTaskActivity(task.id, product.id, 'WORK_ITEM_CREATED', { title: task.title });
@@ -1174,7 +1174,10 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const product = getProductLines().find((line) => line.id === current.productLineId);
     const type: any = productTypes(product).find((type: any) => type.id === (current.taskTypeId || current.workItemTypeId));
     const workflows = type?.workflows || (type?.workflow ? [type.workflow] : []);
-    const workflow = workflows.find((workflow: any) => workflow.status === 'PUBLISHED' && (!current.workflowId || workflow.id === current.workflowId));
+    const matchingWorkflow = workflows.find((workflow: any) => workflow.status === 'PUBLISHED' && (!current.workflowId || workflow.id === current.workflowId));
+    const snapshotWorkflow = current.workflowId ? databaseRows('t_product_workflow').find(flow => flow.id_ === current.workflowId && flow.product_line_id_ === current.productLineId && !flow.delete_flag_ && flow.status_ === 'PUBLISHED') : undefined;
+    const workflow = matchingWorkflow || (snapshotWorkflow ? { id: snapshotWorkflow.id_, status: snapshotWorkflow.status_, definition: snapshotWorkflow.definition_ } : workflows.find((flow: any) => flow.status === 'PUBLISHED' && flow.definition?.states?.some((state: any) => state.key === current.statusKey || state.name === current.status)));
+    if (!workflow?.definition?.states?.length) throw new Error('任务绑定的状态流程已失效，请在产品工作项配置中检查发布的流程');
     const states = workflow?.definition?.states?.filter((state: any) => state.enabled !== false) || [];
     const currentKey = states.find((state: any) => state.key === current.statusKey)?.key || states.find((state: any) => state.name === current.status)?.key;
     let role = '';
@@ -1206,11 +1209,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const ids = [...(item?.relatedTaskIds || []), ...(item?.sourceWorkOrderIds || [])];
     return { relations: ids.map((targetId) => ({ id: `${parts[2]}-${targetId}`, sourceId: parts[2], targetId, type: 'RELATES_TO', scope: 'FINISH', revision: 0 })) };
   }
-  if (parts[1] === 'work-items' && parts[2] && parts[3] === 'relations' && method === 'POST') {
-    const items = getWorkItems(); const index = items.findIndex((candidate) => candidate.id === parts[2]);
-    if (index >= 0) { const current = items[index]; const relatedTaskIds = Array.from(new Set([...(current.relatedTaskIds || []), String(body.targetId || '')].filter(Boolean))); items[index] = { ...current, relatedTaskIds }; write(KEYS.workItems, items); return { id: `${parts[2]}-${body.targetId}`, sourceId: parts[2], targetId: body.targetId, type: 'RELATES_TO', scope: 'FINISH', revision: 0 }; }
-    return { id: id('relation'), sourceId: parts[2], targetId: body.targetId, type: 'RELATES_TO', scope: 'FINISH', revision: 0 };
-  }
+
   if (parts[1] === 'requirements' && parts[2] && parts[3] === 'summary' && method === 'GET') { const requirement = [...getWorkItems()].find((item) => item.id === parts[2]); return { requirement: requirement || undefined, linkedItems: [] }; }
   if (clean.endsWith('/test-case-directories') && method === 'GET') {
     const lineId = parts[2] || '';
