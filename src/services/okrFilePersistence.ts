@@ -1,3 +1,4 @@
+import { mockStateEndpoint } from './mockStateEndpoint';
 import type { OkrFileState } from '../../scripts/mock-okr-state-plugin';
 const keys = ['okrRecords','okrPeople','okrSettings'] as const;
 const storageKey = (key: string) => `shichuang.frontend.mock.${key}`;
@@ -5,7 +6,7 @@ const migrationKey='shichuang.frontend.mock.okrFileMigration.v1';
 export function createOkrFilePersistence(storage: Storage, request: typeof fetch = fetch) {
   let queue: Promise<unknown> = Promise.resolve();
   const transfer = async (init?: RequestInit): Promise<OkrFileState> => {
-    const response=await request('/__dev/okr-state',init);
+    const response=await request(mockStateEndpoint('okr-state'),init);
     const result=await response.json();
     if(!response.ok) throw new Error(result.message || '目标与复盘 Mock 保存失败');
     return result;

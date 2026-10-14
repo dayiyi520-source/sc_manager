@@ -36,7 +36,7 @@ export function mockOkrStatePlugin(): Plugin {
   const register = (server: any) => {
     const file = resolve(server.config.root, 'src/data/mockOkrState.json');
     server.middlewares.use(async (req: any, res: any, next: () => void) => {
-      if (req.url?.split('?')[0] !== okrStateEndpoint) return next();
+      if (![okrStateEndpoint,server.config.base + 'api/mock/okr-state'].includes(req.url?.split('?')[0])) return next();
       let sameOrigin = !req.headers.origin;
       try { if (req.headers.origin) sameOrigin = new URL(req.headers.origin).host === req.headers.host; } catch { sameOrigin=false; }
       if (!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '') || !sameOrigin) {res.statusCode=403;res.end('仅允许本机同源访问');return;}

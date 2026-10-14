@@ -15,17 +15,10 @@ export function saveTemplateValue(file: string, key: string, value: unknown, pre
   renameSync(temporary, file);
 }
 
-export function mockResearchTemplatePlugin(): Plugin {
-  return {
-    name: 'mock-research-template-file',
-    apply: 'serve',
-    handleHotUpdate(context) {
-      if (context.file === resolve(context.server.config.root, 'src/data/mockResearchTemplate.json')) return [];
-    },
-    configureServer(server) {
+function registerTemplateServer(server: any) {
       const file = resolve(server.config.root, 'src/data/mockResearchTemplate.json');
       server.middlewares.use(async (req, res, next) => {
-        if (req.url?.split('?')[0] !== templateEndpoint) return next();
+        if (![templateEndpoint,server.config.base + 'api/mock/research-template'].includes(req.url?.split('?')[0])) return next();
         const address = req.socket.remoteAddress;
         const origin = req.headers.origin;
         // 只允许本机、同源开发页面写入固定文件，不能指定任意路径。
@@ -54,6 +47,9 @@ export function mockResearchTemplatePlugin(): Plugin {
           res.end(JSON.stringify({ message: error instanceof Error ? error.message : '项目 Mock 保存失败' }));
         }
       });
-    },
+}
+export function mockResearchTemplatePlugin(): Plugin {
+  return {name:'mock-research-template-file',apply:'serve',configureServer:registerTemplateServer,configurePreviewServer:registerTemplateServer,
+    handleHotUpdate(context) {if(context.file===resolve(context.server.config.root,'src/data/mockResearchTemplate.json')) return [];},
   };
 }

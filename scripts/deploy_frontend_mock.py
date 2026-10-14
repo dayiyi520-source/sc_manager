@@ -33,7 +33,7 @@ def main():
     node = shutil.which('node')
     if not node or not (source / 'node_modules/vite/bin/vite.js').exists():
         raise SystemExit('Node/Vite dependencies are missing.')
-    build_env = {**os.environ, 'VITE_BASE_PATH': base, 'VITE_MOCK_MODE': 'true', 'VITE_API_BASE_URL': ''}
+    build_env = {**os.environ, 'VITE_BASE_PATH': base, 'VITE_MOCK_MODE': 'true', 'VITE_API_BASE_URL': '', 'VITE_MOCK_DATA_VERSION': args.revision}
     subprocess.run([node, str(source / 'node_modules/vite/bin/vite.js'), 'build'], cwd=source, env=build_env, check=True)
     dist = source / 'dist'
     index = (dist / 'index.html').read_text(encoding='utf-8')
@@ -46,8 +46,20 @@ def main():
             raise SystemExit('Product Mock data missing from artifact.')
     if '智慧校园二期建设方案梳理' not in js or '智慧校园项目启动资料准备' not in js:
         raise SystemExit('Business Mock task data missing from artifact.')
+    (dist / 'mock-data').mkdir(exist_ok=True)
+    (dist / 'mock-service').mkdir(exist_ok=True)
+    snapshots = {'okr-state.json':'mockOkrState.json', 'research-template.json':'mockResearchTemplate.json'}
+    hashes = {}
+    for target, filename in snapshots.items():
+        data = (source / 'src/data' / filename).read_bytes()
+        json.loads(data)
+        (dist / 'mock-data' / target).write_bytes(data)
+        hashes[target] = hashlib.sha256(data).hexdigest()
+    shutil.copy2(source / 'scripts/production_mock_server.py', dist / 'mock-service/server.py')
+    shutil.copy2(source / 'scripts/setup_production_mock.py', dist / 'mock-service/setup.py')
+    if base + 'api/mock/' not in js: raise SystemExit('Production Mock endpoint namespace missing from artifact')
     release = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    manifest = {'release': release, 'revision': args.revision, 'mode': 'static-mock', 'frontendPath': base, 'businessSamples': {'presales': 8, 'delivery': 8}, 'productPreviewSamplesPerCategory': 3}
+    manifest = {'release': release, 'revision': args.revision, 'mode': 'persistent-mock', 'mockSnapshotHashes': hashes, 'frontendPath': base, 'businessSamples': {'presales': 8, 'delivery': 8}, 'productPreviewSamplesPerCategory': 3}
     (dist / 'release.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     if args.build_only:
         print(json.dumps({'status': 'built', **manifest}, ensure_ascii=False)); return
@@ -73,7 +85,7 @@ def main():
             with tarfile.open(archive, 'w:gz') as tar:
                 for path in dist.iterdir(): tar.add(path, arcname=path.name)
             with client.open_sftp() as sftp: sftp.put(str(archive), archive_path)
-        remote_code = '''import json, os, pathlib, shutil, tarfile, sys
+        remote_code = '''import json, os, pathlib, shutil, tarfile, sys, subprocess
 root=pathlib.Path(sys.argv[1]); release=sys.argv[2]
 new=root/'releases'/release; backup=root/'backups'/release; current=root/'dist'
 new.mkdir(); backup.mkdir()
@@ -83,6 +95,7 @@ if not (new/'index.html').is_file(): raise RuntimeError('Missing release index')
 old_assets=current/'assets'
 if old_assets.exists(): shutil.copytree(old_assets,new/'assets',dirs_exist_ok=True)
 (backup/'previous-target.txt').write_text(str(current.resolve()))
+subprocess.run(['python3',str(new/'mock-service/setup.py'),'--root',str(root),'--release-dir',str(new),'--backup',str(backup),'--prefix','/sc-manager-frontend/api/mock/','--release',release],check=True)
 if current.is_symlink():
  os.symlink(str(new), root/('next-'+release)); os.replace(root/('next-'+release),current)
 else:
@@ -93,6 +106,12 @@ print(json.dumps({'release':release,'backup':str(backup),'target':str(new)}))
         result = execute(command)
         try:
             public = 'https://cp.stringedu.com' + base
+            with urllib.request.urlopen(public + 'api/mock/health',timeout=25) as response:
+                health = json.load(response)
+            if not health.get('ok') or health.get('release') != release: raise RuntimeError('Public Mock service release mismatch')
+            for name in ['okr-state','research-template']:
+                with urllib.request.urlopen(public + 'api/mock/' + name,timeout=25) as response:
+                    json.load(response)
             with urllib.request.urlopen(public + 'index.html?release=' + release, timeout=25) as response: live = response.read()
             if live != (dist / 'index.html').read_bytes(): raise RuntimeError('Public index does not match new artifact')
             asset = re.search(r'src="([^"]+assets/[^"]+.js)"', live.decode()).group(1)
@@ -103,6 +122,7 @@ print(json.dumps({'release':release,'backup':str(backup),'target':str(new)}))
         except Exception:
             rollback = "import os,pathlib,sys; r=pathlib.Path(sys.argv[1]); b=r/'backups'/sys.argv[2]; old=b/'dist'; target=str(old) if old.exists() else (b/'previous-target.txt').read_text(); t=r/'rollback-next'; os.symlink(target,t); os.replace(t,r/'dist')"
             execute('python3 -c ' + shlex.quote(rollback) + ' ' + shlex.quote(remote_root) + ' ' + shlex.quote(release))
+            execute('python3 ' + shlex.quote(remote_release+'/mock-service/setup.py')+' --root '+shlex.quote(remote_root)+' --release-dir '+shlex.quote(remote_release)+' --backup '+shlex.quote(remote_root+'/backups/'+release)+' --prefix /sc-manager-frontend/api/mock/ --release '+shlex.quote(release)+' --rollback')
             raise
         print(json.dumps({'status': 'deployed', **manifest, 'publicUrl': public, 'remote': json.loads(result)}, ensure_ascii=False))
     finally: client.close()

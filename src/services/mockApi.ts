@@ -1,3 +1,4 @@
+import { mockStateEndpoint } from './mockStateEndpoint';
 import { createOkrFilePersistence } from './okrFilePersistence';
 import savedOkrState from '../data/mockOkrState.json';
 import { syncProductTemplates, migrateWorkItems } from './workItemTemplateSync';
@@ -74,10 +75,11 @@ const KEYS = {
 };
 
 // 每次导入新数据库快照时，淘汰浏览器里由旧演示数据留下的本地状态。
-if (typeof window !== 'undefined' && localStorage.getItem(KEYS.snapshot) !== MOCK_SNAPSHOT_VERSION) {
+const runtimeMockVersion = import.meta.env.VITE_MOCK_DATA_VERSION || MOCK_SNAPSHOT_VERSION;
+if (typeof window !== 'undefined' && localStorage.getItem(KEYS.snapshot) !== runtimeMockVersion) {
   Object.values(KEYS).filter((key) => key !== KEYS.snapshot && ![KEYS.okrRecords, KEYS.okrSettings, KEYS.okrPeople].includes(key)).forEach((key) => localStorage.removeItem(key));
   localStorage.removeItem(KEYS.workItems + '.previewSeedVersion');
-  localStorage.setItem(KEYS.snapshot, MOCK_SNAPSHOT_VERSION);
+  localStorage.setItem(KEYS.snapshot, runtimeMockVersion);
 }
 
 const now = () => new Date().toISOString();
@@ -1294,7 +1296,7 @@ const templateRoutes: Record<string, string> = {
   '/api/automation-template/rules': 'researchAutomation',
   '/api/automation-template/setting': 'researchAutomationSetting',
 };
-const templateFileEndpoint = '/__dev/research-template';
+const templateFileEndpoint = mockStateEndpoint('research-template');
 let templateFile: Record<string, unknown> = {};
 let templateReady: Promise<void> | undefined;
 let templateQueue: Promise<unknown> = Promise.resolve();
@@ -1312,7 +1314,7 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     okrFilePersistence ??= createOkrFilePersistence(localStorage);
     return okrFilePersistence.run(() => handleMockApiRequest(path, init));
   }
-  if (!import.meta.env.DEV || import.meta.env.MODE === 'test') return handleMockApiRequest(path, init);
+  if (import.meta.env.MODE === 'test') return handleMockApiRequest(path, init);
   if (!templateReady) {
     templateReady = templateFileRequest().then((data) => {
       templateFile = data;

@@ -1,29 +1,37 @@
-# 静态 Mock 演示站部署
+# Mock 演示站部署
 
-当前目标：用户确认的 https://cp.stringedu.com/sc-manager-frontend/ 。站点仅发布前端及其内置 Mock，实际 Nginx 目录为 /opt/sc-manager-frontend/dist 。历史 /manage-admin/ 是另一应用，本流程不切换其发布目录、不部署其后端、不修改数据库。
+发布目标为用户确认的 https://cp.stringedu.com/sc-manager-frontend/，前端目录为 /opt/sc-manager-frontend/dist。历史 /manage-admin/ 是另一应用，本流程不切换其目录、不部署其后端、不修改数据库。
 
-部署入口为 scripts/deploy-production.sh，Windows 可直接执行同一入口委托的 Python 脚本：
+部署入口为 scripts/deploy-production.sh。Windows 使用其委托的 Python 入口：
 
 ```powershell
 python scripts/deploy_frontend_mock.py --project . --source-dir <已验证的独立源码快照目录> --revision <源码提交号>
 ```
 
-准备命令从 stringplugin 根目录运行：
+准备命令从 stringplugin 根目录执行，使用已核实的静态 Mock 站专用配置：
 
 ```text
 python scripts/prepare_deployment.py --project <项目目录> --environment prod --config .enterprise-app-factory/config/frontend-deployment.json
 ```
 
-此专用配置明确 database.mode=none，适用于已经核实的静态演示站，并保留原团队应用配置。原默认数据库预检为新生成的数据库名报不存在，不能将该数据库误当作此站点的依赖。
+专用配置 database.mode=none，不要求数据库替换。凭证只从 .enterprise-app-factory/secrets/runtime.env 或环境变量读取，不写入脚本和发布包。源目录为已提交版本的独立快照；构建使用项目专属路径和 Mock 模式，以源码版本作为演示缓存版本。
 
-前置条件：Node 与现有 Vite 依赖可用，Python 已有 paramiko；凭证只从 .enterprise-app-factory/secrets/runtime.env 或环境变量加载。源码目录必须为本次已提交版本的独立快照加明确审查过的部署修复，不自动发布共享工作区里的其他未提交修改。构建强制 VITE_BASE_PATH=/sc-manager-frontend/ 和 VITE_MOCK_MODE=true。
+## 共享 Mock 数据
 
-Mock 数据编译进静态资源：数据库快照、产研模板、产品/设计/研发/测试/缺陷演示任务，以及售前8条和交付8条样例随资源上传。额外的产研演示样例每类3条，由内置管理员负责并创建，避免全新浏览器默认“我负责的”无记录；原任务归属不变。每个浏览器的编辑与新建仍保存在该浏览器，不是多人共享数据库。
+数据库初始快照、产研任务样例编译进静态资源；最新 src/data/mockOkrState.json 和 src/data/mockResearchTemplate.json 同时上传并初始化 /opt/sc-manager-frontend/shared/mock/ 下的目标复盘及产研模板文件。目标总结设置包含在目标状态文件中。保存成功会写入共享文件，浏览器仅缓存；失败及并发旧版本提交明确提示，不显示虚假的成功。
 
-流程：预检已有专属路由和 nginx -t；构建并检查资源路径及 Mock 数据；上传到 /opt/sc-manager-frontend/incoming/；解压到独立 releases/<时间戳>/；保留旧资源以支持打开中的页面；把旧站备份到 backups/<时间戳>/，切换 dist 链接；验证公共 index、JS 资源和直接业务路由。验证失败自动切回旧目录。每次产物包含 release.json，记录源码版本、模式及样例数量，不记录凭证。
+服务单元为 sc-manager-frontend-mock.service，以无登录权限的 sc-manager-mock 用户运行，只能写入本项目共享 Mock 目录及运行时目录。使用 Unix socket /run/sc-manager-frontend-mock/mock.sock，由专属 Nginx 路径 /sc-manager-frontend/api/mock/ 转发。写入仅接受本站 Origin 和 JSON，并校验格式及版本；不接受任意文件路径。该服务属于纯前端 Mock 演示，不替代正式后端的认证、租户和业务权限校验。
 
-回滚：在服务器上读取所选 backups/<时间戳>/previous-target.txt；首次目录切换前的旧文件位于同备份的 dist/，后续版本则指向此前 releases/。将 /opt/sc-manager-frontend/dist 原子切换到该旧目录，然后校验公共首页和业务路由。不要删除其他站点、数据库或备份。
+每次发布备份原 Nginx 路由、服务单元及共享数据。目标数据更新保留服务器更高版本记录及未包含在新样例中的记录；产研模板以此次上传的最新源码样例更新。后续线上保存独立于发布目录；需把服务器共享数据同步回源码才能将线上编辑带到其他独立环境。
 
-最后成功部署：2026-10-12（北京时间18:18）。发布版本20261012T101817Z，源码afc8740，包含产研任务字段、运维/售前/交付任务、交付待审核流程、产品模板边界和工时 Mock 数据。上一发布版本为20261012T054650Z。
+## 发布、核验与回滚
 
-发布目录：/opt/sc-manager-frontend/releases/20261012T054650Z；备份：/opt/sc-manager-frontend/backups/20261012T054650Z。公共index与本地产物一致，入口JS及直接业务地址返回成功；全新浏览器验证产品、设计、研发、测试、缺陷默认各3条，售前和交付我负责的各6条、我创建的各4条。相关Mock测试23项通过。原数据库未写入，其他站点路由未改。
+预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
+
+失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
+
+上次已核实的发布：20261013T153748Z，源码 ac83321。此次发布核验成功后更新下方记录。
+
+## 最近成功发布
+
+待本次线上核验完成后填写。
