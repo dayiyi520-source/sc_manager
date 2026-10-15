@@ -1,5 +1,5 @@
 {
-  "revision": 29,
+  "revision": 41,
   "okrRecords": [
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
@@ -1511,7 +1511,7 @@
       "periodKey": "2026-10",
       "status": "active",
       "createdAt": "2026-10-13T07:55:03.222Z",
-      "version": 14,
+      "version": 16,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "department",
@@ -1546,7 +1546,10 @@
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-14",
                 "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                "assigneeIds": [
+                  "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
+                ]
               },
               {
                 "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
@@ -1555,7 +1558,10 @@
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-22",
                 "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                "assigneeIds": [
+                  "user-product-member"
+                ]
               },
               {
                 "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
@@ -1564,7 +1570,10 @@
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-24",
                 "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                "assigneeIds": [
+                  "558f155c-51ed-4802-8a85-e3c64a31a422"
+                ]
               },
               {
                 "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
@@ -1573,7 +1582,11 @@
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-21",
                 "plannedEndDate": "2026-10-22",
-                "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e"
+                "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ]
               }
             ],
             "businessObject": "教师教学档案袋,产教融合平台",
@@ -1581,8 +1594,9 @@
             "stage": "产品设计",
             "assigneeIds": [
               "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
-              "user-product",
-              "user-product-member"
+              "user-product-member",
+              "558f155c-51ed-4802-8a85-e3c64a31a422",
+              "user-product"
             ],
             "executionActions": [],
             "plannedDeadline": "2026-10-31"
@@ -1604,106 +1618,13 @@
             "plannedDeadline": "2026-10-31"
           }
         ],
-        "changeReason": "ces",
+        "changeReason": "测试",
         "objectiveType": "target",
         "note": "",
         "plannedDeadline": "2026-10-31"
       },
       "changeRequest": {
         "previousPayload": {
-          "goalModelVersion": 2,
-          "goalLevel": "department",
-          "origin": "assigned",
-          "inherited": false,
-          "title": "产研目标测试",
-          "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
-          "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
-          "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
-          "sourceVersion": 3,
-          "alignments": [
-            {
-              "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
-              "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
-            }
-          ],
-          "weight": 100,
-          "deadline": "2026-10-31",
-          "keyResults": [
-            {
-              "id": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
-              "title": "按期完成3个产品版本迭代计划 · 达到对应的验收阶段",
-              "weight": 80,
-              "progress": 0,
-              "structureType": "product",
-              "deadline": "2026-10-31",
-              "details": [
-                {
-                  "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                  "name": "教师教学档案袋",
-                  "version": "V1.1.0",
-                  "stage": "产品设计",
-                  "plannedStartDate": "2026-10-14",
-                  "plannedEndDate": "2026-10-31",
-                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
-                },
-                {
-                  "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                  "name": "教师教学档案袋",
-                  "version": "V1.2.0",
-                  "stage": "产品设计",
-                  "plannedStartDate": "2026-10-22",
-                  "plannedEndDate": "2026-10-31",
-                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
-                },
-                {
-                  "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                  "name": "教师教学档案袋",
-                  "version": "V1.0.0",
-                  "stage": "产品设计",
-                  "plannedStartDate": "2026-10-24",
-                  "plannedEndDate": "2026-10-31",
-                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
-                }
-              ],
-              "businessObject": "教师教学档案袋",
-              "version": "V1.1.0",
-              "stage": "产品设计",
-              "assigneeIds": [
-                "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
-                "user-product",
-                "user-product-member"
-              ],
-              "executionActions": [],
-              "plannedDeadline": "2026-10-31"
-            },
-            {
-              "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
-              "title": "其他工作支持 · 100%响应",
-              "weight": 20,
-              "progress": 0,
-              "deadline": "2026-10-31",
-              "structureType": "support",
-              "action": "其他工作支持",
-              "result": "100%响应",
-              "assigneeIds": [
-                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
-                "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
-                "user-product"
-              ],
-              "plannedDeadline": "2026-10-31"
-            }
-          ],
-          "changeReason": "测试",
-          "objectiveType": "target",
-          "note": "",
-          "plannedDeadline": "2026-10-31"
-        },
-        "id": "ce0dbf92-7488-4d88-891d-b5f4f5a17dff",
-        "status": "approved",
-        "purpose": "update",
-        "reason": "ces",
-        "reviewerId": "user-admin",
-        "payload": {
           "goalModelVersion": 2,
           "goalLevel": "department",
           "origin": "assigned",
@@ -1759,7 +1680,7 @@
                 },
                 {
                   "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
-                  "name": "部门考核管理系统",
+                  "name": "产教融合平台",
                   "version": "V1.1.0",
                   "stage": "产品设计",
                   "plannedStartDate": "2026-10-21",
@@ -1767,7 +1688,7 @@
                   "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e"
                 }
               ],
-              "businessObject": "教师教学档案袋,部门考核管理系统",
+              "businessObject": "教师教学档案袋,产教融合平台",
               "version": "V1.1.0",
               "stage": "产品设计",
               "assigneeIds": [
@@ -1800,9 +1721,125 @@
           "note": "",
           "plannedDeadline": "2026-10-31"
         },
-        "baseVersion": 12,
-        "requestedAt": "2026-10-15T03:12:35.047Z",
-        "reviewedAt": "2026-10-15T03:12:48.489Z",
+        "id": "96a5f6bd-87b8-4500-a0da-ea56db458f6c",
+        "status": "approved",
+        "purpose": "update",
+        "reason": "测试",
+        "reviewerId": "user-admin",
+        "payload": {
+          "goalModelVersion": 2,
+          "goalLevel": "department",
+          "origin": "assigned",
+          "inherited": false,
+          "title": "产研目标测试",
+          "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+          "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+          "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+          "sourceVersion": 3,
+          "alignments": [
+            {
+              "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+              "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+            }
+          ],
+          "weight": 100,
+          "deadline": "2026-10-31",
+          "keyResults": [
+            {
+              "id": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
+              "title": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
+              "weight": 80,
+              "progress": 0,
+              "structureType": "product",
+              "deadline": "2026-10-31",
+              "details": [
+                {
+                  "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
+                  "name": "教师教学档案袋",
+                  "version": "V1.1.0",
+                  "stage": "产品设计",
+                  "plannedStartDate": "2026-10-14",
+                  "plannedEndDate": "2026-10-31",
+                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                  "assigneeIds": [
+                    "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
+                  ]
+                },
+                {
+                  "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
+                  "name": "教师教学档案袋",
+                  "version": "V1.2.0",
+                  "stage": "产品设计",
+                  "plannedStartDate": "2026-10-22",
+                  "plannedEndDate": "2026-10-31",
+                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                  "assigneeIds": [
+                    "user-product-member"
+                  ]
+                },
+                {
+                  "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
+                  "name": "教师教学档案袋",
+                  "version": "V1.0.0",
+                  "stage": "产品设计",
+                  "plannedStartDate": "2026-10-24",
+                  "plannedEndDate": "2026-10-31",
+                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                  "assigneeIds": [
+                    "558f155c-51ed-4802-8a85-e3c64a31a422"
+                  ]
+                },
+                {
+                  "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
+                  "name": "产教融合平台",
+                  "version": "V1.1.0",
+                  "stage": "产品设计",
+                  "plannedStartDate": "2026-10-21",
+                  "plannedEndDate": "2026-10-22",
+                  "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
+                  "assigneeIds": [
+                    "user-product-member",
+                    "user-product"
+                  ]
+                }
+              ],
+              "businessObject": "教师教学档案袋,产教融合平台",
+              "version": "V1.1.0",
+              "stage": "产品设计",
+              "assigneeIds": [
+                "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+                "user-product-member",
+                "558f155c-51ed-4802-8a85-e3c64a31a422",
+                "user-product"
+              ],
+              "executionActions": [],
+              "plannedDeadline": "2026-10-31"
+            },
+            {
+              "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
+              "title": "其他工作支持 · 100%响应",
+              "weight": 20,
+              "progress": 0,
+              "deadline": "2026-10-31",
+              "structureType": "support",
+              "action": "其他工作支持",
+              "result": "100%响应",
+              "assigneeIds": [
+                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+                "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+                "user-product"
+              ],
+              "plannedDeadline": "2026-10-31"
+            }
+          ],
+          "changeReason": "测试",
+          "objectiveType": "target",
+          "note": "",
+          "plannedDeadline": "2026-10-31"
+        },
+        "baseVersion": 14,
+        "requestedAt": "2026-10-15T13:52:11.103Z",
+        "reviewedAt": "2026-10-15T14:34:41.921Z",
         "feedback": ""
       },
       "changeHistory": [
@@ -2439,7 +2476,7 @@
                 "details": [
                   {
                     "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                    "name": "师创云平台",
+                    "name": "师创云���台",
                     "version": "V1.1.0",
                     "stage": "产品设计",
                     "plannedStartDate": "2026-10-14",
@@ -2462,7 +2499,7 @@
                     "plannedEndDate": "2026-10-31"
                   }
                 ],
-                "businessObject": "师创云平台",
+                "businessObject": "师创云���台",
                 "version": "V1.1.0",
                 "stage": "产品设计",
                 "assigneeIds": [
@@ -2784,6 +2821,225 @@
           "baseVersion": 12,
           "requestedAt": "2026-10-15T03:12:35.047Z",
           "reviewedAt": "2026-10-15T03:12:48.489Z",
+          "feedback": ""
+        },
+        {
+          "previousPayload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产研目标测试",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
+                "title": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
+                "weight": 80,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-14",
+                    "plannedEndDate": "2026-10-31",
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
+                    "name": "教师教学档案袋",
+                    "version": "V1.0.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-24",
+                    "plannedEndDate": "2026-10-31",
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
+                    "name": "产教融合平台",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-21",
+                    "plannedEndDate": "2026-10-22",
+                    "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e"
+                  }
+                ],
+                "businessObject": "教师教学档案袋,产教融合平台",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "assigneeIds": [
+                  "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+                  "user-product",
+                  "user-product-member"
+                ],
+                "executionActions": [],
+                "plannedDeadline": "2026-10-31"
+              },
+              {
+                "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
+                "title": "其他工作支持 · 100%响应",
+                "weight": 20,
+                "progress": 0,
+                "deadline": "2026-10-31",
+                "structureType": "support",
+                "action": "其他工作支持",
+                "result": "100%响应",
+                "assigneeIds": [
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+                  "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+                  "user-product"
+                ],
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "changeReason": "ces",
+            "objectiveType": "target",
+            "note": "",
+            "plannedDeadline": "2026-10-31"
+          },
+          "id": "96a5f6bd-87b8-4500-a0da-ea56db458f6c",
+          "status": "approved",
+          "purpose": "update",
+          "reason": "测试",
+          "reviewerId": "user-admin",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产研目标测试",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
+                "title": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
+                "weight": 80,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-14",
+                    "plannedEndDate": "2026-10-31",
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                    "assigneeIds": [
+                      "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
+                    ]
+                  },
+                  {
+                    "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                    "assigneeIds": [
+                      "user-product-member"
+                    ]
+                  },
+                  {
+                    "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
+                    "name": "教师教学档案袋",
+                    "version": "V1.0.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-24",
+                    "plannedEndDate": "2026-10-31",
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                    "assigneeIds": [
+                      "558f155c-51ed-4802-8a85-e3c64a31a422"
+                    ]
+                  },
+                  {
+                    "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
+                    "name": "产教融合平台",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-21",
+                    "plannedEndDate": "2026-10-22",
+                    "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
+                    "assigneeIds": [
+                      "user-product-member",
+                      "user-product"
+                    ]
+                  }
+                ],
+                "businessObject": "教师教学档案袋,产教融合平台",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "assigneeIds": [
+                  "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+                  "user-product-member",
+                  "558f155c-51ed-4802-8a85-e3c64a31a422",
+                  "user-product"
+                ],
+                "executionActions": [],
+                "plannedDeadline": "2026-10-31"
+              },
+              {
+                "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
+                "title": "其他工作支持 · 100%响应",
+                "weight": 20,
+                "progress": 0,
+                "deadline": "2026-10-31",
+                "structureType": "support",
+                "action": "其他工作支持",
+                "result": "100%响应",
+                "assigneeIds": [
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
+                  "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+                  "user-product"
+                ],
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "changeReason": "测试",
+            "objectiveType": "target",
+            "note": "",
+            "plannedDeadline": "2026-10-31"
+          },
+          "baseVersion": 14,
+          "requestedAt": "2026-10-15T13:52:11.103Z",
+          "reviewedAt": "2026-10-15T14:34:41.921Z",
           "feedback": ""
         }
       ]
@@ -3831,17 +4087,17 @@
       "periodKey": "2026-10",
       "status": "active",
       "createdAt": "2026-10-14T14:41:43.581Z",
-      "version": 1,
+      "version": 3,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "personal",
         "origin": "assigned",
         "inherited": false,
-        "title": "按期完成3个产品版本迭代计划 · 达到对应的验收阶段",
-        "sourceTitle": "按期完成3个产品版本迭代计划 · 达到对应的验收阶段",
+        "title": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
+        "sourceTitle": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
         "sourceObjectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
         "sourceKrId": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
-        "sourceVersion": 12,
+        "sourceVersion": 15,
         "alignments": [
           {
             "parentObjectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
@@ -3853,7 +4109,7 @@
         "keyResults": [
           {
             "id": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
-            "title": "按期完成3个产品版本迭代计划 · 达到对应的验收阶段",
+            "title": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
             "weight": 100,
             "progress": 0,
             "structureType": "product",
@@ -3885,9 +4141,18 @@
                 "plannedStartDate": "2026-10-24",
                 "plannedEndDate": "2026-10-31",
                 "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+              },
+              {
+                "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
+                "name": "产教融合平台",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedStartDate": "2026-10-21",
+                "plannedEndDate": "2026-10-22",
+                "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e"
               }
             ],
-            "businessObject": "教师教学档案袋",
+            "businessObject": "教师教学档案袋,产教融合平台",
             "version": "V1.1.0",
             "stage": "产品设计",
             "assigneeIds": [
@@ -3910,7 +4175,8 @@
         "changeReason": "",
         "objectiveType": "target",
         "note": "",
-        "plannedDeadline": "2026-10-31"
+        "plannedDeadline": "2026-10-31",
+        "sourceWithdrawalAcknowledged": false
       },
       "changeRequest": {
         "id": "03bc716f-0985-4f21-93d5-56235cf97489",
@@ -4207,7 +4473,7 @@
             "title": "公共能力性能优化 1",
             "status": "开发中",
             "workType": "task",
-            "sourceLabel": "师创云平台 / 师创云平台 V1.0.0",
+            "sourceLabel": "师创云平�� / 师创云平台 V1.0.0",
             "result": "",
             "impact": ""
           },
@@ -5140,7 +5406,7 @@
                 "items": [
                   {
                     "workId": "task:2b65d061-2484-4cd7-b841-4005524b0422",
-                    "title": "测试用例编写：统一身份认证与组织同步",
+                    "title": "���试用例编写：统一身份认证与组织同步",
                     "status": "待测试",
                     "workType": "task",
                     "sourceLabel": "师创云平台 / 师创云平台 V1.0.0",
@@ -6421,7 +6687,7 @@
         "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
       ]
     },
-    "version": 19,
+    "version": 26,
     "objectiveTitleTemplates": [
       {
         "id": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
@@ -6454,6 +6720,331 @@
         "krTypes": [
           "support"
         ]
+      }
+    ],
+    "reviewReportTemplates": [
+      {
+        "id": "product-planning-employee-week-v1",
+        "name": "产品规划部员工周报",
+        "department": "产品规划部",
+        "audience": "employee",
+        "reportType": "week",
+        "version": 1,
+        "status": "published",
+        "effectiveFrom": "2026-10-15",
+        "blocks": [
+          {
+            "id": "goals",
+            "title": "本月目标复盘",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "extra",
+            "title": "插播任务",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "nextWeekPlan",
+            "title": "下周计划",
+            "guidance": "",
+            "fields": [
+              {
+                "id": "nextWeekPlan-text",
+                "label": "下周计划",
+                "type": "textarea",
+                "required": false,
+                "maxLength": 10000,
+                "placeholder": "填写下周重点工作、预期结果与关键节点"
+              }
+            ]
+          },
+          {
+            "id": "assistance",
+            "title": "需要协助事项",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "knowledge",
+            "title": "知识沉淀",
+            "guidance": "",
+            "fields": []
+          }
+        ],
+        "enabled": false
+      },
+      {
+        "id": "product-planning-employee-month-v1",
+        "name": "产品规划部员工月报",
+        "department": "产品规划部",
+        "audience": "employee",
+        "reportType": "month",
+        "version": 1,
+        "status": "published",
+        "effectiveFrom": "2026-11-01",
+        "blocks": [
+          {
+            "id": "goals",
+            "title": "本月目标复盘",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "extra",
+            "title": "插播任务",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "suggestions",
+            "title": "对公司或部门发展有帮助的意见和建议",
+            "guidance": "",
+            "fields": [
+              {
+                "id": "suggestions-text",
+                "label": "对公司或部门发展有帮助的意见和建议",
+                "type": "textarea",
+                "required": false,
+                "maxLength": 10000,
+                "placeholder": "填写对公司或部门发展有帮助的意见和建议"
+              }
+            ]
+          },
+          {
+            "id": "assistance",
+            "title": "需要协助事项",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "knowledge",
+            "title": "知识沉淀",
+            "guidance": "",
+            "fields": []
+          }
+        ]
+      },
+      {
+        "id": "product-planning-supervisor-month-v1",
+        "name": "产品规划部主管月报",
+        "department": "产品规划部",
+        "audience": "supervisor",
+        "reportType": "month",
+        "version": 1,
+        "status": "published",
+        "effectiveFrom": "2026-11-01",
+        "blocks": [
+          {
+            "id": "goals",
+            "title": "部门月目标复盘",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "extra",
+            "title": "插播任务",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "departmentSummary",
+            "title": "本月部门补充总结",
+            "guidance": "",
+            "fields": [
+              {
+                "id": "departmentSummary-text",
+                "label": "本月部门补充总结",
+                "type": "textarea",
+                "required": false,
+                "maxLength": 10000,
+                "placeholder": "补充部门本月整体成果、问题与经验"
+              }
+            ]
+          },
+          {
+            "id": "assistance",
+            "title": "需要协助事项",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "knowledge",
+            "title": "知识沉淀",
+            "guidance": "",
+            "fields": []
+          }
+        ]
+      },
+      {
+        "id": "d15f3620-ee11-4080-8127-7574cb63ce76",
+        "name": "产品规划部员工周报",
+        "department": "产品规划部",
+        "audience": "employee",
+        "reportType": "week",
+        "version": 2,
+        "status": "published",
+        "effectiveFrom": "2026-10-16",
+        "blocks": [
+          {
+            "id": "goals",
+            "title": "本月目标复盘",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "extra",
+            "title": "插播任务",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "nextWeekPlan",
+            "title": "下周计划",
+            "guidance": "",
+            "fields": [
+              {
+                "id": "nextWeekPlan-text",
+                "label": "下周计划",
+                "type": "textarea",
+                "required": false,
+                "maxLength": 10000,
+                "placeholder": "填写下周重点工作、预期结果与关键节点"
+              }
+            ]
+          },
+          {
+            "id": "assistance",
+            "title": "需要协助事项",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "knowledge",
+            "title": "知识沉淀",
+            "guidance": "",
+            "fields": []
+          }
+        ]
+      },
+      {
+        "id": "89bf0376-2442-4cdd-96b8-e693828b46ee",
+        "name": "交互设计部员工周报",
+        "department": "交互设计部",
+        "audience": "employee",
+        "reportType": "week",
+        "version": 1,
+        "status": "published",
+        "effectiveFrom": "2026-10-16",
+        "blocks": [
+          {
+            "id": "goals",
+            "title": "本月目标复盘",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "extra",
+            "title": "插播任务",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "nextWeekPlan",
+            "title": "下周计划",
+            "guidance": "",
+            "fields": [
+              {
+                "id": "nextWeekPlan-text",
+                "label": "下周计划",
+                "type": "textarea",
+                "required": false,
+                "maxLength": 10000,
+                "placeholder": "填写下周重点工作、预期结果与关键节点"
+              }
+            ]
+          },
+          {
+            "id": "assistance",
+            "title": "需要协助事项",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "knowledge",
+            "title": "知识沉淀",
+            "guidance": "",
+            "fields": []
+          }
+        ]
+      },
+      {
+        "id": "product-planning-supervisor-week-v1",
+        "name": "产品规划部主管周报",
+        "department": "产品规划部",
+        "audience": "supervisor",
+        "reportType": "week",
+        "version": 1,
+        "status": "published",
+        "effectiveFrom": "2026-10-15",
+        "blocks": [
+          {
+            "id": "goals",
+            "title": "部门月目标复盘",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "extra",
+            "title": "插播任务",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "departmentSummary",
+            "title": "部门补充总结",
+            "guidance": "",
+            "fields": [
+              {
+                "id": "departmentSummary-text",
+                "label": "部门补充总结",
+                "type": "textarea",
+                "required": false,
+                "maxLength": 10000,
+                "placeholder": "补充部门本周整体成果、问题与经验"
+              }
+            ]
+          },
+          {
+            "id": "nextWeekPlan",
+            "title": "部门下周计划",
+            "guidance": "",
+            "fields": [
+              {
+                "id": "nextWeekPlan-text",
+                "label": "部门下周计划",
+                "type": "textarea",
+                "required": false,
+                "maxLength": 10000,
+                "placeholder": "填写下周重点工作、预期结果与关键节点"
+              }
+            ]
+          },
+          {
+            "id": "assistance",
+            "title": "需要协助事项",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "knowledge",
+            "title": "知识沉淀",
+            "guidance": "",
+            "fields": []
+          }
+        ],
+        "enabled": true
       }
     ]
   }

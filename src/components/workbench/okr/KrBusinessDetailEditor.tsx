@@ -6,6 +6,7 @@ import { KrDetailTable } from './KrDetailTable';
 import { deliveryCurrentStage, projectDeliveryMap } from '../../../services/projectDeliveryMap';
 
 interface Props {
+  assigneeOptions?: Array<{ value: string; label: string }>;
   rows: OkrKrDetail[];
   mode: 'product' | 'delivery';
   parentOptions: string[];
@@ -28,7 +29,7 @@ export function replaceKrDetailSelection(rows: OkrKrDetail[], parent: string, ch
   return rows.flatMap((row, index) => index === first ? selected : row.name === parent ? [] : [row]);
 }
 
-export function KrBusinessDetailEditor({ rows, mode, parentOptions, childOptions, stages, disabled, deadlineLimit, onChange, deliveryStageOptions = {}, openPicker = false, onPickerClose, embedded = false, initialRowIds = [] }: Props) {
+export function KrBusinessDetailEditor({ assigneeOptions, rows, mode, parentOptions, childOptions, stages, disabled, deadlineLimit, onChange, deliveryStageOptions = {}, openPicker = false, onPickerClose, embedded = false, initialRowIds = [] }: Props) {
   const [localOpen, setLocalOpen] = useState(false);
   const open = openPicker || localOpen;
   const close = () => { setLocalOpen(false); onPickerClose?.(); };
@@ -64,7 +65,7 @@ export function KrBusinessDetailEditor({ rows, mode, parentOptions, childOptions
   };
   return <div className="okr-business-detail-editor">
     {!embedded && <Button icon={<PlusIcon/>} disabled={disabled || !parents.length} onClick={() => start()}>添加{parentLabel}</Button>}
-    <KrDetailTable rows={rows} label={product ? '产品明细' : '项目明细'} mode={mode} productOptions={childOptions} stages={stages} deliveryStageOptions={deliveryStageOptions} deadlineLimit={deadlineLimit} disabled={disabled} identityEditable={false} placeholder={!rows.length} onSelectChildren={name => start(name || undefined)} removableIds={new Set(rows.filter(row => !initialRowIds.includes(row.id)).map(row => row.id))} onRemove={id => onChange(rows.filter(row => row.id !== id))} onChange={onChange}/>
+    <KrDetailTable assigneeOptions={assigneeOptions} rows={rows} label={product ? '产品明细' : '项目明细'} mode={mode} productOptions={childOptions} stages={stages} deliveryStageOptions={deliveryStageOptions} deadlineLimit={deadlineLimit} disabled={disabled} identityEditable={false} placeholder={!rows.length} onSelectChildren={name => start(name || undefined)} removableIds={new Set(rows.filter(row => !initialRowIds.includes(row.id)).map(row => row.id))} onRemove={id => onChange(rows.filter(row => row.id !== id))} onChange={onChange}/>
     <Modal open={open} title={`选择${parentLabel}与${product ? '版本' : '产品'}`} onCancel={close} onOk={confirm} okText="确定" cancelText="取消" destroyOnHidden okButtonProps={{ disabled: disabled || !parent || !children.length }}>
       <div className="okr-business-detail-picker">
         <label><span>{parentLabel}</span><Select aria-label={`关联${parentLabel}`} showSearch optionFilterProp="label" placeholder={`请选择${parentLabel}`} value={parent} disabled={disabled} options={parents.map(value => ({ value, label: value }))} onChange={selectParent} notFoundContent={<Empty description={`暂无可选${parentLabel}`}/>}/></label>

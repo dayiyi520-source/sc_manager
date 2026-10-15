@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { ReviewProgressCell } from './EmployeeReviewDetailTable';
 import { completedActualHours } from './reviewActualHours';
 import { CircleIcon, CheckCircleIcon, AlertIcon, ClockIcon } from '@primer/octicons-react';
 import './supervisorReview.css';
-import { Alert, Button, Collapse, Empty, Spin, Table, Tag } from 'antd';
+import { Alert, Button, Collapse, Empty, Spin, Table, Tag, Modal } from 'antd';
 import type { OkrWork, OkrKrReview } from '../../../services/okrRepository';
 import type { EmployeeReviewSupport } from '../../../services/supervisorReview';
 import type { EmployeeActionGroup } from '../../../services/supervisorSupportPanels';
@@ -14,6 +15,7 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
   busy: boolean; editable: boolean; supportLoading: boolean; supportError?: unknown; onRetry?: () => void;
   onUpdate: (patch: Partial<OkrKrReview>) => void; onEmployeeSupport: (authorId: string, reportIds: string[]) => void;
 }) {
+  const [progressDetailId, setProgressDetailId] = useState<string>();
   const snapshots = review.employeeReviewSnapshots || [];
   const viewed = new Set(review.viewedEmployeeReviewIds || []);
   const sourceReports = [
@@ -44,20 +46,20 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
     <Table size="small" rowKey="id" pagination={false} scroll={{ x: true }} dataSource={review.detailRows?.length ? review.detailRows : [{ id: review.keyResultId, name: review.keyResultTitle }]} columns={[
       { title: review.detailRows?.length ? '产品' : 'KR名称', dataIndex: 'name', ellipsis: true },
       ...(review.detailRows?.length ? [{ title: '迭代版本', dataIndex: 'version' }, { title: '达成阶段', dataIndex: 'stage' }, { title: '开始时间', dataIndex: 'plannedStartDate' }, { title: '结束时间', dataIndex: 'plannedEndDate' }] : []),
-      { title: '进度', render: (_, row) => { const value = review.detailProgress?.find(item => item.id === row.id); return `${value?.previousProgress ?? 0}% → ${value?.currentProgress ?? 0}%`; } },
-      ...[...new Map((review.contributors || []).filter(item => item.authorId !== viewerId).map(item => [item.authorId, item.authorName])).entries()].map(([authorId, authorName]) => ({ title: authorName, key: `employee:${authorId}`, render: (_: unknown, row: { id: string }) => {
-        const value = review.contributors?.find(item => item.authorId === authorId && item.detailId === row.id);
-        return value ? `${value.previousProgress}% → ${value.currentProgress}%` : '—';
-      } })),
-      ...(selfAssigned ? [{ title: viewerName || review.contributors?.find(item => item.authorId === viewerId)?.authorName || '主管', key: 'self', render: (_: unknown, row: { id: string; name: string }) => {
+      { title: '进度', render: (_, row) => { const value = review.detailProgress?.find(item => item.id === row.id); return <Button type="link" onClick={() => setProgressDetailId(row.id)}>{value?.previousProgress ?? 0}% → {value?.currentProgress ?? 0}%</Button>; } },
+      { title: '更改进度', key: 'self', render: (_: unknown, row: { id: string; name: string; assigneeIds?: string[] }) => {
+        if (!(review.detailRows?.length ? row.assigneeIds?.includes(viewerId || '') : selfAssigned)) return '——';
         const contribution = review.contributors?.find(item => item.authorId === viewerId && item.detailId === row.id);
         const value = review.supervisorProgress?.find(item => item.id === row.id)?.currentProgress ?? contribution?.currentProgress ?? 0;
-        return <ReviewProgressCell label={`${viewerName || contribution?.authorName || '主管'}进度：${row.name}`} previous={contribution?.previousProgress ?? 0} value={value} disabled={busy || !editable || supportLoading || Boolean(supportError)} onChange={next => onUpdate({ supervisorProgress: [...(review.supervisorProgress || []).filter(item => item.id !== row.id), { id: row.id, currentProgress: next }] })}/>;
-      } }] : []),
+        return <ReviewProgressCell label={`${viewerName || '主管'}进度：${row.name}`} previous={contribution?.previousProgress ?? 0} value={value} disabled={busy || !editable || supportLoading || Boolean(supportError)} onChange={next => onUpdate({ supervisorProgress: [...(review.supervisorProgress || []).filter(item => item.id !== row.id), { id: row.id, currentProgress: next }] })}/>;
+      } },
     ]}/>
+    <Modal open={Boolean(progressDetailId)} title="本期员工进度更新" onCancel={() => setProgressDetailId(undefined)} footer={<Button onClick={() => setProgressDetailId(undefined)}>关闭</Button>}>
+      <Table size="small" pagination={false} rowKey="authorId" dataSource={(review.contributors || []).filter(row => row.detailId === progressDetailId && row.authorId !== viewerId && row.submitted)} columns={[{title:'员工姓名',dataIndex:'authorName'},{title:'复盘前进度',render:(_,row)=>`${row.previousProgress}%`},{title:'复盘后进度',render:(_,row)=>`${row.currentProgress}%`}]} locale={{emptyText:<Empty description="本期暂无已提交更新"/>}}/>
+    </Modal>
     <div className="okr-supervisor-support-divider" aria-hidden="true"/>
     <div className="okr-supervisor-support-panels space-y-4">
-      <Collapse defaultActiveKey={['employees']} expandIconPosition="end" items={[{
+      <Collapse defaultActiveKey={[]} expandIconPosition="end" items={[{
         key: 'employees', label: <div className="okr-supervisor-panel-title"><strong>员工复盘支撑</strong><span>{count(groups.size)}人相关 · {count(pending)}份待查看</span></div>,
         children: error || <Spin spinning={supportLoading}>{groups.size ? <div className="okr-supervisor-employee-list">{[...groups.values()].map(group => {
           const reports = sourceReports.filter(report => report.authorId === group.authorId);
@@ -68,7 +70,7 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
               const health = saved?.executionHealth;
               const Icon = health === '超预期' ? CheckCircleIcon : health === '正常' ? CircleIcon : health === '风险' ? AlertIcon : ClockIcon;
               const color = health === '超预期' ? 'var(--success)' : health === '风险' ? 'var(--warning)' : health === '逾期' ? 'var(--danger)' : 'var(--text-muted)';
-              return <div key={`${action.objectiveId}:${action.id}`} className="flex flex-wrap items-center gap-2"><p className="break-words text-[var(--text-muted)]">个人动作：{action.title} · 当前进度{saved?.currentProgress ?? action.progress}%</p><span className="inline-flex items-center gap-1" style={{ color }}><Icon/>{health || '状态未记录'}</span></div>;
+              return <div key={`${action.objectiveId}:${action.id}`} className="flex flex-wrap items-center gap-2"><p className="break-words text-[var(--text-muted)]">个人动作：{action.title}</p><span className="inline-flex items-center gap-1" style={{ color }}><Icon/>{health || '状态未记录'}</span></div>;
             })}</div>
             <div className="flex shrink-0 flex-wrap items-center gap-2"><Tag color={!reports.length ? 'default' : unread ? 'warning' : 'success'}>{!reports.length ? '未提交' : unread ? '待查看' : '已查看'}</Tag><Button type="link" disabled={busy || !reports.length || supportLoading} onClick={() => onEmployeeSupport(group.authorId, reports.map(report => report.id))}>查看本期复盘</Button></div>
           </article>;

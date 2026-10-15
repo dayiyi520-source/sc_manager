@@ -5,13 +5,13 @@ export interface OkrPerson { goalRole?: 'supervisor' | 'employee'; id: string; n
 export interface GoalTiming { deadline?: string; plannedDeadline?: string; forecastDeadline?: string; actualStartedAt?: string; actualCompletedAt?: string; delayReason?: string; delayResponsibility?: 'self' | 'dependency' | 'company'; }
 export interface OkrExecutionAction extends GoalTiming { weight?: number; id: string; title: string; ownerId: string; progress: number; }
 export interface OkrGoalChange { previousPayload?: OkrPayload; id: string; status: 'pending' | 'approved' | 'returned'; purpose?: 'initial' | 'update' | 'alignment' | 'delete'; reason: string; reviewerId: string; payload: OkrPayload; baseVersion: number; requestedAt: string; feedback?: string; reviewedAt?: string; }
-export interface OkrKrDetail { productLineId?: string; progress?: number; id: string; name: string; version?: string; stage?: string; currentStage?: string; targetStage?: string; plannedStartDate?: string; plannedEndDate?: string; }
+export interface OkrKrDetail { assigneeIds?: string[]; productLineId?: string; progress?: number; id: string; name: string; version?: string; stage?: string; currentStage?: string; targetStage?: string; plannedStartDate?: string; plannedEndDate?: string; }
 export interface OkrKr extends GoalTiming { details?: OkrKrDetail[]; structureType?: 'product' | 'delivery' | 'support'; executionActions?: OkrExecutionAction[]; confidence?: number; currentValue?: number; targetValue?: number; id: string; title: string; weight: number; progress: number; deadline?: string; assigneeIds?: string[]; businessObject?: string; version?: string; stage?: string; action?: string; result?: string }
 export interface OkrAlignment { parentObjectiveId: string; parentKeyResultId?: string }
 export interface OkrReviewItem { sourceLabel?:string; actualHours?:number; workId: string; title: string; status: string; workType?: 'task' | 'ticket'; objectiveId?: string; keyResultId?: string; affectedObjectiveId?: string; affectedKeyResultId?: string; result: string; impact: string; included?: boolean; sourceWorkOrderIds?: string }
 export interface OkrKrReview { supervisorProgress?: Array<{ id: string; currentProgress: number }>; executionHealth?: '超预期' | '正常' | '风险' | '逾期'; detailRows?: OkrKrDetail[]; contributors?: Array<{ authorId: string; authorName: string; detailId: string; previousProgress: number; currentProgress: number; submitted: boolean }>; detailProgress?: Array<{ id:string; previousProgress:number; currentProgress:number }>; viewedEmployeeReviewIds?:string[]; supervisorJudgment?:string; employeeReviewSnapshots?:OkrWeeklyReviewSnapshot[]; objectiveId:string; objectiveTitle:string; keyResultId:string; keyResultTitle:string; previousProgress:number; currentProgress:number; health:'normal'|'risk'|'blocked'; achievement:string; blocker:string; nextPlan:string; evidenceNote?:string; workIds:string[] }
 export interface OkrReviewAssistance { workId?:string; status?:string; subject:string; result:string; assistanceType?:string; expectedAssignee?:string; content?:string; expectedDueDate?:string }
-export interface OkrReviewKnowledge { id:string; title:string; category:string; subCategory?:string; tags?:string[]; version?:string; summary?:string; content?:string; fileType?:string; linkUrl?:string; dingtalkUrl?:string; wecomUrl?:string }
+export interface OkrReviewKnowledge { attachments?: import('./knowledgeAttachments').KnowledgeAttachment[]; id:string; title:string; category:string; subCategory?:string; tags?:string[]; version?:string; summary?:string; content?:string; fileType?:string; linkUrl?:string; dingtalkUrl?:string; wecomUrl?:string }
 export interface OkrExtraWork { workIds:string[]; description:string; impact:string; notes?:Record<string,string> }
 export interface OkrMonthlyTask { id:string; content:string; result:string; status:string; sourceReviewId?:string; workId?:string }
 export interface OkrMonthlyPlan { id:string; content:string; objectiveId?:string; keyResultId?:string; plannedDate?:string }
@@ -23,6 +23,8 @@ export interface OkrWeeklyReviewSnapshot {
 export interface DepartmentReviewExclusion { employeeId: string; employeeName?: string; reason: string }
 export interface DepartmentReviewFeedback { employeeId: string; employeeName: string; reviewId: string; suggestion: string; judgment?: '已内部解决' | '需公司解决' }
 export interface OkrPayload extends GoalTiming {
+  reviewTemplateSnapshot?: import('./reviewTemplateConfiguration').ReviewReportTemplate | null;
+  reviewTemplateValues?: import('./reviewTemplateConfiguration').ReviewTemplateValues;
   departmentReviewExclusions?: DepartmentReviewExclusion[];
   departmentFeedbackRows?: DepartmentReviewFeedback[];
   departmentObjectiveVersions?: Record<string, number>;
@@ -83,10 +85,10 @@ export interface OkrConfirmationSettings { enabled: boolean; visiblePending: boo
 export type OkrTemplateKrType = 'product' | 'delivery' | 'support';
 export interface OkrObjectiveTitleTemplate { krTypes?: OkrTemplateKrType[]; id: string; department: string; title: string; guidance: string; enabled: boolean }
 export interface OkrWeeklyReviewCycle {
-  id: string; month: string; startDate: string; endDate: string;
-  template: 'byRole' | 'employee' | 'supervisor'; notifyAt: string; deadline: string; allowBackfill: boolean;
+  id: string; title?: string; month: string; startDate: string; endDate: string;
+  template?: 'byRole' | 'employee' | 'supervisor'; notifyAt: string; deadline: string; allowBackfill: boolean;
 }
-export interface OkrSettings { weeklyReviewCycles?: OkrWeeklyReviewCycle[]; supervisorIds?: string[]; objectiveTitleTemplates?: OkrObjectiveTitleTemplate[]; cycles?: OkrCycleSettings; administratorIds?: string[]; confirmation?: OkrConfirmationSettings; version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
+export interface OkrSettings { reviewReportTemplates?: import('./reviewTemplateConfiguration').ReviewReportTemplate[]; weeklyReviewCycles?: OkrWeeklyReviewCycle[]; supervisorIds?: string[]; objectiveTitleTemplates?: OkrObjectiveTitleTemplate[]; cycles?: OkrCycleSettings; administratorIds?: string[]; confirmation?: OkrConfirmationSettings; version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
 const base = '/api/okr';
 export const okrRepository = {
   markViewed: (id: string, viewerId: string) => apiRequest<void>(`${base}/records/${encodeURIComponent(id)}/viewed`, { method: 'POST', body: JSON.stringify({ viewerId }) }),

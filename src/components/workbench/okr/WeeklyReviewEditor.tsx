@@ -1,3 +1,6 @@
+import { KnowledgeAttachments } from '../KnowledgeAttachments';
+import { ReviewTemplateLayout, reviewBlockTitle, ReviewTemplateSection, useReviewTemplateFields } from './ReviewTemplateFields';
+import type { OkrSettings } from '../../../services/okrRepository';
 import { departmentSubmissionErrors, departmentMonthlyFeedback } from '../../../services/departmentReviewSubmission';
 import { DepartmentReviewSettings } from './DepartmentReviewSettings';
 import { DepartmentFeedbackTable } from './DepartmentFeedbackTable';
@@ -98,6 +101,7 @@ const NO_RECORDS: OkrRecord[] = [];
 const NO_PEOPLE: OkrPerson[] = [];
 
 interface WeeklyReviewEditorProps {
+  reviewSettings?: OkrSettings;
   template?: 'employee' | 'supervisor';
   reviewType?: 'week' | 'month';
   overview?: React.ReactNode;
@@ -127,7 +131,7 @@ interface WeeklyReviewEditorProps {
 }
 
 export function WeeklyReviewEditor({
-  reviewType = 'week', overview, template = 'employee', records = NO_RECORDS, people = NO_PEOPLE, recordsLoading = false, recordsError, onRefreshRecords,
+  reviewSettings, reviewType = 'week', overview, template = 'employee', records = NO_RECORDS, people = NO_PEOPLE, recordsLoading = false, recordsError, onRefreshRecords,
   okrs,
   work,
   busy,
@@ -149,6 +153,7 @@ export function WeeklyReviewEditor({
   const period = useMemo(() => periodOverride || reviewPeriod('week'), [periodOverride]);
   const editorState = reviewEditorState(recordStatus);
   const readOnly = !editorState.editable;
+  const reportTemplate = useReviewTemplateFields(reviewSettings, initialPayload, viewer?.department || '', template, reviewType, period.startDate);
   const periodOkrs = useMemo(() => {
     if (!readOnly) return okrs.filter(objective => objective.cycle === period.startDate.slice(0, 7) || objective.cycle === period.endDate.slice(0, 7));
     const snapshots: OKRItem[] = [];
@@ -336,7 +341,7 @@ export function WeeklyReviewEditor({
   );
 
   const requestSubmit = () => {
-    const errors: string[] = [];
+    const errors: string[] = reportTemplate.errors();
     if (!directSubmit && !reviewerName) {
       errors.push('尚未配置直属上级，无法确定审批人');
     }
@@ -346,14 +351,15 @@ export function WeeklyReviewEditor({
   };
 
   const payload = (): OkrPayload => ({
+    ...reportTemplate.payload,
     title: monthly ? `${start.year()}年第${start.month() + 1}月 部门月报-${viewer?.department || '部门未设置'}` : supervisor ? `${cycleTitle}—${viewer?.department || '部门未设置'}` : reviewTitle,
     startDate: period.startDate,
     endDate: period.endDate,
     reviewType,
     reviewMode: supervisor ? 'supervisor' : 'structured',
     selfScore,
-    summary: supervisor ? departmentSummary.trim() : initialPayload?.summary || '',
-    nextWeekPlan: monthly ? undefined : nextWeekPlan.trim(),
+    summary: supervisor ? reportTemplate.textValue('departmentSummary', departmentSummary).trim() : initialPayload?.summary || '',
+    nextWeekPlan: monthly ? undefined : reportTemplate.textValue('nextWeekPlan', nextWeekPlan).trim(),
     suggestions: initialPayload?.suggestions,
     ...(supervisor ? { departmentReviewExclusions: exclusions, ...(monthly ? { departmentFeedbackRows: feedbackRows } : {}) } : {}),
     syncKrProgress: supervisor,
@@ -534,11 +540,12 @@ export function WeeklyReviewEditor({
       )}
 
       {/* ▌ 1. 本月目标复盘 */}
-      <section className="okr-weekly-section">
+      <ReviewTemplateLayout template={reportTemplate.snapshot} values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}>
+      <section data-review-block="goals" className="okr-weekly-section">
         <div className="okr-weekly-section-header">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-            <span>{supervisor ? '1. 部门月目标复盘' : '1. 本月目标复盘'}</span>
+            <span>{reviewBlockTitle(reportTemplate.snapshot, 'goals', supervisor ? '1. 部门月目标复盘' : '1. 本月目标复盘')}</span>
           </div>
 
         </div>
@@ -660,14 +667,15 @@ export function WeeklyReviewEditor({
             />
           ))
         )}
+      <ReviewTemplateSection template={reportTemplate.snapshot} blockId="goals" values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}/>
       </section>
 
       {/* ▌ 2. 插播任务 */}
-      <section className="okr-weekly-section">
+      <section data-review-block="extra" className="okr-weekly-section">
         <div className="okr-weekly-section-header">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-            <span>2. 插播任务</span>
+            <span>{reviewBlockTitle(reportTemplate.snapshot, 'extra', '2. 插播任务')}</span>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -724,23 +732,24 @@ export function WeeklyReviewEditor({
             <Empty description="暂无插播任务" />
           )}
         </div>
+      <ReviewTemplateSection template={reportTemplate.snapshot} blockId="extra" values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}/>
       </section>
 
-      {supervisor && <section className="okr-weekly-section" aria-label={monthly ? '本月部门补充总结' : '部门补充总结'}>
+      {supervisor && !reportTemplate.hasBlock('departmentSummary') && <section className="okr-weekly-section" aria-label={monthly ? '本月部门补充总结' : '部门补充总结'}>
         <div className="okr-weekly-section-header okr-weekly-section-header-title text-sm font-semibold text-[var(--text-primary)]"><span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" aria-hidden="true"/><span>{monthly ? '3. 本月部门补充总结' : '3. 部门补充总结'}</span></div>
         <Input.TextArea className="okr-weekly-plan-input" aria-label={monthly ? '本月部门补充总结' : '部门补充总结'} value={departmentSummary} onChange={event => setDepartmentSummary(event.target.value)} rows={4} maxLength={10000} showCount placeholder={monthly ? '补充部门本月整体成果、问题与经验' : '补充部门本周整体成果、问题与经验'} disabled={busy || !editorState.editable}/>
       </section>}
 
-      <section className="okr-weekly-section" aria-label={monthly ? '部门反馈问题梳理与分析' : supervisor ? '部门下周计划' : '下周计划'}>
+      {(monthly || !reportTemplate.hasBlock('nextWeekPlan')) && <section className="okr-weekly-section" aria-label={monthly ? '部门反馈问题梳理与分析' : supervisor ? '部门下周计划' : '下周计划'}>
         <div className="okr-weekly-section-header okr-weekly-section-header-title text-sm font-semibold text-[var(--text-primary)]"><span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" aria-hidden="true"/><span>{monthly ? '4. 部门反馈问题梳理与分析' : supervisor ? '4. 部门下周计划' : '3. 下周计划'}</span></div>
         {monthly ? <><DepartmentFeedbackTable rows={feedbackRows} disabled={busy || readOnly || recordsLoading || Boolean(recordsError)} loading={recordsLoading} onChange={row => setFeedbackJudgments(current => [...current.filter(item => item.reviewId !== row.reviewId), row])}/>{readOnly && !feedbackRows.length && initialPayload?.suggestions && <p className="whitespace-pre-wrap break-words">{initialPayload.suggestions}</p>}</> : <Input.TextArea className="okr-weekly-plan-input" aria-label={supervisor ? '部门下周计划' : '下周计划'} value={nextWeekPlan} onChange={event => setNextWeekPlan(event.target.value)} rows={4} maxLength={10000} showCount placeholder="填写下周重点工作、预期结果与关键节点" disabled={busy || !editorState.editable}/>}
-      </section>
+      </section>}
 
-      <section className="okr-weekly-section" aria-label="需要协助事项">
+      <section data-review-block="assistance" className="okr-weekly-section" aria-label="需要协助事项">
         <div className="okr-weekly-section-header">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-            <span>{supervisor ? '5. 需要协助的事项' : '4. 需要协助事项'}</span>
+            <span>{reviewBlockTitle(reportTemplate.snapshot, 'assistance', supervisor ? '5. 需要协助的事项' : '4. 需要协助事项')}</span>
           </div>
           <Dropdown trigger={['click']} disabled={busy || !editorState.editable} menu={{
             items: assistanceTypes.map(type => ({ key: type, label: workOrderDisplayName(type) })),
@@ -758,13 +767,14 @@ export function WeeklyReviewEditor({
             ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || viewer?.name || '主管本人' }] : []),
           ].filter(column => !supervisor || column.title !== '删除操作')}/> : <Empty description="暂无需要协助事项"/>}
         </div>
+      <ReviewTemplateSection template={reportTemplate.snapshot} blockId="assistance" values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}/>
       </section>
 
-      <section className="okr-weekly-section" aria-label="知识沉淀">
+      <section data-review-block="knowledge" className="okr-weekly-section" aria-label="知识沉淀">
         <div className="okr-weekly-section-header">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
             <span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />
-            <span>{supervisor ? '6. 知识沉淀' : '5. 知识沉淀'}</span>
+            <span>{reviewBlockTitle(reportTemplate.snapshot, 'knowledge', supervisor ? '6. 知识沉淀' : '5. 知识沉淀')}</span>
           </div>
           <Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setKnowledgeOpen(true)}>新建知识沉淀</Button>
         </div>
@@ -772,15 +782,18 @@ export function WeeklyReviewEditor({
         {displayedKnowledge.length > 0 ? <Table size="small" rowKey="id" pagination={false} dataSource={displayedKnowledge}
           locale={{ emptyText: <Empty description="暂无知识沉淀" /> }} columns={[
             { title: '标题', ellipsis: true, render: (_, row) => <Button type="link" onClick={() => setViewingKnowledge(row)}>{row.title}</Button> },
-            { title: '分类', dataIndex: 'category' },
             { title: '内容摘要', dataIndex: 'summary', ellipsis: true },
+            { title: '链接地址', render: (_, row) => row.linkUrl ? <a href={/^https?:\/\//i.test(row.linkUrl) ? row.linkUrl : undefined} target="_blank" rel="noreferrer">{row.linkUrl}</a> : '——' },
+            { title: '附件', render: (_, row) => <KnowledgeAttachments attachments={row.attachments}/> },
             { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
             ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || viewer?.name || '主管本人' }] : []),
           ].filter(column => !supervisor || column.title !== '删除操作')}/> : <Empty description="暂无知识沉淀"/>}
         </div>
+      <ReviewTemplateSection template={reportTemplate.snapshot} blockId="knowledge" values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}/>
       </section>
+      </ReviewTemplateLayout>
       {viewingKnowledge && <Modal open title={viewingKnowledge.title} onCancel={() => setViewingKnowledge(null)} footer={<Button aria-label="关闭知识详情" onClick={() => setViewingKnowledge(null)}>关闭</Button>}>
-        <p>{viewingKnowledge.category} · {viewingKnowledge.subCategory} · {viewingKnowledge.version}</p>
+        <KnowledgeAttachments attachments={viewingKnowledge.attachments}/>
         <p className="whitespace-pre-wrap break-words">{viewingKnowledge.summary}</p>
         <p className="whitespace-pre-wrap break-words">{viewingKnowledge.content || '暂无正文'}</p>
         <p className="break-words">{viewingKnowledge.tags?.join('、')}</p>

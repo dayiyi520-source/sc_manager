@@ -1,6 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { apiRequest } from './apiClient'
+import { apiRequest, resolveMockMode } from './apiClient'
+
+describe('resolveMockMode', () => {
+  it('defaults to mock data only during local development', () => {
+    expect(resolveMockMode({ DEV: true })).toBe(true)
+    expect(resolveMockMode({ DEV: false })).toBe(false)
+    expect(resolveMockMode({ DEV: true, MODE: 'test' })).toBe(false)
+  })
+
+  it('honors an explicit deployment override', () => {
+    expect(resolveMockMode({ DEV: false, VITE_MOCK_MODE: 'true' })).toBe(true)
+    expect(resolveMockMode({ DEV: true, VITE_MOCK_MODE: 'false' })).toBe(false)
+  })
+})
 
 describe('apiRequest timeout handling', () => {
   beforeEach(() => {

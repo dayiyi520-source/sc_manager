@@ -21,7 +21,7 @@ export function DepartmentReviewSettings({ payload, records, people, ownerId, di
   const person = people.find(row => row.id === reading?.ownerId);
   const report: PerformanceReview | undefined = reading ? {
     ...reading.payload, id: reading.id, type: reading.payload.reviewType || 'week', cycleName: reading.payload.title,
-    author: person?.name || '人员已停用', authorDept: person?.department || '', summary: reading.payload.summary || '',
+    authorId: reading.ownerId, author: person?.name || '人员已停用', authorDept: person?.department || '', summary: reading.payload.summary || '',
     selfScore: reading.payload.selfScore || 0, suggestions: reading.payload.suggestions || '', uncompletedReason: reading.payload.uncompletedReason || '',
     helpNeeded: reading.payload.helpNeeded || '', sendTo: reading.payload.sendTo || [], createdAt: reading.createdAt || '', status: reading.status as PerformanceReview['status'],
     linkedWorkItems: reading.payload.items?.map(item => ({ id: item.workId, title: item.title, type: item.workType || 'task', status: item.status })),

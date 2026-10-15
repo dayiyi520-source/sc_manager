@@ -1,3 +1,4 @@
+import { assignedDetailRows } from './okrAssignments';
 import { krDetailContentComplete, krDetailsError, krDetails } from './okrKrDetails';
 import { goalLevel } from './okrGoalRules';
 import type { OkrKr, OkrPayload, OkrPerson, OkrRecord, GoalTiming } from './okrRepository';
@@ -32,7 +33,7 @@ export function inheritedGoalPayload(reference: OkrRecord, person: OkrPerson): O
     sourceKrId: reference.payload.sourceKrId || reference.id, sourceVersion: reference.version,
     alignments: [{ parentObjectiveId: reference.payload.sourceObjectiveId || reference.payload.parentObjectiveId || '', parentKeyResultId: reference.id }],
     weight: 100, deadline: reference.payload.deadline,
-    keyResults: personal ? [{ ...(reference.payload.sourceKrData || reference.payload), id: reference.id, title: reference.payload.title, weight: 100, progress: 0, version: reference.payload.sourceKrData?.version, assigneeIds: [person.id], executionActions: [] } as OkrKr] : [],
+    keyResults: personal ? [{ ...(reference.payload.sourceKrData || reference.payload), id: reference.id, title: reference.payload.title, weight: 100, progress: 0, version: reference.payload.sourceKrData?.version, details: assignedDetailRows(reference.payload.sourceKrData || { id: reference.id, title: reference.payload.title, weight: reference.payload.weight ?? 100, progress: reference.payload.progress ?? 0, assigneeIds: reference.payload.assigneeIds }, person.id), assigneeIds: [person.id], executionActions: [] } as OkrKr] : [],
   };
 }
 export function goalsWithAssignments(records: OkrRecord[], _person?: OkrPerson): OkrRecord[] {

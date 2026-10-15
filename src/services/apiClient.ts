@@ -3,7 +3,12 @@ import { mockApiRequest } from './mockApi'
 export interface ApiResponse<T> { code: string; message: string; data: T; requestId: string }
 export interface PageResult<T> { items: T[]; page: number; pageSize: number; total: number; groups?: Array<{ label: string; count: number }> }
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-const MOCK_MODE = import.meta.env.VITE_MOCK_MODE !== 'false'
+export function resolveMockMode(env: { DEV?: boolean; MODE?: string; VITE_MOCK_MODE?: string }) {
+  if (env.VITE_MOCK_MODE !== undefined) return env.VITE_MOCK_MODE === 'true'
+  if (env.MODE === 'test') return false
+  return env.DEV === true
+}
+const MOCK_MODE = resolveMockMode(import.meta.env)
 export class ApiError extends Error { constructor(public status: number, public code: string, message: string) { super(message) } }
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (MOCK_MODE) return mockApiRequest(path, init) as Promise<T>

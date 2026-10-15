@@ -16,6 +16,7 @@ import type { ActionGroupValues } from './ActionBreakdownForm';
 export type MyTargetViewMode = 'list' | 'card';
 
 export type MyTargetActionViewItem = {
+  assigneeOptions?: Array<{ value: string; label: string }>;
   details?: OkrKrDetail[]; detailLabel?: string;
   label?: string; executionActions?: Array<{ id: string; title: string; progress: number; weight?: number; deadline?: string }>;
   id: string;
@@ -30,6 +31,7 @@ export type MyTargetActionViewItem = {
 export type MyTargetViewItem = {
   id: string;
   primaryLabel?: 'KR';
+  assigneeOptions?: Array<{ value: string; label: string }>;
   primaryDetails?: OkrKrDetail[];
   primaryDetailLabel?: string;
   detailId?: string;
@@ -147,6 +149,7 @@ export const buildMyTargetViewItems = (
     const assignedPersonal = isAssignedPersonalGoal(record);
     const displayActions = ownPersonal ? (record.payload.keyResults || []).flatMap(kr => (kr.executionActions || []).filter(action => action.ownerId === record.ownerId)) : record.payload.keyResults || [];
     const actions: MyTargetActionViewItem[] = displayActions.map(action => ({
+      assigneeOptions: people.map(person => ({ value: person.id, label: person.name })),
       details: 'details' in action ? action.details : undefined, detailLabel: 'structureType' in action && action.structureType === 'delivery' ? '项目产品' : '迭代版本',
       label: ownPersonal ? 'A' : 'KR', executionActions: 'executionActions' in action ? action.executionActions?.filter(item => item.ownerId === record.ownerId) : undefined,
       id: action.id,
@@ -157,15 +160,19 @@ export const buildMyTargetViewItems = (
       deadline: action.deadline || '',
       alignments: ownPersonal ? [] : alignmentsFor(action.id, record.periodKey, record.ownerId, record.id),
     }));
-    const sourceId = record.payload.parentObjectiveId || record.payload.alignments?.[0]?.parentObjectiveId;
+    const sourceId = record.payload.sourceObjectiveId || record.payload.parentObjectiveId || record.payload.alignments?.[0]?.parentObjectiveId;
     const recordOwner = people.find(person => person.id === record.ownerId);
     const source = sourceId ? [...sourceActions, ...records].find(item => item.id === sourceId) : undefined;
+    const sourceKr = source?.payload.keyResults?.find(kr => kr.id === record.payload.sourceKrId);
+    const primaryKr = sourceKr || record.payload.keyResults?.[0];
+    const sourceAssignees = sourceKr ? sourceKr.details?.some(row => row.assigneeIds !== undefined) ? sourceKr.details.flatMap(row => row.assigneeIds || []) : sourceKr.assigneeIds : undefined;
     const sourceOwner = nameOf(source?.ownerId || recordOwner?.supervisorId);
     return {
       id: record.id,
       primaryLabel: assignedPersonal ? 'KR' as const : undefined,
-      primaryDetails: assignedPersonal ? krDetails(record.payload.keyResults?.[0] || { id: '', title: '', weight: 100, progress: 0 }) : undefined,
-      primaryDetailLabel: record.payload.keyResults?.[0]?.structureType === 'delivery' ? '项目产品' : '迭代版本',
+      assigneeOptions: people.map(person => ({ value: person.id, label: person.name })),
+      primaryDetails: assignedPersonal ? krDetails(primaryKr || { id: '', title: '', weight: 100, progress: 0 }) : undefined,
+      primaryDetailLabel: primaryKr?.structureType === 'delivery' ? '项目产品' : '迭代版本',
       objectiveWeight: record.payload.weight ?? 100, initialPending: record.changeRequest?.purpose === 'initial' && record.changeRequest.status !== 'approved',
       detailId: record.id,
       alignmentLabel: goalSourceLabel(record, allRecords, people) || `${periodLabel(record.periodKey)}目标`,
@@ -174,7 +181,7 @@ export const buildMyTargetViewItems = (
       title: record.payload.title,
       status: record.status, awaitingApproval: record.changeRequest?.status === 'pending', changePurpose: record.changeRequest?.purpose, autonomous: record.payload.origin === 'autonomous',
       sourceName: sourceOwner ? `来源自上级 · ${sourceOwner}` : undefined,
-      ownerNames: namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
+      ownerNames: assignedPersonal && sourceKr ? namesOf(sourceAssignees) : namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])).length ? namesOf((record.payload.keyResults || []).flatMap(action => action.assigneeIds || [])) : namesOf([record.ownerId]),
       creatorName: ownerNameOf(record.ownerId),
       department: recordOwner?.department,
       levelLabel: ownerGoalLevel(recordOwner, record.payload),
@@ -262,7 +269,7 @@ const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submi
       <span>{action.weight}%</span>
       <time className={overdue ? 'is-overdue' : ''}>{formatDeadline(action.deadline)}</time>
     </>}
-    {!compact && !!action.details?.length && <KrDetailTable rows={action.details} label={action.detailLabel || '迭代版本'} mode={action.detailLabel === '项目产品' ? 'delivery' : 'product'}/>}
+    {!compact && !!action.details?.length && <KrDetailTable assigneeOptions={action.assigneeOptions} rows={action.details} label={action.detailLabel || '迭代版本'} mode={action.detailLabel === '项目产品' ? 'delivery' : 'product'}/>}
     {!compact && showExecutionActions && !!action.executionActions?.length && <div className="okr-target-execution-actions">{action.executionActions.map((item, i) => <ActionRow key={item.id} action={{ ...item, weight: item.weight ?? 0, deadline: item.deadline || '', assigneeNames: [], label: 'A' }} index={i} submitted={submitted} inlineAssignees onProgress={onProgress}/>)}</div>}
   </div>;
 };
@@ -293,7 +300,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
         <div className="okr-target-list-status"><div><span>进度</span><strong>{target.progress}%</strong></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></div>
       </div>
     </header>
-    <div className="okr-target-actions">{!!target.primaryDetails?.length && <KrDetailTable rows={target.primaryDetails} label={target.primaryDetailLabel || '迭代版本'} mode={target.primaryDetailLabel === '项目产品' ? 'delivery' : 'product'}/>} {target.actions.length
+    <div className="okr-target-actions">{!!target.primaryDetails?.length && <KrDetailTable assigneeOptions={target.assigneeOptions} rows={target.primaryDetails} label={target.primaryDetailLabel || '迭代版本'} mode={target.primaryDetailLabel === '项目产品' ? 'delivery' : 'product'}/>} {target.actions.length
       ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees onProgress={onProgress} onOpenAlignment={onOpenAlignment} showExecutionActions={target.levelLabel !== '主管级'} />)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>

@@ -12,8 +12,8 @@ export function hasProgressAlignment(record: OkrRecord, itemId: string, records:
   return records.some(child => child.id !== record.id && child.status !== 'deleted' && child.status !== 'draft' && !(child.changeRequest?.purpose === 'initial' && child.changeRequest.status !== 'approved') && (child.payload.sourceObjectiveId === record.id && (!child.payload.sourceKrId || child.payload.sourceKrId === itemId) || child.payload.alignments?.some(link => link.parentObjectiveId === record.id && (!link.parentKeyResultId || link.parentKeyResultId === itemId)) || child.payload.parentActionId === itemId || child.payload.parentKeyResultId === itemId));
 }
 export function canUpdateProgress(record: OkrRecord, itemId: string, viewerId: string, records: OkrRecord[]) {
-  const subject = progressSubject(record, itemId);
-  return !!subject && ['active', 'reviewed'].includes(record.status) && !(record.changeRequest?.status === 'pending') && subject.ownerId === viewerId && (subject.isAction || !hasProgressAlignment(record, itemId, records));
+  void record; void itemId; void viewerId; void records;
+  return false;
 }
 export function applyProgress(record: OkrRecord, entry: OkrProgressEntry): OkrRecord {
   const weighted = (rows: Array<{ progress: number; weight?: number }>) => {

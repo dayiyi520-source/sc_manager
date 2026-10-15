@@ -120,3 +120,32 @@ it('locks duplicate submissions until the batch save finishes', async () => {
   await act(async () => { resolveSave(true); });
   await waitFor(() => expect(screen.getByRole('button', { name: '编辑原目标' })).toBeEnabled());
 });
+
+it('persists weekly cycles immediately, keeps the tab and preserves input on failure', async () => {
+  const onSave = vi.fn(async (_settings: OkrSettings) => false);
+  render(<OkrSettingsView settings={settings} onSave={onSave}/>);
+  fireEvent.click(screen.getByRole('button', { name: '周报周期配置' }));
+  expect(screen.queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '增加周期' }));
+  fireEvent.change(screen.getByLabelText('周期标题'), { target: { value: '新增周期' } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^确\s*认$/ })); });
+  expect(onSave).toHaveBeenCalledOnce();
+  expect(onSave.mock.calls[0][0].weeklyReviewCycles?.[0].title).toBe('新增周期');
+  expect(screen.getByLabelText('周期标题')).toHaveValue('新增周期');
+  await waitFor(() => expect(screen.getByText('保存失败，请重试，当前内容已保留')).toBeInTheDocument());
+  onSave.mockResolvedValue(true);
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^确\s*认$/ })); });
+  await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.getByRole('cell', { name: '新增周期' })).toBeVisible());
+});
+it('persists role removal directly without saving unrelated draft fields', async () => {
+  const people = [{ id: 'a', name: '甲', department: '研发', rootFlag: 1, supervisorId: null, version: 0 }, { id: 's', name: '乙', department: '研发', rootFlag: 0, supervisorId: 'a', version: 0 }];
+  const onSave = vi.fn(async (_settings: OkrSettings) => true);
+  render(<OkrSettingsView settings={{ ...settings, administratorIds: ['a'], supervisorIds: ['s'] }} people={people} onSave={onSave}/>);
+  fireEvent.click(screen.getByRole('button', { name: '角色设置' }));
+  expect(screen.queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument();
+  await act(async () => { fireEvent.click(within(screen.getByText('乙').closest('tr')!).getByRole('button', { name: '移除' })); });
+  expect(onSave).toHaveBeenCalledOnce();
+  expect(onSave.mock.calls[0][0]).toMatchObject({ administratorIds: ['a'], supervisorIds: [] });
+  expect(screen.queryByText('乙')).not.toBeInTheDocument();
+});

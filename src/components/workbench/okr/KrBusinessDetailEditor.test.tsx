@@ -48,7 +48,7 @@ describe('KR parent and multi-child selection', () => {
   });
   it('clears dependent choices on parent switch and explains missing child data', () => {
     render(<KrBusinessDetailEditor mode="delivery" rows={[first]} parentOptions={['甲', '乙']} childOptions={{ 甲: ['V1'] }} stages={[]} disabled={false} onChange={vi.fn()}/>);
-    fireEvent.click(screen.getByRole('button', { name: '甲 选择产品' }));
+    fireEvent.click(screen.getByRole('button', { name: '修改甲明细' }));
     fireEvent.mouseDown(screen.getByLabelText('关联项目'));
     fireEvent.click(screen.getByText('乙', { selector: '.ant-select-item-option-content' }));
     expect(screen.getByLabelText('关联项目产品')).toBeDisabled();
@@ -57,10 +57,10 @@ describe('KR parent and multi-child selection', () => {
   });
   it('keeps saved choices absent from the current catalog and disables read-only controls', () => {
     const { rerender } = render(<KrBusinessDetailEditor mode="product" rows={[first]} parentOptions={[]} childOptions={{}} stages={[]} disabled={false} onChange={vi.fn()}/>);
-    fireEvent.click(screen.getByRole('button', { name: '甲 选择版本' }));
+    fireEvent.click(screen.getByRole('button', { name: '修改甲明细' }));
     expect(screen.getByRole('button', { name: /^确\s*定$/ })).toBeEnabled();
     rerender(<KrBusinessDetailEditor mode="product" rows={[first]} parentOptions={[]} childOptions={{}} stages={[]} disabled onChange={vi.fn()}/>);
-    expect(screen.getByRole('button', { name: '甲 选择版本' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '甲 选择版本' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '修改甲明细' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '修改甲明细' })).toBeDisabled();
   });
 });

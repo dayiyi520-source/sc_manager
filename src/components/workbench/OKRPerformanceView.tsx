@@ -1,4 +1,4 @@
-import { weeklyCycleFor } from '../../services/weeklyReviewCycles';
+import { normalizeObjectiveTitleTemplates } from '../../services/okrObjectiveTitleTemplates';
 import { departmentObjectiveProgress } from '../../services/departmentObjectiveProgress';
 import { MyReviewCard } from './okr/MyReviewCard';
 import { otherDepartmentPeople, departmentName } from './okr/departmentScope';
@@ -181,9 +181,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   const companyLevel = level === '公司级';
   const reviewerName = me?.supervisorId ? people.find(person => person.id === me.supervisorId)?.name : undefined;
   const directReviewSubmit = Boolean(me?.rootFlag);
-  const configuredWeeklyTemplate = reviewType === 'week' ? weeklyCycleFor(settings, reviewPeriodOverride?.startDate, reviewPeriodOverride?.endDate)?.template : undefined;
-  const baseReviewTemplate = reviewTemplateFor(me, people);
-  const reviewTemplate = baseReviewTemplate === 'boss' ? baseReviewTemplate : configuredWeeklyTemplate && configuredWeeklyTemplate !== 'byRole' ? configuredWeeklyTemplate : baseReviewTemplate;
+  const reviewTemplate = reviewTemplateFor(me, people);
   const reviewRecordStatus = copiedReviewId ? undefined : records.find(record => record.id === reviewDraftId && record.kind === 'review' && record.ownerId === currentUser.id)?.status;
   const periods = cycleOptions(records, currentUser.id, undefined, settings);
   const cyclePaths = periods.flatMap(group => group.children.filter(child => selectedCycles.includes(child.value)).map(child => [group.value, child.value]));
@@ -346,16 +344,23 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   };
   const appendAutonomousGoal = () => {
     if (!me || !canAppendGoal()) return;
+    if (creationLevel === 'department') { addToast('info', '部门 O 已按模板初始化，请在现有 O 下添加关键结果'); return; }
     const id = crypto.randomUUID();
     setInitialObjectives(current => ({ ...current, [id]: companyLevel ? {title:''} : autonomousGoalPayload(me, level === '主管级' ? creationLevel : undefined) }));
     setObjectiveForms(current => [...current, id]);
   };
-  const openGoalCreation = (cycle: string, requestedLevel: 'personal' | 'department' = 'personal') => {
+  const openGoalCreation = (cycle: string, requestedLevel: 'personal' | 'department' = 'personal', sourceId?: string) => {
     if (!me || loading || error) return;
     setCreationLevel(requestedLevel);
     setTargetFormCycle(cycle); setScopeSelection({scope:level === '主管级' && requestedLevel === 'department' ? 'department' : 'my'}); setSelectedOkrRecordId(null); setEditingObjectiveId(null); setActionFormOpen(false); setSelectedMonthDetail(null);
     const pending = companyLevel || level === '主管级' && requestedLevel === 'personal' ? [] : assignedReferences(records, me).filter(reference => reference.periodKey === cycle && !records.some(record => record.ownerId === currentUser.id && record.periodKey === cycle && record.status !== 'deleted' && (record.payload.sourceKrId === reference.id || record.payload.parentActionId === reference.id || record.payload.parentKeyResultId === reference.id || record.payload.alignments?.some(link => link.parentKeyResultId === reference.id) || (record.changeRequest?.status === 'pending' && record.changeRequest.payload.sourceKrId === reference.id))));
-    const entries = pending.map(reference => ({ id: crypto.randomUUID(), payload: inheritedGoalPayload(reference, me) }));
+    const templates = normalizeObjectiveTitleTemplates(settings).filter(template => template.enabled && template.department.trim() === me.department.trim());
+    const departmentReferences = assignedReferences(records, me).filter(reference => reference.periodKey === cycle);
+    const selectedReferences = requestedLevel === 'department' ? departmentReferences.filter(reference => reference.id === (sourceId || departmentReferences[0]?.id)) : pending;
+    const entries = selectedReferences.flatMap<{ id: string; payload: OkrPayload }>(reference => requestedLevel === 'department' ? templates.filter(template => !records.some(record => record.status !== 'deleted' && record.ownerId === me.id && record.periodKey === cycle && record.payload.sourceKrId === reference.id && record.payload.objectiveTitleTemplateId === template.id)).map(template => ({ id: crypto.randomUUID(), payload: { ...inheritedGoalPayload(reference, me), inherited: false, title: template.title, objectiveType: 'target' as const, objectiveTitleTemplateId: template.id, objectiveTemplateKrTypes: template.krTypes, keyResults: [] } })) : [{ id: crypto.randomUUID(), payload: inheritedGoalPayload(reference, me) }]);
+    if (requestedLevel === 'department' && !templates.length) { addToast('warning', '请先配置本部门 O 标题模板'); return; }
+    if (!entries.length && requestedLevel === 'department' && selectedReferences.length) { addToast('info', '该公司 KR 的部门模板目标已创建，请编辑已有目标'); return; }
+    if (!entries.length && requestedLevel === 'department') templates.forEach(template => entries.push({ id: crypto.randomUUID(), payload: { ...autonomousGoalPayload(me, 'department'), title: template.title, objectiveType: 'target', objectiveTitleTemplateId: template.id, objectiveTemplateKrTypes: template.krTypes } }));
     if (!entries.length) entries.push({id:crypto.randomUUID(),payload: companyLevel ? { title: '' } : autonomousGoalPayload(me, level === '主管级' ? requestedLevel : undefined)});
     setInitialObjectives(current => ({ ...current, ...Object.fromEntries(entries.map(entry => [entry.id,entry.payload])) }));
     setObjectiveForms(entries.map(entry => entry.id));
@@ -619,6 +624,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
             <CompanyEditorShell company blocked={busy || !!objectiveBatchAction} onClose={() => setObjectiveForms([])}>
             <div className={`okr-objective-form-stack${objectiveBatchAction ? ' is-batching' : ''}`} aria-busy={objectiveBatchAction !== null}>
             <div className="okr-objective-period"><span>目标归属周期</span><Select aria-label="目标归属周期" className="company-objective-cycle-select" value={targetFormCycle} disabled={busy || objectiveBatchAction !== null || objectiveForms.some(id => initialObjectives[id]?.origin === 'assigned' || initialObjectives[id]?.inherited)} options={periods.flatMap(group => group.children).map(month => ({ value: month.value, label: month.label }))} onChange={setTargetFormCycle}/></div>
+              {creationLevel === 'department' && <div className="okr-objective-period"><span>承接公司 KR</span><Select aria-label="承接公司 KR" value={initialObjectives[objectiveForms[0]]?.sourceKrId} disabled={busy || objectiveBatchAction !== null} options={assignedReferences(records, me!).filter(reference => reference.periodKey === targetFormCycle).map(reference => ({ value: reference.id, label: reference.payload.title }))} onChange={sourceId => Modal.confirm({ title: '切换承接的公司 KR？', content: '此次尚未保存的目标内容将重新按模板初始化。', onOk: () => openGoalCreation(targetFormCycle, 'department', sourceId) })}/></div>}
               {objectiveForms.map((formId, formIndex) => (
             <div key={formId} className="okr-objective-form-item"><ObjectiveForm threeLevel ownerId={currentUser.id} ref={ref => { objectiveRefs.current[formId] = ref; }} chrome={false} cycle={targetFormCycle} objectiveIndex={formIndex} ownerName={currentUser.name} ownerAvatar={currentUser.avatar} parents={parents} people={people} teamMembers={teamMembers} busy={busy} unavailable={loading || !!error} initialPayload={initialObjectives[formId]}
               root={companyLevel}
@@ -633,7 +639,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               okrRecords={records}
               settings={settings}
               onCancel={() => setObjectiveForms(forms => forms.filter(id => id !== formId))}
-              onRemove={formIndex > 0 && objectiveForms.length > 1 ? () => {
+              onRemove={objectiveForms.length > 1 ? () => {
                 setObjectiveForms(forms => forms.filter(id => id !== formId));
                 setInitialObjectives(current => { const next = { ...current }; delete next[formId]; return next; });
               } : undefined}
@@ -641,7 +647,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               onSaveDraft={async payload => { const ok = await saveObjectiveDraft(targetFormCycle, payload); if (ok) setSelectedCycles(current => includeSelectedCycle(current, targetFormCycle)); return ok; }}
               onAddAnother={appendAutonomousGoal}/></div>
             ))}
-            <div className="okr-objective-footer"><div className="company-objective-toolbar"><Button type="text" icon={<PlusIcon/>} onClick={appendAutonomousGoal} disabled={busy || objectiveBatchAction !== null}>添加目标</Button></div><span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy || objectiveBatchAction !== null}>取消</Button><Button onClick={() => void handleObjectiveBatch('draft')} loading={objectiveBatchAction === 'draft'} disabled={busy || loading || !!error || objectiveBatchAction !== null}>存草稿</Button><Button type="primary" onClick={() => void handleObjectiveBatch('submit')} loading={objectiveBatchAction === 'submit'} disabled={loading || !!error || objectiveBatchAction !== null}>{companyLevel ? '提交目标' : '提交主管确认'}</Button></div>
+            <div className="okr-objective-footer">{creationLevel !== 'department' && <div className="company-objective-toolbar"><Button type="text" icon={<PlusIcon/>} onClick={appendAutonomousGoal} disabled={busy || objectiveBatchAction !== null}>添加目标</Button></div>}<span className="okr-objective-footer-spacer"/><Button onClick={() => setObjectiveForms([])} disabled={busy || objectiveBatchAction !== null}>取消</Button><Button onClick={() => void handleObjectiveBatch('draft')} loading={objectiveBatchAction === 'draft'} disabled={busy || loading || !!error || objectiveBatchAction !== null}>存草稿</Button><Button type="primary" onClick={() => void handleObjectiveBatch('submit')} loading={objectiveBatchAction === 'submit'} disabled={loading || !!error || objectiveBatchAction !== null}>{companyLevel ? '提交目标' : '提交主管确认'}</Button></div>
             </div>
             </CompanyEditorShell>
           )}
@@ -785,9 +791,9 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
  !reviewTemplate ? (
               <ReviewTemplateGate template={reviewTemplate} type={reviewType} period={reviewPeriodOverride || currentReviewPeriod(reviewType)} recordStatus={reviewRecordStatus} onCancel={() => { setIsReviewFormOpen(false); setCopiedReviewId(null); }}/>
             ) : reviewType === 'week' ? (
-              <WeeklyReviewEditor template={reviewTemplate === 'supervisor' ? 'supervisor' : 'employee'} records={records} people={people} recordsLoading={loading} recordsError={error} onRefreshRecords={() => void refresh()} key={`weekly-review-${copiedReviewId || reviewDraftId || reviewPeriodOverride?.startDate || 'new'}`} recordStatus={reviewRecordStatus} periodOverride={reviewPeriodOverride} initialPayload={copiedInitialPayload} viewer={currentUser} okrs={reviewableOkrs} work={work} teamMembers={teamMembers} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
+              <WeeklyReviewEditor reviewSettings={settings} template={reviewTemplate === 'supervisor' ? 'supervisor' : 'employee'} records={records} people={people} recordsLoading={loading} recordsError={error} onRefreshRecords={() => void refresh()} key={`weekly-review-${copiedReviewId || reviewDraftId || reviewPeriodOverride?.startDate || 'new'}`} recordStatus={reviewRecordStatus} periodOverride={reviewPeriodOverride} initialPayload={copiedInitialPayload} viewer={currentUser} okrs={reviewableOkrs} work={work} teamMembers={teamMembers} busy={busy} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} reviewerName={reviewerName} directSubmit={directReviewSubmit}/>
             ) : (
-              <MonthlyReviewEditor template={reviewTemplate === 'supervisor' ? 'supervisor' : 'employee'} people={people} recordsLoading={loading} recordsError={error} onRefreshRecords={() => void refresh()} key={`monthly-review-${copiedReviewId || reviewDraftId || reviewPeriodOverride?.startDate || 'new'}`} recordStatus={reviewRecordStatus} periodOverride={reviewPeriodOverride} initialPayload={copiedInitialPayload} okrs={reviewableOkrs} records={records} currentUserId={currentUser.id} viewer={currentUser} work={work} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} busy={busy} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}}/>
+              <MonthlyReviewEditor reviewSettings={settings} template={reviewTemplate === 'supervisor' ? 'supervisor' : 'employee'} people={people} recordsLoading={loading} recordsError={error} onRefreshRecords={() => void refresh()} key={`monthly-review-${copiedReviewId || reviewDraftId || reviewPeriodOverride?.startDate || 'new'}`} recordStatus={reviewRecordStatus} periodOverride={reviewPeriodOverride} initialPayload={copiedInitialPayload} okrs={reviewableOkrs} records={records} currentUserId={currentUser.id} viewer={currentUser} work={work} workLoading={workLoading} workError={workError} onRefreshWork={refreshWork} busy={busy} onCancel={()=>{setIsReviewFormOpen(false);setCopiedReviewId(null);}} onSaveDraft={async payload=>{const saved=await saveReviewDraft(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}} onSubmit={async payload=>{const saved=await saveReview(payload);if(saved){setReviewSubTab('my');setIsReviewFormOpen(false);setCopiedReviewId(null);}return saved;}}/>
             )
           )}
 

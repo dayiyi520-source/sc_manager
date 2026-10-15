@@ -140,6 +140,7 @@ export interface OKRItem {
 }
 
 export interface PerformanceReview {
+  authorId?: string;
   departmentFeedbackRows?: import('../services/okrRepository').DepartmentReviewFeedback[];
   departmentReviewExclusions?: import('../services/okrRepository').DepartmentReviewExclusion[];
   reviewMode?: import('../services/okrRepository').OkrPayload['reviewMode'];
@@ -213,6 +214,7 @@ export interface KnowledgeCategoryInfo {
 }
 
 export interface KnowledgeDoc {
+  attachments?: import('../services/knowledgeAttachments').KnowledgeAttachment[];
   id: string;
   title: string;
   category: KnowledgePrimaryCategory | string;

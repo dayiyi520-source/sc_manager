@@ -56,7 +56,7 @@ describe('review period identity', () => {
   it('hides assistance and knowledge tables until rows are added', () => {
     render(<WeeklyReviewEditor {...props}/>);
     expect(screen.queryByRole('columnheader', { name: '事项类型' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: '分类' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '内容摘要' })).not.toBeInTheDocument();
     expect(screen.getByText('暂无需要协助事项')).toBeInTheDocument();
     expect(screen.getByText('暂无知识沉淀')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '发起协同' })).toBeInTheDocument();
@@ -65,7 +65,8 @@ describe('review period identity', () => {
   it('shows the two tables for saved rows', () => {
     render(<WeeklyReviewEditor {...props} initialPayload={{ title: '草稿', assistance: [{ workId: 'assist', subject: '协助验收', result: '', assistanceType: '售前支持', expectedAssignee: '同事', content: '', expectedDueDate: '' }], knowledgeEntries: [{ id: 'knowledge', title: '设计经验', category: '应知应会' }] }}/>)
     expect(screen.getByRole('columnheader', { name: '事项类型' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '分类' })).toBeInTheDocument();
+    for (const name of ['标题', '内容摘要', '链接地址', '附件']) expect(screen.getAllByRole('columnheader', { name }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('columnheader', { name: '分类' })).not.toBeInTheDocument();
     expect(screen.queryByText('暂无需要协助事项')).not.toBeInTheDocument();
     expect(screen.queryByText('暂无知识沉淀')).not.toBeInTheDocument();
   });
@@ -159,7 +160,7 @@ describe('employee weekly personal progress', () => {
   });
   it('restores subtable progress and risk explanation in a draft, and disables edits when submitted', () => {
     const goal = { ...employeeGoal, keyResults: [{ ...employeeGoal.keyResults[0], parentKeyResultDetails: [{ id: 'd1', name: '产品甲', version: 'V1', stage: '产品设计', plannedStartDate: '2026-10-13', plannedEndDate: '2026-10-16' }] }] };
-    const initialPayload: OkrPayload = { title: '已存草稿', ...week, reviewType: 'week', krReviews: [{ ...reviewDraftTargets([goal])[0], currentProgress: 10, blocker: '等资源', detailProgress: [{ id: 'd1', previousProgress: 0, currentProgress: 10 }] }] };
+    const initialPayload: OkrPayload = { title: '已存草稿', ...week, reviewType: 'week', krReviews: [{ ...reviewDraftTargets([goal])[0], currentProgress: 10, health: 'risk', blocker: '等资源', detailProgress: [{ id: 'd1', previousProgress: 0, currentProgress: 10 }] }] };
     render(<WeeklyReviewEditor {...props} viewer={{ id: 'me', name: '本人', department: '产品部' }} records={[]} okrs={[goal]} periodOverride={week} initialPayload={initialPayload} recordStatus="submitted" reviewerName="主管"/>);
     fireEvent.click(screen.getByText('我的计划：我的动作'));
     expect(screen.getByRole('spinbutton', { name: '产品甲 V1本期更新进度' })).toHaveValue('10');

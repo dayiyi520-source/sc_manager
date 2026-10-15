@@ -19,12 +19,12 @@ describe('goal summary settings entry',()=>{
     mount();
     expect(await screen.findByRole('region',{name:'OKR 设置'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'返回目标页'})).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'角色设置'}));
+    fireEvent.click(screen.getByRole('button',{name:'目标确认配置'}));
     fireEvent.click(screen.getByRole('button',{name:/保存配置/}));
     await waitFor(()=>expect(save).toHaveBeenCalled());
     await waitFor(()=>expect(addToast).toHaveBeenCalledWith('success','目标总结配置已保存'));
   });
-  it.each(['周报周期配置','角色设置','目标确认配置'])('keeps %s selected after consecutive saves', async section => {
+  it.each(['目标确认配置'])('keeps %s selected after consecutive saves', async section => {
     vi.spyOn(okrRepository,'settings').mockResolvedValue(settings);
     const save=vi.spyOn(okrRepository,'saveSettings').mockImplementation(async value=>({...value,version:value.version+1}));
     vi.spyOn(okrRepository,'people').mockResolvedValue([{id:'admin',name:'管理员',department:'公司',rootFlag:1,supervisorId:null,version:0}]);
@@ -38,6 +38,14 @@ describe('goal summary settings entry',()=>{
     await waitFor(()=>expect(save).toHaveBeenCalledTimes(2));
     expect(save.mock.calls[1][0].version).toBe(2);
     expect(screen.getByRole('button',{name:section})).toHaveClass('is-active');
+  });
+  it.each(['周报周期配置', '角色设置'])('removes the redundant save action from %s', async section => {
+    vi.spyOn(okrRepository,'settings').mockResolvedValue(settings);
+    vi.spyOn(okrRepository,'people').mockResolvedValue([{id:'admin',name:'管理员',department:'公司',rootFlag:1,supervisorId:null,version:0}]);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: section }));
+    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: section === '角色设置' ? '添加成员' : '增加周期' })).toBeEnabled();
   });
   it('offers retry after a configuration loading failure',async()=>{
     vi.spyOn(okrRepository,'settings').mockRejectedValueOnce(new Error('offline')).mockResolvedValue(settings);

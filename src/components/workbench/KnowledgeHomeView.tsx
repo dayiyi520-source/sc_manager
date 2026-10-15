@@ -1,3 +1,4 @@
+import { Empty } from 'antd';
 import React, { useState } from 'react';
 import {
   Search,
@@ -341,7 +342,7 @@ export const KnowledgeHomeView: React.FC<KnowledgeHomeViewProps> = ({
                     </div>
 
                     <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 flex flex-wrap items-center gap-2">
-                      <span>{doc.category}{doc.subCategory ? ` / ${doc.subCategory}` : ''}</span>
+                      <span>{doc.summary || '——'}</span>
                       <span>·</span>
                       <span>{doc.author}</span>
                       <span>·</span>
@@ -461,9 +462,7 @@ export const KnowledgeHomeView: React.FC<KnowledgeHomeViewProps> = ({
             {/* Favorite List */}
             <div className="divide-y divide-slate-100 dark:divide-slate-800/80 mt-2">
               {favoriteDocs.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">
-                  暂无收藏文档，点击文档右侧星标即可快捷收藏
-                </div>
+                <Empty description="暂无收藏文档" />
               ) : (
                 favoriteDocs.slice(0, 4).map((doc) => (
                   <div
@@ -488,7 +487,7 @@ export const KnowledgeHomeView: React.FC<KnowledgeHomeViewProps> = ({
                     </div>
 
                     <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 flex items-center justify-between">
-                      <span>{doc.category}</span>
+                      <span>{doc.summary || '——'}</span>
                       <span className="font-mono">{doc.favoritedAt ? `收藏于 ${doc.favoritedAt}` : '已收藏'}</span>
                     </div>
                   </div>

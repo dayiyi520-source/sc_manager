@@ -49,6 +49,14 @@ describe('三级目标沿用现有表单', () => {
     expect(action.title).toBe('完成产品原型');
     expect(ref.current!.snapshot().keyResults![0].weight).toBe(100);
   });
+  it('shows current row assignees read-only when editing an inherited personal target', () => {
+    const detail = { id: 'v1', name: '版本一', assigneeIds: ['employee'] };
+    const parent: OkrRecord = { ...reference, id: 'department', kind: 'objective', ownerId: 'manager', payload: { title: '部门目标', keyResults: [{ id: 'shared', title: '共同结果', weight: 100, progress: 0, details: [{ ...detail, assigneeIds: ['manager', 'employee'] }] }] } };
+    render(<ObjectiveForm {...common} ownerId="employee" ownerName="员工" root={false} goalLevel="个人级" alignmentActions={[]} okrRecords={[parent]} initialPayload={{ goalModelVersion: 2, goalLevel: 'personal', origin: 'assigned', title: '共同结果', sourceObjectiveId: 'department', sourceKrId: 'shared', keyResults: [{ id: 'shared', title: '共同结果', weight: 100, progress: 0, details: [detail], executionActions: [] }] }} onSave={vi.fn()}/>);
+    expect(screen.getByText('主管、员工')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '承接人' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/版本一.*承接人/)).not.toBeInTheDocument();
+  });
   it.each(['product', 'delivery'] as const)('adds a %s detail through the parent and multi-child picker and preserves the existing plan', async type => {
     const ref = createRef<ObjectiveFormHandle>();
     render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} productLineOptions={['业务','第二条']} projectOptions={['业务','第二条']} productLineVersionOptions={{业务:['第一条'],第二条:['版本2']}} projectProductOptions={{业务:['第一条'],第二条:['产品2']}} initialPayload={{goalModelVersion:2,goalLevel:'department',title:'计划',keyResults:[{id:'k',title:'计划',structureType:type,businessObject:'业务',weight:100,progress:0,details:[{id:'one',name:'业务',stage:'UI设计',plannedStartDate:'2026-10-01',plannedEndDate:'2026-10-10'}]}]}} onSave={vi.fn()}/>);
@@ -64,7 +72,7 @@ describe('三级目标沿用现有表单', () => {
     expect(krs?.[0].details).toHaveLength(2);
     expect(krs?.[0].details?.[0]).toMatchObject({id:'one',stage:'UI设计',plannedStartDate:'2026-10-01',plannedEndDate:'2026-10-10'});
     if (type === 'product') expect(screen.getByLabelText('第二条 开始时间')).toBeInTheDocument();
-    else expect(screen.getByLabelText('第二条 选择产品')).toBeInTheDocument();
+    else expect(screen.getByLabelText('修改第二条明细')).toBeInTheDocument();
   });
   it.each(['product', 'delivery'] as const)('edits independent %s detail stages without adding KRs and allows active detail dates', type => {
     const ref = createRef<ObjectiveFormHandle>();
@@ -76,7 +84,7 @@ describe('三级目标沿用现有表单', () => {
       expect(screen.getByLabelText('第一条 开始时间')).not.toBeDisabled();
       expect(screen.getByLabelText('第二条 结束时间')).not.toBeDisabled();
     } else {
-      expect(screen.getByLabelText('第一条 选择产品')).toBeInTheDocument();
+      expect(screen.getByLabelText('修改第一条明细')).toBeInTheDocument();
       expect(screen.getAllByText('未设置').length).toBeGreaterThan(0);
       expect(screen.getByLabelText('第一条 目标里程碑')).toBeInTheDocument();
     }
@@ -250,7 +258,7 @@ it('shows project map milestones only for the selected project product', async (
 it('selects another version of the same product without adding a KR or overwriting its plan', async () => {
   const ref = createRef<ObjectiveFormHandle>();
   render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} productLineOptions={['产品甲']} productLineVersionOptions={{ 产品甲: ['V1', 'V2'] }} initialPayload={{ goalModelVersion: 2, goalLevel: 'department', title: '产品交付', keyResults: [{ id: 'k', title: '交付', weight: 100, progress: 0, structureType: 'product', businessObject: '产品甲', details: [{ id: 'v1', name: '产品甲', version: 'V1', stage: 'UI设计', plannedStartDate: '2026-10-01', plannedEndDate: '2026-10-10' }] }] }} onSave={vi.fn()}/>);
-  fireEvent.click(screen.getByRole('button', { name: '产品甲 选择版本' }));
+  fireEvent.click(screen.getByRole('button', { name: '修改产品甲明细' }));
   fireEvent.mouseDown(screen.getByLabelText('关联迭代版本'));
   fireEvent.click(screen.getByText('V2', { selector: '.ant-select-item-option-content' }));
   fireEvent.click(screen.getByRole('button', { name: /^确\s*定$/ }));
@@ -264,42 +272,19 @@ it('selects another version of the same product without adding a KR or overwriti
 it('keeps the empty KR subtable as a disabled display-only placeholder', () => {
   const ref = createRef<ObjectiveFormHandle>();
   render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} initialPayload={{goalModelVersion:2,goalLevel:'department',title:'产品交付',keyResults:[{id:'k',title:'交付',weight:100,progress:0,structureType:'product',details:[]}]}} onSave={vi.fn()}/>);
+  expect(screen.queryByLabelText('A1 承接人员')).not.toBeInTheDocument();
   expect(screen.getAllByText('暂未选择')).toHaveLength(2);
   expect(screen.getByLabelText('暂未选择 达成阶段')).toBeDisabled();
   expect(screen.getByLabelText('暂未选择 结束时间')).toBeDisabled();
   expect(ref.current?.snapshot().keyResults?.[0].details).toEqual([]);
 });
 
-it('selects only enabled O titles for the supervisor department without replacing KR content', () => {
+it('locks the initialized O template title and commitment type without an import entry', () => {
   const ref = createRef<ObjectiveFormHandle>();
-  render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} settings={{ ...templateSettings, objectiveTitleTemplates: [{ id: 'title', department: '研发', title: '完成重点产品迭代', guidance: '填写本月的产品交付范围', enabled: true }, { id: 'other', department: '交付', title: '其他部门目标', guidance: '', enabled: true }, { id: 'off', department: '研发', title: '停用目标', guidance: '', enabled: false }] }} onSave={vi.fn()}/>);
-  fireEvent.click(screen.getByRole('button', {name:'导入O模板'}));
-  expect(screen.queryByText('其他部门目标')).not.toBeInTheDocument();
-  expect(screen.queryByText('停用目标')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByText('完成重点产品迭代', { selector: '.ant-dropdown-menu-title-content' }));
-  expect(ref.current?.snapshot().title).toBe('完成重点产品迭代');
-  expect(ref.current?.snapshot().keyResults).toHaveLength(1);
-  expect(screen.getByText('填写本月的产品交付范围')).toBeInTheDocument();
-});
-
-it('retains template KR types after editing the O title and restricts the type menu', async () => {
-  const ref = createRef<ObjectiveFormHandle>();
-  render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} settings={{ ...templateSettings, objectiveTitleTemplates: [{ id: 'title-support', department: '研发', title: '协作提升', guidance: '', enabled: true, krTypes: ['support'] }] }} onSave={vi.fn()}/>);
-  fireEvent.click(screen.getByRole('button', {name:'导入O模板'}));
-  fireEvent.click(screen.getByText('协作提升', { selector: '.ant-dropdown-menu-title-content' }));
-  fireEvent.change(screen.getByLabelText('目标名称'), { target: { value: '本月具体协作目标' } });
-  expect(ref.current?.snapshot()).toMatchObject({ title: '本月具体协作目标', objectiveTitleTemplateId: 'title-support', objectiveTemplateKrTypes: ['support'], keyResults: [{ structureType: 'support' }] });
-  fireEvent.click(screen.getByRole('button', { name: 'KR类型' }));
-  expect(screen.queryByRole('menuitem', { name: 'P- KR' })).not.toBeInTheDocument();
-});
-it('rejects an incompatible O template without discarding filled KR content', () => {
-  const ref = createRef<ObjectiveFormHandle>();
-  render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} initialPayload={{ goalModelVersion: 2, goalLevel: 'department', title: '版本交付', keyResults: [{ id: 'k', title: '已有交付结果', structureType: 'product', weight: 100, progress: 0, details: [{ id: 'v', name: '产品甲', version: 'V1', stage: 'UI设计' }] }] }} settings={{ ...templateSettings, objectiveTitleTemplates: [{ id: 'support', department: '研发', title: '协作提升', guidance: '', enabled: true, krTypes: ['support'] }] }} onSave={vi.fn()}/>);
-  fireEvent.click(screen.getByRole('button', {name:'导入O模板'}));
-  fireEvent.click(screen.getByText('协作提升', { selector: '.ant-dropdown-menu-title-content' }));
-  expect(screen.getByText('已有 KR 不受该 O 模板支持，请先调整 KR 或选择其他模板')).toBeInTheDocument();
-  expect(ref.current?.snapshot().title).toBe('版本交付');
-  expect(ref.current?.snapshot().keyResults?.[0].details?.[0]).toMatchObject({ name: '产品甲', version: 'V1' });
+  render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="主管级" alignmentActions={[reference]} initialPayload={{ goalModelVersion: 2, goalLevel: 'department', title: '协作提升', objectiveType: 'target', objectiveTitleTemplateId: 'title-support', objectiveTemplateKrTypes: ['support'], keyResults: [] }} settings={{ ...templateSettings, objectiveTitleTemplates: [{ id: 'title-support', department: '研发', title: '协作提升', guidance: '', enabled: true, krTypes: ['support'] }] }} onSave={vi.fn()}/>);
+  expect(screen.getByLabelText('目标名称')).toHaveAttribute('readonly');
+  expect(screen.queryByRole('button', { name: '导入O模板' })).not.toBeInTheDocument();
+  expect(ref.current?.snapshot()).toMatchObject({ title: '协作提升', objectiveType: 'target', objectiveTitleTemplateId: 'title-support' });
 });
 it('does not render a delete control for the personal single plan', () => {
  render(<ObjectiveForm {...common} ownerId="employee" ownerName="员工" root={false} goalLevel="个人级" initialPayload={{goalModelVersion:2,goalLevel:'personal',origin:'autonomous',title:'本人工作'}} onSave={vi.fn()}/>);

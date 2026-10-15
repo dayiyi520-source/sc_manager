@@ -18,21 +18,19 @@ describe('personal monthly editor', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
     const view = render(<MonthlyReviewEditor {...props} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
     fireEvent.click(screen.getByRole('button', { name: '新建知识沉淀' }));
-    fireEvent.change(screen.getByPlaceholderText('简要概括文档核心内容，便于全员高效检索...'), { target: { value: '月度经验摘要' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '内容摘要' }), { target: { value: '月度经验摘要' } });
     fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('请输入文档名称');
-    expect(screen.getByRole('textbox', { name: '文档名称' })).toHaveFocus();
-    fireEvent.change(screen.getByRole('textbox', { name: '文档名称' }), { target: { value: '  月度排查经验  ' } });
-    expect(screen.getByRole('textbox', { name: '文档名称' })).toHaveAttribute('aria-invalid', 'false');
+    expect(await screen.findByText('请输入标题')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: '标题' }), { target: { value: '  月度排查经验  ' } });
     fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
-    expect(screen.getByRole('button', { name: '月度排查经验' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '月度排查经验' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
     await waitFor(() => expect(save).toHaveBeenCalledOnce());
     const saved = save.mock.calls[0][0];
     expect(saved.knowledgeEntries).toEqual([expect.objectContaining({ title: '月度排查经验', summary: '月度经验摘要' })]);
     view.unmount();
     render(<MonthlyReviewEditor {...props} initialPayload={saved} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
-    expect(screen.getByRole('button', { name: '月度排查经验' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '月度排查经验' })).toBeInTheDocument();
   });
 
   it('shows month, department and default empty cards without table headers', () => {
@@ -42,13 +40,14 @@ describe('personal monthly editor', () => {
     expect(screen.queryByText('复盘本月目标、工作证据、问题建议与协助事项')).not.toBeInTheDocument();
     for (const text of ['暂无插播任务', '暂无需要协助事项', '暂无知识沉淀']) expect(screen.getByText(text)).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '事项类型' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: '分类' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '内容摘要' })).not.toBeInTheDocument();
   });
   it('shows department fallback and restored association tables only when populated', () => {
     render(<MonthlyReviewEditor {...props} initialPayload={initialPayload} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
     expect(screen.getByText('2026年第10月 月报-部门未设置')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '事项类型' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '分类' })).toBeInTheDocument();
+    for (const name of ['标题', '内容摘要', '链接地址', '附件']) expect(screen.getAllByRole('columnheader', { name }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('columnheader', { name: '分类' })).not.toBeInTheDocument();
     expect(screen.queryByText('暂无需要协助事项')).not.toBeInTheDocument();
     expect(screen.queryByText('暂无知识沉淀')).not.toBeInTheDocument();
   });
@@ -66,9 +65,9 @@ describe('personal monthly editor', () => {
     expect(screen.getByRole('columnheader', { name: '来源归属' })).toBeInTheDocument();
     expect(screen.getByText('实际任务')).toBeInTheDocument();
   });
-  it('uses employee monthly reports for department support and saves the two department sections', () => {
+  it('uses employee monthly reports for department support and saves the two department sections', async () => {
     const people = [{ id: 'm', name: '主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 }, { id: 'e', name: '员工甲', department: '产品部', supervisorId: 'm', rootFlag: 0, version: 1 }];
-    const objective: OKRItem = { id: 'department', ownerId: 'm', ownerName: '主管', department: '产品部', cycle: '2026-10', category: 'my', objective: '部门目标', progress: 0, weight: 100, deadline: '2026-10-31', keyResults: [{ id: 'kr', content: '部门KR', progress: 0, weight: 100, deadline: '2026-10-31' }] };
+    const objective: OKRItem = { id: 'department', ownerId: 'm', ownerName: '主管', department: '产品部', cycle: '2026-10', category: 'my', objective: '部门目标', progress: 0, weight: 100, deadline: '2026-10-31', keyResults: [{ id: 'kr', content: '部门KR', assigneeIds: ['e'], progress: 0, weight: 100, deadline: '2026-10-31' }] };
     const goal = { id: 'goal', ownerId: 'e', kind: 'objective' as const, status: 'active', periodKey: '2026-10', version: 1, payload: { title: '本人目标', sourceObjectiveId: 'department', sourceKrId: 'kr', keyResults: [{ id: 'kr', title: '承接', progress: 0, weight: 100, executionActions: [{ id: 'action', title: '个人动作甲', ownerId: 'e', progress: 0 }] }] } };
     const report = { id: 'monthly', ownerId: 'e', kind: 'review' as const, status: 'submitted', periodKey: '2026-10', version: 1, payload: { title: '员工月报', suggestions: '改善跨部门协作', reviewType: 'month' as const, ...props.periodOverride, krReviews: [{ objectiveId: 'goal', objectiveTitle: '本人目标', keyResultId: 'action', keyResultTitle: '个人动作甲', previousProgress: 10, currentProgress: 60, executionHealth: '正常' as const, health: 'normal' as const, achievement: '', blocker: '', nextPlan: '', workIds: [] }] } };
     const save = vi.fn(async (_payload: OkrPayload) => true);
@@ -78,8 +77,15 @@ describe('personal monthly editor', () => {
     expect(screen.getByText('3. 本月部门补充总结')).toBeInTheDocument();
     expect(screen.getByText('4. 部门反馈问题梳理与分析')).toBeInTheDocument();
     fireEvent.click(screen.getByText('KR1：部门KR'));
-    expect(screen.getByRole('columnheader', { name: '员工甲' })).toBeInTheDocument();
-    expect(screen.getByText('个人动作：个人动作甲 · 当前进度60%')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '员工甲' })).not.toBeInTheDocument();
+    expect(screen.queryByText('个人动作：个人动作甲')).not.toBeInTheDocument();
+    expect(screen.getByText('——')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '0% → 60%' }));
+    await waitFor(() => expect(screen.getByText('本期员工进度更新')).toBeInTheDocument());
+    const progressDialog = screen.getByText('本期员工进度更新').closest('.ant-modal')! as HTMLElement;
+    expect(within(progressDialog).getByText('员工甲')).toBeInTheDocument();
+    expect(within(progressDialog).getByText('60%')).toBeInTheDocument();
+    fireEvent.click(within(progressDialog).getByRole('button', { name: /关\s*闭/ }));
     fireEvent.change(screen.getByRole('textbox', { name: '本月部门补充总结' }), { target: { value: '部门总结' } });
     expect(screen.getByRole('columnheader', { name: '员工' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '意见和建议' })).toBeInTheDocument();

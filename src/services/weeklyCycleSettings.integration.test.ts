@@ -28,3 +28,12 @@ it('rejects modification and deletion of a finished weekly cycle at the save bou
   await expect(save(settings)).rejects.toThrow('不能修改或删除');
   await expect(save({ ...settings, weeklyReviewCycles: [{ ...cycle, allowBackfill: false }] })).rejects.toThrow('不能修改或删除');
 });
+
+it('persists a cycle title and reloads it while rejecting stale configuration writes', async () => {
+  const cycle = { id: 'new', title: '十一月第一期', month: '2099-11', startDate: '2099-11-01', endDate: '2099-11-07', notifyAt: '2099-11-05T09:00', deadline: '2099-11-07T18:00', template: 'byRole' as const, allowBackfill: true };
+  await save({ ...settings, weeklyReviewCycles: [cycle] });
+  const reloaded = await mockApiRequest('/api/okr/settings') as OkrSettings;
+  expect(reloaded.weeklyReviewCycles).toEqual([cycle]);
+  await expect(save({ ...settings, weeklyReviewCycles: [] })).rejects.toThrow('配置已更新');
+  expect((await mockApiRequest('/api/okr/settings') as OkrSettings).weeklyReviewCycles).toEqual([cycle]);
+});

@@ -1,3 +1,5 @@
+import { validateReviewProgress, syncSubmittedReviewProgress } from './okrReviewProgressSync';
+import { bindReviewTemplate } from './reviewTemplateConfiguration';
 import { normalizeDefectStatusLabels } from './defectStatusLabels';
 import { syncOkrProductNames } from './okrProductNames';
 import { customerDirectoryRequest } from './customerDirectoryData';
@@ -931,11 +933,16 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     let record: OkrRecord = { id: id('okr'), kind: body.kind, ownerId, periodKey: body.periodKey, status: body.submit === false ? 'draft' : body.kind === 'review' ? 'submitted' : 'active', version: 0, createdAt: now(), ...(submittedAt ? { submittedAt } : {}), payload: body.payload || {} };
     const owner = getOkrPeople().find(person=>person.id===ownerId);
     const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);
+    if (record.kind === 'review') {
+      if (!owner) throw new Error('复盘人员不存在');
+      record.payload = bindReviewTemplate(record.payload, settings, owner, getOkrPeople(), body.submit !== false);
+      validateReviewProgress(record.payload, ownerId, records, getOkrPeople());
+    }
     const reviewerId = record.kind === 'objective' && body.submit !== false && owner && settings.confirmation ? confirmationReviewer(owner,'create',record.payload,settings,getOkrPeople()) : undefined;
     if (reviewerId) record = {...record,status:'submitted',changeRequest:{id:id('change'),purpose:'initial',status:'pending',reason:'目标首次提交',reviewerId,payload:record.payload,baseVersion:0,requestedAt:now()}};
     const department = record.kind === 'review' && body.submit !== false ? submitDepartmentReview(record.payload, ownerId, records, getOkrPeople()) : { records, payload: record.payload };
     record = { ...record, payload: department.payload };
-    write(KEYS.okrRecords, [...department.records, record]);
+    write(KEYS.okrRecords, syncSubmittedReviewProgress([...department.records, record], record, getOkrPeople()));
     return { id: record.id };
   }
   if (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH') {
@@ -955,15 +962,19 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       if (!['draft', 'returned'].includes(record.status)) throw new Error('已提交的复盘不能重复提交或修改');
       if (body.version !== record.version) throw new Error('复盘已变化，请刷新后重试');
       if (!['save', 'submit'].includes(body.action)) throw new Error('不支持此复盘操作');
-      const payload = body.payload || record.payload;
+      const owner = getOkrPeople().find(person => person.id === record.ownerId);
+      if (!owner) throw new Error('复盘人员不存在');
+      const payload = bindReviewTemplate(body.payload || record.payload, read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings), owner, getOkrPeople(), body.action === 'submit', record.payload);
       if (payload.reviewType !== record.payload.reviewType || payload.startDate !== record.payload.startDate || payload.endDate !== record.payload.endDate) throw new Error('不能修改原复盘的周期');
       if (body.action === 'submit') {
         const access = reviewSubmissionAccess(read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings), payload);
         if (!access.allowed) throw new Error(access.reason);
       }
+      validateReviewProgress(payload, record.ownerId, records, getOkrPeople());
       const department = body.action === 'submit' ? submitDepartmentReview(payload, record.ownerId, records, getOkrPeople()) : { records, payload };
       const next = { ...record, payload: department.payload, status: body.action === 'submit' ? 'submitted' : record.status, ...(body.action === 'submit' ? { submittedAt: now() } : {}), version: record.version + 1 };
-      write(KEYS.okrRecords, department.records.map(row => row.id === record.id ? next : row));
+      const saved = department.records.map(row => row.id === record.id ? next : row);
+      write(KEYS.okrRecords, body.action === 'submit' ? syncSubmittedReviewProgress(saved, next, getOkrPeople()) : saved);
       return next;
     }
     if (record.kind === 'objective' || record.kind === 'action') {

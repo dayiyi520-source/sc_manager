@@ -1,3 +1,5 @@
+import { normalizeGoalAssignments, assignedDetailRows } from './okrAssignments';
+import { normalizeObjectiveTitleTemplates } from './okrObjectiveTitleTemplates';
 import { restoreReturnedInitialDraft } from './okrSubmissionState';
 import { applyProgress, canUpdateProgress, progressSubject } from './okrProgress';
 import { canAlignPeriod } from './okrPeriods';
@@ -25,9 +27,23 @@ function verifySource(payload: OkrPayload, records: OkrRecord[], person: OkrPers
   if (!source || (source.changeRequest?.purpose === 'initial' && source.changeRequest.status !== 'approved') || source.ownerId !== person.supervisorId || !kr?.assigneeIds?.includes(person.id)) throw new Error('上级关键结果已撤回或不再指派给本人，请刷新');
   if (kr.deadline && (payload.deadline && payload.deadline > kr.deadline || payload.keyResults?.some(item => item.deadline && item.deadline > kr.deadline! || item.executionActions?.some(action => action.deadline && action.deadline > kr.deadline!)))) throw new Error('部门计划截止日期不能超过上级 KR 原计划');
   if (payload.sourceVersion !== source.version) throw new Error('上级目标已更新，请先确认同步再提交');
-  if (payload.goalLevel === 'personal' && (payload.title !== kr.title || payload.keyResults?.length !== 1 || payload.keyResults[0].id !== kr.id || payload.keyResults[0].title !== kr.title || (!payload.keyResults[0].plannedDeadline && payload.keyResults[0].deadline !== kr.deadline) || payload.keyResults[0].weight !== 100 || payload.keyResults[0].businessObject !== kr.businessObject || payload.keyResults[0].stage !== kr.stage || payload.keyResults[0].version !== kr.version || JSON.stringify(payload.keyResults[0].details) !== JSON.stringify(kr.details) || payload.keyResults[0].progress !== 0 || payload.keyResults[0].structureType !== kr.structureType || payload.keyResults[0].action !== kr.action || payload.keyResults[0].result !== kr.result || (!payload.plannedDeadline && payload.deadline !== kr.deadline))) throw new Error('个人只能填写本人 A，不能修改上级 KR');
+  if (payload.goalLevel === 'personal' && (payload.title !== kr.title || payload.keyResults?.length !== 1 || payload.keyResults[0].id !== kr.id || payload.keyResults[0].title !== kr.title || (!payload.keyResults[0].plannedDeadline && payload.keyResults[0].deadline !== kr.deadline) || payload.keyResults[0].weight !== 100 || payload.keyResults[0].businessObject !== kr.businessObject || payload.keyResults[0].stage !== kr.stage || payload.keyResults[0].version !== kr.version || JSON.stringify(payload.keyResults[0].details) !== JSON.stringify(assignedDetailRows(kr, person.id)) || payload.keyResults[0].progress !== 0 || payload.keyResults[0].structureType !== kr.structureType || payload.keyResults[0].action !== kr.action || payload.keyResults[0].result !== kr.result || (!payload.plannedDeadline && payload.deadline !== kr.deadline))) throw new Error('个人只能填写本人 A，不能修改上级 KR');
 }
 export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation, records: OkrRecord[], people: OkrPerson[], settings?: OkrSettings): Result | undefined {
+  if (body.payload && body.kind !== 'review') {
+    body = { ...body, payload: normalizeGoalAssignments(body.payload) };
+    const payload = body.payload!;
+    if (payload.goalLevel === 'department' && (payload.objectiveTitleTemplateId || !recordId) && settings) {
+      const owner = people.find(person => person.id === body.viewerId);
+      const template = normalizeObjectiveTitleTemplates(settings).find(row => row.id === payload.objectiveTitleTemplateId && row.enabled && row.department === owner?.department);
+      if (!template || payload.title !== template.title || payload.objectiveType !== 'target' || payload.keyResults?.some(kr => !template.krTypes?.includes(kr.structureType!))) throw new Error('部门 O 须使用启用模板的标题、承诺类型及支持的 KR 类型');
+    }
+    for (const kr of payload.keyResults || []) for (const id of [...(kr.assigneeIds || []), ...(kr.details || []).flatMap(row => row.assigneeIds || [])]) {
+      const member = people.find(person => person.id === id);
+      const owner = people.find(person => person.id === body.viewerId);
+      if (!member || payload.goalLevel === 'department' && member.department !== owner?.department) throw new Error('承接人不在当前部门');
+    }
+  }
   const record = records.find(item => item.id === recordId);
   const normalized = record && restoreReturnedInitialDraft(record);
   if (record && normalized !== record) return mutateOkrLifecycle(recordId, body, records.map(item => item.id === recordId ? normalized! : item), people, settings);
@@ -75,7 +91,7 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
         return replace({ ...record, payload: { ...record.payload, sourceObjectiveId: undefined, sourceKrId: undefined, sourceVersion: undefined, sourceTitle: undefined, sourceWithdrawalAcknowledged: true }, version: record.version + 1 });
       }
       const updated = { ...record.payload, sourceWithdrawalAcknowledged: false, sourceVersion: source.version, sourceTitle: sourceKr?.title || source.payload.title,
-        ...(record.payload.goalLevel === 'personal' && record.payload.origin !== 'autonomous' && sourceKr ? { title: sourceKr.title, keyResults: [{ ...sourceKr, weight: 100, progress: 0, deadline: record.payload.keyResults?.[0]?.deadline || sourceKr.deadline, plannedDeadline: record.payload.keyResults?.[0]?.plannedDeadline, forecastDeadline: record.payload.keyResults?.[0]?.forecastDeadline, assigneeIds: [person.id], executionActions: record.payload.keyResults?.[0]?.executionActions || [] }] } : {}) };
+        ...(record.payload.goalLevel === 'personal' && record.payload.origin !== 'autonomous' && sourceKr ? { title: sourceKr.title, keyResults: [{ ...sourceKr, details: assignedDetailRows(sourceKr, person.id), weight: 100, progress: 0, deadline: record.payload.keyResults?.[0]?.deadline || sourceKr.deadline, plannedDeadline: record.payload.keyResults?.[0]?.plannedDeadline, forecastDeadline: record.payload.keyResults?.[0]?.forecastDeadline, assigneeIds: [person.id], executionActions: record.payload.keyResults?.[0]?.executionActions || [] }] } : {}) };
       verifySource(updated, records, person, record.periodKey, settings);
       return replace({ ...record, payload: updated, version: record.version + 1 });
     }
@@ -100,7 +116,7 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
   verifySource(payload, records, owner, record?.periodKey || body.periodKey || '', settings, people);
   if (record && !['draft','submitted'].includes(record.status) && (payload.deadline !== record.payload.deadline || record.payload.keyResults?.some(kr => { const next = payload.keyResults?.find(item => item.id === kr.id); return next && next.deadline !== kr.deadline; }))) throw new Error('目标及 KR 原计划日期已锁定');
   if (record && record.payload.goalModelVersion === 2 && records.some(child => child.status !== 'deleted' && child.payload.sourceObjectiveId === record.id && !payload.keyResults?.some(kr => kr.id === child.payload.sourceKrId))) throw new Error('已有下级承接的 KR 不能移除，请先处理承接关系');
-  if (payload.sourceKrId && records.some(item => item.id !== record?.id && item.status !== 'deleted' && item.kind === 'objective' && item.ownerId === person.id && item.periodKey === (record?.periodKey || body.periodKey) && (item.payload.sourceKrId === payload.sourceKrId || (item.changeRequest?.status === 'pending' && item.changeRequest.payload.sourceKrId === payload.sourceKrId)))) throw new Error('该指派已承接或正在关联确认，请继续编辑已有目标');
+  if (payload.sourceKrId && records.some(item => item.id !== record?.id && item.status !== 'deleted' && item.kind === 'objective' && item.ownerId === person.id && item.periodKey === (record?.periodKey || body.periodKey) && (payload.goalLevel !== 'department' || !payload.objectiveTitleTemplateId || item.payload.objectiveTitleTemplateId === payload.objectiveTitleTemplateId) && (item.payload.sourceKrId === payload.sourceKrId || (item.changeRequest?.status === 'pending' && item.changeRequest.payload.sourceKrId === payload.sourceKrId)))) throw new Error('该指派已承接或正在关联确认，请继续编辑已有目标');
   const reviewerId = submission ? confirmationReviewer(owner,record && !['draft','submitted'].includes(record.status) ? 'update' : 'create',payload,settings,people) : undefined;
   if (record && !['draft','submitted'].includes(record.status) && reviewerId) {
     if (!payload.changeReason?.trim()) throw new Error('请填写修改原因');

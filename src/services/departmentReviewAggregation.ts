@@ -25,6 +25,7 @@ export function departmentKrAggregation(objective: OKRItem, target: OkrKrReview,
     const previous = previousPeriods.flatMap(record => record.payload.krReviews || []);
     const current = live.filter(report => report.record.ownerId === group.authorId).sort((a,b) => (b.record.submittedAt || '').localeCompare(a.record.submittedAt || '')).flatMap(report => report.contributions);
     for (const detailId of rowIds) {
+      if (!((details.length ? details.find(row => row.id === detailId)?.assigneeIds : source?.assigneeIds) ?? []).includes(group.authorId)) continue;
       const actions = group.actions.filter(action => {
         if (!details.length) return true;
         const record = records.find(row => row.id === action.objectiveId);
@@ -40,7 +41,7 @@ export function departmentKrAggregation(objective: OKRItem, target: OkrKrReview,
         const value = details.length ? now?.detailProgress?.find(row => row.id === detailId)?.currentProgress ?? prior : now?.currentProgress ?? prior;
         return { previous: prior, current: value, submitted: Boolean(now) };
       });
-      contributors.push({ authorId: group.authorId, authorName: group.authorName, detailId, previousProgress: average(values.map(value => value.previous)), currentProgress: average(values.map(value => value.current)), submitted: values.every(value => value.submitted) });
+      contributors.push({ authorId: group.authorId, authorName: group.authorName, detailId, previousProgress: average(values.map(value => value.previous)), currentProgress: average(values.map(value => value.current)), submitted: values.some(value => value.submitted) });
     }
   }
   // The owner contributes only to KRs explicitly assigned to them.
@@ -49,6 +50,10 @@ export function departmentKrAggregation(objective: OKRItem, target: OkrKrReview,
       .sort((a, b) => (b.payload.endDate || '').localeCompare(a.payload.endDate || ''));
     const previous = history.flatMap(row => row.payload.krReviews || []).find(row => row.objectiveId === target.objectiveId && row.keyResultId === target.keyResultId);
     for (const detailId of rowIds) {
+      if (!((details.length ? details.find(row => row.id === detailId)?.assigneeIds : source?.assigneeIds) ?? []).includes(ownerId)) {
+        if (target.supervisorProgress?.some(row => row.id === detailId)) throw new Error('此子 KR 未指派给主管本人');
+        continue;
+      }
       const prior = previous?.supervisorProgress?.find(row => row.id === detailId)?.currentProgress ?? 0;
       const value = target.supervisorProgress?.find(row => row.id === detailId)?.currentProgress ?? prior;
       if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error('本人进度必须在 0 到 100 之间');
@@ -94,13 +99,7 @@ export function submitDepartmentReview(payload: OkrPayload, ownerId: string, rec
     if (expectedVersion != null && expectedVersion !== record.version) throw new Error('部门目标已被更新，请刷新后重试');
     if (record.changeRequest?.status === 'pending') throw new Error('部门目标有待确认修改，请先处理');
     if (record.ownerId !== ownerId || record.status === 'deleted') throw new Error('无权更新此部门目标');
-    const keyResults = (record.payload.keyResults || []).map(kr => {
-      const review = rows.find(row => row.keyResultId === kr.id);
-      return review ? { ...kr, progress: review.currentProgress, details: kr.details?.map(detail => ({ ...detail, progress: review.detailProgress?.find(row => row.id === detail.id)?.currentProgress ?? detail.progress })) } : kr;
-    });
-    const weight = keyResults.reduce((sum, kr) => sum + kr.weight, 0);
-    const progress = weight ? Math.round(keyResults.reduce((sum, kr) => sum + kr.progress * kr.weight, 0) / weight * 10) / 10 : 0;
-    return { ...record, version: record.version + 1, progressHistory: [...(record.progressHistory || []), ...rows.map(row => ({ id: crypto.randomUUID(), itemId: row.keyResultId, operatorId: ownerId, createdAt: new Date().toISOString(), previousProgress: record.payload.keyResults?.find(kr => kr.id === row.keyResultId)?.progress || 0, progress: row.currentProgress, status: 'normal' as const, note: `部门${reviewType === 'month' ? '月' : '周'}报 ${period.startDate} 至 ${period.endDate} 汇总同步`, attachments: [] }))], payload: { ...record.payload, keyResults, progress } };
+    return record;
   });
-  return { records: next, payload: { ...payload, departmentFeedbackRows: feedback, departmentReviewExclusions: payload.departmentReviewExclusions?.map(row => ({ ...row, employeeName: people.find(person => person.id === row.employeeId)?.name, reason: row.reason.trim() })), krReviews: reviews, syncKrProgress: true, objectiveSnapshots: next.filter(record => reviews.some(row => row.objectiveId === record.id)).map(record => ({ id: record.id, period: record.periodKey, payload: record.payload })), departmentContentSnapshots: departmentContentSnapshots(records, people, ownerId, period, reviewType) } };
+  return { records: next, payload: { ...payload, departmentFeedbackRows: feedback, departmentReviewExclusions: payload.departmentReviewExclusions?.map(row => ({ ...row, employeeName: people.find(person => person.id === row.employeeId)?.name, reason: row.reason.trim() })), krReviews: reviews, syncKrProgress: false, objectiveSnapshots: next.filter(record => reviews.some(row => row.objectiveId === record.id)).map(record => ({ id: record.id, period: record.periodKey, payload: record.payload })), departmentContentSnapshots: departmentContentSnapshots(records, people, ownerId, period, reviewType) } };
 }

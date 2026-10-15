@@ -3,12 +3,17 @@ import type { OkrKrReview, OkrPayload } from '../../../services/okrRepository';
 import { mergeCopiedKrReviews } from './reviewCopy';
 import type { OkrRecord } from '../../../services/okrRepository';
 
+function permittedSupervisorProgress(target: OkrKrReview, saved: OkrKrReview) {
+  return target.supervisorProgress === undefined ? saved.supervisorProgress
+    : saved.supervisorProgress?.filter(row => target.supervisorProgress!.some(item => item.id === row.id));
+}
+
 export function reviewDraftTargets(objectives: OKRItem[]): OkrKrReview[] {
   return objectives.flatMap(objective => objective.keyResults.map(kr => ({
     objectiveId: objective.id, objectiveTitle: objective.objective,
     keyResultId: kr.id, keyResultTitle: kr.content,
     previousProgress: kr.progress, currentProgress: kr.progress,
-    health: 'normal' as const, achievement: '', blocker: '', nextPlan: '', workIds: [],
+    detailRows: kr.parentKeyResultDetails ?? kr.details, health: 'normal' as const, achievement: '', blocker: '', nextPlan: '', workIds: [],
   })));
 }
 
@@ -21,16 +26,19 @@ export function employeeReviewBaseline(targets: OkrKrReview[], records: OkrRecor
   return targets.map(target => {
     const previous = history.flatMap(record => record.payload.krReviews || []).find(row => row.objectiveId === target.objectiveId && row.keyResultId === target.keyResultId);
     return { ...target, previousProgress: previous?.currentProgress ?? 0, currentProgress: previous?.currentProgress ?? 0,
-      detailProgress: previous?.detailProgress?.map(row => ({ ...row, previousProgress: row.currentProgress })) };
+      detailProgress: previous?.detailProgress?.filter(row => !target.detailRows || target.detailRows.some(detail => detail.id === row.id)).map(row => ({ ...row, previousProgress: row.currentProgress })) };
   });
 }
 
 export function restoreReviewDraftTargets(current: OkrKrReview[], payload?: OkrPayload): OkrKrReview[] {
-  if (!payload?.startDate) return mergeCopiedKrReviews(current, payload?.krReviews || []);
+  if (!payload?.startDate) return mergeCopiedKrReviews(current, payload?.krReviews || []).map(saved => {
+    const target = current.find(row => row.objectiveId === saved.objectiveId && row.keyResultId === saved.keyResultId);
+    return target ? { ...saved, supervisorProgress: permittedSupervisorProgress(target, saved) } : saved;
+  });
   const restored = current.map(target => {
     const saved = payload.krReviews?.find(row => row.keyResultId === target.keyResultId && row.objectiveId === target.objectiveId);
     if (!saved) return target;
-    return { ...saved, objectiveId: target.objectiveId, objectiveTitle: target.objectiveTitle,
+    return { ...saved, supervisorProgress: permittedSupervisorProgress(target, saved), detailRows: target.detailRows, detailProgress: saved.detailProgress?.filter(row => !target.detailRows || target.detailRows.some(detail => detail.id === row.id)), objectiveId: target.objectiveId, objectiveTitle: target.objectiveTitle,
       keyResultId: target.keyResultId, keyResultTitle: target.keyResultTitle };
   });
   return restored.concat((payload.krReviews || []).filter(row => !current.some(target => target.keyResultId === row.keyResultId && target.objectiveId === row.objectiveId)));
@@ -42,8 +50,8 @@ export function reconcileReviewDraftTargets(previous: OkrKrReview[], current: Ok
     const edited = previous.find(row => row.keyResultId === target.keyResultId && row.objectiveId === target.objectiveId);
     if (!edited) return target;
     const baseline = priorTargets?.find(row => row.keyResultId === target.keyResultId && row.objectiveId === target.objectiveId);
-    return { ...edited, objectiveTitle: target.objectiveTitle, keyResultTitle: target.keyResultTitle,
-      previousProgress: target.previousProgress, detailProgress: edited.detailProgress?.map(row => {
+    return { ...edited, supervisorProgress: permittedSupervisorProgress(target, edited), objectiveTitle: target.objectiveTitle, keyResultTitle: target.keyResultTitle,
+      detailRows: target.detailRows, previousProgress: target.previousProgress, detailProgress: edited.detailProgress?.filter(row => !target.detailRows || target.detailRows.some(detail => detail.id === row.id)).map(row => {
         const prior = target.detailProgress?.find(item => item.id === row.id);
         return { ...row, previousProgress: prior?.previousProgress ?? row.previousProgress,
           currentProgress: row.currentProgress === (baseline?.detailProgress?.find(item => item.id === row.id)?.currentProgress ?? row.previousProgress) ? prior?.currentProgress ?? row.currentProgress : row.currentProgress };

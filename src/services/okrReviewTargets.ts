@@ -1,5 +1,6 @@
 import type { OKRItem } from '../types';
 import type { OkrPerson, OkrRecord } from './okrRepository';
+import { assignedDetailRows } from './okrAssignments';
 import { reviewTemplateFor } from './okrReviewTemplates';
 
 const effective = (record: OkrRecord) => ['active', 'reviewed', 'completed', 'archived'].includes(record.status)
@@ -17,13 +18,18 @@ export function monthlyReviewTargets(records: OkrRecord[], userId: string, peopl
       const actions = !supervisor && (personal || kr.executionActions !== undefined)
         ? (kr.executionActions || []).filter(action => action.ownerId === userId)
         : [kr];
+      const source = records.find(row => row.id === record.payload.sourceObjectiveId);
+      const sourceKr = source?.payload.keyResults?.find(row => row.id === record.payload.sourceKrId);
+      if (!supervisor && record.payload.sourceObjectiveId && (!source || !effective(source) || !sourceKr || !(sourceKr.details?.length ? assignedDetailRows(sourceKr, userId)?.length : sourceKr.assigneeIds?.includes(userId)))) return [];
+      const permittedDetails = assignedDetailRows(sourceKr || kr, userId);
+      if (!supervisor && (sourceKr || kr).details?.length && !permittedDetails.length) return [];
       return actions.map(action => ({
         id: action.id, content: action.title, progress: action.progress,
-        weight: action.weight ?? 100, deadline: action.deadline || '', assigneeIds: [userId],
+        weight: action.weight ?? 100, deadline: action.deadline || '', assigneeIds: supervisor ? kr.assigneeIds : [userId],
         businessObject: kr.businessObject, version: kr.version, details: supervisor ? kr.details : undefined,
         executionStatus: [...(record.progressHistory || [])].reverse().find(entry => entry.itemId === action.id)?.status,
         parentKeyResultId: supervisor ? undefined : kr.id, parentKeyResultTitle: supervisor ? undefined : kr.title,
-        parentKeyResultProgress: supervisor ? undefined : kr.progress, parentKeyResultDetails: supervisor ? undefined : kr.details, plannedStartDate: action.actualStartedAt || kr.actualStartedAt,
+        parentKeyResultProgress: supervisor ? undefined : kr.progress, parentKeyResultDetails: supervisor ? undefined : permittedDetails, plannedStartDate: action.actualStartedAt || kr.actualStartedAt,
       }));
     });
     return {
@@ -47,16 +53,17 @@ export function monthlyReviewTargets(records: OkrRecord[], userId: string, peopl
       id, cycle: first.periodKey, ownerId: userId, ownerName: person?.name || '本人',
       department: person?.department || '', category: 'my', objective: source?.payload.title || '本人月度执行动作',
       primaryLabel: 'O', weight: 100, progress: 0, deadline: first.payload.deadline || '', status: 'active',
-      keyResults: actions.map(record => {
+      keyResults: actions.flatMap(record => {
         const parentId = record.payload.parentKeyResultId || record.payload.parentActionId;
         const parent = source?.payload.keyResults?.find(kr => kr.id === parentId);
-        return {
+        if (source && (!effective(source) || parent && (parent.details?.length ? !assignedDetailRows(parent, userId)?.length : parent.assigneeIds && !parent.assigneeIds.includes(userId)))) return [];
+        return [{
           id: record.id, content: record.payload.title, progress: record.payload.progress || 0,
           weight: record.payload.weight ?? 100, deadline: record.payload.deadline || '', assigneeIds: [userId],
           businessObject: parent?.businessObject, version: parent?.version,
           parentKeyResultId: parent?.id, parentKeyResultTitle: parent?.title,
-          parentKeyResultProgress: parent?.progress, parentKeyResultDetails: parent?.details, plannedStartDate: record.payload.actualStartedAt || parent?.actualStartedAt,
-        };
+          parentKeyResultProgress: parent?.progress, parentKeyResultDetails: parent ? assignedDetailRows(parent, userId) : undefined, plannedStartDate: record.payload.actualStartedAt || parent?.actualStartedAt,
+        }];
       }),
     });
   }

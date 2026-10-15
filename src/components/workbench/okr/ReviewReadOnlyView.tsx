@@ -1,3 +1,4 @@
+import { KnowledgeAttachments } from '../KnowledgeAttachments';
 import { ModernReviewReadOnlyView } from './ModernReviewReadOnlyView';
 import React, { useState } from 'react';
 import type { OkrKrReview } from '../../../services/okrRepository';
@@ -131,7 +132,7 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
 
       {<section className="okr-review-readonly-section">
         <div className="okr-review-readonly-title"><FileText /><h3>知识沉淀</h3></div>
-        {review.knowledgeEntries?.length ? review.knowledgeEntries.map(item => <article key={item.id}><b>{item.title}</b><Tag>{item.category}</Tag><p className="whitespace-pre-wrap break-words">{item.summary}</p><p className="whitespace-pre-wrap break-words">{item.content}</p>{item.linkUrl && <p className="break-words">链接地址：{item.linkUrl}</p>}</article>) : <Empty description="暂无知识沉淀" />}
+        {review.knowledgeEntries?.length ? review.knowledgeEntries.map(item => <article key={item.id}><b>{item.title}</b><KnowledgeAttachments attachments={item.attachments}/><p className="whitespace-pre-wrap break-words">{item.summary}</p><p className="whitespace-pre-wrap break-words">{item.content}</p>{item.linkUrl && <p className="break-words">链接地址：{item.linkUrl}</p>}</article>) : <Empty description="暂无知识沉淀" />}
       </section>}
 
       {review.type === 'month' && review.nextMonthArrangement && (

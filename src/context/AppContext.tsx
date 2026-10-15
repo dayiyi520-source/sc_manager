@@ -1,3 +1,4 @@
+import { loadKnowledgeDocs, saveKnowledgeDocs } from '../services/knowledgeRepository';
 import { directoryCustomers, directoryLeads, directoryOpportunities, directoryProjects } from '../services/customerDirectoryData';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { customerDirectoryRepository } from '../services/customerDirectoryRepository';
@@ -399,7 +400,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [projects, setProjects] = useState<ProjectItem[]>(directoryProjects());
   const [servers, setServers] = useState<ServerNode[]>([]);
   const { okrs, setOkrs, performances, setPerformances } = useOkrState(currentUser, dataMode === 'remote' || import.meta.env.VITE_MOCK_MODE !== 'false');
-  const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>([]);
+  const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>(loadKnowledgeDocs);
 
   // Operations & Delivery Extensions
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -828,31 +829,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addKnowledgeDoc = (doc: Partial<KnowledgeDoc>) => {
     const newDoc: KnowledgeDoc = {
-      id: `doc-${Date.now()}`,
+      ...doc,
+      id: crypto.randomUUID(),
       title: doc.title || '新建知识文档',
       category: doc.category || '应知应会',
-      subCategory: doc.subCategory || '通用规范',
-      tags: doc.tags && doc.tags.length > 0 ? doc.tags : ['标准规范'],
+      subCategory: doc.subCategory || '',
+      tags: doc.tags || [],
       author: doc.author || currentUser.name,
       creator: currentUser.name,
-      version: doc.version || 'V1.0.0',
+      version: doc.version || '',
       updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
       timeAgo: '刚刚',
       views: 1,
       downloadsCount: 0,
       isFavorited: false,
       summary: doc.summary || '文档简述',
-      content: doc.content || `## ${doc.title || '新建知识文档'}\n\n该文档由 ${currentUser.name} 沉淀至公司知识库。`,
+      content: doc.content || '',
       fileType: doc.fileType || 'doc',
-      dingtalkUrl: doc.dingtalkUrl || 'https://dingtalk.com/doc/new-doc',
-      wecomUrl: doc.wecomUrl || 'https://work.weixin.qq.com/doc/new-doc',
-      fileSize: doc.fileSize || '3.5 MB',
+      dingtalkUrl: doc.dingtalkUrl,
+      wecomUrl: doc.wecomUrl,
+      fileSize: doc.fileSize,
       isMine: true,
       isFollowed: true
     };
-    setKnowledgeDocs((prev) => [newDoc, ...prev]);
+    const next = [newDoc, ...knowledgeDocs];
+    saveKnowledgeDocs(next);
+    setKnowledgeDocs(next);
     addToast('success', '知识文档已上传发布', newDoc.title);
   };
+
+  useEffect(() => { try { saveKnowledgeDocs(knowledgeDocs); } catch { addToast('error', '知识库保存失败，请检查浏览器存储空间'); } }, [knowledgeDocs]);
 
   const toggleFavoriteDoc = (id: string) => {
     setKnowledgeDocs((prev) =>

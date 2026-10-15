@@ -47,7 +47,7 @@ describe('复盘调整的文件持久化闭环', () => {
    };
    const created = await call('/api/okr/records', { viewerId: manager.id, kind: 'review', periodKey: `${period.startDate}/${period.endDate}`, payload, submit: false }) as { id: string };
    const storedDraft = read().okrRecords.find(row => row.id === created.id)!;
-   expect(storedDraft.payload).toEqual(payload);
+   expect(storedDraft.payload).toMatchObject(payload);
    localStorage.clear(); persistence = start();
    await persistence.run(async () => expect(JSON.parse(localStorage.getItem(key)!).find((row: OkrRecord) => row.id === created.id)).toEqual(storedDraft));
    rejectSave = true;

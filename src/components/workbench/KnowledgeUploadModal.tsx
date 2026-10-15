@@ -1,85 +1,57 @@
-import React, { useId, useRef, useState } from 'react';
-import { Button, Col, Form, Input, Modal, Row, Select } from 'antd';
-import type { InputRef } from 'antd';
-import { KnowledgeDoc, KnowledgePrimaryCategory } from '../../types';
+import React, { useRef, useState } from 'react';
+import { Alert, Button, Form, Input, Modal, Upload } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
+import type { KnowledgeDoc } from '../../types';
+import { readKnowledgeAttachment, type KnowledgeAttachment } from '../../services/knowledgeAttachments';
 
 interface KnowledgeUploadModalProps {
   mode?: 'library' | 'review';
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (doc: Partial<KnowledgeDoc>) => void;
+  onSubmit: (doc: Partial<KnowledgeDoc>) => void | boolean | Promise<void | boolean>;
 }
 
-export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
-  mode = 'library',
-  isOpen,
-  onClose,
-  onSubmit
-}) => {
-  const [title, setTitle] = useState('');
-  const [submitAttempted, setSubmitAttempted] = useState(false);
-  const titleId = useId();
-  const titleRef = useRef<InputRef>(null);
-  const titleInvalid = submitAttempted && !title.trim();
-  const [category, setCategory] = useState<KnowledgePrimaryCategory>('应知应会');
-  const [subCategory, setSubCategory] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
-  const [version, setVersion] = useState('V1.0.0');
-  const [summary, setSummary] = useState('');
-  const [fileType, setFileType] = useState<'word' | 'code' | 'ppt' | 'pdf' | 'excel' | 'design' | 'doc'>('doc');
-  const [linkUrl, setLinkUrl] = useState('');
-  const [content, setContent] = useState('');
-
-  if (!isOpen) return null;
-
-  const handleSubmit = () => {
-    if (!title.trim()) {
-      setSubmitAttempted(true);
-      titleRef.current?.focus();
-      return;
-    }
-
-    const tags = tagsInput
-      .split(/[,，\s]+/)
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    onSubmit({
-      title: title.trim(),
-      category,
-      subCategory: subCategory.trim() || '通用规范',
-      tags: tags.length > 0 ? tags : ['企业标准'],
-      version: version.trim() || 'V1.0.0',
-      summary: summary.trim() || (mode === 'review' ? '' : '已沉淀至公司知识库的标准文档。'),
-      content: content.trim(),
-      fileType,
-      linkUrl: linkUrl.trim() || undefined,
-      fileSize: mode === 'review' ? undefined : '4.2 MB',
-      isMine: true,
-      isFollowed: true
-    });
-
-    onClose();
+export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({ mode = 'library', isOpen, onClose, onSubmit }) => {
+  const [form] = Form.useForm();
+  const [attachments, setAttachments] = useState<KnowledgeAttachment[]>([]);
+  const [saving, setBusy] = useState(false);
+  const [pending, setPending] = useState(0);
+  const attachmentRef = useRef<KnowledgeAttachment[]>([]);
+  const busy = saving || pending > 0;
+  const updateAttachments = (rows: KnowledgeAttachment[]) => { attachmentRef.current = rows; setAttachments(rows); };
+  const [error, setError] = useState('');
+  const submit = async () => {
+    const values = await form.validateFields().catch(() => null);
+    if (!values) return;
+    setBusy(true); setError('');
+    try {
+      const saved = await onSubmit({ title: values.title.trim(), summary: values.summary.trim(), linkUrl: values.linkUrl?.trim() || undefined, attachments, isMine: true, isFollowed: true });
+      if (saved !== false) { form.resetFields(); updateAttachments([]); onClose(); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '保存失败，请重试'); }
+    finally { setBusy(false); }
   };
-
-  return <Modal open={isOpen} onCancel={onClose} title={mode === 'review' ? '新建知识沉淀' : '上传 / 沉淀企业知识文档'} width={720}
-    footer={<><Button onClick={onClose}>取消</Button><Button type="primary" onClick={handleSubmit}>{mode === 'review' ? '确认添加' : '确认发布沉淀'}</Button></>}>
-    <Form layout="vertical">
-      <Form.Item label="文档名称" htmlFor={titleId} required validateStatus={titleInvalid ? 'error' : undefined}
-        help={titleInvalid ? <span id={`${titleId}-error`} role="alert">请输入文档名称</span> : undefined}>
-        <Input id={titleId} ref={titleRef} aria-required="true" aria-invalid={titleInvalid} aria-describedby={titleInvalid ? `${titleId}-error` : undefined}
-          value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：智慧校园平台V3.0产品需求规格说明书" />
+  return <Modal open={isOpen} onCancel={() => { if (!busy) onClose(); }} title="新建知识沉淀" width={720} closable={!busy} maskClosable={!busy}
+    footer={<><Button disabled={busy} onClick={onClose}>取消</Button><Button type="primary" loading={busy} onClick={() => void submit()}>{mode === 'review' ? '确认添加' : '确认发布沉淀'}</Button></>}>
+    <Form form={form} layout="vertical" disabled={busy}>
+      <Form.Item name="title" label="标题" rules={[{ required: true, whitespace: true, message: '请输入标题' }]}><Input maxLength={255}/></Form.Item>
+      <Form.Item name="summary" label="内容摘要" rules={[{ required: true, whitespace: true, message: '请输入内容摘要' }]}><Input.TextArea rows={3} maxLength={10000}/></Form.Item>
+      <Form.Item name="linkUrl" label="链接地址" rules={[{ validator: (_, value) => !value?.trim() || /^https?:\/\/[^\s]+$/i.test(value.trim()) ? Promise.resolve() : Promise.reject(new Error('请输入 http 或 https 链接')) }]}><Input placeholder="选填"/></Form.Item>
+      <Form.Item label="附件" extra="支持多个附件，总大小不超过 1MB">
+        <Upload multiple disabled={busy} fileList={attachments.map(file => ({ uid: file.id, name: file.name, status: 'done' }))}
+          onRemove={file => { updateAttachments(attachmentRef.current.filter(row => row.id !== file.uid)); }}
+          beforeUpload={async file => {
+            setPending(count => count + 1); setError('');
+            try {
+              const attachment = await readKnowledgeAttachment(file);
+              const rows = attachmentRef.current;
+              if (rows.reduce((sum, row) => sum + row.size, 0) + attachment.size > 1024 * 1024) setError('附件总大小不能超过 1MB');
+              else updateAttachments([...rows, attachment]);
+            } catch (cause) { setError(cause instanceof Error ? cause.message : '读取附件失败'); }
+            finally { setPending(count => count - 1); }
+            return Upload.LIST_IGNORE;
+          }}><Button icon={<UploadOutlined/>}>添加附件</Button></Upload>
       </Form.Item>
-      <Row gutter={16}>
-        <Col span={12}><Form.Item label="一级分类" required><Select value={category} onChange={setCategory} options={['应知应会', '产研规范', '产品沉淀', '项目沉淀', '售前文档', '行业洞察'].map(value => ({ value, label: value }))}/></Form.Item></Col>
-        <Col span={12}><Form.Item label="二级子分类 / 专业领域"><Input value={subCategory} onChange={e => setSubCategory(e.target.value)} placeholder="例如：研发规范、产品设计文档、行业知识" /></Form.Item></Col>
-        <Col span={12}><Form.Item label="版本号"><Input value={version} onChange={e => setVersion(e.target.value)} placeholder="V1.0.0 或 2024版" /></Form.Item></Col>
-        <Col span={12}><Form.Item label="文档格式类型"><Select value={fileType} onChange={setFileType} options={[{value:'doc',label:'Word / 文档 (DOC)'},{value:'code',label:'代码 / 规范手册 (CODE)'},{value:'ppt',label:'演示文稿 / 宣讲 (PPT)'},{value:'pdf',label:'行业报告 / 白皮书 (PDF)'},{value:'design',label:'UI/UX 交互设计稿 (DESIGN)'},{value:'excel',label:'数据表格 / Checklist (EXCEL)'}]} /></Form.Item></Col>
-      </Row>
-      <Form.Item label="标签关键词 (以逗号或空格分隔)"><Input value={tagsInput} onChange={e => setTagsInput(e.target.value)} placeholder="例如：产品设计, PRD, 智慧校园, 交付规范" /></Form.Item>
-      <Form.Item label="文档摘要 / 适用场景说明"><Input.TextArea rows={2} value={summary} onChange={e => setSummary(e.target.value)} placeholder="简要概括文档核心内容，便于全员高效检索..." /></Form.Item>
-      <Form.Item label="链接地址（可选）"><Input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="请输入文档链接地址" /></Form.Item>
-      <Form.Item label="正文内容简述 / Markdown 大纲 (可选)"><Input.TextArea rows={3} value={content} onChange={e => setContent(e.target.value)} placeholder="输入文档大纲或核心段落..." /></Form.Item>
+      {error && <Alert type="error" showIcon title={error}/>}
     </Form>
   </Modal>;
 };

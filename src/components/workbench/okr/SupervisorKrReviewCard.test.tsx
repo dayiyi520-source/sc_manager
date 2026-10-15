@@ -29,7 +29,7 @@ it('merges employee and supervisor evidence in one table with names and owner-on
   const saved = { ...review, workIds: ['employee-work'] };
   const employeeSnapshot = { id: 'employee-review', authorId: 'e', authorName: '张三', title: '员工周报', startDate: '2026-10-12', endDate: '2026-10-18', status: 'submitted', krReviews: [saved], assistance: [], items: [{ workId: 'employee-work', title: '员工验证', status: '已完成', sourceLabel: '产品甲 / V1', actualHours: 2, result: '', impact: '' }] };
   render(<SupervisorKrReviewCard {...props} viewerName="陈宇璋" selfAssigned review={{ ...review, employeeReviewSnapshots: [employeeSnapshot] }} ownEvidence={[{ id: 'owner-work', title: '主管验证', status: '已完成', productLineName: '产品乙', versionName: 'V2', actualHours: 3, ownerName: '任务负责人' } as OkrWork]}/>);
-  expect(screen.getByRole('columnheader', { name: '陈宇璋' })).toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: '更改进度' })).toBeInTheDocument();
   expect(screen.queryByText('本人进度')).not.toBeInTheDocument();
   expect(screen.queryByText('主管本人工作证据')).not.toBeInTheDocument();
   const employeeRow = screen.getByText('员工验证').closest('tr')!;
@@ -41,4 +41,20 @@ it('merges employee and supervisor evidence in one table with names and owner-on
   expect(within(ownerRow).getByRole('button', { name: '移除本人证据：主管验证' })).toBeEnabled();
   expect(within(ownerRow).getByText('产品乙 / V2')).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: '关联工作证据' })).toHaveLength(1);
+});
+
+it('never inherits main KR permission for unassigned sub KR rows', () => {
+  render(<SupervisorKrReviewCard {...props} selfAssigned review={{ ...review, detailRows: [
+    { id: 'own', name: '本人子项', assigneeIds: ['m'] },
+    { id: 'other', name: '他人子项', assigneeIds: ['e'] },
+    { id: 'legacy', name: '旧版未指派子项' },
+    { id: 'empty', name: '未指派子项', assigneeIds: [] },
+  ] }}/>);
+  expect(screen.getAllByRole('spinbutton')).toHaveLength(1);
+  expect(within(screen.getByText('本人子项').closest('tr')!).getByRole('spinbutton')).toBeInTheDocument();
+  for (const name of ['他人子项', '旧版未指派子项', '未指派子项']) {
+    const row = within(screen.getByText(name).closest('tr')!);
+    expect(row.queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(row.getByText('——')).toBeInTheDocument();
+  }
 });

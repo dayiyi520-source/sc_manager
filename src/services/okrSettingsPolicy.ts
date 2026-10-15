@@ -1,10 +1,11 @@
+import { normalizeLegacyReviewTemplates, validateReviewTemplates } from './reviewTemplateConfiguration';
 import { validateWeeklyCycles } from './weeklyReviewCycles';
 import { normalizeObjectiveTitleTemplates, validateObjectiveTitleTemplates } from './okrObjectiveTitleTemplates';
 import type { OkrConfirmationSettings, OkrPerson, OkrRecord, OkrSettings } from './okrRepository';
 import { defaultCycles, materializePeriods } from './okrPeriods';
 export const defaultConfirmation = (): OkrConfirmationSettings => ({ enabled:true,visiblePending:true,actions:['create','update'],types:['target','challenge'],missingSupervisor:'admin',selfSupervisor:'auto',exemptIds:[],companyEditorIds:[] });
 export function normalizedPolicy(settings: OkrSettings, people: OkrPerson[] = []): OkrSettings {
-  return {...settings, cycles:materializePeriods({...defaultCycles(),...settings.cycles,schedules:{...defaultCycles().schedules,...settings.cycles?.schedules}}), administratorIds:settings.administratorIds ?? people.filter(p=>p.rootFlag).map(p=>p.id), confirmation:{...defaultConfirmation(),...settings.confirmation}};
+  return {...settings, ...(settings.reviewReportTemplates ? { reviewReportTemplates: normalizeLegacyReviewTemplates(settings.reviewReportTemplates) } : {}), cycles:materializePeriods({...defaultCycles(),...settings.cycles,schedules:{...defaultCycles().schedules,...settings.cycles?.schedules}}), administratorIds:settings.administratorIds ?? people.filter(p=>p.rootFlag).map(p=>p.id), confirmation:{...defaultConfirmation(),...settings.confirmation}};
 }
 export const isOkrAdmin = (viewer: string, settings: OkrSettings | undefined, people: OkrPerson[]) => settings?.administratorIds ? settings.administratorIds.includes(viewer) : !!people.find(p=>p.id===viewer)?.rootFlag;
 export const canEditOkr = (record: OkrRecord, viewer: string, settings?: OkrSettings, people: OkrPerson[] = []) => record.ownerId === viewer || (record.payload.goalLevel === 'company' || record.kind === 'objective' && !!people.find(p=>p.id===record.ownerId)?.rootFlag) && (isOkrAdmin(viewer, settings, people) || !!settings?.confirmation?.companyEditorIds.includes(viewer));
@@ -27,6 +28,8 @@ export function confirmationReviewer(owner: OkrPerson, action: 'create'|'update'
   return administrator;
 }
 export function validatePolicy(settings: OkrSettings, people: OkrPerson[], previous?: OkrSettings) {
+  const templateError = validateReviewTemplates(settings.reviewReportTemplates || [], previous?.reviewReportTemplates || []);
+  if (templateError) return templateError;
   const cycleError = validateWeeklyCycles(settings.weeklyReviewCycles || [], previous?.weeklyReviewCycles || settings.weeklyReviewCycles || []);
   if (cycleError) return cycleError;
   if (settings.supervisorIds?.some(id => !people.some(person => person.id === id))) return '所选主管已失效，请重新选择';

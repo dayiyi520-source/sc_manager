@@ -346,3 +346,15 @@ it('shows assigned personal execution content in card view',()=>{
  render(<MyTargetMonthSection periodKey="2026-10" targets={buildMyTargetViewItems([goal],[],[goal],[],'staff')} viewMode="card" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()}/>);
  expect(screen.getByText('本人计划动作')).toBeInTheDocument();expect(screen.queryByText('暂无拆解行动')).not.toBeInTheDocument();
 });
+
+it('shows all source KR assignees and each latest sub KR assignment in the employee list', () => {
+  const people: OkrPerson[] = ['m', 'a', 'b'].map(id => ({ id, name: `姓名${id}`, department: '研发', supervisorId: id === 'm' ? null : 'm', rootFlag: id === 'm' ? 1 : 0, version: 1 }));
+  const source: OkrRecord = { id: 'dept', kind: 'objective', ownerId: 'm', periodKey: '2026-10', status: 'active', version: 2, payload: { title: '部门O', goalLevel: 'department', keyResults: [{ id: 'kr', title: '部门KR', weight: 100, progress: 0, assigneeIds: ['a', 'b'], details: [{ id: 'one', name: '甲', assigneeIds: ['a'] }, { id: 'two', name: '乙', assigneeIds: ['b'] }] }] } };
+  const personal: OkrRecord = { id: 'personal', kind: 'objective', ownerId: 'a', periodKey: '2026-10', status: 'active', version: 1, payload: { title: '个人承接', goalLevel: 'personal', sourceObjectiveId: 'dept', sourceKrId: 'kr', keyResults: [{ id: 'kr', title: '部门KR', progress: 0, weight: 100, assigneeIds: ['a'], details: [{ id: 'one', name: '甲' }] }] } };
+  const targets = buildMyTargetViewItems([personal], [], [source], people, 'a');
+  expect(targets[0].ownerNames).toEqual(['姓名a', '姓名b']);
+  render(<MyTargetMonthSection periodKey="2026-10" targets={targets} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()}/>);
+  expect(screen.getByText('承接人员：姓名a、姓名b')).toBeInTheDocument();
+  expect(within(screen.getByText('乙').closest('tr')!).getByText('姓名b')).toBeInTheDocument();
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+});

@@ -9,8 +9,9 @@ export function validateWeeklyCycles(rows: OkrWeeklyReviewCycle[], previous: Okr
   for (const row of rows) {
     if (!row.id || ids.has(row.id)) return '周报周期标识重复';
     ids.add(row.id);
+    if (row.title !== undefined && (!row.title.trim() || row.title.trim().length > 100)) return '周报周期标题须为1至100个字符';
     if (!dateValid(row.startDate) || !dateValid(row.endDate) || row.startDate > row.endDate || row.month !== row.startDate.slice(0, 7)) return '周报周期日期或所属月份无效';
-    if (!['byRole', 'employee', 'supervisor'].includes(row.template) || typeof row.allowBackfill !== 'boolean') return '请选择有效的周报模板及补录规则';
+    if (typeof row.allowBackfill !== 'boolean') return '请选择有效的补录规则';
     if (!timeValid(row.notifyAt) || !timeValid(row.deadline) || row.notifyAt > row.deadline || dayjs(row.notifyAt).isBefore(dayjs(row.startDate)) || dayjs(row.deadline).isBefore(dayjs(row.endDate).startOf('day'))) return '通知时间须在周期开始后且不晚于截止时间，截止日期不能早于周期结束日期';
     const old = previous.find(item => item.id === row.id);
     if ((!old || weeklyCycleState(old, now) === '未开始') && weeklyCycleState(row, now) !== '未开始') return '只能新增或调整为未开始的周报周期';
@@ -19,7 +20,7 @@ export function validateWeeklyCycles(rows: OkrWeeklyReviewCycle[], previous: Okr
   if (ordered.some((row, index) => index > 0 && row.startDate <= ordered[index - 1].endDate)) return '周报周期时间不能重叠';
   for (const old of previous) {
     const next = rows.find(row => row.id === old.id);
-    if (weeklyCycleState(old, now) !== '未开始' && (!next || ['month', 'startDate', 'endDate', 'template', 'notifyAt', 'deadline', 'allowBackfill'].some(key => old[key as keyof OkrWeeklyReviewCycle] !== next[key as keyof OkrWeeklyReviewCycle]))) return '已开始或已结束的周报周期不能修改或删除';
+    if (weeklyCycleState(old, now) !== '未开始' && (!next || ['title', 'month', 'startDate', 'endDate', 'notifyAt', 'deadline', 'allowBackfill'].some(key => old[key as keyof OkrWeeklyReviewCycle] !== next[key as keyof OkrWeeklyReviewCycle]))) return '已开始或已结束的周报周期不能修改或删除';
   }
 }
 export function weeklyCycleFor(settings: OkrSettings | undefined, startDate?: string, endDate?: string) {
