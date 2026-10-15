@@ -11,6 +11,13 @@ interface Props {
   onChange: (rows: DetailProgress[]) => void;
 }
 
+export function ReviewProgressCell({ label, previous, value, disabled, onChange }: { label: string; previous: number; value: number; disabled: boolean; onChange: (value: number) => void }) {
+  return <div className="okr-review-detail-progress-cell flex items-center gap-2 whitespace-nowrap text-xs text-[var(--text-body)]">
+    <span>复盘前进度 {previous}% → 当前进度</span>
+    <InputNumber className="okr-review-detail-progress-input" aria-label={label} min={0} max={100} precision={0} suffix="%" size="small" disabled={disabled} value={value} onChange={next => onChange(next ?? 0)}/>
+  </div>;
+}
+
 /** The goal's KR subtable is read-only except for this employee's own review progress. */
 export function EmployeeReviewDetailTable({ rows, progress, productName, disabled, onChange }: Props) {
   return <div className="okr-kr-detail-table" aria-label="KR子表进度更新">
@@ -23,11 +30,8 @@ export function EmployeeReviewDetailTable({ rows, progress, productName, disable
       { title: '进度修改', key: 'reviewProgress', width: 290, render: (_, row) => {
         const saved = progress.find(item => item.id === row.id);
         const previous = saved?.previousProgress ?? 0;
-        return <div className="okr-review-detail-progress-cell flex items-center gap-2 whitespace-nowrap text-xs text-[var(--text-body)]">
-          <span>复盘前进度 {previous}% → 当前进度</span>
-          <InputNumber className="okr-review-detail-progress-input" aria-label={`${row.name} ${row.version || ''}本期更新进度`} min={0} max={100} precision={0} suffix="%" size="small" disabled={disabled} value={saved?.currentProgress ?? previous}
-            onChange={value => onChange([...progress.filter(item => item.id !== row.id), { id: row.id, previousProgress: previous, currentProgress: value ?? 0 }])}/>
-        </div>;
+        return <ReviewProgressCell label={`${row.name} ${row.version || ''}本期更新进度`} previous={previous} value={saved?.currentProgress ?? previous} disabled={disabled}
+          onChange={value => onChange([...progress.filter(item => item.id !== row.id), { id: row.id, previousProgress: previous, currentProgress: value }])}/>;
       } },
     ]}/>
   </div>;

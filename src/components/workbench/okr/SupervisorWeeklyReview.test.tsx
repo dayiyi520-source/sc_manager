@@ -109,14 +109,14 @@ describe('supervisor self-assignment editing and saved recovery', () => {
     const work = [{ id: 'owner-task', sourceId: 'owner-task', title: '主管验证任务', kind: 'task', status: '已完成', assigneeId: manager.id, ownerName: manager.name, createdAt: '2026-10-12', completedAt: '2026-10-13', updatedAt: '2026-10-13', dueDate: '', actualHours: 1, estimatedHours: 1, linkVersion: 0, sourceWorkOrderIds: '[]' }];
     const { unmount } = render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} work={work} onSaveDraft={save}/>);
     fireEvent.click(screen.getByText('KR1：部门 KR'));
-    fireEvent.change(screen.getByRole('spinbutton', { name: '本人进度：部门 KR' }), { target: { value: '70' } });
-    fireEvent.click(within(screen.getByRole('region', { name: '主管本人工作证据' })).getByRole('button', { name: '关联工作证据' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: '主管进度：部门 KR' }), { target: { value: '70' } });
+    fireEvent.click(within(screen.getByRole('region', { name: '主管 KR 复盘：部门 KR' })).getByRole('button', { name: '关联工作证据' }));
     expect(screen.getByText(/全部产品/)).toBeInTheDocument();
     const picker = screen.getByRole('dialog');
     const choices = within(picker).getAllByRole('checkbox');
     fireEvent.click(choices[choices.length - 1]);
     fireEvent.click(within(picker).getByRole('button', { name: '确认关联' }));
-    await waitFor(() => expect(within(screen.getByRole('region', { name: '主管本人工作证据' })).getByText('主管验证任务')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('主管验证任务')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
     expect(save.mock.calls[0][0].krReviews?.[0]).toMatchObject({ currentProgress: 70, supervisorProgress: [{ id: 'manager-kr', currentProgress: 70 }], workIds: ['owner-task'] });
     const payload = save.mock.calls[0][0];
@@ -124,8 +124,24 @@ describe('supervisor self-assignment editing and saved recovery', () => {
     unmount();
     render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} initialPayload={payload} onSaveDraft={save}/>);
     fireEvent.click(screen.getByText('KR1：部门 KR'));
-    expect(screen.getByRole('spinbutton', { name: '本人进度：部门 KR' })).toHaveValue('70');
-    expect(within(screen.getByRole('region', { name: '主管本人工作证据' })).getByText('主管验证任务')).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: '主管进度：部门 KR' })).toHaveValue('70');
+    expect(screen.getByText('主管验证任务')).toBeInTheDocument();
   });
 });
 
+it('offers supervisor pending tasks in extra work and saves their source as the supervisor name', () => {
+  const save = vi.fn(async (_payload: OkrPayload) => true);
+  const work = [{ id: 'pending-own', sourceId: 'pending-own', title: '主管待测试工作', kind: 'task', status: '待测试', assigneeId: manager.id, ownerName: manager.name, createdAt: '2026-10-12', updatedAt: '2026-10-12', dueDate: '', actualHours: 0, estimatedHours: 1, linkVersion: 0, sourceWorkOrderIds: '[]' }];
+  render(<WeeklyReviewEditor {...baseProps} records={[]} work={work} onSaveDraft={save}/>);
+  const extra = screen.getByText('2. 插播任务').closest('section')!;
+  fireEvent.click(within(extra).getByRole('button', { name: '关联工作证据' }));
+  const picker = screen.getByRole('dialog');
+  expect(within(picker).getByText(/主管待测试工作/)).toBeInTheDocument();
+  const choices = within(picker).getAllByRole('checkbox');
+  fireEvent.click(choices[choices.length - 1]);
+  fireEvent.click(within(picker).getByRole('button', { name: '确认关联' }));
+  const row = within(extra).getByText('主管待测试工作').closest('tr')!;
+  expect(within(row).getByText('主管')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
+  expect(save.mock.calls[0][0].extraWork?.workIds).toContain('pending-own');
+});

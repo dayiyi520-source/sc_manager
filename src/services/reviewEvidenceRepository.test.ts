@@ -30,3 +30,9 @@ describe('review evidence adapters', () => {
     expect(rows[0]).toMatchObject({ id: 'saved-id', sourceId: 't', productLineName: '产品甲', versionName: 'V1' });
   });
 });
+
+it('uses a supplied assignee ID as authoritative and supports missing display names', () => {
+  const task = { id: 't', code: 'T', category: 'test', title: '主管待测试任务', productLineId: 'p', assigneeId: 'me', status: { name: '待测试' } };
+  expect(taskEvidence(task, '产品甲', viewer)).toMatchObject({ assigneeId: 'me', ownerName: '本人', status: '待测试' });
+  expect(taskEvidence({ ...task, assigneeId: 'other', assigneeName: '本人' }, '产品甲', viewer)).toBeUndefined();
+});

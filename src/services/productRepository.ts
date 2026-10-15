@@ -32,6 +32,7 @@ export type WorkItemTemplateType = ProductLineWorkItemType & {
   workflow?: WorkItemWorkflow & { templateTypeId?: string | null };
 };
 export type UnifiedWorkItem = {
+  assigneeId?: string;
   verifierId?: string; verifierName?: string;
   projectId?: string; projectName?: string; needsCollaboration?: Array<'design' | 'dev' | 'test'>; relatedTaskIds?: string[]; sourceWorkOrderIds?: string[]; sourceWorkOrderTitles?: string[];
   id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;

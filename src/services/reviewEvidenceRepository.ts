@@ -30,11 +30,12 @@ export function collaborationEvidence(task: RequirementTask, viewer: EvidenceVie
 }
 
 export function taskEvidence(task: UnifiedWorkItem, productName: string, viewer: EvidenceViewer): OkrWork | undefined {
-  if (task.assigneeName !== viewer.name || task.sourceType === 'COLLABORATION' || task.sourceType === 'collaboration') return;
+  const assigneeId = task.assigneeId;
+  if (!belongsTo(assigneeId, task.assigneeName, viewer) || task.sourceType === 'COLLABORATION' || task.sourceType === 'collaboration') return;
   return {
     id: `task:${task.id}`, sourceId: task.id, kind: 'task', title: task.title,
     status: task.status?.name || '', statusGroup: task.status?.group,
-    ownerName: task.assigneeName, assigneeId: viewer.id, creatorName: task.creatorName,
+    ownerName: task.assigneeName || viewer.name, assigneeId: assigneeId || viewer.id, creatorName: task.creatorName,
     productLineId: task.productLineId, productLineName: productName, versionId: task.versionId || undefined, versionName: task.versionName,
     participantNames: strings(task.ccNames), createdAt: task.createdAt || '', updatedAt: task.createdAt || '', completedAt: task.completedAt || undefined,
     dueDate: task.dueDate || '', actualHours: task.actualHours || 0, estimatedHours: task.estimatedHours || 0,

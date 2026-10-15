@@ -1,13 +1,15 @@
+import { ReviewProgressCell } from './EmployeeReviewDetailTable';
+import { completedActualHours } from './reviewActualHours';
 import { CircleIcon, CheckCircleIcon, AlertIcon, ClockIcon } from '@primer/octicons-react';
 import './supervisorReview.css';
-import { Alert, Button, Collapse, Empty, Spin, Table, Tag, InputNumber } from 'antd';
+import { Alert, Button, Collapse, Empty, Spin, Table, Tag } from 'antd';
 import type { OkrWork, OkrKrReview } from '../../../services/okrRepository';
 import type { EmployeeReviewSupport } from '../../../services/supervisorReview';
 import type { EmployeeActionGroup } from '../../../services/supervisorSupportPanels';
 import { employeeEvidenceForKr } from '../../../services/supervisorSupportPanels';
 
-export function SupervisorKrReviewCard({ review, employeeActions, supports, busy, editable, supportLoading, supportError, onRetry, onUpdate, onEmployeeSupport, viewerId, selfAssigned = false, ownEvidence = [], onAddEvidence, onRemoveEvidence }: {
-  viewerId?: string; selfAssigned?: boolean; ownEvidence?: OkrWork[]; onAddEvidence?: () => void; onRemoveEvidence?: (id: string) => void;
+export function SupervisorKrReviewCard({ review, employeeActions, supports, busy, editable, supportLoading, supportError, onRetry, onUpdate, onEmployeeSupport, viewerId, viewerName, selfAssigned = false, ownEvidence = [], onAddEvidence, onRemoveEvidence }: {
+  viewerId?: string; viewerName?: string; selfAssigned?: boolean; ownEvidence?: OkrWork[]; onAddEvidence?: () => void; onRemoveEvidence?: (id: string) => void;
   review: OkrKrReview; employeeActions: EmployeeActionGroup[]; supports: EmployeeReviewSupport[];
   busy: boolean; editable: boolean; supportLoading: boolean; supportError?: unknown; onRetry?: () => void;
   onUpdate: (patch: Partial<OkrKrReview>) => void; onEmployeeSupport: (authorId: string, reportIds: string[]) => void;
@@ -24,6 +26,18 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
   }
   const pending = sourceReports.filter(report => report.status !== 'reviewed' && !viewed.has(report.id)).length;
   const evidence = employeeEvidenceForKr(supports, snapshots);
+  const evidenceRows = new Map(evidence.map(item => [item.workId, {
+    id: item.workId, title: item.title, status: item.status, sourceLabel: item.sourceLabel || '—',
+    hours: completedActualHours(item), sourceEmployees: item.employeeNames, removable: false,
+  }]));
+  for (const item of ownEvidence) {
+    const previous = evidenceRows.get(item.id);
+    evidenceRows.set(item.id, {
+      id: item.id, title: previous?.title || item.title, status: previous?.status || item.status,
+      sourceLabel: previous?.sourceLabel || [item.productLineName, item.versionName].filter(Boolean).join(' / ') || '—',
+      hours: previous?.hours ?? completedActualHours(item), sourceEmployees: [...new Set([...(previous?.sourceEmployees || []), viewerName || '人员未设置'])], removable: true,
+    });
+  }
   const count = (value: number) => supportLoading || supportError ? '—' : value;
   const error = supportError ? <Alert type="error" showIcon title="员工复盘加载失败" action={<Button onClick={onRetry}>重试</Button>}/> : null;
   return <section className="space-y-4" aria-label={`主管 KR 复盘：${review.keyResultTitle}`}>
@@ -35,9 +49,10 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
         const value = review.contributors?.find(item => item.authorId === authorId && item.detailId === row.id);
         return value ? `${value.previousProgress}% → ${value.currentProgress}%` : '—';
       } })),
-      ...(selfAssigned ? [{ title: '本人进度', key: 'self', render: (_: unknown, row: { id: string; name: string }) => {
-        const value = review.supervisorProgress?.find(item => item.id === row.id)?.currentProgress ?? review.contributors?.find(item => item.authorId === viewerId && item.detailId === row.id)?.currentProgress ?? 0;
-        return <InputNumber aria-label={`本人进度：${row.name}`} min={0} max={100} precision={0} suffix="%" value={value} disabled={busy || !editable || supportLoading || Boolean(supportError)} onChange={next => onUpdate({ supervisorProgress: [...(review.supervisorProgress || []).filter(item => item.id !== row.id), { id: row.id, currentProgress: next ?? 0 }] })}/>;
+      ...(selfAssigned ? [{ title: viewerName || review.contributors?.find(item => item.authorId === viewerId)?.authorName || '主管', key: 'self', render: (_: unknown, row: { id: string; name: string }) => {
+        const contribution = review.contributors?.find(item => item.authorId === viewerId && item.detailId === row.id);
+        const value = review.supervisorProgress?.find(item => item.id === row.id)?.currentProgress ?? contribution?.currentProgress ?? 0;
+        return <ReviewProgressCell label={`${viewerName || contribution?.authorName || '主管'}进度：${row.name}`} previous={contribution?.previousProgress ?? 0} value={value} disabled={busy || !editable || supportLoading || Boolean(supportError)} onChange={next => onUpdate({ supervisorProgress: [...(review.supervisorProgress || []).filter(item => item.id !== row.id), { id: row.id, currentProgress: next }] })}/>;
       } }] : []),
     ]}/>
     <div className="okr-supervisor-support-divider" aria-hidden="true"/>
@@ -60,17 +75,20 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
         })}</div> : <Empty description="暂无对齐的员工动作"/>}</Spin>,
       }]}/>
       <Collapse defaultActiveKey={['evidence']} expandIconPosition="end" items={[{
-        key: 'evidence', label: <div className="okr-supervisor-panel-title"><strong>关联工作证据</strong><span>{count(new Set([...evidence.map(item => item.workId), ...ownEvidence.map(item => item.id)]).size)}项</span></div>,
-        children: <div className="space-y-4">{error || <Spin spinning={supportLoading}>{evidence.length ? <div className="okr-supervisor-employee-list">{evidence.map(item => <article key={item.workId} className="okr-supervisor-evidence-row">
-          <div className="flex flex-wrap items-center justify-between gap-2"><strong className="break-words">{item.title}</strong><span><Tag>{item.missing ? '引用失效' : item.workType === 'ticket' ? '协同事项' : '任务'}</Tag><Tag>{item.status}</Tag></span></div>
-          <p className="text-xs text-[var(--text-muted)]">关联员工：{item.employeeNames.join('、')}</p>
-          {item.result && <p className="whitespace-pre-wrap break-words">{item.result}</p>}
-          {item.missing && <p className="text-xs text-[var(--warning)]">保留历史关联，当前未能读取这条工作证据。</p>}
-        </article>)}</div> : <Empty description="暂无员工关联工作证据"/>}</Spin>}
-          <section className="space-y-3" aria-label="主管本人工作证据">
-            <div className="flex flex-wrap items-center justify-between gap-2"><strong>主管本人工作证据</strong><Button onClick={onAddEvidence} disabled={busy || !editable || supportLoading || Boolean(supportError)}>关联工作证据</Button></div>
-            {ownEvidence.length ? ownEvidence.map(item => <article key={item.id} className="okr-supervisor-evidence-row"><div className="flex items-center justify-between gap-2"><strong>{item.title}</strong><Tag>{item.status}</Tag></div>{editable && <Button type="text" danger disabled={busy} aria-label={`移除本人证据：${item.title}`} onClick={() => onRemoveEvidence?.(item.id)}>移除</Button>}</article>) : <Empty description="暂无本人关联工作证据"/>}
-          </section>
+        key: 'evidence',
+        label: <div className="okr-supervisor-panel-title"><strong>关联工作证据</strong><span>{count(new Set([...evidence.map(item => item.workId), ...ownEvidence.map(item => item.id)]).size)}项</span></div>,
+        extra: <Button onClick={event => { event.stopPropagation(); onAddEvidence?.(); }} disabled={busy || !editable || supportLoading || Boolean(supportError)}>关联工作证据</Button>,
+        children: <div aria-label="统一工作证据列表">
+          {error ? error : <Spin spinning={supportLoading}><div className="border border-[var(--border-main)] rounded overflow-hidden bg-[var(--bg-card)]">
+            <Table size="small" rowKey="id" pagination={false} dataSource={[...evidenceRows.values()]} locale={{ emptyText: <Empty description="暂无关联工作证据"/> }} columns={[
+              { title: '标题', dataIndex: 'title', ellipsis: true },
+              { title: '来源归属', dataIndex: 'sourceLabel', ellipsis: true },
+              { title: '状态', dataIndex: 'status' },
+              { title: '任务工时', render: (_, row) => row.hours == null ? '—' : `${row.hours} 小时` },
+              { title: '来源员工', render: (_, row) => row.sourceEmployees.join('、') },
+              { title: '操作', hidden: !editable, render: (_, row) => row.removable ? <Button type="text" danger disabled={busy} aria-label={`移除本人证据：${row.title}`} onClick={() => onRemoveEvidence?.(row.id)}>删除</Button> : '—' },
+            ]}/>
+          </div></Spin>}
         </div>,
       }]}/>
     </div>

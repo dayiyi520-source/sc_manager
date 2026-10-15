@@ -584,7 +584,7 @@ export function WeeklyReviewEditor({
                       key: kr.keyResultId,
                       label: supervisor ? <div className="min-w-0 space-y-2 w-full"><strong className="block truncate" title={kr.keyResultTitle}>KR{krIdx + 1}：{kr.keyResultTitle}</strong><div className="flex items-center gap-3"><Progress percent={kr.currentProgress} showInfo={false} size="small"/><span>{kr.currentProgress}%</span></div><div className="text-xs text-[var(--text-muted)]">员工支撑 {new Set(kr.contributors?.map(row => row.authorId)).size} 人 · 工作证据 {employeeEvidenceForKr(supportsByKr.get(kr.keyResultId) || [], kr.employeeReviewSnapshots || []).length} 项</div></div> : <div className="flex flex-wrap items-center gap-3"><strong>{supervisor ? `KR${krIdx + 1}：` : '我的计划：'}{kr.keyResultTitle}</strong><Tag>{supervisor ? `${kr.previousProgress}% → ${kr.currentProgress}%` : `${personalProgress}%`}</Tag>{!supervisor && <Tag color={health === '超预期' ? 'success' : health === '风险' ? 'warning' : health === '逾期' ? 'error' : undefined}>{health || '暂无预期'}</Tag>}{defaultCollapsedReview(kr) && kr.currentProgress < 100 ? <Tag>本周无变化</Tag> : null}</div>,
                       children: supervisor ? <SupervisorKrReviewCard review={kr} employeeActions={readOnly ? [] : employeeActionsForKr(records, people, viewer?.id || '', kr, period)} supports={supportsByKr.get(kr.keyResultId) || []}
-                        viewerId={viewer?.id} selfAssigned={Boolean(records.find(row => row.id === kr.objectiveId)?.payload.keyResults?.find(row => row.id === kr.keyResultId)?.assigneeIds?.includes(viewer?.id || ''))}
+                        viewerId={viewer?.id} viewerName={viewer?.name} selfAssigned={Boolean(records.find(row => row.id === kr.objectiveId)?.payload.keyResults?.find(row => row.id === kr.keyResultId)?.assigneeIds?.includes(viewer?.id || ''))}
                         ownEvidence={evidence} onAddEvidence={() => openPicker(kr.keyResultId)} onRemoveEvidence={id => removeWork(kr.keyResultId, id)}
                         busy={busy} editable={editorState.editable} supportLoading={recordsLoading} supportError={recordsError} onRetry={onRefreshRecords}
                         onUpdate={patch => update(kr.keyResultId, patch)} onEmployeeSupport={(authorId, reportIds) => {
@@ -707,7 +707,7 @@ export function WeeklyReviewEditor({
                       />
                     )
                   },
-                  ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || '主管本人' }] : []),
+                  ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || viewer?.name || '主管本人' }] : []),
                 ].filter(column => !supervisor || column.title !== '操作')}
               />
             </div>
@@ -746,7 +746,7 @@ export function WeeklyReviewEditor({
             { title: '负责人', dataIndex: 'expectedAssignee' },
             { title: '状态', render: (_, row) => row.status || '未发起' },
             { title: '删除操作', hidden: readOnly, render: (_, row, index) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`移除协同事项${row.subject}`} onClick={() => setAssistance(rows => rows.filter((_, rowIndex) => rowIndex !== index))}>删除</Button> },
-            ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || '主管本人' }] : []),
+            ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || viewer?.name || '主管本人' }] : []),
           ].filter(column => !supervisor || column.title !== '删除操作')}/> : <Empty description="暂无需要协助事项"/>}
         </div>
       </section>
@@ -766,7 +766,7 @@ export function WeeklyReviewEditor({
             { title: '分类', dataIndex: 'category' },
             { title: '内容摘要', dataIndex: 'summary', ellipsis: true },
             { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
-            ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || '主管本人' }] : []),
+            ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || viewer?.name || '主管本人' }] : []),
           ].filter(column => !supervisor || column.title !== '删除操作')}/> : <Empty description="暂无知识沉淀"/>}
         </div>
       </section>
@@ -793,7 +793,7 @@ export function WeeklyReviewEditor({
       </Modal>}
 
       {supportTarget && <EmployeeReviewSupportDialog target={supportTarget} supports={(supportsByKr.get(supportTarget.keyResultId) || []).filter(support => !supportAuthorId || support.record.ownerId === supportAuthorId)} savedSnapshots={(supportTarget.employeeReviewSnapshots || []).filter(snapshot => !supportAuthorId || (snapshot.authorId || snapshot.authorName || snapshot.id) === supportAuthorId)} loading={recordsLoading} error={recordsError} onRetry={onRefreshRecords} onClose={() => { setSupportTargetId(null); setSupportAuthorId(null); }}/>}
-      {picker && <WorkEvidencePicker requireProduct={!supervisor && picker.target !== 'extra'} work={work} viewer={viewer} product={supervisor ? undefined : pickerSourceKr?.businessObject} startDate={period.startDate} endDate={period.endDate} selectedIds={picker.selection} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPicker(null)} onConfirm={confirmPicker}/>}
+      {picker && <WorkEvidencePicker includePending={supervisor} requireProduct={!supervisor && picker.target !== 'extra'} work={work} viewer={viewer} product={supervisor ? undefined : pickerSourceKr?.businessObject} startDate={period.startDate} endDate={period.endDate} selectedIds={picker.selection} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPicker(null)} onConfirm={confirmPicker}/>}
 
       {/* 提交确认弹窗 (带中文界面及OKR系统进度同步勾选) */}
       <Modal

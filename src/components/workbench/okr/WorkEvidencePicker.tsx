@@ -7,16 +7,16 @@ import { filterEvidence } from './evidenceFilters';
 import { workSource } from './workAggregation';
 
 interface Props {
-  requireProduct?: boolean; work: OkrWork[]; viewer?: EvidenceViewer; product?: string; version?: string;
+  includePending?: boolean; requireProduct?: boolean; work: OkrWork[]; viewer?: EvidenceViewer; product?: string; version?: string;
   startDate: string; endDate: string; selectedIds: string[]; blockedIds?: ReadonlySet<string>;
   loading?: boolean; error?: unknown; onRetry?: () => void;
   onConfirm: (ids: string[]) => void; onCancel: () => void;
 }
-export function WorkEvidencePicker({ requireProduct = false, work, viewer, product, startDate, endDate, selectedIds, blockedIds = new Set(), loading = false, error, onRetry, onConfirm, onCancel }: Props) {
+export function WorkEvidencePicker({ includePending = false, requireProduct = false, work, viewer, product, startDate, endDate, selectedIds, blockedIds = new Set(), loading = false, error, onRetry, onConfirm, onCancel }: Props) {
   const [selection, setSelection] = useState<string[]>(selectedIds);
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState('all');
-  const eligible = useMemo(() => requireProduct && !product ? [] : filterEvidence(work, { viewer, product, startDate, endDate, source: 'task' }), [work, viewer, product, startDate, endDate, requireProduct]);
+  const eligible = useMemo(() => requireProduct && !product ? [] : filterEvidence(work, { viewer, product, startDate, endDate, source: 'task', includePending }), [work, viewer, product, startDate, endDate, requireProduct, includePending]);
   const matchesKeyword = (item: OkrWork) => !keyword.trim() || `${item.title} ${item.sourceId}`.toLowerCase().includes(keyword.trim().toLowerCase());
   const rows = eligible.filter(item => matchesKeyword(item) && (status === 'all' || status === item.status));
   return <Modal open className="okr-work-association-modal" title="关联工作证据" width={1120} onCancel={onCancel} footer={[

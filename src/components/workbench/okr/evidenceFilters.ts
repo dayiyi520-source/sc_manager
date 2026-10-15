@@ -3,7 +3,7 @@ import type { OkrWork } from '../../../services/okrRepository';
 import type { EvidenceViewer } from '../../../services/reviewEvidenceRepository';
 import { workSource } from './workAggregation';
 
-export type EvidenceContext = { viewer?: EvidenceViewer; product?: string; version?: string; startDate: string; endDate: string; source: 'task' | 'ticket' };
+export type EvidenceContext = { includePending?: boolean; viewer?: EvidenceViewer; product?: string; version?: string; startDate: string; endDate: string; source: 'task' | 'ticket' };
 const inPeriod = (value: string | undefined, context: EvidenceContext) => Boolean(value && dayjs(value).isValid() && !dayjs(value).isBefore(context.startDate, 'day') && !dayjs(value).isAfter(context.endDate, 'day'));
 const finished = new Set(['已完成', '已发布', '已验收', '已关闭']);
 const processing = new Set(['处理中', '进行中', '开发中', '研发中', '设计中', '测试中', '修复中']);
@@ -12,7 +12,8 @@ export function filterEvidence(work: OkrWork[], context: EvidenceContext) {
   const unique = new Map<string, OkrWork>();
   for (const item of work) {
     if (workSource(item) !== context.source) continue;
-    if (context.source === 'task' && inactive.has(item.status)) continue;
+    const pending = Boolean(context.includePending && ['待处理', '待开始', '未开始', '待办', '待测试', '待验收'].includes(item.status));
+    if (context.source === 'task' && inactive.has(item.status) && !pending) continue;
     if (item.createdAt && dayjs(item.createdAt).isAfter(context.endDate, 'day')) continue;
     if (!context.viewer && context.source === 'task') continue;
     if (context.viewer) {
@@ -27,7 +28,7 @@ export function filterEvidence(work: OkrWork[], context: EvidenceContext) {
     const recentlyCompleted = (item.statusGroup === 'COMPLETED' || finished.has(item.status)) && inPeriod(item.completedAt, context);
     const ongoing = item.statusGroup ? ['IN_PROGRESS', 'PROCESSING', 'ACTIVE'].includes(item.statusGroup) : processing.has(item.status);
     const collaborationState = context.source === 'ticket' && ['待验收', '已退回'].includes(item.status);
-    if (context.source === 'task' ? !(recentlyCompleted || ongoing) : !(recentlyCompleted || ongoing || collaborationState || (recentlyCreated && !['已取消', '已驳回', '已搁置'].includes(item.status)))) continue;
+    if (context.source === 'task' ? !(recentlyCompleted || ongoing || pending) : !(recentlyCompleted || ongoing || collaborationState || (recentlyCreated && !['已取消', '已驳回', '已搁置'].includes(item.status)))) continue;
     const key = item.sourceId || item.id;
     if (!unique.has(key)) unique.set(key, item);
   }

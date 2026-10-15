@@ -32,3 +32,8 @@ describe('review evidence defaults', () => {
     expect(defaultCollapsedReview({ ...unchanged, workIds: ['evidence'] })).toBe(false);
   });
 });
+
+it('allows supervisor-owned pending and awaiting-test tasks without exposing foreign or cancelled work', () => {
+  const rows = [row({ id: 'test', sourceId: 'test', status: '待测试' }), row({ id: 'pending', sourceId: 'pending', status: '待处理' }), row({ id: 'other-product', sourceId: 'other-product', status: '待验收', productLineName: '产品乙' }), row({ id: 'cancelled', status: '已取消' }), row({ id: 'foreign', ownerName: '其他人' })];
+  expect(filterEvidence(rows, { ...context, product: undefined, includePending: true }).map(item => item.id)).toEqual(['test', 'pending', 'other-product']);
+});
