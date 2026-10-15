@@ -14,9 +14,12 @@ import {
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
+import { Empty } from 'antd';
 import { StatusBadge } from '@/components/common';
 import { requirementRepository } from '../../services/requirementRepository';
 import { MOCK_WORKBENCH_FEEDS } from '../../data/mockSnapshot';
+import { projectDeliveryMap } from '../../services/projectDeliveryMap';
+import { getMyTaskMetrics } from './myTasksMetrics';
 
 const WORKBENCH_FEEDS: Array<{ id: string; type: FeedTabType; time: string; title: string; content: string; customer?: string; author?: string }> = MOCK_WORKBENCH_FEEDS;
 
@@ -35,14 +38,14 @@ type MyTaskRecord = {
   sourceId: string;
 };
 
-type TabType = 'all' | 'mine' | 'assist';
+type TabType = 'all' | 'mine' | 'assist' | 'work_order';
 type ApprovalTabType = 'pending' | 'my_apply' | 'cc_me';
 type FeedTabType = 'dynamic' | 'feedback' | 'competitor';
 
 export const MyTasksView: React.FC = () => {
   const {
     openPageTab,
-    customers,
+    opportunities,
     approvals,
     okrs,
     currentUser
@@ -66,9 +69,11 @@ export const MyTasksView: React.FC = () => {
   }, [currentUser.id]);
 
   const pendingTodos = useMemo(() => realTasks, [realTasks]);
+  const dashboardMetrics = useMemo(() => getMyTaskMetrics(realTasks, opportunities, projectDeliveryMap()), [realTasks, opportunities]);
   const displayTodos = useMemo(() => {
     if (todoTab === 'mine') return realTasks.filter((task) => task.taskGroup === 'mine');
-    if (todoTab === 'assist') return realTasks.filter((task) => task.taskGroup === 'assist');
+    if (todoTab === 'assist') return realTasks.filter((task) => task.taskGroup === 'assist' && task.type !== 'work_order');
+    if (todoTab === 'work_order') return realTasks.filter((task) => task.type === 'work_order');
     return realTasks;
   }, [realTasks, todoTab]);
 
@@ -106,36 +111,37 @@ export const MyTasksView: React.FC = () => {
       {/* 顶部核心指标 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="待办事项"
-          value={pendingTodos.length}
+          title="待办任务"
+          value={dashboardMetrics.todoTaskCount}
           unit="项"
           icon={<CheckSquare className="w-5 h-5" />}
           iconBgColor="bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
           onClick={() => openPageTab('prod_req_tasks')}
         />
         <StatCard
-          title="待办审批"
-          value={approvals.filter((a) => a.status === '待审批' && a.nodes.some((node) => node.approver === currentUser.name && node.status === 'current')).length}
-          unit="单"
-          icon={<FileCheck className="w-5 h-5" />}
-          iconBgColor="bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400"
-          onClick={() => openPageTab('approval_center')}
+          title="协同事项/工单"
+          value={dashboardMetrics.collaborationCount}
+          unit="项"
+          subText={`工单 ${dashboardMetrics.workOrderCount} 项`}
+          icon={<MessageSquare className="w-5 h-5" />}
+          iconBgColor="bg-cyan-50 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-400"
+          onClick={() => openPageTab('wb_work_order')}
         />
         <StatCard
-          title="跟进客户数"
-          value={customers.length}
+          title="跟进商机数"
+          value={dashboardMetrics.opportunityCount}
           unit="家"
           icon={<Users className="w-5 h-5" />}
           iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400"
-          onClick={() => openPageTab('crm_customers')}
+          onClick={() => openPageTab('crm_opportunities')}
         />
         <StatCard
-          title="商机总额"
-          value="1443"
-          unit="万元"
+          title="项目交付数"
+          value={dashboardMetrics.projectDeliveryCount}
+          unit="项"
           icon={<Briefcase className="w-5 h-5" />}
           iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
-          onClick={() => openPageTab('crm_opportunities')}
+          onClick={() => openPageTab('proj_delivery_map')}
         />
       </div>
 
@@ -152,7 +158,8 @@ export const MyTasksView: React.FC = () => {
               <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5">
                 <TabButton active={todoTab === 'all'} onClick={() => setTodoTab('all')}>全部 ({pendingTodos.length})</TabButton>
                 <TabButton active={todoTab === 'mine'} onClick={() => setTodoTab('mine')}>任务 ({realTasks.filter((task) => task.taskGroup === 'mine').length})</TabButton>
-                <TabButton active={todoTab === 'assist'} onClick={() => setTodoTab('assist')}>协同事项 ({realTasks.filter((task) => task.taskGroup === 'assist').length})</TabButton>
+                <TabButton active={todoTab === 'assist'} onClick={() => setTodoTab('assist')}>协同事项 ({dashboardMetrics.collaborationCount})</TabButton>
+                <TabButton active={todoTab === 'work_order'} onClick={() => setTodoTab('work_order')}>工单 ({dashboardMetrics.workOrderCount})</TabButton>
               </div>
             </div>
           </div>
@@ -164,10 +171,12 @@ export const MyTasksView: React.FC = () => {
               ) : taskError ? (
                 <div className="text-center py-8 text-[var(--danger)] text-sm"><AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-70" /><div>我的工作加载失败，请稍后重试</div><div className="mt-1 text-xs text-[var(--text-muted)]">{taskError}</div></div>
               ) : displayTodos.length === 0 ? (
-                <div className="text-center py-8 text-[var(--text-muted)] text-sm">
-                  <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  暂无相关工作
-                </div>
+                todoTab === 'work_order' ? <Empty description="暂无工单" /> : (
+                  <div className="text-center py-8 text-[var(--text-muted)] text-sm">
+                    <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    暂无相关工作
+                  </div>
+                )
               ) : (
                 displayTodos.map((task) => (
                   <div
