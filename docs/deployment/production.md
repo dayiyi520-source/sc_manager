@@ -30,14 +30,15 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
 
-上次已核实的发布：20261015T043544Z，源码 6875d63f0fd604f43284b9e0d1da2dbaaaf56e26。此次发布核验成功后更新下方记录。
+上次已核实的发布：20261015T061044Z，源码 3757b4d。
 
 ## 最近成功发布
 
-- 发布时间：2026-10-15 12:35:44（北京时间）。
-- 发布编号：20261015T043544Z；发布源码：6875d63f0fd604f43284b9e0d1da2dbaaaf56e26。
-- 发布目录：/opt/sc-manager-frontend/releases/20261015T043544Z。
-- 回滚备份：/opt/sc-manager-frontend/backups/20261015T043544Z；上一版本为 20261014T103653Z。
-- 公共首页、入口资源、/app/wb_work_order 直达路由及 Mock 健康检查通过。
-- /api/mock/okr-state 与 /api/mock/research-template 可读取，上传 Mock 快照摘要已写入 release.json。
-- 本次源码版本 6875d63f0fd604f43284b9e0d1da2dbaaaf56e26 已构建并完成线上资源匹配校验。
+- 发布时间：2026-10-15 14:10:44（北京时间）。
+- 发布编号：20261015T061044Z；发布源码：3757b4d。
+- 发布目录：/opt/sc-manager-frontend/releases/20261015T061044Z。
+- 回滚备份：/opt/sc-manager-frontend/backups/20261015T061044Z；上一版本为 20261015T045837Z。
+- 本次修复设计任务来源归属、左侧产品设计分类的产品名称同步。
+- 使用已提交源码的独立快照构建；发布前获取线上当前两份共享 Mock 数据作为本次随包快照，发布后核对产品模板、目标及复盘内容保持一致。
+- 生产构建、线上首页与入口资源匹配、设计任务直达路由、Mock 健康和数据读取核验通过。
+- 本次 6 项专项测试、类型检查、差异检查通过；扩展回归的两项项目归属预填测试在修改前同样失败，PRD 校验仍有既有的技术字段及需求数量不一致问题。
