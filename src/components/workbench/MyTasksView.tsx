@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Calendar,
   MessageSquare,
+  Bell,
   AlertCircle,
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
@@ -20,6 +21,7 @@ import { requirementRepository } from '../../services/requirementRepository';
 import { MOCK_WORKBENCH_FEEDS } from '../../data/mockSnapshot';
 import { projectDeliveryMap } from '../../services/projectDeliveryMap';
 import { getMyTaskMetrics } from './myTasksMetrics';
+import { hasUnreadFeed, unreadFeedIds } from './feedUnread';
 
 const WORKBENCH_FEEDS: Array<{ id: string; type: FeedTabType; time: string; title: string; content: string; customer?: string; author?: string }> = MOCK_WORKBENCH_FEEDS;
 
@@ -54,6 +56,9 @@ export const MyTasksView: React.FC = () => {
   const [todoTab, setTodoTab] = useState<TabType>('all');
   const [approvalTab, setApprovalTab] = useState<ApprovalTabType>('pending');
   const [feedTab, setFeedTab] = useState<FeedTabType>('dynamic');
+  const [readFeedIds, setReadFeedIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('shichuang.frontend.mock.workbench.feedRead') || '[]')); } catch { return new Set(); }
+  });
   const [realTasks, setRealTasks] = useState<MyTaskRecord[]>([]);
   const [taskLoading, setTaskLoading] = useState(true);
   const [taskError, setTaskError] = useState<string | null>(null);
@@ -69,6 +74,17 @@ export const MyTasksView: React.FC = () => {
   }, [currentUser.id]);
 
   const pendingTodos = useMemo(() => realTasks, [realTasks]);
+  const feedUnreadIds = useMemo(() => unreadFeedIds(WORKBENCH_FEEDS, readFeedIds), [readFeedIds]);
+  const markFeedTabRead = (nextTab: FeedTabType) => {
+    setFeedTab(nextTab);
+    setReadFeedIds((current) => {
+      const next = new Set(current);
+      WORKBENCH_FEEDS.filter((feed) => feed.type === nextTab).forEach((feed) => next.add(feed.id));
+      try { localStorage.setItem('shichuang.frontend.mock.workbench.feedRead', JSON.stringify([...next])); } catch { /* browser storage unavailable */ }
+      return next;
+    });
+  };
+
   const dashboardMetrics = useMemo(() => getMyTaskMetrics(realTasks, opportunities, projectDeliveryMap()), [realTasks, opportunities]);
   const displayTodos = useMemo(() => {
     if (todoTab === 'mine') return realTasks.filter((task) => task.taskGroup === 'mine');
@@ -306,31 +322,32 @@ export const MyTasksView: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {myOkr.keyResults.map((kr, idx) => (
-                    <div
-                      key={kr.id}
-                      className="p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg space-y-2"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm text-[var(--text-primary)] font-medium">
-                          KR{idx + 1}: {kr.content}
-                        </span>
-                        <span className="font-semibold text-[var(--text-primary)] shrink-0">
-                          {kr.progress}%
-                        </span>
+                  {myOkr.keyResults.map((kr, idx) => {
+                    const actions = (kr.executionActions || []).filter((action) => !action.ownerId || action.ownerId === currentUser.id);
+                    const hasEmployeeActions = actions.length > 0;
+                    return (
+                      <div key={kr.id} className="p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-sm text-[var(--text-primary)] font-medium">{hasEmployeeActions ? `部门 KR${idx + 1}` : `KR${idx + 1}`}: {kr.content}</span>
+                          <span className="font-semibold text-[var(--text-primary)] shrink-0">{kr.progress}%</span>
+                        </div>
+                        <div className="w-full bg-[var(--bg-main)] rounded-full h-1.5 overflow-hidden">
+                          <div className="h-full bg-[var(--primary)] rounded-full transition-all" style={{ width: `${kr.progress}%` }} />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                          <span>权重: {kr.weight}%</span>
+                          <span>截止: {kr.deadline}</span>
+                        </div>
+                        {hasEmployeeActions && <div className="ml-3 border-l-2 border-[var(--primary)]/30 pl-3 space-y-2" aria-label="个人动作">
+                          <div className="text-xs font-medium text-[var(--text-muted)]">个人动作</div>
+                          {actions.map((action) => <div key={action.id} className="flex items-start justify-between gap-3 rounded-md bg-[var(--bg-main)] px-3 py-2 text-xs">
+                            <span className="min-w-0 text-[var(--text-body)]">{action.title}</span>
+                            <span className="shrink-0 font-semibold text-[var(--text-primary)]">{action.progress}%</span>
+                          </div>)}
+                        </div>}
                       </div>
-                      <div className="w-full bg-[var(--bg-main)] rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="h-full bg-[var(--primary)] rounded-full transition-all"
-                          style={{ width: `${kr.progress}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
-                        <span>权重: {kr.weight}%</span>
-                        <span>截止: {kr.deadline}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -353,21 +370,21 @@ export const MyTasksView: React.FC = () => {
               <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5">
                 <TabButton
                   active={feedTab === 'dynamic'}
-                  onClick={() => setFeedTab('dynamic')}
+                  onClick={() => markFeedTabRead('dynamic')}
                 >
-                  产品动态
+                  <span className="relative">产品动态{hasUnreadFeed(WORKBENCH_FEEDS, readFeedIds, 'dynamic') && <i aria-label="产品动态有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
                 </TabButton>
                 <TabButton
                   active={feedTab === 'feedback'}
-                  onClick={() => setFeedTab('feedback')}
+                  onClick={() => markFeedTabRead('feedback')}
                 >
-                  评价吐槽
+                  <span className="relative">评价吐槽{hasUnreadFeed(WORKBENCH_FEEDS, readFeedIds, 'feedback') && <i aria-label="评价吐槽有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
                 </TabButton>
                 <TabButton
                   active={feedTab === 'competitor'}
-                  onClick={() => setFeedTab('competitor')}
+                  onClick={() => markFeedTabRead('competitor')}
                 >
-                  行业资讯
+                  <span className="relative">行业资讯{hasUnreadFeed(WORKBENCH_FEEDS, readFeedIds, 'competitor') && <i aria-label="行业资讯有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
                 </TabButton>
               </div>
             </div>
@@ -380,8 +397,8 @@ export const MyTasksView: React.FC = () => {
                   <div key={feed.id} className="relative space-y-1.5">
                     <span className="absolute -left-[26px] top-0.5 w-3 h-3 rounded-full border-2 border-[var(--primary)] bg-[var(--bg-surface)]" />
                     <div className="text-xs text-[var(--text-muted)]">{feed.time}</div>
-                    <div className="font-semibold text-sm text-[var(--text-primary)]">
-                      {feed.title}
+                    <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-1">
+                      {feed.title}{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 text-[var(--danger)]" />}
                     </div>
                     <p className="text-[var(--text-body)] leading-relaxed">
                       {feed.content}
@@ -394,8 +411,8 @@ export const MyTasksView: React.FC = () => {
                 {WORKBENCH_FEEDS.filter((f) => f.type === feedTab).map((feed) => (
                   <div key={feed.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm text-[var(--text-primary)]">
-                        {feed.title}
+                      <span className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-1">
+                        {feed.title}{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 text-[var(--danger)]" />}
                       </span>
                       <span className="text-xs text-[var(--text-muted)]">{feed.time}</span>
                     </div>

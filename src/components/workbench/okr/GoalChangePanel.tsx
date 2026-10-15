@@ -16,7 +16,7 @@ export function GoalChangePanel({ showRequests = true, records, people, viewerId
   const [showDetail, setShowDetail] = useState(false);
   const [showSource, setShowSource] = useState<OkrRecord>();
   const requests = showRequests ? records.filter(record => record.changeRequest?.status === 'pending' && record.changeRequest.reviewerId === viewerId) : [];
-  const sync = records.filter(record => record.ownerId === viewerId && !record.payload.inherited && record.payload.sourceObjectiveId && records.find(source => source.id === record.payload.sourceObjectiveId)?.version !== record.payload.sourceVersion);
+  const sync = records.filter(record => record.ownerId === viewerId && !record.payload.inherited && !record.payload.sourceWithdrawalAcknowledged && record.payload.sourceObjectiveId && records.find(source => source.id === record.payload.sourceObjectiveId)?.version !== record.payload.sourceVersion);
   const mutate = async (record: OkrRecord, action: string) => {
     if (busy) return;
     if (action === 'return-change' && !feedback.trim()) { setError('请填写退回原因'); return; }

@@ -26,7 +26,7 @@ export interface OkrPayload extends GoalTiming {
   objectiveTitleTemplateId?: string; objectiveTemplateKrTypes?: OkrTemplateKrType[];
   goalModelVersion?: 2; goalLevel?: 'company' | 'department' | 'personal';
   sourceKrData?: OkrKr; sourceObjectiveId?: string; sourceKrId?: string; sourceVersion?: number; sourceTitle?: string;
-  origin?: 'assigned' | 'autonomous'; reviewerSuggestedSource?: string;
+  origin?: 'assigned' | 'autonomous'; reviewerSuggestedSource?: string; sourceWithdrawalAcknowledged?: boolean;
   inherited?: boolean; changeReason?: string;
 
   reviewMode?: 'completed' | 'structured' | 'monthly' | 'supervisor'; reviewType?: 'week' | 'month'; selfScore?: number;

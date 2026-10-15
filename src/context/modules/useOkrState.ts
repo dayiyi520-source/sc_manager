@@ -22,7 +22,7 @@ export function useOkrState(currentUser: CurrentUser, enabled: boolean) {
       deadline: record.periodKey,
       parentObjectiveId: record.payload.parentObjectiveId,
       parentKeyResultId: record.payload.parentKeyResultId,
-      keyResults: (record.payload.keyResults || []).map((keyResult) => ({ id: keyResult.id, content: keyResult.title, weight: keyResult.weight, progress: keyResult.progress, deadline: record.periodKey, assigneeIds: keyResult.assigneeIds })),
+      keyResults: (record.payload.keyResults || []).map((keyResult) => ({ id: keyResult.id, content: keyResult.title, weight: keyResult.weight, progress: keyResult.progress, deadline: record.periodKey, assigneeIds: keyResult.assigneeIds, executionActions: keyResult.executionActions })),
     })));
   }, [okrQuery.data, currentUser.id, currentUser.name, currentUser.department]);
 

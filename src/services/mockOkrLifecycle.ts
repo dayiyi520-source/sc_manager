@@ -71,8 +71,10 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
     if (body.action === 'acknowledge-source') {
       const source = records.find(item => item.id === record.payload.sourceObjectiveId);
       const sourceKr = source && sourceKeyResults(source).find(kr => kr.id === record.payload.sourceKrId);
-      if (!source || source.status === 'deleted' || (record.payload.origin !== 'autonomous' && !sourceKr?.assigneeIds?.includes(person.id))) throw new Error('上级指派已撤回，请联系上级');
-      const updated = { ...record.payload, sourceVersion: source.version, sourceTitle: sourceKr?.title || source.payload.title,
+      if (!source || source.status === 'deleted' || (record.payload.origin !== 'autonomous' && !sourceKr?.assigneeIds?.includes(person.id))) {
+        return replace({ ...record, payload: { ...record.payload, sourceObjectiveId: undefined, sourceKrId: undefined, sourceVersion: undefined, sourceTitle: undefined, sourceWithdrawalAcknowledged: true }, version: record.version + 1 });
+      }
+      const updated = { ...record.payload, sourceWithdrawalAcknowledged: false, sourceVersion: source.version, sourceTitle: sourceKr?.title || source.payload.title,
         ...(record.payload.goalLevel === 'personal' && record.payload.origin !== 'autonomous' && sourceKr ? { title: sourceKr.title, keyResults: [{ ...sourceKr, weight: 100, progress: 0, deadline: record.payload.keyResults?.[0]?.deadline || sourceKr.deadline, plannedDeadline: record.payload.keyResults?.[0]?.plannedDeadline, forecastDeadline: record.payload.keyResults?.[0]?.forecastDeadline, assigneeIds: [person.id], executionActions: record.payload.keyResults?.[0]?.executionActions || [] }] } : {}) };
       verifySource(updated, records, person, record.periodKey, settings);
       return replace({ ...record, payload: updated, version: record.version + 1 });

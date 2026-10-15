@@ -17,6 +17,12 @@ describe('撤回目标确认', () => {
     expect(result.records[0]).toMatchObject({status:'active',payload:{title:'生效内容'},version:3});
     expect(result.records[0].changeRequest).toBeUndefined();
   });
+  it('acknowledges a withdrawn assignment and clears the stale sync prompt', () => {
+    const assigned: OkrRecord = { id: 'assigned', kind: 'objective', ownerId: 'owner', periodKey: '2026-10', status: 'active', version: 4, payload: { title: '个人目标', sourceObjectiveId: 'missing-source', sourceKrId: 'missing-kr', sourceVersion: 2, sourceTitle: '已撤回 KR', goalLevel: 'personal', origin: 'assigned' } };
+    const result = mutateOkrLifecycle('assigned', { action: 'acknowledge-source', viewerId: 'owner', version: 4 }, [assigned], people)!;
+    expect(result.records[0]).toMatchObject({ version: 5, payload: { sourceWithdrawalAcknowledged: true } });
+    expect(result.records[0].payload.sourceObjectiveId).toBeUndefined();
+  });
   it('rejects other users, stale versions and duplicate withdrawal', () => {
     expect(()=>mutateOkrLifecycle('goal',{action:'withdraw-change',viewerId:'boss',version:2},[record],people)).toThrow();
     expect(()=>mutateOkrLifecycle('goal',{action:'withdraw-change',viewerId:'owner',version:1},[record],people)).toThrow();

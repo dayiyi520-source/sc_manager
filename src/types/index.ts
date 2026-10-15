@@ -134,6 +134,7 @@ export interface OKRItem {
     parentKeyResultProgress?: number;
     details?: import('../services/okrRepository').OkrKrDetail[];
     parentKeyResultDetails?: import('../services/okrRepository').OkrKrDetail[];
+    executionActions?: import('../services/okrRepository').OkrExecutionAction[];
     plannedStartDate?: string;
   }[];
 }
