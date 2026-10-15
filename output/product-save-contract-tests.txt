@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 D:/project/manager_admin_frontend
+
+ ✓ src/services/productRepository.test.ts (10 tests) 14ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  11:39:22
+   Duration  2.08s (transform 1.37s, setup 170ms, collect 1.63s, tests 14ms, environment 0ms, prepare 101ms)
+

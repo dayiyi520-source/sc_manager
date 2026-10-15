@@ -1,0 +1,47 @@
+
+ RUN  v3.2.7 D:/project/manager_admin_frontend
+
+ ✓ src/components/product/RequirementTasksView.fixedFields.test.tsx (13 tests) 5399ms
+   ✓ renders fixed 'requirement' undefined creation fields even when old settings hide fields  1067ms
+   ✓ renders fixed 'dev' undefined creation fields even when old settings hide fields  502ms
+   ✓ renders fixed 'test' undefined creation fields even when old settings hide fields  500ms
+   ✓ renders fixed 'design' 'product' creation fields even when old settings hide fields  568ms
+   ✓ renders fixed 'design' 'project' creation fields even when old settings hide fields  561ms
+   ✓ renders fixed 'design' 'other' creation fields even when old settings hide fields  761ms
+stderr | src/components/product/RequirementTasksView.business.test.tsx > limits presales details to activity, collaboration and related tasks
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+stderr | src/components/product/RequirementTasksView.business.test.tsx > limits delivery details to activity, collaboration and related tasks
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+ ✓ src/components/product/RequirementTasksView.business.test.tsx (16 tests) 13254ms
+   ✓ shows exact presales columns and the shared text-only empty state  440ms
+   ✓ uses complete counts while locally paging and switching scopes  2298ms
+   ✓ shows loading, reports a failed request and recovers through retry  309ms
+   ✓ keeps only collaboration and related task entries in presales creation  1020ms
+   ✓ keeps only collaboration and related task entries in delivery creation  994ms
+   ✓ limits presales details to activity, collaboration and related tasks  1642ms
+   ✓ limits delivery details to activity, collaboration and related tasks  1687ms
+   ✓ locks pending status and replaces the menu with approve review controls  551ms
+   ✓ locks pending status and replaces the menu with reject review controls  507ms
+   ✓ disables review for non-reviewers and preserves a pending task when review fails  522ms
+   ✓ keeps review buttons disabled for the owner who is not the creator  408ms
+   ✓ requests completion hours before persisting delivery completion  366ms
+   ✓ filters by project and uses business statuses instead of the generic development stages  2039ms
+ ✓ src/components/product/TaskCompletionDialog.test.tsx (6 tests) 3478ms
+   ✓ cancels completion without writing  936ms
+   ✓ requires hours and retains input after save failure for retry  770ms
+   ✓ saves review text and attachments together with hours  658ms
+   ✓ accepts an attachment without a detected MIME type  534ms
+   ✓ explains that approval requests keep the task processing  360ms
+ ✓ src/services/businessTask.integration.test.ts (17 tests) 267ms
+ ✓ src/services/mockProductTaskPreview.integration.test.ts (5 tests) 495ms
+ ✓ src/utils/taskActivity.test.ts (6 tests) 26ms
+ ✓ src/services/businessTaskRepository.test.ts (4 tests) 7ms
+ ✓ src/services/taskStatusOptions.integration.test.ts (8 tests) 99ms
+
+ Test Files  8 passed (8)
+      Tests  75 passed (75)
+   Start at  10:18:12
+   Duration  24.49s (transform 2.39s, setup 2.02s, collect 14.68s, tests 23.02s, environment 6.21s, prepare 877ms)
+

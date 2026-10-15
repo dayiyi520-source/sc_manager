@@ -1,0 +1,161 @@
+
+ RUN  v3.2.7 D:/project/manager_admin_frontend
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor weekly review > shows department metrics and six sections and saves the restored summary and plan
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor weekly review > updates pending risks after viewing support and shows loading/error instead of zero
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor weekly review > defaults to the progress card, expands a calculated employee table and removes manual judgment
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor weekly review > uses employee names as columns and shows saved action health with an icon
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor weekly review > merges employee extra work, assistance and knowledge without deletion and saves their source snapshot
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor self-assignment editing and saved recovery > keeps owner progress and evidence after saving and reopening week
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor self-assignment editing and saved recovery > keeps owner progress and evidence after saving and reopening week
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor self-assignment editing and saved recovery > keeps owner progress and evidence after saving and reopening month
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+
+stderr | src/components/workbench/okr/SupervisorWeeklyReview.test.tsx > supervisor self-assignment editing and saved recovery > keeps owner progress and evidence after saving and reopening month
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+ ✓ src/components/workbench/okr/SupervisorWeeklyReview.test.tsx (10 tests) 7232ms
+   ✓ supervisor weekly review > shows department metrics and six sections and saves the restored summary and plan  1015ms
+   ✓ supervisor weekly review > updates pending risks after viewing support and shows loading/error instead of zero  1188ms
+   ✓ supervisor weekly review > defaults to the progress card, expands a calculated employee table and removes manual judgment  377ms
+   ✓ supervisor weekly review > merges employee extra work, assistance and knowledge without deletion and saves their source snapshot  602ms
+   ✓ supervisor self-assignment editing and saved recovery > keeps owner progress and evidence after saving and reopening week  1961ms
+   ✓ supervisor self-assignment editing and saved recovery > keeps owner progress and evidence after saving and reopening month  1689ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  11:02:25
+   Duration  14.55s (transform 2.01s, setup 172ms, collect 5.79s, tests 7.23s, environment 830ms, prepare 161ms)
+

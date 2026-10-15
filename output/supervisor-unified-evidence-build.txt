@@ -1,0 +1,98 @@
+vite v6.4.4 building for production...
+transforming...
+✓ 4524 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                              1.91 kB │ gzip:   0.88 kB
+dist/assets/ViewModeSwitch-DrEbYPoN.css                      0.91 kB │ gzip:   0.37 kB
+dist/assets/RichTextEditor-CUZq28Rl.css                      1.52 kB │ gzip:   0.50 kB
+dist/assets/TestAndDefectView-C7jP4fER.css                   5.87 kB │ gzip:   1.43 kB
+dist/assets/TrainingCenterView-9HWrzD2u.css                 16.38 kB │ gzip:   3.03 kB
+dist/assets/OKRPerformanceView-BWJ_km2s.css                 33.13 kB │ gzip:   5.26 kB
+dist/assets/originalOkr-Dmg-8grz.css                       126.29 kB │ gzip:  17.40 kB
+dist/assets/rich-editor-Ce62PmkG.css                       179.22 kB │ gzip:  25.05 kB
+dist/assets/index-1MbdCbLZ.css                             204.19 kB │ gzip:  31.99 kB
+dist/assets/FormDateRangePicker-CNPkA4ux.js                  0.15 kB │ gzip:   0.14 kB
+dist/assets/StatusBadge-DdRzC-dn.js                          0.39 kB │ gzip:   0.29 kB
+dist/assets/DownOutlined-B1jM4w9v.js                         0.41 kB │ gzip:   0.30 kB
+dist/assets/SearchOutlined-4xP2eaMt.js                       0.41 kB │ gzip:   0.30 kB
+dist/assets/PlusOutlined-DGtAFt8R.js                         0.41 kB │ gzip:   0.30 kB
+dist/assets/PaperClipOutlined-B7w1kIq-.js                    0.44 kB │ gzip:   0.31 kB
+dist/assets/DeleteOutlined-D-76attt.js                       0.45 kB │ gzip:   0.32 kB
+dist/assets/DeleteOutlined-DFutYCzo.js                       0.50 kB │ gzip:   0.34 kB
+dist/assets/StarFilled-CNctUIhy.js                           0.51 kB │ gzip:   0.35 kB
+dist/assets/CopyOutlined-DO-5wM49.js                         0.53 kB │ gzip:   0.36 kB
+dist/assets/ViewModeSwitch-BKfz3Q9s.js                       0.62 kB │ gzip:   0.36 kB
+dist/assets/PageHeader-jwIMxN9m.js                           0.63 kB │ gzip:   0.37 kB
+dist/assets/ArrowLeftOutlined-BQI7MWzD.js                    0.76 kB │ gzip:   0.55 kB
+dist/assets/ArrowRightOutlined-BlucRraw.js                   0.77 kB │ gzip:   0.55 kB
+dist/assets/StopOutlined-BsoeHdvW.js                         0.83 kB │ gzip:   0.57 kB
+dist/assets/UploadOutlined-CAGYKUoA.js                       1.19 kB │ gzip:   0.62 kB
+dist/assets/UndoOutlined-DV78gd9j.js                         1.22 kB │ gzip:   0.77 kB
+dist/assets/LinkOutlined-DeaQxIJ1.js                         1.24 kB │ gzip:   0.66 kB
+dist/assets/ConfirmModal-DAhI9aba.js                         1.30 kB │ gzip:   0.82 kB
+dist/assets/Pagination-CvLscSac.js                           1.36 kB │ gzip:   0.65 kB
+dist/assets/PersonIdentity-BitpkoN3.js                       1.42 kB │ gzip:   0.78 kB
+dist/assets/AntDesignTestView-CQZhpXqa.js                    2.89 kB │ gzip:   1.26 kB
+dist/assets/index-B8BIshDJ.js                                2.90 kB │ gzip:   1.39 kB
+dist/assets/WorkItemCategoryIcon-BqUomp9D.js                 2.96 kB │ gzip:   1.33 kB
+dist/assets/KnowledgeUploadModal-DkcPWRPW.js                 3.61 kB │ gzip:   1.83 kB
+dist/assets/index-CxdbOOwO.js                                4.15 kB │ gzip:   1.95 kB
+dist/assets/index-CmHF3tq1.js                                4.71 kB │ gzip:   2.09 kB
+dist/assets/index-CifXRNbf.js                                5.07 kB │ gzip:   2.37 kB
+dist/assets/index-Ce_5hI4Y.js                                5.52 kB │ gzip:   2.38 kB
+dist/assets/zh_CN-C7GCc0J2.js                                5.52 kB │ gzip:   2.45 kB
+dist/assets/DesignTasksView-CIi7v49x.js                      6.03 kB │ gzip:   2.58 kB
+dist/assets/ProjectDeliveryMapView-Be8ObdvD.js               7.40 kB │ gzip:   2.80 kB
+dist/assets/CreateVersionModal-C9Wdtvlr.js                   7.90 kB │ gzip:   3.05 kB
+dist/assets/ProductReviewView-BRyWQOoH.js                    8.35 kB │ gzip:   3.23 kB
+dist/assets/PermissionDemoView-BXNU2MhG.js                   9.84 kB │ gzip:   3.56 kB
+dist/assets/index-B7Po2xex.js                               10.11 kB │ gzip:   3.88 kB
+dist/assets/SystemSettingsView-CV5hsIxM.js                  10.21 kB │ gzip:   3.42 kB
+dist/assets/VersionReviewView-CDqRfA6F.js                   10.53 kB │ gzip:   4.01 kB
+dist/assets/index-WvcYuMdQ.js                               11.31 kB │ gzip:   3.93 kB
+dist/assets/TeamOrgView-Dtz4QojA.js                         11.90 kB │ gzip:   4.70 kB
+dist/assets/WorkflowDemoView-D8uQQqFH.js                    13.06 kB │ gzip:   3.62 kB
+dist/assets/RequirementWorkItemsView-FdCdUfYb.js            13.29 kB │ gzip:   3.94 kB
+dist/assets/WorkItemStateConfigDrawer-BP9HU79p.js           13.56 kB │ gzip:   5.28 kB
+dist/assets/ProductPlanningView-BOh5juJ5.js                 14.27 kB │ gzip:   3.01 kB
+dist/assets/MyTasksView-sRYIZd1E.js                         14.77 kB │ gzip:   3.90 kB
+dist/assets/Drawer-CmprRBwa.js                              14.93 kB │ gzip:   5.73 kB
+dist/assets/InvoiceManagementView-BrI6dN3H.js               15.43 kB │ gzip:   3.40 kB
+dist/assets/PaymentCollectionManagementView-BfyN7EZe.js     15.52 kB │ gzip:   3.59 kB
+dist/assets/AssetManagementView-whKzXjeY.js                 16.93 kB │ gzip:   3.66 kB
+dist/assets/ProcurementManagementView-DQvxZH6M.js           18.29 kB │ gzip:   3.82 kB
+dist/assets/ApprovalCenterView-Cz0AEkY7.js                  18.40 kB │ gzip:   4.66 kB
+dist/assets/GoalSummarySettingsView-BFsiJyH7.js             20.59 kB │ gzip:   7.27 kB
+dist/assets/originalOkr-hX7iArN_.js                         21.46 kB │ gzip:   8.30 kB
+dist/assets/index-hcVsodnR.js                               21.69 kB │ gzip:   7.73 kB
+dist/assets/index-Dj4kJ2rK.js                               21.73 kB │ gzip:   8.76 kB
+dist/assets/AttendanceManagementView-BpSPlZOC.js            22.14 kB │ gzip:   4.37 kB
+dist/assets/context-llozKVhf.js                             24.93 kB │ gzip:   9.04 kB
+dist/assets/index-DTlVllsq.js                               25.00 kB │ gzip:   9.78 kB
+dist/assets/ResearchTemplateView-CXseaEmM.js                32.13 kB │ gzip:   9.15 kB
+dist/assets/index-DkKDJFIy.js                               32.87 kB │ gzip:  11.41 kB
+dist/assets/RichTextEditor-CxNphPwf.js                      34.54 kB │ gzip:  15.04 kB
+dist/assets/KnowledgeBaseView-DhEkjCso.js                   39.66 kB │ gzip:   8.50 kB
+dist/assets/query-qiulUQr-.js                               40.68 kB │ gzip:  12.06 kB
+dist/assets/markdown-CF0aoQVP.js                            46.94 kB │ gzip:  14.21 kB
+dist/assets/index-3NRLQiyo.js                               46.99 kB │ gzip:  16.66 kB
+dist/assets/VersionIterationView-B2ybtmJk.js                63.22 kB │ gzip:  16.09 kB
+dist/assets/TestAndDefectView-BNqhHvXM.js                   71.55 kB │ gzip:  21.18 kB
+dist/assets/RequirementPoolView-BWa2XMMC.js                 80.15 kB │ gzip:  23.99 kB
+dist/assets/TrainingCenterView-CyZxpDGY.js                  87.62 kB │ gzip:  27.21 kB
+dist/assets/index-BdiyFa4g.js                              104.57 kB │ gzip:  33.98 kB
+dist/assets/ProductLinesView-iyqg-n1h.js                   115.28 kB │ gzip:  30.91 kB
+dist/assets/motion-DIWerfjd.js                             126.43 kB │ gzip:  49.82 kB
+dist/assets/RequirementTasksView-CyKIK71d.js               152.28 kB │ gzip:  44.55 kB
+dist/assets/react-CwdQJTIV.js                              262.78 kB │ gzip:  83.38 kB
+dist/assets/OKRPerformanceView-Ccd5ooVt.js                 323.64 kB │ gzip:  93.43 kB
+dist/assets/charts-DiD64GMg.js                             418.32 kB │ gzip: 119.86 kB
+dist/assets/rich-editor-Crndhefy.js                      1,346.83 kB │ gzip: 462.51 kB
+dist/assets/index-DjqJBbuU.js                            4,116.78 kB │ gzip: 641.13 kB
+
+(!) Some chunks are larger than 600 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 25.81s

@@ -1,0 +1,2 @@
+- PRD contains technical implementation detail matching: ×Ö¶ÎÀàĞÍ
+- PRD and registry have different requirement counts

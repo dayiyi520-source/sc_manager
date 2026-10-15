@@ -1,0 +1,92 @@
+
+ RUN  v3.2.7 D:/project/manager_admin_frontend
+
+ ❯ src/services/businessTask.integration.test.ts (14 tests | 2 failed) 206ms
+   ✓ local commercial task routes > seeds eight tasks per kind and paginates independent stores 30ms
+   ✓ local commercial task routes > retains stored tasks and edited sample records when adding missing samples 3ms
+   ✓ local commercial task routes > honors a persisted empty array after initialization instead of repeatedly reseeding 2ms
+   ✓ local commercial task routes > provides stable unique presales samples with populated business fields 4ms
+   ✓ local commercial task routes > provides stable unique delivery samples with populated business fields 2ms
+   ✓ local commercial task routes > derives task business associations from the new directory and delivery-map sources 1ms
+   ✓ local commercial task routes > persists creation and edits while protecting identity and creation information 8ms
+   ✓ local commercial task routes > rejects invalid writes without changing task counts 6ms
+   ✓ local commercial task routes > retains task comments and operations across subsequent reads 11ms
+   × moves a delivery task to review when a different creator completes it, then supports approval and rejection 22ms
+     → expected { title: '需要主管审核的交付任务', …(14) } to match object { status: '处理中', …(2) }
+(13 matching properties omitted from actual)
+   ✓ keeps business tasks out of product work-item templates and supports ops route 5ms
+   ✓ provides multiple status candidates for product task transitions when the type has no stored workflow 66ms
+   ✓ seeds plan dates for estimated product work items used by the hours timeline 25ms
+   × requires hours before requesting approval and locks a pending request 18ms
+     → promise resolved "null" instead of rejecting
+ ❯ src/services/mockProductTaskPreview.integration.test.ts (4 tests | 1 failed) 233ms
+   ✓ ships three owned and created samples for each product task category to a new browser 78ms
+   ✓ preserves browser edits and manual records without duplicating seeded product tasks 51ms
+   ✓ returns active product work items for the product iteration timeline 37ms
+   × does not classify pending or cancelled string statuses as processing 65ms
+     → expected 'IN_PROGRESS' to be 'NOT_STARTED' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/services/businessTask.integration.test.ts > moves a delivery task to review when a different creator completes it, then supports approval and rejection
+AssertionError: expected { title: '需要主管审核的交付任务', …(14) } to match object { status: '处理中', …(2) }
+(13 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "actualHours": 4,
+-   "completionApproval": "pending",
+-   "status": "处理中",
++   "status": "待审核",
+  }
+
+ ❯ src/services/businessTask.integration.test.ts:87:69
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/services/businessTask.integration.test.ts > requires hours before requesting approval and locks a pending request
+AssertionError: promise resolved "null" instead of rejecting
+
+- Expected: 
+Error {
+  "message": "rejected promise",
+}
+
++ Received: 
+null
+
+ ❯ src/services/businessTask.integration.test.ts:125:95
+    123|   const created = await mockApiRequest('/api/delivery-tasks', { method…
+    124|   const url = `/api/delivery-tasks/${created.id}`;
+    125|   await expect(mockApiRequest(url, { method: 'PUT', body: JSON.stringi…
+       |                                                                                               ^
+    126|   await mockApiRequest(url, { method: 'PUT', body: JSON.stringify({ st…
+    127|   await expect(mockApiRequest(url, { method: 'PUT', body: JSON.stringi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/services/mockProductTaskPreview.integration.test.ts > does not classify pending or cancelled string statuses as processing
+AssertionError: expected 'IN_PROGRESS' to be 'NOT_STARTED' // Object.is equality
+
+Expected: "NOT_STARTED"
+Received: "IN_PROGRESS"
+
+ ❯ src/services/mockProductTaskPreview.integration.test.ts:59:20
+     57|   const result = await mockApiRequest(`/api/work-items?productLineId=$…
+     58|   const group = (index: number) => result.page.items.find((item: { id:…
+     59|   expect(group(0)).toBe('NOT_STARTED');
+       |                    ^
+     60|   expect(group(1)).toBe('IN_PROGRESS');
+     61|   expect(group(2)).toBe('COMPLETED');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  3 failed | 15 passed (18)
+   Start at  09:59:32
+   Duration  3.27s (transform 1.30s, setup 394ms, collect 3.09s, tests 440ms, environment 1.70s, prepare 280ms)
+

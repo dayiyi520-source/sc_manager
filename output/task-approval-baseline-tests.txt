@@ -1,0 +1,130 @@
+
+ RUN  v3.2.7 D:/project/manager_admin_frontend
+
+ ❯ src/services/__baselineApprovalOps.test.ts (3 tests | 3 failed) 82ms
+   × local operations tasks > provides four distinct samples and opens their details 41ms
+     → expected [ { id: 'demo-ops-1', …(21) }, …(9) ] to have a length of 4 but got 10
+   × local operations tasks > retains edits and new tasks across repeated reads without reseeding 26ms
+     → 请选择关联项目
+   × local operations tasks > rejects missing records and blank titles without changing stored tasks 12ms
+     → expected 10 to be 4 // Object.is equality
+ ❯ src/services/__baselineApprovalCompletion.test.ts (5 tests | 1 failed) 481ms
+   ✓ saves completion hours, summary and attachment together and reads them again 97ms
+   ✓ rejects invalid attachments, hours and missing reasons without partial writes 34ms
+   × preserves role, product and parent restrictions 70ms
+     → promise resolved "{ id: 'task', …(15) }" instead of rejecting
+   ✓ requires a project for ops creation and persists completion review 36ms
+   ✓ restores snapshot task workflow bindings even when browser task caches lack them 240ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/services/__baselineApprovalCompletion.test.ts > preserves role, product and parent restrictions
+AssertionError: promise resolved "{ id: 'task', …(15) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "actualHours": 3.25,
++   "assigneeName": "",
++   "category": "dev",
++   "completedAt": "2026-10-15T02:15:04.722Z",
++   "completionReview": {
++     "content": "补充回归覆盖",
++     "media": [
++       {
++         "dataUrl": "data:text/plain;base64,b2s=",
++         "id": "media",
++         "name": "复盘.txt",
++         "type": "file",
++       },
++     ],
++   },
++   "hasChildren": true,
++   "id": "task",
++   "productLineId": "line",
++   "revision": 3,
++   "status": {
++     "group": "COMPLETED",
++     "name": "已完成",
++     "successful": true,
++   },
++   "statusColor": undefined,
++   "statusKey": "done",
++   "taskTypeId": "type",
++   "title": "复盘验收",
++   "workItemTypeId": undefined,
++   "workflowId": undefined,
+  }
+
+ ❯ src/services/__baselineApprovalCompletion.test.ts:34:26
+     32|   sessionStorage.setItem('shichuang.session', JSON.stringify({ user: {…
+     33|   localStorage.setItem('shichuang.frontend.mock.workItems', JSON.strin…
+     34|   await expect(complete()).rejects.toThrow('父任务');
+       |                          ^
+     35|   await expect(mockApiRequest('/api/work-items/task/transitions?produc…
+     36| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/services/__baselineApprovalOps.test.ts > local operations tasks > provides four distinct samples and opens their details
+AssertionError: expected [ { id: 'demo-ops-1', …(21) }, …(9) ] to have a length of 4 but got 10
+
+- Expected
++ Received
+
+- 4
++ 10
+
+ ❯ src/services/__baselineApprovalOps.test.ts:10:24
+      8|   it('provides four distinct samples and opens their details', async (…
+      9|     const list = await mockApiRequest('/api/ops-tasks');
+     10|     expect(list.items).toHaveLength(4);
+       |                        ^
+     11|     expect(new Set(list.items.map((item: { code: string }) => item.cod…
+     12|     expect(new Set(list.items.map((item: { status: string }) => item.s…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/services/__baselineApprovalOps.test.ts > local operations tasks > retains edits and new tasks across repeated reads without reseeding
+Error: 请选择关联项目
+ ❯ handleMockBusinessTasks src/services/__baselineApprovalBusiness.ts:91:63
+     89|   if (method === 'POST' && !taskId) {
+     90|     if (!text(body.title).trim()) throw new Error('任务标题不能为空');
+     91|     if (kind === 'ops' && !text(body.projectId).trim()) throw new Erro…
+       |                                                               ^
+     92|     let user = MOCK_USERS[0];
+     93|     try { user = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'nu…
+ ❯ handleMockApiRequest src/services/__baselineApprovalMockApi.ts:455:12
+ ❯ mockApiRequest src/services/__baselineApprovalMockApi.ts:1299:47
+ ❯ src/services/__baselineApprovalOps.test.ts:19:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/services/__baselineApprovalOps.test.ts > local operations tasks > rejects missing records and blank titles without changing stored tasks
+AssertionError: expected 10 to be 4 // Object.is equality
+
+- Expected
++ Received
+
+- 4
++ 10
+
+ ❯ src/services/__baselineApprovalOps.test.ts:30:60
+     28|     await expect(mockApiRequest('/api/ops-tasks/demo-ops-1', { method:…
+     29|     await expect(mockApiRequest('/api/ops-tasks', { method: 'POST', bo…
+     30|     expect((await mockApiRequest('/api/ops-tasks')).total).toBe(4);
+       |                                                            ^
+     31|   });
+     32| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 4 passed (8)
+   Start at  10:14:58
+   Duration  6.95s (transform 3.21s, setup 699ms, collect 7.45s, tests 563ms, environment 3.16s, prepare 586ms)
+

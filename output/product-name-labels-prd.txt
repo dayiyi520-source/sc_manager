@@ -1,0 +1,2 @@
+- PRD contains technical implementation detail matching: 字段类型
+- PRD and registry have different requirement counts

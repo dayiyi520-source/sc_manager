@@ -1,0 +1,3 @@
+src/services/reviewEvidenceRepository.ts(33,15): error TS2339: Property 'assigneeId' does not exist on type 'UnifiedWorkItem'.
+src/services/reviewEvidenceRepository.ts(33,34): error TS2339: Property 'assigneeId' does not exist on type 'UnifiedWorkItem'.
+src/services/reviewEvidenceRepository.ts(37,67): error TS2339: Property 'assigneeId' does not exist on type 'UnifiedWorkItem'.

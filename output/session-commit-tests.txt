@@ -1,0 +1,51 @@
+
+ RUN  v3.2.7 D:/project/manager_admin_frontend
+
+ ✓ src/components/product/TaskCompletionDialog.test.tsx (6 tests) 5721ms
+   ✓ cancels completion without writing  1684ms
+   ✓ requires hours and retains input after save failure for retry  1305ms
+   ✓ saves review text and attachments together with hours  1125ms
+   ✓ accepts an attachment without a detected MIME type  915ms
+   ✓ explains that approval requests keep the task processing  479ms
+ ✓ src/services/mockResearchTemplateSave.test.ts (7 tests) 2534ms
+   ✓ 文件写入失败会拒绝保存并恢复浏览器配置  1060ms
+   ✓ 产品通知和状态流程写入文件，刷新恢复且不影响其他产品或全局模板  483ms
+ ✓ src/services/mockProductTaskPreview.integration.test.ts (5 tests) 1505ms
+   ✓ ships three owned and created samples for each product task category to a new browser  608ms
+   ✓ preserves browser edits and manual records without duplicating seeded product tasks  430ms
+stderr | src/components/product/RequirementTasksView.business.test.tsx > limits presales details to activity, collaboration and related tasks
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+ ✓ src/services/businessTask.integration.test.ts (17 tests) 694ms
+stderr | src/components/product/RequirementTasksView.business.test.tsx > limits delivery details to activity, collaboration and related tasks
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+ ✓ src/components/workbench/okr/useOriginalOkr.productNames.test.tsx (1 test) 125ms
+ ✓ src/services/taskStatusOptions.integration.test.ts (8 tests) 262ms
+ ✓ src/services/productNameAndDefectLabels.integration.test.ts (4 tests) 73ms
+ ✓ src/utils/taskActivity.test.ts (6 tests) 35ms
+ ✓ src/services/mockResearchTemplate.integration.test.ts (5 tests) 24ms
+ ✓ src/services/businessTaskRepository.test.ts (4 tests) 10ms
+ ✓ src/services/okrProductNames.test.ts (5 tests) 10ms
+ ✓ src/services/defectStatusLabels.test.ts (1 test) 7ms
+ ✓ src/components/product/RequirementTasksView.business.test.tsx (16 tests) 25907ms
+   ✓ shows exact presales columns and the shared text-only empty state  982ms
+   ✓ uses complete counts while locally paging and switching scopes  5555ms
+   ✓ renders the requested source, stage and missing creator without guessing  328ms
+   ✓ shows loading, reports a failed request and recovers through retry  466ms
+   ✓ keeps only collaboration and related task entries in presales creation  1730ms
+   ✓ keeps only collaboration and related task entries in delivery creation  1532ms
+   ✓ limits presales details to activity, collaboration and related tasks  3381ms
+   ✓ limits delivery details to activity, collaboration and related tasks  2914ms
+   ✓ locks pending status and replaces the menu with approve review controls  954ms
+   ✓ locks pending status and replaces the menu with reject review controls  893ms
+   ✓ disables review for non-reviewers and preserves a pending task when review fails  1041ms
+   ✓ keeps review buttons disabled for the owner who is not the creator  679ms
+   ✓ requests completion hours before persisting delivery completion  694ms
+   ✓ filters by project and uses business statuses instead of the generic development stages  4301ms
+
+ Test Files  13 passed (13)
+      Tests  85 passed (85)
+   Start at  11:49:34
+   Duration  37.65s (transform 2.90s, setup 3.88s, collect 17.60s, tests 36.91s, environment 10.79s, prepare 2.13s)
+

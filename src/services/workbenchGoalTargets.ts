@@ -1,8 +1,18 @@
 import type { CurrentUser, OKRItem } from '../types';
 import type { OkrRecord } from './okrRepository';
 
+type WorkbenchGoalLevel = 'company' | 'department' | 'personal';
+
+function viewerGoalLevel(viewer: CurrentUser): WorkbenchGoalLevel {
+  if (viewer.role === 'admin') return 'company';
+  if (viewer.roleTitle.includes('主管')) return 'department';
+  return 'personal';
+}
+
 export function workbenchGoalTargets(records: OkrRecord[], viewer: CurrentUser): OKRItem[] {
-  const effective = records.filter(row => row.kind === 'objective' && ['active', 'reviewed', 'completed'].includes(row.status) && !row.payload.inherited);
+  const currentCycle = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const effective = records.filter(row => row.kind === 'objective' && row.periodKey === currentCycle && ['active', 'reviewed', 'completed'].includes(row.status) && !row.payload.inherited);
+  const level = viewerGoalLevel(viewer);
   const personal = effective.filter(row => row.ownerId === viewer.id && row.payload.goalLevel === 'personal');
   const map = (record: OkrRecord, title: string, krs: OKRItem['keyResults'], primaryLabel: 'O' | 'KR'): OKRItem => ({
     id: record.id, ownerId: viewer.id, ownerName: viewer.name, department: viewer.department, category: 'my',
@@ -18,6 +28,16 @@ export function workbenchGoalTargets(records: OkrRecord[], viewer: CurrentUser):
     })));
     return map(record, kr?.title || record.payload.sourceTitle || record.payload.title, actions, 'KR');
   });
+
+  if (level === 'company' || level === 'department') {
+    return effective
+      .filter(record => record.ownerId === viewer.id && record.payload.goalLevel === level)
+      .map(record => map(record, record.payload.title, (record.payload.keyResults || []).map(kr => ({
+        id: kr.id, content: kr.title, weight: kr.weight, progress: kr.progress, deadline: kr.deadline || record.periodKey,
+        executionActions: kr.executionActions,
+      })), 'O'));
+  }
+
   for (const record of effective) {
     if (record.payload.goalLevel === 'personal') continue;
     const ownKrs = (record.payload.keyResults || []).filter(kr => kr.assigneeIds?.includes(viewer.id));
