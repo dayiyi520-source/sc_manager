@@ -1,7 +1,7 @@
 import type { OkrPerson, OkrRecord } from './okrRepository';
 
-export const goalLevel = (person?: Pick<OkrPerson, 'name' | 'jobTitle'> & { id?: string; rootFlag?: number }) =>
-  person?.rootFlag === 1 || person?.id === 'user-admin' || person?.name === '林志豪' ? '公司级' : person?.jobTitle?.includes('主管') ? '主管级' : '个人级';
+export const goalLevel = (person?: Pick<OkrPerson, 'name' | 'jobTitle'> & { id?: string; rootFlag?: number; goalRole?: 'supervisor' | 'employee' }) =>
+  person?.rootFlag === 1 || person?.id === 'user-admin' || person?.name === '林志豪' ? '公司级' : (person?.goalRole ? person.goalRole === 'supervisor' : person?.jobTitle?.includes('主管')) ? '主管级' : '个人级';
 
 export const actionGroupKey = (record: OkrRecord) => record.payload.parentActionId || record.payload.parentKeyResultId || record.payload.parentObjectiveId || record.id;
 export const legacyGoalActions = (record: OkrRecord, records: OkrRecord[]) => records.filter(item => item.kind === 'action' && item.status !== 'deleted' && item.ownerId === record.ownerId && item.periodKey === record.periodKey && actionGroupKey(item) === actionGroupKey(record));

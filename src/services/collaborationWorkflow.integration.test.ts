@@ -44,7 +44,7 @@ it('closes a returned matter independently of tasks and records creator closure'
   seed('已退回');
   await post('transition', { action: 'close', revision: 2 });
   const result = await detail();
-  expect(result).toMatchObject({ id: 'matter', code: 'MATTER-1', status: '已完成', revision: 3 });
+  expect(result).toMatchObject({ id: 'matter', code: 'MATTER-1', status: '已关闭', revision: 3 });
   expect(result.workItems).toEqual([direct]);
   expect(result.events.at(-1)).toMatchObject({ eventType: '事项关闭', metadata: { completionType: 'CREATOR_CLOSED' } });
   await expect(post('transition', { action: 'close', revision: 3 })).rejects.toThrow('已退回');
@@ -72,4 +72,13 @@ it('enforces creator identity and valid business state for close and resubmit', 
   await expect(post('reopen', { assigneeId: processor.id, revision: 2 })).rejects.toThrow('创建人');
   sessionStorage.setItem('shichuang.session', JSON.stringify({ user: creator })); seed('处理中');
   await expect(post('reopen', { assigneeId: processor.id, revision: 2 })).rejects.toThrow('重新发起');
+});
+
+it('reopens a creator-closed matter with a reason and preserves its history', async () => {
+  seed('已退回');
+  await post('transition', { action: 'close', revision: 2 });
+  await expect(post('reopen', { assigneeId: processor.id, revision: 3 })).rejects.toThrow('重新开启原因');
+  await post('reopen', { assigneeId: processor.id, revision: 3, reason: '补充诉求' });
+  expect(await detail()).toMatchObject({ status: '待处理', revision: 4, workItems: [direct] });
+  expect((await detail()).events.at(-1)).toMatchObject({ eventType: '事项重开', fromStatus: '已关闭' });
 });

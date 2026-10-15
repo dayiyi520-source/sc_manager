@@ -5,6 +5,8 @@ export function createReviewCopyDraft(source: OkrPayload): OkrPayload {
     ...source,
     title: '',
     departmentContentSnapshots: [],
+    departmentReviewExclusions: [],
+    departmentFeedbackRows: [],
     departmentObjectiveVersions: undefined,
     startDate: undefined,
     endDate: undefined,

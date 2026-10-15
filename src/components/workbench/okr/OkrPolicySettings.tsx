@@ -1,4 +1,5 @@
-import { Avatar, Button, Checkbox, Input, InputNumber, Radio, Select, Space, Switch, Table, Typography } from 'antd';
+import { OkrRoleSettings } from './OkrRoleSettings';
+import { Checkbox, Input, InputNumber, Radio, Select, Space, Switch, Typography } from 'antd';
 import Card from 'antd/es/card/Card';
 import type { OkrPerson, OkrSettings } from '../../../services/okrRepository';
 import { cycleTypeLabels } from '../../../services/okrPeriods';
@@ -16,7 +17,7 @@ export function OkrPolicySettings({active,draft,people,busy,onChange}:{active:st
     <Typography.Paragraph>开启后可对齐包含当前周期的上级周期。例：2020年01月 → 2020年第1季度 → 2020年度；不允许对齐不包含当前周期的目标。</Typography.Paragraph>
     <Typography.Text type="secondary">自动创建会在打开应用时补齐到期周期；当前本地版本不提供关闭应用后的后台定时执行。</Typography.Text>
   </Space></Card>;
-  if(active==='administrators') return <Card className="okr-policy-settings" title="管理员设置"><Space orientation="vertical" size="large" style={{width:'100%'}}><Select mode="multiple" aria-label="添加OKR管理员" placeholder="选择人员添加管理员" style={{minWidth:480}} options={options} value={draft.administratorIds} disabled={busy} onChange={administratorIds=>onChange({...draft,administratorIds})}/><Table pagination={false} rowKey="id" dataSource={people.filter(p=>draft.administratorIds?.includes(p.id))} columns={[{title:'姓名',render:(_,p)=><Space><Avatar size={28}>{p.name.slice(-2)}</Avatar>{p.name}</Space>},{title:'部门',dataIndex:'department'},{title:'操作',render:(_,p)=><Button danger type="text" disabled={busy || draft.administratorIds!.length<=1} onClick={()=>onChange({...draft,administratorIds:draft.administratorIds!.filter(id=>id!==p.id)})}>移除</Button>}]}/><Typography.Text type="secondary">至少保留一名管理员；更换时先添加新管理员，再移除原管理员。</Typography.Text></Space></Card>;
+  if(active==='administrators') return <OkrRoleSettings draft={draft} people={people} disabled={busy} onChange={onChange}/>;
   if(active==='confirmation') return <Card className="okr-policy-settings" title="目标确认配置"><Space orientation="vertical" size="large" style={{width:'100%'}}>
     <label>目标确认 <Switch aria-label="目标确认" checked={confirmation.enabled} disabled={busy} onChange={enabled=>updateConfirmation({enabled})}/></label>
     <Checkbox disabled={busy || !confirmation.enabled} checked={confirmation.visiblePending} onChange={e=>updateConfirmation({visiblePending:e.target.checked})}>确认中的目标能被他人看到</Checkbox>

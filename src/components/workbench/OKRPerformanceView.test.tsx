@@ -284,18 +284,18 @@ describe('OKRPerformanceView target navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
     expect(screen.getByLabelText('月复盘编辑器')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '2026年第9月 月报-产品部' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toHaveValue('已保存的问题建议');
+    expect(screen.getByRole('textbox', { name: '对公司或部门发展有帮助的意见和建议' })).toHaveValue('已保存的问题建议');
     if (status === 'draft') {
-      expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toBeEnabled();
+      expect(screen.getByRole('textbox', { name: '对公司或部门发展有帮助的意见和建议' })).toBeEnabled();
       fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
       await waitFor(() => expect(okrState.saveReviewDraft).toHaveBeenCalledWith(expect.objectContaining({ startDate: '2026-09-01', suggestions: '已保存的问题建议' })));
     } else {
-      expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toBeDisabled();
+      expect(screen.getByRole('textbox', { name: '对公司或部门发展有帮助的意见和建议' })).toBeDisabled();
       expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '提交月报' })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '复制为本期' }));
       expect(screen.getByRole('button', { name: '存草稿' })).toBeEnabled();
-      expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toBeEnabled();
+      expect(screen.getByRole('textbox', { name: '对公司或部门发展有帮助的意见和建议' })).toBeEnabled();
     }
   });
 
@@ -327,6 +327,27 @@ describe('OKRPerformanceView target navigation', () => {
     }
   });
 
+  it('only exposes the supervisor filter to administrators and restricts regular members to their department', () => {
+    currentUser = { id: 'boss', name: '老板', department: '管理层' };
+    okrState.people = [...defaultPeople, { id: 'staff', name: '员工', department: '产品部', supervisorId: 'manager', rootFlag: 0, version: 1 }, { id: 'foreign', name: '外部门成员', department: '交付部', supervisorId: 'boss', rootFlag: 0, version: 1 }];
+    okrState.performances = ['manager', 'staff', 'foreign'].map(authorId => ({ id: authorId, authorId, author: authorId === 'manager' ? '主管' : authorId === 'staff' ? '员工' : '外部门成员', authorDept: authorId === 'foreign' ? '交付部' : '产品部', type: 'week' as const, cycleName: '本轮周报', summary: '', selfScore: 0, uncompletedReason: '', suggestions: '', helpNeeded: '', sendTo: [], createdAt: '', status: 'submitted' as const }));
+    const view = render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('tab', { name: /看他人的复盘/ }));
+    fireEvent.click(screen.getByRole('button', { name: '可以看的' }));
+    expect(screen.getByRole('button', { name: /外部门成员.*本轮周报/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: '只看主管' }));
+    expect(screen.getByRole('button', { name: /主管.*本轮周报/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /员工.*本轮周报/ })).not.toBeInTheDocument();
+    view.unmount();
+    currentUser = { id: 'manager', name: '主管', department: '产品部' };
+    render(<ReviewSummaryView/>);
+    fireEvent.click(screen.getByRole('tab', { name: /看他人的复盘/ }));
+    fireEvent.click(screen.getByRole('button', { name: '可以看的' }));
+    expect(screen.queryByRole('checkbox', { name: '只看主管' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /员工.*本轮周报/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /外部门成员.*本轮周报/ })).not.toBeInTheDocument();
+  });
+
   it.each([['week', 'structured'], ['month', 'monthly'], ['week', 'supervisor'], ['month', 'supervisor']] as const)('opens received %s %s in the new read-only layout and records reading separately', async (type, mode) => {
     currentUser = { id: 'boss', name: '老板', department: '管理层' };
     const record: OkrRecord = { id: 'received', ownerId: 'manager', kind: 'review', periodKey: '2026-09', version: 2, status: 'reviewed',
@@ -351,7 +372,7 @@ describe('OKRPerformanceView target navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
     expect(screen.getByText('请选择一份复盘')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '可以看的' }));
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: '只看主管' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /主管.*收到的复盘/ })).toBeInTheDocument();
     markViewed.mockRestore();
   });

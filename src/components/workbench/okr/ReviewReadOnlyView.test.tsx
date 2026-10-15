@@ -52,7 +52,7 @@ describe('ReviewReadOnlyView', () => {
   it('shows monthly metrics and suggestions without historical impact', () => {
     render(<ReviewReadOnlyView review={{ ...review, type: 'month', suggestions: '改进建议', monthlyMetrics: { taskCount: 2, collaborationCount: 1, totalHours: 12 } }} onBack={vi.fn()} onCopy={vi.fn()}/>);
     expect(screen.queryByText('对 OKR 的影响：支持 KR')).not.toBeInTheDocument();
-    for (const title of ['本月整体进度', '本月任务', '协同事项', '总工时', '加班时长', '遇到的问题或者建议', '需要协助事项']) expect(screen.getByText(title)).toBeInTheDocument();
+    for (const title of ['本月整体进度', '本月任务', '协同事项', '总工时', '加班时长', '对公司或部门发展有帮助的意见和建议', '需要协助事项']) expect(screen.getByText(title)).toBeInTheDocument();
     expect(screen.getByText('12 小时')).toBeInTheDocument();
     expect(screen.getByText('改进建议')).toBeInTheDocument();
   });

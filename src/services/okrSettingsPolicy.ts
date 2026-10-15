@@ -1,3 +1,4 @@
+import { validateWeeklyCycles } from './weeklyReviewCycles';
 import { normalizeObjectiveTitleTemplates, validateObjectiveTitleTemplates } from './okrObjectiveTitleTemplates';
 import type { OkrConfirmationSettings, OkrPerson, OkrRecord, OkrSettings } from './okrRepository';
 import { defaultCycles, materializePeriods } from './okrPeriods';
@@ -25,7 +26,10 @@ export function confirmationReviewer(owner: OkrPerson, action: 'create'|'update'
   if (!administrator) throw new Error('未配置可用的 OKR 管理员');
   return administrator;
 }
-export function validatePolicy(settings: OkrSettings, people: OkrPerson[]) {
+export function validatePolicy(settings: OkrSettings, people: OkrPerson[], previous?: OkrSettings) {
+  const cycleError = validateWeeklyCycles(settings.weeklyReviewCycles || [], previous?.weeklyReviewCycles || settings.weeklyReviewCycles || []);
+  if (cycleError) return cycleError;
+  if (settings.supervisorIds?.some(id => !people.some(person => person.id === id))) return '所选主管已失效，请重新选择';
   const titleError = validateObjectiveTitleTemplates(normalizeObjectiveTitleTemplates(settings));
   if (titleError) return titleError;
   const known = new Set(people.map(p=>p.id));

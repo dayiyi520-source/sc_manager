@@ -5,6 +5,7 @@ export type ReviewTemplate = 'employee' | 'supervisor' | 'boss';
 export function reviewTemplateFor(person: OkrPerson | undefined, people: OkrPerson[]): ReviewTemplate | undefined {
   if (!person) return undefined;
   if (person.rootFlag === 1) return 'boss';
+  if (person.goalRole) return person.goalRole === 'supervisor' ? 'supervisor' : 'employee';
   if (people.some(member => member.supervisorId === person.id && member.id !== person.id) || person.jobTitle?.includes('主管')) return 'supervisor';
   return 'employee';
 }

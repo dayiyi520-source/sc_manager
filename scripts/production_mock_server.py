@@ -20,7 +20,13 @@ def migrate_state(current, legacy):
     for row in legacy.get('okrRecords', []):
         if row.get('kind') == 'review' and row.get('ownerId') == 'user-admin': continue
         saved = merged.get(row['id'])
-        if not saved or current['revision'] == 0 or row.get('version',0) > saved.get('version',0): merged[row['id']] = row
+        next_row = row if not saved or current['revision'] == 0 or row.get('version',0) > saved.get('version',0) else saved
+        # Read receipts are independent of report content versions.
+        same_report = (saved and saved.get('kind') == row.get('kind') == 'review'
+                       and all(saved.get(key) == row.get(key) for key in ('ownerId', 'periodKey'))
+                       and all(saved.get('payload', {}).get(key) == row.get('payload', {}).get(key) for key in ('reviewType', 'startDate', 'endDate'))
+                       and saved.get('status') in {'submitted', 'reviewed', 'active'} and row.get('status') in {'submitted', 'reviewed', 'active'})
+        merged[row['id']] = {**next_row, 'viewedBy': list(dict.fromkeys([*saved.get('viewedBy', []), *row.get('viewedBy', [])]))} if same_report else next_row
     state = {**current, 'okrRecords':list(merged.values())}
     settings = legacy.get('okrSettings')
     if settings and (current['revision'] == 0 or settings.get('version',0) > current['okrSettings'].get('version',0)): state['okrSettings'] = settings

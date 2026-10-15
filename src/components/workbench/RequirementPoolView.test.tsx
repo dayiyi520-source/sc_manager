@@ -346,7 +346,7 @@ describe('workbench work-order creation layout', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '设计' }));
     expect(screen.getByTestId('embedded-task-create')).toHaveAttribute('data-design-variant', variant);
   });
-  it.each(['已退回', '已完成'] as const)('backfills all saved text, html, product description and attachments when editing %s', async status => {
+  it.each(['已退回', '已完成', '已关闭'] as const)('backfills all saved text, html, product description and attachments when editing %s', async status => {
     const sample = await renderDetail({ status, description: '保留正确部分，调整末尾', descriptionHtml: '<p><strong>保留正确部分</strong>，调整末尾</p>', media: [{ id: 'file-1', name: '原始说明.pdf', type: 'file', dataUrl: 'data:application/pdf;base64,YQ==' }], specialFields: { projectName: '中标项目甲', requestSource: '客户访谈', transferToProduct: '需要', productDescription: '已写好的产品说明', productDescriptionHtml: '<p>已写好的产品说明</p>' } });
     fireEvent.click(screen.getByRole('button', { name: status === '已退回' ? '重新编辑' : '重新开启' }));
     const editors = screen.getAllByTestId('rich-text-editor');

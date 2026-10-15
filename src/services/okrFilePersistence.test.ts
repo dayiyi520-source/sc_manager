@@ -47,3 +47,16 @@ describe('portable goal/review mock persistence',()=>{
   fail=false;await second.run(async()=>true);
  });
 });
+
+ describe('review receipt migration', () => {
+  it('merges unversioned receipts without overwriting file-backed feedback and exclusions', () => {
+   const saved = { ...record('monthly', 'review'), status: 'submitted', version: 2, viewedBy: ['admin'], payload: { title: '部门月报', reviewType: 'month' as const, startDate: '2026-10-01', endDate: '2026-10-31', departmentReviewExclusions: [{ employeeId: 'e', reason: '本轮休假' }], departmentFeedbackRows: [{ employeeId: 'e', employeeName: '员工', reviewId: 'r', suggestion: '建议', judgment: '需公司解决' as const }] } };
+   const legacy = { ...saved, viewedBy: ['manager'], payload: { ...saved.payload, departmentReviewExclusions: [], departmentFeedbackRows: [] } };
+   const current = { ...state(), revision: 1, okrRecords: [saved] };
+   const migrated = migrateLegacyOkrState(current, { okrRecords: [legacy] });
+   expect(migrated.okrRecords[0]).toEqual({ ...saved, viewedBy: ['admin', 'manager'] });
+   expect(migrateLegacyOkrState(migrated, { okrRecords: [legacy] })).toEqual(migrated);
+   expect(migrateLegacyOkrState(current, { okrRecords: [{ ...legacy, periodKey: 'other' }] }).okrRecords[0]).toEqual(saved);
+   expect(migrateLegacyOkrState(current, { okrRecords: [{ ...legacy, status: 'draft' }] }).okrRecords[0]).toEqual(saved);
+  });
+ });

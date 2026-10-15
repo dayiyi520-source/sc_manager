@@ -1,3 +1,4 @@
+import { activeWeeklyCycle, configuredWeeklyAccess } from './weeklyReviewCycles';
 import dayjs from 'dayjs';
 import type { OkrPayload, OkrRecord, OkrSettings, OkrTimeRule } from './okrRepository';
 import type { OKRItem } from '../types';
@@ -13,6 +14,11 @@ export function currentReviewPeriod(type: ReviewType, now = dayjs()): ReviewPeri
   return { startDate: start.format('YYYY-MM-DD'), endDate: (type === 'month' ? start.endOf('month') : start.add(6, 'day')).format('YYYY-MM-DD') };
 }
 
+export function reviewPeriodFor(settings: OkrSettings | undefined, type: ReviewType, now = dayjs()): ReviewPeriod {
+  const configured = type === 'week' ? activeWeeklyCycle(settings, now) : undefined;
+  return configured ? { startDate: configured.startDate, endDate: configured.endDate } : currentReviewPeriod(type, now);
+}
+
 export const REVIEW_WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 /** The legacy full-month default means unrestricted access and maps to the whole week. */
@@ -24,6 +30,11 @@ export function normalizeWeeklyReviewRule(rule: OkrTimeRule): OkrTimeRule {
 
 export function reviewWriteAccess(settings: OkrSettings | undefined, type: ReviewType, now = dayjs()) {
   if (!settings) return { allowed: false, reason: '填写日期配置尚未加载' };
+  if (type === 'week') {
+    const active = activeWeeklyCycle(settings, now);
+    if (active) return configuredWeeklyAccess(settings, active.startDate, active.endDate, now)!;
+    if (settings.weeklyReviewCycles?.some(row => row.month === now.format('YYYY-MM'))) return { allowed: false, reason: '当前不在已配置的周报周期内' };
+  }
   const configured = settings.timeRules.find(item => item.key === (type === 'week' ? 'weeklyReview' : 'monthlyReview'));
   const rule = configured ? normalizeWeeklyReviewRule(configured) : undefined;
   if (!rule) return { allowed: true, reason: '' }; // Existing configurations without time rules remain compatible.
@@ -52,6 +63,11 @@ export function reviewSubmissionAccess(settings: OkrSettings | undefined, payloa
   if (!settings) return { allowed: false, reason: '填写日期配置尚未加载，请稍后重试' };
   if (payload.reviewType !== 'week' && payload.reviewType !== 'month') return { allowed: false, reason: '复盘类型无效' };
   const type = payload.reviewType;
+  if (type === 'week' && payload.startDate && payload.endDate) {
+    const configured = configuredWeeklyAccess(settings, payload.startDate, payload.endDate, now);
+    if (configured) return configured;
+    if (settings.weeklyReviewCycles?.some(row => row.month === payload.startDate?.slice(0, 7))) return { allowed: false, reason: '周报周期已调整，请重新选择' };
+  }
   const current = currentReviewPeriod(type, now);
   const start = dayjs(payload.startDate);
   const end = dayjs(payload.endDate);
@@ -84,7 +100,7 @@ export function backfillReviews(records: OkrRecord[], objectives: OKRItem[], own
   const mine = records.filter(record => record.kind === 'review' && record.ownerId === ownerId && record.status !== 'deleted');
   const periods = new Map<string, BackfillReview>();
   const add = (type: ReviewType, period: ReviewPeriod) => {
-    if (!allowsReviewBackfill(settings, type) || !dayjs(period.endDate).isBefore(now, 'day')) return;
+    if (!dayjs(period.endDate).isBefore(now, 'day') || !reviewSubmissionAccess(settings, { title: '', reviewType: type, ...period }, now).allowed) return;
     const matching = mine.filter(record => record.payload.reviewType === type && record.payload.startDate === period.startDate && record.payload.endDate === period.endDate);
     if (matching.some(record => submittedStatuses.has(record.status))) return;
     const draft = matching.find(record => ['draft', 'returned'].includes(record.status));
@@ -103,10 +119,11 @@ export function backfillReviews(records: OkrRecord[], objectives: OKRItem[], own
     add('month', currentReviewPeriod('month', month));
     let week = dayjs(currentReviewPeriod('week', month).startDate);
     while (!week.isAfter(month.endOf('month'), 'day')) {
-      add('week', currentReviewPeriod('week', week));
+      if (!settings.weeklyReviewCycles?.some(row => row.month === week.format('YYYY-MM'))) add('week', currentReviewPeriod('week', week));
       week = week.add(7, 'day');
     }
   }
+  for (const configured of settings.weeklyReviewCycles || []) add('week', { startDate: configured.startDate, endDate: configured.endDate });
   for (const record of mine) {
     if (['draft', 'returned'].includes(record.status) && record.payload.startDate && record.payload.endDate && (record.payload.reviewType === 'week' || record.payload.reviewType === 'month')) {
       const period = { startDate: record.payload.startDate, endDate: record.payload.endDate };

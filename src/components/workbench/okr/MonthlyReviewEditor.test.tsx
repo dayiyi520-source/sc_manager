@@ -70,7 +70,7 @@ describe('personal monthly editor', () => {
     const people = [{ id: 'm', name: '主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 }, { id: 'e', name: '员工甲', department: '产品部', supervisorId: 'm', rootFlag: 0, version: 1 }];
     const objective: OKRItem = { id: 'department', ownerId: 'm', ownerName: '主管', department: '产品部', cycle: '2026-10', category: 'my', objective: '部门目标', progress: 0, weight: 100, deadline: '2026-10-31', keyResults: [{ id: 'kr', content: '部门KR', progress: 0, weight: 100, deadline: '2026-10-31' }] };
     const goal = { id: 'goal', ownerId: 'e', kind: 'objective' as const, status: 'active', periodKey: '2026-10', version: 1, payload: { title: '本人目标', sourceObjectiveId: 'department', sourceKrId: 'kr', keyResults: [{ id: 'kr', title: '承接', progress: 0, weight: 100, executionActions: [{ id: 'action', title: '个人动作甲', ownerId: 'e', progress: 0 }] }] } };
-    const report = { id: 'monthly', ownerId: 'e', kind: 'review' as const, status: 'submitted', periodKey: '2026-10', version: 1, payload: { title: '员工月报', reviewType: 'month' as const, ...props.periodOverride, krReviews: [{ objectiveId: 'goal', objectiveTitle: '本人目标', keyResultId: 'action', keyResultTitle: '个人动作甲', previousProgress: 10, currentProgress: 60, executionHealth: '正常' as const, health: 'normal' as const, achievement: '', blocker: '', nextPlan: '', workIds: [] }] } };
+    const report = { id: 'monthly', ownerId: 'e', kind: 'review' as const, status: 'submitted', periodKey: '2026-10', version: 1, payload: { title: '员工月报', suggestions: '改善跨部门协作', reviewType: 'month' as const, ...props.periodOverride, krReviews: [{ objectiveId: 'goal', objectiveTitle: '本人目标', keyResultId: 'action', keyResultTitle: '个人动作甲', previousProgress: 10, currentProgress: 60, executionHealth: '正常' as const, health: 'normal' as const, achievement: '', blocker: '', nextPlan: '', workIds: [] }] } };
     const save = vi.fn(async (_payload: OkrPayload) => true);
     render(<MonthlyReviewEditor {...props} template="supervisor" currentUserId="m" viewer={{ id: 'm', name: '主管', department: '产品部' }} people={people} records={[goal, report, { ...report, id: 'weekly', payload: { ...report.payload, reviewType: 'week', krReviews: [{ ...report.payload.krReviews[0], currentProgress: 99 }] } }]} okrs={[objective]} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
     expect(screen.getByText('部门月报')).toBeInTheDocument();
@@ -81,9 +81,11 @@ describe('personal monthly editor', () => {
     expect(screen.getByRole('columnheader', { name: '员工甲' })).toBeInTheDocument();
     expect(screen.getByText('个人动作：个人动作甲 · 当前进度60%')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: '本月部门补充总结' }), { target: { value: '部门总结' } });
-    fireEvent.change(screen.getByRole('textbox', { name: '部门反馈问题梳理与分析' }), { target: { value: '部门问题分析' } });
+    expect(screen.getByRole('columnheader', { name: '员工' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '意见和建议' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '主管判断' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
-    expect(save.mock.calls[0][0]).toMatchObject({ reviewType: 'month', reviewMode: 'supervisor', summary: '部门总结', suggestions: '部门问题分析', krReviews: [{ currentProgress: 60, employeeReviewSnapshots: [{ id: 'monthly' }] }] });
+    expect(save.mock.calls[0][0]).toMatchObject({ reviewType: 'month', reviewMode: 'supervisor', summary: '部门总结', departmentFeedbackRows: expect.any(Array), krReviews: [{ currentProgress: 60, employeeReviewSnapshots: [{ id: 'monthly' }] }] });
   });
   it('removes the monthly summary input and keeps an existing summary only for history', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
@@ -114,17 +116,17 @@ describe('personal monthly editor', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
     const work: OkrWork[] = [{ id: 't', sourceId: 't', kind: 'task', title: '已关联任务', status: '处理中', assigneeId: 'me', actualHours: 4, estimatedHours: 0, createdAt: '', updatedAt: '', dueDate: '', linkVersion: 0, sourceWorkOrderIds: '[]', statusChanges: [{ status: '处理中', createdAt: '2026-10-01' }] }];
     const { unmount } = render(<MonthlyReviewEditor {...props} work={work} initialPayload={initialPayload} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
-    for (const title of ['1. 本月目标复盘', '2. 插播任务', '3. 遇到的问题或者建议', '4. 需要协助事项', '5. 知识沉淀']) expect(screen.getByText(title)).toBeInTheDocument();
+    for (const title of ['1. 本月目标复盘', '2. 插播任务', '3. 对公司或部门发展有帮助的意见和建议', '4. 需要协助事项', '5. 知识沉淀']) expect(screen.getByText(title)).toBeInTheDocument();
     expect(screen.queryByText('KR 达成')).not.toBeInTheDocument();
     expect(screen.queryByText('下个月安排')).not.toBeInTheDocument();
     await waitFor(() => expect(within(screen.getByLabelText('月度概览')).getByText('4')).toBeInTheDocument());
-    fireEvent.change(screen.getByRole('textbox', { name: '遇到的问题或者建议' }), { target: { value: '新的问题\n新的建议' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '对公司或部门发展有帮助的意见和建议' }), { target: { value: '新的问题\n新的建议' } });
     fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
     const saved = save.mock.calls[0][0];
     expect(saved).toMatchObject({ reviewType: 'month', suggestions: '新的问题\n新的建议', knowledgeEntries: initialPayload.knowledgeEntries, assistance: initialPayload.assistance, monthlyMetrics: { taskCount: 1, collaborationCount: 0, totalHours: 4 }, nextMonthArrangement: '历史安排' });
     unmount();
     render(<MonthlyReviewEditor {...props} work={work} initialPayload={saved} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
-    expect(screen.getByRole('textbox', { name: '遇到的问题或者建议' })).toHaveValue('新的问题\n新的建议');
+    expect(screen.getByRole('textbox', { name: '对公司或部门发展有帮助的意见和建议' })).toHaveValue('新的问题\n新的建议');
     fireEvent.click(screen.getByRole('button', { name: '排查经验' }));
     expect(screen.getByText('经验正文')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '关闭知识详情' }));

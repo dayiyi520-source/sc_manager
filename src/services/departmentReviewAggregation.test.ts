@@ -10,7 +10,7 @@ const period = { startDate: '2026-10-12', endDate: '2026-10-18' };
 const target: OkrKrReview = { objectiveId: 'o', objectiveTitle: '部门目标', keyResultId: 'kr', keyResultTitle: 'KR', previousProgress: 0, currentProgress: 0, health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: [] };
 const department: OkrRecord = { id: 'o', ownerId: 'm', kind: 'objective', periodKey: '2026-10', status: 'active', version: 1, payload: { title: '部门目标', goalLevel: 'department', keyResults: [{ id: 'kr', title: 'KR', progress: 0, weight: 25, details: [{ id: 'd1', name: '产品', version: 'V1' }, { id: 'd2', name: '产品', version: 'V2' }] }, { id: 'other', title: '其他', progress: 80, weight: 75 }] } };
 const goal = (id: string): OkrRecord => ({ id: `goal-${id}`, ownerId: id, kind: 'objective', periodKey: '2026-10', status: 'active', version: 1, payload: { title: '个人承接', sourceObjectiveId: 'o', sourceKrId: 'kr', keyResults: [{ id: 'kr', title: 'KR', progress: 0, weight: 100, details: department.payload.keyResults![0].details, executionActions: [{ id: `action-${id}`, ownerId: id, title: '动作', progress: 99 }] }] } });
-const report = (id: string, values: number[], old = false): OkrRecord => ({ id: `${old ? 'old' : 'new'}-${id}`, kind: 'review', ownerId: id, periodKey: '', status: 'submitted', version: 1, payload: { title: '员工周报', reviewType: 'week', startDate: old ? '2026-10-05' : period.startDate, endDate: old ? '2026-10-11' : period.endDate, krReviews: [{ ...target, objectiveId: `goal-${id}`, keyResultId: `action-${id}`, detailProgress: values.map((value,index) => ({ id: `d${index+1}`, previousProgress: 0, currentProgress: value })) }] } });
+const report = (id: string, values: number[], old = false): OkrRecord => ({ id: `${old ? 'old' : 'new'}-${id}`, kind: 'review', ownerId: id, periodKey: '', viewedBy: ['m'], status: 'submitted', version: 1, payload: { title: '员工周报', reviewType: 'week', startDate: old ? '2026-10-05' : period.startDate, endDate: old ? '2026-10-11' : period.endDate, krReviews: [{ ...target, objectiveId: `goal-${id}`, keyResultId: `action-${id}`, detailProgress: values.map((value,index) => ({ id: `d${index+1}`, previousProgress: 0, currentProgress: value })) }] } });
 describe('department review authoritative aggregation', () => {
   it('averages employees per detail, details per KR, and weights KRs per objective', () => {
     const records = [department,goal('a'),goal('b'),report('a',[40,80]),report('b',[60,80])];
@@ -36,13 +36,13 @@ describe('department review authoritative aggregation', () => {
     const a = report('a',[40,80]);
     const b = report('b',[60,20],true);
     const records = [department,goal('a'),goal('b'),{...a,payload:{...a.payload,...month,reviewType:'month' as const}},{...b,payload:{...b.payload,reviewType:'month' as const,startDate:'2026-09-01',endDate:'2026-09-30'}},report('b',[100,100])];
-    const result=submitDepartmentReview({title:'部门月报',reviewType:'month',reviewMode:'supervisor',...month,krReviews:[target]},'m',records,people);
+    const result=submitDepartmentReview({title:'部门月报',reviewType:'month',reviewMode:'supervisor',...month,departmentReviewExclusions:[{employeeId:'b',reason:'本轮请假'}],krReviews:[target]},'m',records,people);
     expect(result.payload.krReviews?.[0].currentProgress).toBe(50);
     expect(result.payload.departmentContentSnapshots).toHaveLength(1);
     expect(result.records[0].payload.keyResults?.[0].progress).toBe(50);
   });
   it('rejects stale objective versions and unauthorized ownership', () => {
-    const records = [department,goal('a'),report('a',[40,80])];
+    const records = [department,goal('a'),report('a',[40,80]),report('b',[0,0])];
     expect(() => submitDepartmentReview({title:'周报',reviewType:'week',reviewMode:'supervisor',...period,krReviews:[target],departmentObjectiveVersions:{o:0}},'m',records,people)).toThrow('部门目标已被更新');
     expect(() => submitDepartmentReview({title:'周报',reviewType:'week',reviewMode:'supervisor',...period,krReviews:[target]},'a',records,people)).toThrow('无部门周报');
   });
@@ -68,7 +68,7 @@ describe('主管本人承接进度', () => {
   it.each(['week', 'month'] as const)('persists own contribution and objective snapshot on %s submission', reviewType => {
     const assigned = { ...department, payload: { ...department.payload, keyResults: department.payload.keyResults!.map(kr => kr.id === 'kr' ? { ...kr, assigneeIds: ['m'] } : kr) } };
     const edited = { ...target, supervisorProgress: [{ id: 'd1', currentProgress: 40 }, { id: 'd2', currentProgress: 80 }], workIds: ['owner-evidence'] };
-    const result = submitDepartmentReview({ title: '部门复盘', reviewMode: 'supervisor', reviewType, ...period, krReviews: [edited] }, 'm', [assigned], people);
+    const result = submitDepartmentReview({ title: '部门复盘', reviewMode: 'supervisor', reviewType, ...period, departmentReviewExclusions: [{employeeId:'a',reason:'本轮请假'},{employeeId:'b',reason:'本轮请假'}], krReviews: [edited] }, 'm', [assigned], people);
     expect(result.payload.krReviews![0]).toMatchObject({ currentProgress: 60, workIds: ['owner-evidence'], supervisorProgress: edited.supervisorProgress });
     expect(result.records[0].payload.progress).toBe(75);
     expect(result.payload.objectiveSnapshots![0].payload.progress).toBe(75);
@@ -80,6 +80,6 @@ describe('主管本人承接进度', () => {
     expect(result.detailProgress?.map(row => row.currentProgress)).toEqual([70, 90]);
   });
   it('rejects owner edits after the assignment is withdrawn', () => {
-    expect(() => submitDepartmentReview({ title: '部门复盘', reviewMode: 'supervisor', reviewType: 'week', ...period, krReviews: [{ ...target, supervisorProgress: [{ id: 'd1', currentProgress: 100 }] }] }, 'm', [department], people)).toThrow('未指派');
+    expect(() => submitDepartmentReview({ title: '部门复盘', reviewMode: 'supervisor', reviewType: 'week', ...period, departmentReviewExclusions: [{employeeId:'a',reason:'本轮请假'},{employeeId:'b',reason:'本轮请假'}], krReviews: [{ ...target, supervisorProgress: [{ id: 'd1', currentProgress: 100 }] }] }, 'm', [department], people)).toThrow('未指派');
   });
 });

@@ -140,6 +140,8 @@ export interface OKRItem {
 }
 
 export interface PerformanceReview {
+  departmentFeedbackRows?: import('../services/okrRepository').DepartmentReviewFeedback[];
+  departmentReviewExclusions?: import('../services/okrRepository').DepartmentReviewExclusion[];
   reviewMode?: import('../services/okrRepository').OkrPayload['reviewMode'];
   id: string;
   version?: number;

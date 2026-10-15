@@ -62,3 +62,9 @@ describe('review copy draft', () => {
     });
   });
 });
+
+ it('does not carry round exclusions or employee suggestion judgments into another round', () => {
+  const draft = createReviewCopyDraft({ title: '旧月报', departmentReviewExclusions: [{ employeeId: 'e', reason: '上轮休假' }], departmentFeedbackRows: [{ employeeId: 'e', employeeName: '员工', reviewId: 'old', suggestion: '旧建议', judgment: '需公司解决' }] });
+  expect(draft.departmentReviewExclusions).toEqual([]);
+  expect(draft.departmentFeedbackRows).toEqual([]);
+ });

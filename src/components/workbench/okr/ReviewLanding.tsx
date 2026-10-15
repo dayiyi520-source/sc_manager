@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import { CalendarIcon, ChevronRightIcon, ClockIcon } from '@primer/octicons-react';
 import type { OKRItem } from '../../../types';
 import type { OkrRecord, OkrSettings } from '../../../services/okrRepository';
-import { backfillReviews, currentReviewPeriod, recentSubmittedReviews, reviewWriteAccess, type BackfillReview, type ReviewPeriod, type ReviewType } from '../../../services/okrReviewRules';
+import { backfillReviews, reviewPeriodFor, recentSubmittedReviews, reviewWriteAccess, type BackfillReview, type ReviewPeriod, type ReviewType } from '../../../services/okrReviewRules';
 import './reviewLanding.css';
 
 type Props = {
@@ -40,7 +40,7 @@ export function ReviewLanding({ records, objectives, ownerId, settings, loading 
     onOpen(item.type, { startDate: item.startDate, endDate: item.endDate }, item.draft);
   };
   const writeButton = (type: ReviewType) => {
-    const period = currentReviewPeriod(type, now);
+    const period = reviewPeriodFor(settings, type, now);
     const access = reviewWriteAccess(settings, type, now);
     const existing = records.find(record => record.kind === 'review' && record.ownerId === ownerId && record.payload.reviewType === type && record.payload.startDate === period.startDate && record.payload.endDate === period.endDate && record.status !== 'deleted');
     const alreadySubmitted = existing && ['active', 'submitted', 'reviewed'].includes(existing.status);
@@ -48,7 +48,9 @@ export function ReviewLanding({ records, objectives, ownerId, settings, loading 
     const reason = exempt ? '你无需写复盘总结' : settingsError ? '填写日期配置加载失败，请重试' : settingsLoading || !settings ? '正在加载填写日期配置' : alreadySubmitted ? '本周期已提交，可在我的复盘列表查看' : access.reason;
     return <Tooltip title={reason || undefined}><span tabIndex={disabled ? 0 : undefined} aria-label={reason || undefined}><Button type={type === 'week' ? 'primary' : 'default'} disabled={disabled} onClick={() => onOpen(type, period, existing)} icon={<CalendarIcon/>}>{type === 'week' ? '写周报' : '写月报'}</Button></span></Tooltip>;
   };
+  const dueCycle = settings?.weeklyReviewCycles?.find(row => !now.isBefore(dayjs(row.notifyAt)) && !now.isAfter(dayjs(row.deadline)) && !records.some(record => record.kind === 'review' && record.ownerId === ownerId && ['submitted', 'reviewed', 'active'].includes(record.status) && record.payload.reviewType === 'week' && record.payload.startDate === row.startDate && record.payload.endDate === row.endDate));
   return <div className="review-landing">
+    {!exempt && dueCycle && <Alert type="info" showIcon title="周报待提交" description={`${dueCycle.startDate} 至 ${dueCycle.endDate} 的周报请于 ${dueCycle.deadline.replace('T', ' ')} 前提交。`}/>}
     {settingsError ? <Alert type="error" showIcon title="填写日期配置加载失败" action={<Button size="small" onClick={onRetry}>重试</Button>}/> : null}
     <section className="review-landing-pending" aria-label="待填写">
       <header className="review-landing-head"><h2>待填写</h2><Button type="text" disabled={blocked} onClick={() => setDrawerOpen(true)}>可补交的<ChevronRightIcon/></Button></header>

@@ -66,6 +66,7 @@ const statuses: RequirementTask["status"][] = [
   "待验收",
   "已完成",
   "已退回",
+  "已关闭",
 ];
 const taskTypes: RequirementTaskType[] = [
   "产品需求",
@@ -463,7 +464,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     setCreating(true);
   };
   const startEditing = (mode: 'returned' | 'reopen') => {
-    if (!selected || !isInitiator(selected, currentUser) || selected.status !== (mode === 'returned' ? '已退回' : '已完成')) return;
+    if (!selected || !isInitiator(selected, currentUser) || !(mode === 'returned' ? selected.status === '已退回' : ['已完成', '已关闭'].includes(selected.status))) return;
     reset();
     setEditingMatter({ ...selected, events }); setEditingMode(mode);
     setWorkOrderType(selected.workOrderType || '其他问题');
@@ -851,7 +852,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     setCloseSubmitting(true);
     try {
       const detail = await requirementRepository.close(selected.id, { revision: selected.revision ?? selected.version ?? 0 });
-      if (detail.id !== selected.id || detail.status !== '已完成') throw new Error('事项状态未更新，请刷新后重试');
+      if (detail.id !== selected.id || detail.status !== '已关闭') throw new Error('事项状态未更新，请刷新后重试');
       const next = { ...selected, ...detail };
       setSelected(next); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
       setRequirementTasks(list => list.map(item => item.id === next.id ? next : item)); setScopeReload(value => value + 1);
@@ -968,7 +969,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     (item) => item.status === "处理中",
   ).length;
   const handledCount = requirementTasks.filter((item) =>
-    ["已完成", "已搁置"].includes(item.status),
+    ["已完成", "已关闭", "已搁置"].includes(item.status),
   ).length;
   const rejectedCount = requirementTasks.filter(
     (item) => item.status === "已退回",
@@ -986,7 +987,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   ).length;
   const todayHandled = requirementTasks.filter(
     (item) =>
-      isToday(item.createdAt) && ["已完成", "已搁置"].includes(item.status),
+      isToday(item.createdAt) && ["已完成", "已关闭", "已搁置"].includes(item.status),
   ).length;
   const todayRejected = requirementTasks.filter(
     (item) => isToday(item.createdAt) && item.status === "已退回",
@@ -1253,7 +1254,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
                 {selected.status === "处理中" && ownsSelected && <Button type="primary" disabled={completeSubmitting || workItems.some((item) => !(item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"))} onClick={() => setCompleteModalOpen(true)}>事项完成</Button>}
                 {selected.status === "已退回" && isInitiator(selected, currentUser) && <><Button danger disabled={closeSubmitting} onClick={() => setCloseModalOpen(true)}>事项关闭</Button><Button type="primary" onClick={() => startEditing('returned')}>重新编辑</Button></>}
                 {selected.status === "待验收" && isInitiator(selected, currentUser) && <><Button type="primary" loading={acceptanceSubmitting} disabled={acceptanceSubmitting} onClick={() => { setAcceptanceRating(0); setAcceptanceComment(""); setRatingModalOpen(true); }}>验收通过</Button><button type="button" onClick={openAcceptanceFailed} className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]">验收未通过</button></>}
-                {selected.status === "已完成" && isInitiator(selected, currentUser) && <button type="button" onClick={() => startEditing('reopen')} className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]">重新开启</button>}
+                {["已完成", "已关闭"].includes(selected.status) && isInitiator(selected, currentUser) && <button type="button" onClick={() => startEditing('reopen')} className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]">重新开启</button>}
               </div>
               <button type="button" onClick={closeDetail} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs text-[var(--text-body)]">关闭</button>
             </div>

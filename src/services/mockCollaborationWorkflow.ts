@@ -11,11 +11,11 @@ export function applyCollaborationWorkflow(action: 'close' | 'reopen' | 'accepta
   const revision = current.revision ?? current.version ?? 0;
   if (body.revision !== revision) throw new Error('事项已被其他人更新，请刷新后重试');
   if (action === 'close' && current.status !== '已退回') throw new Error('仅已退回事项可以关闭');
-  if (action === 'reopen' && !['已完成', '已退回'].includes(current.status)) throw new Error('仅已完成或已退回事项可以重新发起');
+  if (action === 'reopen' && !['已完成', '已关闭', '已退回'].includes(current.status)) throw new Error('仅已完成、已关闭或已退回事项可以重新发起');
   if (action === 'acceptance-failed' && current.status !== '待验收') throw new Error('仅待验收事项可以验收未通过');
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
   if (reason.length > 2000) throw new Error('原因不能超过2000字');
-  if ((action === 'acceptance-failed' || action === 'reopen' && current.status === '已完成') && !reason) throw new Error(action === 'reopen' ? '请填写重新开启原因' : '请填写验收未通过原因');
+  if ((action === 'acceptance-failed' || action === 'reopen' && ['已完成', '已关闭'].includes(current.status)) && !reason) throw new Error(action === 'reopen' ? '请填写重新开启原因' : '请填写验收未通过原因');
   let changes: Partial<Item> = {};
   let feedback: Record<string, unknown> = {};
   let owner: EmployeeOption | undefined;
@@ -49,8 +49,8 @@ export function applyCollaborationWorkflow(action: 'close' | 'reopen' | 'accepta
       feedback = { workItemId: task.id, taskCode: code, taskTitle: task.title, failedTask: { id: task.id, code, title: task.title }, feedbackReason: reason };
     }
   }
-  const status = action === 'close' ? '已完成' : action === 'reopen' ? '待处理' : '处理中';
-  const eventType = action === 'close' ? '事项关闭' : action === 'reopen' ? current.status === '已完成' ? '事项重开' : '重新发起' : '验收未通过';
+  const status = action === 'close' ? '已关闭' : action === 'reopen' ? '待处理' : '处理中';
+  const eventType = action === 'close' ? '事项关闭' : action === 'reopen' ? ['已完成', '已关闭'].includes(current.status) ? '事项重开' : '重新发起' : '验收未通过';
   const updated = { ...current, ...changes, status, ...(owner ? { ownerName: owner.name, assigneeName: owner.name, assigneeId: owner.id, department: owner.department } : {}), revision: revision + 1 };
   updated.events = [...(current.events || []), { id: context.eventId, eventType, fromStatus: current.status, toStatus: status, operatorName: context.viewer?.name || current.creatorName || '', reason, createdAt: context.now, metadata: { ...feedback, ...(owner ? { ownerChanged: current.assigneeId !== owner.id, fromAssigneeName: current.ownerName, assigneeName: owner.name, assigneeId: owner.id } : {}), ...(action === 'close' ? { completionType: 'CREATOR_CLOSED' } : {}), ...(action === 'reopen' ? { editedFields: Object.keys(changes).filter(field => field !== 'progress') } : {}), attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds : [] } }];
   return updated;

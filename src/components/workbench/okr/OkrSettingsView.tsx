@@ -1,3 +1,4 @@
+import { WeeklyCycleSettings } from './WeeklyCycleSettings';
 import { ObjectiveTitleConfiguration } from './ObjectiveTitleConfiguration';
 import { normalizeObjectiveTitleTemplates, validateObjectiveTitleTemplates } from '../../../services/okrObjectiveTitleTemplates';
 import { OkrPolicySettings } from './OkrPolicySettings';
@@ -11,7 +12,7 @@ import { normalizeWeeklyReviewRule, REVIEW_WEEKDAYS } from '../../../services/ok
 import type { OkrSettings, OkrTemplate, OkrTimeRule, OkrPerson, OkrObjectiveTitleTemplate } from '../../../services/okrRepository';
 
 type Props = { key?: Key; settings: OkrSettings; busy?: boolean; readOnly?: boolean; onSave: (settings: OkrSettings) => Promise<boolean>; onClose?: () => void; departments?: string[]; people?: OkrPerson[] };
-const labels: Record<string, string> = { templates: 'OKR模板', administrators:'管理员设置', confirmation:'目标确认配置', timeRules: '开放时间', validation: '权重与必填校验', defaultView: '默认视图' };
+const labels: Record<string, string> = { templates: 'OKR模板', administrators:'角色设置', weeklyCycles: '周报周期配置', confirmation:'目标确认配置', timeRules: '开放时间', validation: '权重与必填校验', defaultView: '默认视图' };
 const TEMPLATE_DEFAULTS: OkrTemplate[] = [
   { department: '产研部门', type: 'product', fields: ['目标内容', '关联产品', '关键节点', '动作', '截止日期', '权重'] },
   { department: '项目交付部门', type: 'delivery', fields: ['目标内容', '关联项目', '关键节点', '动作', '截止日期', '权重'] },
@@ -53,7 +54,7 @@ export function OkrSettingsView({ settings, busy = false, readOnly = false, onSa
   }, [settings]);
   const save = async () => {
     const next = { ...draft, objectiveTitleTemplates: (draft.objectiveTitleTemplates || []).map(row => ({ ...row, department: row.department.trim(), title: row.title.trim(), guidance: row.guidance.trim() })) };
-    const error = validateSettings(next) || (people.length ? validatePolicy(next, people) : undefined);
+    const error = validateSettings(next) || (people.length ? validatePolicy(next, people, settings) : undefined);
     if (error) { message.warning(error); return; }
     try { if (await onSave(next)) onClose?.(); }
     catch { message.error('配置保存失败，请稍后重试，已保留当前修改'); }
@@ -79,6 +80,7 @@ export function OkrSettingsView({ settings, busy = false, readOnly = false, onSa
     <main className="okr-settings-content">
       <header className="okr-settings-page-head"><div><h2>{labels[active]}</h2></div>{active !== 'templates' && <Space><Button type="primary" loading={busy} disabled={readOnly} onClick={() => void save()}>保存配置</Button></Space>}</header>
       <fieldset inert={readOnly} disabled={readOnly} style={{border:0,padding:0,margin:0}} aria-label="配置内容">
+      {active === 'weeklyCycles' && <WeeklyCycleSettings rows={draft.weeklyReviewCycles || []} disabled={busy || readOnly} onChange={weeklyReviewCycles => setDraft(current => ({ ...current, weeklyReviewCycles }))}/>}
       {['administrators','confirmation'].includes(active) && <OkrPolicySettings active={active} draft={draft} people={people} busy={busy || readOnly} onChange={setDraft}/>}
       {active === 'templates' && <div className="okr-template-settings"><ObjectiveTitleConfiguration rows={draft.objectiveTitleTemplates || []} departments={departmentOptions} disabled={busy || readOnly} onSave={saveTemplates}/></div>}
       {active === 'timeRules' && <Card title="开放时间"><Space orientation="vertical" size="middle" style={{width:'100%'}}>{draft.timeRules.map((rule, index) => <div className="okr-settings-time-rule" key={rule.key}><strong>{rule.label}</strong>{rule.key === 'weeklyReview' ? <><Select aria-label="周报开放开始星期" placeholder="开始星期" disabled={busy} value={rule.startDay >= 1 && rule.startDay <= 7 ? rule.startDay : undefined} options={REVIEW_WEEKDAYS.map((label, day) => ({ label, value: day + 1 }))} onChange={value => updateTimeRule(index, { startDay: value })}/><span>至</span><Select aria-label="周报开放结束星期" placeholder="结束星期" disabled={busy} value={rule.endDay >= 1 && rule.endDay <= 7 ? rule.endDay : undefined} options={REVIEW_WEEKDAYS.map((label, day) => ({ label, value: day + 1 }))} onChange={value => updateTimeRule(index, { endDay: value })}/>{(rule.startDay < 1 || rule.startDay > 7 || rule.endDay < 1 || rule.endDay > 7 || rule.startDay > rule.endDay) && <Tag color="error">请重新设置周报开放星期</Tag>}</> : <><InputNumber min={1} max={31} value={rule.startDay} addonBefore="开始日" onChange={value => updateTimeRule(index, { startDay: value ?? 1 })}/><InputNumber min={1} max={31} value={rule.endDay} addonBefore="结束日" onChange={value => updateTimeRule(index, { endDay: value ?? 31 })}/><Select value={rule.shortMonthRule || 'clamp'} options={[{ value: 'clamp', label: '短月份顺延到月末' }, { value: 'reject', label: '短月份禁止超出' }]} onChange={value => updateTimeRule(index, { shortMonthRule: value })}/></>}<label className="flex items-center gap-2"><Switch size="small" checked={rule.allowBackfill !== false} onChange={value => updateTimeRule(index, { allowBackfill: value })} />允许补录</label></div>)}</Space></Card>}

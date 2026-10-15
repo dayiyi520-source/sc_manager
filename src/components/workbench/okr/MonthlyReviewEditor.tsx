@@ -287,9 +287,9 @@ export function MonthlyReviewEditor({ template = 'employee', people = EMPTY_PEOP
         {extraWork.description && <div className="okr-monthly-panel"><p className="whitespace-pre-wrap">{historicalExtraDescription(extraWork.description)}</p><Button type="text" danger disabled={busy || !editorState.editable} onClick={() => setExtraWork(value => ({ ...value, description: '' }))}>删除历史补充</Button></div>}
         </div>
       </section>
-      <section className="okr-weekly-section" aria-label="遇到的问题或者建议">
-        <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />3. 遇到的问题或者建议</h3></div>
-        <Input.TextArea className="okr-weekly-plan-input" aria-label="遇到的问题或者建议" rows={4} maxLength={10000} showCount value={suggestions} onChange={event => setSuggestions(event.target.value)} disabled={busy || !editorState.editable} placeholder="填写本月遇到的问题或者建议" />
+      <section className="okr-weekly-section" aria-label="对公司或部门发展有帮助的意见和建议">
+        <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />3. 对公司或部门发展有帮助的意见和建议</h3></div>
+        <Input.TextArea className="okr-weekly-plan-input" aria-label="对公司或部门发展有帮助的意见和建议" rows={4} maxLength={10000} showCount value={suggestions} onChange={event => setSuggestions(event.target.value)} disabled={busy || !editorState.editable} placeholder="填写对公司或部门发展有帮助的意见和建议" />
       </section>
       <section className="okr-weekly-section" aria-label="需要协助事项">
         <div className="okr-weekly-section-header">

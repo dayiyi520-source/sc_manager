@@ -1,5 +1,5 @@
 {
-  "revision": 27,
+  "revision": 29,
   "okrRecords": [
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
@@ -4886,7 +4886,10 @@
           }
         ]
       },
-      "submittedAt": "2026-10-15T02:01:06.606Z"
+      "submittedAt": "2026-10-15T02:01:06.606Z",
+      "viewedBy": [
+        "user-product"
+      ]
     },
     {
       "id": "okr-1792030839228-tfgw8",
@@ -6418,7 +6421,7 @@
         "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
       ]
     },
-    "version": 18,
+    "version": 19,
     "objectiveTitleTemplates": [
       {
         "id": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",

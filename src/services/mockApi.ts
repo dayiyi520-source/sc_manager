@@ -233,10 +233,11 @@ const mergeVersionReview = (current: VersionReview, input: SaveVersionReviewInpu
 
 const getOkrPeople = () => {
   const cached = read(KEYS.okrPeople, MOCK_OKR_PEOPLE);
+  const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);
   return MOCK_OKR_PEOPLE.map((person) => {
     const saved = cached.find((item) => item.id === person.id);
     const member = getMembers().find(item => item.id === person.id);
-    return { ...(saved && saved.version > person.version ? { ...person, ...saved } : person), ...(member ? { name: member.name, department: member.department, jobTitle: member.jobTitle } : {}) };
+    return { ...(saved && saved.version > person.version ? { ...person, ...saved } : person), ...(member ? { name: member.name, department: member.department, jobTitle: member.jobTitle } : {}), ...(settings.supervisorIds ? { goalRole: settings.supervisorIds.includes(person.id) ? 'supervisor' as const : 'employee' as const } : {}) };
   });
 };
 const planCases = (caseIds: string[]): TestPlanCase[] => getCases().filter((item) => caseIds.includes(item.id)).map((item, index) => ({
@@ -893,13 +894,13 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (!body.viewerId || !isOkrAdmin(body.viewerId,current,people)) throw new Error('仅 OKR 管理员可保存设置');
     if ((body.version ?? 0)!==(current.version ?? 0)) throw new Error('配置已更新，请刷新后重试');
     const {viewerId: _viewerId,...input}=body;
-    const error=validatePolicy(input as OkrSettings,people); if(error) throw new Error(error);
+    const error=validatePolicy(input as OkrSettings,people,current); if(error) throw new Error(error);
     const saved=normalizedPolicy({...input,version:(current.version ?? 0)+1} as OkrSettings,people); write(KEYS.okrSettings,saved); return saved;
   }
   if (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && parts[4] === 'viewed' && method === 'POST') {
     const records = read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]);
     const record = records.find(row => row.id === parts[3] && row.kind === 'review');
-    if (!body.viewerId || !getOkrPeople().some(person => person.id === body.viewerId) || !record || !['submitted', 'reviewed', 'active'].includes(record.status) || !canReadReviewRecord(record, body.viewerId, getOkrPeople())) throw new Error('复盘不存在或无查看权限');
+    if (!body.viewerId || !getOkrPeople().some(person => person.id === body.viewerId) || !record || !['submitted', 'reviewed', 'active'].includes(record.status) || !canReadReviewRecord(record, body.viewerId, getOkrPeople(), read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings))) throw new Error('复盘不存在或无查看权限');
     if (!record.viewedBy?.includes(body.viewerId)) {
       write(KEYS.okrRecords, records.map(row => row.id === record.id ? { ...row, viewedBy: [...(row.viewedBy || []), body.viewerId] } : row));
     }
@@ -909,7 +910,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const viewerId = queryOf(path).get('viewerId');
     const settings = read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings);
     const reviewPeople = getOkrPeople();
-    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => (!record.changeRequest || record.changeRequest.status !== 'pending' || settings.confirmation?.visiblePending !== false || record.ownerId===viewerId || record.changeRequest.reviewerId===viewerId || isOkrAdmin(viewerId || '',settings,getOkrPeople())) && record.status !== 'deleted' && canReadReviewRecord(record, viewerId, reviewPeople));
+    return read(KEYS.okrRecords, MOCK_OKR_RECORDS).filter((record: any) => (!record.changeRequest || record.changeRequest.status !== 'pending' || settings.confirmation?.visiblePending !== false || record.ownerId===viewerId || record.changeRequest.reviewerId===viewerId || isOkrAdmin(viewerId || '',settings,getOkrPeople())) && record.status !== 'deleted' && canReadReviewRecord(record, viewerId, reviewPeople, settings));
   }
   if ((clean === '/api/okr/records' && method === 'POST') || (parts[1] === 'okr' && parts[2] === 'records' && parts[3] && method === 'PATCH')) {
     const mutation = mutateOkrLifecycle(parts[3], body, read<OkrRecord[]>(KEYS.okrRecords, MOCK_OKR_RECORDS as OkrRecord[]), getOkrPeople(), read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings));

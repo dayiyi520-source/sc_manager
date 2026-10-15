@@ -1,7 +1,7 @@
 import { restoreReturnedInitialDraft } from './okrSubmissionState';
 import { apiRequest } from './apiClient';
 
-export interface OkrPerson { id: string; name: string; department: string; jobTitle?: string; supervisorId: string | null; rootFlag: number; version: number }
+export interface OkrPerson { goalRole?: 'supervisor' | 'employee'; id: string; name: string; department: string; jobTitle?: string; supervisorId: string | null; rootFlag: number; version: number }
 export interface GoalTiming { deadline?: string; plannedDeadline?: string; forecastDeadline?: string; actualStartedAt?: string; actualCompletedAt?: string; delayReason?: string; delayResponsibility?: 'self' | 'dependency' | 'company'; }
 export interface OkrExecutionAction extends GoalTiming { weight?: number; id: string; title: string; ownerId: string; progress: number; }
 export interface OkrGoalChange { previousPayload?: OkrPayload; id: string; status: 'pending' | 'approved' | 'returned'; purpose?: 'initial' | 'update' | 'alignment' | 'delete'; reason: string; reviewerId: string; payload: OkrPayload; baseVersion: number; requestedAt: string; feedback?: string; reviewedAt?: string; }
@@ -20,7 +20,11 @@ export interface OkrWeeklyReviewSnapshot {
   id:string; title:string; startDate:string; endDate:string; status:string; summary?:string; knowledgeEntries?:OkrReviewKnowledge[];
   krReviews:OkrKrReview[]; assistance:OkrReviewAssistance[]; extraWork?:OkrExtraWork; items:OkrReviewItem[];
 }
+export interface DepartmentReviewExclusion { employeeId: string; employeeName?: string; reason: string }
+export interface DepartmentReviewFeedback { employeeId: string; employeeName: string; reviewId: string; suggestion: string; judgment?: '已内部解决' | '需公司解决' }
 export interface OkrPayload extends GoalTiming {
+  departmentReviewExclusions?: DepartmentReviewExclusion[];
+  departmentFeedbackRows?: DepartmentReviewFeedback[];
   departmentObjectiveVersions?: Record<string, number>;
   departmentContentSnapshots?: OkrWeeklyReviewSnapshot[];
   objectiveTitleTemplateId?: string; objectiveTemplateKrTypes?: OkrTemplateKrType[];
@@ -78,7 +82,11 @@ export interface OkrCycleSettings { automatic: boolean; types: OkrCycleType[]; s
 export interface OkrConfirmationSettings { enabled: boolean; visiblePending: boolean; actions: ('create' | 'update' | 'delete')[]; types: ('target' | 'challenge')[]; missingSupervisor: 'auto' | 'upper' | 'admin'; selfSupervisor: 'auto' | 'upper'; exemptIds: string[]; companyEditorIds: string[] }
 export type OkrTemplateKrType = 'product' | 'delivery' | 'support';
 export interface OkrObjectiveTitleTemplate { krTypes?: OkrTemplateKrType[]; id: string; department: string; title: string; guidance: string; enabled: boolean }
-export interface OkrSettings { objectiveTitleTemplates?: OkrObjectiveTitleTemplate[]; cycles?: OkrCycleSettings; administratorIds?: string[]; confirmation?: OkrConfirmationSettings; version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
+export interface OkrWeeklyReviewCycle {
+  id: string; month: string; startDate: string; endDate: string;
+  template: 'byRole' | 'employee' | 'supervisor'; notifyAt: string; deadline: string; allowBackfill: boolean;
+}
+export interface OkrSettings { weeklyReviewCycles?: OkrWeeklyReviewCycle[]; supervisorIds?: string[]; objectiveTitleTemplates?: OkrObjectiveTitleTemplate[]; cycles?: OkrCycleSettings; administratorIds?: string[]; confirmation?: OkrConfirmationSettings; version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
 const base = '/api/okr';
 export const okrRepository = {
   markViewed: (id: string, viewerId: string) => apiRequest<void>(`${base}/records/${encodeURIComponent(id)}/viewed`, { method: 'POST', body: JSON.stringify({ viewerId }) }),

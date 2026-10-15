@@ -19,6 +19,21 @@ const support: OkrRecord = { id: 'employee-review', ownerId: 'employee', kind: '
 const baseProps = { template: 'supervisor' as const, people: [manager, employee], viewer: { id: 'manager', name: '主管', department: '产品部' }, periodOverride: period, okrs: [objective], work: [], busy: false, workLoading: false, reviewerName: '老板', onCancel: vi.fn(), onRefreshWork: vi.fn(), onSubmit: vi.fn(async () => true) };
 
 describe('supervisor weekly review', () => {
+  it('blocks submission for missing or unread employee reports and proceeds only when read', () => {
+    const submit = vi.fn(async () => true);
+    const { rerender } = render(<WeeklyReviewEditor {...baseProps} records={[]} onSubmit={submit} onSaveDraft={vi.fn(async () => true)}/>);
+    fireEvent.click(screen.getByRole('button', { name: '提交周报' }));
+    expect(screen.getByText(/本轮周报未提交：员工/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '确认提交周报' })).not.toBeInTheDocument();
+    rerender(<WeeklyReviewEditor {...baseProps} records={[support]} onSubmit={submit} onSaveDraft={vi.fn(async () => true)}/>);
+    fireEvent.click(screen.getByRole('button', { name: '提交周报' }));
+    expect(screen.getByText(/本轮复盘尚未读：员工/)).toBeInTheDocument();
+    rerender(<WeeklyReviewEditor {...baseProps} records={[{ ...support, viewedBy: ['manager'] }]} onSubmit={submit} onSaveDraft={vi.fn(async () => true)}/>);
+    fireEvent.click(screen.getByRole('button', { name: '提交周报' }));
+    expect(screen.getByRole('dialog', { name: '确认提交周报' })).toBeInTheDocument();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
   it('shows department metrics and six sections and saves the restored summary and plan', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
     render(<WeeklyReviewEditor {...baseProps} records={[goal, support]} initialPayload={{ title: '草稿', summary: '原总结', nextWeekPlan: '原计划' }} onSaveDraft={save}/>);

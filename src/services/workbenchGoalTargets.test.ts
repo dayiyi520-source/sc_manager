@@ -68,3 +68,9 @@ describe('工作台本人目标', () => {
     expect(result.map(item => item.id)).toEqual(['department-o']);
   });
 });
+
+it('uses explicit goal role instead of an old job title for workbench hierarchy', () => {
+  const person = { id: supervisor.id, name: supervisor.name, department: supervisor.department, rootFlag: 0, supervisorId: root.id, version: 0, goalRole: 'supervisor' as const };
+  expect(workbenchGoalTargets([department], { ...supervisor, roleTitle: '产品经理' }, person)[0]?.primaryLabel).toBe('O');
+  expect(workbenchGoalTargets([department], supervisor, { ...person, goalRole: 'employee' })).toEqual([]);
+});

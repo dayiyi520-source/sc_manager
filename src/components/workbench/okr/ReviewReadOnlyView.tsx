@@ -120,7 +120,7 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
           ]}/>}
           {extraWorkRows.length > 0 ? <div className="okr-review-readonly-extra-list">{extraWorkRows.map((item, index) => <div key={`${item.content}-${index}`}><span><Tag>{item.source || '手工记录'}</Tag><b>{item.content || '未命名工作'}</b></span><small>{item.status || '未填写状态'} · {item.hours ? `${item.hours} 小时` : '未填写耗时'}</small></div>)}</div> : review.extraWork?.description ? <p>{review.extraWork.description}</p> : review.type !== 'week' ? <p>暂无额外工作记录</p> : null}
         </section>
-        {review.type === 'month' && <section className="okr-review-readonly-section"><div className="okr-review-readonly-title"><FileText/><h3>遇到的问题或者建议</h3></div><p className="whitespace-pre-wrap break-words">{review.suggestions || review.otherNotes || '暂无问题或建议'}</p></section>}
+        {review.type === 'month' && <section className="okr-review-readonly-section"><div className="okr-review-readonly-title"><FileText/><h3>对公司或部门发展有帮助的意见和建议</h3></div><p className="whitespace-pre-wrap break-words">{review.suggestions || review.otherNotes || '暂无问题或建议'}</p></section>}
         <section className="okr-review-readonly-section">
           <div className="okr-review-readonly-title"><CheckCircle /><h3>{review.type === 'month' ? '需要协助事项' : '协助与协同事项'}</h3></div>
           {review.assistance?.length ? review.assistance.map((item, index) => <p key={`${item.subject}-${index}`}><b>{item.subject}</b>：{item.result}{item.workId && <small> · {item.assistanceType === '客户诉求' ? '产品需求' : item.assistanceType === '其他问题' ? '其他协同' : item.assistanceType} · {item.expectedAssignee || '—'} · {item.status || '—'}</small>}</p>) : <p>暂无协同事项</p>}

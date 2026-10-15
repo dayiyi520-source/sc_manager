@@ -25,7 +25,18 @@ export function saveOkrState(file: string, next: OkrFileState, previousRevision:
 export function migrateLegacyOkrState(current: OkrFileState, legacy: Partial<OkrFileState>): OkrFileState {
   const rows = (Array.isArray(legacy.okrRecords) ? legacy.okrRecords : []).filter(record => !(record.kind === 'review' && record.ownerId === 'user-admin'));
   const merged = new Map(current.okrRecords.map(record => [record.id, record]));
-  for (const record of rows) {const saved=merged.get(record.id);if(!saved || current.revision === 0 || record.version > saved.version) merged.set(record.id,record);}
+  for (const record of rows) {
+    const saved = merged.get(record.id);
+    const next = !saved || current.revision === 0 || record.version > saved.version ? record : saved;
+    // Read receipts do not increment the report version. Merge them only for
+    // the same immutable submitted report, without replacing its saved content.
+    const sameReport = saved?.kind === 'review' && record.kind === 'review'
+      && saved.ownerId === record.ownerId && saved.periodKey === record.periodKey
+      && saved.payload.reviewType === record.payload.reviewType
+      && saved.payload.startDate === record.payload.startDate && saved.payload.endDate === record.payload.endDate
+      && ['submitted', 'reviewed', 'active'].includes(saved.status) && ['submitted', 'reviewed', 'active'].includes(record.status);
+    merged.set(record.id, sameReport ? { ...next, viewedBy: [...new Set([...(saved.viewedBy || []), ...(record.viewedBy || [])])] } : next);
+  }
   return {...current,
     okrRecords:[...merged.values()],
     okrSettings:legacy.okrSettings && (current.revision === 0 || (legacy.okrSettings.version ?? 0) > (current.okrSettings.version ?? 0)) ? legacy.okrSettings : current.okrSettings,

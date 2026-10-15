@@ -1,3 +1,4 @@
+import { departmentSubmissionErrors, departmentMonthlyFeedback } from './departmentReviewSubmission';
 import type { OKRItem } from '../types';
 import type { OkrKrReview, OkrPerson, OkrRecord, OkrPayload, OkrWeeklyReviewSnapshot } from './okrRepository';
 import type { ReviewPeriod } from './okrReviewRules';
@@ -74,6 +75,10 @@ export function departmentContentSnapshots(records: OkrRecord[], people: OkrPers
 export function submitDepartmentReview(payload: OkrPayload, ownerId: string, records: OkrRecord[], people: OkrPerson[]) {
   if (payload.reviewMode !== 'supervisor' || !['week', 'month'].includes(payload.reviewType || '') || !payload.startDate || !payload.endDate) return { records, payload };
   if (!people.some(person => person.supervisorId === ownerId && person.id !== ownerId)) throw new Error('当前人员无部门周报汇总权限');
+  const errors = departmentSubmissionErrors(payload, records, people, ownerId);
+  if (errors.length) throw new Error(errors.join('；'));
+  const feedback = payload.reviewType === 'month' ? departmentMonthlyFeedback(payload, records, people, ownerId) : undefined;
+  if (feedback?.some(row => row.judgment && !['已内部解决', '需公司解决'].includes(row.judgment))) throw new Error('主管判断选项无效');
   const reviewType = payload.reviewType as 'week' | 'month';
   const period = { startDate: payload.startDate, endDate: payload.endDate };
   const objectives = monthlyReviewTargets(records, ownerId, people).filter(objective => [period.startDate.slice(0,7),period.endDate.slice(0,7)].includes(objective.cycle));
@@ -97,5 +102,5 @@ export function submitDepartmentReview(payload: OkrPayload, ownerId: string, rec
     const progress = weight ? Math.round(keyResults.reduce((sum, kr) => sum + kr.progress * kr.weight, 0) / weight * 10) / 10 : 0;
     return { ...record, version: record.version + 1, progressHistory: [...(record.progressHistory || []), ...rows.map(row => ({ id: crypto.randomUUID(), itemId: row.keyResultId, operatorId: ownerId, createdAt: new Date().toISOString(), previousProgress: record.payload.keyResults?.find(kr => kr.id === row.keyResultId)?.progress || 0, progress: row.currentProgress, status: 'normal' as const, note: `部门${reviewType === 'month' ? '月' : '周'}报 ${period.startDate} 至 ${period.endDate} 汇总同步`, attachments: [] }))], payload: { ...record.payload, keyResults, progress } };
   });
-  return { records: next, payload: { ...payload, krReviews: reviews, syncKrProgress: true, objectiveSnapshots: next.filter(record => reviews.some(row => row.objectiveId === record.id)).map(record => ({ id: record.id, period: record.periodKey, payload: record.payload })), departmentContentSnapshots: departmentContentSnapshots(records, people, ownerId, period, reviewType) } };
+  return { records: next, payload: { ...payload, departmentFeedbackRows: feedback, departmentReviewExclusions: payload.departmentReviewExclusions?.map(row => ({ ...row, employeeName: people.find(person => person.id === row.employeeId)?.name, reason: row.reason.trim() })), krReviews: reviews, syncKrProgress: true, objectiveSnapshots: next.filter(record => reviews.some(row => row.objectiveId === record.id)).map(record => ({ id: record.id, period: record.periodKey, payload: record.payload })), departmentContentSnapshots: departmentContentSnapshots(records, people, ownerId, period, reviewType) } };
 }

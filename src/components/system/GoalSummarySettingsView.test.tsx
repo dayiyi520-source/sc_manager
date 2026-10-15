@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { okrRepository } from '../../services/okrRepository';
 import { GoalSummarySettingsView } from './GoalSummarySettingsView';
-vi.mock('../../services/teamRepository', () => ({teamRepository:{departments:vi.fn(async()=>['研发','交付'])}}));
+vi.mock('../../services/teamRepository', () => ({teamRepository:{options:vi.fn(async()=>[]),departments:vi.fn(async()=>['研发','交付'])}}));
 const addToast = vi.fn();
 vi.mock('../../context/AppContext', () => ({useApp:()=>({addToast,currentUser:{id:"admin"}})}));
 vi.mock('../workbench/okr/OkrProvider', () => ({OkrProvider:({children}:any)=>children}));
@@ -19,11 +19,12 @@ describe('goal summary settings entry',()=>{
     mount();
     expect(await screen.findByRole('region',{name:'OKR 设置'})).toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'返回目标页'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'角色设置'}));
     fireEvent.click(screen.getByRole('button',{name:/保存配置/}));
     await waitFor(()=>expect(save).toHaveBeenCalled());
     await waitFor(()=>expect(addToast).toHaveBeenCalledWith('success','目标总结配置已保存'));
   });
-  it.each(['周期设置','管理员设置','目标确认配置'])('keeps %s selected after consecutive saves', async section => {
+  it.each(['周报周期配置','角色设置','目标确认配置'])('keeps %s selected after consecutive saves', async section => {
     vi.spyOn(okrRepository,'settings').mockResolvedValue(settings);
     const save=vi.spyOn(okrRepository,'saveSettings').mockImplementation(async value=>({...value,version:value.version+1}));
     vi.spyOn(okrRepository,'people').mockResolvedValue([{id:'admin',name:'管理员',department:'公司',rootFlag:1,supervisorId:null,version:0}]);

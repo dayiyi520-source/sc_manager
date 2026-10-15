@@ -1,3 +1,4 @@
+import { departmentSubmissionErrors } from '../../../services/departmentReviewSubmission';
 import { syncOkrProductNames } from '../../../services/okrProductNames';
 import { canEditOkr } from '../../../services/okrSettingsPolicy';
 import { goalsWithAssignments, assignedReferences } from '../../../services/okrThreeLevelRules';
@@ -79,7 +80,7 @@ export function useOriginalOkr() {
   const businessOptionsError = productLinesQuery.error || opportunitiesQuery.error;
   const rawRecords = useMemo(() => syncOkrProductNames(records.data || [], currentProducts), [records.data, currentProducts]);
   const me = people.find(p=>p.id===currentUser.id);
-  const all = useMemo(() => goalsWithAssignments(rawRecords, me), [rawRecords, currentUser.id, me?.supervisorId, me?.jobTitle, me?.name]);
+  const all = useMemo(() => goalsWithAssignments(rawRecords, me), [rawRecords, currentUser.id, me?.supervisorId, me?.jobTitle, me?.goalRole, me?.name]);
   const derivedActionParents = [...new Map([...assignedGoalActions(all, me), ...assignedReferences(all, me)].map(item => [item.id, item])).values()];
   const okrs: OKRItem[] = all.filter(r=>r.kind==='objective').map(r=>{
     const owner = people.find(p=>p.id===r.ownerId);
@@ -100,7 +101,7 @@ export function useOriginalOkr() {
     const extraWorkIds = [...new Set([...(p.extraWork?.workIds || []), ...departmentSnapshots.flatMap(snapshot => snapshot.extraWork?.workIds || [])])];
     const displayedItems = [...new Map([...(p.items || []), ...departmentSnapshots.flatMap(snapshot => snapshot.items)].map(item => [item.workId, item])).values()];
     return {id:r.id,version:r.version,authorId:r.ownerId,author:owner?.name || '人员已停用',authorDept:owner?.department || '',
-      type:p.reviewType || 'month',reviewMode:p.reviewMode,cycleName:p.title,summary:p.summary || '',selfScore:p.selfScore ?? 0,
+      type:p.reviewType || 'month',reviewMode:p.reviewMode,departmentFeedbackRows:p.departmentFeedbackRows,departmentReviewExclusions:p.departmentReviewExclusions,cycleName:p.title,summary:p.summary || '',selfScore:p.selfScore ?? 0,
       uncompletedReason:p.uncompletedReason || '',suggestions:p.suggestions || '',helpNeeded:p.helpNeeded || '',sendTo:p.sendTo || [],
       createdAt:r.createdAt?.replace('T',' ').slice(0,16) || '—',status:r.status as PerformanceReview['status'],feedback:p.feedback,leaderScore:p.finalScore,
       linkedWorkItems:displayedItems.map(i=>({id:i.workId,title:i.title,type:i.workType === 'ticket' ? 'ticket' : 'task',status:i.status,sourceLabel:i.sourceLabel,actualHours:i.actualHours})),
@@ -123,6 +124,9 @@ export function useOriginalOkr() {
     if (settingsQuery.error) { addToast('warning', '填写日期配置加载失败，请重试'); return false; }
     const access = reviewSubmissionAccess(settingsQuery.data, record.payload);
     if (!access.allowed) { addToast('warning', access.reason); return false; }
+    if (records.isPending || records.error || peopleQuery.isPending || peopleQuery.error) { addToast('warning', '人员或复盘数据尚未就绪，请刷新后重试'); return false; }
+    const errors = departmentSubmissionErrors(record.payload, all, people, currentUser.id);
+    if (errors.length) { addToast('warning', errors.join('；')); return false; }
     setBusy(true);
     try{
       await okrRepository.update(record,'submit',{},currentUser.id);
@@ -167,6 +171,9 @@ export function useOriginalOkr() {
   };
   const save = async (kind: 'objective' | 'review', period:string, payload:OkrPayload, submit = true) => {
     if (kind === 'review' && submit) {
+      if (records.isPending || records.error || peopleQuery.isPending || peopleQuery.error) { addToast('warning', '人员或复盘数据尚未就绪，请刷新后重试'); return false; }
+      const errors = departmentSubmissionErrors(payload, all, people, currentUser.id);
+      if (errors.length) { addToast('warning', errors.join('；')); return false; }
       if (settingsQuery.error) { addToast('warning', '填写日期配置加载失败，请重试'); return false; }
       const access = reviewSubmissionAccess(settingsQuery.data, payload);
       if (!access.allowed) { addToast('warning', access.reason); return false; }

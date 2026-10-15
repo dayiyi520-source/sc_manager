@@ -1,3 +1,4 @@
+import { weeklyCycleFor } from '../../services/weeklyReviewCycles';
 import { departmentObjectiveProgress } from '../../services/departmentObjectiveProgress';
 import { MyReviewCard } from './okr/MyReviewCard';
 import { otherDepartmentPeople, departmentName } from './okr/departmentScope';
@@ -5,7 +6,7 @@ import { GoalWeightConfirmation, type GoalWeightEntry } from './okr/GoalWeightCo
 import { GoalProgressModal } from './okr/GoalProgressModal';
 import { GoalChangeSummary } from './okr/GoalChangeSummary';
 import { ExclamationCircleFilled } from '@ant-design/icons';
-import { canEditOkr } from '../../services/okrSettingsPolicy';
+import { canEditOkr, isOkrAdmin } from '../../services/okrSettingsPolicy';
 import { periodLabel } from '../../services/okrPeriods';
 import { goalContentComplete, GOAL_ADDITION_MESSAGE } from './okr/goalAdditionRules';
 import { GoalAssignmentLinks } from './okr/GoalAssignmentLinks';
@@ -37,7 +38,7 @@ import { filterReviewsByMonth, toggleReviewMonth } from './okr/reviewMonthFilter
 import { ReviewReadOnlyView } from './okr/ReviewReadOnlyView';
 import { createReviewCopyDraft } from './okr/reviewCopy';
 import { ReviewLanding } from './okr/ReviewLanding';
-import { currentReviewPeriod, reviewSubmissionAccess, type ReviewPeriod } from '../../services/okrReviewRules';
+import { currentReviewPeriod, reviewPeriodFor, reviewSubmissionAccess, type ReviewPeriod } from '../../services/okrReviewRules';
 import { ActionBreakdownForm, type ActionGroupValues } from './okr/ActionBreakdownForm';
 import { GoalHierarchyView } from './okr/GoalHierarchyView';
 import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewMode } from './okr/MyTargetMonthSection';
@@ -109,6 +110,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   const [receivedSearch, setReceivedSearch] = useState('');
   const [receivedSidebarCollapsed, setReceivedSidebarCollapsed] = useState(false);
   const [receivedFilter, setReceivedFilter] = useState<'received'|'viewable'>('received');
+  const [supervisorsOnly, setSupervisorsOnly] = useState(false);
   const [receivedUnreadOnly, setReceivedUnreadOnly] = useState(false);
   const [selectedReceivedId, setSelectedReceivedId] = useState<string | null>(null);
   const [myReviewFilter, setMyReviewFilter] = useState<'all'|'week'|'month'>('all');
@@ -150,6 +152,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     setReviewDetailId(null);
     setSelectedReceivedId(null);
     setReceivedFilter('received');
+    setSupervisorsOnly(false);
     setReceivedUnreadOnly(false);
     setReceivedSearch('');
     setScopeSelection({ scope: 'my' });
@@ -178,7 +181,9 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   const companyLevel = level === '公司级';
   const reviewerName = me?.supervisorId ? people.find(person => person.id === me.supervisorId)?.name : undefined;
   const directReviewSubmit = Boolean(me?.rootFlag);
-  const reviewTemplate = reviewTemplateFor(me, people);
+  const configuredWeeklyTemplate = reviewType === 'week' ? weeklyCycleFor(settings, reviewPeriodOverride?.startDate, reviewPeriodOverride?.endDate)?.template : undefined;
+  const baseReviewTemplate = reviewTemplateFor(me, people);
+  const reviewTemplate = baseReviewTemplate === 'boss' ? baseReviewTemplate : configuredWeeklyTemplate && configuredWeeklyTemplate !== 'byRole' ? configuredWeeklyTemplate : baseReviewTemplate;
   const reviewRecordStatus = copiedReviewId ? undefined : records.find(record => record.id === reviewDraftId && record.kind === 'review' && record.ownerId === currentUser.id)?.status;
   const periods = cycleOptions(records, currentUser.id, undefined, settings);
   const cyclePaths = periods.flatMap(group => group.children.filter(child => selectedCycles.includes(child.value)).map(child => [group.value, child.value]));
@@ -221,11 +226,12 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   ));
   const subordinateIds = new Set(people.filter(person => person.supervisorId === currentUser.id).map(person => person.id));
   const receivedPerformances = performances.filter(performance => subordinateIds.has(performance.authorId) && ['submitted', 'reviewed', 'active'].includes(performance.status));
-  const viewablePerformances = performances.filter(performance => performance.authorId !== currentUser.id && ['submitted', 'reviewed', 'active'].includes(performance.status));
+  const reviewAdmin = isOkrAdmin(currentUser.id, settings, people);
+  const viewablePerformances = performances.filter(performance => performance.authorId !== currentUser.id && ['submitted', 'reviewed', 'active'].includes(performance.status) && (reviewAdmin || Boolean(me?.department.trim() && people.find(person => person.id === performance.authorId)?.department.trim() === me.department.trim())));
   const receivedFiltered = (receivedFilter === 'received' ? receivedPerformances : viewablePerformances).filter(performance => {
     const matchesSearch = !receivedSearch || `${performance.author}${performance.cycleName}${performance.summary}`.toLowerCase().includes(receivedSearch.toLowerCase());
     const matchesUnread = !receivedUnreadOnly || !records.find(record => record.id === performance.id)?.viewedBy?.includes(currentUser.id);
-    return matchesSearch && matchesUnread;
+    return matchesSearch && matchesUnread && (receivedFilter !== 'viewable' || !reviewAdmin || !supervisorsOnly || reviewTemplateFor(people.find(person => person.id === performance.authorId), people) === 'supervisor');
   });
   const selectedReceived = receivedFiltered.find(performance => performance.id === selectedReceivedId);
   const receivedUnreadCount = receivedPerformances.filter(performance => !records.find(record => record.id === performance.id)?.viewedBy?.includes(currentUser.id)).length;
@@ -303,7 +309,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     }
     setCopiedReviewId(reviewId);
     setReviewDraftId(null);
-    setReviewPeriodOverride(undefined);
+    setReviewPeriodOverride(reviewPeriodFor(settings, type));
     setReviewDetailId(null);
     setReviewType(type);
     setReviewSubTab('write');
@@ -827,6 +833,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
                     <div className="okr-received-list-tools">
                       <Input prefix={<Search />} placeholder="搜索成员或周期" value={receivedSearch} onChange={event => { setReceivedSearch(event.target.value); setSelectedReceivedId(null); }} />
                       <div className="okr-received-filter-row"><div className="okr-received-filter-pills">{(['received', 'viewable'] as const).map(filter => <button type="button" key={filter} aria-pressed={receivedFilter === filter} className={receivedFilter === filter ? 'is-active' : ''} onClick={() => { setReceivedFilter(filter); setReceivedUnreadOnly(false); setSelectedReceivedId(null); }}>{filter === 'received' ? '我收到的' : '可以看的'}</button>)}</div>
+                        {receivedFilter === 'viewable' && reviewAdmin && <Checkbox checked={supervisorsOnly} onChange={event => { setSupervisorsOnly(event.target.checked); setSelectedReceivedId(null); }}>只看主管</Checkbox>}
                         {receivedFilter === 'received' && <Checkbox checked={receivedUnreadOnly} onChange={event => { setReceivedUnreadOnly(event.target.checked); setSelectedReceivedId(null); }}>未读 ({receivedUnreadCount})</Checkbox>}
                       </div>
                     </div>

@@ -1,3 +1,6 @@
+import { departmentSubmissionErrors, departmentMonthlyFeedback } from '../../../services/departmentReviewSubmission';
+import { DepartmentReviewSettings } from './DepartmentReviewSettings';
+import { DepartmentFeedbackTable } from './DepartmentFeedbackTable';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -191,7 +194,9 @@ export function WeeklyReviewEditor({
   const [collapsedObjectives, setCollapsedObjectives] = useState<Record<string, boolean>>({});
   const [collapsedKrs, setCollapsedKrs] = useState<Record<string, boolean>>({});
   const [departmentSummary, setDepartmentSummary] = useState(initialPayload?.summary || '');
-  const [departmentFeedback, setDepartmentFeedback] = useState(initialPayload?.suggestions || '');
+  const [exclusions, setExclusions] = useState(initialPayload?.departmentReviewExclusions || []);
+  const [feedbackJudgments, setFeedbackJudgments] = useState(initialPayload?.departmentFeedbackRows || []);
+  const feedbackRows = readOnly ? initialPayload?.departmentFeedbackRows || [] : departmentMonthlyFeedback({ reviewType, ...period, title: '', departmentFeedbackRows: feedbackJudgments }, records, people, viewer?.id || '');
   const [nextWeekPlan, setNextWeekPlan] = useState(initialPayload?.nextWeekPlan || '');
   const [picker, setPicker] = useState<PickerState>(null);
   const toolbarSentinelRef = useRef<HTMLDivElement>(null);
@@ -335,6 +340,7 @@ export function WeeklyReviewEditor({
     if (!directSubmit && !reviewerName) {
       errors.push('尚未配置直属上级，无法确定审批人');
     }
+    if (supervisor) errors.push(...departmentSubmissionErrors(payload(), records, people, viewer?.id || ''));
     setValidationErrors(errors);
     if (errors.length === 0) setSubmitModalOpen(true);
   };
@@ -348,7 +354,8 @@ export function WeeklyReviewEditor({
     selfScore,
     summary: supervisor ? departmentSummary.trim() : initialPayload?.summary || '',
     nextWeekPlan: monthly ? undefined : nextWeekPlan.trim(),
-    suggestions: monthly ? departmentFeedback.trim() : initialPayload?.suggestions,
+    suggestions: initialPayload?.suggestions,
+    ...(supervisor ? { departmentReviewExclusions: exclusions, ...(monthly ? { departmentFeedbackRows: feedbackRows } : {}) } : {}),
     syncKrProgress: supervisor,
     krReviews: selectedKrs.map(kr => ({
       ...kr,
@@ -484,6 +491,7 @@ export function WeeklyReviewEditor({
             </Tag>
           </div>
           <div className="flex items-center gap-2.5">
+            {supervisor && <DepartmentReviewSettings payload={{ ...period, title: '', reviewType, departmentReviewExclusions: exclusions }} records={records} people={people} ownerId={viewer?.id || ''} disabled={busy || readOnly} loading={recordsLoading} error={recordsError} onRefresh={onRefreshRecords} onChange={rows => { setExclusions(rows); setValidationErrors([]); }}/>}
             <Button onClick={onCancel}>
               取消
             </Button>
@@ -513,6 +521,7 @@ export function WeeklyReviewEditor({
 
       {supervisor && recordsError ? <Alert type="error" showIcon title="员工复盘加载失败，已保留填写内容" action={<Button onClick={onRefreshRecords}>重试</Button>}/> : null}
       {detachedTargets.length > 0 && <Alert type="warning" showIcon title="月度目标已变化，请确认失效内容" description={<div className="space-y-2"><p>以下已填写内容暂时保留，请复制需要的信息，再确认移除。确认后可继续保存或提交。</p><pre className="whitespace-pre-wrap break-words font-sans">{detachedReviewDescription(detachedTargets)}</pre></div>} action={<Button onClick={() => setKrs(rows => rows.filter(row => currentTargets.some(target => target.keyResultId === row.keyResultId && target.objectiveId === row.objectiveId)))}>移除失效内容</Button>} />}
+      {supervisor && exclusions.length > 0 && <Alert type="info" showIcon title="本轮排除员工及原因" description={<div className="space-y-2">{exclusions.map(row => <p key={row.employeeId} className="whitespace-pre-wrap break-words">{people.find(person => person.id === row.employeeId)?.name || row.employeeName || '人员已停用'}：{row.reason}</p>)}</div>}/>}
       {validationErrors.length > 0 && (
         <Alert
           type="warning"
@@ -724,7 +733,7 @@ export function WeeklyReviewEditor({
 
       <section className="okr-weekly-section" aria-label={monthly ? '部门反馈问题梳理与分析' : supervisor ? '部门下周计划' : '下周计划'}>
         <div className="okr-weekly-section-header okr-weekly-section-header-title text-sm font-semibold text-[var(--text-primary)]"><span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" aria-hidden="true"/><span>{monthly ? '4. 部门反馈问题梳理与分析' : supervisor ? '4. 部门下周计划' : '3. 下周计划'}</span></div>
-        <Input.TextArea className="okr-weekly-plan-input" aria-label={monthly ? '部门反馈问题梳理与分析' : supervisor ? '部门下周计划' : '下周计划'} value={monthly ? departmentFeedback : nextWeekPlan} onChange={event => monthly ? setDepartmentFeedback(event.target.value) : setNextWeekPlan(event.target.value)} rows={4} maxLength={10000} showCount placeholder={monthly ? '梳理部门反馈的问题、影响及原因分析' : '填写下周重点工作、预期结果与关键节点'} disabled={busy || !editorState.editable}/>
+        {monthly ? <><DepartmentFeedbackTable rows={feedbackRows} disabled={busy || readOnly || recordsLoading || Boolean(recordsError)} loading={recordsLoading} onChange={row => setFeedbackJudgments(current => [...current.filter(item => item.reviewId !== row.reviewId), row])}/>{readOnly && !feedbackRows.length && initialPayload?.suggestions && <p className="whitespace-pre-wrap break-words">{initialPayload.suggestions}</p>}</> : <Input.TextArea className="okr-weekly-plan-input" aria-label={supervisor ? '部门下周计划' : '下周计划'} value={nextWeekPlan} onChange={event => setNextWeekPlan(event.target.value)} rows={4} maxLength={10000} showCount placeholder="填写下周重点工作、预期结果与关键节点" disabled={busy || !editorState.editable}/>}
       </section>
 
       <section className="okr-weekly-section" aria-label="需要协助事项">
@@ -803,6 +812,8 @@ export function WeeklyReviewEditor({
         okButtonProps={{ disabled: !editorState.editable || Boolean(detachedTargets.length) || (supervisor && (recordsLoading || Boolean(recordsError))) }}
         onOk={async () => {
           if (!editorState.editable || detachedTargets.length || (supervisor && (recordsLoading || recordsError))) return;
+          const errors = supervisor ? departmentSubmissionErrors(payload(), records, people, viewer?.id || '') : [];
+          if (errors.length) { setValidationErrors(errors); setSubmitModalOpen(false); return; }
           if (await onSubmit(payload())) setSubmitModalOpen(false);
         }}
         confirmLoading={busy}

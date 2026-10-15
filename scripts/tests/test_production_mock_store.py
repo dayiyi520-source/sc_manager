@@ -40,4 +40,18 @@ class StoreTests(unittest.TestCase):
   for patch in [{'id':'missing','previous':{},'changes':{'name':'new'}},{'id':'p','previous':{},'changes':{'id':'other'}}]:
    with self.assertRaises(ValueError): self.store.update('research-template',{'key':'productLines','value':[],'productPatch':patch})
   self.assertEqual(self.store.read('research-template')['productLines'][0]['name'],'old')
+ def test_review_fields_survive_restart_and_receipts_merge_without_content_overwrite(self):
+  payload={'title':'部门月报','reviewType':'month','startDate':'2026-10-01','endDate':'2026-10-31','departmentReviewExclusions':[{'employeeId':'e','employeeName':'员工','reason':'本轮休假'}],'departmentFeedbackRows':[{'employeeId':'e','employeeName':'员工','reviewId':'r','suggestion':'改善协作','judgment':'需公司解决'}]}
+  record={'id':'monthly','kind':'review','ownerId':'manager','periodKey':'2026-10','status':'submitted','version':1,'viewedBy':['admin'],'payload':payload}
+  saved=self.store.update('okr-state',{'previousRevision':1,'state':{**self.state,'okrRecords':[record]}})
+  restarted=module.Store(self.root)
+  self.assertEqual(restarted.read('okr-state')['okrRecords'],[record])
+  legacy={**record,'viewedBy':['manager'],'payload':{**payload,'departmentFeedbackRows':[],'departmentReviewExclusions':[]}}
+  result=restarted.update('okr-state',{'previousRevision':saved['revision'],'legacy':{'okrRecords':[legacy]}},True)
+  self.assertEqual(result['okrRecords'],[{**record,'viewedBy':['admin','manager']}])
+  again=restarted.update('okr-state',{'previousRevision':result['revision'],'legacy':{'okrRecords':[legacy]}},True)
+  self.assertEqual(again['okrRecords'],result['okrRecords'])
+  for changed in [{'periodKey':'other'},{'status':'draft'}]:
+   isolated=module.migrate_state({**self.state,'okrRecords':[record]}, {'okrRecords':[{**legacy,**changed}]})
+   self.assertEqual(isolated['okrRecords'],[record])
 if __name__=='__main__': unittest.main()

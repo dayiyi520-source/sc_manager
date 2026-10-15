@@ -1,12 +1,18 @@
-import type { OkrKrReview, OkrPerson, OkrRecord, OkrWeeklyReviewSnapshot } from './okrRepository';
+import { isOkrAdmin } from './okrSettingsPolicy';
+import type { OkrSettings, OkrKrReview, OkrPerson, OkrRecord, OkrWeeklyReviewSnapshot } from './okrRepository';
 import type { ReviewPeriod } from './okrReviewRules';
 
 const submitted = new Set(['submitted', 'reviewed', 'active']);
 export type EmployeeReviewSupport = { record: OkrRecord; authorName: string; contributions: OkrKrReview[] };
 
-export function canReadReviewRecord(record: OkrRecord, viewerId: string | null, people: OkrPerson[]) {
-  if (record.kind !== 'review' || !viewerId || record.ownerId === viewerId) return true;
-  return submitted.has(record.status) && people.some(person => person.id === record.ownerId && person.supervisorId === viewerId);
+export function canReadReviewRecord(record: OkrRecord, viewerId: string | null, people: OkrPerson[], settings?: OkrSettings) {
+  if (record.kind !== 'review') return true;
+  if (!viewerId) return false;
+  if (record.ownerId === viewerId) return true;
+  const viewer = people.find(person => person.id === viewerId);
+  const owner = people.find(person => person.id === record.ownerId);
+  if (!viewer) return false;
+  return submitted.has(record.status) && (isOkrAdmin(viewerId, settings, people) || Boolean(viewer.department.trim() && owner?.department.trim() === viewer.department.trim()));
 }
 
 export function employeeSupportsForKr(records: OkrRecord[], people: OkrPerson[], supervisorId: string, target: Pick<OkrKrReview, 'objectiveId' | 'keyResultId'>, period: ReviewPeriod, reviewType: 'week' | 'month' = 'week'): EmployeeReviewSupport[] {
