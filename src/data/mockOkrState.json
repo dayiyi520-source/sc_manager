@@ -1,5 +1,5 @@
 {
-  "revision": 26,
+  "revision": 27,
   "okrRecords": [
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
@@ -4894,7 +4894,7 @@
       "ownerId": "user-product",
       "periodKey": "2026-10-12/2026-10-18",
       "status": "draft",
-      "version": 0,
+      "version": 1,
       "createdAt": "2026-10-15T02:20:39.228Z",
       "payload": {
         "title": "2026年第 41 周 (10.12 - 10.18)—产品规划部",
@@ -4911,9 +4911,9 @@
             "objectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
             "objectiveTitle": "产研目标测试",
             "keyResultId": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
-            "keyResultTitle": "按期完成3个产品版本迭代计划 · 达到对应的验收阶段",
+            "keyResultTitle": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
             "previousProgress": 0,
-            "currentProgress": 20,
+            "currentProgress": 10,
             "health": "normal",
             "achievement": "",
             "blocker": "",
@@ -4922,27 +4922,39 @@
             "detailRows": [
               {
                 "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                "name": "师创云平台",
+                "name": "教师教学档案袋",
                 "version": "V1.1.0",
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-14",
-                "plannedEndDate": "2026-10-31"
+                "plannedEndDate": "2026-10-31",
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
               },
               {
                 "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                "name": "师创云平台",
+                "name": "教师教学档案袋",
                 "version": "V1.2.0",
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-22",
-                "plannedEndDate": "2026-10-31"
+                "plannedEndDate": "2026-10-31",
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
               },
               {
                 "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                "name": "师创云平台",
+                "name": "教师教学档案袋",
                 "version": "V1.0.0",
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-24",
-                "plannedEndDate": "2026-10-31"
+                "plannedEndDate": "2026-10-31",
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+              },
+              {
+                "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
+                "name": "产教融合平台",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedStartDate": "2026-10-21",
+                "plannedEndDate": "2026-10-22",
+                "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e"
               }
             ],
             "contributors": [
@@ -4993,23 +5005,60 @@
                 "previousProgress": 0,
                 "currentProgress": 0,
                 "submitted": false
+              },
+              {
+                "authorId": "user-product",
+                "authorName": "陈宇璋",
+                "detailId": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
+                "previousProgress": 0,
+                "currentProgress": 0,
+                "submitted": true
+              },
+              {
+                "authorId": "user-product",
+                "authorName": "陈宇璋",
+                "detailId": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
+                "previousProgress": 0,
+                "currentProgress": 0,
+                "submitted": true
+              },
+              {
+                "authorId": "user-product",
+                "authorName": "陈宇璋",
+                "detailId": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
+                "previousProgress": 0,
+                "currentProgress": 0,
+                "submitted": true
+              },
+              {
+                "authorId": "user-product",
+                "authorName": "陈宇璋",
+                "detailId": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
+                "previousProgress": 0,
+                "currentProgress": 0,
+                "submitted": true
               }
             ],
             "detailProgress": [
               {
                 "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
                 "previousProgress": 0,
-                "currentProgress": 25
+                "currentProgress": 16.7
               },
               {
                 "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
                 "previousProgress": 0,
-                "currentProgress": 25
+                "currentProgress": 16.7
               },
               {
                 "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
                 "previousProgress": 0,
-                "currentProgress": 10
+                "currentProgress": 6.7
+              },
+              {
+                "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
+                "previousProgress": 0,
+                "currentProgress": 0
               }
             ],
             "supervisorJudgment": "",
@@ -5106,6 +5155,24 @@
                   }
                 ]
               }
+            ],
+            "supervisorProgress": [
+              {
+                "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
+                "currentProgress": 0
+              },
+              {
+                "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
+                "currentProgress": 0
+              },
+              {
+                "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
+                "currentProgress": 0
+              },
+              {
+                "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
+                "currentProgress": 0
+              }
             ]
           },
           {
@@ -5121,7 +5188,16 @@
             "nextPlan": "",
             "workIds": [],
             "detailRows": [],
-            "contributors": [],
+            "contributors": [
+              {
+                "authorId": "user-product",
+                "authorName": "陈宇璋",
+                "detailId": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
+                "previousProgress": 0,
+                "currentProgress": 0,
+                "submitted": true
+              }
+            ],
             "detailProgress": [
               {
                 "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
@@ -5130,11 +5206,17 @@
               }
             ],
             "supervisorJudgment": "",
-            "employeeReviewSnapshots": []
+            "employeeReviewSnapshots": [],
+            "supervisorProgress": [
+              {
+                "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
+                "currentProgress": 0
+              }
+            ]
           }
         ],
         "departmentObjectiveVersions": {
-          "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc": 12
+          "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc": 14
         },
         "departmentContentSnapshots": [
           {
@@ -5353,6 +5435,30 @@
                 "id": "6702697b-b018-4644-9f2a-195116824093"
               }
             ]
+          }
+        ],
+        "objectiveSnapshots": [
+          {
+            "id": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
+            "period": "2026-10",
+            "payload": {
+              "title": "产研目标测试",
+              "weight": 100,
+              "keyResults": [
+                {
+                  "id": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
+                  "title": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
+                  "weight": 80,
+                  "progress": 10
+                },
+                {
+                  "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
+                  "title": "其他工作支持 · 100%响应",
+                  "weight": 20,
+                  "progress": 0
+                }
+              ]
+            }
           }
         ],
         "knowledgeEntries": [],

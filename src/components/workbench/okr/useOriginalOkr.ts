@@ -132,6 +132,19 @@ export function useOriginalOkr() {
     }catch(error){addToast('error',error instanceof Error?error.message:'提交失败，请重试');return false;}
     finally{setBusy(false);}
   };
+  const deleteReview = async (id: string) => {
+    const record = all.find(item => item.id === id && item.kind === 'review');
+    if (!record || record.ownerId !== currentUser.id) { addToast('error', '复盘记录不存在或无删除权限'); return false; }
+    if (record.status !== 'draft') { addToast('warning', '已提交的复盘无法删除'); return false; }
+    setBusy(true);
+    try {
+      await okrRepository.update(record, 'delete', {}, currentUser.id);
+      await refresh();
+      addToast('success', '复盘草稿已删除');
+      return true;
+    } catch (error) { addToast('error', error instanceof Error ? error.message : '删除失败，请重试'); return false; }
+    finally { setBusy(false); }
+  };
   const submitOkrDraft = async (id: string) => {
     const record = all.find(item => item.id === id && (item.kind === 'objective' || item.kind === 'action'));
     if (!record || record.ownerId !== currentUser.id) { addToast('error', '目标不存在或无修改权限'); return false; }
@@ -214,7 +227,7 @@ export function useOriginalOkr() {
     saveObjectiveDraft:(period:string,payload:OkrPayload)=>save('objective',period,payload,false),
     saveReview:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload),
     saveReviewDraft:(payload:OkrPayload)=>save('review',`${payload.startDate}/${payload.endDate}`,payload,false),
-    submitReviewDraft,submitOkrDraft,updateOkr,deleteOkr,
+    submitReviewDraft,deleteReview,submitOkrDraft,updateOkr,deleteOkr,
     settings: settingsQuery.data, settingsLoading: settingsQuery.isPending, settingsError: settingsQuery.error, saveSettings, teamMembers: teamMembersQuery.data || [],
   };
 }

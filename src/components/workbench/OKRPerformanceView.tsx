@@ -88,7 +88,7 @@ const impactLabel = (value?: string) => ({
 const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab }) => {
   const { currentUser, addToast } = useApp();
   const { openPageTab } = useAppNavigationContext();
-  const { records, okrs, reviewableOkrs, performances, people, work, teamMembers, actionParents, productLineOptions, productLineVersionOptions, projectOptions, projectProductOptions, projectProductStageOptions, opportunityOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, submitOkrDraft, updateOkr, deleteOkr, busy, settings, settingsLoading, settingsError } = useOriginalOkr();
+  const { records, okrs, reviewableOkrs, performances, people, work, teamMembers, actionParents, productLineOptions, productLineVersionOptions, projectOptions, projectProductOptions, projectProductStageOptions, opportunityOptions, businessOptionsLoading, businessOptionsError, loading, error, workLoading, workError, refresh, refreshWork, saveActions, saveObjective, saveObjectiveDraft, saveReview, saveReviewDraft, submitReviewDraft, deleteReview, submitOkrDraft, updateOkr, deleteOkr, busy, settings, settingsLoading, settingsError } = useOriginalOkr();
 
   const pageTitle = mainTab === 'okrs' ? '月度目标' : '复盘总结';
 
@@ -814,7 +814,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
                 })}
               </div>
               {myPerformances.length === 0 ? <div className="review-empty-state okr-review-empty"><Empty description={selectedReviewMonth ? `${Number(selectedReviewMonth.slice(5))}月暂无复盘` : '暂无历史复盘'} /></div> : <div className="okr-my-review-grid">
-                {myPerformances.map(perf => { const record = records.find(item => item.id === perf.id && item.kind === 'review'); const current = record ? currentReviewPeriod(perf.type) : undefined; const isCurrentPeriod = Boolean(record && current && record.payload.startDate === current.startDate && record.payload.endDate === current.endDate && ['draft', 'submitted'].includes(record.status)); return <MyReviewCard key={perf.id} departmentProgress={departmentObjectiveProgress(record?.payload.objectiveSnapshots)} review={perf} onView={() => openReviewDetail(perf.id)} onCopy={isCurrentPeriod ? undefined : () => openCopiedReview(perf.id, perf.type)} onSubmit={() => setDraftToSubmit(perf.id)}/>; })}
+                {myPerformances.map(perf => { const record = records.find(item => item.id === perf.id && item.kind === 'review'); const current = record ? currentReviewPeriod(perf.type) : undefined; const isCurrentPeriod = Boolean(record && current && record.payload.startDate === current.startDate && record.payload.endDate === current.endDate && ['draft', 'submitted'].includes(record.status)); return <MyReviewCard key={perf.id} departmentProgress={departmentObjectiveProgress(record?.payload.objectiveSnapshots)} review={perf} onView={() => openReviewDetail(perf.id)} onCopy={isCurrentPeriod ? undefined : () => openCopiedReview(perf.id, perf.type)} onSubmit={() => setDraftToSubmit(perf.id)} onDelete={() => Modal.confirm({ title: '删除复盘草稿', content: '删除后本条草稿内容将全部丢失，确认删除吗？', okText: '确认删除', cancelText: '取消', okButtonProps: { danger: true }, onOk: () => deleteReview(perf.id) })}/>; })}
               </div>}
             </div>
           )}

@@ -944,6 +944,13 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const record = records[index];
     if (record.kind === 'review') {
       if (!body.viewerId || record.ownerId !== body.viewerId) throw new Error('只能修改本人复盘');
+      if (body.action === 'delete') {
+        if (record.status !== 'draft') throw new Error('已提交的复盘无法删除');
+        if (body.version !== record.version) throw new Error('复盘已变化，请刷新后重试');
+        records[index] = { ...record, status: 'deleted', version: record.version + 1, deletedAt: now(), deletedBy: body.viewerId };
+        write(KEYS.okrRecords, records);
+        return records[index];
+      }
       if (!['draft', 'returned'].includes(record.status)) throw new Error('已提交的复盘不能重复提交或修改');
       if (body.version !== record.version) throw new Error('复盘已变化，请刷新后重试');
       if (!['save', 'submit'].includes(body.action)) throw new Error('不支持此复盘操作');

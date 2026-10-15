@@ -23,6 +23,13 @@ describe('persistent review submission rules', () => {
     await expect(create()).rejects.toThrow('已有复盘');
     expect(rows()).toHaveLength(1);
   });
+  it('deletes an owned draft and rejects deletion of submitted reviews', async () => {
+    localStorage.setItem(recordsKey, JSON.stringify([draft]));
+    await mockApiRequest('/api/okr/records/draft', { method: 'PATCH', body: JSON.stringify({ action: 'delete', version: 1, viewerId: 'me' }) });
+    expect(rows()[0]).toMatchObject({ id: 'draft', status: 'deleted', version: 2 });
+    localStorage.setItem(recordsKey, JSON.stringify([{ ...draft, status: 'submitted' }]));
+    await expect(mockApiRequest('/api/okr/records/draft', { method: 'PATCH', body: JSON.stringify({ action: 'delete', version: 1, viewerId: 'me' }) })).rejects.toThrow('已提交的复盘无法删除');
+  });
   it('updates the original draft without adding a second period record', async () => {
     localStorage.setItem(recordsKey, JSON.stringify([draft]));
     await update({ payload: { ...payload, summary: '补交内容' } });
