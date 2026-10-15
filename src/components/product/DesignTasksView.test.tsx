@@ -3,7 +3,8 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { DesignTasksView } from './DesignTasksView';
-vi.mock('../../context/AppContext', () => ({ useApp: () => ({ designTasks: [
+const catalog = vi.hoisted(() => ({ products: [] as Array<{ id: string; name: string }> }));
+vi.mock('../../context/AppContext', () => ({ useApp: () => ({ productLines: catalog.products, designTasks: [
   { id: '1', designVariant: 'product', productLineId: 'p1', productLineName: '产品甲' },
   { id: '2', designVariant: 'product', productLineId: 'p1', productLineName: '产品甲' },
   { id: '3', requirementType: '物料设计', designProjectName: '项目甲' },
@@ -21,4 +22,18 @@ it('expands every design type and filters by its product, project or department'
   }
   fireEvent.click(screen.getByRole('button', { name: /全部/ }));
   expect(screen.getByTestId('filter')).toHaveTextContent('all:');
+});
+
+it('keeps the selected product category and count when its name changes', () => {
+  catalog.products = [{ id: 'p1', name: '产品甲' }];
+  const { rerender } = render(<DesignTasksView />);
+  fireEvent.click(screen.getByRole('button', { name: '产品设计' }));
+  fireEvent.click(screen.getByRole('button', { name: '产品设计：产品甲' }));
+  catalog.products = [{ id: 'p1', name: '最新产品名' }];
+  rerender(<DesignTasksView />);
+  const category = screen.getByRole('button', { name: '产品设计：最新产品名' });
+  expect(category).toHaveAttribute('aria-pressed', 'true');
+  expect(category).toHaveTextContent('2');
+  expect(screen.queryByRole('button', { name: '产品设计：产品甲' })).not.toBeInTheDocument();
+  expect(screen.getByTestId('filter')).toHaveTextContent('product:p1');
 });

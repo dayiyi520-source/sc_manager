@@ -319,3 +319,18 @@ it('filters defects awaiting my verification and offers the full company scope i
   expect(await screen.findByText('已关闭缺陷')).toBeVisible();
   expect(screen.getByText('他人验证缺陷')).toBeVisible();
 });
+
+it('refreshes design source ownership from the current product catalog after rename', () => {
+  window.history.replaceState(null, '', '/app/prod_design_tasks');
+  const context = { ...useApp(), currentUser: { id: 'me', name: '测试人员', department: '产品部' }, designTasks: [{ id: 'design', title: '保留的设计标题', designVariant: 'product', productLineId: 'line-1', productLineName: '旧产品名称', versionName: 'V1.0', status: '待处理', priority: '中', ownerName: '测试人员', createdAt: '2026-10-15' }], productLines: [{ id: 'line-1', name: '新产品名称' }] };
+  vi.mocked(useApp).mockReturnValue(context as unknown as ReturnType<typeof useApp>);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const page = <QueryClientProvider client={client}><RequirementTasksView taskKind="design" itemLabel="设计任务" designVariantFilter="all" /></QueryClientProvider>;
+  const { rerender } = render(page);
+  expect(screen.getByRole('cell', { name: '新产品名称 / V1.0' })).toBeVisible();
+  vi.mocked(useApp).mockReturnValue({ ...context, productLines: [{ id: 'line-1', name: '再次修改产品名' }] } as unknown as ReturnType<typeof useApp>);
+  rerender(<QueryClientProvider client={client}><RequirementTasksView taskKind="design" itemLabel="设计任务" designVariantFilter="all" /></QueryClientProvider>);
+  expect(screen.getByRole('cell', { name: '再次修改产品名 / V1.0' })).toBeVisible();
+  expect(screen.getByText('保留的设计标题')).toBeVisible();
+  expect(screen.queryByRole('cell', { name: '新产品名称 / V1.0' })).not.toBeInTheDocument();
+});

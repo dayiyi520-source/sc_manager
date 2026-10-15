@@ -2,7 +2,7 @@ import { BUSINESS_TASK_STATUSES, canReviewCompletion, isCompletionPending, needs
 import { isPendingVerification } from '../../services/workItemTemplateSync';
 import { BUSINESS_TASK_SCOPES, businessTaskSource, matchesBusinessTaskScope } from './businessTaskPresentation';
 import { loadBusinessTasks } from '../../services/businessTaskRepository';
-import { designGroupOf, designTypeLabel, designVariantOf } from './designTaskPresentation';
+import { designGroupOf, designTypeLabel, designVariantOf, syncDesignProductNames } from './designTaskPresentation';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { openWorkItemDetailLink, workItemDetailLink } from '../../utils/workItemDetailLink';
 import { copyToClipboard } from '../../utils/copyToClipboard';
@@ -236,7 +236,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
     else if (taskKind === 'dev') setSpecialTasks(devTasks.map((item: DevTask) => ({ ...item, ownerName: item.developer || '', expectedGoal: '', dueDate: '', priority: item.priority || '中', versionName: item.versionName || '', productLineName: item.productLineName || '', description: item.description || '', status: item.status || '开发中' })) as RequirementTask[]);
     else setSpecialTasks([]);
   }, [taskKind, bugs, devTasks]);
-  const contextTasks = taskKind === 'design' ? designTasks : isCommercialTask ? commercialTasksQuery.data || EMPTY_REQUIREMENT_TASKS : isBusinessTask ? businessTasks : isSpecialTask ? specialTasks : requirementTasks;
+  const currentDesignTasks = useMemo(() => syncDesignProductNames(designTasks, productLines), [designTasks, productLines]);
+  const contextTasks = taskKind === 'design' ? currentDesignTasks : isCommercialTask ? commercialTasksQuery.data || EMPTY_REQUIREMENT_TASKS : isBusinessTask ? businessTasks : isSpecialTask ? specialTasks : requirementTasks;
   const addTask = async (task: Partial<RequirementTask>) => {
     if (taskKind === 'design') return addDesignTask(task);
     if (isBusinessTask) {
@@ -1481,7 +1482,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const designSourceOwnershipValue = (task: RequirementTask, variant = designTaskTypeOf(task)) => {
     if (variant === 'product') {
       const linkedVersion = versions.find((version) => version.id === task.versionId);
-      return [task.productLineName, linkedVersion?.code || task.versionName || '未关联'].filter(Boolean).join(' / ') || '未设置';
+      return [syncDesignProductNames([task], productLines)[0].productLineName, linkedVersion?.code || task.versionName || '未关联'].filter(Boolean).join(' / ') || '未设置';
     }
     if (variant === 'project') return task.designProjectName || (task as RequirementTask & { projectName?: string }).projectName || task.productLineName || '未设置';
     return task.designSourceDepartment || task.department || '未设置';

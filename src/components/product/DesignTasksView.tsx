@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Button, Empty, Input, Modal, Select, message } from 'antd';
 import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
-import { designGroupOf, designVariantOf } from './designTaskPresentation';
+import { designGroupOf, designVariantOf, syncDesignProductNames } from './designTaskPresentation';
 import { Search } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import type { RequirementTask } from '../../types';
@@ -64,7 +64,8 @@ const DesignPoolList: React.FC<{ variant: PoolVariant }> = ({ variant }) => {
 export const DesignTasksView: React.FC<DesignTasksViewProps> = () => {
   const [designVariant, setDesignVariant] = useState<DesignTaskVariant>('product');
   const [designVariantFilter, setDesignVariantFilter] = useState<DesignTaskVariant | 'all'>('all');
-  const { designTasks = [] } = useApp();
+  const { designTasks: storedDesignTasks = [], productLines = [] } = useApp();
+  const designTasks = useMemo(() => syncDesignProductNames(storedDesignTasks, productLines), [storedDesignTasks, productLines]);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [ownershipFilter, setOwnershipFilter] = useState('');
   const designGroups = useMemo(() => Object.fromEntries(DESIGN_VARIANTS.map(({ key }) => {
