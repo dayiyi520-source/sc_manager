@@ -57,7 +57,7 @@ import { employeeSelectOptions } from "../common/PersonIdentity";
 import { isWorkOrderInScope, ownerDepartment, REQUIREMENT_SCOPES, type RequirementScope } from './requirementScope';
 import { WorkItemCategoryIcon } from '../product/WorkItemCategoryIcon';
 import { directoryCustomers, directoryOpportunities, directoryProjects } from '../../services/customerDirectoryData';
-import { projectDeliveryMap } from '../../services/projectDeliveryMap';
+import { projectDeliveryMap, resolveProjectProductLines } from '../../services/projectDeliveryMap';
 export { isWorkOrderInScope } from './requirementScope';
 
 const statuses: RequirementTask["status"][] = [
@@ -394,12 +394,11 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
 
   const currentWorkOrderType = selected?.workOrderType || selected?.taskType || selected?.requirementType || "通用/其他";
   const selectedProject = projectOptions.find((item) => item.name === specialFields.projectName || item.id === specialFields.projectId);
-  const selectedDeliveryProject = projectDeliveryMap().find((item) => item.id === selectedProject?.id);
+  const selectedDeliveryProject = projectDeliveryMap().find((item) => item.id === selectedProject?.id || item.name === selectedProject?.name);
   const selectedRelatedOpportunity = opportunityOptions.find((item) => item.id === (workOrderType === "售前支持" ? specialFields.opportunityId : selectedProject?.opportunityId));
   const relatedProducts = [selectedRelatedOpportunity?.relatedProduct || ""];
-  const projectProducts = selectedDeliveryProject?.products.map((item) => item.name) || [];
   const hasProductSource = workOrderType === "售前支持" ? Boolean(selectedRelatedOpportunity) : Boolean(selectedProject);
-  const projectProductLines = projectProducts.length ? productLines.filter((line) => projectProducts.includes(line.name) || projectProducts.includes(line.id)) : [];
+  const projectProductLines = resolveProjectProductLines(selectedDeliveryProject, productLines);
   const sourceProductLines = hasProductSource ? productLines.filter((line) => relatedProducts.some((value) => value === line.id || value === line.name || line.products?.some((item) => item.id === value || item.name === value))) : [];
   const availableSourceProductLines = workOrderType === "售前支持" ? sourceProductLines : projectProductLines;
   const savedProduct = editingMatter && productLineId === (editingMatter.productLineId || productLines.find(line => line.name === editingMatter.productLineName)?.id) ? productLines.find(line => line.id === productLineId) : undefined;

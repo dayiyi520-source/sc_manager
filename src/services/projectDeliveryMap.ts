@@ -1,5 +1,5 @@
+import type { DeliveryMapProject, ProductLine } from '../types';
 import { MOCK_PROJECT_DELIVERY_MAP } from '../data/mockSnapshot';
-import type { DeliveryMapProject } from '../types';
 
 // The committed snapshot is the shared, portable mock contract for the map and delivery KR.
 export const projectDeliveryMap = (): DeliveryMapProject[] => MOCK_PROJECT_DELIVERY_MAP;
@@ -9,4 +9,17 @@ export const deliveryStagesByProduct = (projects: DeliveryMapProject[]) => Objec
 export const deliveryCurrentStage = (projects: DeliveryMapProject[], projectName: string, productName: string) => {
   const stages = projects.find(project => project.name === projectName)?.products.find(product => product.name === productName)?.stages || [];
   return [...stages].reverse().find(stage => stage.status === 'ongoing')?.name || [...stages].reverse().find(stage => stage.status === 'completed')?.name;
+};
+
+/**
+ * Resolves the product choices for a collaboration project.
+ * Delivery snapshots and the product-line catalog can use different names;
+ * when the project declares products but none match the catalog, keep the
+ * collaboration flow usable with the tenant's product-line choices.
+ */
+export const resolveProjectProductLines = (project: DeliveryMapProject | undefined, productLines: ProductLine[]) => {
+  if (!project?.products.length) return [];
+  const projectProductNames = new Set(project.products.flatMap(product => [product.id, product.name]));
+  const matched = productLines.filter(line => projectProductNames.has(line.id) || projectProductNames.has(line.name));
+  return matched.length ? matched : productLines;
 };
