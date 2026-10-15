@@ -50,6 +50,21 @@ class Store:
             if key not in TEMPLATE_KEYS: raise ValueError('不支持的模板配置')
             valid=type(value) is bool if key=='researchAutomationSetting' else isinstance(value,dict) if key=='researchNotifications' else isinstance(value,list)
             if not valid: raise ValueError('模板配置格式错误')
+            if key == 'productLines' and body.get('productPatch'):
+                patch = body['productPatch']
+                fields = {'name','description','website','sort','visibility','commercialAvailability'}
+                if not isinstance(patch,dict) or not patch.get('id') or not isinstance(patch.get('changes'),dict) or not isinstance(patch.get('previous'),dict): raise ValueError('产品保存参数无效')
+                products = current.get(key,[])
+                product = next((row for row in products if row.get('id') == patch['id']), None)
+                if product is None: raise ValueError('产品不存在，请刷新后重试')
+                for field, next_value in patch['changes'].items():
+                    if field not in fields: raise ValueError('不支持的产品字段')
+                    if product.get(field) != patch['previous'].get(field) and product.get(field) != next_value: raise ValueError('产品信息已被修改，请刷新产品信息后重试；当前填写内容已保留')
+                updated = {**product, **patch['changes']}
+                if not isinstance(updated.get('name'),str) or not updated['name'].strip(): raise ValueError('产品名称不能为空')
+                if updated['name'] != product.get('name'): updated['nameAliases'] = list(dict.fromkeys([*product.get('nameAliases',[]),product['name']]))
+                value = [updated if row.get('id') == patch['id'] else row for row in products]
+                self.write(kind,{**current,key:value});return {'saved':True,'value':value}
             if current.get(key) != body.get('previous'): raise ValueError('模板已被其他页面修改，请刷新后重试')
             self.write(kind,{**current,key:value});return {'saved':True}
 

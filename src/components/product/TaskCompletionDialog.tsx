@@ -9,7 +9,7 @@ type SaveCompletion = (hours: number, reason: string, review: TaskCompletionRevi
 export const validCompletionHours = (value: number | null): value is number =>
   value !== null && Number.isFinite(value) && value >= 0 && value <= 99999999.99 && Math.abs(value * 100 - Math.round(value * 100)) < 1e-6;
 
-const CompletionFields: React.FC<{ save: SaveCompletion; close: () => void; reasonRequired: boolean }> = ({ save, close, reasonRequired }) => {
+const CompletionFields: React.FC<{ save: SaveCompletion; close: () => void; reasonRequired: boolean; approvalRequired?: boolean }> = ({ save, close, reasonRequired, approvalRequired = false }) => {
   const [hours, setHours] = useState<number | null>(null);
   const [review, setReview] = useState<TaskCompletionReview>({ content: '', media: [] });
   const pending = useRef(0);
@@ -45,16 +45,16 @@ const CompletionFields: React.FC<{ save: SaveCompletion; close: () => void; reas
     </Form.Item>
     <Form.Item label="复盘附件"><Upload multiple disabled={busy} beforeUpload={readAttachment} fileList={review.media.map((item) => ({ uid: item.id, name: item.name, status: 'done' }))} onRemove={(file) => { if (saving.current) return false; setReview((current) => ({ ...current, media: current.media.filter((item) => item.id !== file.uid) })); }}><Button disabled={busy} loading={reading > 0} icon={<PaperClipOutlined />}>添加附件</Button></Upload></Form.Item>
     {reasonRequired && <Form.Item label="状态变更原因" required><Input.TextArea disabled={busy} rows={4} maxLength={2000} value={reason} placeholder="请输入状态变更原因" onChange={(event) => setReason(event.target.value)} /></Form.Item>}
-    <Alert type="info" showIcon title="确认后一起保存实际工时、复盘总结及附件，并将任务标记为已完成。取消不会修改任务。" />
+    <Alert type="info" showIcon title={approvalRequired ? '确认后保存实际工时、复盘总结及附件并提交完成申请。任务保持处理中，审核通过后才会完成。取消不会修改任务。' : '确认后一起保存实际工时、复盘总结及附件，并将任务标记为已完成。取消不会修改任务。'} />
     {error && <Alert className="mt-3" type="error" showIcon title={error} />}
     <div className="mt-4 flex justify-end gap-2"><Button disabled={busy || reading > 0} onClick={close}>取消</Button><Button type="primary" loading={busy} disabled={reading > 0} onClick={() => void submit()}>确认完成</Button></div>
   </Form>;
 };
 
-export function openTaskCompletionDialog(save: SaveCompletion, reasonRequired = false) {
+export function openTaskCompletionDialog(save: SaveCompletion, reasonRequired = false, approvalRequired = false) {
   const dialog = Modal.confirm({
     title: '完成任务', width: 'min(720px, calc(100vw - 32px))', centered: true, footer: null, mask: { closable: false }, closable: false, keyboard: false,
-    content: <CompletionFields reasonRequired={reasonRequired} save={save} close={() => dialog.destroy()} />
+    content: <CompletionFields approvalRequired={approvalRequired} reasonRequired={reasonRequired} save={save} close={() => dialog.destroy()} />
   });
   return dialog;
 }

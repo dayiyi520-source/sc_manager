@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { openTaskCompletionDialog } from './TaskCompletionDialog';
+import { directoryProjects } from '../../services/customerDirectoryData';
 import { RequirementTasksView } from './RequirementTasksView';
 import { useApp } from '../../context/AppContext';
 import { productRepository } from '../../services/productRepository';
@@ -14,9 +16,10 @@ vi.mock('../../services/requirementRepository', () => ({ requirementRepository: 
 vi.mock('../../services/productRepository', () => ({ productRepository: {
   businessTasks: vi.fn(), updateBusinessTask: vi.fn().mockResolvedValue(null),
   workItemFieldConfigurations: vi.fn().mockResolvedValue({ scenes: [{ scene: 'LIST', fields: [{ fieldCode: 'priority', visible: false }, { fieldCode: 'creator', visible: false }] }] }),
-  businessTask: vi.fn(), workItemDetail: vi.fn(), workItemTypes: vi.fn().mockResolvedValue([]),
+  businessTask: vi.fn(), reviewBusinessTask: vi.fn().mockResolvedValue(null), workItemDetail: vi.fn(), workItemTypes: vi.fn().mockResolvedValue([]),
   workItemReview: vi.fn().mockResolvedValue(null), workItemRelations: vi.fn().mockResolvedValue({ relations: [] }), businessTaskActivities: vi.fn().mockResolvedValue([])
 } }));
+vi.mock('./TaskCompletionDialog', () => ({ openTaskCompletionDialog: vi.fn() }));
 vi.mock('./LazyRichTextEditor', () => ({ LazyRichTextEditor: () => <div /> }));
 const task = (id: string, value: Partial<RequirementTask> = {}): RequirementTask => ({ id, title: '任务-' + id, status: '待处理', priority: '中', ownerName: '当前用户', assigneeId: 'u1', creatorName: '其他人', creatorId: 'other', department: '交付部', productLineName: '', versionName: '', estimatedHours: 0, dueDate: '', createdAt: '2026-10-12', ...value });
 beforeEach(() => {
@@ -108,4 +111,78 @@ it('does not request legacy field settings for task pages', async () => {
   mount('presales');
   await screen.findByText('没有符合当前搜索、过滤或分组条件的售前任务');
   expect(productRepository.workItemFieldConfigurations).not.toHaveBeenCalled();
+});
+
+
+it.each(['approve', 'reject'] as const)('locks pending status and replaces the menu with %s review controls', async action => {
+  const sample = task('review', { status: '处理中', completionApproval: 'pending', creatorId: 'u1', creatorName: '当前用户', assigneeId: 'u2', ownerName: '部门同事' });
+  vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [sample], total: 1, page: 1, pageSize: 200 });
+  vi.mocked(productRepository.reviewBusinessTask).mockImplementationOnce(async () => {
+    vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+  });
+  mount('delivery');
+  fireEvent.click(await screen.findByRole('tab', { name: '待审核·1' }));
+  expect(screen.getByRole('combobox', { name: sample.title + '状态' })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: '操作' + sample.title })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: action === 'approve' ? /^通\s*过$/ : /^拒\s*绝$/ }));
+  await waitFor(() => expect(productRepository.reviewBusinessTask).toHaveBeenCalledWith(sample.id, action));
+  await screen.findByRole('tab', { name: '待审核·0' });
+});
+
+it('disables review for non-reviewers and preserves a pending task when review fails', async () => {
+  const sample = task('review-error', { status: '处理中', completionApproval: 'pending', creatorId: 'u1' });
+  vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [sample], total: 1, page: 1, pageSize: 200 });
+  vi.mocked(productRepository.reviewBusinessTask).mockRejectedValueOnce(new Error('网络中断'));
+  mount('delivery');
+  fireEvent.click(await screen.findByRole('tab', { name: '待审核·1' }));
+  fireEvent.click(screen.getByRole('button', { name: /^通\s*过$/ }));
+  await waitFor(() => expect(useApp().addToast).toHaveBeenCalledWith('error', '审核失败', '网络中断'));
+  expect(screen.getByRole('tab', { name: '待审核·1' })).toBeVisible();
+  await waitFor(() => expect(screen.getByRole('button', { name: /^通\s*过$/ })).not.toBeDisabled());
+});
+
+it('keeps review buttons disabled for the owner who is not the creator', async () => {
+  const sample = task('unauthorized-review', { status: '处理中', completionApproval: 'pending' });
+  vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [sample], total: 1, page: 1, pageSize: 200 });
+  mount('delivery');
+  fireEvent.click(await screen.findByRole('tab', { name: '待审核·1' }));
+  expect(screen.getByRole('button', { name: /^通\s*过$/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /^拒\s*绝$/ })).toBeDisabled();
+});
+
+it('requests completion hours before persisting delivery completion', async () => {
+  const sample = task('complete', { status: '处理中' });
+  vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [sample], total: 1, page: 1, pageSize: 200 });
+  mount('delivery');
+  const select = await screen.findByRole('combobox', { name: sample.title + '状态' });
+  fireEvent.mouseDown(select);
+  fireEvent.click(document.querySelectorAll('.ant-select-item-option-content')[2]);
+  expect(openTaskCompletionDialog).toHaveBeenCalledWith(expect.any(Function), false, true);
+  expect(productRepository.updateBusinessTask).not.toHaveBeenCalled();
+  const save = vi.mocked(openTaskCompletionDialog).mock.calls[0][0];
+  await act(async () => { await save(3.5, '', { content: '验收说明', media: [] }); });
+  expect(productRepository.updateBusinessTask).toHaveBeenCalledWith('delivery', sample.id, { status: '已完成', actualHours: 3.5, completionReview: { content: '验收说明', media: [] } });
+});
+
+it('filters by project and uses business statuses instead of the generic development stages', async () => {
+  const project = directoryProjects()[0];
+  const one = task('project-one', { projectId: project.id, projectName: project.name, customerName: '不是项目的客户名' });
+  const two = task('project-two', { projectName: '另一个项目' });
+  vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [one, two], total: 2, page: 1, pageSize: 200 });
+  mount('delivery');
+  await screen.findByRole('button', { name: one.title });
+  fireEvent.click(screen.getByRole('button', { name: '过滤器' }));
+  expect(screen.queryByText('关联客户')).not.toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '状态' }));
+  const statuses = Array.from(document.querySelectorAll('.ant-select-item-option-content')).map(item => item.textContent);
+  expect(statuses).toEqual(['待处理', '处理中', '已完成']);
+  expect(statuses).not.toContain('待审核');
+  fireEvent.keyDown(screen.getByRole('combobox', { name: '状态' }), { key: 'Escape' });
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '关联项目' }));
+  const option = Array.from(document.querySelectorAll('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content')).find(item => item.textContent === project.name)!;
+  fireEvent.click(option);
+  fireEvent.click(screen.getByRole('button', { name: '应用过滤' }));
+  expect(screen.getByRole('button', { name: one.title })).toBeVisible();
+  expect(screen.queryByRole('button', { name: two.title })).not.toBeInTheDocument();
+  expect(screen.getByText(`关联项目 包含 ${project.name}`)).toBeVisible();
 });

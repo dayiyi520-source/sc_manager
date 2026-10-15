@@ -21,3 +21,12 @@ describe('task activity display', () => {
    expect(formatTaskActivityTime('2026-10-10T07:38:42.987123Z')).toMatch(/^2026-10-10 \d{2}:38:42$/);
    expect(formatTaskActivityTime('invalid')).toBe('—');
  });
+
+
+it.each([
+  ['BUSINESS_TASK_COMPLETION_REQUESTED', '提交了完成申请，任务保持处理中，完成工时 3 小时'],
+  ['BUSINESS_TASK_REVIEW_APPROVED', '通过了完成申请，任务已完成'],
+  ['BUSINESS_TASK_REVIEW_REJECTED', '拒绝了完成申请，任务保持处理中'],
+])('describes delivery approval event %s', (eventType, expected) => {
+  expect(taskActivitySummary(normalizeTaskActivity({ id: 'approval', eventType, content: { actualHours: 3 } }))).toBe(expected);
+});

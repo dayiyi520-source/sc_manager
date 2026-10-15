@@ -11,7 +11,7 @@ beforeEach(() => {
     return { destroy: () => view.unmount(), update: vi.fn() };
   });
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(async () => { cleanup(); await new Promise(resolve => setTimeout(resolve, 200)); vi.restoreAllMocks(); });
 
 it('validates nonnegative hours with at most two decimal places', () => {
   for (const value of [null, -1, Infinity, 1.001, 100000000]) expect(validCompletionHours(value)).toBe(false);
@@ -60,4 +60,11 @@ it('accepts an attachment without a detected MIME type', async () => {
   expect(await screen.findByText('复盘.custom')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /确认完成/ }));
   await waitFor(() => expect(save).toHaveBeenCalledWith(1, '', { content: '', media: [expect.objectContaining({ dataUrl: expect.stringMatching(/^data:application\/octet-stream;base64,/) })] }));
+});
+
+
+it('explains that approval requests keep the task processing', async () => {
+  await act(async () => { openTaskCompletionDialog(vi.fn(), false, true); });
+  expect(screen.getByText(/任务保持处理中，审核通过后才会完成/)).toBeVisible();
+  expect(screen.queryByText(/并将任务标记为已完成/)).not.toBeInTheDocument();
 });

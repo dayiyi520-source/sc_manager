@@ -143,12 +143,12 @@ export const productRepository = {
   updateDesignTask: (id: string, body: Record<string, unknown>) => apiRequest<void>(`/api/design-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   businessTasks: async (kind: BusinessTaskKind, values: Record<string,string|number> = {}) => page(await apiRequest<PageResult<RequirementTask> | RequirementTask[]>(`${businessTaskPath(kind)}${querySuffix(values)}`)),
   businessTask: (kind: BusinessTaskKind, id: string) => apiRequest<RequirementTask>(`${businessTaskPath(kind)}/${id}`),
-  reviewBusinessTask: (id: string, action: 'approve' | 'reject', comment?: string) => apiRequest<void>(`/api/delivery-tasks/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify({ action, comment }) }),
+  reviewBusinessTask: (id: string, action: 'approve' | 'reject', comment?: string) => apiRequest<RequirementTask | void>(`/api/delivery-tasks/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify({ action, comment }) }),
   businessTaskActivities: (kind: BusinessTaskKind, id: string) => apiRequest<Record<string, unknown>[]>(`${businessTaskPath(kind)}/${id}/activities`),
   commentBusinessTask: (kind: BusinessTaskKind, id: string, content: string) => apiRequest<void>(`${businessTaskPath(kind)}/${id}/comments`, { method: 'POST', body: JSON.stringify({ content }) }),
   archiveBusinessTask: (kind: BusinessTaskKind, id: string) => apiRequest<void>(`${businessTaskPath(kind)}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   createBusinessTask: (kind: BusinessTaskKind, body: Partial<RequirementTask>) => apiRequest<{ id: string; code: string }>(businessTaskPath(kind), { method: 'POST', body: JSON.stringify(body) }),
-  updateBusinessTask: (kind: BusinessTaskKind, id: string, body: Record<string, unknown>) => apiRequest<void>(`${businessTaskPath(kind)}/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  updateBusinessTask: (kind: BusinessTaskKind, id: string, body: Record<string, unknown>) => apiRequest<RequirementTask | void>(`${businessTaskPath(kind)}/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   ,testCaseDirectories: (lineId: string) => apiRequest<TestCaseDirectory[]>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories`)
   ,createTestCaseDirectory: (lineId: string, body: { parentId?: string | null; productLineId?: string; name: string; sort?: number }) => apiRequest<TestCaseDirectory>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories`, { method: 'POST', body: JSON.stringify(body) })
   ,renameTestCaseDirectory: (lineId: string, directoryId: string, name: string) => apiRequest<TestCaseDirectory>(`/api/product-lines/${encodeURIComponent(lineId)}/test-case-directories/${encodeURIComponent(directoryId)}`, { method: 'PUT', body: JSON.stringify({ name }) })

@@ -14,6 +14,9 @@ const value = (input: unknown) => {
 };
 export const taskActivitySummary = (event: RequirementEvent): string => {
   const metadata = event.metadata || {};
+  if (event.eventType === 'BUSINESS_TASK_COMPLETION_REQUESTED') return `提交了完成申请，任务保持处理中，完成工时 ${value(metadata.actualHours)} 小时`;
+  if (event.eventType === 'BUSINESS_TASK_REVIEW_APPROVED') return '通过了完成申请，任务已完成';
+  if (event.eventType === 'BUSINESS_TASK_REVIEW_REJECTED') return `拒绝了完成申请，任务保持处理中${metadata.comment ? `：${value(metadata.comment)}` : ''}`;
   if (event.eventType === 'LOCAL_DATA_ENRICHED') return '补充了任务资料';
   if (event.eventType === 'WORK_ITEM_REVIEWED') return `保存了复盘总结“${String((metadata.review as { title?: string })?.title || '')}”`;
   if (event.eventType === 'WORK_ITEM_CREATED') return '创建了任务';

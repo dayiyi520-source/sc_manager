@@ -1,3 +1,5 @@
+import { normalizeDefectStatusLabels } from './defectStatusLabels';
+import { syncOkrProductNames } from './okrProductNames';
 import { customerDirectoryRequest } from './customerDirectoryData';
 import { mockStateEndpoint } from './mockStateEndpoint';
 import { createOkrFilePersistence } from './okrFilePersistence';
@@ -87,7 +89,19 @@ const read = <T>(key: string, fallback: T): T => {
   const templateKey = key.replace('shichuang.frontend.mock.', '');
   const savedState = templateKey.startsWith('okr') ? savedOkrState : savedResearchTemplate;
   const seed = Object.prototype.hasOwnProperty.call(savedState, templateKey) ? (savedState as Record<string, unknown>)[templateKey] as T : fallback;
-  try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : seed; } catch { return seed; }
+  let value: T;
+  try { const stored = localStorage.getItem(key); value = stored ? JSON.parse(stored) as T : seed; } catch { value = seed; }
+  if ([KEYS.researchTypes, KEYS.researchStatuses, KEYS.productLines, KEYS.workItems].includes(key)) {
+    const normalized = normalizeDefectStatusLabels(value);
+    if (normalized !== value) localStorage.setItem(key, JSON.stringify(normalized));
+    value = normalized;
+  }
+  if (key === KEYS.okrRecords && Array.isArray(value)) {
+    const normalized = syncOkrProductNames(value as OkrRecord[], getProductLines());
+    if (normalized.some((record, index) => record !== value[index])) localStorage.setItem(key, JSON.stringify(normalized));
+    return normalized as T;
+  }
+  return value;
 };
 const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
 const bodyOf = (init?: RequestInit) => { try { return init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {}; } catch { return {}; } };
@@ -190,7 +204,9 @@ const getMembers = () => read(KEYS.members, MOCK_TEAM_MEMBERS.map((item) => ({ .
 const getProductLines = (): ProductLine[] => {
  const products = read<ProductLine[]>(KEYS.productLines, MOCK_PRODUCT_LINES.map((item) => ({ ...item, versions: [...(item.versions || [])] }))).map((product) => {
   const snapshotVersions = MOCK_PRODUCT_LINES.find((item) => item.id === product.id)?.versions || [];
-  return { ...product, versions: product.versions?.map((version) => ({
+  const originalName = MOCK_PRODUCT_LINES.find(item => item.id === product.id)?.name;
+  const nameAliases = [...new Set([...(product.nameAliases || []), originalName].filter((name): name is string => Boolean(name && name !== product.name)))];
+  return { ...product, ...(nameAliases.length ? { nameAliases } : {}), versions: product.versions?.map((version) => ({
     ...version,
     releaseDate: version.releaseDate || snapshotVersions.find((item) => item.id === version.id)?.releaseDate || '',
   })) };
@@ -388,13 +404,26 @@ const productTypes = (product: ProductLine | undefined): any[] => {
   return types.map(row => ({ id: row.id_, name: row.name_, category: row.category_, enabled: Boolean(row.enabled_), isDefault: Boolean(row.is_default_), revision: Number(row.version_ || 0), workflows: workflows.filter(flow => flow.task_type_id_ === row.id_ && !flow.delete_flag_).map(flow => ({ id: flow.id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: flow.name_, revision: Number(flow.version_ || 0), status: flow.status_, workflowVersion: flow.workflow_version_, definition: flow.definition_ })).length ? workflows.filter(flow => flow.task_type_id_ === row.id_ && !flow.delete_flag_).map(flow => ({ id: flow.id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: flow.name_, revision: Number(flow.version_ || 0), status: flow.status_, workflowVersion: flow.workflow_version_, definition: flow.definition_ })) : [defaultProductWorkflow({ id: row.id_, name: row.name_, category: row.category_ })] }));
 };
 const templateNotifications = () => read(KEYS.researchNotifications, databaseRows('t_notification_template')[0]?.config_ || { categories: [] });
-const unifiedWorkItem = (item: any) => ({
+const statusForWorkItem = (item: any, typesByProduct: Map<string, any[]>) => {
+  if (typeof item.status !== 'string') return item.status || { name: '未设置', group: 'UNCLASSIFIED', successful: false };
+  const canonical: Record<string, string> = { '待处理': 'NOT_STARTED', '处理中': 'IN_PROGRESS', '已完成': 'COMPLETED', '已取消': 'CANCELLED' };
+  let types = typesByProduct.get(item.productLineId);
+  if (!types) {
+    types = item.taskTypeId || item.workItemTypeId ? productTypes(getProductLines().find(line => line.id === item.productLineId)) : [];
+    if (types.length) typesByProduct.set(item.productLineId, types);
+  }
+  const type = types.find(type => type.id === (item.taskTypeId || item.workItemTypeId));
+  const workflows = type?.workflows || (type?.workflow ? [type.workflow] : []);
+  const workflow = workflows.find((flow: any) => flow.id === item.workflowId && flow.status === 'PUBLISHED');
+  const states = (workflow ? [workflow] : workflows.filter((flow: any) => flow.status === 'PUBLISHED')).flatMap((flow: any) => flow.definition?.states || []);
+  const state = states.find((state: any) => state.name === item.status) || states.find((state: any) => item.statusKey && state.key === item.statusKey);
+  return { name: state?.name || item.status, group: state?.group || canonical[item.status] || 'UNCLASSIFIED', successful: state?.successful ?? item.status === '已完成' };
+};
+const unifiedWorkItem = (item: any, typesByProduct = new Map<string, any[]>()) => ({
   ...item,
   taskTypeId: item.taskTypeId || item.workItemTypeId,
   assigneeName: item.assigneeName ?? item.ownerName ?? '',
-  status: typeof item.status === 'string'
-    ? { name: item.status, group: item.status === '已完成' ? 'COMPLETED' : 'IN_PROGRESS', successful: item.status === '已完成' }
-    : item.status || { name: '未设置', group: 'IN_PROGRESS', successful: false },
+  status: statusForWorkItem(item, typesByProduct),
   revision: item.revision ?? 0,
 });
 
@@ -698,7 +727,15 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   }
   if (parts[1] === 'product-lines' && parts[2] && !parts[3] && method === 'PUT') {
     const products = getProductLines(); const index = products.findIndex((item) => item.id === parts[2]);
-    if (index >= 0) { products[index] = { ...products[index], ...body }; write(KEYS.productLines, products); return products[index]; }
+    if (index >= 0) {
+      const previous = products[index];
+      const name = body.name === undefined ? previous.name : String(body.name).trim();
+      if (!name) throw new Error('产品名称不能为空');
+      const nameAliases = [...new Set([...(previous.nameAliases || []), ...(name !== previous.name ? [previous.name] : [])])];
+      products[index] = { ...previous, ...body, id: previous.id, name, nameAliases };
+      write(KEYS.productLines, products);
+      return products[index];
+    }
   }
   if (clean === '/api/team-members/options' && method === 'GET') return getEmployeeOptions();
   if (clean === '/api/team-members/departments' && method === 'GET') return Array.from(new Set(getMembers().map((item) => item.department).filter(Boolean))).sort();
@@ -1088,8 +1125,8 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   }
 
   if (clean.startsWith('/api/work-items/') && parts.length === 3 && method === 'GET') {
-    const found = getWorkItems().filter((item) => !item.deleted && !item.deleteFlag).map(unifiedWorkItem).find((item) => item.id === parts[2]);
-    return found || null;
+    const found = getWorkItems().find(item => !item.deleted && !item.deleteFlag && item.id === parts[2]);
+    return found ? unifiedWorkItem(found) : null;
   }
   if (parts[1] === 'work-items' && parts[2] && parts.length === 3 && method === 'PUT') {
     if (body.verifierId != null) {
@@ -1170,7 +1207,8 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const query = queryOf(path); const productLineId = query.get('productLineId'); const category = query.get('category'); const keyword = (query.get('keyword') || '').toLowerCase();
     let items = getWorkItems().filter((item) => !item.deleted && !item.deleteFlag && (!productLineId || item.productLineId === productLineId) && (!category || category === item.category) && (!keyword || String(item.title || '').toLowerCase().includes(keyword) || String(item.code || '').toLowerCase().includes(keyword) || (category === 'bug' && String(item.id).toLowerCase().includes(keyword))));
     if (category === 'bug') items = items.filter((item) => !item.deleted && !item.deleteFlag);
-    items = items.map((item) => unifiedWorkItem(item)) as any;
+    const typesByProduct = new Map<string, any[]>();
+    items = items.map((item) => unifiedWorkItem(item, typesByProduct)) as any;
     const page = Math.max(1, Number(query.get('page') || 1)); const pageSize = Math.max(1, Number(query.get('pageSize') || 100));
     return { page: { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length } };
   }
@@ -1310,10 +1348,40 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
   const route = Object.keys(templateRoutes).find((route) => clean === route || clean.startsWith(`${route}/`));
   if (!route) return handleMockApiRequest(path, init);
   const operation = templateQueue.then(async () => {
-    if ((init.method || 'GET').toUpperCase() === 'GET') return handleMockApiRequest(path, init);
+    if ((init.method || 'GET').toUpperCase() === 'GET') {
+      const latest = await templateFileRequest();
+      templateFile = latest;
+      for (const key of Object.values(templateRoutes)) {
+        if (Object.prototype.hasOwnProperty.call(latest, key)) write(`shichuang.frontend.mock.${key}`, latest[key]);
+      }
+      return handleMockApiRequest(path, init);
+    }
     const key = templateRoutes[route];
     const storageKey = `shichuang.frontend.mock.${key}`;
     const previousLocal = localStorage.getItem(storageKey);
+    const productId = /^\/api\/product-lines\/([^/]+)$/.exec(clean)?.[1];
+    const basicFields = ['name', 'description', 'website', 'sort', 'visibility', 'commercialAvailability'];
+    const body = bodyOf(init);
+    const basicSave = productId && (init.method || 'GET').toUpperCase() === 'PUT' && Object.keys(body).every(field => basicFields.includes(field));
+    if (basicSave) {
+      const previousProducts = (templateFile.productLines || []) as ProductLine[];
+      const previousProduct = previousProducts.find(product => product.id === decodeURIComponent(productId));
+      if (!previousProduct) throw new Error('产品不存在，请刷新后重试');
+      const changes = Object.fromEntries(Object.entries(body).filter(([field, value]) => JSON.stringify(value ?? null) !== JSON.stringify(previousProduct[field] ?? null)));
+      const previous = Object.fromEntries(Object.keys(changes).map(field => [field, previousProduct[field] ?? null]));
+      // Check against the latest file without replacing the baseline the user edited.
+      const latest = await templateFileRequest();
+      const current = (latest.productLines as ProductLine[] || []).find(product => product.id === previousProduct.id);
+      if (!current) throw new Error('产品不存在，请刷新后重试');
+      for (const [field, value] of Object.entries(changes)) {
+        if (JSON.stringify(current[field] ?? null) !== JSON.stringify(previous[field]) && JSON.stringify(current[field] ?? null) !== JSON.stringify(value ?? null)) throw new Error('产品信息已被修改，请刷新产品信息后重试；当前填写内容已保留');
+      }
+      const response = await templateFileRequest({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'productLines', value: latest.productLines, productPatch: { id: previousProduct.id, previous, changes } }) });
+      if (!Array.isArray(response.value)) throw new Error('产品保存结果无效，请刷新核对');
+      templateFile = { ...latest, productLines: response.value };
+      write(storageKey, response.value);
+      return (response.value as ProductLine[]).find(product => product.id === previousProduct.id);
+    }
     try {
       const result = await handleMockApiRequest(path, init);
       const nextLocal = localStorage.getItem(storageKey);

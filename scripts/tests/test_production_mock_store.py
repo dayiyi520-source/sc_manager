@@ -26,4 +26,18 @@ class StoreTests(unittest.TestCase):
   with self.assertRaises(ValueError): self.store.file('../../secret')
   with self.assertRaises(ValueError): self.store.update('okr-state',{'previousRevision':1,'state':{**self.state,'okrRecords':[{}]}})
   self.assertEqual(self.store.read('okr-state'),self.state)
+ def test_product_patch_preserves_unrelated_updates_and_rejects_race(self):
+  self.store.write('research-template',{'productLines':[{'id':'p','name':'old','description':'latest'},{'id':'other','name':'another latest'}]})
+  patch={'id':'p','previous':{'name':'old'},'changes':{'name':'new'}}
+  result=self.store.update('research-template',{'key':'productLines','value':[],'productPatch':patch})
+  self.assertEqual(result['value'][0]['name'],'new');self.assertEqual(result['value'][0]['description'],'latest');self.assertEqual(result['value'][1]['name'],'another latest')
+  self.assertEqual(result['value'][0]['nameAliases'],['old'])
+  with self.assertRaisesRegex(ValueError,'产品信息已被修改'): self.store.update('research-template',{'key':'productLines','value':[],'productPatch':{'id':'p','previous':{'name':'old'},'changes':{'name':'overwrite'}}})
+  self.assertEqual(self.store.read('research-template')['productLines'][0]['name'],'new')
+  self.assertEqual(self.store.update('research-template',{'key':'productLines','value':[],'productPatch':patch})['value'],result['value'])
+ def test_product_patch_rejects_missing_and_identity_updates(self):
+  self.store.write('research-template',{'productLines':[{'id':'p','name':'old'}]})
+  for patch in [{'id':'missing','previous':{},'changes':{'name':'new'}},{'id':'p','previous':{},'changes':{'id':'other'}}]:
+   with self.assertRaises(ValueError): self.store.update('research-template',{'key':'productLines','value':[],'productPatch':patch})
+  self.assertEqual(self.store.read('research-template')['productLines'][0]['name'],'old')
 if __name__=='__main__': unittest.main()

@@ -1,3 +1,4 @@
+import { syncOkrProductNames } from '../../../services/okrProductNames';
 import { canEditOkr } from '../../../services/okrSettingsPolicy';
 import { goalsWithAssignments, assignedReferences } from '../../../services/okrThreeLevelRules';
 import { useMemo, useState } from 'react';
@@ -13,7 +14,7 @@ import { loadReviewEvidence } from '../../../services/reviewEvidenceRepository';
 import { reviewSubmissionAccess } from '../../../services/okrReviewRules';
 import { monthlyReviewTargets } from '../../../services/okrReviewTargets';
 import { assignedGoalActions, legacyGoalActions } from '../../../services/okrGoalRules';
-import type { EmployeeOption, OKRItem, PerformanceReview } from '../../../types';
+import type { EmployeeOption, OKRItem, PerformanceReview, ProductLine } from '../../../types';
 
 export const findReviewForPayload = (records: OkrRecord[], ownerId: string, periodKey: string, payload: OkrPayload) =>
   records.find(record => (
@@ -25,8 +26,10 @@ export const findReviewForPayload = (records: OkrRecord[], ownerId: string, peri
     && record.payload.endDate === payload.endDate
   ));
 
+const EMPTY_PRODUCT_LINES: ProductLine[] = [];
+
 export function useOriginalOkr() {
-  const {currentUser, addToast} = useApp();
+  const {currentUser, addToast, productLines: liveProducts = EMPTY_PRODUCT_LINES} = useApp();
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const records = useQuery({queryKey:['okr',currentUser.id,'records'],queryFn:()=>okrRepository.records(currentUser.id),retry:false});
@@ -48,8 +51,13 @@ export function useOriginalOkr() {
     retry:false,
   });
   const people = (peopleQuery.data || []).map(person => ({ ...person, department: teamMembersQuery.data?.find(member => member.id === person.id)?.department || person.department, jobTitle: teamMembersQuery.data?.find(member => member.id === person.id)?.jobTitle || teamMembersQuery.data?.find(member => member.id === person.id)?.roleTitle || person.jobTitle }));
-  const productLineOptions = (productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => line.name);
-  const productLineVersionOptions = Object.fromEntries((productLinesQuery.data || []).filter(line => line.status !== '已停用').map(line => [line.name, (line.versions || []).map(version => String(version.code || version.name || '')).filter(Boolean)]));
+  const currentProducts = useMemo(() => {
+    const catalog = new Map((productLinesQuery.data || []).map(product => [product.id, product]));
+    for (const product of liveProducts) catalog.set(product.id, product);
+    return [...catalog.values()];
+  }, [productLinesQuery.data, liveProducts]);
+  const productLineOptions = currentProducts.filter(line => line.status !== '已停用').map(line => line.name);
+  const productLineVersionOptions = Object.fromEntries(currentProducts.filter(line => line.status !== '已停用').map(line => [line.name, (line.versions || []).map(version => String(version.code || version.name || '')).filter(Boolean)]));
   const projectOptions = deliveryProjectNames(deliveryProjects);
   const namesFrom = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.flatMap(item => namesFrom(item));
@@ -69,7 +77,7 @@ export function useOriginalOkr() {
     return { value: String(item.name || ''), label: String(item.name || ''), products: [...new Set(namesFrom([item.relatedProduct, item.product, item.products]))] };
   }).filter(item => item.value);
   const businessOptionsError = productLinesQuery.error || opportunitiesQuery.error;
-  const rawRecords = records.data || [];
+  const rawRecords = useMemo(() => syncOkrProductNames(records.data || [], currentProducts), [records.data, currentProducts]);
   const me = people.find(p=>p.id===currentUser.id);
   const all = useMemo(() => goalsWithAssignments(rawRecords, me), [rawRecords, currentUser.id, me?.supervisorId, me?.jobTitle, me?.name]);
   const derivedActionParents = [...new Map([...assignedGoalActions(all, me), ...assignedReferences(all, me)].map(item => [item.id, item])).values()];

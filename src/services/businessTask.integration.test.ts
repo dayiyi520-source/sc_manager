@@ -1,12 +1,20 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { mockApiRequest } from './mockApi';
+import { SESSION_KEY } from './sessionStorage';
 import { MOCK_SNAPSHOT_VERSION } from '../data/mockSnapshot';
 import { directoryCustomers, directoryOpportunities, directoryProjects } from './customerDirectoryData';
 import { projectDeliveryMap } from './projectDeliveryMap';
 import type { RequirementTask } from '../types';
 import type { PageResult } from './apiClient';
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+const asOwner = async (id: string, action: () => Promise<unknown>) => {
+  const saved = sessionStorage.getItem(SESSION_KEY);
+  const task = await mockApiRequest(`/api/delivery-tasks/${id}`) as RequirementTask;
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: { id: task.assigneeId, name: task.ownerName, role: 'tech_lead' } }));
+  try { return await action(); }
+  finally { if (saved === null) sessionStorage.removeItem(SESSION_KEY); else sessionStorage.setItem(SESSION_KEY, saved); }
+};
 const create = async (kind: 'presales' | 'delivery' | 'ops', title: string) => await mockApiRequest('/api/' + kind + '-tasks', { method: 'POST', body: JSON.stringify({ title }) }) as { id: string };
 describe('local commercial task routes', () => {
   it('seeds eight tasks per kind and paginates independent stores', async () => {
@@ -83,12 +91,12 @@ describe('local commercial task routes', () => {
 
 it('moves a delivery task to review when a different creator completes it, then supports approval and rejection', async () => {
   const created = await mockApiRequest('/api/delivery-tasks', { method: 'POST', body: JSON.stringify({ title: '需要主管审核的交付任务', ownerName: '毛景强', assigneeId: 'u-002', estimatedHours: 4 }) }) as { id: string };
-  await mockApiRequest(`/api/delivery-tasks/${created.id}`, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 4 }) });
-  expect(await mockApiRequest(`/api/delivery-tasks/${created.id}`)).toMatchObject({ status: '待审核' });
+  await asOwner(created.id, () => mockApiRequest(`/api/delivery-tasks/${created.id}`, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 4 }) }));
+  expect(await mockApiRequest(`/api/delivery-tasks/${created.id}`)).toMatchObject({ status: '处理中', completionApproval: 'pending', actualHours: 4 });
   await mockApiRequest(`/api/delivery-tasks/${created.id}/review`, { method: 'POST', body: JSON.stringify({ action: 'reject', comment: '请补充验收记录' }) });
   expect(await mockApiRequest(`/api/delivery-tasks/${created.id}`)).toMatchObject({ status: '处理中' });
   const approved = await mockApiRequest('/api/delivery-tasks', { method: 'POST', body: JSON.stringify({ title: '审核通过任务', ownerName: '毛景强', assigneeId: 'u-002', estimatedHours: 4 }) }) as { id: string };
-  await mockApiRequest(`/api/delivery-tasks/${approved.id}`, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 4 }) });
+  await asOwner(approved.id, () => mockApiRequest(`/api/delivery-tasks/${approved.id}`, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 4 }) }));
   await mockApiRequest(`/api/delivery-tasks/${approved.id}/review`, { method: 'POST', body: JSON.stringify({ action: 'approve', comment: '验收通过' }) });
   expect(await mockApiRequest(`/api/delivery-tasks/${approved.id}`)).toMatchObject({ status: '已完成' });
   await expect(mockApiRequest(`/api/delivery-tasks/${approved.id}/review`, { method: 'POST', body: JSON.stringify({ action: 'approve' }) })).rejects.toThrow('待审核');
@@ -116,4 +124,52 @@ it('seeds plan dates for estimated product work items used by the hours timeline
   const planned = result.page.items.filter((item) => Number(item.estimatedHours || 0) > 0);
   expect(planned.length).toBeGreaterThan(0);
   expect(planned.every((item) => item.plannedStartDate && item.plannedEndDate)).toBe(true);
+});
+
+
+it('requires hours before requesting approval and locks a pending request', async () => {
+  const created = await mockApiRequest('/api/delivery-tasks', { method: 'POST', body: JSON.stringify({ title: '审核锁定', assigneeId: 'u-002', ownerName: '毛景强' }) }) as { id: string };
+  const url = `/api/delivery-tasks/${created.id}`;
+  await expect(asOwner(created.id, () => mockApiRequest(url, { method: 'PUT', body: JSON.stringify({ status: '已完成' }) }))).rejects.toThrow('完成工时');
+  await asOwner(created.id, () => mockApiRequest(url, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 3 }) }));
+  await expect(mockApiRequest(url, { method: 'PUT', body: JSON.stringify({ status: '待处理' }) })).rejects.toThrow('审核');
+  await expect(mockApiRequest(url, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 5 }) })).rejects.toThrow('审核');
+  expect(await mockApiRequest(url)).toMatchObject({ status: '处理中', completionApproval: 'pending', actualHours: 3 });
+});
+
+
+it('allows same-person completion, rejects forged review metadata and unauthorized reviewers', async () => {
+  const same = await create('delivery', '自行完成');
+  await mockApiRequest(`/api/delivery-tasks/${same.id}`, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 0 }) });
+  expect(await mockApiRequest(`/api/delivery-tasks/${same.id}`)).toMatchObject({ status: '已完成', actualHours: 0 });
+  const different = await mockApiRequest('/api/delivery-tasks', { method: 'POST', body: JSON.stringify({ title: '审核权限', assigneeId: 'u-002', ownerName: '毛景强' }) }) as { id: string };
+  await expect(mockApiRequest(`/api/delivery-tasks/${different.id}`, { method: 'PUT', body: JSON.stringify({ completionApproval: 'approved' }) })).rejects.toThrow('审核信息');
+  await asOwner(different.id, () => mockApiRequest(`/api/delivery-tasks/${different.id}`, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 2 }) }));
+  await expect(asOwner(different.id, () => mockApiRequest(`/api/delivery-tasks/${different.id}/review`, { method: 'POST', body: JSON.stringify({ action: 'approve' }) }))).rejects.toThrow('创建人或管理员');
+  expect(await mockApiRequest(`/api/delivery-tasks/${different.id}`)).toMatchObject({ status: '处理中', completionApproval: 'pending' });
+});
+
+it('migrates legacy pending-review tasks without losing completion evidence', async () => {
+  await mockApiRequest('/api/delivery-tasks');
+  const key = 'shichuang.frontend.mock.deliveryTasks';
+  const tasks = JSON.parse(localStorage.getItem(key)!);
+  tasks.push({ id: 'legacy-review', title: '历史审核', status: '待审核', actualHours: 7, completionReview: { content: '验收记录', media: [] } });
+  localStorage.setItem(key, JSON.stringify(tasks));
+  const expected = { status: '处理中', completionApproval: 'pending', actualHours: 7, completionReview: { content: '验收记录', media: [] } };
+  expect(await mockApiRequest('/api/delivery-tasks/legacy-review')).toMatchObject(expected);
+  expect(JSON.parse(localStorage.getItem(key)!).find((task: RequirementTask) => task.id === 'legacy-review')).toMatchObject(expected);
+});
+
+
+it('allows a rejected request to be resubmitted and approved without losing hours', async () => {
+  const created = await mockApiRequest('/api/delivery-tasks', { method: 'POST', body: JSON.stringify({ title: '重新申请', assigneeId: 'u-002', ownerName: '毛景强' }) }) as { id: string };
+  const url = `/api/delivery-tasks/${created.id}`;
+  await asOwner(created.id, () => mockApiRequest(url, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 2 }) }));
+  await mockApiRequest(url + '/review', { method: 'POST', body: JSON.stringify({ action: 'reject' }) });
+  await asOwner(created.id, () => mockApiRequest(url, { method: 'PUT', body: JSON.stringify({ status: '已完成', actualHours: 4 }) }));
+  expect(await mockApiRequest(url)).toMatchObject({ status: '处理中', completionApproval: 'pending', actualHours: 4 });
+  await mockApiRequest(url + '/review', { method: 'POST', body: JSON.stringify({ action: 'approve' }) });
+  expect(await mockApiRequest(url)).toMatchObject({ status: '已完成', completionApproval: 'approved', actualHours: 4 });
+  const events = await mockApiRequest(url + '/activities') as Array<{ eventType: string }>;
+  expect(events.filter(event => event.eventType === 'BUSINESS_TASK_COMPLETION_REQUESTED')).toHaveLength(2);
 });
