@@ -2,7 +2,7 @@ import { Button, Progress, Tag } from 'antd';
 import { BookIcon, ChecklistIcon, PeopleIcon } from '@primer/octicons-react';
 import type { PerformanceReview } from '../../../types';
 
-export function MyReviewCard({ review, onView, onCopy, onSubmit }: { key?: string; review: PerformanceReview; onView: () => void; onCopy: () => void; onSubmit: () => void }) {
+export function MyReviewCard({ review, onView, onCopy, onSubmit }: { key?: string; review: PerformanceReview; onView: () => void; onCopy?: () => void; onSubmit: () => void }) {
   const plans = review.krReviews || [];
   const progress = plans.length ? Math.round(plans.reduce((sum, row) => sum + row.currentProgress, 0) / plans.length) : 0;
   const risks = plans.filter(row => row.health !== 'normal').length;
@@ -17,6 +17,6 @@ export function MyReviewCard({ review, onView, onCopy, onSubmit }: { key?: strin
     <div className="grid grid-cols-3 gap-3" aria-label="复盘内容统计">{stats.map(({ label, value, Icon }) => <div key={label} className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 space-y-2"><span className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Icon/>{label}</span><strong className="block text-lg tabular-nums">{value}</strong></div>)}</div>
     {department && review.summary && <div className="my-4 text-sm"><b>{monthly ? '本月部门补充总结' : '部门补充总结'}</b><p className="line-clamp-2 whitespace-pre-wrap text-[var(--text-body)]">{review.summary}</p></div>}
     {preview && <div className="my-4 text-sm"><b>{monthly ? department ? '部门反馈问题梳理与分析' : '问题与建议' : department ? '部门下周计划' : '下周计划'}</b><p className="line-clamp-2 whitespace-pre-wrap text-[var(--text-body)]">{preview}</p></div>}
-    <div className="flex flex-wrap justify-end gap-2 mt-4">{review.status === 'draft' && <Button type="primary" onClick={onSubmit}>提交</Button>}<Button onClick={onView}>查看详情</Button><Button onClick={onCopy}>复制为本期</Button></div>
+    <div className="flex flex-wrap justify-end gap-2 mt-4">{review.status === 'draft' && <Button type="primary" onClick={onSubmit}>提交</Button>}<Button onClick={onView}>查看详情</Button>{onCopy && <Button onClick={onCopy}>复制为本期</Button>}</div>
   </article>;
 }

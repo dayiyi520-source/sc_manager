@@ -288,7 +288,7 @@ export const MyTasksView: React.FC = () => {
           <div className="px-5 py-4 border-b border-[var(--border-main)] flex items-center justify-between">
             <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
               <Target className="w-4 h-4 text-[var(--warning)]" />
-              我的OKR进度
+              我的目标进度
             </div>
             <button
               onClick={() => openPageTab('wb_okr_perf')}
@@ -299,7 +299,7 @@ export const MyTasksView: React.FC = () => {
             </button>
           </div>
 
-          <div className="p-5">
+          <div className="p-5 max-h-[520px] overflow-y-auto">
             {myOkr ? (
               <div className="space-y-4">
                 <div className="flex items-start justify-between gap-4">
@@ -390,7 +390,7 @@ export const MyTasksView: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-5 max-h-80 overflow-y-auto text-xs">
+          <div className="p-5 max-h-[520px] overflow-y-auto text-xs">
             {feedTab === 'dynamic' ? (
               <div className="relative ml-2 border-l border-[var(--primary)] pl-5 space-y-5">
                 {WORKBENCH_FEEDS.filter((f) => f.type === 'dynamic').map((feed) => (

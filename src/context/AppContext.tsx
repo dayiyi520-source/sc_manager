@@ -398,7 +398,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [approvals, setApprovals] = useState<ApprovalFlow[]>(MOCK_APPROVALS);
   const [projects, setProjects] = useState<ProjectItem[]>(directoryProjects());
   const [servers, setServers] = useState<ServerNode[]>([]);
-  const { okrs, setOkrs, performances, setPerformances } = useOkrState(currentUser, dataMode === 'remote');
+  const { okrs, setOkrs, performances, setPerformances } = useOkrState(currentUser, dataMode === 'remote' || import.meta.env.VITE_MOCK_MODE !== 'false');
   const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>([]);
 
   // Operations & Delivery Extensions
