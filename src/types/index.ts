@@ -495,6 +495,7 @@ export interface ProductDocument {
 }
 
 export interface ProductLine {
+  nameAliases?: string[];
   documents?: Partial<Record<'introduction' | 'manual' | 'features', ProductDocument | null>>;
   id: string;
   name: string;
@@ -552,6 +553,11 @@ export interface ProductLine {
 export type TaskCompletionReview = { content: string; media: RequirementMedia[] };
 
 export interface RequirementTask {
+  completionApproval?: 'pending' | 'approved' | 'rejected';
+  completionRequestedAt?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewComment?: string;
   completionReview?: TaskCompletionReview;
   projectId?: string;
   projectName?: string;

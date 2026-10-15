@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { OkrPayload, OkrPerson, OkrRecord } from '../../../services/okrRepository';
 import type { OKRItem } from '../../../types';
@@ -101,3 +101,31 @@ describe('supervisor weekly review', () => {
     expect(save.mock.calls[0][0].departmentContentSnapshots?.[0].knowledgeEntries?.[0].title).toBe('员工经验');
   });
 });
+
+describe('supervisor self-assignment editing and saved recovery', () => {
+  it.each(['week', 'month'] as const)('keeps owner progress and evidence after saving and reopening %s', async reviewType => {
+    const source: OkrRecord = { id: objective.id, ownerId: manager.id, kind: 'objective', status: 'active', version: 1, periodKey: '2026-10', payload: { title: '部门 O', goalLevel: 'department', keyResults: [{ id: 'manager-kr', title: '部门 KR', weight: 100, progress: 0, assigneeIds: [manager.id] }] } };
+    const save = vi.fn(async (_payload: OkrPayload) => true);
+    const work = [{ id: 'owner-task', sourceId: 'owner-task', title: '主管验证任务', kind: 'task', status: '已完成', assigneeId: manager.id, ownerName: manager.name, createdAt: '2026-10-12', completedAt: '2026-10-13', updatedAt: '2026-10-13', dueDate: '', actualHours: 1, estimatedHours: 1, linkVersion: 0, sourceWorkOrderIds: '[]' }];
+    const { unmount } = render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} work={work} onSaveDraft={save}/>);
+    fireEvent.click(screen.getByText('KR1：部门 KR'));
+    fireEvent.change(screen.getByRole('spinbutton', { name: '本人进度：部门 KR' }), { target: { value: '70' } });
+    fireEvent.click(within(screen.getByRole('region', { name: '主管本人工作证据' })).getByRole('button', { name: '关联工作证据' }));
+    expect(screen.getByText(/全部产品/)).toBeInTheDocument();
+    const picker = screen.getByRole('dialog');
+    const choices = within(picker).getAllByRole('checkbox');
+    fireEvent.click(choices[choices.length - 1]);
+    fireEvent.click(within(picker).getByRole('button', { name: '确认关联' }));
+    await waitFor(() => expect(within(screen.getByRole('region', { name: '主管本人工作证据' })).getByText('主管验证任务')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
+    expect(save.mock.calls[0][0].krReviews?.[0]).toMatchObject({ currentProgress: 70, supervisorProgress: [{ id: 'manager-kr', currentProgress: 70 }], workIds: ['owner-task'] });
+    const payload = save.mock.calls[0][0];
+    expect(payload.objectiveSnapshots?.[0].payload.keyResults?.[0].progress).toBe(70);
+    unmount();
+    render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} initialPayload={payload} onSaveDraft={save}/>);
+    fireEvent.click(screen.getByText('KR1：部门 KR'));
+    expect(screen.getByRole('spinbutton', { name: '本人进度：部门 KR' })).toHaveValue('70');
+    expect(within(screen.getByRole('region', { name: '主管本人工作证据' })).getByText('主管验证任务')).toBeInTheDocument();
+  });
+});
+

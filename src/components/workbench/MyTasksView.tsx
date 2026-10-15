@@ -328,7 +328,7 @@ export const MyTasksView: React.FC = () => {
                     return (
                       <div key={kr.id} className="p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg space-y-2">
                         <div className="flex items-start justify-between gap-2">
-                          <span className="text-sm text-[var(--text-primary)] font-medium">{hasEmployeeActions ? `部门 KR${idx + 1}` : `KR${idx + 1}`}: {kr.content}</span>
+                          <span className="text-sm text-[var(--text-primary)] font-medium">{myOkr.primaryLabel === 'KR' ? `个人动作${idx + 1}` : hasEmployeeActions ? `部门 KR${idx + 1}` : `KR${idx + 1}`}: {kr.content}</span>
                           <span className="font-semibold text-[var(--text-primary)] shrink-0">{kr.progress}%</span>
                         </div>
                         <div className="w-full bg-[var(--bg-main)] rounded-full h-1.5 overflow-hidden">

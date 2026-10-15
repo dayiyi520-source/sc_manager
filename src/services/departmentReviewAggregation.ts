@@ -42,11 +42,25 @@ export function departmentKrAggregation(objective: OKRItem, target: OkrKrReview,
       contributors.push({ authorId: group.authorId, authorName: group.authorName, detailId, previousProgress: average(values.map(value => value.previous)), currentProgress: average(values.map(value => value.current)), submitted: values.every(value => value.submitted) });
     }
   }
+  // The owner contributes only to KRs explicitly assigned to them.
+  if (records.find(row => row.id === target.objectiveId)?.payload.keyResults?.find(row => row.id === target.keyResultId)?.assigneeIds?.includes(ownerId)) {
+    const history = records.filter(row => submitted(row, reviewType) && row.ownerId === ownerId && row.payload.reviewMode === 'supervisor' && row.payload.endDate! < period.startDate)
+      .sort((a, b) => (b.payload.endDate || '').localeCompare(a.payload.endDate || ''));
+    const previous = history.flatMap(row => row.payload.krReviews || []).find(row => row.objectiveId === target.objectiveId && row.keyResultId === target.keyResultId);
+    for (const detailId of rowIds) {
+      const prior = previous?.supervisorProgress?.find(row => row.id === detailId)?.currentProgress ?? 0;
+      const value = target.supervisorProgress?.find(row => row.id === detailId)?.currentProgress ?? prior;
+      if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error('本人进度必须在 0 到 100 之间');
+      contributors.push({ authorId: ownerId, authorName: people.find(row => row.id === ownerId)?.name || '主管本人', detailId, previousProgress: prior, currentProgress: value, submitted: true });
+    }
+  } else if (target.supervisorProgress?.length) {
+    throw new Error('此 KR 未指派给主管本人，请刷新后重试');
+  }
   const detailProgress = rowIds.map(id => {
     const rows = contributors.filter(row => row.detailId === id);
     return { id, previousProgress: average(rows.map(row => row.previousProgress)), currentProgress: average(rows.map(row => row.currentProgress)) };
   });
-  return { ...target, detailRows: details, contributors, detailProgress, previousProgress: average(detailProgress.map(row => row.previousProgress)), currentProgress: average(detailProgress.map(row => row.currentProgress)) };
+  return { ...target, supervisorProgress: contributors.filter(row => row.authorId === ownerId).map(row => ({ id: row.detailId, currentProgress: row.currentProgress })), detailRows: details, contributors, detailProgress, previousProgress: average(detailProgress.map(row => row.previousProgress)), currentProgress: average(detailProgress.map(row => row.currentProgress)) };
 }
 
 export function departmentContentSnapshots(records: OkrRecord[], people: OkrPerson[], ownerId: string, period: ReviewPeriod, reviewType: 'week' | 'month' = 'week'): OkrWeeklyReviewSnapshot[] {
@@ -83,5 +97,5 @@ export function submitDepartmentReview(payload: OkrPayload, ownerId: string, rec
     const progress = weight ? Math.round(keyResults.reduce((sum, kr) => sum + kr.progress * kr.weight, 0) / weight * 10) / 10 : 0;
     return { ...record, version: record.version + 1, progressHistory: [...(record.progressHistory || []), ...rows.map(row => ({ id: crypto.randomUUID(), itemId: row.keyResultId, operatorId: ownerId, createdAt: new Date().toISOString(), previousProgress: record.payload.keyResults?.find(kr => kr.id === row.keyResultId)?.progress || 0, progress: row.currentProgress, status: 'normal' as const, note: `部门${reviewType === 'month' ? '月' : '周'}报 ${period.startDate} 至 ${period.endDate} 汇总同步`, attachments: [] }))], payload: { ...record.payload, keyResults, progress } };
   });
-  return { records: next, payload: { ...payload, krReviews: reviews, syncKrProgress: true, departmentContentSnapshots: departmentContentSnapshots(records, people, ownerId, period, reviewType) } };
+  return { records: next, payload: { ...payload, krReviews: reviews, syncKrProgress: true, objectiveSnapshots: next.filter(record => reviews.some(row => row.objectiveId === record.id)).map(record => ({ id: record.id, period: record.periodKey, payload: record.payload })), departmentContentSnapshots: departmentContentSnapshots(records, people, ownerId, period, reviewType) } };
 }

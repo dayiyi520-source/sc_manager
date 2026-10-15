@@ -63,3 +63,23 @@ describe('department review submission storage', () => {
     expect(saved.find(row => row.id === 'o')?.progressHistory).toHaveLength(1);
   });
 });
+
+describe('主管本人承接进度', () => {
+  it.each(['week', 'month'] as const)('persists own contribution and objective snapshot on %s submission', reviewType => {
+    const assigned = { ...department, payload: { ...department.payload, keyResults: department.payload.keyResults!.map(kr => kr.id === 'kr' ? { ...kr, assigneeIds: ['m'] } : kr) } };
+    const edited = { ...target, supervisorProgress: [{ id: 'd1', currentProgress: 40 }, { id: 'd2', currentProgress: 80 }], workIds: ['owner-evidence'] };
+    const result = submitDepartmentReview({ title: '部门复盘', reviewMode: 'supervisor', reviewType, ...period, krReviews: [edited] }, 'm', [assigned], people);
+    expect(result.payload.krReviews![0]).toMatchObject({ currentProgress: 60, workIds: ['owner-evidence'], supervisorProgress: edited.supervisorProgress });
+    expect(result.records[0].payload.progress).toBe(75);
+    expect(result.payload.objectiveSnapshots![0].payload.progress).toBe(75);
+  });
+  it('averages self and employee contributions without duplicating the owner', () => {
+    const assigned = { ...department, payload: { ...department.payload, keyResults: department.payload.keyResults!.map(kr => kr.id === 'kr' ? { ...kr, assigneeIds: ['m', 'a'] } : kr) } };
+    const records = [assigned, goal('a'), report('a', [40, 80])];
+    const result = departmentKrAggregation(monthlyReviewTargets(records, 'm', people)[0], { ...target, supervisorProgress: [{ id: 'd1', currentProgress: 100 }, { id: 'd2', currentProgress: 100 }] }, records, people, 'm', period);
+    expect(result.detailProgress?.map(row => row.currentProgress)).toEqual([70, 90]);
+  });
+  it('rejects owner edits after the assignment is withdrawn', () => {
+    expect(() => submitDepartmentReview({ title: '部门复盘', reviewMode: 'supervisor', reviewType: 'week', ...period, krReviews: [{ ...target, supervisorProgress: [{ id: 'd1', currentProgress: 100 }] }] }, 'm', [department], people)).toThrow('未指派');
+  });
+});

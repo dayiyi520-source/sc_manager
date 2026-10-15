@@ -56,6 +56,7 @@ export interface KrReviewDraft {
   keyResultTitle: string;
   previousProgress: number;
   currentProgress: number;
+  supervisorProgress?: Array<{ id: string; currentProgress: number }>;
   detailProgress?: Array<{ id: string; previousProgress: number; currentProgress: number }>;
   health: Health;
   achievement: string;
@@ -275,7 +276,12 @@ export function WeeklyReviewEditor({
   const workById = useMemo(() => new Map(work.map(item => [item.id, item])), [work]);
 
   const update = (id: string, p: Partial<KrReviewDraft>) =>
-    setKrs(rows => rows.map(row => (row.keyResultId === id ? { ...row, ...p } : row)));
+    setKrs(rows => rows.map(row => {
+      if (row.keyResultId !== id) return row;
+      const next = { ...row, ...p };
+      const objective = periodOkrs.find(item => item.id === row.objectiveId);
+      return supervisor && objective && p.supervisorProgress ? departmentKrAggregation(objective, next, records, people, viewer?.id || '', period, reviewType) : next;
+    }));
 
   const updateWorkNote = (_krId: string, workId: string, note: string) => {
     setWorkNotes(prev => ({ ...prev, [workId]: note }));
@@ -287,8 +293,8 @@ export function WeeklyReviewEditor({
   );
 
   const selectedKrs = useMemo(
-    () => krs.filter(kr => currentTargets.some(target => target.keyResultId === kr.keyResultId && target.objectiveId === kr.objectiveId)).map(kr => { if (!supervisor) return kr; const target = currentTargets.find(target => target.keyResultId === kr.keyResultId && target.objectiveId === kr.objectiveId)!; return { ...kr, previousProgress: target.previousProgress, currentProgress: target.currentProgress, detailProgress: target.detailProgress, detailRows: target.detailRows, contributors: target.contributors }; }),
-    [krs, currentTargets, supervisor]
+    () => krs.filter(kr => currentTargets.some(target => target.keyResultId === kr.keyResultId && target.objectiveId === kr.objectiveId)).map(kr => { if (!supervisor || readOnly) return kr; const objective = periodOkrs.find(row => row.id === kr.objectiveId); return objective ? departmentKrAggregation(objective, kr, records, people, viewer?.id || '', period, reviewType) : kr; }),
+    [krs, currentTargets, supervisor, readOnly, periodOkrs, records, people, viewer?.id, period, reviewType]
   );
 
   const metricRecords = useMemo(() => {
@@ -369,6 +375,9 @@ export function WeeklyReviewEditor({
     })),
     departmentObjectiveVersions: supervisor ? Object.fromEntries(periodOkrs.map(objective => [objective.id, records.find(row => row.id === objective.id)?.version ?? 0])) : undefined,
     departmentContentSnapshots: supervisor ? departmentContent : undefined,
+    objectiveSnapshots: supervisor ? periodOkrs.map(objective => ({ id: objective.id, period: objective.cycle, payload: {
+      title: objective.objective, weight: objective.weight, keyResults: objective.keyResults.map(kr => ({ id: kr.id, title: kr.content, weight: kr.weight, progress: selectedKrs.find(row => row.objectiveId === objective.id && row.keyResultId === kr.id)?.currentProgress ?? kr.progress }))
+    } })) : undefined,
     knowledgeEntries,
     helpNeeded: assistance.map(row => row.content.trim()).filter(Boolean).join('；'),
     assistance: assistance.filter(row => row.workId || row.content.trim()).map(({ rowId: _rowId, ...row }) => ({ ...row, result: row.content.trim() })),
@@ -575,6 +584,8 @@ export function WeeklyReviewEditor({
                       key: kr.keyResultId,
                       label: supervisor ? <div className="min-w-0 space-y-2 w-full"><strong className="block truncate" title={kr.keyResultTitle}>KR{krIdx + 1}：{kr.keyResultTitle}</strong><div className="flex items-center gap-3"><Progress percent={kr.currentProgress} showInfo={false} size="small"/><span>{kr.currentProgress}%</span></div><div className="text-xs text-[var(--text-muted)]">员工支撑 {new Set(kr.contributors?.map(row => row.authorId)).size} 人 · 工作证据 {employeeEvidenceForKr(supportsByKr.get(kr.keyResultId) || [], kr.employeeReviewSnapshots || []).length} 项</div></div> : <div className="flex flex-wrap items-center gap-3"><strong>{supervisor ? `KR${krIdx + 1}：` : '我的计划：'}{kr.keyResultTitle}</strong><Tag>{supervisor ? `${kr.previousProgress}% → ${kr.currentProgress}%` : `${personalProgress}%`}</Tag>{!supervisor && <Tag color={health === '超预期' ? 'success' : health === '风险' ? 'warning' : health === '逾期' ? 'error' : undefined}>{health || '暂无预期'}</Tag>}{defaultCollapsedReview(kr) && kr.currentProgress < 100 ? <Tag>本周无变化</Tag> : null}</div>,
                       children: supervisor ? <SupervisorKrReviewCard review={kr} employeeActions={readOnly ? [] : employeeActionsForKr(records, people, viewer?.id || '', kr, period)} supports={supportsByKr.get(kr.keyResultId) || []}
+                        viewerId={viewer?.id} selfAssigned={Boolean(records.find(row => row.id === kr.objectiveId)?.payload.keyResults?.find(row => row.id === kr.keyResultId)?.assigneeIds?.includes(viewer?.id || ''))}
+                        ownEvidence={evidence} onAddEvidence={() => openPicker(kr.keyResultId)} onRemoveEvidence={id => removeWork(kr.keyResultId, id)}
                         busy={busy} editable={editorState.editable} supportLoading={recordsLoading} supportError={recordsError} onRetry={onRefreshRecords}
                         onUpdate={patch => update(kr.keyResultId, patch)} onEmployeeSupport={(authorId, reportIds) => {
                           setSupportTargetId(kr.keyResultId); setSupportAuthorId(authorId);
@@ -782,7 +793,7 @@ export function WeeklyReviewEditor({
       </Modal>}
 
       {supportTarget && <EmployeeReviewSupportDialog target={supportTarget} supports={(supportsByKr.get(supportTarget.keyResultId) || []).filter(support => !supportAuthorId || support.record.ownerId === supportAuthorId)} savedSnapshots={(supportTarget.employeeReviewSnapshots || []).filter(snapshot => !supportAuthorId || (snapshot.authorId || snapshot.authorName || snapshot.id) === supportAuthorId)} loading={recordsLoading} error={recordsError} onRetry={onRefreshRecords} onClose={() => { setSupportTargetId(null); setSupportAuthorId(null); }}/>}
-      {picker && <WorkEvidencePicker requireProduct={picker.target !== 'extra'} work={work} viewer={viewer} product={pickerSourceKr?.businessObject} startDate={period.startDate} endDate={period.endDate} selectedIds={picker.selection} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPicker(null)} onConfirm={confirmPicker}/>}
+      {picker && <WorkEvidencePicker requireProduct={!supervisor && picker.target !== 'extra'} work={work} viewer={viewer} product={supervisor ? undefined : pickerSourceKr?.businessObject} startDate={period.startDate} endDate={period.endDate} selectedIds={picker.selection} blockedIds={linkedIds} loading={workLoading} error={workError} onRetry={onRefreshWork} onCancel={() => setPicker(null)} onConfirm={confirmPicker}/>}
 
       {/* 提交确认弹窗 (带中文界面及OKR系统进度同步勾选) */}
       <Modal

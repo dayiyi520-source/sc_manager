@@ -1,12 +1,13 @@
 import { CircleIcon, CheckCircleIcon, AlertIcon, ClockIcon } from '@primer/octicons-react';
 import './supervisorReview.css';
-import { Alert, Button, Collapse, Empty, Spin, Table, Tag } from 'antd';
-import type { OkrKrReview } from '../../../services/okrRepository';
+import { Alert, Button, Collapse, Empty, Spin, Table, Tag, InputNumber } from 'antd';
+import type { OkrWork, OkrKrReview } from '../../../services/okrRepository';
 import type { EmployeeReviewSupport } from '../../../services/supervisorReview';
 import type { EmployeeActionGroup } from '../../../services/supervisorSupportPanels';
 import { employeeEvidenceForKr } from '../../../services/supervisorSupportPanels';
 
-export function SupervisorKrReviewCard({ review, employeeActions, supports, busy, editable, supportLoading, supportError, onRetry, onUpdate, onEmployeeSupport }: {
+export function SupervisorKrReviewCard({ review, employeeActions, supports, busy, editable, supportLoading, supportError, onRetry, onUpdate, onEmployeeSupport, viewerId, selfAssigned = false, ownEvidence = [], onAddEvidence, onRemoveEvidence }: {
+  viewerId?: string; selfAssigned?: boolean; ownEvidence?: OkrWork[]; onAddEvidence?: () => void; onRemoveEvidence?: (id: string) => void;
   review: OkrKrReview; employeeActions: EmployeeActionGroup[]; supports: EmployeeReviewSupport[];
   busy: boolean; editable: boolean; supportLoading: boolean; supportError?: unknown; onRetry?: () => void;
   onUpdate: (patch: Partial<OkrKrReview>) => void; onEmployeeSupport: (authorId: string, reportIds: string[]) => void;
@@ -30,10 +31,14 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
       { title: review.detailRows?.length ? '产品' : 'KR名称', dataIndex: 'name', ellipsis: true },
       ...(review.detailRows?.length ? [{ title: '迭代版本', dataIndex: 'version' }, { title: '达成阶段', dataIndex: 'stage' }, { title: '开始时间', dataIndex: 'plannedStartDate' }, { title: '结束时间', dataIndex: 'plannedEndDate' }] : []),
       { title: '进度', render: (_, row) => { const value = review.detailProgress?.find(item => item.id === row.id); return `${value?.previousProgress ?? 0}% → ${value?.currentProgress ?? 0}%`; } },
-      ...[...new Map((review.contributors || []).map(item => [item.authorId, item.authorName])).entries()].map(([authorId, authorName]) => ({ title: authorName, key: `employee:${authorId}`, render: (_: unknown, row: { id: string }) => {
+      ...[...new Map((review.contributors || []).filter(item => item.authorId !== viewerId).map(item => [item.authorId, item.authorName])).entries()].map(([authorId, authorName]) => ({ title: authorName, key: `employee:${authorId}`, render: (_: unknown, row: { id: string }) => {
         const value = review.contributors?.find(item => item.authorId === authorId && item.detailId === row.id);
         return value ? `${value.previousProgress}% → ${value.currentProgress}%` : '—';
       } })),
+      ...(selfAssigned ? [{ title: '本人进度', key: 'self', render: (_: unknown, row: { id: string; name: string }) => {
+        const value = review.supervisorProgress?.find(item => item.id === row.id)?.currentProgress ?? review.contributors?.find(item => item.authorId === viewerId && item.detailId === row.id)?.currentProgress ?? 0;
+        return <InputNumber aria-label={`本人进度：${row.name}`} min={0} max={100} precision={0} suffix="%" value={value} disabled={busy || !editable || supportLoading || Boolean(supportError)} onChange={next => onUpdate({ supervisorProgress: [...(review.supervisorProgress || []).filter(item => item.id !== row.id), { id: row.id, currentProgress: next ?? 0 }] })}/>;
+      } }] : []),
     ]}/>
     <div className="okr-supervisor-support-divider" aria-hidden="true"/>
     <div className="okr-supervisor-support-panels space-y-4">
@@ -55,13 +60,18 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
         })}</div> : <Empty description="暂无对齐的员工动作"/>}</Spin>,
       }]}/>
       <Collapse defaultActiveKey={['evidence']} expandIconPosition="end" items={[{
-        key: 'evidence', label: <div className="okr-supervisor-panel-title"><strong>关联工作证据</strong><span>{count(evidence.length)}项</span></div>,
-        children: error || <Spin spinning={supportLoading}>{evidence.length ? <div className="okr-supervisor-employee-list">{evidence.map(item => <article key={item.workId} className="okr-supervisor-evidence-row">
+        key: 'evidence', label: <div className="okr-supervisor-panel-title"><strong>关联工作证据</strong><span>{count(new Set([...evidence.map(item => item.workId), ...ownEvidence.map(item => item.id)]).size)}项</span></div>,
+        children: <div className="space-y-4">{error || <Spin spinning={supportLoading}>{evidence.length ? <div className="okr-supervisor-employee-list">{evidence.map(item => <article key={item.workId} className="okr-supervisor-evidence-row">
           <div className="flex flex-wrap items-center justify-between gap-2"><strong className="break-words">{item.title}</strong><span><Tag>{item.missing ? '引用失效' : item.workType === 'ticket' ? '协同事项' : '任务'}</Tag><Tag>{item.status}</Tag></span></div>
           <p className="text-xs text-[var(--text-muted)]">关联员工：{item.employeeNames.join('、')}</p>
           {item.result && <p className="whitespace-pre-wrap break-words">{item.result}</p>}
           {item.missing && <p className="text-xs text-[var(--warning)]">保留历史关联，当前未能读取这条工作证据。</p>}
-        </article>)}</div> : <Empty description="暂无员工关联工作证据"/>}</Spin>,
+        </article>)}</div> : <Empty description="暂无员工关联工作证据"/>}</Spin>}
+          <section className="space-y-3" aria-label="主管本人工作证据">
+            <div className="flex flex-wrap items-center justify-between gap-2"><strong>主管本人工作证据</strong><Button onClick={onAddEvidence} disabled={busy || !editable || supportLoading || Boolean(supportError)}>关联工作证据</Button></div>
+            {ownEvidence.length ? ownEvidence.map(item => <article key={item.id} className="okr-supervisor-evidence-row"><div className="flex items-center justify-between gap-2"><strong>{item.title}</strong><Tag>{item.status}</Tag></div>{editable && <Button type="text" danger disabled={busy} aria-label={`移除本人证据：${item.title}`} onClick={() => onRemoveEvidence?.(item.id)}>移除</Button>}</article>) : <Empty description="暂无本人关联工作证据"/>}
+          </section>
+        </div>,
       }]}/>
     </div>
 

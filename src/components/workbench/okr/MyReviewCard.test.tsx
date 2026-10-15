@@ -24,3 +24,10 @@ describe('personal review card and detail',()=>{
   expect(screen.getByLabelText('复盘内容统计').children).toHaveLength(3);
  });
 });
+
+it('shows weighted department O progress rather than the KR average', () => {
+  render(<MyReviewCard review={{ ...review, reviewMode: 'supervisor' }} departmentProgress={16} onView={vi.fn()} onSubmit={vi.fn()}/>);
+  expect(screen.getByText('部门 O 整体进度')).toBeInTheDocument();
+  expect(screen.getByText('16%')).toBeInTheDocument();
+  expect(screen.queryByText('KR 平均进度')).not.toBeInTheDocument();
+});
