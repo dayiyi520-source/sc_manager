@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { OkrRoleSettings } from './OkrRoleSettings';
 import type { OkrSettings } from '../../../services/okrRepository';
@@ -55,4 +55,17 @@ it('combines name and role filters, includes dual roles and supports clearing se
   expect(screen.getByText('管理员甲')).toBeVisible();
   expect(screen.queryByText('主管乙')).not.toBeInTheDocument();
   expect(onChange).not.toHaveBeenCalled();
+});
+
+it('adds the sub-administrator role and opens the six-grant editor',async()=>{
+ const onChange=vi.fn(async()=>true);
+ const full={...draft,subAdministratorIds:['s'],permissionGrants:{a:['okrTemplates','reviewTemplates','roleSettings','weeklyCycles','confirmationSettings','companyGoalEdit'],s:['okrTemplates','reviewTemplates','roleSettings','weeklyCycles','confirmationSettings','companyGoalEdit']}} as OkrSettings;
+ render(<OkrRoleSettings draft={full} people={people} disabled={false} onChange={onChange}/>);
+ fireEvent.click(screen.getByRole('button',{name:'主管乙权限管理'}));
+ await screen.findByRole('checkbox',{name:'公司目标编辑'});
+ expect(screen.getByLabelText('公司目标编辑')).toBeChecked();
+ fireEvent.click(screen.getByLabelText('公司目标编辑'));
+ fireEvent.click(screen.getByRole('button',{name:'保存权限'}));
+ await waitFor(()=>expect(screen.getByRole('dialog')).not.toBeVisible());
+ expect(onChange).toHaveBeenCalledWith(expect.objectContaining({permissionGrants:expect.objectContaining({s:expect.not.arrayContaining(['companyGoalEdit'])})}));
 });

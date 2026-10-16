@@ -81,14 +81,15 @@ export type OkrTimeRule = {
 export type OkrTemplate = { department: string; departments?: string[]; type: string; fields: string[]; stages?: string[]; types?: string[] };
 export type OkrCycleType = 'month' | 'quarter' | 'halfYear' | 'year';
 export interface OkrCycleSettings { automatic: boolean; types: OkrCycleType[]; schedules: Record<OkrCycleType, { daysBefore: number; time: string }>; crossAlignment: boolean; periods: string[] }
-export interface OkrConfirmationSettings { enabled: boolean; visiblePending: boolean; actions: ('create' | 'update' | 'delete')[]; types: ('target' | 'challenge')[]; missingSupervisor: 'auto' | 'upper' | 'admin'; selfSupervisor: 'auto' | 'upper'; exemptIds: string[]; companyEditorIds: string[] }
+export interface OkrConfirmationSettings { enabled: boolean; visiblePending: boolean; actions: ('create' | 'update' | 'delete')[]; types: ('target' | 'challenge')[]; missingSupervisor: 'auto' | 'upper' | 'admin'; selfSupervisor: 'auto' | 'upper'; exemptIds: string[]; companyEditorIds?: string[] }
 export type OkrTemplateKrType = 'product' | 'delivery' | 'support';
 export interface OkrObjectiveTitleTemplate { krTypes?: OkrTemplateKrType[]; id: string; department: string; title: string; guidance: string; enabled: boolean }
 export interface OkrWeeklyReviewCycle {
   id: string; title?: string; month: string; startDate: string; endDate: string;
   template?: 'byRole' | 'employee' | 'supervisor'; notifyAt: string; deadline: string; allowBackfill: boolean;
 }
-export interface OkrSettings { reviewReportTemplates?: import('./reviewTemplateConfiguration').ReviewReportTemplate[]; weeklyReviewCycles?: OkrWeeklyReviewCycle[]; supervisorIds?: string[]; objectiveTitleTemplates?: OkrObjectiveTitleTemplate[]; cycles?: OkrCycleSettings; administratorIds?: string[]; confirmation?: OkrConfirmationSettings; version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
+export type OkrPermission = 'okrTemplates' | 'reviewTemplates' | 'roleSettings' | 'weeklyCycles' | 'confirmationSettings' | 'companyGoalEdit';
+export interface OkrSettings { reviewReportTemplates?: import('./reviewTemplateConfiguration').ReviewReportTemplate[]; weeklyReviewCycles?: OkrWeeklyReviewCycle[]; supervisorIds?: string[]; subAdministratorIds?: string[]; permissionGrants?: Record<string, OkrPermission[]>; objectiveTitleTemplates?: OkrObjectiveTitleTemplate[]; cycles?: OkrCycleSettings; administratorIds?: string[]; confirmation?: OkrConfirmationSettings; version?: number; defaultView: 'list'|'card'; timeRules: OkrTimeRule[]; validation: {actionWeightTotal:number;maxActions:number;assigneeMultiple:boolean;keyNodeMultiple:boolean;resultRequired:boolean}; dictionaries: {productNodes:string[];deliveryNodes:string[];presalesNodes:string[];supportTypes:string[]}; templates: OkrTemplate[] }
 const base = '/api/okr';
 export const okrRepository = {
   markViewed: (id: string, viewerId: string) => apiRequest<void>(`${base}/records/${encodeURIComponent(id)}/viewed`, { method: 'POST', body: JSON.stringify({ viewerId }) }),

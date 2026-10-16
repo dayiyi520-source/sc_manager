@@ -1,6 +1,7 @@
 import type { OkrRecord, OkrProgressEntry } from './okrRepository';
 
 export function progressSubject(record: OkrRecord, itemId: string) {
+  if (record.kind === 'objective' && record.id === itemId) return { id: record.id, title: record.payload.title, progress: record.payload.progress ?? 0, isAction: false };
   if (record.kind === 'action' && record.id === itemId) return { ...record.payload, id: record.id, ownerId: record.ownerId, progress: Number(record.payload.progress || 0), isAction: true };
   for (const kr of record.payload.keyResults || []) {
     const action = kr.executionActions?.find(item => item.id === itemId);

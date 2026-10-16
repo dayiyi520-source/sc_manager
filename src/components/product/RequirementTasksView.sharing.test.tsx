@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RequirementTasksView, WorkOrderPicker } from './RequirementTasksView';
 import { useApp } from '../../context/AppContext';
 import { productRepository } from '../../services/productRepository';
+import { teamRepository } from '../../services/teamRepository';
 import { readSession } from '../../services/session';
 import { copyToClipboard } from '../../utils/copyToClipboard';
 
@@ -16,11 +17,14 @@ vi.mock('../../services/requirementRepository', () => ({ requirementRepository: 
 vi.mock('../../services/productRepository', () => ({ productRepository: {
   businessTasks: vi.fn().mockResolvedValue({ items: [], total: 0 }),
   createBusinessTask: vi.fn().mockResolvedValue(undefined),
-  businessTask: vi.fn(), workItemDetail: vi.fn(),
+  businessTask: vi.fn(), workItemDetail: vi.fn(), requirementSummary: vi.fn().mockResolvedValue({ linkedItems: [] }),
   workItemReview: vi.fn().mockResolvedValue(null), saveWorkItemReview: vi.fn(),
   workItemTypes: vi.fn().mockResolvedValue([]),
   workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }),
   workItemRelations: vi.fn().mockResolvedValue({ relations: [] }),
+  testPlans: vi.fn().mockResolvedValue([]),
+  availableTestPlans: vi.fn().mockResolvedValue([]),
+  associateTestPlans: vi.fn().mockResolvedValue(undefined),
   businessTaskActivities: vi.fn().mockResolvedValue([]), workItemActivities: vi.fn().mockResolvedValue([]),
   commentBusinessTask: vi.fn().mockResolvedValue(undefined), commentWorkItem: vi.fn().mockResolvedValue(undefined),
 } }));
@@ -33,6 +37,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(readSession).mockReturnValue(null);
   vi.mocked(productRepository.workItems).mockReset().mockResolvedValue({ page: { items: [], total: 0 } } as never);
+  vi.mocked(productRepository.testPlans).mockReset().mockResolvedValue([]);
+  vi.mocked(productRepository.availableTestPlans).mockReset().mockResolvedValue([]);
+  vi.mocked(productRepository.associateTestPlans).mockReset().mockResolvedValue(undefined);
+  vi.mocked(productRepository.workItemDetail).mockReset().mockImplementation(async (_lineId: string, id: string) => ({ id, code: id, category: 'test', title: '测试详情任务', productLineId: 'line-1', status: { name: '待测试', group: 'NOT_STARTED' }, revision: 0 }) as never);
+  vi.mocked(teamRepository.options).mockResolvedValue([{ id: 'owner-1', name: '负责人甲', department: '测试部' }, { id: 'qa-2', name: '验证者乙', department: '测试部' }] as never);
   sessionStorage.clear();
   window.history.replaceState(null, '', '/manager/app/crm_presales_tasks?detailId=shared-task');
   vi.mocked(useApp).mockReturnValue({ currentUser: { name: '测试人员' }, requirementTasks: [], designTasks: [], productLines: [], projects: [], versions: [], customers: [], bugs: [], devTasks: [], requirementPool: [], risks: [], addToast } as unknown as ReturnType<typeof useApp>);
@@ -40,7 +49,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 it.each([
-  ['requirement', '产品任务'], ['design', '设计任务'], ['bug', '缺陷'], ['presales', '售前任务'], ['delivery', '交付任务'],
+  ['requirement', '产品任务'], ['design', '设计任务'], ['dev', '研发任务'], ['test', '测试任务'], ['bug', '缺陷'], ['presales', '售前任务'], ['delivery', '交付任务'],
 ] as const)('opens the real %s creation form over a collaboration detail and closes without navigation', async (kind, label) => {
   window.history.replaceState(null, '', '/app/wb_work_order?detailId=assistance-1');
   vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '协同产品' }] } as unknown as ReturnType<typeof useApp>);
@@ -278,6 +287,100 @@ it('opens operations creation from a matter with its associated project and coll
   await screen.findByText('新建运维任务');
   expect(screen.getByRole('button', { name: '协同事项 · 1' })).toBeVisible();
   expect(screen.getByText('关联项目').closest('.ant-form-item')).toHaveTextContent('归属项目');
+});
+
+
+it.each([
+  ['dev', ['动态 · 0', '协同事项 · 0', '关联任务 · 0']],
+  ['test', ['动态 · 0', '协同事项 · 0', '关联任务 · 0', '测试计划 · 1']],
+] as const)('shows %s detail associations in the requested order', async (kind, expected) => {
+  const task = { id: `${kind}-detail`, code: 'TASK-01', category: kind, title: '目标任务', status: '处理中', productLineId: 'line-1', productLineName: '协同产品', relatedTaskIds: [], sourceWorkOrderIds: [] } as import('../../types').RequirementTask;
+  vi.mocked(productRepository.testPlans).mockResolvedValue([{ id: 'plan-1', workItemId: task.id, executable: true, name: '单任务回归计划', ownerName: '负责人甲', revision: 0, cases: [] }] as never);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const view = render(<QueryClientProvider client={client}><RequirementTasksView taskKind={kind} itemLabel={kind === 'dev' ? '研发任务' : '测试任务'} initialDetail={task} /></QueryClientProvider>);
+  await screen.findByRole('button', { name: expected[0] });
+  if (kind === 'test') await screen.findByRole('button', { name: '测试计划 · 1' });
+  const expectedLabels = [...expected];
+  const associationTabs = [...document.querySelectorAll('button')].map(button => button.textContent?.trim() || '').filter(label => expectedLabels.includes(label));
+  expect(associationTabs).toEqual(expected);
+  if (kind === 'test') {
+    expect(productRepository.testPlans).toHaveBeenCalledWith(task.id);
+    fireEvent.click(screen.getByRole('button', { name: '测试计划 · 1' }));
+    expect(await screen.findByRole('region', { name: '关联测试计划' })).toHaveTextContent('单任务回归计划');
+  }
+  view.unmount();
+});
+
+
+it('selects existing plans from the plan table and persists the relation on the test task', async () => {
+  const task = { id: 'test-task-target', code: 'TEST-01', category: 'test', title: '目标测试任务', status: '待测试', productLineId: 'line-1', relatedTaskIds: [], sourceWorkOrderIds: [] } as import('../../types').RequirementTask;
+  const plan = { id: 'plan-existing', workItemId: 'test-task-source', executable: true, name: '既有回归计划', ownerName: '负责人甲', revision: 2, cases: [] };
+  vi.mocked(productRepository.testPlans).mockResolvedValueOnce([]).mockResolvedValue([{ ...plan, workItemId: task.id }] as never);
+  vi.mocked(productRepository.availableTestPlans).mockResolvedValue([{ plan, workItemTitle: '来源测试任务', workItemCode: 'TEST-02' }] as never);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={client}><RequirementTasksView taskKind="test" itemLabel="测试任务" initialDetail={task} /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: '测试计划 · 0' }));
+  fireEvent.click(screen.getByRole('button', { name: '新增关联测试计划' }));
+
+  const picker = await screen.findByRole('dialog', { name: '选择关联测试计划' });
+  const row = await within(picker).findByRole('row', { name: /既有回归计划.*TEST-02.*来源测试任务/ });
+  fireEvent.click(within(row).getByRole('checkbox'));
+  fireEvent.click(within(picker).getByRole('button', { name: '关联' }));
+
+  await waitFor(() => expect(productRepository.associateTestPlans).toHaveBeenCalledWith(task.id, [plan.id]));
+  expect(await screen.findByText('既有回归计划')).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: '测试计划 · 1' })).toBeInTheDocument();
+  expect(await screen.queryByRole('dialog', { name: '选择关联测试计划' })).not.toBeInTheDocument();
+});
+
+it('retains the selected plan and displays an error when the relation save fails', async () => {
+  const task = { id: 'test-task-failed', code: 'TEST-03', category: 'test', title: '保存失败测试任务', status: '待测试', productLineId: 'line-1', relatedTaskIds: [], sourceWorkOrderIds: [] } as import('../../types').RequirementTask;
+  const plan = { id: 'plan-retry', workItemId: 'test-task-source', executable: true, name: '待关联计划', revision: 0, cases: [] };
+  vi.mocked(productRepository.availableTestPlans).mockResolvedValue([{ plan, workItemTitle: '来源任务', workItemCode: 'TEST-02' }] as never);
+  vi.mocked(productRepository.associateTestPlans).mockRejectedValue(new Error('保存失败，请重试'));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={client}><RequirementTasksView taskKind="test" itemLabel="测试任务" initialDetail={task} /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: '测试计划 · 0' }));
+  fireEvent.click(screen.getByRole('button', { name: '新增关联测试计划' }));
+  const picker = await screen.findByRole('dialog', { name: '选择关联测试计划' });
+  const row = await within(picker).findByRole('row', { name: /待关联计划.*TEST-02.*来源任务/ });
+  fireEvent.click(within(row).getByRole('checkbox'));
+  fireEvent.click(within(picker).getByRole('button', { name: '关联' }));
+  expect(await within(picker).findByText('保存失败，请重试')).toBeInTheDocument();
+  expect(within(row).getByRole('checkbox')).toBeChecked();
+  expect(within(picker).getByRole('button', { name: '取消' })).toBeEnabled();
+});
+
+it('shows empty and retryable error states for test plans in test task details', async () => {
+  const task = { id: 'test-plan-state', code: 'TEST-01', category: 'test', title: '测试任务', status: '待测试', productLineId: 'line-1', relatedTaskIds: [], sourceWorkOrderIds: [] } as import('../../types').RequirementTask;
+  vi.mocked(productRepository.testPlans).mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('计划读取失败')).mockResolvedValueOnce([]);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={client}><RequirementTasksView taskKind="test" itemLabel="测试任务" initialDetail={task} /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: '测试计划 · 0' }));
+  expect(await screen.findByText('暂无关联测试计划')).toBeInTheDocument();
+  await act(async () => { await client.invalidateQueries({ queryKey: ['test-task-plans', task.id] }); });
+  expect(await screen.findByText('测试计划加载失败')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '重试' }));
+  expect(await screen.findByText('暂无关联测试计划')).toBeInTheDocument();
+});
+
+it('defaults a new defect verifier to its selected owner, allows changing it, and labels its version as iteration', async () => {
+  window.history.replaceState(null, '', '/app/prod_bugs');
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), currentUser: { id: 'user-admin', name: '当前用户' }, productLines: [{ id: 'line-1', name: '协同产品' }], versions: [{ id: 'version-1', name: 'V1.0', productLineId: 'line-1', productLineName: '协同产品' }] } as unknown as ReturnType<typeof useApp>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" itemLabel="缺陷" /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: '新建' }));
+  const ownerItem = screen.getByText('负责人', { selector: '.ant-form-item-label label' }).closest('.ant-form-item')!;
+  const owner = ownerItem.querySelector('.ant-select input')!;
+  fireEvent.mouseDown(owner);
+  fireEvent.click(await screen.findByText('负责人甲', { selector: '.ant-select-item-option-content' }));
+  const verifierItem = screen.getByText('验证者', { selector: '.ant-form-item-label label' }).closest('.ant-form-item')!;
+  const verifier = verifierItem.querySelector('.ant-select input')!;
+  expect(verifier.closest('.ant-select')).toHaveTextContent('负责人甲');
+  fireEvent.mouseDown(verifier);
+  fireEvent.click(await screen.findByText('验证者乙', { selector: '.ant-select-item-option-content' }));
+  expect(verifier.closest('.ant-select')).toHaveTextContent('验证者乙');
+  expect(screen.getByText('迭代版本')).toBeInTheDocument();
+  expect(screen.queryByText('关联版本')).not.toBeInTheDocument();
 });
 
 it('shows fixed independent defect types and the requested bug creation fields', async () => {

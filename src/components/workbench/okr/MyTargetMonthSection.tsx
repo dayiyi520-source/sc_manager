@@ -297,11 +297,11 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
       </div>
       <div className="okr-target-list-right">
         <TargetToolbar target={target} onOpen={onOpen} onEdit={onEdit} onDelete={onDelete} busy={busy}/>
-        <div className="okr-target-list-status"><div><span>进度</span><strong>{target.progress}%</strong></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></div>
+        <div className="okr-target-list-status"><div><span>进度</span><Button type="text" className="okr-target-progress-button" aria-label={`查看目标进度历史：${target.title}`} disabled={!submitted || !onProgress || busy} onClick={event => { event.stopPropagation(); onProgress?.(target.primaryLabel === 'KR' ? target.actions[0]?.id || target.id : target.id); }}>{target.progress}%</Button></div><div><span>权重</span><strong>{target.totalWeight ?? 0}%</strong></div><div><span>截止日期</span><strong>{formatDeadline(target.maxDeadline || '')}</strong></div></div>
       </div>
     </header>
     <div className="okr-target-actions">{!!target.primaryDetails?.length && <KrDetailTable assigneeOptions={target.assigneeOptions} rows={target.primaryDetails} label={target.primaryDetailLabel || '迭代版本'} mode={target.primaryDetailLabel === '项目产品' ? 'delivery' : 'product'}/>} {target.actions.length
-      ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees onProgress={onProgress} onOpenAlignment={onOpenAlignment} showExecutionActions={target.levelLabel !== '主管级'} />)
+      ? target.actions.map((action, actionIndex) => <ActionRow key={action.id} action={action} index={actionIndex} submitted={submitted} inlineAssignees onProgress={onProgress} onOpenAlignment={onOpenAlignment} showExecutionActions={target.levelLabel !== '部门级'} />)
       : <p className="okr-target-no-actions">暂无拆解行动</p>}
     </div>
   </article>;

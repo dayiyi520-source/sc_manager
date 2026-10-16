@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, expect, it, vi } from 'vitest';
 import { WeeklyCycleSettings } from './WeeklyCycleSettings';
 const cycle = { id: 'w', month: '2026-10', startDate: '2026-10-01', endDate: '2026-10-07', template: 'employee' as const, notifyAt: '2026-10-05T09:00', deadline: '2026-10-07T18:00', allowBackfill: true };
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); window.sessionStorage.clear(); });
 it('locks begun and ended cycles but permits future edits', () => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-15T12:00:00'));
   render(<WeeklyCycleSettings rows={[cycle, { ...cycle, id: 'active', startDate: '2026-10-13', endDate: '2026-10-19' }, { ...cycle, id: 'future', startDate: '2026-10-20', endDate: '2026-10-26' }]} disabled={false} onChange={vi.fn()}/>);

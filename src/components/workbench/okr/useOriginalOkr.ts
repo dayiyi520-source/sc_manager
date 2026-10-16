@@ -107,7 +107,7 @@ export function useOriginalOkr() {
       linkedWorkItems:displayedItems.map(i=>({id:i.workId,title:i.title,type:i.workType === 'ticket' ? 'ticket' : 'task',status:i.status,sourceLabel:i.sourceLabel,actualHours:i.actualHours})),
       krReviews:p.krReviews || [], assistance:[...new Map([...(p.assistance || []), ...departmentSnapshots.flatMap(snapshot => snapshot.assistance)].map((row,index) => [row.workId || `unlinked:${index}`,row])).values()], extraWork:p.extraWork ? {...p.extraWork,workIds:extraWorkIds} : {workIds:extraWorkIds,description:'',impact:'none'}, knowledgeEntries:[...(p.knowledgeEntries || []), ...departmentSnapshots.flatMap(snapshot => (snapshot.knowledgeEntries || []).map(row => ({...row,id:`${snapshot.authorId}:${row.id}`})))], syncKrProgress:p.syncKrProgress,
       weeklyReviewSnapshots:p.weeklyReviewSnapshots || [], monthlyOtherTasks:p.monthlyOtherTasks || [], nextMonthPlans:p.nextMonthPlans || [],
-      monthlyMetrics:p.monthlyMetrics,
+      monthlyMetrics:p.monthlyMetrics, objectiveSnapshots:p.objectiveSnapshots,
       otherNotes:p.otherNotes || '', nextMonthArrangement:p.nextMonthArrangement || '', nextWeekPlan:p.nextWeekPlan || '',
     };
   });

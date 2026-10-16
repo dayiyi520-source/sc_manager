@@ -60,7 +60,7 @@ describe('OKR周期与确认配置',()=>{
   expect(approved.records[0].changeHistory?.[0].status).toBe('approved');
  });
  it('allows an authorized company editor without changing ownership and prevents other access',()=>{
-  const config=settings();config.confirmation!.companyEditorIds=['employee'];
+  const config=settings();config.administratorIds=['admin','employee'];
   const company={...record,ownerId:'admin',payload:{...payload,goalLevel:'company' as const,keyResults:[{id:'kr',title:'公司目标',weight:100,progress:0,deadline:'2026-10-31',assigneeIds:['manager']}]}};
   expect(canEditOkr(company,'employee',config,people)).toBe(true);
   expect(canEditOkr(record,'employee',config,people)).toBe(false);
@@ -75,7 +75,7 @@ describe('OKR周期与确认配置',()=>{
  it('enforces cross-period alignment in mutations and blocks same-size mismatched quarters',()=>{
   const source={...record,id:'source',ownerId:'admin',periodKey:'2026-Q4',payload:{title:'季度方向',goalModelVersion:2 as const,goalLevel:'company' as const,deadline:'2026-12-31',keyResults:[]}};
   const config=settings();config.cycles!.crossAlignment=true;config.confirmation!.enabled=false;
-  const aligned={...payload,sourceObjectiveId:'source',sourceVersion:1};
+  const aligned={...payload,objectiveType:'challenge' as const,sourceObjectiveId:'source',sourceVersion:1};
   const created=mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:aligned},[source],people,config)!;
   expect(created.records.at(-1)?.status).toBe('active');
   config.cycles!.crossAlignment=false;

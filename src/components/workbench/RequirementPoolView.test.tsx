@@ -20,7 +20,7 @@ vi.mock('../product/RequirementTasksView', () => ({
   RequirementTasksView: ({ taskKind, itemLabel, designVariant, creationContext }: { taskKind: string; itemLabel: string; designVariant?: string; creationContext: { sourceWorkOrder?: RequirementTask; onClose?: () => void; onCreated?: () => void } }) => <section aria-label={`新建${itemLabel}`} data-testid="embedded-task-create" data-kind={taskKind} data-design-variant={designVariant} data-source={creationContext.sourceWorkOrder?.id}><h2>新建{itemLabel}</h2><button onClick={creationContext.onClose}>取消任务新建</button><button onClick={() => { creationContext.onCreated?.(); creationContext.onClose?.(); }}>模拟任务保存</button></section>,
 }));
 vi.mock('../../services/requirementRepository', () => ({
-  requirementRepository: { allForScope: vi.fn(), transferredBy: vi.fn(), employees: vi.fn(), detail: vi.fn(), receive: vi.fn(), transition: vi.fn(), acceptancePassed: vi.fn(), acceptanceFailed: vi.fn(), close: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), addComment: vi.fn(), createWorkItem: vi.fn() },
+  requirementRepository: { allForScope: vi.fn(), transferredBy: vi.fn(), employees: vi.fn(), detail: vi.fn(), receive: vi.fn(), transition: vi.fn(), acceptancePassed: vi.fn(), acceptanceFailed: vi.fn(), close: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), addComment: vi.fn(), complete: vi.fn(), createWorkItem: vi.fn() },
   normalizeRequirementTask: (task: RequirementTask) => task,
 }));
 vi.mock('../product/LazyRichTextEditor', () => ({
@@ -39,6 +39,7 @@ describe('workbench work-order creation layout', () => {
   it('only shows the assignee phrase when the owner actually changes', () => {
     expect(eventOperatorLabel({ operatorName: '林志豪' } as never, {})).toBe('操作人：林志豪');
     expect(eventOperatorLabel({ operatorName: '林志豪' } as never, { ownerChanged: true, assigneeName: '陈雅婷' })).toBe('操作人：林志豪 · 负责人指派为：陈雅婷');
+    expect(eventOperatorLabel({ eventType: '退回', operatorName: '林志豪' } as never, { ownerChanged: true, fromAssigneeName: '林志豪', assigneeName: '创建人' })).toBe('操作人：林志豪');
   });
   const addRequirementTask = vi.fn();
   const addToast = vi.fn();
@@ -285,6 +286,35 @@ describe('workbench work-order creation layout', () => {
     expect(useApp().openPageTab).not.toHaveBeenCalled();
   });
 
+  it('does not show or submit a completion owner field', async () => {
+    await renderDetail({ status: '处理中', ownerName: '林志豪', assigneeId: 'user-admin' });
+    fireEvent.click(screen.getByRole('button', { name: '事项完成' }));
+    expect(screen.getByRole('heading', { name: '事项完成' })).toBeVisible();
+    expect(screen.queryByLabelText('指定负责人')).not.toBeInTheDocument();
+    vi.mocked(requirementRepository.complete).mockResolvedValue({ id: 'receive-1', status: '待验收' } as never);
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ id: 'receive-1', title: '接收协同事项', status: '待验收', ownerName: '林志豪', creatorName: '林志豪', revision: 2, events: [], workItems: [] } as never);
+    fireEvent.click(screen.getByRole('button', { name: '确认完成' }));
+    await waitFor(() => expect(requirementRepository.complete).toHaveBeenCalledWith('receive-1', expect.not.objectContaining({ assigneeId: expect.anything(), assigneeName: expect.anything() })));
+  });
+
+  it('does not report reception success when storage still returns pending', async () => {
+    await renderDetail({ status: '待处理' });
+    vi.mocked(requirementRepository.receive).mockResolvedValue({ id: 'receive-1', status: '待处理', ownerName: '林志豪' } as never);
+    fireEvent.click(screen.getByRole('button', { name: '事项接收' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '事项接收失败', '事项状态未更新，请刷新后重试'));
+    expect(addToast).not.toHaveBeenCalledWith('success', '事项已接收');
+  });
+
+  it('does not report completion success when stored detail remains processing', async () => {
+    await renderDetail({ status: '处理中', ownerName: '林志豪' });
+    vi.mocked(requirementRepository.complete).mockResolvedValue({ id: 'receive-1', status: '待验收' } as never);
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ id: 'receive-1', title: '接收协同事项', status: '处理中', ownerName: '林志豪', revision: 2, events: [], workItems: [] } as never);
+    fireEvent.click(screen.getByRole('button', { name: '事项完成' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认完成' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', '事项完成失败', '事项状态未更新，请刷新后重试'));
+    expect(addToast).not.toHaveBeenCalledWith('success', '事项已提交验收', '事项状态已变更为待验收');
+  });
+
   it('keeps pending status and task lock when reception fails', async () => {
     await renderDetail();
     vi.mocked(requirementRepository.receive).mockRejectedValueOnce(new Error('状态已变化'));
@@ -321,7 +351,7 @@ describe('workbench work-order creation layout', () => {
   });
 
   it.each([
-    ['产品', 'requirement', '产品任务'], ['设计', 'design', '设计任务'], ['缺陷', 'bug', '缺陷'],
+    ['产品', 'requirement', '产品任务'], ['设计', 'design', '设计任务'], ['研发', 'dev', '研发任务'], ['测试', 'test', '测试任务'], ['缺陷', 'bug', '缺陷'],
     ['售前', 'presales', '售前任务'], ['交付', 'delivery', '交付任务'], ['运维', 'ops', '运维任务'],
   ])('opens %s creation inside the matter detail without list navigation', async (label, kind, itemLabel) => {
     await renderDetail({ status: '处理中', productLineId: 'line-1' });
@@ -342,7 +372,7 @@ describe('workbench work-order creation layout', () => {
     await renderDetail({ status: '处理中', productLineId: 'line-1', workOrderType });
     fireEvent.click(screen.getByRole('button', { name: '新增任务' }));
     const items = await screen.findAllByRole('menuitem');
-    expect(items.map(item => item.textContent?.trim())).toEqual(['产品', '设计', '缺陷', '售前', '交付', '运维']);
+    expect(items.map(item => item.textContent?.trim())).toEqual(['产品', '设计', '研发', '测试', '缺陷', '售前', '交付', '运维']);
     fireEvent.click(screen.getByRole('menuitem', { name: '设计' }));
     expect(screen.getByTestId('embedded-task-create')).toHaveAttribute('data-design-variant', variant);
   });
@@ -385,17 +415,17 @@ describe('workbench work-order creation layout', () => {
     expect(screen.getByRole('button', { name: '新增任务' })).toBeDisabled();
   });
 
-  it('退回后读取保存结果立即更新负责人，原负责人不可完成', async () => {
+  it('事项退回后保持操作前负责人不变', async () => {
     await renderDetail({ creatorName: '陈雅婷', ownerName: '林志豪' });
     fireEvent.click(screen.getByRole('button', { name: '事项退回' }));
     fireEvent.mouseDown(screen.getByLabelText('驳回原因 *'));
     const option = (await screen.findAllByText(/.+/, { selector: '.ant-select-item-option-content' }))[0];
     fireEvent.click(option);
     fireEvent.change(screen.getByPlaceholderText('请输入详细驳回说明或补充建议...'), { target: { value: '资料不完整，请创建人处理' } });
-    vi.mocked(requirementRepository.detail).mockResolvedValue({ id: 'receive-1', title: '接收协同事项', status: '已退回', ownerName: '陈雅婷', creatorName: '陈雅婷', assigneeId: 'employee-1', revision: 3, events: [], workItems: [] } as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
+    vi.mocked(requirementRepository.detail).mockResolvedValue({ id: 'receive-1', title: '接收协同事项', status: '已退回', ownerName: '林志豪', creatorName: '陈雅婷', assigneeId: 'owner-id', revision: 3, events: [], workItems: [] } as unknown as Awaited<ReturnType<typeof requirementRepository.detail>>);
     fireEvent.submit(screen.getByLabelText('驳回原因 *').closest('form')!);
     await waitFor(() => expect(requirementRepository.transition).toHaveBeenCalledWith('receive-1', 'reject', expect.any(String)));
-    await waitFor(() => expect(screen.getByText('负责人', { exact: true, selector: 'span' }).parentElement).toHaveTextContent('陈雅婷'));
+    await waitFor(() => expect(requirementRepository.detail).toHaveBeenCalledWith('receive-1'));
     expect(screen.getAllByText('已退回').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: '事项完成' })).not.toBeInTheDocument();
   });

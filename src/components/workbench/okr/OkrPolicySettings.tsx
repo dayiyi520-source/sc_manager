@@ -24,9 +24,9 @@ export function OkrPolicySettings({active,draft,people,busy,onChange}:{active:st
     <label>确认内容 <Checkbox.Group value={confirmation.actions} disabled={busy || !confirmation.enabled} options={[{value:'create',label:'制定目标'},{value:'update',label:'修改目标'},{value:'delete',label:'删除目标'}]} onChange={actions=>updateConfirmation({actions:actions as typeof confirmation.actions})}/></label>
     <label>需要确认的目标类型 <Checkbox.Group value={confirmation.types} disabled={busy || !confirmation.enabled} options={[{value:'target',label:'承诺型'},{value:'challenge',label:'挑战型'}]} onChange={types=>updateConfirmation({types:types as typeof confirmation.types})}/></label>
     <label>找不到主管时 <Radio.Group value={confirmation.missingSupervisor} disabled={busy || !confirmation.enabled} options={[{value:'auto',label:'自动通过'},{value:'upper',label:'由上上级主管确认'},{value:'admin',label:'由 OKR 管理员进行确认'}]} onChange={e=>updateConfirmation({missingSupervisor:e.target.value})}/></label>
+    <Typography.Text type="secondary">管理员默认免确认；待确认申请会按最新组织关系和配置重新分配。</Typography.Text>
     <label>直属主管是自己时 <Radio.Group value={confirmation.selfSupervisor} disabled={busy || !confirmation.enabled} options={[{value:'auto',label:'自动通过'},{value:'upper',label:'由上上级主管确认'}]} onChange={e=>updateConfirmation({selfSupervisor:e.target.value})}/></label>
     <label>不需要确认的人员 <Select mode="multiple" aria-label="不需要确认的人员" placeholder="请选择人员" style={{minWidth:480}} options={options} value={confirmation.exemptIds} disabled={busy} onChange={exemptIds=>updateConfirmation({exemptIds})}/></label>
-    <label>除管理员外可编辑公司级OKR的人员 <Select mode="multiple" aria-label="公司级OKR编辑人员" placeholder="请选择人员" style={{minWidth:480}} options={options} value={confirmation.companyEditorIds} disabled={busy} onChange={companyEditorIds=>updateConfirmation({companyEditorIds})}/></label>
   </Space></Card>;
   return null;
 }

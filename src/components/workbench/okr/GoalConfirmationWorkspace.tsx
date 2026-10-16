@@ -8,12 +8,12 @@ import { confirmationMembers, confirmationRequests, goalDifferences } from './go
 import { buildMyTargetViewItems, MyTargetMonthSection } from './MyTargetMonthSection';
 import { CompanyObjectiveDetail } from './CompanyObjectiveDetail';
 
-export function GoalConfirmationWorkspace({ records, people, viewerId, selectedMemberId, selectedCycles, onSelectCycles, onSelectMember, onRefresh, loading, loadError, work, workLoading, workError, onRetryWork }: {
-  records: OkrRecord[]; people: OkrPerson[]; viewerId: string; selectedMemberId?: string; selectedCycles?: string[]; onSelectCycles?: (cycles: string[]) => void; onSelectMember: (id: string) => void;
+export function GoalConfirmationWorkspace({ records, people, settings, viewerId, selectedMemberId, selectedCycles, onSelectCycles, onSelectMember, onRefresh, loading, loadError, work, workLoading, workError, onRetryWork }: {
+  records: OkrRecord[]; people: OkrPerson[]; settings?: import('../../../services/okrRepository').OkrSettings; viewerId: string; selectedMemberId?: string; selectedCycles?: string[]; onSelectCycles?: (cycles: string[]) => void; onSelectMember: (id: string) => void;
   onRefresh: () => Promise<unknown>; loading: boolean; loadError?: Error | null; work: OkrWork[]; workLoading: boolean; workError: Error | null; onRetryWork: () => void;
 }) {
-  const members = confirmationMembers(people, viewerId);
-  const requests = confirmationRequests(records, people, viewerId);
+  const members = confirmationMembers(people, viewerId, records, settings);
+  const requests = confirmationRequests(records, people, viewerId, settings);
   const [defaultMemberId] = useState(() => (members.find(person => requests.some(record => record.ownerId === person.id)) || members[0])?.id);
   const member = members.find(person => person.id === (selectedMemberId || defaultMemberId)) || members[0];
   const [comparison, setComparison] = useState(true);

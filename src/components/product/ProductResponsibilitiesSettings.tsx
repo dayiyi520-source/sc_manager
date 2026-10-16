@@ -10,7 +10,8 @@ import { normalizeResponsibilityNames } from './productResponsibilityPresentatio
 const roles = [
   ['产品责任人', 'requirementOwnerUserId', 'requirementOwnerSecondaryUserId'],
   ['研发责任人', 'techOwnerUserId', 'techOwnerSecondaryUserId'],
-  ['测试责任人', 'testOwnerUserId', 'testOwnerSecondaryUserId']
+  ['测试责任人', 'testOwnerUserId', 'testOwnerSecondaryUserId'],
+  ['交付主管', 'deliveryOwnerUserId', 'deliveryOwnerSecondaryUserId']
 ] as const;
 
 export const validateResponsibilities = (values: Partial<ProductLine>) => {
@@ -41,8 +42,8 @@ export const ProductResponsibilitiesSettings: React.FC<{ productLine: ProductLin
       const secondaryIds = normalizeResponsibilityNames(values[secondary]);
       (persistedValues as Record<string, unknown>)[primary] = primaryId;
       (persistedValues as Record<string, unknown>)[secondary] = secondaryIds;
-      const nameField = primary === 'requirementOwnerUserId' ? 'requirementOwner' : primary === 'techOwnerUserId' ? 'techOwner' : 'testOwner';
-      const secondaryNameField = secondary === 'requirementOwnerSecondaryUserId' ? 'requirementOwnerSecondary' : secondary === 'techOwnerSecondaryUserId' ? 'techOwnerSecondary' : 'testOwnerSecondary';
+      const nameField = primary === 'requirementOwnerUserId' ? 'requirementOwner' : primary === 'techOwnerUserId' ? 'techOwner' : primary === 'testOwnerUserId' ? 'testOwner' : 'deliveryOwner';
+      const secondaryNameField = secondary === 'requirementOwnerSecondaryUserId' ? 'requirementOwnerSecondary' : secondary === 'techOwnerSecondaryUserId' ? 'techOwnerSecondary' : secondary === 'testOwnerSecondaryUserId' ? 'testOwnerSecondary' : 'deliveryOwnerSecondary';
       (persistedValues as Record<string, unknown>)[nameField] = nameById.get(primaryId) || '';
       (persistedValues as Record<string, unknown>)[secondaryNameField] = secondaryIds.map((id) => nameById.get(id) || id);
     }
@@ -56,7 +57,7 @@ export const ProductResponsibilitiesSettings: React.FC<{ productLine: ProductLin
   };
   return <div className="mx-auto max-w-2xl space-y-4">
     <h3 className="text-sm font-bold">责任人配置</h3>
-    <p className="text-xs text-[var(--text-muted)]">为当前产品配置产品、研发和测试职责的主责任人与次责任人。</p>
+    <p className="text-xs text-[var(--text-muted)]">为当前产品配置产品、研发、测试和交付职责的主责任人与次责任人。</p>
     {query.isError && <Alert type="error" message="成员加载失败" action={<Button onClick={() => void query.refetch()}>重试</Button>} />}
     {error && <Alert type="error" message={error} showIcon />}
     {roles.map(([label, primary, secondary]) => <section key={primary} className="space-y-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4">

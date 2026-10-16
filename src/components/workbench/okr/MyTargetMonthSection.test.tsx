@@ -193,7 +193,7 @@ describe('MyTargetMonthSection', () => {
       { id: 'child', kind: 'action', ownerId: 'manager', periodKey: '2026-09', status: 'active', version: 1, payload: { title: '测试1', parentObjectiveId: 'o1', parentActionId: 'parent', assigneeIds: ['staff', 'staff'], weight: 100 } },
     ];
     const target = buildMyTargetViewItems(records, [], [], people, 'manager').find(item => item.actions.some(action => action.title === '测试1'))!;
-    expect(target.levelLabel).toBe('主管级');
+    expect(target.levelLabel).toBe('部门级');
     expect(target.creatorName).toBe('陈宇璋');
     expect(target.ownerNames).toEqual(['毛景强']);
   });
@@ -357,4 +357,12 @@ it('shows all source KR assignees and each latest sub KR assignment in the emplo
   expect(screen.getByText('承接人员：姓名a、姓名b')).toBeInTheDocument();
   expect(within(screen.getByText('乙').closest('tr')!).getByText('姓名b')).toBeInTheDocument();
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+});
+
+it('opens objective history from the list progress without opening details', () => {
+  const onProgress = vi.fn(), onOpenTarget = vi.fn();
+  render(<MyTargetMonthSection periodKey="2026-09" targets={[targets[1]]} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={onOpenTarget} onProgress={onProgress}/>);
+  fireEvent.click(screen.getByRole('button', { name: `查看目标进度历史：${targets[1].title}` }));
+  expect(onProgress).toHaveBeenCalledWith('active-target', 'active-target');
+  expect(onOpenTarget).not.toHaveBeenCalled();
 });

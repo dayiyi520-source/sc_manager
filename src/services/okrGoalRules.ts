@@ -1,7 +1,7 @@
 import type { OkrPerson, OkrRecord } from './okrRepository';
 
 export const goalLevel = (person?: Pick<OkrPerson, 'name' | 'jobTitle'> & { id?: string; rootFlag?: number; goalRole?: 'supervisor' | 'employee' }) =>
-  person?.rootFlag === 1 || person?.id === 'user-admin' || person?.name === '林志豪' ? '公司级' : (person?.goalRole ? person.goalRole === 'supervisor' : person?.jobTitle?.includes('主管')) ? '主管级' : '个人级';
+  person?.rootFlag === 1 ? '公司级' : (person?.goalRole ? person.goalRole === 'supervisor' : person?.jobTitle?.includes('主管')) ? '部门级' : '个人级';
 
 export const actionGroupKey = (record: OkrRecord) => record.payload.parentActionId || record.payload.parentKeyResultId || record.payload.parentObjectiveId || record.id;
 export const legacyGoalActions = (record: OkrRecord, records: OkrRecord[]) => records.filter(item => item.kind === 'action' && item.status !== 'deleted' && item.ownerId === record.ownerId && item.periodKey === record.periodKey && actionGroupKey(item) === actionGroupKey(record));
@@ -18,13 +18,13 @@ export function assignedGoalActions(records: OkrRecord[], person?: OkrPerson): O
   });
 }
 
-export const ownerGoalLevel = (person: OkrPerson | undefined, payload: OkrRecord['payload']) => goalLevel(person) === '主管级' && payload.goalLevel === 'personal' ? '个人级' : goalLevel(person);
+export const ownerGoalLevel = (person: OkrPerson | undefined, payload: OkrRecord['payload']) => goalLevel(person) === '部门级' && payload.goalLevel === 'personal' ? '个人级' : goalLevel(person);
 
 export function autonomousAlignmentSource(source: OkrRecord, person: OkrPerson | undefined, personal: boolean, people: OkrPerson[]): boolean {
   if (!person) return false;
-  if (personal && goalLevel(person) === '主管级') {
+  if (personal && goalLevel(person) === '部门级') {
     const owner = people.find(item => item.id === source.ownerId);
-    return source.kind === 'objective' && source.payload.goalLevel !== 'personal' && goalLevel(owner) === '主管级' && Boolean(person.department?.trim()) && owner?.department?.trim() === person.department.trim();
+    return source.kind === 'objective' && source.payload.goalLevel !== 'personal' && goalLevel(owner) === '部门级' && Boolean(person.department?.trim()) && owner?.department?.trim() === person.department.trim();
   }
   return source.ownerId === person.supervisorId;
 }

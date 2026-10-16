@@ -24,6 +24,20 @@ describe('product templates and historical defect migration', () => {
     migrated[0] = { ...migrated[0], status: '已关闭', statusKey: 'done' };
     expect(migrateWorkItems(migrated, products, members)).toEqual(migrated);
   });
+  it('does not remap collaboration matter statuses through product task workflows', () => {
+    const requirementTemplate = { id: 'system-requirement', name: '产品需求', category: '需求', enabled: true, workflow: { id: 'requirement-flow', status: 'PUBLISHED', definition: { states: [{ key: 'todo', name: '待处理', enabled: true }, { key: 'doing', name: '处理中', enabled: true }, { key: 'done', name: '已完成', enabled: true }], transitions: [] } } };
+    const products = syncProductTemplates([{ id: 'p' }], [requirementTemplate]);
+    const matter = { id: 'matter-1', category: 'requirement', workOrderType: '客户诉求', productLineId: 'p', taskTypeId: products[0].workItemTypes[0].id, workflowId: products[0].workItemTypes[0].workflows[0].id, status: '已退回', statusKey: 'returned', revision: 4 };
+    expect(migrateWorkItems([matter], products, members)[0]).toEqual(matter);
+  });
+  it('preserves collaboration-owned statuses instead of applying product task workflows', () => {
+    const requirement = { id: 'system-requirement', name: '产品需求', category: '需求', enabled: true, workflow: { id: 'requirement-flow', status: 'PUBLISHED', definition: { states: [{ key: 'todo', name: '待处理', enabled: true }, { key: 'doing', name: '处理中', enabled: true }, { key: 'done', name: '已完成', enabled: true }], transitions: [] } } };
+    const products = syncProductTemplates([{ id: 'p' }], [requirement]);
+    for (const status of ['待处理', '处理中', '待验收', '已退回', '已完成', '已关闭']) {
+      const matter = { id: `matter-${status}`, category: 'requirement', workOrderType: '客户诉求', productLineId: 'p', status, revision: 4 };
+      expect(migrateWorkItems([matter], products, members)[0]).toEqual(matter);
+    }
+  });
   it('respects disabled templates and refreshes definitions on subsequent edits', () => {
     const first = syncProductTemplates([{ id: 'p' }], templates);
     const updated = syncProductTemplates(first, [{ ...templates[0], enabled: false, workflow: { ...templates[0].workflow, definition: { ...definition, states: definition.states.slice(1) } } }]);

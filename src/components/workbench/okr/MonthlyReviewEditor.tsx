@@ -8,7 +8,7 @@ import { Alert, Button, Checkbox, Empty, Input, InputNumber, Modal, Progress, Ta
 import dayjs from 'dayjs';
 import type { OKRItem, WorkOrderType } from '../../../types';
 import type { OkrKrReview, OkrPayload, OkrRecord, OkrPerson } from '../../../services/okrRepository';
-import { FileText, Save, Send, Target, Plus } from '@/components/common/octicons-compat';
+import { Save, Send, Plus } from '@/components/common/octicons-compat';
 import { aggregateKrReview, aggregateMonthlyTasks, eligibleWeeklyReviews, monthPeriod } from './monthlyReview';
 import { restoreReviewDraftTargets, reconcileReviewDraftTargets, detachedReviewDescription } from './reviewDraftTargets';
 import { reviewEditorState } from '../../../services/okrReviewTemplates';
@@ -24,8 +24,10 @@ import type { OkrReviewAssistance, OkrReviewKnowledge } from '../../../services/
 import { KnowledgeUploadModal } from '../KnowledgeUploadModal';
 import { RequirementPoolView } from '../RequirementPoolView';
 import { workOrderDisplayName } from '../../../utils/workOrderDisplay';
-import { loadMonthlyReviewMetrics, type MonthlyReviewMetrics } from '../../../services/monthlyReviewMetrics';
+import { loadMonthlyReviewMetrics, loadDepartmentMonthlyComparison, type MonthlyReviewMetrics } from '../../../services/monthlyReviewMetrics';
 import './weeklyReviewEditor.css';
+import { MonthlyOverview } from './MonthlyOverview';
+import { monthlyOverallProgress, monthlyProgressTrend, savedReviewProgress } from '../../../services/monthlyProgress';
 
 const assistanceTypes: WorkOrderType[] = ['客户诉求', '线上问题', '售前支持', '交付支持', '其他问题'];
 const EMPTY_WORK: OkrWork[] = [];
@@ -138,12 +140,13 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
       setMetricsError(Boolean(workError));
       return () => { active = false; };
     }
-    loadMonthlyReviewMetrics(work, period, { id: currentUserId, name: viewer?.name || '' })
-      .then(value => { if (active) setMetrics(value); })
+    const metricViewer = { id: currentUserId, name: viewer?.name || '', department: viewer?.department };
+    Promise.all([loadMonthlyReviewMetrics(work, period, metricViewer), loadDepartmentMonthlyComparison(work, period, metricViewer, people)])
+      .then(([value, comparison]) => { if (active) setMetrics({ ...value, ...comparison }); })
       .catch(() => { if (active) setMetricsError(true); })
       .finally(() => { if (active) setMetricsLoading(false); });
     return () => { active = false; };
-  }, [work, workLoading, workError, period, currentUserId, viewer?.name, metricsRevision, readOnly, template, initialPayload?.monthlyMetrics]);
+  }, [work, workLoading, workError, period, currentUserId, viewer?.name, viewer?.department, people, metricsRevision, readOnly, template, initialPayload?.monthlyMetrics]);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [expandedKrs, setExpandedKrs] = useState<Record<string, boolean>>({});
@@ -155,7 +158,6 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
   const sourceKr = monthlyOkrs.flatMap(objective => objective.keyResults).find(item => item.id === pickerKrId);
   const linkedIds = new Set<string>(krs.flatMap(item => item.workIds).concat(extraWork.workIds));
   const otherTasks = useMemo(() => aggregateMonthlyTasks(weeklyReviews), [weeklyReviews]);
-  const metricValue = (value?: number) => metricsLoading ? '加载中' : metricsError || value == null ? '—' : value;
   const planProgress = (row: OkrKrReview) => {
     if (readOnly) return row.currentProgress;
     const action = monthlyOkrs.find(objective => objective.id === row.objectiveId)?.keyResults.find(kr => kr.id === row.keyResultId);
@@ -169,7 +171,13 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
     const today = dayjs().isBefore(month.endOf('month'), 'day') ? dayjs() : month.endOf('month');
     return employeeReviewHealth(planProgress(row), action?.plannedStartDate || month.startOf('month').format('YYYY-MM-DD'), action?.deadline || month.endOf('month').format('YYYY-MM-DD'), today.format('YYYY-MM-DD'));
   };
-  const overallProgress = selectedKrs.length ? Math.round(selectedKrs.reduce((sum, item) => sum + planProgress(item), 0) / selectedKrs.length) : 0;
+  const overallProgress = readOnly ? savedReviewProgress(initialPayload || { title: '' }) : monthlyOverallProgress(monthlyOkrs, selectedKrs.map(row => ({ ...row, currentProgress: planProgress(row) })));
+  const progressTrend = readOnly ? initialPayload?.monthlyMetrics?.progressTrend || [] : monthlyProgressTrend(weeklyReviews, overallProgress ?? 0, period.endDate, template === 'supervisor');
+  const savedMetrics = (rows: OkrKrReview[] = selectedKrs.map(row => ({ ...row, currentProgress: planProgress(row) }))) => {
+    if (readOnly) return initialPayload?.monthlyMetrics;
+    const progress = monthlyOverallProgress(monthlyOkrs, rows);
+    return { ...(metricsError || metricsLoading ? initialPayload?.monthlyMetrics : metrics), overallProgress: progress, progressTrend: monthlyProgressTrend(weeklyReviews, progress, period.endDate, template === 'supervisor') } as MonthlyReviewMetrics;
+  };
 
   const updateKr = (keyResultId: string, value: Partial<OkrKrReview>) => {
     setKrs(rows => rows.map(row => row.keyResultId === keyResultId ? { ...row, ...value } : row));
@@ -186,6 +194,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
     reviewType: 'month',
     reviewMode: 'monthly',
     selfScore: overallProgress,
+    objectiveSnapshots: monthlyOkrs.map(objective => ({ id: objective.id, period: objective.cycle, payload: { title: objective.objective, weight: objective.weight, keyResults: objective.keyResults.map(kr => ({ id: kr.id, title: kr.content, weight: kr.weight, progress: selectedKrs.find(row => row.objectiveId === objective.id && row.keyResultId === kr.id)?.currentProgress ?? kr.progress })) } })),
     summary: initialPayload?.summary || '',
     weeklyReviewIds: weeklyReviews.map(record => record.id),
     krReviews: selectedKrs.map(row => ({ ...row, executionHealth: planHealth(row) || undefined, detailRows: monthlyOkrs.find(objective => objective.id === row.objectiveId)?.keyResults.find(kr => kr.id === row.keyResultId)?.parentKeyResultDetails, currentProgress: planProgress(row), health: planHealth(row) === '风险' ? 'risk' as const : planHealth(row) === '逾期' ? 'blocked' as const : 'normal' as const })),
@@ -194,7 +203,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
     nextMonthArrangement: initialPayload?.nextMonthArrangement || '',
     suggestions: reportTemplate.textValue('suggestions', suggestions).trim(),
     knowledgeEntries,
-    monthlyMetrics: !metricsLoading && !metricsError ? metrics : initialPayload?.monthlyMetrics,
+    monthlyMetrics: savedMetrics(),
     nextMonthPlans: [],
     assistance,
     helpNeeded: assistance.map(row => row.content || row.result).filter(Boolean).join('；') || initialPayload?.helpNeeded || '',
@@ -209,17 +218,16 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
     if (errors.length === 0) setConfirmOpen(true);
   };
 
-  const monthlyOverview = (      <section className="okr-monthly-metrics" aria-label="月度概览">
-        <div><Progress type="circle" percent={overallProgress} size={52} /><span><strong>本月整体进度</strong></span></div>
-        <div><Target /><span><strong>本月任务</strong><b>{metricValue(metrics?.taskCount)}</b></span></div>
-        <div><FileText /><span><strong>协同事项</strong><b>{metricValue(metrics?.collaborationCount)}</b></span></div>
-        <div><FileText /><span><strong>总工时</strong><b>{metricValue(metrics?.totalHours)}</b></span></div>
-        <div><FileText /><span><strong>加班时长</strong><b>—</b></span></div>
-      </section>);
-  if (template === 'supervisor') return <WeeklyReviewEditor reviewSettings={reviewSettings} template="supervisor" reviewType="month" overview={<>{monthlyOverview}{metricsError && <Alert type="error" showIcon title="月度统计加载失败" action={<Button onClick={() => { onRefreshWork?.(); setMetricsRevision(value => value + 1); }}>重试</Button>}/>}</>} records={records} people={people} recordsLoading={recordsLoading} recordsError={recordsError} onRefreshRecords={onRefreshRecords}
+  const renderOverview = (rows?: OkrKrReview[]) => {
+    const progress = rows && !readOnly ? monthlyOverallProgress(monthlyOkrs, rows) : overallProgress;
+    const points = rows && !readOnly ? monthlyProgressTrend(weeklyReviews, progress ?? 0, period.endDate, template === 'supervisor') : progressTrend;
+    return <MonthlyOverview progress={progress} points={points} metrics={metrics} loading={metricsLoading} error={metricsError} department={template === 'supervisor'} onRetry={() => { onRefreshWork?.(); setMetricsRevision(value => value + 1); }}/>;
+  };
+  const monthlyOverview = renderOverview();
+  if (template === 'supervisor') return <WeeklyReviewEditor reviewSettings={reviewSettings} template="supervisor" reviewType="month" overview={rows => renderOverview(rows)} records={records} people={people} recordsLoading={recordsLoading} recordsError={recordsError} onRefreshRecords={onRefreshRecords}
     periodOverride={period} initialPayload={initialPayload} recordStatus={recordStatus} okrs={okrs} work={work} viewer={viewer} busy={busy} workLoading={Boolean(workLoading)} workError={workError} onRefreshWork={onRefreshWork || (() => {})} onCancel={onCancel} onCopy={onCopy} directSubmit
-    onSaveDraft={payload => onSaveDraft({ ...payload, monthlyMetrics: metricsError || metricsLoading ? initialPayload?.monthlyMetrics : metrics })}
-    onSubmit={payload => onSubmit({ ...payload, monthlyMetrics: metricsError || metricsLoading ? initialPayload?.monthlyMetrics : metrics })}/>;
+    onSaveDraft={payload => onSaveDraft({ ...payload, monthlyMetrics: savedMetrics(payload.krReviews) })}
+    onSubmit={payload => onSubmit({ ...payload, monthlyMetrics: savedMetrics(payload.krReviews) })}/>;
   return (
     <div className="okr-monthly-review okr-weekly-editor" aria-label="月复盘编辑器">
       <header className="okr-monthly-toolbar">
@@ -240,7 +248,6 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
 
       {monthlyOverview}
 
-      {metricsError && <Alert type="error" showIcon title="月度统计加载失败" description="未能读取完整状态变化记录，请重试。" action={<Button onClick={() => { onRefreshWork?.(); setMetricsRevision(value => value + 1); }}>重试</Button>} />}
       <ReviewTemplateLayout template={reportTemplate.snapshot} values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}>
       <section data-review-block="goals" className="okr-weekly-section" aria-label="本月目标复盘">
         <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />{reviewBlockTitle(reportTemplate.snapshot, 'goals', '1. 本月目标复盘')}</h3></div>

@@ -1,4 +1,4 @@
-import { isOkrAdmin } from '../../services/okrSettingsPolicy';
+import { hasOkrPermission } from '../../services/okrSettingsPolicy';
 import { teamRepository } from '../../services/teamRepository';
 import { useState } from 'react';
 import { Alert, Button, Spin } from 'antd';
@@ -20,12 +20,12 @@ function SettingsContent() {
   const departments = useQuery({ queryKey: ['team-member-departments'], queryFn: teamRepository.departments, retry: false });
   const save = async (settings: OkrSettings) => {
     if (busy) return false;
-    if (!isOkrAdmin(currentUser.id,query.data,people.data || [])) { addToast('error','仅 OKR 管理员可保存设置'); return false; }
+    if (!hasOkrPermission(currentUser.id,'roleSettings',query.data,people.data || []) && !['okrTemplates','reviewTemplates','weeklyCycles','confirmationSettings'].some(permission => hasOkrPermission(currentUser.id,permission as import('../../services/okrRepository').OkrPermission,query.data,people.data || []))) { addToast('error','仅 OKR 管理员可保存设置'); return false; }
     setBusy(true);
     try {
       const saved = await okrRepository.saveSettings(settings,currentUser.id);
       client.setQueryData(['okr', 'settings'], saved);
-      await client.invalidateQueries({ queryKey: ['okr'], predicate: query => query.queryKey.includes('people') });
+      await client.invalidateQueries({ queryKey: ['okr'], predicate: query => query.queryKey.includes('people') || query.queryKey.includes('records') });
       addToast('success', '目标总结配置已保存');
       return true;
     } catch (error) {
@@ -33,7 +33,7 @@ function SettingsContent() {
       return false;
     } finally { setBusy(false); }
   };
-  return <div className="original-okr">{query.data && people.data && !isOkrAdmin(currentUser.id,query.data,people.data) && <Alert type="info" title="仅 OKR 管理员可保存配置"/>}{departments.isError && <Alert type="error" showIcon title="部门列表加载失败" action={<Button onClick={() => void departments.refetch()}>重试</Button>}/>} {(query.isPending || people.isPending || members.isPending || departments.isPending) ? <div role="status"><Spin size="small"/> 正在加载目标总结设置…</div> : members.isError ? <Alert type="error" showIcon title="团队成员加载失败" action={<Button onClick={() => void members.refetch()}>重试</Button>}/> : people.isError ? <Alert type="error" showIcon title="人员列表加载失败" action={<Button onClick={() => void people.refetch()}>重试</Button>}/> : query.isError ? <Alert type="error" showIcon title="目标总结设置加载失败" action={<Button onClick={() => void query.refetch()}>重试</Button>}/> : query.data ? <OkrSettingsView key={currentUser.id} settings={query.data} readOnly={!isOkrAdmin(currentUser.id,query.data,people.data || [])} people={directoryPeople} departments={departments.data || []} busy={busy} onSave={save}/> : <Alert type="warning" title="暂无目标总结配置"/>}</div>;
+  return <div className="original-okr">{query.data && people.data && !['roleSettings','okrTemplates','reviewTemplates','weeklyCycles','confirmationSettings'].some(permission => hasOkrPermission(currentUser.id,permission as import('../../services/okrRepository').OkrPermission,query.data,people.data)) && <Alert type="info" title="仅 OKR 管理员可保存配置"/>}{departments.isError && <Alert type="error" showIcon title="部门列表加载失败" action={<Button onClick={() => void departments.refetch()}>重试</Button>}/>} {(query.isPending || people.isPending || members.isPending || departments.isPending) ? <div role="status"><Spin size="small"/> 正在加载目标总结设置…</div> : members.isError ? <Alert type="error" showIcon title="团队成员加载失败" action={<Button onClick={() => void members.refetch()}>重试</Button>}/> : people.isError ? <Alert type="error" showIcon title="人员列表加载失败" action={<Button onClick={() => void people.refetch()}>重试</Button>}/> : query.isError ? <Alert type="error" showIcon title="目标总结设置加载失败" action={<Button onClick={() => void query.refetch()}>重试</Button>}/> : query.data ? <OkrSettingsView key={currentUser.id} viewerId={currentUser.id} settings={query.data} readOnly={!['roleSettings','okrTemplates','reviewTemplates','weeklyCycles','confirmationSettings'].some(permission => hasOkrPermission(currentUser.id,permission as import('../../services/okrRepository').OkrPermission,query.data,people.data || []))} people={directoryPeople} departments={departments.data || []} busy={busy} onSave={save}/> : <Alert type="warning" title="暂无目标总结配置"/>}</div>;
 }
 
 export function GoalSummarySettingsView() {

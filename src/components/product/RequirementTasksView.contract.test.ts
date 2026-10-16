@@ -9,7 +9,7 @@ const designSource = readFileSync(new URL('./DesignTasksView.tsx', import.meta.u
 describe('requirement task Ant Design contract', () => {
   it('groups by configured subtype names and paginates only the selected root-task group', () => {
     expect(requirementSource).toContain('productRepository.workItemTypes(line.id)');
-    expect(requirementSource).toContain("types.find((type) => type.id === item.taskTypeId)?.name || '未设置'");
+    expect(requirementSource).toContain("types.find((type) => type.id === item.taskTypeId)?.name || item.requirementType || '未设置'");
     expect(requirementSource).not.toContain('requirementType: item.category');
     expect(requirementSource).toContain("['requirementType', '类型']");
     expect(requirementSource).toContain('Array.from(rootTasks.reduce');
@@ -40,7 +40,7 @@ describe('requirement task Ant Design contract', () => {
   it('allows a persisted product website to be edited above visibility', () => {
     const basicInfo = productLineSource.slice(
       productLineSource.indexOf("section === 'basic'"),
-      productLineSource.indexOf("section === 'members'")
+      productLineSource.indexOf("section === 'other'")
     );
     expect(basicInfo).toContain('<span>产品网址</span>');
     expect(basicInfo.indexOf('<span>产品网址</span>')).toBeLessThan(basicInfo.indexOf('>可见范围 *</label>'));

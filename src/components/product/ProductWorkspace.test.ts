@@ -11,11 +11,12 @@ import { responsibilitySummary, normalizeResponsibilityNames } from './productRe
 
 describe('product workspace business rules', () => {
   beforeEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
-  it('requires all three primary owners, permits multiple secondary owners, rejects duplicates', () => {
-    const valid = { requirementOwnerUserId: 'a', techOwnerUserId: 'b', testOwnerUserId: 'c' };
+  it('requires all four primary owners, permits multiple secondary owners, rejects duplicates', () => {
+    const valid = { requirementOwnerUserId: 'a', techOwnerUserId: 'b', testOwnerUserId: 'c', deliveryOwnerUserId: 'f' };
     expect(validateResponsibilities(valid)).toBe('');
     expect(validateResponsibilities({ ...valid, testOwnerUserId: '' })).toContain('测试责任人');
     expect(validateResponsibilities({ ...valid, techOwnerSecondaryUserId: 'b' })).toContain('不能相同');
+    expect(validateResponsibilities({ ...valid, deliveryOwnerSecondaryUserId: ['f'] })).toContain('不能相同');
     expect(validateResponsibilities({ ...valid, techOwnerSecondaryUserId: ['d', 'e'] })).toBe('');
     expect(normalizeResponsibilityNames('张三、李四')).toEqual(['张三', '李四']);
     expect(responsibilitySummary(['张三', '李四', '王五'])).toEqual({ label: '张三 +2', title: '张三、李四、王五' });
@@ -65,7 +66,7 @@ describe('product workspace business rules', () => {
     expect((await loadProductTaskAllocation(lines, 'design')).map((item) => item.id)).toEqual(['design-only']);
     expect((await loadProductTaskAllocation(lines, 'dev')).map((item) => item.id)).toEqual(['default']);
   });
-  it('inherits template types and preserves product overrides after refresh', async () => {
+  it('uses global template types even when historical product overrides remain stored', async () => {
     const line = await mockApiRequest('/api/product-lines', { method: 'POST', body: JSON.stringify({ name: '模板产品', code: 'templates' }) });
     const inherited = await mockApiRequest(`/api/product-lines/${line.id}/work-item-types`);
     expect(inherited.length).toBeGreaterThan(0);
@@ -73,7 +74,8 @@ describe('product workspace business rules', () => {
     expect(requirementType).toBeTruthy();
     const overrides = inherited.map((item: any) => item.id === requirementType.id ? { ...item, enabled: false } : item);
     await mockApiRequest(`/api/product-lines/${line.id}`, { method: 'PUT', body: JSON.stringify({ workItemTypes: overrides }) });
-    expect(await mockApiRequest(`/api/product-lines/${line.id}/work-item-types`)).toEqual(overrides);
-    await expect(mockApiRequest('/api/work-items', { method: 'POST', body: JSON.stringify({ title: '禁用类型任务', productLineId: line.id, category: 'requirement', taskTypeId: requirementType.id }) })).rejects.toThrow('不可用');
+    const current = await mockApiRequest(`/api/product-lines/${line.id}/work-item-types`);
+    expect(current.find((item: any) => item.id === requirementType.id)?.enabled).toBe(true);
+    expect(await mockApiRequest('/api/work-items', { method: 'POST', body: JSON.stringify({ title: '统一模板任务', productLineId: line.id, category: 'requirement', taskTypeId: requirementType.id }) })).toMatchObject({ taskTypeId: requirementType.id });
   });
 });

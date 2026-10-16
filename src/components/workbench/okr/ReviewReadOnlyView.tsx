@@ -1,3 +1,4 @@
+import { MonthlyOverview } from './MonthlyOverview';
 import { KnowledgeAttachments } from '../KnowledgeAttachments';
 import { ModernReviewReadOnlyView } from './ModernReviewReadOnlyView';
 import React, { useState } from 'react';
@@ -69,19 +70,11 @@ export function ReviewReadOnlyView({ review, onBack, onCopy }: ReviewReadOnlyVie
         </div>
       </header>
 
-      <section className="okr-review-readonly-metrics" aria-label="复盘概览">
-        {review.type === 'month' ? <>
-          <div><Progress type="circle" percent={average} size={56}/><span><b>本月整体进度</b><small>{average}%</small></span></div>
-          <div><span><b>本月任务</b><small>{review.monthlyMetrics?.taskCount ?? '—'}</small></span></div>
-          <div><span><b>协同事项</b><small>{review.monthlyMetrics?.collaborationCount ?? '—'}</small></span></div>
-          <div><span><b>总工时</b><small>{review.monthlyMetrics?.totalHours ?? '—'} 小时</small></span></div>
-          <div><span><b>加班时长</b><small>{review.monthlyMetrics?.overtimeHours ?? '—'}</small></span></div>
-        </> : <>
+      {review.type === 'month' ? <MonthlyOverview progress={review.monthlyMetrics?.overallProgress ?? average} points={review.monthlyMetrics?.progressTrend} metrics={review.monthlyMetrics}/> : <section className="okr-review-readonly-metrics" aria-label="复盘概览">
           <div><Progress type="circle" percent={average} size={56}/><span><b>KR 平均进度</b><small>{average}%</small></span></div>
           <div><Target/><span><b>自评分</b><small>{review.selfScore} 分</small></span></div>
           <div><CheckCircle/><span><b>主管评分</b><small>{review.leaderScore == null ? '暂无' : `${review.leaderScore} 分`}</small></span></div>
-        </>}
-      </section>
+      </section>}
 
       {review.type === 'week' && <section className="okr-review-readonly-section">
         <div className="okr-review-readonly-title"><FileText /><h3>{review.reviewMode === 'supervisor' ? '部门补充总结' : '整体工作摘要'}</h3></div>

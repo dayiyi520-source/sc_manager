@@ -2,3 +2,6 @@
   background: var(--bg-surface-soft) !important;
   color: var(--text-muted) !important;
 }
+.okr-objective-fullscreen-modal.ant-modal { top: 0; max-width: none; margin: 0; padding: 0; }
+.okr-objective-fullscreen-modal .ant-modal-content { min-height: 100dvh; border-radius: 0; }
+.okr-objective-fullscreen-modal .ant-modal-body { max-height: calc(100dvh - 4rem); overflow-y: auto; }

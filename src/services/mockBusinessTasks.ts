@@ -54,6 +54,25 @@ function read(kind: Kind): RequirementTask[] {
 }
 const write = (kind: Kind, tasks: RequirementTask[]) => localStorage.setItem(storageKey(kind), JSON.stringify(tasks));
 
+export function archivedBusinessTasks() {
+  return (['presales', 'delivery', 'ops'] as const).flatMap((kind) => read(kind)
+    .filter((task) => (task as RequirementTask & { archived?: boolean }).archived)
+    .map((task) => ({ id: task.id, title: task.title, category: kind,
+      taskType: kind === 'presales' ? '售前任务' : kind === 'delivery' ? '交付任务' : '运维任务',
+      sourceName: task.projectName || task.customerName || task.productLineName || '未关联',
+      operatorName: (task as RequirementTask & { operatorName?: string }).operatorName || '未记录',
+      operatedAt: (task as RequirementTask & { operatedAt?: string }).operatedAt || '',
+      revision: Number((task as RequirementTask & { revision?: number }).revision || 0) })));
+}
+
+export function mutateArchivedBusinessTask(kind: Kind, id: string, revision: number, action: 'restore' | 'purge') {
+  const tasks = read(kind);
+  const task = tasks.find((item) => item.id === id) as (RequirementTask & { archived?: boolean; revision?: number }) | undefined;
+  if (!task?.archived) throw new Error('归档任务不存在');
+  if (Number(task.revision || 0) !== revision) throw new Error('任务已更新，请刷新后重试');
+  write(kind, action === 'purge' ? tasks.filter((item) => item.id !== id) : tasks.map((item) => item.id === id ? { ...item, archived: false, revision: revision + 1 } : item));
+}
+
 export function handleMockBusinessTasks(path: string, method: string, body: Record<string, unknown>, audit: AuditContext) {
   const url = new URL(path, 'http://mock.local');
   const parts = url.pathname.split('/').filter(Boolean);
@@ -91,7 +110,8 @@ export function handleMockBusinessTasks(path: string, method: string, body: Reco
     return { items: visibleTasks.slice((page - 1) * pageSize, page * pageSize), total: visibleTasks.length, page, pageSize };
   }
   if (method === 'DELETE' && task) {
-    write(kind, tasks.map(item => item.id === taskId ? { ...item, archived: true } : item));
+    const user = currentUser();
+    write(kind, tasks.map(item => item.id === taskId ? { ...item, archived: true, revision: Number((item as RequirementTask & { revision?: number }).revision || 0) + 1, operatorName: user.name, operatedAt: new Date().toISOString() } : item));
     audit.record(taskId, task.productLineId || '', 'WORK_ITEM_ARCHIVED', { title: task.title });
     return null;
   }

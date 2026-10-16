@@ -8,19 +8,19 @@ const own = (level:'department'|'personal'):OkrPayload=>({...autonomousGoalPaylo
 const company:OkrRecord={id:'company',kind:'objective',ownerId:'user-admin',periodKey:'2026-09',status:'active',version:1,payload:{title:'公司方向',deadline:'2026-09-30',keyResults:[{id:'kr1',title:'方向一',deadline:'2026-09-30',weight:50,progress:0,assigneeIds:['manager']},{id:'kr2',title:'方向二',deadline:'2026-09-30',weight:50,progress:0,assigneeIds:['manager']}]}};
 describe('自主目标与历史承接规则',()=>{
  it('allows no-assignment independent goals but does not activate them before approval',()=>{
-  const created=mutateOkrLifecycle(undefined,{kind:'objective',periodKey:'2026-09',viewerId:'manager',payload:own('department'),submit:true},[],people)!;
-  const record=created.records[0];expect(record.status).toBe('submitted');expect(record.changeRequest).toMatchObject({purpose:'initial',reviewerId:'user-admin',status:'pending'});
+  const created=mutateOkrLifecycle(undefined,{kind:'objective',periodKey:'2026-09',viewerId:'manager',payload:own('department'),submit:true},[company],people)!;
+  const record=created.records.at(-1)!;expect(record.status).toBe('submitted');expect(record.changeRequest).toMatchObject({purpose:'initial',reviewerId:'user-admin',status:'pending'});
   const departmentWithAssignment={...record,payload:{...record.payload,keyResults:record.payload.keyResults?.map(kr=>({...kr,assigneeIds:['employee']}))}};
   expect(assignedReferences([departmentWithAssignment],people[2])).toEqual([]);
   const approved=mutateOkrLifecycle(record.id,{viewerId:'user-admin',action:'approve-change',version:record.version},created.records,people)!;
-  expect(approved.records[0].status).toBe('active');expect(approved.records[0].payload.plannedDeadline).toBe('2026-09-30');
+  expect(approved.records.at(-1)!.status).toBe('active');expect(approved.records.at(-1)!.payload.plannedDeadline).toBe('2026-09-30');
  });
  it('supports employee autonomous O/A with approval by manager and later update review',()=>{
-  const created=mutateOkrLifecycle(undefined,{kind:'objective',periodKey:'2026-09',viewerId:'employee',payload:own('personal'),submit:true},[],people)!;
-  const record=created.records[0];expect(record.changeRequest?.reviewerId).toBe('manager');
+  const created=mutateOkrLifecycle(undefined,{kind:'objective',periodKey:'2026-09',viewerId:'employee',payload:own('personal'),submit:true},[{...company,id:'upstream-dept',ownerId:'manager',payload:{...company.payload,goalLevel:'department'}}],people)!;
+  const record=created.records.at(-1)!;expect(record.changeRequest?.reviewerId).toBe('manager');
   const approved=mutateOkrLifecycle(record.id,{viewerId:'manager',action:'approve-change',version:record.version},created.records,people)!;
-  const live=approved.records[0];const changed=mutateOkrLifecycle(live.id,{viewerId:'employee',action:'save',version:live.version,payload:{...live.payload,title:'修改目标',changeReason:'范围调整'}},approved.records,people)!;
-  expect(changed.records[0].status).toBe('active');expect(changed.records[0].payload.title).toBe('本月工作目标');expect(changed.records[0].changeRequest?.purpose).toBe('update');
+  const live=approved.records.at(-1)!;const changed=mutateOkrLifecycle(live.id,{viewerId:'employee',action:'save',version:live.version,payload:{...live.payload,title:'修改目标',changeReason:'范围调整'}},approved.records,people)!;
+  expect(changed.records.at(-1)!.status).toBe('active');expect(changed.records.at(-1)!.payload.title).toBe('本月工作目标');expect(changed.records.at(-1)!.changeRequest?.purpose).toBe('update');
  });
  it('preserves assigned references without generating subordinate drafts',()=>{
   const all=goalsWithAssignments([company],people[1]);expect(all.filter(r=>r.payload.inherited)).toHaveLength(0);expect(assignedReferences(all,people[1])).toHaveLength(2);
@@ -59,7 +59,7 @@ describe('自主目标与历史承接规则',()=>{
   const live=approved.records.at(-1)!;
   const linked=mutateOkrLifecycle(live.id,{viewerId:'manager',action:'save',version:live.version,payload:{...live.payload,sourceObjectiveId:'company',sourceKrId:'kr1',sourceVersion:1,changeReason:'关联本人指派'}},approved.records,people)!;
   expect(goalsWithAssignments(linked.records,people[1]).filter(record=>record.payload.inherited && record.payload.sourceKrId==='kr1')).toHaveLength(0);
-  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',periodKey:'2026-09',viewerId:'manager',payload:{...own('department'),sourceObjectiveId:'company',sourceKrId:'kr1',sourceVersion:1},submit:false},linked.records,people)).toThrow('正在关联确认');
+  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',periodKey:'2026-09',viewerId:'manager',payload:{...own('department'),objectiveType:'target',sourceObjectiveId:'company',sourceKrId:'kr1',sourceVersion:1},submit:false},linked.records,people)).toThrow('正在关联确认');
  });
 
  it('source sync keeps the employee baseline and actions, and rejects a source from a different supervisor',()=>{

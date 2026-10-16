@@ -59,7 +59,7 @@ describe('GoalHierarchyView', () => {
       payload: { title: '主管目标', parentObjectiveId: 'o1', keyResults: [] },
     };
     const [root] = buildGoalHierarchy([...records, managerObjective], '2026-09', 'manager', people);
-    expect(root.objectiveLevel).toBe('主管级');
+    expect(root.objectiveLevel).toBe('部门级');
     expect(root.objectiveMetaOwnerId).toBe('boss');
   });
 

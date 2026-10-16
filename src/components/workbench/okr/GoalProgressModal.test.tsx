@@ -21,3 +21,15 @@ describe('只读进度历史', () => {
     expect(update).not.toHaveBeenCalled();
   });
 });
+
+it('separates the subject in a single-line history title and scopes objective entries', () => {
+  const title = '很长的目标名称'.repeat(12);
+  render(<GoalProgressModal record={{ ...record, payload: { ...record.payload, title }, progressHistory: [
+    { id: 'o-history', itemId: record.id, previousProgress: 10, progress: 30, operatorId: 'owner', createdAt: '2026-10-10', status: 'normal', note: '目标更新', attachments: [] },
+    { id: 'kr-history', itemId: 'kr', previousProgress: 20, progress: 50, operatorId: 'owner', createdAt: '2026-10-10', status: 'normal', note: '不显示此KR记录', attachments: [] },
+  ] }} itemId={record.id} records={[record]} people={[]} viewerId="owner" onClose={vi.fn()} onRefresh={vi.fn()}/>);
+  expect(screen.getByTitle(title)).toHaveClass('okr-progress-modal-subject');
+  expect(screen.getByText('历史进度')).toBeInTheDocument();
+  expect(screen.getByText('目标更新')).toBeInTheDocument();
+  expect(screen.queryByText('不显示此KR记录')).not.toBeInTheDocument();
+});

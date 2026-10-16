@@ -47,7 +47,7 @@ describe('company objective detail', () => {
     expect(display.ownerId).toBe('manager');
     expect(display.payload.keyResults?.map(item => item.id)).toEqual([child.id]);
     render(<CompanyObjectiveDetail record={child} records={all} people={people} work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
-    expect(screen.getByText('主管级')).toBeInTheDocument();
+    expect(screen.getByText('部门级')).toBeInTheDocument();
     expect(screen.queryByText('公司级')).not.toBeInTheDocument();
     expect(screen.getByLabelText('制定人：陈宇璋')).toBeInTheDocument();
     expect(screen.queryByText('所属部门:产品部')).not.toBeInTheDocument();

@@ -39,29 +39,73 @@ describe('协同事项关联任务卡片契约', () => {
     await expect(submit(5, 3)).rejects.toThrow('状态不允许');
   });
 
-  it('事项退回后统一创建人责任，创建人关闭而不是提交完成', async () => {
+  it('事项退回后保留当前负责人，创建人仍可关闭而不是提交完成', async () => {
     const record = { id: 'returned-flow', category: 'requirement', workOrderType: '客户诉求', title: '退回验收', status: '待处理', creatorId: 'creator-id', creatorName: '创建人', ownerName: '原负责人', assigneeName: '原负责人', assigneeId: 'owner-id', revision: 2, events: [], workItems: [] };
     localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify([record]));
     await mockApiRequest(`/api/requirements/${record.id}/transition`, { method: 'POST', body: JSON.stringify({ action: 'reject', reason: '资料不完整' }) });
     const detail = await mockApiRequest(`/api/requirements/${record.id}`) as typeof record;
-    expect(detail).toMatchObject({ status: '已退回', ownerName: '创建人', assigneeName: '创建人', assigneeId: 'creator-id', revision: 3 });
-    expect(JSON.parse(localStorage.getItem('shichuang.frontend.mock.workItems')!)[0]).toMatchObject({ status: '已退回', ownerName: '创建人', assigneeId: 'creator-id' });
-    expect(detail.events).toEqual([expect.objectContaining({ eventType: '退回', operatorName: '原负责人', metadata: { ownerChanged: true, fromAssigneeName: '原负责人', assigneeName: '创建人' } })]);
+    expect(detail).toMatchObject({ status: '已退回', ownerName: '原负责人', assigneeName: '原负责人', assigneeId: 'owner-id', revision: 3 });
+    expect(JSON.parse(localStorage.getItem('shichuang.frontend.mock.workItems')!)[0]).toMatchObject({ status: '已退回', ownerName: '原负责人', assigneeId: 'owner-id' });
+    expect(detail.events).toEqual([expect.objectContaining({ eventType: '退回', operatorName: '原负责人' })]);
+    expect(detail.events[0]).not.toHaveProperty('metadata.ownerChanged');
     const page = await mockApiRequest('/api/requirements?status=已退回') as { items: typeof record[] };
     expect(page.items.map(item => item.id)).toContain(record.id);
     await expect(mockApiRequest(`/api/requirements/${record.id}/transition`, { method: 'POST', body: JSON.stringify({ action: 'reject', reason: '再次退回' }) })).rejects.toThrow('仅待处理');
     sessionStorage.setItem('shichuang.session', JSON.stringify({ user: { id: 'creator-id', name: '创建人' } }));
     await mockApiRequest(`/api/requirements/${record.id}/transition`, { method: 'POST', body: JSON.stringify({ revision: 3, action: 'close' }) });
-    expect(await mockApiRequest(`/api/requirements/${record.id}`)).toMatchObject({ status: '已完成', ownerName: '创建人', revision: 4 });
+    expect(await mockApiRequest(`/api/requirements/${record.id}`)).toMatchObject({ status: '已关闭', ownerName: '原负责人', assigneeId: 'owner-id', revision: 4 });
   });
 
-  it('历史已驳回事项兼容为已退回并恢复创建人责任，不改变其他任务', async () => {
+  it('历史已驳回事项兼容为已退回并保留原负责人，不改变其他任务', async () => {
     localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify([
       { id: 'legacy-return', category: 'requirement', workOrderType: '客户诉求', status: '已驳回', creatorId: 'creator-id', creatorName: '创建人', ownerName: '原负责人', assigneeId: 'old-id', events: [] },
       { id: 'other-design', category: 'design', status: '已驳回', ownerName: '设计负责人' },
     ]));
-    expect(await mockApiRequest('/api/requirements/legacy-return')).toMatchObject({ status: '已退回', ownerName: '创建人', assigneeId: 'creator-id' });
+    expect(await mockApiRequest('/api/requirements/legacy-return')).toMatchObject({ status: '已退回', ownerName: '原负责人', assigneeId: 'old-id' });
     expect(await mockApiRequest('/api/requirements/other-design')).toMatchObject({ status: '已驳回', ownerName: '设计负责人' });
+  });
+
+  it('完整事项流转在持久化读回后保持每个真实状态及负责人', async () => {
+    const members = await mockApiRequest('/api/team-members/options') as Array<{ id: string; name: string; status: string }>;
+    const active = members;
+    const creator = active[0];
+    const processor = active.find(member => member.id !== creator?.id);
+    expect(creator).toBeTruthy();
+    expect(processor).toBeTruthy();
+    const record = { id: 'full-collaboration-flow', category: 'requirement', workOrderType: '其他问题', title: '完整流转事项', description: '完整流转说明', expectedCompleteDate: '2026-10-30', specialFields: { problemType: '其他' }, status: '待处理', creatorId: creator.id, creatorName: creator.name, ownerName: processor.name, assigneeName: processor.name, assigneeId: processor.id, revision: 0, events: [], workItems: [] };
+    localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify([record]));
+    const detail = () => mockApiRequest(`/api/requirements/${record.id}`) as Promise<typeof record>;
+    const transition = (body: Record<string, unknown>) => mockApiRequest(`/api/requirements/${record.id}/transition`, { method: 'POST', body: JSON.stringify(body) });
+
+    await transition({ status: '处理中', reason: '接收事项' });
+    expect(await detail()).toMatchObject({ status: '处理中', ownerName: processor.name, assigneeId: processor.id });
+    let current = await detail();
+    await mockApiRequest(`/api/requirements/${record.id}/complete`, { method: 'POST', body: JSON.stringify({ revision: current.revision, note: '首轮提交' }) });
+    expect(await detail()).toMatchObject({ status: '待验收', ownerName: processor.name, assigneeId: processor.id });
+
+    sessionStorage.setItem('shichuang.session', JSON.stringify({ user: { id: creator.id, name: creator.name } }));
+    current = await detail();
+    await mockApiRequest(`/api/requirements/${record.id}/acceptance-failed`, { method: 'POST', body: JSON.stringify({ revision: current.revision, taskOwnerId: processor.id, reason: '补充验收材料' }) });
+    expect(await detail()).toMatchObject({ status: '处理中', ownerName: processor.name, assigneeId: processor.id });
+
+    current = await detail();
+    await mockApiRequest(`/api/requirements/${record.id}/complete`, { method: 'POST', body: JSON.stringify({ revision: current.revision, note: '复验提交' }) });
+    expect(await detail()).toMatchObject({ status: '待验收', ownerName: processor.name, assigneeId: processor.id });
+    current = await detail();
+    await mockApiRequest(`/api/requirements/${record.id}/acceptance-passed`, { method: 'POST', body: JSON.stringify({ revision: current.revision, rating: 5, comment: '验收通过' }) });
+    expect(await detail()).toMatchObject({ status: '已完成', ownerName: processor.name, assigneeId: processor.id });
+
+    current = await detail();
+    await mockApiRequest(`/api/requirements/${record.id}/reopen`, { method: 'POST', body: JSON.stringify({ revision: current.revision, assigneeId: processor.id, reason: '继续跟进', changes: {} }) });
+    expect(await detail()).toMatchObject({ status: '待处理', ownerName: processor.name, assigneeId: processor.id });
+    await transition({ action: 'reject', reason: '当前负责人保持不变' });
+    const returned = await detail();
+    expect(returned).toMatchObject({ status: '已退回', ownerName: processor.name, assigneeId: processor.id });
+    expect(returned.events.at(-1)).toMatchObject({ eventType: '退回', operatorName: processor.name });
+    expect(returned.events.at(-1)).not.toHaveProperty('metadata.ownerChanged');
+    current = await detail();
+    await transition({ action: 'close', revision: current.revision });
+    expect(await detail()).toMatchObject({ status: '已关闭', ownerName: processor.name, assigneeId: processor.id });
   });
 
   it('创建多个任务后在事项详情持久化多张卡片，并同步任务状态', async () => {
@@ -87,30 +131,22 @@ describe('协同事项关联任务卡片契约', () => {
     expect(detail.workItems.find((item) => item.id === created.items[0].id)?.status).toBe('已完成');
   });
 
-  it('事项完成后在全历程保存富文本和附件信息', async () => {
-    const page = await mockApiRequest('/api/requirements?page=1&pageSize=1') as { items: Array<{ id: string }> };
-    const requirementId = page.items[0].id;
+  it('事项完成后保留原负责人并在全历程保存富文本和附件信息', async () => {
+    const record = { id: 'completion-owner-flow', category: 'requirement', workOrderType: '其他问题', title: '完成负责人验收', status: '处理中', creatorId: 'creator-id', creatorName: '创建人', ownerName: '处理负责人', assigneeName: '处理负责人', assigneeId: 'owner-id', revision: 2, events: [], workItems: [] };
+    localStorage.setItem('shichuang.frontend.mock.workItems', JSON.stringify([record]));
     const staged = await mockApiRequest('/api/attachments/stage', {
       method: 'POST',
       body: JSON.stringify({ name: '完成截图.png', mimeType: 'image/png', size: 12, dataUrl: 'data:image/png;base64,abc' }),
     }) as { id: string };
-    const before = await mockApiRequest(`/api/requirements/${requirementId}`) as { revision?: number; version?: number; status?: string };
-    if (before.status !== '处理中') {
-      await mockApiRequest(`/api/requirements/${requirementId}/transition`, { method: 'POST', body: JSON.stringify({ status: '处理中', reason: '开始处理' }) });
-    }
-    const processing = await mockApiRequest(`/api/requirements/${requirementId}`) as { revision?: number; version?: number };
-
-    await mockApiRequest(`/api/requirements/${requirementId}/complete`, {
+    await mockApiRequest(`/api/requirements/${record.id}/complete`, {
       method: 'POST',
-      body: JSON.stringify({ revision: processing.revision ?? processing.version ?? 0, note: '完成说明', noteHtml: '<p><strong>完成说明</strong></p>', attachmentIds: [staged.id] }),
+      body: JSON.stringify({ revision: record.revision, assigneeId: record.creatorId, assigneeName: record.creatorName, note: '完成说明', noteHtml: '<p><strong>完成说明</strong></p>', attachmentIds: [staged.id] }),
     });
-
-    const detail = await mockApiRequest(`/api/requirements/${requirementId}`) as { ownerName?: string; creatorName?: string; assigneeId?: string; creatorId?: string; events: Array<{ eventType: string; reason: string; metadata?: { noteHtml?: string; attachments?: Array<{ name: string }>; ownerChanged?: boolean; fromAssigneeName?: string; assigneeName?: string } }> };
+    const detail = await mockApiRequest(`/api/requirements/${record.id}`) as typeof record & { events: Array<{ eventType: string; reason: string; metadata?: { noteHtml?: string; attachments?: Array<{ name: string }>; ownerChanged?: boolean; processingAssigneeId?: string; processingAssigneeName?: string } }> };
     const event = detail.events.find((item) => item.eventType === '事项完成');
-    expect(event).toMatchObject({ reason: '完成说明', metadata: { noteHtml: '<p><strong>完成说明</strong></p>', attachments: [{ name: '完成截图.png' }] } });
-    expect(detail.ownerName).toBe(detail.creatorName);
-    expect(detail.assigneeId).toBe(detail.creatorId);
-    expect(event?.metadata).toMatchObject({ ownerChanged: true, fromAssigneeName: expect.any(String), assigneeName: detail.creatorName });
+    expect(detail).toMatchObject({ status: '待验收', ownerName: '处理负责人', assigneeName: '处理负责人', assigneeId: 'owner-id' });
+    expect(event).toMatchObject({ reason: '完成说明', metadata: { noteHtml: '<p><strong>完成说明</strong></p>', attachments: [{ name: '完成截图.png' }], processingAssigneeId: 'owner-id', processingAssigneeName: '处理负责人' } });
+    expect(event?.metadata).not.toHaveProperty('ownerChanged');
   });
 
   it('验收未通过只反馈所选任务，保留任务状态并交回原事项处理人', async () => {

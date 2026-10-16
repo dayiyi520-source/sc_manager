@@ -101,6 +101,12 @@ export interface TestPlan {
   cases: TestPlanCase[];
 }
 
+export interface TestPlanAssociationCandidate {
+  plan: TestPlan;
+  workItemTitle: string;
+  workItemCode: string;
+}
+
 export interface SaveTestPlanInput {
   caseResults?: Array<{ testCaseId: string; executionStatus: TestPlanCaseStatus; defectIds: string[] }>;
   testCaseIds: string[];

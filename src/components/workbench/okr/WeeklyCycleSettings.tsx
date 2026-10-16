@@ -6,7 +6,7 @@ import type { OkrWeeklyReviewCycle } from '../../../services/okrRepository';
 import { validateWeeklyCycles, weeklyCycleState } from '../../../services/weeklyReviewCycles';
 
 export function WeeklyCycleSettings({ rows, disabled, onChange }: { rows: OkrWeeklyReviewCycle[]; disabled: boolean; onChange: (rows: OkrWeeklyReviewCycle[]) => void | Promise<boolean> }) {
-  const [month, setMonth] = useState(() => dayjs().format('YYYY-MM'));
+  const [month, setMonth] = useState(() => window.sessionStorage.getItem('okr.settings.weeklyMonth') || dayjs().format('YYYY-MM'));
   const [editing, setEditing] = useState<OkrWeeklyReviewCycle>();
   const [saving, setSaving] = useState(false);
   const locked = useRef(false);
@@ -37,10 +37,10 @@ export function WeeklyCycleSettings({ rows, disabled, onChange }: { rows: OkrWee
     const next = rows.some(item => item.id === row.id) ? rows.map(item => item.id === row.id ? row : item) : [...rows, row];
     const invalid = validateWeeklyCycles(next, rows);
     if (invalid) { setError(invalid); return; }
-    if (await persist(next)) { setMonth(row.month); setEditing(undefined); }
+    if (await persist(next)) { window.sessionStorage.setItem('okr.settings.weeklyMonth', row.month); setMonth(row.month); setEditing(undefined); }
   };
   return <section className="space-y-4" aria-label="周报周期配置">
-    <div className="flex items-center justify-between gap-4"><Space><span>月份</span><DatePicker picker="month" allowClear={false} aria-label="周报所属月份" value={dayjs(month + '-01')} onChange={value => { if (value) setMonth(value.format('YYYY-MM')); }}/></Space><Button type="primary" icon={<PlusIcon/>} disabled={blocked} onClick={() => open()}>增加周期</Button></div>
+    <div className="flex items-center justify-between gap-4"><Space><span>月份</span><DatePicker picker="month" allowClear={false} aria-label="周报所属月份" value={dayjs(month + '-01')} onChange={value => { if (value) { const selected = value.format('YYYY-MM'); window.sessionStorage.setItem('okr.settings.weeklyMonth', selected); setMonth(selected); } }}/></Space><Button type="primary" icon={<PlusIcon/>} disabled={blocked} onClick={() => open()}>增加周期</Button></div>
     <p className="text-xs text-[var(--text-muted)]">周期归属于开始日期所在月份，确认后立即生效；开始后锁定；通知仅在应用在线时提醒。</p>
     <Table rowKey="id" scroll={{ x: true }} dataSource={rows.filter(row => row.month === month).sort((a, b) => a.startDate.localeCompare(b.startDate))} columns={[
       { title: '标题', render: (_, row) => row.title || `${row.startDate} 至 ${row.endDate}` },

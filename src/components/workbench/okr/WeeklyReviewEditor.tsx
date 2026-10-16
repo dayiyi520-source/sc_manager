@@ -26,7 +26,7 @@ import { SupervisorReviewMetrics } from './SupervisorReviewMetrics';
 import { departmentKrAggregation, departmentContentSnapshots } from '../../../services/departmentReviewAggregation';
 import { employeeEvidenceForKr } from '../../../services/supervisorSupportPanels';
 import type { EmployeeOption, OKRItem, WorkOrderType } from '../../../types';
-import type { OkrPayload, OkrWork, OkrRecord, OkrPerson, OkrWeeklyReviewSnapshot } from '../../../services/okrRepository';
+import type { OkrKrReview, OkrPayload, OkrWork, OkrRecord, OkrPerson, OkrWeeklyReviewSnapshot } from '../../../services/okrRepository';
 import { Plus, Save, Send, Trash2 } from '@/components/common/octicons-compat';
 import { workSource } from './workAggregation';
 import { reviewPeriod } from './simpleReview';
@@ -104,7 +104,7 @@ interface WeeklyReviewEditorProps {
   reviewSettings?: OkrSettings;
   template?: 'employee' | 'supervisor';
   reviewType?: 'week' | 'month';
-  overview?: React.ReactNode;
+  overview?: React.ReactNode | ((reviews: OkrKrReview[]) => React.ReactNode);
   records?: OkrRecord[];
   people?: OkrPerson[];
   recordsLoading?: boolean;
@@ -388,9 +388,9 @@ export function WeeklyReviewEditor({
     })),
     departmentObjectiveVersions: supervisor ? Object.fromEntries(periodOkrs.map(objective => [objective.id, records.find(row => row.id === objective.id)?.version ?? 0])) : undefined,
     departmentContentSnapshots: supervisor ? departmentContent : undefined,
-    objectiveSnapshots: supervisor ? periodOkrs.map(objective => ({ id: objective.id, period: objective.cycle, payload: {
-      title: objective.objective, weight: objective.weight, keyResults: objective.keyResults.map(kr => ({ id: kr.id, title: kr.content, weight: kr.weight, progress: selectedKrs.find(row => row.objectiveId === objective.id && row.keyResultId === kr.id)?.currentProgress ?? kr.progress }))
-    } })) : undefined,
+    objectiveSnapshots: periodOkrs.map(objective => ({ id: objective.id, period: objective.cycle, payload: {
+      title: objective.objective, weight: objective.weight, keyResults: objective.keyResults.map(kr => ({ id: kr.id, title: kr.content, weight: kr.weight, progress: (() => { const row = selectedKrs.find(row => row.objectiveId === objective.id && row.keyResultId === kr.id); if (!row) return kr.progress; const details = !supervisor ? kr.parentKeyResultDetails || [] : []; return details.length ? Math.round(details.reduce((sum, detail) => sum + (row.detailProgress?.find(item => item.id === detail.id)?.currentProgress ?? 0), 0) / details.length) : row.currentProgress; })() }))
+    } })),
     knowledgeEntries,
     helpNeeded: assistance.map(row => row.content.trim()).filter(Boolean).join('；'),
     assistance: assistance.filter(row => row.workId || row.content.trim()).map(({ rowId: _rowId, ...row }) => ({ ...row, result: row.content.trim() })),
@@ -523,7 +523,7 @@ export function WeeklyReviewEditor({
         </div>
       </div>
 
-      {overview || (supervisor && <SupervisorReviewMetrics objectives={periodOkrs} reviews={selectedKrs} records={metricRecords} people={people} supervisorId={viewer?.id || ''} period={period} loading={recordsLoading} error={recordsError}/>)}
+      {(typeof overview === 'function' ? overview(selectedKrs) : overview) || (supervisor && <SupervisorReviewMetrics objectives={periodOkrs} reviews={selectedKrs} records={metricRecords} people={people} supervisorId={viewer?.id || ''} period={period} loading={recordsLoading} error={recordsError}/>)}
 
       {supervisor && recordsError ? <Alert type="error" showIcon title="员工复盘加载失败，已保留填写内容" action={<Button onClick={onRefreshRecords}>重试</Button>}/> : null}
       {detachedTargets.length > 0 && <Alert type="warning" showIcon title="月度目标已变化，请确认失效内容" description={<div className="space-y-2"><p>以下已填写内容暂时保留，请复制需要的信息，再确认移除。确认后可继续保存或提交。</p><pre className="whitespace-pre-wrap break-words font-sans">{detachedReviewDescription(detachedTargets)}</pre></div>} action={<Button onClick={() => setKrs(rows => rows.filter(row => currentTargets.some(target => target.keyResultId === row.keyResultId && target.objectiveId === row.objectiveId)))}>移除失效内容</Button>} />}

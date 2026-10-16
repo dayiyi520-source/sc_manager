@@ -1,7 +1,8 @@
 import { apiRequest } from './apiClient';
+import { categoryCode } from '../utils/workItemCategories';
 import type { ProductLine, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, VersionIteration, RequirementTask, RequirementMedia, TaskCompletionReview, DefectBug, DevTask } from '../types';
 import type { PageResult } from './apiClient';
-import type { SaveTestCaseInput, SaveTestPlanInput, SaveVersionTestReportInput, TestCase, TestCaseDirectory, TestCasePage, TestPlan, VersionTestReport, VersionTestReportListItem } from '../types/testManagement';
+import type { SaveTestCaseInput, SaveTestPlanInput, SaveVersionTestReportInput, TestCase, TestCaseDirectory, TestCasePage, TestPlan, TestPlanAssociationCandidate, VersionTestReport, VersionTestReportListItem } from '../types/testManagement';
 import type { SaveVersionReviewInput, VersionReview, VersionReviewListItem } from '../types/versionReview';
 
 export type WorkItemReview = { title: string; content: string; contentHtml: string; media: RequirementMedia[]; revision: number; updatedAt?: string };
@@ -36,6 +37,7 @@ export type UnifiedWorkItem = {
   verifierId?: string; verifierName?: string;
   projectId?: string; projectName?: string; needsCollaboration?: Array<'design' | 'dev' | 'test'>; relatedTaskIds?: string[]; sourceWorkOrderIds?: string[]; sourceWorkOrderTitles?: string[];
   id: string; code: string; category: WorkItemCategoryKey; title: string; productLineId: string;
+  requirementType?: string;
   requirementId?: string | null; requirementTitle?: string | null; requirementInitiatorName?: string | null; customerId?: string | null; customerName?: string | null; assigneeName?: string; sourceType?: string; status?: { name?: string; group?: string; successful?: boolean };
   versionName?: string; taskTypeId?: string | null; workflowId?: string | null; statusKey?: string | null; statusColor?: string;
   priority?: string; severity?: string | null; parentWorkItemId?: string | null; versionId?: string | null; dueDate?: string | null;
@@ -59,6 +61,7 @@ export type ResearchStatusScope = 'PRODUCT' | 'ITERATION';
 export type ResearchStatusTemplate = { id: string; scope: ResearchStatusScope; name: string; phase: '待开始' | '处理中' | '已完成' | '已结束'; color: string; initial: boolean; enabled: boolean; sort: number; revision: number };
 export type ArchivedProductLine = { id: string; name: string; code: string; ownerName?: string; archivedAt: string; archivedByName?: string };
 export type RecycleBinItem = { id: string; category: WorkItemCategoryKey; title: string; code: string; versionId?: string | null; versionName: string; operatorName: string; operatedAt: string; revision: number };
+export type ArchivedTask = { id: string; title: string; category: string; taskType: string; sourceName: string; sourceId?: string; operatorName: string; operatedAt: string; revision: number };
 
 const specialTaskPath = (kind: SpecialTaskKind) => kind === 'bug' ? '/api/bugs' : '/api/dev-tasks';
 const businessTaskPath = (kind: BusinessTaskKind) => `/api/${kind}-tasks`;
@@ -101,12 +104,22 @@ export const productRepository = {
   restoreProductLine: (id: string) => apiRequest<void>(`/api/product-lines/${id}/restore`, { method: 'POST' }),
   deleteProductLine: (id: string) => apiRequest<void>(`/api/product-lines/${id}`, { method: 'DELETE' }),
   recycleBin: (id: string) => apiRequest<RecycleBinItem[]>(`/api/product-lines/${id}/recycle-bin`),
+  archivedTasks: () => apiRequest<ArchivedTask[]>('/api/archived-tasks'),
+  restoreArchivedTask: (category: string, id: string, revision: number) => apiRequest<void>(`/api/archived-tasks/${encodeURIComponent(category)}/${encodeURIComponent(id)}/restore`, { method: 'POST', body: JSON.stringify({ revision }) }),
+  purgeArchivedTask: (category: string, id: string, revision: number) => apiRequest<void>(`/api/archived-tasks/${encodeURIComponent(category)}/${encodeURIComponent(id)}?revision=${revision}`, { method: 'DELETE' }),
   restoreRecycleBinItem: (lineId: string, id: string, revision: number) => apiRequest<void>(`/api/product-lines/${lineId}/recycle-bin/${id}/restore`, { method: 'POST', body: JSON.stringify({ revision }) }),
   purgeRecycleBinItem: (lineId: string, id: string, revision: number) => apiRequest<void>(`/api/product-lines/${lineId}/recycle-bin/${id}?revision=${revision}`, { method: 'DELETE' }),
   addProductLineMember: (id: string, body: Pick<ProductLineMember, 'userId' | 'role'>) => apiRequest<void>(`/api/product-lines/${id}/members`, { method: 'POST', body: JSON.stringify(body) }),
   updateProductLineMember: (id: string, memberId: string, body: Pick<ProductLineMember, 'role'>) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(body) }),
   removeProductLineMember: (id: string, memberId: string) => apiRequest<void>(`/api/product-lines/${id}/members/${memberId}`, { method: 'DELETE' }),
-  workItemTypes: (id: string, category?: ProductLineWorkItemCategory) => apiRequest<ProductLineWorkItemType[]>(`/api/product-lines/${id}/work-item-types${category ? `?category=${encodeURIComponent(category)}` : ''}`),
+  workItemTypes: (id: string, category?: ProductLineWorkItemCategory) => {
+    if (category && !['requirement', 'design', 'dev', 'test', 'bug', '产品', '需求', '设计', '研发', '测试', '缺陷'].includes(category)) {
+      return apiRequest<ProductLineWorkItemType[]>(`/api/product-lines/${id}/work-item-types?category=${encodeURIComponent(category)}`);
+    }
+    return apiRequest<WorkItemTemplateType[]>('/api/work-item-template').then((items) => items.filter((item) =>
+      ['requirement', 'design', 'dev', 'test', 'bug'].includes(categoryCode(item.category === '产品' ? '需求' : item.category))
+      && (!category || categoryCode(item.category === '产品' ? '需求' : item.category) === categoryCode(category === '产品' ? '需求' : category))));
+  },
   createWorkItemType: (id: string, body: Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'> & { workflow: Pick<WorkItemWorkflow, 'category' | 'name' | 'definition'> }) => apiRequest<{ id: string; workflowId: string }>(`/api/product-lines/${id}/work-item-types`, { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItemType: (id: string, typeId: string, body: Partial<Pick<ProductLineWorkItemType, 'category' | 'name' | 'description' | 'enabled' | 'isDefault'>>) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteWorkItemType: (id: string, typeId: string) => apiRequest<void>(`/api/product-lines/${id}/work-item-types/${typeId}`, { method: 'DELETE' }),
@@ -167,6 +180,8 @@ export const productRepository = {
   ,setTestCaseEnabled: (lineId: string, caseId: string, revision: number, enabled: boolean) => apiRequest<TestCase>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/${encodeURIComponent(caseId)}/enabled`, { method: 'PUT', body: JSON.stringify({ revision, enabled }) })
   ,batchUpdateTestCases: (lineId: string, body: { caseIds: string[]; operation: 'MOVE' | 'OWNER' | 'PRIORITY' | 'DELETE' | 'TYPE'; value?: string }) => apiRequest<void>(`/api/product-lines/${encodeURIComponent(lineId)}/test-cases/batch`, { method: 'POST', body: JSON.stringify(body) })
   ,testPlans: (workItemId: string) => apiRequest<TestPlan[]>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans`)
+  ,availableTestPlans: (workItemId: string) => apiRequest<TestPlanAssociationCandidate[]>(`/api/work-items/${encodeURIComponent(workItemId)}/available-test-plans`)
+  ,associateTestPlans: (workItemId: string, testPlanIds: string[]) => apiRequest<void>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plan-associations`, { method: 'POST', body: JSON.stringify({ testPlanIds }) })
   ,createTestPlan: (workItemId: string, body: SaveTestPlanInput) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans`, { method: 'POST', body: JSON.stringify(body) })
   ,saveTestPlan: (workItemId: string, planId: string, body: SaveTestPlanInput) => apiRequest<TestPlan>(`/api/work-items/${encodeURIComponent(workItemId)}/test-plans/${encodeURIComponent(planId)}`, { method: 'PUT', body: JSON.stringify(body) })
   ,versionTestReports: (lineId: string, versionId: string) => apiRequest<VersionTestReportListItem[]>(`/api/product-lines/${encodeURIComponent(lineId)}/versions/${encodeURIComponent(versionId)}/test-reports`)

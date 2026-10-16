@@ -169,6 +169,7 @@ export interface PerformanceReview {
   syncKrProgress?: boolean;
   weeklyReviewSnapshots?: import('../services/okrRepository').OkrWeeklyReviewSnapshot[];
   monthlyMetrics?: import('../services/monthlyReviewMetrics').MonthlyReviewMetrics;
+  objectiveSnapshots?: import('../services/okrRepository').OkrPayload['objectiveSnapshots'];
   monthlyOtherTasks?: import('../services/okrRepository').OkrMonthlyTask[];
   nextMonthPlans?: import('../services/okrRepository').OkrMonthlyPlan[];
   otherNotes?: string;
@@ -519,7 +520,7 @@ export interface ProductLine {
   status?: '待规划' | '迭代中' | '已归档' | '已停用' | '启用中' | string;
   visibility?: '公开' | '私密' | '仅创建者可见' | '部门可见' | '保密';
   sort?: number;
-  commercialAvailability?: '可商用' | '不可商用';
+  commercialAvailability?: '可商用' | '不可商用' | '可销售' | '不可销售';
   coverColor?: string;
   coverUrl?: string;
   members?: ProductLineMember[] | string[];
@@ -545,6 +546,10 @@ export interface ProductLine {
   testOwnerUserId?: string;
   testOwnerSecondary?: string | string[];
   testOwnerSecondaryUserId?: string | string[];
+  deliveryOwner?: string;
+  deliveryOwnerUserId?: string;
+  deliveryOwnerSecondary?: string | string[];
+  deliveryOwnerSecondaryUserId?: string | string[];
   products?: ProductItemInLine[];
   pendingReqCount?: number;
   pendingRequirementCount?: number;

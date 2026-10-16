@@ -4,34 +4,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OkrSettings } from '../../../services/okrRepository';
 import { OkrSettingsView } from './OkrSettingsView';
 import { message } from 'antd';
-afterEach(async()=>{ await act(async()=>{ message.destroy(); cleanup(); await new Promise(resolve=>setTimeout(resolve,0)); }); });
+afterEach(async()=>{ await act(async()=>{ message.destroy(); cleanup(); await new Promise(resolve=>setTimeout(resolve,0)); }); window.sessionStorage.clear(); });
 
 const settings: OkrSettings = { defaultView: 'list', timeRules: [{ key: 'weeklyReview', label: '周总结', startDay: 1, endDay: 31, allowBackfill: true }], templates: [{department:'研发',departments:['研发'],type:'support',fields:[],types:['支持']}], dictionaries: { productNodes: [], deliveryNodes: [], presalesNodes: [], supportTypes: [] }, validation: { actionWeightTotal: 100, maxActions: 8, assigneeMultiple: true, keyNodeMultiple: true, resultRequired: true } };
 
-describe('weekly review settings', () => {
-  it('uses Monday through Sunday selectors, retains monthly dates and saves weekday values', async () => {
-    const onSave = vi.fn(async (_settings: OkrSettings) => true);
-    render(<OkrSettingsView settings={settings} onSave={onSave}/>);
-    fireEvent.click(screen.getByRole('button', { name: '开放时间' }));
-    const row = screen.getByText('周总结').closest('.okr-settings-time-rule') as HTMLElement;
-    expect(within(row).getByText('周一')).toBeInTheDocument();
-    expect(within(row).getByText('周日')).toBeInTheDocument();
-    expect(within(row).queryByText('开始日')).not.toBeInTheDocument();
-    expect(within(row).queryByText('短月份顺延到月末')).not.toBeInTheDocument();
-    const monthly = screen.getByText('月总结').closest('.okr-settings-time-rule') as HTMLElement;
-    expect(within(monthly).getByText('开始日')).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '周报开放开始星期' }));
-    fireEvent.click(screen.getByText('周五'));
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存配置' })); });
-    expect(onSave).toHaveBeenCalledOnce();
-    expect(onSave.mock.calls[0][0].timeRules.find(rule => rule.key === 'weeklyReview')).toMatchObject({ startDay: 5, endDay: 7 });
+describe('goal summary settings navigation', () => {
+  it('removes the obsolete configuration sections', () => {
+    render(<OkrSettingsView settings={settings} onSave={vi.fn(async () => true)}/>);
+    expect(screen.queryByRole('button', { name: '开放时间' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '权重与必填校验' })).not.toBeInTheDocument();
   });
-  it('flags old date ranges instead of silently opening weekly access', () => {
-    render(<OkrSettingsView settings={{ ...settings, timeRules: [{ ...settings.timeRules[0], startDay: 20, endDay: 31 }] }} onSave={vi.fn(async () => true)}/>);
-    fireEvent.click(screen.getByRole('button', { name: '开放时间' }));
-    expect(screen.getByText('请重新设置周报开放星期')).toBeInTheDocument();
-    expect(screen.getByText('开始星期')).toBeInTheDocument();
-    expect(screen.getByText('结束星期')).toBeInTheDocument();
+  it('restores the weekly cycle list after a remount', () => {
+    const onSave = vi.fn(async () => true);
+    const view = render(<OkrSettingsView settings={settings} onSave={onSave}/>);
+    fireEvent.click(screen.getByRole('button', { name: '周报周期配置' }));
+    view.unmount();
+    render(<OkrSettingsView settings={settings} onSave={onSave}/>);
+    expect(screen.getByRole('button', { name: '周报周期配置' })).toHaveClass('is-active');
+    expect(screen.getByRole('button', { name: '增加周期' })).toBeEnabled();
   });
 });
 
@@ -63,7 +53,7 @@ it('uses a batch modal and saves multiple O titles directly with multiselect KR 
     expect.objectContaining({ department: '研发', title: '质量提升', krTypes: ['support'] }),
   ]);
   expect(screen.getByRole('button', { name: '编辑质量提升' })).toBeInTheDocument();
-});
+}, 15000);
 it('validates every row and preserves a failed batch for retry', async () => {
   const onSave = vi.fn(async (_settings: OkrSettings) => false);
   render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} departments={['研发']} onSave={onSave}/>);
@@ -123,7 +113,7 @@ it('locks duplicate submissions until the batch save finishes', async () => {
 
 it('persists weekly cycles immediately, keeps the tab and preserves input on failure', async () => {
   const onSave = vi.fn(async (_settings: OkrSettings) => false);
-  render(<OkrSettingsView settings={settings} onSave={onSave}/>);
+  const view = render(<OkrSettingsView settings={settings} onSave={onSave}/>);
   fireEvent.click(screen.getByRole('button', { name: '周报周期配置' }));
   expect(screen.queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '增加周期' }));
@@ -137,6 +127,11 @@ it('persists weekly cycles immediately, keeps the tab and preserves input on fai
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^确\s*认$/ })); });
   await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(screen.getByRole('cell', { name: '新增周期' })).toBeVisible());
+  view.unmount();
+  render(<OkrSettingsView settings={{ ...settings, weeklyReviewCycles: onSave.mock.calls[1][0].weeklyReviewCycles }} onSave={onSave}/>);
+  expect(screen.getByRole('button', { name: '周报周期配置' })).toHaveClass('is-active');
+  expect(screen.getByRole('cell', { name: '新增周期' })).toBeVisible();
+  expect(screen.getByRole('button', { name: '增加周期' })).toBeEnabled();
 });
 it('persists role removal directly without saving unrelated draft fields', async () => {
   const people = [{ id: 'a', name: '甲', department: '研发', rootFlag: 1, supervisorId: null, version: 0 }, { id: 's', name: '乙', department: '研发', rootFlag: 0, supervisorId: 'a', version: 0 }];

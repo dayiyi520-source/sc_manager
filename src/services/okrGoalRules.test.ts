@@ -14,8 +14,8 @@ describe('goal role and mock persistence', () => {
   beforeEach(()=>{localStorage.clear();localStorage.setItem('shichuang.frontend.mock.okrRecords',JSON.stringify(records));});
   it('identifies positions rather than reporting relationships',()=>{
     expect(goalLevel(person)).toBe('个人级');
-    expect(goalLevel({...person,jobTitle:'产品主管'})).toBe('主管级');
-    expect(goalLevel({...person,name:'林志豪'})).toBe('公司级');
+    expect(goalLevel({...person,jobTitle:'产品主管'})).toBe('部门级');
+    expect(goalLevel({...person,name:'林志豪'})).toBe('个人级');
     expect(assignedGoalActions(records,person).map(row=>row.id)).toEqual(['a1','a2']);
     expect(assignedGoalActions(records.map(row=>({...row,status:'draft'})),person)).toEqual([]);
   });
@@ -27,8 +27,8 @@ describe('goal role and mock persistence', () => {
     const people=await mockApiRequest('/api/okr/people') as OkrPerson[];
     expect(options.find(row=>row.id===member.id)).toMatchObject({name:'改名后的主管',jobTitle:'产品主管'});
     expect(people.find(row=>row.id===member.id)).toMatchObject({name:'改名后的主管',jobTitle:'产品主管'});
-    expect(goalLevel(people.find(row=>row.id===member.id))).toBe('主管级');
-    expect(goalLevel({id:'user-admin',name:'改名后的公司负责人'})).toBe('公司级');
+    expect(goalLevel(people.find(row=>row.id===member.id))).toBe('部门级');
+    expect(goalLevel({id:'user-admin',name:'改名后的公司负责人'})).toBe('个人级');
   });
   it('saves a legacy group once and preserves lower-level action references',async()=>{
     const child:OkrRecord={id:'child',kind:'action',ownerId:'staff',periodKey:'2026-09',status:'active',version:0,payload:{title:'员工动作',parentObjectiveId:'parent',parentActionId:'a2'}};

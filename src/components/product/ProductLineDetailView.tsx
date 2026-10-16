@@ -1,10 +1,8 @@
 import { ProductInsightFilter, filterInsightItems, initialInsightFilter, insightDateRange } from './ProductInsightFilter';
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Input, Select, Button, Switch, Drawer, Tag, Dropdown, Popconfirm, Spin } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Input, Select, Button, Dropdown } from 'antd';
 import Card from 'antd/es/card/Card';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { categoryCode, displayedTaskCategoryCodes, enabledCategoryOptions } from '../../utils/workItemCategories';
-import { ApartmentOutlined, DeleteOutlined, DownOutlined, EditOutlined, PlusOutlined, UserAddOutlined, UserDeleteOutlined, SettingOutlined, UndoOutlined } from '@ant-design/icons';
+import { DownOutlined, SettingOutlined } from '@ant-design/icons';
 import {
   ArrowLeft,
   Boxes,
@@ -31,23 +29,13 @@ import {
   GitBranch
 } from '../common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { ProductLine, ProductLineActivity, ProductLineMember, ProductLineWorkItemCategory, ProductLineWorkItemType, RequirementTask, VersionIteration } from '../../types';
-import { responsibilitySummary } from './productResponsibilityPresentation';
+import { ProductLine, ProductLineActivity, RequirementTask, VersionIteration } from '../../types';
+import { normalizeResponsibilityNames } from './productResponsibilityPresentation';
 import { productRepository, type UnifiedWorkItem } from '../../services/productRepository';
 import { StatusTag, Modal } from '../common/UIComponents';
 import { CreateVersionModal } from './CreateVersionModal';
-import { ManageMembersModal } from './ManageMembersModal';
-import {
-  buildWorkflowDefinition,
-  createDefaultWorkItemStates,
-  EditableWorkflowState,
-  validateWorkflowStates,
-  WorkItemStateConfigDrawer,
-  WorkItemStateEditor
-} from './WorkItemStateConfigDrawer';
 import { normalizeProductWebsiteUrl } from './productWebsite';
-import { teamRepository } from '../../services/teamRepository';
-import { employeeJobTitle, PersonAvatar, PersonIdentity } from '../common/PersonIdentity';
+import { PersonAvatar } from '../common/PersonIdentity';
 import { ProductLineBoard, ProductLineHours, useProductLineWorkItems } from './ProductLineInsights';
 import { ProductLinePerformance } from './ProductLinePerformance';
 import { WorkItemCategoryIcon } from './WorkItemCategoryIcon';
@@ -63,7 +51,7 @@ interface ProductLineDetailViewProps {
   initialSettingsSection?: ProductLineSettingsSection;
 }
 
-export type ProductLineSettingsSection = 'basic' | 'responsibilities' | 'members' | 'work-items' | 'other' | 'recycle-bin';
+export type ProductLineSettingsSection = 'basic' | 'responsibilities' | 'other';
 
 const normalizeProductVisibility = (value?: ProductLine['visibility']): '公开' | '私密' =>
   value === '私密' || value === '部门可见' || value === '保密' || value === '仅创建者可见' ? '私密' : '公开';
@@ -81,11 +69,10 @@ const ProductLineSettingsPanel: React.FC<{
   productLine: ProductLine;
   onBack: () => void;
   onProductRemoved: () => void;
-  onOpenMembers: () => void;
   initialSection?: ProductLineSettingsSection;
   embedded?: boolean;
-}> = ({ productLine, onBack, onProductRemoved, onOpenMembers, initialSection, embedded }) => {
-  const { updateProductLine, updateProductLineMember, removeProductLineMember, setProductLines, addToast } = useApp();
+}> = ({ productLine, onBack, onProductRemoved, initialSection, embedded }) => {
+  const { updateProductLine, setProductLines, addToast } = useApp();
   const [section, setSection] = useState<ProductLineSettingsSection>(initialSection || 'basic');
   const [name, setName] = useState(productLine.name);
   const [code, setCode] = useState(productLine.code);
@@ -94,15 +81,10 @@ const ProductLineSettingsPanel: React.FC<{
   const [websiteError, setWebsiteError] = useState('');
   const [isSavingBasic, setIsSavingBasic] = useState(false);
   const [description, setDescription] = useState(productLine.description);
-  const [commercialAvailability, setCommercialAvailability] = useState<ProductLine['commercialAvailability']>(productLine.commercialAvailability || '不可商用');
+  const [commercialAvailability, setCommercialAvailability] = useState<ProductLine['commercialAvailability']>(productLine.commercialAvailability === '可商用' ? '可销售' : productLine.commercialAvailability === '不可商用' ? '不可销售' : productLine.commercialAvailability || '不可销售');
   const [visibility, setVisibility] = useState<'公开' | '私密'>(normalizeProductVisibility(productLine.visibility));
   const [pendingOperation, setPendingOperation] = useState<'archive' | null>(null);
   const [isOperating, setIsOperating] = useState(false);
-  const [memberTab, setMemberTab] = useState('全部');
-  const [memberToRemove, setMemberToRemove] = useState<ProductLineMember | null>(null);
-  const employeesQuery = useQuery({ queryKey: ['team-member-options'], queryFn: teamRepository.options, retry: false });
-  const roleTemplatesQuery = useQuery({ queryKey: ['product-role-templates'], queryFn: productRepository.productRoleTemplates, retry: false });
-  const employeesById = new Map((employeesQuery.data || []).map((employee) => [employee.id, employee]));
 
   useEffect(() => {
     setName(productLine.name);
@@ -111,7 +93,7 @@ const ProductLineSettingsPanel: React.FC<{
     setSort(productLine.sort ?? 0);
     setWebsiteError('');
     setDescription(productLine.description);
-    setCommercialAvailability(productLine.commercialAvailability || '不可商用');
+    setCommercialAvailability(productLine.commercialAvailability === '可商用' ? '可销售' : productLine.commercialAvailability === '不可商用' ? '不可销售' : productLine.commercialAvailability || '不可销售');
     setVisibility(normalizeProductVisibility(productLine.visibility));
   }, [productLine]);
 
@@ -157,10 +139,7 @@ const ProductLineSettingsPanel: React.FC<{
   const sections: Array<{ id: ProductLineSettingsSection; label: string }> = [
     { id: 'basic', label: '基本信息' },
     { id: 'responsibilities', label: '责任人配置' },
-    { id: 'members', label: '产品成员' },
-    { id: 'work-items', label: '工作项设置' },
     { id: 'other', label: '其他' },
-    { id: 'recycle-bin', label: '归档任务' }
   ];
 
   const operationCopy = {
@@ -231,248 +210,15 @@ const ProductLineSettingsPanel: React.FC<{
                 </div>
               </div>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>产品描述</span><Input.TextArea rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="请输入产品描述" /></label>
-              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>是否商用</span><Select value={commercialAvailability} onChange={setCommercialAvailability} options={[{ value: '可商用', label: '可商用' }, { value: '不可商用', label: '不可商用' }]} /></label>
+              <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>是否销售</span><Select value={commercialAvailability} onChange={setCommercialAvailability} options={[{ value: '可销售', label: '可销售' }, { value: '不可销售', label: '不可销售' }]} /></label>
               <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>排序</span><Input type="number" min={0} max={999} step={1} value={sort} onChange={(event) => setSort(Number(event.target.value))} /></label>
               <div className="flex justify-end"><Button type="primary" htmlType="submit" loading={isSavingBasic}>保存基本信息</Button></div>
             </form>
           )}
-          {section === 'members' && (
-            <div className="mx-auto w-full max-w-5xl space-y-5 px-4 text-xs sm:px-6">
-              <div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品成员</h3><p className="mt-1 text-[var(--text-muted)]">配置产品成员及其角色。</p></div><Button type="primary" onClick={onOpenMembers} icon={<UserAddOutlined />}>添加成员</Button></div>
-              {(() => {
-                const members: ProductLineMember[] = (productLine.members || []).map((member, index) => typeof member === 'string' ? { id: `legacy-${index}-${member}`, userId: '', name: member, role: '参与人' } : member);
-                const configuredRoles = (roleTemplatesQuery.data || []).map((role) => role.name);
-                const historicalRoles = members.map((member) => member.role).filter((role) => role && !configuredRoles.includes(role));
-                const memberTabs = ['全部', ...configuredRoles, ...historicalRoles];
-                const visibleMembers = memberTab === '全部' ? members : members.filter((member) => member.role === memberTab);
-                return <>
-                  <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">{memberTabs.map((tab) => { const count = tab === '全部' ? members.length : members.filter((member) => member.role === tab).length; return <button key={tab} type="button" onClick={() => setMemberTab(tab)} className={`h-10 px-3 text-xs font-normal border-b-2 transition-colors ${memberTab === tab ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{tab}</span><span className="ml-1 text-xs font-normal text-[var(--primary)]">{count}</span></button>; })}</div>
-                  <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[560px]">
-                    <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-[11px] text-[var(--text-muted)]"><span>成员</span><span>角色</span><span className="text-right">操作</span></div>
-                    {visibleMembers.length ? visibleMembers.map((member) => { const employee = employeesById.get(member.userId); const roleOptions = [...new Set([...configuredRoles, member.role])].filter(Boolean).map((role) => ({ value: role, label: role })); return <div key={member.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(120px,0.8fr)_56px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-2 last:border-b-0"><PersonIdentity name={member.name} subtitle={employee ? employeeJobTitle(employee) || '未设置职位' : undefined} size={28} /><Select className="w-full" value={member.role} loading={roleTemplatesQuery.isLoading} disabled={roleTemplatesQuery.isError} options={roleOptions} onChange={async (role) => { try { await updateProductLineMember(productLine.id, member.id, role); addToast('success', '成员角色已更新'); } catch (error) { addToast('error', '成员角色更新失败', error instanceof Error ? error.message : '请稍后重试'); } }} /><div className="text-right"><Button type="text" danger aria-label={`移除成员 ${member.name}`} title={`移除成员 ${member.name}`} icon={<UserDeleteOutlined />} onClick={() => setMemberToRemove(member)} /></div></div>; }) : <div className="px-3 py-8 text-center text-[var(--text-muted)]">暂无成员</div>}
-                  </div></div>
-                </>;
-              })()}
-              <Modal isOpen={Boolean(memberToRemove)} onClose={() => setMemberToRemove(null)} title="移除产品成员" footer={<><Button onClick={() => setMemberToRemove(null)}>取消</Button><Button type="primary" danger onClick={async () => { if (!memberToRemove) return; try { await removeProductLineMember(productLine.id, memberToRemove.id); addToast('success', '成员已移除'); setMemberToRemove(null); } catch (error) { addToast('error', '成员移除失败', error instanceof Error ? error.message : '请稍后重试'); } }}>确认移除</Button></>}><p className="text-sm text-[var(--text-body)]">确定将“{memberToRemove?.name}”移除产品吗？</p></Modal>
-            </div>
-          )}
-          {section === 'work-items' && <ProductLineWorkItemSettings productLine={productLine} />}
           {section === 'other' && <div className="w-full space-y-5 px-0 text-xs sm:px-2 lg:px-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品操作</h3><p className="mt-1 text-[var(--text-muted)]">管理产品归档。</p></div><div className="space-y-3"><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">产品归档</h4><p className="mt-1 text-[var(--text-muted)]">产品完成后可归档，归档产品统一在产研模板中管理。</p></div><Button className="!h-9" type="primary" onClick={() => setPendingOperation('archive')}>归档</Button></div></div></div>}
-          {section === 'recycle-bin' && <ProductRecycleBin productLineId={productLine.id} />}
         </section>
       </div>
       <Modal isOpen={Boolean(pendingOperation)} onClose={() => !isOperating && setPendingOperation(null)} title={pendingOperation ? operationCopy[pendingOperation].title : ''} footer={<><Button disabled={isOperating} onClick={() => setPendingOperation(null)}>取消</Button><Button type="primary" danger loading={isOperating} onClick={() => void executeOperation()}>{pendingOperation ? operationCopy[pendingOperation].confirm : '确认'}</Button></>}><p className="text-sm text-[var(--text-body)]">{pendingOperation ? operationCopy[pendingOperation].description : ''}</p></Modal>
-    </div>
-  );
-};
-
-const ProductRecycleBin: React.FC<{ productLineId: string }> = ({ productLineId }) => {
-  const queryClient = useQueryClient();
-  const { addToast } = useApp();
-  const query = useQuery({ queryKey: ['product-recycle-bin', productLineId], queryFn: () => productRepository.recycleBin(productLineId), retry: false });
-  const [operatingId, setOperatingId] = useState('');
-  const restore = async (id: string, revision: number) => {
-    setOperatingId(id);
-    try { await productRepository.restoreRecycleBinItem(productLineId, id, revision); await Promise.all([query.refetch(), ...['unified-task-page', 'requirements', 'design-tasks', 'product-dev-tasks', 'product-bugs'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))]); addToast('success', '任务已恢复'); }
-    catch (error) { addToast('error', '恢复失败', error instanceof Error ? error.message : '请稍后重试'); }
-    finally { setOperatingId(''); }
-  };
-  const purge = async (id: string, revision: number) => {
-    setOperatingId(id);
-    try { await productRepository.purgeRecycleBinItem(productLineId, id, revision); await query.refetch(); addToast('success', '任务已彻底删除'); }
-    catch (error) { addToast('error', '彻底删除失败', error instanceof Error ? error.message : '请稍后重试'); }
-    finally { setOperatingId(''); }
-  };
-  return <div className="w-full space-y-5 text-xs">
-    <div><h3 className="text-sm font-bold text-[var(--text-primary)]">归档任务</h3><p className="mt-1 text-[var(--text-muted)]">查看当前产品已归档的产品、设计、研发、测试和缺陷任务。</p></div>
-    {query.isLoading ? <div className="flex min-h-40 items-center justify-center"><Spin /></div> : query.isError ? <div role="alert" className="py-8 text-center text-[var(--danger)]">归档任务加载失败<Button type="link" onClick={() => query.refetch()}>重试</Button></div> : <div className="overflow-x-auto rounded-md border border-[var(--border-main)]"><div className="min-w-[820px]"><div className="grid grid-cols-[minmax(260px,1.6fr)_160px_130px_180px_150px] gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-3 text-[var(--text-muted)]"><span>标题</span><span>所属版本</span><span>操作人</span><span>操作时间</span><span className="text-right">操作</span></div>{(query.data || []).map((item) => <div key={item.id} className="grid grid-cols-[minmax(260px,1.6fr)_160px_130px_180px_150px] items-center gap-3 border-b border-[var(--border-main)] px-4 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]"><WorkItemCategoryIcon category={item.category} className="shrink-0 text-[var(--primary)]" /><span className="truncate" title={item.title}>{item.title}</span></span><span className="truncate text-[var(--text-body)]" title={item.versionName}>{item.versionName}</span><span className="truncate text-[var(--text-body)]">{item.operatorName || '未记录'}</span><span className="text-[var(--text-muted)]">{item.operatedAt ? new Date(item.operatedAt).toLocaleString('zh-CN', { hour12: false }) : '未记录'}</span><span className="flex justify-end gap-1"><Popconfirm title="恢复任务" description={`确定恢复“${item.title}”吗？`} okText="恢复" cancelText="取消" onConfirm={() => restore(item.id, item.revision)}><Button type="link" size="small" loading={operatingId === item.id} icon={<UndoOutlined />}>恢复</Button></Popconfirm><Popconfirm title="彻底删除" description={`确定彻底删除“${item.title}”吗？此操作不可恢复。`} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => purge(item.id, item.revision)}><Button type="link" danger size="small" loading={operatingId === item.id} icon={<DeleteOutlined />}>删除</Button></Popconfirm></span></div>)}{!query.data?.length && <div className="px-4 py-12 text-center text-[var(--text-muted)]">归档任务为空</div>}</div></div>}
-  </div>;
-};
-
-const SettingsPlaceholder: React.FC<{ title: string; description: string }> = ({ title, description }) => (
-  <div className="max-w-2xl space-y-2 text-xs"><h3 className="text-sm font-bold text-[var(--text-primary)]">{title}</h3><p className="text-[var(--text-muted)]">{description}</p><div className="mt-5 border border-dashed border-[var(--border-main)] p-5 text-[var(--text-muted)]">暂无可配置项</div></div>
-);
-
-const ProductLineWorkItemSettings: React.FC<{ productLine: ProductLine }> = ({ productLine }) => {
-  const queryClient = useQueryClient();
-  const { addToast, setProductLines } = useApp();
-  const categoryQuery = useQuery({ queryKey: ['work-item-categories'], queryFn: productRepository.workItemCategories, retry: false });
-  const categoryOptions = enabledCategoryOptions(categoryQuery.data || []);
-  const typesQuery = useQuery({ queryKey: ['product-work-item-types', productLine.id], queryFn: () => productRepository.workItemTypes(productLine.id), retry: false });
-  const workItemCategoryLabel = (value: string) => categoryQuery.data?.find((item) => item.code === categoryCode(value))?.displayName || value;
-  const [activeCategory, setActiveCategory] = useState<ProductLineWorkItemCategory>('需求');
-  const normalizeItems = (nextItems: ProductLineWorkItemType[]) => nextItems.map((item) => ({ ...item, enabled: Boolean(item.enabled), isDefault: Boolean(item.isDefault) }));
-  const [items, setItems] = useState<ProductLineWorkItemType[]>(normalizeItems(productLine.workItemTypes || []));
-  const displayedCategories = displayedTaskCategoryCodes(categoryOptions.map((item) => item.value), items.map((item) => item.category));
-  useEffect(() => {
-    if (displayedCategories.length && !displayedCategories.includes(activeCategory)) setActiveCategory(displayedCategories[0]);
-  }, [categoryQuery.data, items, activeCategory]);
-  const [editingItem, setEditingItem] = useState<ProductLineWorkItemType | null>(null);
-  const [itemToDelete, setItemToDelete] = useState<ProductLineWorkItemType | null>(null);
-  const [stateConfigItem, setStateConfigItem] = useState<ProductLineWorkItemType | null>(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [form, setForm] = useState<{ category: ProductLineWorkItemCategory; name: string; description: string; enabled: boolean; isDefault: boolean }>({ category: '需求', name: '', description: '', enabled: true, isDefault: false });
-  const [initialWorkflowStates, setInitialWorkflowStates] = useState<EditableWorkflowState[]>(createDefaultWorkItemStates('requirement'));
-
-  useEffect(() => {
-    setItems(normalizeItems(typesQuery.data || productLine.workItemTypes || []));
-  }, [typesQuery.data, productLine.workItemTypes]);
-
-  const isRemote = () => {
-    const token = sessionStorage.getItem('shichuang.session.token');
-    return Boolean(token && !token.startsWith('local-dev-'));
-  };
-
-  const visibleItems = items.filter((item) => categoryCode(item.category) === categoryCode(activeCategory));
-  const persistLocalItems = async (nextItems: ProductLineWorkItemType[]) => {
-    await productRepository.updateProductLine(productLine.id, { workItemTypes: nextItems });
-    queryClient.setQueryData(['product-work-item-types', productLine.id], nextItems);
-    setItems(nextItems);
-    setProductLines((previous) => previous.map((line) => line.id === productLine.id ? { ...line, workItemTypes: nextItems } : line));
-  };
-  const openCreate = () => {
-    setEditingItem(null);
-    setForm({ category: categoryOptions.find((item) => categoryCode(item.value) === categoryCode(activeCategory))?.value || activeCategory, name: '', description: '', enabled: true, isDefault: false });
-    setInitialWorkflowStates(createDefaultWorkItemStates(categoryCode(activeCategory)));
-    setIsEditorOpen(true);
-  };
-  const openEdit = (item: ProductLineWorkItemType) => {
-    setEditingItem(item);
-    setForm({ category: item.category, name: item.name, description: item.description || '', enabled: item.enabled, isDefault: Boolean(item.isDefault) });
-    setIsEditorOpen(true);
-  };
-  const reloadRemoteItems = async () => {
-    if (!isRemote()) return;
-    const nextItems = await productRepository.workItemTypes(productLine.id);
-    queryClient.setQueryData(['product-work-item-types', productLine.id], nextItems);
-    setItems(normalizeItems(nextItems));
-  };
-  const saveItem = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const name = form.name.trim();
-    if (!name) {
-      addToast('warning', '请输入工作项类型名称');
-      return;
-    }
-    if (!editingItem && (categoryQuery.isError || !categoryOptions.some((item) => categoryCode(item.value) === categoryCode(form.category)))) {
-      addToast('warning', '分类不可用，请同步分类后重试');
-      return;
-    }
-    if (!editingItem) {
-      const invalid = validateWorkflowStates(initialWorkflowStates);
-      if (invalid) {
-        addToast('warning', invalid);
-        return;
-      }
-    }
-    setIsSaving(true);
-    try {
-      if (isRemote()) {
-        if (editingItem) await productRepository.updateWorkItemType(productLine.id, editingItem.id, { ...form, name, description: form.description.trim() });
-        else {
-          const category = categoryCode(form.category);
-          const states = initialWorkflowStates.map((state) => ({ ...state, name: state.name.trim(), stage: category === 'bug' ? 'dev' : category === 'case' ? 'test' : category }));
-          await productRepository.createWorkItemType(productLine.id, {
-            ...form,
-            name,
-            description: form.description.trim(),
-            workflow: { category, name: `${name}状态配置`, definition: buildWorkflowDefinition(states) }
-          });
-        }
-        await reloadRemoteItems();
-      } else {
-        const localItem: ProductLineWorkItemType = editingItem
-          ? { ...editingItem, ...form, name, description: form.description.trim() }
-          : { id: `work-item-type-${Date.now()}`, ...form, name, description: form.description.trim(), creatorName: '当前用户', createdAt: new Date().toISOString() };
-        const baseItems = localItem.isDefault
-          ? items.map((item) => categoryCode(item.category) === categoryCode(localItem.category) ? { ...item, isDefault: false } : item)
-          : items;
-        const normalizedLocalItem = localItem.enabled ? localItem : { ...localItem, isDefault: false };
-        const nextItems = editingItem ? baseItems.map((item) => item.id === editingItem.id ? normalizedLocalItem : item) : [normalizedLocalItem, ...baseItems];
-        await persistLocalItems(nextItems);
-      }
-      setIsEditorOpen(false);
-      addToast('success', editingItem ? '工作项类型已修改' : '工作项类型已新增');
-    } catch (error) {
-      addToast('error', editingItem ? '工作项类型修改失败' : '工作项类型新增失败', error instanceof Error ? error.message : '请稍后重试');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  const toggleItem = async (item: ProductLineWorkItemType, enabled: boolean) => {
-    try {
-      if (isRemote()) {
-        await productRepository.updateWorkItemType(productLine.id, item.id, { enabled });
-        await reloadRemoteItems();
-      } else {
-        await persistLocalItems(items.map((candidate) => candidate.id === item.id ? { ...candidate, enabled, isDefault: enabled ? candidate.isDefault : false } : candidate));
-      }
-    } catch (error) {
-      addToast('error', '工作项类型状态更新失败', error instanceof Error ? error.message : '请稍后重试');
-    }
-  };
-  const deleteItem = async () => {
-    if (!itemToDelete) return;
-    try {
-      if (isRemote()) {
-        await productRepository.deleteWorkItemType(productLine.id, itemToDelete.id);
-        await reloadRemoteItems();
-      } else {
-        await persistLocalItems(items.filter((item) => item.id !== itemToDelete.id));
-      }
-      addToast('success', '工作项类型已删除');
-    } catch (error) {
-      addToast('error', '工作项类型删除失败', error instanceof Error ? error.message : '请稍后重试');
-    } finally {
-      setItemToDelete(null);
-    }
-  };
-
-  return (
-    <div className="mx-auto w-full max-w-4xl space-y-4 text-xs">
-      <div className="flex items-start justify-between gap-4">
-        <div><h3 className="text-sm font-bold text-[var(--text-primary)]">工作项设置</h3><p className="mt-1 text-[var(--text-muted)]">按工作项分类维护类型名称、描述和启用状态。</p></div>
-        <div className="flex gap-2"><Button loading={categoryQuery.isFetching || typesQuery.isFetching} onClick={() => { void categoryQuery.refetch(); void typesQuery.refetch(); }}>同步模板</Button><Button type="primary" icon={<PlusOutlined />} disabled={categoryQuery.isPending || categoryQuery.isError || typesQuery.isPending || typesQuery.isError || !categoryOptions.some((item) => categoryCode(item.value) === categoryCode(activeCategory))} onClick={openCreate}>新增类型</Button></div>
-      </div>
-      <div className="flex flex-wrap gap-1 border-b border-[var(--border-main)]">
-        {displayedCategories.map((category) => {
-          const count = items.filter((item) => categoryCode(item.category) === categoryCode(category)).length;
-          return <button key={category} type="button" onClick={() => setActiveCategory(category)} className={`h-10 px-4 text-xs font-normal border-b-2 transition-colors ${activeCategory === category ? 'border-[var(--primary)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><span>{workItemCategoryLabel(category)}</span><span className="ml-1 font-normal text-[var(--primary)]">{count}</span></button>;
-        })}
-      </div>
-      {categoryQuery.isError && <Alert type="error" showIcon message="工作项分类读取失败，请点击同步分类重试" />}
-      {typesQuery.isPending && <Alert type="info" message="正在读取工作项模板" />}
-      {typesQuery.isError && <Alert type="error" showIcon message="工作项模板读取失败" action={<Button size="small" onClick={() => void typesQuery.refetch()}>重试</Button>} />}
-      <div className="overflow-hidden rounded-md border border-[var(--border-main)]">
-        <div className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-3 text-[11px] text-[var(--text-muted)]"><span>类型名称</span><span>描述</span><span>添加人</span><span>添加时间</span><span>是否启用</span><span className="text-right">操作</span></div>
-        {visibleItems.length ? visibleItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(150px,1fr)_minmax(180px,1.6fr)_120px_150px_100px_96px] items-center gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-b-0"><span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text-primary)]" title={item.name}><span className="truncate">{item.name}</span>{item.isDefault && <Tag color="blue">默认</Tag>}</span><span className="truncate text-[var(--text-body)]" title={item.description}>{item.description || '暂无描述'}</span><span className="truncate text-[var(--text-body)]">{item.creatorName || '暂无'}</span><span className="text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }) : '暂无'}</span><Switch className="product-line-switch justify-self-start" checked={item.enabled} onChange={(checked) => void toggleItem(item, checked)} /><span className="flex justify-end gap-1"><Button type="text" aria-label={`配置${item.name}状态`} title="状态配置" icon={<ApartmentOutlined />} onClick={() => setStateConfigItem(item)} /><Button type="text" aria-label={`修改${item.name}`} title={`修改${item.name}`} icon={<EditOutlined />} onClick={() => openEdit(item)} /><Button type="text" danger aria-label={`删除${item.name}`} title={`删除${item.name}`} icon={<DeleteOutlined />} onClick={() => setItemToDelete(item)} /></span></div>) : <div className="px-3 py-10 text-center text-[var(--text-muted)]">暂无{workItemCategoryLabel(activeCategory)}工作项类型，点击右上角“新增类型”添加</div>}
-      </div>
-      <Drawer
-        width={editingItem ? 560 : 840}
-        open={isEditorOpen}
-        onClose={() => setIsEditorOpen(false)}
-        destroyOnClose={false}
-        title={editingItem ? '修改工作项类型' : '新增工作项类型'}
-        footer={<div className="flex justify-end gap-2"><Button onClick={() => setIsEditorOpen(false)}>取消</Button><Button type="primary" loading={isSaving} htmlType="submit" form="work-item-type-form">{editingItem ? '保存修改' : '创建并发布'}</Button></div>}
-      >
-        <form id="work-item-type-form" onSubmit={saveItem} className="space-y-5 text-xs">
-          <section className="space-y-4">
-            <div><h3 className="text-sm font-bold text-[var(--text-primary)]">基本信息</h3><p className="mt-1 text-[var(--text-muted)]">设置子类型的名称、分类和启用状态。</p></div>
-            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型分类</span><Select value={form.category} disabled={Boolean(editingItem) || categoryQuery.isError} onChange={(category) => { setForm((previous) => ({ ...previous, category })); setInitialWorkflowStates(createDefaultWorkItemStates(categoryCode(category))); }} options={categoryOptions.map((item) => ({ value: item.value, label: <span className="inline-flex items-center gap-2"><WorkItemCategoryIcon category={item.iconKey} />{item.label}</span> }))} /></label>
-            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>类型名称 *</span><Input maxLength={128} value={form.name} onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))} placeholder="请输入类型名称" /></label>
-            <label className="flex flex-col gap-[5px] font-medium text-[var(--text-body)]"><span>描述</span><Input.TextArea rows={3} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} placeholder="请输入类型描述" /></label>
-            <div className="flex items-center justify-between"><div><div className="font-medium text-[var(--text-body)]">是否启用</div><p className="mt-1 text-[11px] text-[var(--text-muted)]">停用后不能新建该类型的工作项。</p></div><Switch className="product-line-switch" checked={form.enabled} onChange={(enabled) => setForm((previous) => ({ ...previous, enabled }))} /></div>
-            <div className="flex items-center justify-between"><div><div className="font-medium text-[var(--text-body)]">是否默认</div><p className="mt-1 text-[11px] text-[var(--text-muted)]">设为默认后，新建该分类任务时优先选择此类型。</p></div><Switch aria-label="是否默认" className="product-line-switch" checked={form.isDefault} disabled={!form.enabled} onChange={(isDefault) => setForm((previous) => ({ ...previous, isDefault }))} /></div>
-          </section>
-          {!editingItem && <section className="space-y-4 border-t border-[var(--border-main)] pt-5">
-            <div><h3 className="text-sm font-bold text-[var(--text-primary)]">初始化状态</h3><p className="mt-1 text-[var(--text-muted)]">状态名称可自定义，每个状态必须归属未开始、进行中、已完成或已取消。</p></div>
-            <WorkItemStateEditor states={initialWorkflowStates} category={categoryCode(form.category)} onChange={setInitialWorkflowStates} />
-          </section>}
-        </form>
-      </Drawer>
-      <Modal isOpen={Boolean(itemToDelete)} onClose={() => setItemToDelete(null)} title="删除工作项类型" footer={<><Button onClick={() => setItemToDelete(null)}>取消</Button><Button type="primary" danger onClick={() => void deleteItem()}>确认删除</Button></>}><p className="text-sm text-[var(--text-body)]">确定删除“{itemToDelete?.name}”吗？删除后不可恢复。</p></Modal>
-      <WorkItemStateConfigDrawer productLine={productLine} item={stateConfigItem} open={Boolean(stateConfigItem)} onClose={() => setStateConfigItem(null)} />
     </div>
   );
 };
@@ -491,14 +237,12 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   } = useApp();
 
   const productLine = productLines.find((pl) => pl.id === productLineId);
-  const roleTemplatesQuery = useQuery({ queryKey: ['product-role-templates'], queryFn: productRepository.productRoleTemplates, retry: false });
 
   // Modals state
   const [boardCreateKind, setBoardCreateKind] = useState<'requirement' | 'design' | 'dev' | 'test' | 'bug' | null>(null);
   const [detailWorkItem, setDetailWorkItem] = useState<UnifiedWorkItem | null>(null);
   const [isCreateVersionOpen, setIsCreateVersionOpen] = useState(false);
   const [editingVersion, setEditingVersion] = useState<VersionIteration | null>(null);
-  const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<ProductLineSettingsSection>(initialSettingsSection || 'basic');
 
   useEffect(() => {
@@ -514,71 +258,6 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
   const [insightFilter, setInsightFilter] = useState(initialInsightFilter);
   useEffect(() => setInsightFilter(initialInsightFilter), [productLineId]);
   const workItemsQuery = useProductLineWorkItems(productLineId);
-  const productInfoRef = useRef<HTMLDivElement>(null);
-  const statsPanelRef = useRef<HTMLElement>(null);
-  const tabWorkspaceRef = useRef<HTMLDivElement>(null);
-  const activityPanelRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const productInfo = productInfoRef.current;
-    const statsPanel = statsPanelRef.current;
-    if (!productInfo || !statsPanel) return undefined;
-
-    const mediaQuery = window.matchMedia('(min-width: 1280px)');
-    const syncPanelHeights = () => {
-      productInfo.style.minHeight = '';
-      statsPanel.style.minHeight = '';
-      if (!mediaQuery.matches) return;
-      const height = Math.max(productInfo.offsetHeight, statsPanel.offsetHeight);
-      productInfo.style.minHeight = `${height}px`;
-      statsPanel.style.minHeight = `${height}px`;
-    };
-    const observer = new ResizeObserver(syncPanelHeights);
-    observer.observe(productInfo);
-    observer.observe(statsPanel);
-    mediaQuery.addEventListener('change', syncPanelHeights);
-    syncPanelHeights();
-    return () => {
-      observer.disconnect();
-      mediaQuery.removeEventListener('change', syncPanelHeights);
-      productInfo.style.minHeight = '';
-      statsPanel.style.minHeight = '';
-    };
-  }, [productLine?.id]);
-
-  useEffect(() => {
-    const tabWorkspace = tabWorkspaceRef.current;
-    const activityPanel = activityPanelRef.current;
-    if (!tabWorkspace || !activityPanel) return undefined;
-
-    const mediaQuery = window.matchMedia('(min-width: 1280px)');
-    const syncTabWorkspaceHeight = () => {
-      tabWorkspace.style.height = '';
-      tabWorkspace.style.maxHeight = '';
-      tabWorkspace.style.overflowY = '';
-      if (!mediaQuery.matches) return;
-      const availableHeight = activityPanel.getBoundingClientRect().bottom - tabWorkspace.getBoundingClientRect().top;
-      const viewportHeight = window.innerHeight - tabWorkspace.getBoundingClientRect().top - 24;
-      const maxHeight = Math.max(320, Math.min(availableHeight, viewportHeight));
-      tabWorkspace.style.height = `${maxHeight}px`;
-      tabWorkspace.style.maxHeight = `${maxHeight}px`;
-      tabWorkspace.style.overflowY = 'auto';
-    };
-    const observer = new ResizeObserver(syncTabWorkspaceHeight);
-    observer.observe(activityPanel);
-    window.addEventListener('resize', syncTabWorkspaceHeight);
-    mediaQuery.addEventListener('change', syncTabWorkspaceHeight);
-    syncTabWorkspaceHeight();
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', syncTabWorkspaceHeight);
-      mediaQuery.removeEventListener('change', syncTabWorkspaceHeight);
-      tabWorkspace.style.height = '';
-      tabWorkspace.style.maxHeight = '';
-      tabWorkspace.style.overflowY = '';
-    };
-  }, [productLine?.id, activeTab, productLine?.activities?.length, versions.length]);
-
   if (!productLine) {
     return (
       <div className="p-8 text-center space-y-4">
@@ -623,44 +302,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
     openPageTab('prod_versions');
   };
 
-  const normalizeRole = (role?: string) => {
-    if (!role) return '参与人';
-    if (role === '管理员' || role.includes('综合负责人')) return '管理员';
-    if (role === '产品' || role.includes('需求') || role.includes('产品')) return '产品';
-    if (role === '研发' || role.includes('技术') || role.includes('架构') || role.includes('研发')) return '研发';
-    if (role === '设计' || role.includes('设计') || role.includes('UI') || role.includes('UX')) return '设计';
-    if (role === '测试' || role.includes('测试') || role.includes('QA')) return '测试';
-    if (role === '交付主管') return '交付主管';
-    return role.trim();
-  };
-  const baseDetailMembers: ProductLineMember[] = (productLine.members || []).map((member, index) => (
-    typeof member === 'string'
-      ? { id: `legacy-${index}-${member}`, userId: '', name: member, role: '参与人' }
-      : { ...member, role: normalizeRole(member.role) }
-  ));
-  const detailMembers = baseDetailMembers;
-  const memberCount = new Set([
-    ...detailMembers.map((member) => member.name),
-    productLine.owner,
-    productLine.ownerName,
-    productLine.requirementOwner,
-    productLine.techOwner,
-    productLine.testOwner
-  ].filter(Boolean)).size;
-  const configuredRoleNames = Array.from(
-    new Set((roleTemplatesQuery.data || []).map((role) => role.name).filter(Boolean))
-  );
-  const detailRoleNames = Array.from(
-    new Set([
-      ...configuredRoleNames,
-      ...detailMembers
-        .map((member) => normalizeRole(member.role))
-        .filter((role) => !configuredRoleNames.includes(role))
-    ])
-  );
-  const memberRoleGroups = detailRoleNames
-    .map((label) => ({ label, members: detailMembers.filter((member) => normalizeRole(member.role) === label) }))
-    .filter((group) => group.members.length > 0);
+  const memberCount = new Set([...(productLine.members || []).map((member) => typeof member === 'string' ? member : member.name), productLine.owner, productLine.ownerName, productLine.requirementOwner, productLine.techOwner, productLine.testOwner, productLine.deliveryOwner].filter(Boolean)).size;
   const activityItems: ProductLineActivity[] = productLine.activities?.length
     ? productLine.activities
     : lineVersions.map((version) => ({ id: version.id, action: '创建了版本', detail: version.code || version.name, operatorName: currentUser.name, createdAt: version.createdAt || version.releaseDate || '' }));
@@ -707,16 +349,16 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       {activeTab === 'basic' && <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-[var(--text-primary)]">基本信息</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">查看产品概况、责任人配置、线上版本和产品动态。</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">查看产品概况、责任人配置、最新发布版本和产品动态。</p>
         </div>
       </div>}
 
-      {activeTab === 'settings' && <ProductLineSettingsPanel embedded productLine={productLine} initialSection={settingsSection} onBack={() => setActiveTab('basic')} onProductRemoved={onBack} onOpenMembers={() => setIsManageMembersOpen(true)} />}
+      {activeTab === 'settings' && <ProductLineSettingsPanel embedded productLine={productLine} initialSection={settingsSection} onBack={() => setActiveTab('basic')} onProductRemoved={onBack} />}
       {activeTab === 'documents' && <ProductDocumentsPanel key={productLine.id} productLine={productLine} />}
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,2.35fr)_minmax(300px,0.95fr)]">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(360px,1fr)]">
       <main className={`min-w-0 space-y-5 ${activeTab !== 'basic' ? 'xl:col-span-2' : ''}`}>
       {/* Hero Overview Banner with Cover */}
-      {activeTab === 'basic' && <div ref={productInfoRef} className="product-line-hero relative rounded-2xl border border-[var(--border-main)] overflow-hidden bg-[var(--bg-surface)] shadow-lg">
+      {activeTab === 'basic' && <div className="product-line-hero relative rounded-md border border-[var(--border-main)] overflow-hidden bg-[var(--bg-surface)]">
         {/* Cover Background Graphic */}
         <div className="hidden">
           {productLine.coverImage ? (
@@ -737,7 +379,7 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
               {productLine.code}
             </span>
             <span className="px-2.5 py-1 rounded-md bg-[var(--primary)]/80 backdrop-blur-md text-white font-mono font-bold text-xs">
-              线上版本 {onlineVersion?.code || onlineVersion?.name || '暂无发布'}
+              最新发布版本 {onlineVersion?.code || onlineVersion?.name || '暂无发布'}
             </span>
           </div>
 
@@ -770,69 +412,36 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
                 </p>
               </div>
               <div className="mt-4 flex min-w-0 items-center justify-between gap-4 border-t border-[var(--border-main)] pt-3 text-xs">
-                <span className="font-mono font-medium text-[var(--text-body)]">线上版本：{onlineVersion?.code || onlineVersion?.name || '暂无发布'}</span>
+                <span className="font-mono font-medium text-[var(--text-body)]">最新发布版本：{onlineVersion?.code || onlineVersion?.name || '暂无发布'}</span>
                 <span className="shrink-0 text-[var(--text-muted)]">发布时间：{onlineVersion ? onlinePublishedAt : '无发布'}</span>
               </div>
           </div>
 
-          {/* Three Key Leads Display Bar (需求负责人、技术负责人、测试负责人) */}
-          <div className="pt-2 border-t border-[var(--border-main)]">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* 需求负责人 */}
-              <div className="product-line-lead-card p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-main)] flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 font-bold text-xs">
-                  PO
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[11px] text-[var(--text-muted)]">产品责任人 (Product Owner)</div>
-                  <div className="mt-0.5 truncate text-sm font-bold">
-                    <span className="text-[var(--primary)]">主：{productLine.requirementOwner || '暂无'}</span>{responsibilitySummary(productLine.requirementOwnerSecondary).label && <span className="text-[var(--text-body)]" title={responsibilitySummary(productLine.requirementOwnerSecondary).title}> · 次：{responsibilitySummary(productLine.requirementOwnerSecondary).label}</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* 技术负责人 */}
-              <div className="product-line-lead-card p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-main)] flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/15 border border-[var(--primary)]/30 flex items-center justify-center text-[var(--active-text)] font-bold text-xs">
-                  TL
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[11px] text-[var(--text-muted)]">研发责任人 (Tech Lead)</div>
-                  <div className="mt-0.5 truncate text-sm font-bold">
-                    <span className="text-[var(--primary)]">主：{productLine.techOwner || '暂无'}</span>{responsibilitySummary(productLine.techOwnerSecondary).label && <span className="text-[var(--text-body)]" title={responsibilitySummary(productLine.techOwnerSecondary).title}> · 次：{responsibilitySummary(productLine.techOwnerSecondary).label}</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* 测试负责人 */}
-              <div className="product-line-lead-card p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-main)] flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs">
-                  QA
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[11px] text-[var(--text-muted)]">测试责任人 (QA Lead)</div>
-                  <div className="mt-0.5 truncate text-sm font-bold">
-                    <span className="text-[var(--primary)]">主：{productLine.testOwner || '暂无'}</span>{responsibilitySummary(productLine.testOwnerSecondary).label && <span className="text-[var(--text-body)]" title={responsibilitySummary(productLine.testOwnerSecondary).title}> · 次：{responsibilitySummary(productLine.testOwnerSecondary).label}</span>}
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-3 border-t border-[var(--border-main)] pt-4 sm:grid-cols-3">
+            {workItemsQuery.isError ? <div role="alert" className="col-span-full text-xs text-[var(--danger)]">统计加载失败 <Button size="small" onClick={() => workItemsQuery.refetch()}>重试</Button></div> : productLineStatCards.map(({ label, category, tone }) => {
+              const scoped = category === 'assistance'
+                ? workItems.filter((item) => item.category === 'requirement' && item.sourceType === 'WORK_ORDER')
+                : workItems.filter((item) => item.category === category && (category !== 'requirement' || item.sourceType !== 'WORK_ORDER'));
+              return <div key={category} className="product-line-stat-card flex min-h-16 flex-col items-center justify-center gap-1 rounded-md bg-[var(--bg-surface-soft)] p-2 text-center"><div className="flex items-center gap-1.5 text-xs text-[var(--text-primary)]"><WorkItemCategoryIcon category={category} className={`h-3.5 w-3.5 ${tone}`} />{label}</div><span className={`font-mono text-xl font-bold ${category === 'bug' ? tone : 'text-[var(--text-primary)]'}`}>{workItemsQuery.isPending ? '--' : scoped.length}</span></div>;
+            })}
           </div>
 
         </div>
       </div>}
 
       {activeTab === 'basic' && <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
-        <div className="space-y-4">
-          <h3 className="font-bold text-sm text-[var(--text-primary)]">产品动态</h3>
-          <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
-            {activityGroups.map(([date, activities]) => <section key={date} className="space-y-2"><div className="inline-flex rounded-md bg-[var(--bg-surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">{date === '暂无日期' ? date : `${date} ${new Date(`${date}T00:00:00`).toLocaleDateString('zh-CN', { weekday: 'short' })}`}</div><div className="space-y-1">{[...activities].sort((left, right) => activityTimestamp(right).localeCompare(activityTimestamp(left))).map((activity) => { const timestamp = activityTimestamp(activity); return <div key={activity.id} className="flex min-w-0 items-center gap-3 py-3 text-xs"><PersonAvatar name={activity.operatorName || currentUser.name || '系'} size={32} /><span className="w-16 shrink-0 font-mono text-sm font-semibold text-[var(--text-muted)]">{timestamp ? timestamp.slice(11, 16) : '--:--'}</span><span className="min-w-0 flex-1 break-words text-sm text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span></div>; })}</div></section>)}
-            {activityItems.length === 0 && <div className="py-12 text-center text-sm text-[var(--text-muted)]">暂无产品动态</div>}
-          </div>
+        <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-bold text-[var(--text-primary)]">责任人管理</h3><Button type="text" aria-label="责任人配置" title="责任人配置" icon={<SettingOutlined />} onClick={() => { setSettingsSection('responsibilities'); setActiveTab('settings'); }} /></div>
+        <div className="divide-y divide-[var(--border-main)]">
+          {([
+            ['产品', productLine.requirementOwner, productLine.requirementOwnerSecondary],
+            ['研发', productLine.techOwner, productLine.techOwnerSecondary],
+            ['测试', productLine.testOwner, productLine.testOwnerSecondary],
+            ['交付', productLine.deliveryOwner, productLine.deliveryOwnerSecondary]
+          ] as const).map(([role, primary, secondary]) => <div key={role} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0"><span className="w-16 shrink-0 rounded bg-[var(--primary)]/10 px-2 py-1 text-center text-[11px] font-semibold text-[var(--active-text)]">{role}</span><div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2"><span className="inline-flex min-w-0 items-center gap-2 text-xs text-[var(--primary)]" title={`${role}主责任人：${primary || '未设置'}`}><PersonAvatar name={primary} size={24} /><span className="break-words font-semibold">{primary || '未设置'}</span></span>{(normalizeResponsibilityNames(secondary).length ? normalizeResponsibilityNames(secondary) : ['未设置']).map((name, index) => <span key={`${name}-${index}`} className="inline-flex min-w-0 items-center gap-2 text-xs text-[var(--text-muted)]" title={`${role}次责任人：${name}`}><PersonAvatar name={name} size={24} /><span className="break-words">{name}</span></span>)}</div></div>)}
         </div>
       </section>}
 
-      {activeTab !== 'basic' && activeTab !== 'settings' && activeTab !== 'documents' && <div ref={tabWorkspaceRef} className="product-line-tab-workspace min-h-[calc(100vh-180px)]">
+      {activeTab !== 'basic' && activeTab !== 'settings' && activeTab !== 'documents' && <div className="product-line-tab-workspace min-h-[calc(100vh-180px)]">
       {/* Tabs Navigation */}
       <div className="hidden">
         <button
@@ -906,50 +515,17 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
       </div>}
 
       </main>
-      {activeTab === 'basic' && <aside className="min-w-0 space-y-5">
-        <section ref={statsPanelRef}>
-          <Card size="small" title={<span className="text-sm font-bold text-[var(--text-primary)]">统计</span>} className="product-line-stat-panel h-full">
-          {workItemsQuery.isError ? <div className="p-2 text-xs text-[var(--danger)]">统计加载失败 <Button size="small" onClick={() => workItemsQuery.refetch()}>重试</Button></div> : <div className="grid grid-cols-2 gap-3">
-            {productLineStatCards.map(({ label, category, tone }) => {
-              const scoped = category === 'assistance'
-                ? workItems.filter((item) => item.category === 'requirement' && item.sourceType === 'WORK_ORDER')
-                : workItems.filter((item) => item.category === category && (category !== 'requirement' || item.sourceType !== 'WORK_ORDER'));
-              return <div key={category} className="product-line-stat-card flex flex-col items-center justify-center gap-1.5 rounded-lg bg-[var(--bg-surface-soft)] p-3 text-center"><div className="flex items-center justify-center gap-1.5 text-xs font-normal text-[var(--text-primary)]"><WorkItemCategoryIcon category={category} className={`h-3.5 w-3.5 ${tone}`} /><span>{label}</span></div><div className={`text-xl font-bold font-mono tabular-nums ${category === 'bug' ? tone : 'text-[var(--text-primary)]'}`}>{workItemsQuery.isPending ? '--' : scoped.length}</div></div>;
-            })}
-          </div>}
-          </Card>
-        </section>
-        <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-3">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-[var(--text-primary)]">成员管理</h3>
-            <div className="flex items-center gap-1">
-              <Button type="text" style={{ color: 'var(--primary)' }} className="hover:text-[var(--active-text)]" aria-label="添加成员" title="添加成员" icon={<UserAddOutlined style={{ color: 'var(--primary)' }} />} onClick={() => setIsManageMembersOpen(true)} />
-              <Button type="text" aria-label="成员设置" title="成员设置" icon={<SettingOutlined />} onClick={() => { setSettingsSection('members'); setActiveTab('settings'); }} />
-            </div>
+      {activeTab === 'basic' && <aside className="min-w-0 xl:self-stretch">
+        <section className="border border-[var(--border-main)] bg-[var(--bg-surface)] p-4 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+        <div className="space-y-4 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
+          <h3 className="font-bold text-sm text-[var(--text-primary)]">产品动态</h3>
+          <div className="max-h-96 space-y-3 overflow-y-auto pr-1 xl:max-h-none xl:min-h-0 xl:flex-1">
+            {activityGroups.map(([date, activities]) => <section key={date} className="space-y-2"><div className="inline-flex rounded-md bg-[var(--bg-surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">{date === '暂无日期' ? date : `${date} ${new Date(`${date}T00:00:00`).toLocaleDateString('zh-CN', { weekday: 'short' })}`}</div><div className="space-y-1">{[...activities].sort((left, right) => activityTimestamp(right).localeCompare(activityTimestamp(left))).map((activity) => { const timestamp = activityTimestamp(activity); return <div key={activity.id} className="flex min-w-0 items-center gap-3 py-3 text-xs"><PersonAvatar name={activity.operatorName || currentUser.name || '系'} size={32} /><span className="w-16 shrink-0 font-mono text-sm font-semibold text-[var(--text-muted)]">{timestamp ? timestamp.slice(11, 16) : '--:--'}</span><span className="min-w-0 flex-1 break-words text-sm text-[var(--text-body)]">{activity.operatorName || currentUser.name} {activity.action} <span className="text-[var(--active-text)]">{activity.detail || ''}</span></span></div>; })}</div></section>)}
+            {activityItems.length === 0 && <div className="py-12 text-center text-sm text-[var(--text-muted)]">暂无产品动态</div>}
           </div>
-
-          <div className="divide-y divide-[var(--border-main)]">
-          {memberRoleGroups.map((group) => (
-            <section key={group.label} className="flex items-center gap-3 py-2 first:pt-1 last:pb-1">
-              <span className="w-16 shrink-0 rounded bg-[var(--primary)]/10 px-2 py-1 text-center text-[11px] font-semibold text-[var(--active-text)]">{group.label}</span>
-              <div className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-2">
-                {group.members.map((member) => (
-                  <div key={member.id} className="flex min-w-0 items-center gap-2">
-                    <PersonAvatar name={member.name} size={28} />
-                    <div className="max-w-24 truncate text-xs text-[var(--text-body)]" title={member.name}>{member.name}</div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
-          </div>
-          {memberRoleGroups.length === 0 && <div className="py-6 text-center text-xs text-[var(--text-muted)]">暂无成员</div>}
         </div>
-        </section>
-
-      </aside>
-      }
+      </section>
+      </aside>}
       </div>
 
       {boardCreateKind && activeTab === 'board' && (
@@ -993,12 +569,6 @@ export const ProductLineDetailView: React.FC<ProductLineDetailViewProps> = ({
         editingVersion={editingVersion}
       />
 
-      {/* Modal 4: Manage Members Modal */}
-      <ManageMembersModal
-        isOpen={isManageMembersOpen}
-        onClose={() => setIsManageMembersOpen(false)}
-        productLine={productLine}
-      />
     </div>
   );
 };

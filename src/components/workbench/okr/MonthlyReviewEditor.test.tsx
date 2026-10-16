@@ -125,7 +125,7 @@ describe('personal monthly editor', () => {
     for (const title of ['1. 本月目标复盘', '2. 插播任务', '3. 对公司或部门发展有帮助的意见和建议', '4. 需要协助事项', '5. 知识沉淀']) expect(screen.getByText(title)).toBeInTheDocument();
     expect(screen.queryByText('KR 达成')).not.toBeInTheDocument();
     expect(screen.queryByText('下个月安排')).not.toBeInTheDocument();
-    await waitFor(() => expect(within(screen.getByLabelText('月度概览')).getByText('4')).toBeInTheDocument());
+    await waitFor(() => expect(within(screen.getByLabelText('月度概览')).getByText('4 小时')).toBeInTheDocument());
     fireEvent.change(screen.getByRole('textbox', { name: '对公司或部门发展有帮助的意见和建议' }), { target: { value: '新的问题\n新的建议' } });
     fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
     const saved = save.mock.calls[0][0];
@@ -159,20 +159,22 @@ describe('personal monthly editor', () => {
   it('shows submitted snapshots in the monthly layout even after goals and live work change', async () => {
     const onCopy = vi.fn();
     const saved: OkrPayload = { ...initialPayload, startDate: '2026-10-01', endDate: '2026-10-31',
-      monthlyMetrics: { taskCount: 7, collaborationCount: 2, totalHours: 16 },
+      monthlyMetrics: { taskCount: 7, collaborationCount: 2, totalHours: 16, overallProgress: 80, progressTrend: [{ id: 'saved-week', date: '2026-10-10', progress: 30 }, { id: 'month', date: '2026-10-31', progress: 80, monthly: true }] },
       krReviews: [{ objectiveId: 'removed', objectiveTitle: '原月度目标', keyResultId: 'removed-action', keyResultTitle: '已保存的个人计划', previousProgress: 0, currentProgress: 80,
         executionHealth: '超预期', health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: ['t'],
         detailRows: [{ id: 'detail', name: '原产品', version: 'V1.0', stage: '产品设计' }], detailProgress: [{ id: 'detail', previousProgress: 0, currentProgress: 80 }] }] };
     render(<MonthlyReviewEditor {...props} recordStatus="submitted" initialPayload={saved} work={[{ id: 't', title: '后续改名任务', actualHours: 99 } as OkrWork]}
       onCopy={onCopy} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
     expect(screen.getByText('我的计划：已保存的个人计划')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '本月周报与月报进度趋势' })).toBeInTheDocument();
+    expect(screen.getByText('2026-10-10：30%')).toBeInTheDocument();
     fireEvent.click(screen.getByText('我的计划：已保存的个人计划'));
     expect(screen.getByText('原产品')).toBeInTheDocument();
     expect(screen.getByRole('spinbutton')).toHaveValue('80');
     expect(screen.getByRole('spinbutton')).toBeDisabled();
     expect(screen.queryByText('后续改名任务')).not.toBeInTheDocument();
     expect(screen.getAllByText('已关联任务').length).toBeGreaterThan(0);
-    await waitFor(() => expect(screen.getByText('16')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('16 小时')).toBeInTheDocument());
     expect(screen.queryByText('月度目标已变化，请确认失效内容')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '提交月报' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
@@ -180,4 +182,15 @@ describe('personal monthly editor', () => {
     fireEvent.click(screen.getByRole('button', { name: '复制为本期' }));
     expect(onCopy).toHaveBeenCalledOnce();
   });
+});
+
+it('persists a weighted monthly trend snapshot alongside metrics', async () => {
+  const objective = { id: 'o', ownerId: 'me', ownerName: '本人', department: '产品部', cycle: '2026-10', category: 'my', objective: '目标', progress: 0, weight: 100, deadline: '2026-10-31', keyResults: [{ id: 'a', content: '计划甲', progress: 0, weight: 80, deadline: '2026-10-31' }, { id: 'b', content: '计划乙', progress: 0, weight: 20, deadline: '2026-10-31' }] } as OKRItem;
+  const rows = objective.keyResults.map((kr, i) => ({ objectiveId: 'o', objectiveTitle: '目标', keyResultId: kr.id, keyResultTitle: kr.content, previousProgress: 0, currentProgress: i === 0 ? 50 : 0, health: 'normal' as const, achievement: '', blocker: '', nextPlan: '', workIds: [] }));
+  const save = vi.fn(async (_payload: OkrPayload) => true);
+  render(<MonthlyReviewEditor {...props} okrs={[objective]} initialPayload={{ title: '月报', startDate: '2026-10-01', krReviews: rows }} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
+  await waitFor(() => expect(screen.getByLabelText('月度概览')).toHaveAttribute('aria-busy', 'false'));
+  expect(within(screen.getByLabelText('月度概览')).getByText('40%')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
+  expect(save.mock.calls[0][0].monthlyMetrics).toMatchObject({ overallProgress: 40, progressTrend: [{ id: 'month', date: '2026-10-31', progress: 40, monthly: true }] });
 });

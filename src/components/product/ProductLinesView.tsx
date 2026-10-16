@@ -5,7 +5,6 @@ import {
   Boxes,
   Layers,
   Globe,
-  Users,
 } from '../common/octicons-compat';
 import { ViewModeSwitch } from '../common/ViewModeSwitch';
 import { useApp } from '../../context/AppContext';
@@ -48,15 +47,14 @@ const ResponsibilitySummary: React.FC<{ productLine: ProductLine; compact?: bool
     ['产品', productLine.requirementOwner, productLine.requirementOwnerSecondary],
     ['研发', productLine.techOwner, productLine.techOwnerSecondary],
     ['测试', productLine.testOwner, productLine.testOwnerSecondary],
+    ['交付', productLine.deliveryOwner, productLine.deliveryOwnerSecondary],
   ] as const;
-  const longestName = Math.max(2, ...groups.flatMap(([, primary, secondary]) => [primary || '未设置', responsibilitySummary(secondary).label || '未设置'].map((name) => Array.from(name).length)));
-  const badgeWidth = longestName * 12 + 34;
 
   return (
-    <div className={`${compact ? 'gap-y-1' : 'gap-y-1.5'} grid w-max max-w-full items-center gap-x-1.5 text-left`} style={{ gridTemplateColumns: `28px repeat(2, minmax(0, ${badgeWidth}px))` }}>
+    <div className={`${compact ? 'gap-y-2' : 'gap-y-3'} grid w-full min-w-0 grid-cols-2 gap-x-3 text-left`}>
       {groups.map(([label, primary, secondary]) => (
-        <React.Fragment key={label}>
-          <span className="text-left text-[var(--text-muted)]">{label}</span>
+        <div key={label} className="grid min-w-0 grid-cols-[28px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5">
+          <span className="text-[var(--text-muted)]">{label}</span>
           <span className="responsibility-person responsibility-person-primary w-full" title={primary || '未设置'}>
               <span className="responsibility-role">主</span>
               <span className="responsibility-name responsibility-name-primary truncate">{primary || '未设置'}</span>
@@ -65,7 +63,7 @@ const ResponsibilitySummary: React.FC<{ productLine: ProductLine; compact?: bool
               <span className="responsibility-role">次</span>
               <span className="responsibility-name responsibility-name-secondary truncate">{responsibilitySummary(secondary).label || '未设置'}</span>
           </span>
-        </React.Fragment>
+        </div>
       ))}
     </div>
   );
@@ -169,14 +167,14 @@ export const ProductLinesView: React.FC = () => {
       ),
     },
     { title: '状态', key: 'status', width: 110, render: (_: unknown, pl: ProductLine) => <StatusTag type={displayStatus(pl) === '空闲中' ? 'default' : 'info'} status={displayStatus(pl)} /> },
-    { title: '责任人', key: 'responsibility', width: 300, render: (_: unknown, pl: ProductLine) => <ResponsibilitySummary productLine={pl} compact /> },
+    { title: '责任人', key: 'responsibility', width: 460, render: (_: unknown, pl: ProductLine) => <ResponsibilitySummary productLine={pl} compact /> },
     {
-      title: '线上版本', key: 'version', width: 150,
+      title: '最新发布版本', key: 'version', width: 150,
       render: (_: unknown, pl: ProductLine) => {
         const version = latestReleasedVersion(pl);
         return version
           ? <div className="text-left"><div className="font-mono font-semibold text-[var(--text-body)]">{version.code || version.name}</div><div className="mt-0.5 text-[11px] text-[var(--text-muted)]">发布时间 {formatVersionPublishedAt(version)}</div></div>
-          : <div className="text-left text-[var(--text-body)]">暂无线上版本</div>;
+          : <div className="text-left text-[var(--text-body)]">暂无发布</div>;
       }
     },
     {
@@ -197,7 +195,6 @@ export const ProductLinesView: React.FC = () => {
         const productWebsiteUrl = normalizeProductWebsiteUrl(pl.website);
         return <div className="flex flex-wrap gap-1.5" onClick={(event) => event.stopPropagation()}>
           <Button size="small" onClick={() => { sessionStorage.setItem('shichuang.productLineFilter', pl.id); sessionStorage.setItem('shichuang.productLineTargetTab', 'detail'); window.dispatchEvent(new Event('shichuang:product-line-context')); openPageTab('prod_versions'); }}>版本管理 ({productLineVersionCount(pl.id, versions)})</Button>
-          <Button size="small" onClick={() => { setSelectedSettingsSection('members'); setSelectedProductLineId(pl.id); }}>成员管理 ({productLineMemberCount(pl)})</Button>
           <Button size="small" disabled={!productWebsiteUrl} title={productWebsiteUrl ? '打开产品网址' : '暂未配置产品网址'} onClick={() => { if (productWebsiteUrl) window.open(productWebsiteUrl, '_blank', 'noopener,noreferrer'); }}>产品网址</Button>
         </div>;
       },
@@ -266,7 +263,6 @@ export const ProductLinesView: React.FC = () => {
         {filteredLines.map((pl) => {
           const stats = getLineStats(pl);
           const versionCount = productLineVersionCount(pl.id, versions);
-          const memberCount = productLineMemberCount(pl);
           const onlineVersion = latestReleasedVersion(pl);
           const productWebsiteUrl = normalizeProductWebsiteUrl(pl.website);
 
@@ -299,9 +295,9 @@ export const ProductLinesView: React.FC = () => {
               <div onClick={() => setSelectedProductLineId(pl.id)} className="product-line-body flex flex-1 flex-col justify-between space-y-3 p-4 text-xs cursor-pointer">
                 {/* Responsibility and online version information */}
                   <div className="space-y-2 text-[11px] text-[var(--text-muted)]">
-                  <div className="space-y-1.5 text-left"><span className="block">责任人</span><div className="flex min-w-0 justify-end font-medium text-[var(--text-body)]"><ResponsibilitySummary productLine={pl} compact /></div></div>
+                  <div className="space-y-1.5 text-left"><span className="block">责任人</span><ResponsibilitySummary productLine={pl} compact /></div>
                   <div className="flex min-w-0 items-center justify-between gap-4 border-t border-[var(--border-main)] pt-3 text-left">
-                    <span className="min-w-0 truncate font-mono font-semibold text-[var(--text-body)]">线上版本：{onlineVersion?.code || onlineVersion?.name || '暂无发布'}</span>
+                    <span className="min-w-0 truncate font-mono font-semibold text-[var(--text-body)]">最新发布版本：{onlineVersion?.code || onlineVersion?.name || '暂无发布'}</span>
                     <span className="shrink-0 text-[11px] text-[var(--text-muted)]">发布时间：{onlineVersion ? formatVersionPublishedAt(onlineVersion) : '无发布'}</span>
                   </div>
                 </div>
@@ -350,7 +346,7 @@ export const ProductLinesView: React.FC = () => {
                   <div onClick={(event) => { event.stopPropagation(); openLineTaskPage(pl, 'prod_bugs'); }} className="rounded-md px-1 py-1.5 text-center cursor-pointer bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-elevated)] transition-colors"><div className="flex items-center justify-center gap-1 text-[var(--text-primary)] text-[10px] font-medium mb-0.5"><WorkItemCategoryIcon category="bug" className="h-3 w-3 text-[var(--danger)]" /><span>缺陷任务</span></div><span className="font-mono text-sm font-bold text-[var(--danger)]">{stats.pendingBugs}</span></div>
                 </div>
 
-                {/* Footer Controls: 版本管理 & 成员管理 (满足需求2) */}
+                {/* 产品卡片快捷操作 */}
                 <div className="pt-2 border-t border-[var(--border-main)]">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Button
@@ -367,17 +363,6 @@ export const ProductLinesView: React.FC = () => {
                       <span className="whitespace-nowrap">版本管理 ({versionCount})</span>
                     </Button>
 
-                    <Button
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedSettingsSection('members');
-                        setSelectedProductLineId(pl.id);
-                      }}
-                      icon={<Users className="w-3.5 h-3.5 text-purple-400" />}
-                    >
-                      <span className="whitespace-nowrap">成员管理 ({memberCount})</span>
-                    </Button>
 
                     <Button
                       size="small"

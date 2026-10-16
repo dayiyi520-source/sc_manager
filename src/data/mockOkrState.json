@@ -1,5 +1,5 @@
 {
-  "revision": 41,
+  "revision": 48,
   "okrRecords": [
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
@@ -2476,7 +2476,7 @@
                 "details": [
                   {
                     "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                    "name": "师创云���台",
+                    "name": "师创云�������台",
                     "version": "V1.1.0",
                     "stage": "产品设计",
                     "plannedStartDate": "2026-10-14",
@@ -3049,9 +3049,9 @@
       "kind": "objective",
       "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
       "periodKey": "2026-10",
-      "status": "active",
+      "status": "deleted",
       "createdAt": "2026-10-13T08:22:30.434Z",
-      "version": 8,
+      "version": 9,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "personal",
@@ -4740,7 +4740,8 @@
       },
       "submittedAt": "2026-10-14T15:00:31.427Z",
       "viewedBy": [
-        "user-product"
+        "user-product",
+        "user-admin"
       ]
     },
     {
@@ -6220,6 +6221,159 @@
           "totalHours": 0
         }
       }
+    },
+    {
+      "id": "demo-month-2026-10-user-admin",
+      "kind": "objective",
+      "ownerId": "user-admin",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 0,
+      "createdAt": "2026-10-08T09:11:30.775Z",
+      "payload": {
+        "title": "推动季度重点项目按计划交付",
+        "weight": 100,
+        "progress": 45,
+        "deadline": "2026-10-31",
+        "objectiveType": "target",
+        "keyResults": [
+          {
+            "id": "demo-month-2026-10-user-admin-kr-1",
+            "title": "明确跨部门交付里程碑",
+            "weight": 50,
+            "progress": 70,
+            "deadline": "2026-10-31",
+            "assigneeIds": [
+              "user-product",
+              "user-tech"
+            ]
+          },
+          {
+            "id": "demo-month-2026-10-user-admin-kr-2",
+            "title": "跟进关键项目风险闭环",
+            "weight": 50,
+            "progress": 20,
+            "deadline": "2026-10-31",
+            "assigneeIds": [
+              "user-admin"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "demo-month-2026-10-user-product",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 0,
+      "createdAt": "2026-10-08T09:11:30.775Z",
+      "payload": {
+        "title": "完成核心产品体验优化",
+        "weight": 100,
+        "progress": 45,
+        "deadline": "2026-10-31",
+        "objectiveType": "target",
+        "keyResults": [
+          {
+            "id": "demo-month-2026-10-user-product-kr-1",
+            "title": "完成需求评审与方案确认",
+            "weight": 50,
+            "progress": 70,
+            "deadline": "2026-10-31",
+            "assigneeIds": [
+              "user-product"
+            ]
+          },
+          {
+            "id": "demo-month-2026-10-user-product-kr-2",
+            "title": "推动体验问题验收上线",
+            "weight": 50,
+            "progress": 20,
+            "deadline": "2026-10-31",
+            "assigneeIds": [
+              "user-product"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "demo-month-2026-10-user-tech",
+      "kind": "objective",
+      "ownerId": "user-tech",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 0,
+      "createdAt": "2026-10-08T09:11:30.775Z",
+      "payload": {
+        "title": "提升研发交付质量与效率",
+        "weight": 100,
+        "progress": 45,
+        "deadline": "2026-10-31",
+        "objectiveType": "target",
+        "keyResults": [
+          {
+            "id": "demo-month-2026-10-user-tech-kr-1",
+            "title": "完成关键模块开发联调",
+            "weight": 50,
+            "progress": 70,
+            "deadline": "2026-10-31",
+            "assigneeIds": [
+              "user-tech"
+            ]
+          },
+          {
+            "id": "demo-month-2026-10-user-tech-kr-2",
+            "title": "建立自动化回归检查",
+            "weight": 50,
+            "progress": 20,
+            "deadline": "2026-10-31",
+            "assigneeIds": [
+              "user-tech"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "demo-month-2026-10-user-sales",
+      "kind": "objective",
+      "ownerId": "user-sales",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 0,
+      "createdAt": "2026-10-08T09:11:30.775Z",
+      "payload": {
+        "title": "拓展重点客户并推进商机转化",
+        "weight": 100,
+        "progress": 45,
+        "deadline": "2026-10-31",
+        "objectiveType": "target",
+        "keyResults": [
+          {
+            "id": "demo-month-2026-10-user-sales-kr-1",
+            "title": "完成重点客户需求访谈",
+            "weight": 50,
+            "progress": 70,
+            "deadline": "2026-10-31",
+            "assigneeIds": [
+              "user-sales"
+            ]
+          },
+          {
+            "id": "demo-month-2026-10-user-sales-kr-2",
+            "title": "推进试点方案和商务确认",
+            "weight": 50,
+            "progress": 20,
+            "deadline": "2026-10-31",
+            "assigneeIds": [
+              "user-sales"
+            ]
+          }
+        ]
+      }
     }
   ],
   "okrPeople": [
@@ -6682,12 +6836,9 @@
       ],
       "missingSupervisor": "admin",
       "selfSupervisor": "auto",
-      "exemptIds": [],
-      "companyEditorIds": [
-        "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
-      ]
+      "exemptIds": []
     },
-    "version": 26,
+    "version": 29,
     "objectiveTitleTemplates": [
       {
         "id": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
@@ -7046,6 +7197,42 @@
         ],
         "enabled": true
       }
-    ]
+    ],
+    "weeklyReviewCycles": [
+      {
+        "id": "a1d7cbe3-a282-4710-8960-57e999aba801",
+        "title": "2026年10月第四周",
+        "month": "2026-10",
+        "startDate": "2026-10-19",
+        "endDate": "2026-10-25",
+        "notifyAt": "2026-10-23T09:00",
+        "deadline": "2026-10-25T00:00",
+        "allowBackfill": true
+      },
+      {
+        "id": "4c664a20-14e8-4dae-8ee1-e7cd3b21c970",
+        "title": "2026年10月第五周",
+        "month": "2026-10",
+        "startDate": "2026-10-26",
+        "endDate": "2026-11-01",
+        "notifyAt": "2026-10-30T09:00",
+        "deadline": "2026-11-02T00:00",
+        "allowBackfill": true
+      }
+    ],
+    "subAdministratorIds": [],
+    "permissionGrants": {
+      "user-admin": [
+        "okrTemplates",
+        "reviewTemplates",
+        "roleSettings",
+        "weeklyCycles",
+        "confirmationSettings",
+        "companyGoalEdit"
+      ],
+      "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4": [
+        "companyGoalEdit"
+      ]
+    }
   }
 }

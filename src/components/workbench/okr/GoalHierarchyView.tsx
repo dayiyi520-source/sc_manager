@@ -51,7 +51,7 @@ export function buildGoalHierarchy(records: OkrRecord[], periodKey: string, owne
 
   const levelLabel = (id: string) => {
     const person = people.find(item => item.id === id);
-    return person?.rootFlag === 1 ? '公司级' : person?.supervisorId ? '主管级' : '个人级';
+    return person?.rootFlag === 1 ? '公司级' : person?.supervisorId ? '部门级' : '个人级';
   };
 
   const buildActionChildren = (parent: GoalHierarchyNode, parentReferenceId: string, seen: Set<string>): GoalHierarchyNode[] => actions
@@ -270,7 +270,7 @@ export function GoalHierarchyView({ records, people, periodKey, ownerId, supplem
           ownerId: ownerId || '',
           assigneeIds: [...new Set(target.actions.flatMap(action => action.assigneeNames.map(name => people.find(person => person.name === name)?.id).filter((id): id is string => Boolean(id))))],
           assigneeNames: [...new Set(target.actions.flatMap(action => action.assigneeNames))],
-          objectiveLevel: target.levelLabel || (people.find(person => person.id === ownerId)?.rootFlag === 1 ? '公司级' : people.find(person => person.id === ownerId)?.supervisorId ? '主管级' : '个人级'),
+          objectiveLevel: target.levelLabel || (people.find(person => person.id === ownerId)?.rootFlag === 1 ? '公司级' : people.find(person => person.id === ownerId)?.supervisorId ? '部门级' : '个人级'),
           objectiveMetaOwnerId: target.metaOwnerId || ownerId,
           deadline: target.maxDeadline,
           record: records.find(record => record.kind === 'action' && record.status === 'draft' && target.actions.some(action => action.id === record.id)),

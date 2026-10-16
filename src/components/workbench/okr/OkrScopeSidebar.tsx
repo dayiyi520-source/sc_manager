@@ -1,5 +1,6 @@
 import { otherDepartmentPeople as getOtherDepartmentPeople, departmentName } from './departmentScope';
 import { confirmationMembers, confirmationRequests } from './goalConfirmation';
+import { hasOkrPermission } from '../../../services/okrSettingsPolicy';
 import { goalLevel } from '../../../services/okrGoalRules';
 import { ChecklistIcon } from '@primer/octicons-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -42,7 +43,7 @@ const groupMeta: Array<Pick<OkrScopeGroup, 'key' | 'label' | 'icon'>> = [
   { key: 'otherDepartments', label: '其他部门', icon: <Building /> },
 ];
 
-export function buildOkrScopeGroups(people: OkrPerson[], currentUserId: string): OkrScopeGroup[] {
+export function buildOkrScopeGroups(people: OkrPerson[], currentUserId: string, records: OkrRecord[] = [], settings?: import('../../../services/okrRepository').OkrSettings): OkrScopeGroup[] {
   const current = people.find(person => person.id === currentUserId);
   const otherDepartmentPeople = getOtherDepartmentPeople(people, currentUserId);
   const departmentGroups = Array.from(new Set(otherDepartmentPeople.map(person => departmentName(person.department)))).sort().map(department => ({
@@ -55,30 +56,32 @@ export function buildOkrScopeGroups(people: OkrPerson[], currentUserId: string):
     company: [],
     myDepartment: people.filter(person => person.id !== currentUserId && departmentName(person.department) === departmentName(current?.department)),
     otherDepartments: otherDepartmentPeople,
-    confirmation: confirmationMembers(people, currentUserId),
+    confirmation: confirmationMembers(people, currentUserId, records, settings),
   };
-  const meta = [...groupMeta, ...(goalLevel(current) !== '个人级' ? [{ key: 'confirmation' as const, label: '目标确认', icon: <ChecklistIcon/> }] : [])];
+  const meta = [...groupMeta, ...((goalLevel(current) !== '个人级' || (settings?.administratorIds || []).includes(currentUserId) || (settings?.subAdministratorIds || []).includes(currentUserId) || confirmationRequests(records, people, currentUserId, settings).length > 0) ? [{ key: 'confirmation' as const, label: '目标确认', icon: <ChecklistIcon/> }] : [])];
   return meta.map(group => ({ ...group, members: membersByScope[group.key], ...(group.key === 'otherDepartments' ? { departmentGroups } : {}) }));
 }
 
 type Props = {
   people: OkrPerson[];
   records?: OkrRecord[];
+  settings?: import('../../../services/okrRepository').OkrSettings;
   currentUserId: string;
   selection: OkrScopeSelection;
   defaultExpandMembers?: boolean;
   onSelect: (selection: OkrScopeSelection) => void;
-  onAddTarget: (level?: 'personal' | 'department') => void;
+  onAddTarget: (level?: 'personal' | 'department' | 'company') => void;
   addTargetDisabled?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 };
 
-export function OkrScopeSidebar({ people, records = [], currentUserId, selection, defaultExpandMembers = false, onSelect, onAddTarget, addTargetDisabled = false, collapsed = false, onToggleCollapse }: Props) {
-  const groups = useMemo(() => buildOkrScopeGroups(people, currentUserId), [people, currentUserId]);
-  const requests = confirmationRequests(records, people, currentUserId);
+export function OkrScopeSidebar({ people, records = [], settings, currentUserId, selection, defaultExpandMembers = false, onSelect, onAddTarget, addTargetDisabled = false, collapsed = false, onToggleCollapse }: Props) {
+  const groups = useMemo(() => buildOkrScopeGroups(people, currentUserId, records, settings), [people, currentUserId, records, settings]);
+  const requests = confirmationRequests(records, people, currentUserId, settings);
   const pendingOwnerIds = new Set(requests.map(record => record.ownerId));
   const currentUser = people.find(person => person.id === currentUserId);
+  const companyEditor = !!currentUser && hasOkrPermission(currentUser.id,'companyGoalEdit',settings,people);
   const primaryActionLabel = !currentUser ? '组织信息加载中' : currentUser.rootFlag === 1 ? '添加目标' : '拆解目标';
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(defaultExpandMembers ? groups.filter(group => group.members.length).map(group => group.key) : []));
@@ -91,7 +94,7 @@ export function OkrScopeSidebar({ people, records = [], currentUserId, selection
   return <aside className={`okr-scope-sidebar${collapsed ? ' is-collapsed' : ''}`} aria-label="目标范围导航">
     <div className="okr-scope-search">
       <Input value={query} onChange={event => setQuery(event.target.value)} prefix={<Search />} allowClear placeholder="搜索人名" aria-label="搜索人名" />
-      {goalLevel(currentUser) === '主管级' ? <Dropdown trigger={['click']} disabled={addTargetDisabled} menu={{items:[{key:'department',label:'部门目标'},{key:'personal',label:'我的目标'}],onClick:({key})=>onAddTarget(key as 'personal'|'department')}}><Button type="primary" icon={<Plus/>} aria-label="添加目标选项" disabled={addTargetDisabled}/></Dropdown> : <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} disabled={addTargetDisabled || !currentUser} onClick={()=>onAddTarget()} /></Tooltip>}
+      {goalLevel(currentUser) === '部门级' || companyEditor && currentUser?.rootFlag !== 1 ? <Dropdown trigger={['click']} disabled={addTargetDisabled} menu={{items:[...(companyEditor ? [{key:'company',label:'公司目标'}] : []),...(goalLevel(currentUser) === '部门级' ? [{key:'department',label:'部门目标'}] : []),{key:'personal',label:'我的目标'}],onClick:({key})=>onAddTarget(key as 'personal'|'department'|'company')}}><Button type="primary" icon={<Plus/>} aria-label="添加目标选项" disabled={addTargetDisabled}/></Dropdown> : <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} disabled={addTargetDisabled || !currentUser || currentUser.rootFlag === 1 && !companyEditor} onClick={()=>onAddTarget(currentUser?.rootFlag === 1 ? 'company' : 'personal')} /></Tooltip>}
     </div>
     <nav className="okr-scope-groups">
       {groups.map(group => {

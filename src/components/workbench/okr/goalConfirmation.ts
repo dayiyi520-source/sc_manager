@@ -1,13 +1,16 @@
 import { goalLevel } from '../../../services/okrGoalRules';
-import type { OkrPerson, OkrRecord, OkrPayload } from '../../../services/okrRepository';
+import { effectiveReviewer } from '../../../services/okrSettingsPolicy';
+import type { OkrPerson, OkrRecord, OkrPayload, OkrSettings } from '../../../services/okrRepository';
 
-export function confirmationMembers(people: OkrPerson[], viewerId: string): OkrPerson[] {
+export function confirmationMembers(people: OkrPerson[], viewerId: string, records?: OkrRecord[], settings?: OkrSettings): OkrPerson[] {
+  if (records && settings) { const owners = new Set(records.filter(record => record.kind === 'objective' && record.status !== 'deleted' && effectiveReviewer(record, settings, people) === viewerId).map(record => record.ownerId)); return people.filter(person => owners.has(person.id)); }
   const viewer = people.find(person => person.id === viewerId);
-  if (goalLevel(viewer) === '公司级') return people.filter(person => person.id !== viewerId && goalLevel(person) === '主管级');
-  if (goalLevel(viewer) === '主管级') return people.filter(person => person.supervisorId === viewerId);
+  if (goalLevel(viewer) === '公司级') return people.filter(person => person.id !== viewerId && goalLevel(person) === '部门级');
+  if (goalLevel(viewer) === '部门级') return people.filter(person => person.supervisorId === viewerId);
   return [];
 }
-export function confirmationRequests(records: OkrRecord[], people: OkrPerson[], viewerId: string): OkrRecord[] {
+export function confirmationRequests(records: OkrRecord[], people: OkrPerson[], viewerId: string, settings?: OkrSettings): OkrRecord[] {
+  if (settings) return records.filter(record => record.kind === 'objective' && record.status !== 'deleted' && record.changeRequest?.status === 'pending' && effectiveReviewer(record, settings, people) === viewerId);
   const members = new Set(confirmationMembers(people, viewerId).map(person => person.id));
   return records.filter(record => record.kind === 'objective' && record.status !== 'deleted' && members.has(record.ownerId)
     && record.changeRequest?.status === 'pending' && record.changeRequest.reviewerId === viewerId);

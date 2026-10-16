@@ -45,7 +45,7 @@ export const TestPlanWorkspace: React.FC<{ productLineFilter?: string; onDetailC
       const line = productLines.find((item) => item.id === task.productLineId);
       const version = versions.find((item) => item.id === task.versionId);
       const plansForTask = await productRepository.testPlans(task.id);
-      return plansForTask.map((plan) => ({ plan, task, productName: line?.name || task.productLineName || '未设置', versionName: version?.name || task.versionName || '未设置' }));
+      return plansForTask.filter((plan) => plan.workItemId === task.id).map((plan) => ({ plan, task, productName: line?.name || task.productLineName || '未设置', versionName: version?.name || task.versionName || '未设置' }));
     }));
     return values.flat() as PlanRecord[];
   }, retry: false });

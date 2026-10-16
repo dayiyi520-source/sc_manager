@@ -88,7 +88,7 @@ export const WorkItemBatchBar: React.FC<{
   const open = (key: string) => {
     if (!valid) { messageApi.warning('请选择同类型且有版本信息的工作项'); return; }
     if (key === 'delete') {
-      Modal.confirm({ title: `归档选中的 ${targets.length} 条工作项？`, content: '归档后工作项将从当前列表移除，可在产品配置的归档任务中恢复。', okText: '确认归档', okButtonProps: { danger: true }, cancelText: '取消', onOk: async () => {
+      Modal.confirm({ title: `归档选中的 ${targets.length} 条工作项？`, content: '归档后工作项将从当前列表移除，可在系统与组织的产研模板中恢复。', okText: '确认归档', okButtonProps: { danger: true }, cancelText: '取消', onOk: async () => {
         setLoading(true);
         try {
           await productRepository.batchWorkItems({ targets: targets.map(({ id, productLineId, revision }) => ({ id, productLineId: productLineId!, revision: revision! })), operation: 'delete' });

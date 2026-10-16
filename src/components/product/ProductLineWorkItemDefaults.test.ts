@@ -38,7 +38,7 @@ describe('product line work item defaults', () => {
     ])).toBe(2);
     expect(productLinesSource).toContain('版本管理 ({versionCount})');
     expect(productLinesSource).toContain('版本管理 ({productLineVersionCount(pl.id, versions)})');
-    expect(productLinesSource).toContain('成员管理 ({productLineMemberCount(pl)})');
+    expect(productLinesSource).not.toContain('成员管理 ({productLineMemberCount(pl)})');
   });
 
   it('uses the latest published version as the online version and formats its release time', () => {
@@ -51,10 +51,10 @@ describe('product line work item defaults', () => {
     } as ProductLine;
     expect(latestReleasedVersion(line)?.code).toBe('V2.0.0');
     expect(formatVersionPublishedAt(latestReleasedVersion(line))).toBe('2026-09-28 15:30');
-    expect(productLinesSource).toContain("title: '线上版本'");
+    expect(productLinesSource).toContain("title: '最新发布版本'");
     expect(productLinesSource).toContain("onlineVersion?.code || onlineVersion?.name || '暂无发布'");
     expect(productLinesSource).toContain("发布时间：{onlineVersion ? formatVersionPublishedAt(onlineVersion) : '无发布'}");
-    expect(productLinesSource).toContain('暂无线上版本</div>');
+    expect(productLinesSource).toContain('暂无发布</div>');
     expect(settingsSource).toContain('latestReleasedVersion({ versions: lineVersions })');
     expect(settingsSource).toContain("发布时间：{onlineVersion ? onlinePublishedAt : '无发布'}");
   });

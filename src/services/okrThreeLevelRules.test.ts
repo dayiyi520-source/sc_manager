@@ -121,11 +121,12 @@ it('submits a generic department KR with content and result without a business o
 
 it('lets a supervisor create only their own autonomous personal goal and preserves department validation', () => {
  const personal:OkrPayload={goalModelVersion:2,goalLevel:'personal',origin:'autonomous',title:'本人本月工作',weight:100,deadline:'2026-10-25',keyResults:[{id:'mine',title:'本人本月工作',weight:100,progress:0,deadline:'2026-10-25',assigneeIds:['manager'],executionActions:[{id:'a',ownerId:'manager',title:'完成个人计划',weight:100,progress:0,deadline:'2026-10-25'}]}]};
- const created=mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:personal,submit:true},[company],people)!;
+ const upstream:OkrRecord={...company,id:'dept-upstream',ownerId:'manager',payload:department()};
+ const created=mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:personal,submit:true},[company,upstream],people)!;
  expect(created.records.at(-1)?.ownerId).toBe('manager');
  expect(created.records.at(-1)?.payload.goalLevel).toBe('personal');
- expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'employee',periodKey:'2026-10',payload:{...personal,goalLevel:'department'},submit:true},[company],people)).toThrow('目标层级');
- expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:{...personal,keyResults:personal.keyResults?.map(kr=>({...kr,assigneeIds:['employee'],executionActions:kr.executionActions?.map(a=>({...a,ownerId:'employee'}))}))},submit:true},[company],people)).toThrow('只能填写');
+ expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'employee',periodKey:'2026-10',payload:{...personal,goalLevel:'department'},submit:true},[company,upstream],people)).toThrow('公司级目标还未提交');
+ expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:{...personal,keyResults:personal.keyResults?.map(kr=>({...kr,assigneeIds:['employee'],executionActions:kr.executionActions?.map(a=>({...a,ownerId:'employee'}))}))},submit:true},[company,upstream],people)).toThrow('只能填写');
 });
 
 it('aligns supervisor personal goals to their department and rejects company/other-department sources',()=>{
@@ -134,5 +135,5 @@ it('aligns supervisor personal goals to their department and rejects company/oth
  expect(mutateOkrLifecycle(undefined,{viewerId:'manager',kind:'objective',periodKey:'2026-10',payload:personal,submit:true},[company,dept],people)?.records.at(-1)?.payload.sourceObjectiveId).toBe('dept');
  expect(()=>mutateOkrLifecycle(undefined,{viewerId:'manager',kind:'objective',periodKey:'2026-10',payload:{...personal,sourceObjectiveId:'company',sourceKrId:'company-kr'},submit:true},[company,dept],people)).toThrow('本部门');
  const other={...dept,ownerId:'other'};const directory=[...people,{...people[1],id:'other',department:'其他部门'}];
- expect(()=>mutateOkrLifecycle(undefined,{viewerId:'manager',kind:'objective',periodKey:'2026-10',payload:personal,submit:true},[other],directory)).toThrow('本部门');
+ expect(()=>mutateOkrLifecycle(undefined,{viewerId:'manager',kind:'objective',periodKey:'2026-10',payload:personal,submit:true},[other,{...dept,id:'valid-dept'}],directory)).toThrow('本部门');
 });

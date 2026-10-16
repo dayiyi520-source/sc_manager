@@ -137,6 +137,7 @@ const eventAttachments = (metadata: Record<string, unknown>): RequirementMedia[]
 
 export const eventOperatorLabel = (event: RequirementEvent, metadata: Record<string, unknown>) => {
   const operator = `操作人：${event.operatorName || "未知"}`;
+  if (event.eventType === '退回' || event.eventType === '事项退回') return operator;
   const assignee = String(metadata.assigneeName || "").trim();
   const fromAssignee = String(metadata.fromAssigneeName || "").trim();
   const ownerChanged = metadata.ownerChanged === true || (Boolean(assignee) && Boolean(fromAssignee) && assignee !== fromAssignee);
@@ -276,7 +277,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const saveInFlight = useRef(false);
   const [workOrderType, setWorkOrderType] = useState<WorkOrderType | null>(creationType || null);
   const [selected, setSelected] = useState<RequirementTask | null>(null);
-  const [taskCreationKind, setTaskCreationKind] = useState<'requirement' | 'design' | 'bug' | 'presales' | 'delivery' | 'ops' | null>(null);
+  const [taskCreationKind, setTaskCreationKind] = useState<'requirement' | 'design' | 'dev' | 'test' | 'bug' | 'presales' | 'delivery' | 'ops' | null>(null);
   const [receiving, setReceiving] = useState(false);
   const receiveInFlight = useRef(false);
   const [events, setEvents] = useState<RequirementEvent[]>([]);
@@ -808,11 +809,12 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
         finalReason,
       );
       const detail = await requirementRepository.detail(selected.id);
-      if (detail.status !== nextStatus) throw new Error("事项状态未更新，请刷新后重试");
+      if (detail.id !== selected.id || detail.status !== nextStatus) throw new Error("事项状态未更新，请刷新后重试");
       const next = { ...selected, ...detail };
       setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
       setSelected(next);
       setEvents(Array.isArray(detail.events) ? detail.events : []);
+      setScopeReload((value) => value + 1);
     } catch {
       addToast("error", "事项操作失败", "服务未确认本次流转，请稍后重试");
       return;
@@ -831,13 +833,15 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     if (!selected) return;
     setCompleteSubmitting(true);
     try {
-      await requirementRepository.complete(selected.id, { revision: selected.revision ?? selected.version ?? 0, assigneeId: selected.creatorId, assigneeName: selected.creatorName, note: completeNote.trim(), noteHtml: completeNoteHtml, attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
+      await requirementRepository.complete(selected.id, { revision: selected.revision ?? selected.version ?? 0, note: completeNote.trim(), noteHtml: completeNoteHtml, attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
       const detail = await requirementRepository.detail(selected.id);
-      const next = { ...selected, ...detail, status: "待验收" as RequirementTask["status"] };
+      if (detail.id !== selected.id || detail.status !== "待验收") throw new Error("事项状态未更新，请刷新后重试");
+      const next = { ...selected, ...detail };
       setSelected(next);
       setEvents(Array.isArray(detail.events) ? detail.events : []);
       setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
       setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
+      setScopeReload((value) => value + 1);
       setCompleteModalOpen(false);
       setCompleteNote("");
       setCompleteNoteHtml("");
@@ -919,10 +923,11 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     try {
       await requirementRepository.acceptancePassed(selected.id, { revision: selected.revision ?? selected.version ?? 0, rating: acceptanceRating, comment: acceptanceComment.trim() });
       const detail = await requirementRepository.detail(selected.id);
-      if (detail.status !== "已完成") throw new Error("事项尚未完成，请刷新后核实验收结果");
+      if (detail.id !== selected.id || detail.status !== "已完成") throw new Error("事项尚未完成，请刷新后核实验收结果");
       const next = { ...selected, ...detail };
       setSelected(next); setEvents(Array.isArray(detail.events) ? detail.events : []); setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
       setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
+      setScopeReload((value) => value + 1);
       setRatingModalOpen(false);
       addToast("success", "验收通过", "评价已保存，事项已完成");
     } catch (error) { addToast("error", "验收操作失败", error instanceof Error ? error.message : "请刷新后重试"); }
@@ -998,11 +1003,11 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const canAddTask = ownsSelected && selected?.status === "处理中";
   const openTaskCreation = (taskType: string) => {
     if (!selected || !canAddTask || receiving) return;
-    setTaskCreationKind(({ "产品需求": "requirement", "设计任务": "design", "缺陷管理": "bug", "售前任务": "presales", "交付任务": "delivery", "运维任务": "ops" } as const)[taskType as "产品需求" | "设计任务" | "缺陷管理" | "售前任务" | "交付任务" | "运维任务"] || null);
+    setTaskCreationKind(({ "产品需求": "requirement", "设计任务": "design", "研发任务": "dev", "测试任务": "test", "缺陷管理": "bug", "售前任务": "presales", "交付任务": "delivery", "运维任务": "ops" } as const)[taskType as "产品需求" | "设计任务" | "研发任务" | "测试任务" | "缺陷管理" | "售前任务" | "交付任务" | "运维任务"] || null);
   };
   const taskCreationMenu = {
-    items: ["产品", "设计", "缺陷", "售前", "交付", "运维"].map((label) => ({ key: label, label })),
-    onClick: ({ key }: { key: string }) => openTaskCreation(({ 产品: "产品需求", 设计: "设计任务", 缺陷: "缺陷管理", 售前: "售前任务", 交付: "交付任务", 运维: "运维任务" } as Record<string, string>)[key]),
+    items: ["产品", "设计", "研发", "测试", "缺陷", "售前", "交付", "运维"].map((label) => ({ key: label, label })),
+    onClick: ({ key }: { key: string }) => openTaskCreation(({ 产品: "产品需求", 设计: "设计任务", 研发: "研发任务", 测试: "测试任务", 缺陷: "缺陷管理", 售前: "售前任务", 交付: "交付任务", 运维: "运维任务" } as Record<string, string>)[key]),
   };
   const openWorkflow = (action: "convert" | "reassign") => {
     if ((action === "convert" && !canAddTask) || (action === "reassign" && !canReceive)) return;
@@ -1017,9 +1022,11 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     setReceiving(true);
     try {
       const next = await requirementRepository.receive(selected.id);
+      if (next.id !== selected.id || next.status !== "处理中") throw new Error("事项状态未更新，请刷新后重试");
       setSelected((current) => current?.id === selected.id ? { ...current, ...next } : current);
       setRequirementTasks((list) => list.map((item) => item.id === selected.id ? { ...item, ...next } : item));
       setEvents(Array.isArray(next.events) ? next.events : []);
+      setScopeReload((value) => value + 1);
       addToast("success", "事项已接收");
     } catch (error) {
       addToast("error", "事项接收失败", error instanceof Error ? error.message : "请刷新后重试");
@@ -1365,7 +1372,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       {taskCreationKind && selected && <RequirementTasksView
         key={taskCreationKind}
         taskKind={taskCreationKind}
-        itemLabel={{ requirement: "产品任务", design: "设计任务", bug: "缺陷", presales: "售前任务", delivery: "交付任务", ops: "运维任务" }[taskCreationKind]}
+        itemLabel={{ requirement: "产品任务", design: "设计任务", dev: "研发任务", test: "测试任务", bug: "缺陷", presales: "售前任务", delivery: "交付任务", ops: "运维任务" }[taskCreationKind]}
         designVariant={collaborationDesignVariant(selected)}
         creationContext={{
           productLineId: selected.productLineId || productLines.find((line) => line.name === selected.productLineName)?.id || '',
@@ -1508,7 +1515,6 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       </Modal>
       <Modal isOpen={completeModalOpen} onClose={() => { if (!completeSubmitting) setCompleteModalOpen(false); }} title="事项完成">
         <form onSubmit={submitComplete} className="work-order-dialog space-y-4">
-          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">指定负责人<input aria-label="指定负责人" className="mt-1 w-full rounded border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-3 py-2 text-sm" value={selected?.creatorName || "未记录"} readOnly /></label>
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">事项备注<RichTextEditor editor={completeEditor} size="work-order" value={completeNote} htmlValue={completeNoteHtml} onInput={(text, html) => { setCompleteNote(text); setCompleteNoteHtml(html); }} placeholder="请输入事项完成备注" /></label>
           <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
           <div className="flex justify-end gap-2 border-t border-[var(--border-main)] pt-3"><button type="button" onClick={() => setCompleteModalOpen(false)} disabled={completeSubmitting} className="h-9 px-4 rounded-lg border border-[var(--border-main)] text-xs">取消</button><button type="submit" disabled={completeSubmitting} className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white disabled:opacity-60">{completeSubmitting ? "提交中…" : "确认完成"}</button></div>

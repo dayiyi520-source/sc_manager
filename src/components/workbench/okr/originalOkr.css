@@ -1296,3 +1296,25 @@
 .okr-received-detail::-webkit-scrollbar, .okr-received-list-scroll::-webkit-scrollbar { width:8px; height:8px; }
 .okr-received-detail::-webkit-scrollbar-thumb, .okr-received-list-scroll::-webkit-scrollbar-thumb { background:var(--text-muted); border-radius:8px; }
 .okr-received-detail::-webkit-scrollbar-track, .okr-received-list-scroll::-webkit-scrollbar-track { background:var(--bg-surface-soft); }
+
+/* Progress history and monthly metric additions use the existing theme tokens. */
+.okr-progress-modal-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding-right: 32px; white-space: nowrap; }
+.okr-progress-modal-title > strong { flex: none; color: var(--text-primary); font-size: 18px; }
+.okr-progress-modal-title > span { color: var(--text-muted); font-size: 14px; }
+.okr-progress-modal-subject { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.okr-target-list-status .okr-target-progress-button { height: 28px; min-width: 48px; padding: 0 4px; color: var(--text-body); font-size: 16px; }
+.okr-target-list-status .okr-target-progress-button:not(:disabled):hover,
+.okr-target-list-status .okr-target-progress-button:not(:disabled):focus-visible { color: var(--primary); background: var(--bg-surface-soft); }
+
+.okr-monthly-metrics { grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)); }
+.okr-monthly-metrics > div { min-width: 0; }
+.okr-monthly-metrics span { min-width: 0; }
+.okr-monthly-metrics b { overflow-wrap: anywhere; }
+.okr-monthly-metrics .okr-monthly-trend-metric { gap: 8px; }
+.okr-monthly-metrics .okr-monthly-sparkline { width: 50%; max-width: 160px; min-width: 0; height: 64px; flex: 1; color: var(--primary); }
+.okr-monthly-sparkline line { stroke: currentColor; stroke-width: 2; }
+.okr-monthly-sparkline circle { stroke: currentColor; stroke-width: 2; fill: currentColor; }
+.okr-monthly-sparkline line.is-monthly { stroke-dasharray: 4 4; }
+.okr-monthly-sparkline circle.is-monthly { fill: var(--bg-surface); stroke-dasharray: 2 2; }
+@media (max-width: 1180px) { .okr-monthly-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .okr-monthly-metrics { grid-template-columns: minmax(0, 1fr); } }

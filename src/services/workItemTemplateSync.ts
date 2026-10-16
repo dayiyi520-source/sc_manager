@@ -18,17 +18,23 @@ export function syncProductTemplates(products: any[], templates: any[]) {
     return { ...product, workItemTypes: [...inherited, ...custom], workItemTemplateSignature: signature };
   });
 }
-export function migrateWorkItems(tasks: any[], products: any[], members: any[]) {
+export function migrateWorkItems(tasks: any[], products: any[], members: any[], templates: any[] = []) {
   const enabledMembers = members.filter(member => member.status === 'enabled');
   return tasks.map(task => {
     let next = task;
+    if (task.category === 'requirement' && task.workOrderType) return task;
+    const product = products.find(product => product.id === task.productLineId);
+    const boundWorkflow = [...(product?.workItemTypes || []), ...templates]
+      .flatMap((type: any) => [type.workflow, ...(type.workflows || [])])
+      .find((flow: any) => flow?.id === task.workflowId);
+    const hasValidBinding = Boolean(task.statusKey && boundWorkflow?.definition?.states?.some((state: any) => state.key === task.statusKey));
     const seed = [...String(task.id)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    const types = products.find(product => product.id === task.productLineId)?.workItemTypes || [];
+    const types = product?.workItemTypes || [];
     const candidates = types.filter((type: any) => type.enabled !== false && (categoryCode(type.category) === task.category || (!type.category && type.id === (task.taskTypeId || task.workItemTypeId))));
     const type = candidates.find((type: any) => type.id === (task.taskTypeId || task.workItemTypeId)) || candidates.find((type: any) => type.name === (task.type || task.requirementType || task.taskType)) || candidates.find((type: any) => type.isDefault) || candidates[0];
     const workflow = type?.sourceTemplateId ? type.workflows?.find((flow: any) => flow.status === 'PUBLISHED') : undefined;
     const states = workflow?.definition?.states?.filter((state: any) => state.enabled !== false) || [];
-    if (states.length) {
+    if (states.length && !hasValidBinding) {
       const statusName = typeof task.status === 'string' ? task.status : task.status?.name;
       const state = states.find((state: any) => state.name === statusName) || states.find((state: any) => state.key === task.statusKey) || states[seed % states.length];
       if (task.taskTypeId !== type.id || task.workItemTypeId !== type.id || task.workflowId !== workflow.id || task.statusKey !== state.key || statusName !== state.name) {

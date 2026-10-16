@@ -1,5 +1,6 @@
+import * as evidence from './reviewEvidenceRepository';
 import { describe, expect, it, vi } from 'vitest';
-import { calculateMonthlyReviewMetrics, loadMonthlyReviewMetrics } from './monthlyReviewMetrics';
+import { calculateMonthlyReviewMetrics, loadMonthlyReviewMetrics, loadDepartmentMonthlyComparison } from './monthlyReviewMetrics';
 import type { OkrWork } from './okrRepository';
 import { productRepository } from './productRepository';
 import { requirementRepository } from './requirementRepository';
@@ -29,5 +30,27 @@ describe('monthly personal review statistics', () => {
     const request = vi.spyOn(productRepository, 'workItemActivities').mockRejectedValue(new Error('读取失败'));
     await expect(loadMonthlyReviewMetrics([work('t', undefined, { productLineId: 'p' })], period, viewer)).rejects.toThrow('读取失败');
     request.mockRestore();
+  });
+});
+
+describe('department monthly comparison', () => {
+  const me = { id: 'me', name: '本人', department: '产品部', supervisorId: null, rootFlag: 0, version: 1 };
+  const colleague = { ...me, id: 'colleague', name: '同事' };
+  it('includes zero-hour members in the denominator and excludes other departments', async () => {
+    const load = vi.spyOn(evidence, 'loadReviewEvidence').mockResolvedValue([]);
+    const result = await loadDepartmentMonthlyComparison([work('t', [{ status: '处理中', createdAt: '2026-10-10' }], { actualHours: 8 })], period, me, [me, colleague, { ...me, id: 'outside', department: '研发部' }]);
+    expect(result).toMatchObject({ departmentAverageHours: 4, departmentTotalHours: 8, departmentMemberCount: 2, departmentTaskCount: 1 });
+    expect(result).not.toHaveProperty('departmentAverageOvertimeHours');
+    expect(load).toHaveBeenCalledOnce();
+    load.mockRestore();
+  });
+  it('does not return a partial mean on permission or network failure', async () => {
+    const load = vi.spyOn(evidence, 'loadReviewEvidence').mockRejectedValue(new Error('无权限'));
+    expect(await loadDepartmentMonthlyComparison([], period, me, [me, colleague])).toEqual({ departmentUnavailable: true });
+    load.mockRestore();
+  });
+  it('does not infer a department or silently use the viewer alone when roster is absent', async () => {
+    expect(await loadDepartmentMonthlyComparison([], period, me, [])).toEqual({ departmentUnavailable: true });
+    expect(await loadDepartmentMonthlyComparison([], period, { id: 'me', name: '本人' }, [me])).toEqual({ departmentUnavailable: true });
   });
 });

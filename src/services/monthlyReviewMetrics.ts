@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
-import type { OkrWork } from './okrRepository';
+import type { OkrWork, OkrPerson } from './okrRepository';
+import { loadReviewEvidence } from './reviewEvidenceRepository';
 import type { EvidenceViewer } from './reviewEvidenceRepository';
 import { productRepository } from './productRepository';
 import { requirementRepository } from './requirementRepository';
@@ -7,7 +8,13 @@ import { workSource } from '../components/workbench/okr/workAggregation';
 import type { ReviewPeriod } from './okrReviewRules';
 
 export type ReviewStatusChange = { status: string; createdAt: string };
-export type MonthlyReviewMetrics = { taskCount: number; collaborationCount: number; totalHours: number; overtimeHours?: number };
+export type MonthlyReviewMetrics = {
+  taskCount: number; collaborationCount: number; totalHours: number; overtimeHours?: number;
+  departmentAverageHours?: number; departmentAverageOvertimeHours?: number;
+  departmentTotalHours?: number; departmentTaskCount?: number; departmentCollaborationCount?: number;
+  departmentMemberCount?: number; departmentUnavailable?: boolean;
+  overallProgress?: number; progressTrend?: import('./monthlyProgress').MonthlyProgressPoint[];
+};
 const taskStates = new Set(['已完成', '处理中', '进行中', '开发中', '研发中', '设计中', '测试中', '修复中']);
 const collaborationStates = new Set(['处理中', '进行中', '已完成', '待验收', '已退回', '已驳回']);
 export const isReviewOwner = (item: OkrWork, viewer: EvidenceViewer) => item.assigneeId ? item.assigneeId === viewer.id : item.ownerName === viewer.name;
@@ -55,4 +62,18 @@ export async function loadMonthlyReviewMetrics(work: OkrWork[], period: ReviewPe
     return { ...item, statusChanges };
   }));
   return calculateMonthlyReviewMetrics(rows, period, viewer);
+}
+
+/** Reuse authorized evidence APIs; never infer missing departmental data from the viewer alone. */
+export async function loadDepartmentMonthlyComparison(work: OkrWork[], period: ReviewPeriod, viewer: EvidenceViewer, people: OkrPerson[]) {
+  const members = people.filter(person => viewer.department?.trim() && person.department?.trim() === viewer.department.trim());
+  if (!members.length || !members.some(person => person.id === viewer.id)) return { departmentUnavailable: true };
+  try {
+    const values = await Promise.all(members.map(async member => loadMonthlyReviewMetrics(
+      member.id === viewer.id ? work : await loadReviewEvidence(member), period, member)));
+    const total = values.reduce((sum, value) => sum + value.totalHours, 0);
+    return { departmentAverageHours: Math.round(total / members.length * 100) / 100, departmentTotalHours: Math.round(total * 100) / 100, departmentTaskCount: values.reduce((sum, value) => sum + value.taskCount, 0), departmentCollaborationCount: values.reduce((sum, value) => sum + value.collaborationCount, 0), departmentMemberCount: members.length };
+  } catch {
+    return { departmentUnavailable: true };
+  }
 }
