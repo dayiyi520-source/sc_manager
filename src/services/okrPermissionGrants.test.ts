@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { canEditOkr, canUpdateOkrSettings, confirmationReviewer, defaultConfirmation, effectiveReviewer, hasOkrPermission, isOkrAdmin, normalizedPolicy, canViewPending, reconcileConfirmationRequests } from './okrSettingsPolicy';
 import { confirmationMembers, confirmationRequests } from '../components/workbench/okr/goalConfirmation';
 import { mutateOkrLifecycle } from './mockOkrLifecycle';
+import { ownerGoalLevel } from './okrGoalRules';
 import type { OkrPerson, OkrRecord, OkrSettings } from './okrRepository';
 const people: OkrPerson[] = [
  {id:'admin',name:'管理员',department:'公司',rootFlag:1,supervisorId:null,version:1},
@@ -33,6 +34,8 @@ describe('OKR permission grants and effective reviewers',()=>{
   expect(canEditOkr(company,'employee',config,people)).toBe(false);
   expect(canEditOkr(own,'employee',config,people)).toBe(true);
   expect(isOkrAdmin('employee',config,people)).toBe(true);
+  expect(ownerGoalLevel(people[0],own.payload)).toBe('个人级');
+  expect(ownerGoalLevel(people[2],company.payload)).toBe('公司级');
  });
  it('migrates legacy company editors without retaining the old setting',()=>{
   const legacy={...base(),confirmation:{...defaultConfirmation(),companyEditorIds:['employee']}} as OkrSettings;
@@ -40,6 +43,18 @@ describe('OKR permission grants and effective reviewers',()=>{
   expect(hasOkrPermission('employee','companyGoalEdit',migrated,people)).toBe(true);
   expect(migrated.confirmation?.companyEditorIds).toBeUndefined();
   expect(migrated.administratorIds).not.toContain('employee');
+ });
+ it('preserves all administrator defaults when a legacy company editor is also an administrator',()=>{
+  const migrated=normalizedPolicy({...base(),administratorIds:['admin','employee'],confirmation:{...defaultConfirmation(),companyEditorIds:['employee']}},people);
+  expect(migrated.permissionGrants?.employee).toHaveLength(6);
+  expect(normalizedPolicy(migrated,people)).toEqual(migrated);
+ });
+ it('rejects company creation after revocation while allowing the root owner personal drafts',()=>{
+  const config=base();config.permissionGrants!.admin=[];
+  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'公司目标',goalModelVersion:2,goalLevel:'company'}},[],people,config)).toThrow('无公司级目标权限');
+  const draft=mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'个人目标',goalModelVersion:2,goalLevel:'personal',origin:'autonomous'}},[],people,config)!;
+  expect(draft.records[0].payload.goalLevel).toBe('personal');
+  expect(canEditOkr(draft.records[0],'admin',config,people)).toBe(true);
  });
  it('uses effective reviewer after supervisor reassignment for lists and visibility',()=>{
   const config=base();config.confirmation!.visiblePending=false;

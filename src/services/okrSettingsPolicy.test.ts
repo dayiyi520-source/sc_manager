@@ -28,12 +28,12 @@ describe('OKR周期与确认配置',()=>{
   expect(due.periods).toEqual(['2026-10','2026-11']);
   expect(materializePeriods(due,dayjs('2026-10-28T10:00'))).toEqual(due);
  });
- it('matches the legacy product template to the real department and prioritizes explicit configuration',()=>{
+ it('matches legacy templates by type and retains other explicitly configured types',()=>{
   const config=settings();
   expect(departmentTemplates(config,people[1].department)[0].type).toBe('product');
   expect(departmentTemplates(config,'未知部门')).toEqual([]);
   config.templates.push({department:'产品规划部',type:'support',fields:[],types:['运营']});
-  expect(departmentTemplates(config,people[1].department).map(t=>t.type)).toEqual(['support']);
+  expect(departmentTemplates(config,people[1].department).map(t=>t.type)).toEqual(['support','product']);
  });
  it('applies action, target type, exemptions and missing/self supervisor fallbacks',()=>{
   const config=settings();
@@ -79,6 +79,8 @@ describe('OKR周期与确认配置',()=>{
   const created=mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:aligned},[source],people,config)!;
   expect(created.records.at(-1)?.status).toBe('active');
   config.cycles!.crossAlignment=false;
-  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:aligned},[source],people,config)).toThrow('只能对齐');
+  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:aligned},[source],people,config)).toThrow('公司级目标还未提交');
+  const monthlySource={...source,id:'monthly-source',periodKey:'2026-10'};
+  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:aligned},[source,monthlySource],people,config)).toThrow('只能对齐');
  });
 });

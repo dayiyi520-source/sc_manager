@@ -37,7 +37,7 @@ export function goalDifferences(before: OkrPayload, after: OkrPayload, people: O
       if (!prior) add(kr.id+':detail:'+detail.id,'新增明细',undefined,label);
       else {
         add(kr.id+':detail:'+detail.id+':object',`${prefix} 明细对象`,[prior.name,prior.version].filter(Boolean).join(' / '),[detail.name,detail.version].filter(Boolean).join(' / '));
-        add(kr.id+':detail:'+detail.id+':stage',`${label} 达成阶段`,prior.stage,detail.stage);
+        add(kr.id+':detail:'+detail.id+':stage',`${label} 阶段`,prior.stage,detail.stage);
         add(kr.id+':detail:'+detail.id+':target',`${label} 目标里程碑`,prior.targetStage,detail.targetStage);
         add(kr.id+':detail:'+detail.id+':start',`${label} 开始时间`,prior.plannedStartDate,detail.plannedStartDate);
         add(kr.id+':detail:'+detail.id+':end',`${label} 结束时间`,prior.plannedEndDate,detail.plannedEndDate);

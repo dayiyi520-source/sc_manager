@@ -1,10 +1,10 @@
 import { assignedDetailRows } from './okrAssignments';
-import { krDetailContentComplete, krDetailsError, krDetails } from './okrKrDetails';
+import { krDetailContentComplete, krDetailsError, krDetails, supervisorKrTitle } from './okrKrDetails';
 import { goalLevel } from './okrGoalRules';
 import type { OkrKr, OkrPayload, OkrPerson, OkrRecord, GoalTiming } from './okrRepository';
 
 export function sourceKeyResults(record: OkrRecord): OkrKr[] {
-  if (record.kind === 'objective') return record.payload.keyResults || [];
+  if (record.kind === 'objective') return (record.payload.keyResults || []).map(kr => ({...kr,title:supervisorKrTitle(kr)}));
   if (record.kind !== 'action') return [];
   return [{ id: record.id, title: record.payload.title, weight: Number(record.payload.weight || 100), progress: Number(record.payload.progress || 0), deadline: record.payload.deadline, assigneeIds: record.payload.assigneeIds, businessObject: record.payload.businessObject || record.payload.productLine, version: undefined, stage: record.payload.milestone, action: record.payload.title, result: record.payload.acceptanceStandard }];
 }
@@ -25,8 +25,8 @@ export function upstreamReadiness(records: OkrRecord[], person: OkrPerson | unde
 export function autonomousGoalPayload(person: OkrPerson, level?: 'personal' | 'department'): OkrPayload {
   return { goalModelVersion: 2, goalLevel: level || (goalLevel(person) === '个人级' ? 'personal' : 'department'), origin: 'autonomous', title: '', objectiveType: 'challenge', weight: 100, keyResults: [] };
 }
-export function inheritedGoalPayload(reference: OkrRecord, person: OkrPerson): OkrPayload {
-  const personal = goalLevel(person) === '个人级';
+export function inheritedGoalPayload(reference: OkrRecord, person: OkrPerson, level?: 'personal' | 'department'): OkrPayload {
+  const personal = level ? level === 'personal' : goalLevel(person) === '个人级';
   return { goalModelVersion: 2, goalLevel: personal ? 'personal' : 'department', origin: 'assigned', inherited: true,
     title: personal ? reference.payload.title : '', sourceTitle: reference.payload.title,
     sourceObjectiveId: reference.payload.sourceObjectiveId || reference.payload.parentObjectiveId,

@@ -22,6 +22,10 @@ export function readSession(): Session | null {
     return session;
   } catch { return null; }
 }
+export function updateSessionUser(user: CurrentUser) {
+  const session = readSession();
+  if (session) storage().setItem(KEY, JSON.stringify({ ...session, user }));
+}
 export const clearSession = clearStoredSession;
 const ROLE_USERNAMES: Record<CurrentUser['role'], string> = {
   admin: 'admin',

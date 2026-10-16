@@ -1,10 +1,10 @@
-import { Alert, Button, Empty, Tag } from 'antd';
+import { Alert, Button, Empty, Spin, Tag } from 'antd';
 import type { ReviewPeriod, ReviewType } from '../../../services/okrReviewRules';
 import type { ReviewTemplate } from '../../../services/okrReviewTemplates';
 import { reviewEditorState } from '../../../services/okrReviewTemplates';
 
-export function ReviewTemplateGate({ template, type, period, recordStatus, onCancel }: {
-  template?: ReviewTemplate; type: ReviewType; period: ReviewPeriod; recordStatus?: string; onCancel: () => void;
+export function ReviewTemplateGate({ template, type, period, recordStatus, loading = false, error, onRetry, onCancel }: {
+  template?: ReviewTemplate; type: ReviewType; period: ReviewPeriod; recordStatus?: string; loading?: boolean; error?: unknown; onRetry?: () => void; onCancel: () => void;
 }) {
   const name = template === 'supervisor' ? '主管' : template === 'boss' ? '老板' : '人员';
   const reviewName = type === 'week' ? '周报' : '月报';
@@ -14,7 +14,9 @@ export function ReviewTemplateGate({ template, type, period, recordStatus, onCan
       <div className="flex flex-wrap items-center gap-2"><h2 className="m-0 text-base font-bold">{name}{reviewName}</h2><Tag color={state.color}>{state.label}</Tag><span className="text-xs text-[var(--text-muted)]">{period.startDate} 至 {period.endDate}</span></div>
       <Button onClick={onCancel}>返回</Button>
     </header>
-    <Alert type={template ? 'info' : 'warning'} showIcon title={template ? `${name}${reviewName}模板待配置` : '人员角色尚未确认'} description={template ? `${name}使用独立复盘模板，字段与填写规则尚未确定。已保存复盘可在我的复盘中查看；补交权限仍沿用统一日期设置。` : '请确认组织人员资料后重新进入。'}/>
-    <Empty description={template ? `暂无已配置的${name}${reviewName}模板` : '暂无已确认的人员角色'}/>
+    {loading ? <div role="status" className="okr-loading-state"><Spin size="small"/>正在加载复盘资料</div> : error ? <Alert type="error" showIcon title="复盘资料加载失败" description="暂时无法确认人员角色，请重试。" action={onRetry && <Button onClick={onRetry}>重试</Button>}/> : <>
+      <Alert type={template ? 'info' : 'warning'} showIcon title={template ? `${name}${reviewName}模板待配置` : '人员角色尚未确认'} description={template ? `${name}使用独立复盘模板，字段与填写规则尚未确定。已保存复盘可在我的复盘中查看；补交权限仍沿用统一日期设置。` : '请确认组织人员资料后重新进入。'}/>
+      <Empty description={template ? `暂无已配置的${name}${reviewName}模板` : '暂无已确认的人员角色'}/>
+    </>}
   </section>;
 }

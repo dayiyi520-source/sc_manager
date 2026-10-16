@@ -12,9 +12,6 @@ type BusinessTaskKind = 'presales' | 'delivery' | 'ops';
 export type WorkItemCategoryKey = string;
 export type WorkItemAssociations = { designVariant?: 'product' | 'project' | 'other'; designProjectName?: string; designSourceDepartment?: string } & Pick<UnifiedWorkItem, 'projectId' | 'projectName' | 'needsCollaboration' | 'relatedTaskIds' | 'sourceWorkOrderIds' | 'sourceWorkOrderTitles'>;
 export type WorkItemCategoryDefinition = { id: string; code: WorkItemCategoryKey; name: string; displayName: string; iconKey: string; capabilityType: 'STANDARD' | 'TEST_CASE'; sort: number; enabled: boolean; builtIn: boolean; revision: number };
-export type WorkItemFieldScene = 'CREATE' | 'LIST' | 'ITERATION' | 'DETAIL';
-export type WorkItemFieldConfiguration = { fieldCode: string; label: string; description?: string; fieldType: string; visible: boolean; required: boolean; editable?: boolean; defaultValue?: string | string[] | number | boolean | null; sort: number; locked: boolean };
-export type WorkItemFieldConfigurationSet = { categoryCode: string; scenes: Array<{ scene: WorkItemFieldScene; fields: WorkItemFieldConfiguration[] }> };
 export type WorkItemWorkflow = {
   id: string;
   category: WorkItemCategoryKey;
@@ -83,8 +80,6 @@ export const productRepository = {
   createWorkItemCategory: (body: Pick<WorkItemCategoryDefinition, 'code' | 'name' | 'displayName' | 'iconKey' | 'capabilityType' | 'sort' | 'enabled'>) => apiRequest<{ id: string; code: string }>('/api/work-item-categories', { method: 'POST', body: JSON.stringify(body) }),
   updateWorkItemCategory: (id: string, body: Partial<Pick<WorkItemCategoryDefinition, 'name' | 'displayName' | 'iconKey' | 'capabilityType' | 'sort' | 'enabled'>>) => apiRequest<void>(`/api/work-item-categories/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteWorkItemCategory: (id: string) => apiRequest<void>(`/api/work-item-categories/${id}`, { method: 'DELETE' }),
-  workItemFieldConfigurations: (categoryCode: string) => apiRequest<WorkItemFieldConfigurationSet>(`/api/work-item-field-configurations?categoryCode=${encodeURIComponent(categoryCode)}`),
-  saveWorkItemFieldConfigurations: (categoryCode: string, scene: WorkItemFieldScene, fields: WorkItemFieldConfiguration[]) => apiRequest<WorkItemFieldConfigurationSet>(`/api/work-item-field-configurations/${encodeURIComponent(categoryCode)}/${scene}`, { method: 'PUT', body: JSON.stringify({ fields }) }),
   workItemTemplate: () => apiRequest<WorkItemTemplateType[]>('/api/work-item-template'),
   notificationTemplate: () => apiRequest<NotificationSettings>('/api/notification-template'),
   saveNotificationTemplate: (body: NotificationSettings) => apiRequest<NotificationSettings>('/api/notification-template', { method: 'PUT', body: JSON.stringify(body) }),

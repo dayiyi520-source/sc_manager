@@ -4,6 +4,10 @@
 
 部署入口为 scripts/deploy-production.sh。Windows 使用其委托的 Python 入口：
 
+本纯前端项目在未显式配置时，开发及普通生产构建均默认使用 Mock；接口传输测试仍默认使用测试请求。只有显式设置 `VITE_MOCK_MODE=false` 才关闭 Mock，该兼容选项不用于本站正常发布。现有部署脚本继续显式开启 Mock，不改变发布方式。
+
+`npm run build` 可用于构建检查，但不会自动设置线上专属子路径、打包共享数据和安装 Mock 文件服务，不能代替完整发布入口。线上发布仍使用下述脚本完成资源路径、共享数据、备份和切换。
+
 ```powershell
 python scripts/deploy_frontend_mock.py --project . --source-dir <已验证的独立源码快照目录> --revision <源码提交号>
 ```

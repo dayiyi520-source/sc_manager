@@ -52,7 +52,7 @@ it('keeps historical product rows with a version name readable and valid', () =>
 
 it('derives supervisor KR summaries from saved child rows and leaves legacy titles readable', () => {
  const base={id:'k',title:'历史内容',weight:100,progress:0};
- expect(supervisorKrTitle({...base,structureType:'product',details:[{id:'a',name:'甲',version:'V1'},{id:'b',name:'甲',version:'V2'}]})).toBe('按期完成2个产品版本迭代计划 · 达到对应的验收阶段');
+ expect(supervisorKrTitle({...base,structureType:'product',details:[{id:'a',name:'甲',version:'V1'},{id:'b',name:'甲',version:'V2'}]})).toBe('按期完成2个产品版本迭代计划 · 达到对应的阶段');
  expect(supervisorKrTitle({...base,structureType:'delivery',details:[{id:'a',name:'项目甲',version:'产品甲'}]})).toBe('按期完成1个项目包含的产品推进计划 · 达到目标里程碑');
  expect(supervisorKrTitle({...base,structureType:'product'})).toBe('历史内容');
 });

@@ -15,7 +15,6 @@ vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.
 vi.mock('../../services/requirementRepository', () => ({ requirementRepository: { workOrderCandidates: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../services/productRepository', () => ({ productRepository: {
   businessTasks: vi.fn(), updateBusinessTask: vi.fn().mockResolvedValue(null),
-  workItemFieldConfigurations: vi.fn().mockResolvedValue({ scenes: [{ scene: 'LIST', fields: [{ fieldCode: 'priority', visible: false }, { fieldCode: 'creator', visible: false }] }] }),
   businessTask: vi.fn(), reviewBusinessTask: vi.fn().mockResolvedValue(null), workItemDetail: vi.fn(), workItemTypes: vi.fn().mockResolvedValue([]),
   workItemReview: vi.fn().mockResolvedValue(null), workItemRelations: vi.fn().mockResolvedValue({ relations: [] }), businessTaskActivities: vi.fn().mockResolvedValue([])
 } }));
@@ -107,10 +106,9 @@ it.each(['presales', 'delivery'] as const)('limits %s details to activity, colla
   expect(screen.getByRole('button', { name: /请选择关联任务|请选择协同事项/ })).toBeVisible();
 });
 
-it('does not request legacy field settings for task pages', async () => {
+it('renders the presales empty state without a field configuration service', async () => {
   mount('presales');
   await screen.findByText('没有符合当前搜索、过滤或分组条件的售前任务');
-  expect(productRepository.workItemFieldConfigurations).not.toHaveBeenCalled();
 });
 
 

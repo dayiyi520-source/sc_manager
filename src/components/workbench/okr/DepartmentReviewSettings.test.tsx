@@ -41,3 +41,25 @@ describe('本轮提交设置', () => {
   expect(screen.getByRole('button', { name: '本轮提交设置' })).toBeDisabled();
  });
 });
+
+it.each(['week', 'month'] as const)('keeps %s exclusions on submission failure and allows retry', async reviewType => {
+ const onSubmit = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+ const onCloseSubmit = vi.fn();
+ render(<DepartmentReviewSettings {...props} payload={{...payload, reviewType}} submitOpen onSubmit={onSubmit} onCloseSubmit={onCloseSubmit}/>);
+ fireEvent.click(screen.getByRole('button', {name: /^提\s*交$/}));
+ expect(screen.getByText(/未提交：员工甲/)).toBeInTheDocument();
+ expect(onSubmit).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('checkbox', {name:'排除员工甲'}));
+ fireEvent.click(screen.getByRole('button', {name: /^提\s*交$/}));
+ expect(screen.getByText('请为每位排除员工填写原因')).toBeInTheDocument();
+ fireEvent.change(screen.getByRole('textbox',{name:'员工甲排除原因'}),{target:{value:'  本轮休假  '}});
+ fireEvent.click(screen.getByRole('button', {name: /^提\s*交$/}));
+ await screen.findByText(/提交未成功/);
+ expect(onCloseSubmit).not.toHaveBeenCalled();
+ expect(screen.getByRole('checkbox', {name:'排除员工甲'})).toBeChecked();
+ expect(screen.getByRole('textbox',{name:'员工甲排除原因'})).toHaveValue('  本轮休假  ');
+ await waitFor(() => expect(screen.getByRole('button', {name: /提\s*交$/})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button', {name: /提\s*交$/}));
+ await waitFor(()=>expect(onCloseSubmit).toHaveBeenCalledOnce());
+ expect(onSubmit).toHaveBeenLastCalledWith([{employeeId:'a', employeeName:'员工甲', reason:'本轮休假'}]);
+});

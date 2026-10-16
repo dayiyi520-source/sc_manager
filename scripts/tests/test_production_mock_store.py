@@ -6,6 +6,10 @@ class StoreTests(unittest.TestCase):
   self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name);self.store=module.Store(self.root)
   self.state={'revision':1,'okrRecords':[],'okrPeople':[],'okrSettings':{}}
   (self.root/'okr-state.json').write_text(json.dumps(self.state));(self.root/'research-template.json').write_text(json.dumps({'researchTypes':[]}))
+ def test_removed_field_configuration_is_rejected(self):
+  before=self.store.read('research-template')
+  with self.assertRaises(ValueError): self.store.update('research-template',{'key':'researchFields','value':[]})
+  self.assertEqual(self.store.read('research-template'),before)
  def tearDown(self): self.tmp.cleanup()
  def test_goal_roundtrip_and_conflict(self):
   record={'id':'goal','kind':'objective','ownerId':'manager','periodKey':'2026-10','version':0,'payload':{'title':'goal'}}

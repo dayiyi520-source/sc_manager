@@ -11,6 +11,23 @@ const record=(id:string,kind:OkrRecord['kind']='objective',ownerId='manager'):Ok
 const state=():OkrFileState=>({...seed as unknown as OkrFileState,revision:0,okrRecords:[]});
 const key='shichuang.frontend.mock.okrRecords';
 describe('portable goal/review mock persistence',()=>{
+ it('explains a disconnected preview service, preserves local content and recovers on retry',async()=>{
+  localStorage.clear();localStorage.setItem(key,JSON.stringify([record('local-draft','review')]));
+  const request=vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue(new Response(JSON.stringify(state())));
+  const persistence=createOkrFilePersistence(localStorage,request);
+  const operation=vi.fn(async()=>true);
+  await expect(persistence.run(operation)).rejects.toThrow('无法连接复盘数据服务');
+  expect(operation).not.toHaveBeenCalled();
+  expect(JSON.parse(localStorage.getItem(key)!)[0].id).toBe('local-draft');
+  localStorage.setItem('shichuang.frontend.mock.okrFileMigration.v1','done');
+  await expect(persistence.run(operation)).resolves.toBe(true);
+  expect(operation).toHaveBeenCalledOnce();
+ });
+ it('reports an invalid response instead of exposing a JSON parsing error',async()=>{
+  localStorage.clear();
+  const request=vi.fn().mockResolvedValue(new Response('<html>not the state service</html>'));
+  await expect(createOkrFilePersistence(localStorage,request).run(async()=>true)).rejects.toThrow('复盘数据服务返回内容无效');
+ });
  it('atomically saves goals and reviews and rejects concurrent overwrites',()=>{
   const dir=mkdtempSync(join(tmpdir(),'okr-state-'));const file=join(dir,'state.json');
   try{writeFileSync(file,JSON.stringify(state()));const saved=saveOkrState(file,{...state(),okrRecords:[record('goal'),record('review','review')]},0);
@@ -60,3 +77,53 @@ describe('portable goal/review mock persistence',()=>{
    expect(migrateLegacyOkrState(current, { okrRecords: [{ ...legacy, status: 'draft' }] }).okrRecords[0]).toEqual(saved);
   });
  });
+
+describe('file read query bursts', () => {
+ it('serves 40 concurrent and repeated read queries with one file GET, then revalidates after focus or expiry', async () => {
+  localStorage.clear(); localStorage.setItem('shichuang.frontend.mock.okrFileMigration.v1', 'done');
+  let file = state();
+  const request = vi.fn(async () => new Response(JSON.stringify(file)));
+  const persistence = createOkrFilePersistence(localStorage, request);
+  const read = () => persistence.run(async () => JSON.parse(localStorage.getItem(key)!), true);
+  await Promise.all(Array.from({ length: 40 }, read));
+  await read(); expect(request).toHaveBeenCalledTimes(1);
+  file = { ...file, revision: 1, okrRecords: [record('external')] };
+  window.dispatchEvent(new Event('focus'));
+  expect((await read())[0].id).toBe('external'); expect(request).toHaveBeenCalledTimes(2);
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 5001);
+  try { await read(); expect(request).toHaveBeenCalledTimes(3); } finally { clock.mockRestore(); }
+ });
+ it('reads a fresh revision before writing and exposes successful writes to cached reads', async () => {
+  localStorage.clear(); localStorage.setItem('shichuang.frontend.mock.okrFileMigration.v1', 'done');
+  let file = state();
+  const request = vi.fn(async (_url: unknown, init?: RequestInit) => {
+   if (init?.method === 'PUT') {
+    const body = JSON.parse(String(init.body)); expect(body.previousRevision).toBe(file.revision);
+    file = { ...body.state, revision: file.revision + 1 };
+   }
+   return new Response(JSON.stringify(file));
+  });
+  const persistence = createOkrFilePersistence(localStorage, request);
+  await persistence.run(async () => true, true);
+  file = { ...file, revision: 3, okrRecords: [record('external')] };
+  await persistence.run(async () => {
+   const rows = JSON.parse(localStorage.getItem(key)!); rows.push(record('new'));
+   localStorage.setItem(key, JSON.stringify(rows));
+  });
+  expect(await persistence.run(async () => JSON.parse(localStorage.getItem(key)!).map((row: OkrRecord) => row.id), true)).toEqual(['external', 'new']);
+  expect(request).toHaveBeenCalledTimes(3);
+ });
+});
+
+
+it('shares a read failure across queued queries and allows the next explicit retry', async () => {
+ localStorage.clear();
+ const request = vi.fn().mockRejectedValueOnce(new TypeError('断网')).mockResolvedValue(new Response(JSON.stringify(state())));
+ const persistence = createOkrFilePersistence(localStorage, request);
+ const read = () => persistence.run(async () => true, true);
+ const failed = await Promise.allSettled(Array.from({ length: 40 }, read));
+ expect(failed.every(result => result.status === 'rejected')).toBe(true);
+ expect(request).toHaveBeenCalledTimes(1);
+ await expect(read()).resolves.toBe(true);
+ expect(request).toHaveBeenCalledTimes(2);
+});

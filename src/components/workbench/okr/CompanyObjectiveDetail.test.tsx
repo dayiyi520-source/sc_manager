@@ -29,7 +29,7 @@ describe('company objective detail', () => {
     vi.spyOn(okrRepository,'events').mockResolvedValue([]);
     const record:OkrRecord={id:'manager',kind:'objective',ownerId:'manager',periodKey:'2026-10',status:'active',version:1,payload:{goalLevel:'department',title:'主管O',keyResults:[{id:'k',title:'旧的拼接文案',weight:100,progress:0,structureType:'product',details:[{id:'a',name:'产品甲',version:'V1',stage:'设计'},{id:'b',name:'产品甲',version:'V2',stage:'开发'}]}]}};
     render(<CompanyObjectiveDetail record={record} records={[record]} people={[{id:'manager',name:'主管',jobTitle:'产品主管',department:'产品部',rootFlag:0,supervisorId:'boss',version:1}]} work={[]} workLoading={false} workError={null} onRetryWork={vi.fn()} onClose={vi.fn()}/>);
-    expect(screen.getByText('按期完成2个产品版本迭代计划 · 达到对应的验收阶段')).toBeInTheDocument();
+    expect(screen.getByText('按期完成2个产品版本迭代计划 · 达到对应的阶段')).toBeInTheDocument();
     expect(screen.getByText('产品部',{selector:'.company-detail-department'})).toBeInTheDocument();
     vi.restoreAllMocks();
   });

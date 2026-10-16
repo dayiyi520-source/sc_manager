@@ -1,3 +1,4 @@
+import { newestCreatedFirst } from '../../utils/creationOrder';
 import React, { useEffect, useMemo, useState } from 'react';
 import type { TaskCompletionReview } from '../../types';
 import { openTaskCompletionDialog } from './TaskCompletionDialog';
@@ -502,8 +503,8 @@ export const VersionIterationView: React.FC = () => {
   const visibleVersions = useMemo(
     () =>
       productLineFilter === 'all'
-        ? versions
-        : versions.filter((version) => version.productLineId === productLineFilter || version.productLineName === selectedProductLineName),
+        ? [...versions].sort(newestCreatedFirst)
+        : versions.filter((version) => version.productLineId ? version.productLineId === productLineFilter : version.productLineName === selectedProductLineName).sort(newestCreatedFirst),
     [productLineFilter, selectedProductLineName, versions]
   );
 
@@ -643,7 +644,7 @@ export const VersionIterationView: React.FC = () => {
       if (!(item.kind in planningKindLabel) || unique.has(workItemKey(item))) continue;
       unique.set(workItemKey(item), item);
     }
-    return [...unique.values()];
+    return [...unique.values()].sort(newestCreatedFirst);
   }, [bugs, designTasks, devTasks, recentItems, requirementTasks, selectedVersion, testItems]);
 
   const unplannedWorkItems = useMemo(() => planningItems.filter((item) => {
@@ -1014,7 +1015,7 @@ export const VersionIterationView: React.FC = () => {
       && (!taskFilters.plannedStartDate[1] || String((item.source as unknown as Record<string, unknown>).plannedStartDate || '').slice(0, 10) <= taskFilters.plannedStartDate[1])
       && (!taskOwnerNames.length || taskOwnerNames.includes(item.ownerName))
       && `${item.title} ${item.ownerName} ${item.creatorName || ''} ${item.status}`.toLowerCase().includes(taskQuery.trim().toLowerCase())
-    ).sort((a, b) => taskGroupBy === 'none' ? 0 : normalizedTaskGroupValue(a, taskGroupBy).localeCompare(normalizedTaskGroupValue(b, taskGroupBy), 'zh-CN'));
+    ).sort((a, b) => (taskGroupBy === 'none' ? 0 : normalizedTaskGroupValue(a, taskGroupBy).localeCompare(normalizedTaskGroupValue(b, taskGroupBy), 'zh-CN')) || newestCreatedFirst(a, b));
     const taskStatuses = [...new Set(selectedItems.map((item) => item.status).filter(Boolean))];
     const taskOwners = directoryOwnerNames;
     const taskCreators = [...new Set(selectedItems.map((item) => item.creatorName).filter(Boolean))];

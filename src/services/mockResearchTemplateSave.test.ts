@@ -40,7 +40,7 @@ it('产品通知和状态流程写入文件，刷新恢复且不影响其他产�
   let file: Record<string, any> = { productLines: [
     { id: 'p1', name: '演示一', versions: [], workItemTypes: [{ id: 't1', name: '类型一', category: '需求', enabled: true }] },
     { id: 'p2', name: '演示二', versions: [] },
-  ], researchNotifications: { marker: '全局通知' } };
+  ], researchTypes: [{ id: 't1', name: '类型一', category: '需求', enabled: true }], researchNotifications: { marker: '全局通知' } };
   const request = vi.fn(async (_path: string, init?: RequestInit) => {
     if (init?.method === 'PUT') { const input = JSON.parse(String(init.body)); expect(input.previous).toEqual(file[input.key] ?? null); file = { ...file, [input.key]: input.value }; }
     return { ok: true, json: async () => file };
@@ -95,6 +95,7 @@ it('基本信息只提交当前产品变化字段，读取刷新更新基准且�
   await mockApiRequest('/api/product-lines/p1', { method: 'PUT', body: JSON.stringify({ name: '新名', description: '原描述' }) });
   expect(file.productLines[1].name).toBe('其他页面修改了另一个产品');
   file.productLines[0].description = '外部新描述';
+  window.dispatchEvent(new Event('focus'));
   expect((await mockApiRequest('/api/product-lines')).find((product: any) => product.id === 'p1').description).toBe('外部新描述');
 });
 

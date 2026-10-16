@@ -2,7 +2,7 @@ import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 
-export const templateKeys = ['researchRoles', 'researchStatuses', 'researchCategories', 'researchFields', 'researchTypes', 'researchNotifications', 'researchAutomation', 'researchAutomationSetting', 'productLines'] as const;
+export const templateKeys = ['researchRoles', 'researchStatuses', 'researchCategories', 'researchTypes', 'researchNotifications', 'researchAutomation', 'researchAutomationSetting', 'productLines'] as const;
 export const templateEndpoint = '/__dev/research-template';
 
 export function saveTemplateValue(file: string, key: string, value: unknown, previous: unknown) {

@@ -1,5 +1,5 @@
 import { GoalSourceTree } from './GoalSourceTree';
-import { autonomousAlignmentSource } from '../../../services/okrGoalRules';
+import { autonomousAlignmentSource, goalLevel } from '../../../services/okrGoalRules';
 import { canAlignPeriod, periodLabel } from '../../../services/okrPeriods';
 import { departmentTemplates } from '../../../services/okrTemplates';
 import { normalizeObjectiveTitleTemplates, PRODUCT_KR_STAGES } from '../../../services/okrObjectiveTitleTemplates';
@@ -8,7 +8,7 @@ import { KrDetailTable } from './KrDetailTable';
 import { krDetails, krDetailContentComplete, supervisorKrTitle } from '../../../services/okrKrDetails';
 import { GoalAlignmentDrawer } from './GoalAlignmentDrawer';
 import { goalContentComplete, GOAL_ADDITION_MESSAGE } from './goalAdditionRules';
-import { inheritedGoalPayload, validateThreeLevelGoal, sourceKeyResults } from '../../../services/okrThreeLevelRules';
+import { inheritedGoalPayload, validateThreeLevelGoal, sourceKeyResults, assignedReferences } from '../../../services/okrThreeLevelRules';
 import { GoalExecutionFields } from './GoalExecutionFields';
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Alert, Avatar, Button, DatePicker, Dropdown, Form, Input, InputNumber, Popconfirm, Select, Tooltip, Typography } from 'antd';
@@ -21,6 +21,8 @@ import { isSubmissionDeadline, isSubmissionWeight } from './submissionValidation
 import { PersonAvatar } from '../../common/PersonIdentity';
 
 interface Props {
+  hideSourceTree?: boolean;
+  requireSource?: boolean;
   threeLevel?: boolean; ownerId?: string; planLocked?: boolean;
   cycle: string;
   objectiveIndex?: number;
@@ -61,13 +63,14 @@ interface Props {
 export interface ObjectiveFormHandle { submit: (weight?: number) => Promise<boolean>; saveDraft: () => Promise<boolean>; snapshot: () => OkrPayload; }
 export const calculateKrWeightTotal = (items: Pick<OkrKr, 'weight'>[]) => items.reduce((total, item) => total + item.weight, 0);
 
-export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ threeLevel = false, ownerId = '', planLocked = false, cycle, objectiveIndex = 0, ownerName, ownerAvatar, people = [], teamMembers, busy, unavailable, root, onCancel, onRemove, onSave, onSaveDraft, submitLabel, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false, supervisor = false, goalLevel: levelLabel, department, alignmentActions: suppliedAlignments = [], productLineOptions = [], productLineVersionOptions = {}, projectOptions = [], projectProductOptions = {}, projectProductStageOptions = {}, opportunityOptions = [], okrRecords = [], settings }, ref) {
+export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function ObjectiveForm({ requireSource = false, hideSourceTree = false, threeLevel = false, ownerId = '', planLocked = false, cycle, objectiveIndex = 0, ownerName, ownerAvatar, people = [], teamMembers, busy, unavailable, root, onCancel, onRemove, onSave, onSaveDraft, submitLabel, onAddAnother, chrome = true, initialPayload, readOnly = false, detailMode = false, compactDetail = false, allowAddAnotherInDetail = false, supervisor = false, goalLevel: levelLabel, department, alignmentActions: suppliedAlignments = [], productLineOptions = [], productLineVersionOptions = {}, projectOptions = [], projectProductOptions = {}, projectProductStageOptions = {}, opportunityOptions = [], okrRecords = [], settings }, ref) {
   const person = people.find(item => item.id === ownerId);
-  const assigned = suppliedAlignments.filter(reference => reference.payload.assigneeIds?.includes(ownerId));
+  const referencePerson = person && (initialPayload?.goalLevel === 'personal' || levelLabel === '个人级') && goalLevel(person) === '部门级' ? {...person,supervisorId:person.id} : person;
+  const assigned = [...new Map([...suppliedAlignments.filter(reference => reference.payload.assigneeIds?.includes(ownerId)), ...(threeLevel ? assignedReferences(okrRecords, referencePerson) : [])].map(reference => [reference.id, reference])).values()];
   const referenceId = initialPayload?.sourceKrId || initialPayload?.alignments?.[0]?.parentKeyResultId || initialPayload?.parentKeyResultId;
   const autonomous = initialPayload?.origin === 'autonomous';
   const reference = autonomous ? undefined : referenceId ? assigned.find(item => item.id === referenceId) : assigned.filter(reference => !okrRecords.some(record => record.ownerId === ownerId && !record.payload.inherited && record.payload.sourceKrId === reference.id && record.periodKey === cycle))[objectiveIndex];
-  const seed = threeLevel && !root && reference && person ? inheritedGoalPayload(reference, person) : undefined;
+  const seed = threeLevel && !root && reference && person ? inheritedGoalPayload(reference, person, initialPayload?.goalLevel === 'personal' || levelLabel === '个人级' ? 'personal' : undefined) : undefined;
   const personal = threeLevel && (initialPayload?.goalLevel === 'personal' || levelLabel === '个人级') && !autonomous;
   const ownPersonal = threeLevel && (initialPayload?.goalLevel === 'personal' || levelLabel === '个人级') && autonomous;
   const effectiveInitial = initialPayload?.inherited && initialPayload.goalLevel === 'department' ? { ...initialPayload, title: '' } : personal && seed && !initialPayload?.sourceKrId ? seed : initialPayload ? { ...seed, ...initialPayload } : seed;
@@ -94,6 +97,8 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const dragHandleIndex = useRef<number | null>(null);
   const [error, setError] = useState('');
+  useEffect(() => { setSelectedSource(initialPayload?.sourceObjectiveId ? `${initialPayload.sourceObjectiveId}:${initialPayload.sourceKrId || ''}` : ''); setError(''); }, [initialPayload?.sourceObjectiveId, initialPayload?.sourceKrId]);
+
   useEffect(() => {
     setTitle(effectiveInitial?.title || '');
     setTitleTemplateId(initialPayload?.objectiveTitleTemplateId);
@@ -148,7 +153,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const actionTypeForIndex = (index: number) => threeLevel ? krs[index]?.structureType || defaultTypes[0] || 'support' : index === 0 ? 'support' : index === 1 ? 'product' : index === 2 ? 'presales' : 'delivery';
   const actionTypeForKr = (index: number) => actionTypeForIndex(index);
   const personalKrTitle = (kr: OkrKr) => {
-    if (kr.structureType === 'product') return `${(kr.details || []).map(row => row.name).filter(Boolean).join('、') || kr.businessObject || '产品'}完成${(kr.details || []).map(row => row.stage).filter(Boolean).join('、') || '达成阶段'}`;
+    if (kr.structureType === 'product') return `${(kr.details || []).map(row => row.name).filter(Boolean).join('、') || kr.businessObject || '产品'}完成${(kr.details || []).map(row => row.stage).filter(Boolean).join('、') || '阶段'}`;
     if (kr.structureType === 'delivery') return `${(kr.details || []).map(row => row.name).filter(Boolean).join('、') || kr.businessObject || '项目'}达成${(kr.details || []).map(row => row.targetStage).filter(Boolean).join('、') || '目标里程碑'}`;
     return [kr.action, kr.result].filter(value => value?.trim()).join('，');
   };
@@ -174,6 +179,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const submit = async (fromBatch = false, confirmedWeight?: number): Promise<boolean> => {
     const submittedPayload = { ...payload(), ...(confirmedWeight !== undefined ? { weight: confirmedWeight } : {}) };
     if ((!fromBatch && busy) || unavailable || readOnly) return false;
+    if (requireSource && (!payload().sourceObjectiveId || !payload().sourceKrId)) { setError('请选择挑战目标来源'); return false; }
     if (templateMissing && krs.some(kr => !kr.structureType)) { setError('请先为当前部门配置 KR 模板'); return false; }
     if (exceedsParentDeadline) { setError('KR 截止日期不能超过上级截止日期'); return false; }
     if (threeLevel) { const validation = validateThreeLevelGoal(submittedPayload, ownerId); if (validation) { setError(validation); return false; } setError(''); return onSave(submittedPayload); }
@@ -190,6 +196,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const saveDraft = async (fromBatch = false): Promise<boolean> => {
     if ((!fromBatch && busy) || unavailable || readOnly) return false;
     if (!onSaveDraft) return false;
+    if (requireSource && (!payload().sourceObjectiveId || !payload().sourceKrId)) { setError('请选择挑战目标来源'); return false; }
     if (templateMissing && krs.some(kr => !kr.structureType)) { setError('请先为当前部门配置 KR 模板'); return false; }
     if (!title.trim() && (!supervisor || threeLevel)) { setError('请先填写目标名称。'); return false; }
     if (!isSubmissionWeight(objectiveWeight)) { setError('目标权重须为 1-100 的整数。'); return false; }
@@ -244,11 +251,11 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
   const moveKr = (from: number, to: number) => setKrs(items => { const copy = [...items]; [copy[from], copy[to]] = [copy[to], copy[from]]; return copy; });
   return <Form className={`okr-objective-form${isCompanyStyle || personal || ownPersonal ? ' company-objective-form' : ''}${supervisor ? ' supervisor-objective-form' : ''}${threeLevel && !root && !personal && !ownPersonal ? ' department-objective-editor' : ''}`} disabled={busy || readOnly} onFinish={() => void submit()}>
     {chrome && <div className="okr-objective-period">{periodLabel(cycle)}{!compactDetail && <span>{periodStatusLabel(cycle)}</span>}{detailMode && <Button type="text" onClick={onCancel} disabled={busy}>取消</Button>}</div>}
-    {(personal || ownPersonal) && <GoalSourceTree payload={payload()} records={okrRecords} people={people} cycle={cycle}/>}
+    {!hideSourceTree && (personal || ownPersonal) && <GoalSourceTree payload={payload()} records={okrRecords} people={people} cycle={cycle}/>}
     <div className="okr-objective-body">
 
       {supervisor && !personal && !ownPersonal && selectedTitleTemplate?.guidance && <Typography.Paragraph type="secondary">{selectedTitleTemplate.guidance}</Typography.Paragraph>}
-      <div className="okr-objective-columns okr-source-heading" hidden={personal || threeLevel && !root && !ownPersonal}>
+      <div className="okr-objective-columns okr-source-heading" hidden={personal || hideSourceTree && !root || threeLevel && !root && !ownPersonal}>
         <div aria-hidden={threeLevel && !root && !ownPersonal} className={`company-objective-alignment${personal ? ' is-personal-alignment' : ''}`}>
           {threeLevel && !root && !ownPersonal ? null : autonomous ? <><Typography.Text type="secondary">自主提出 · {selectedSource ? '已选择对齐' : '未对齐'}</Typography.Text><Button type="text" size="small" className="okr-alignment-trigger" icon={<PlusIcon/>} disabled={busy || readOnly} onClick={() => setAlignmentOpen(true)}>选择对齐</Button></> : root ? <span>{periodLabel(cycle)}目标</span> : <div className="supervisor-alignment-actions">{(threeLevel ? reference ? [reference] : [] : alignmentActions).map(action => <div key={action.id} className="supervisor-alignment-action">{`${personal ? (okrRecords.find(record => record.id === action.payload.parentObjectiveId && record.kind === 'objective')?.payload.title || action.payload.title) : action.payload.title}——来源于上级${people.find(person => person.id === action.ownerId)?.name || '未知人员'}`} </div>)}{!alignmentActions.length && <span className="supervisor-alignment-placeholder">暂无需要承接的动作</span>}</div>}
         </div>{!ownPersonal && <><span>权重</span><span>截止日期</span></>}<span/>

@@ -67,18 +67,6 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).not.toContain('shrink-0 rounded border border-[var(--border-main)] bg-[var(--bg-surface)] px-1.5');
   });
 
-  it('keeps child creation context while applying fixed detail relation tabs', () => {
-    expect(requirementSource).toContain("value: 'collaborationItems'");
-    expect(requirementSource).toContain("value: 'relatedTasks'");
-    expect(requirementSource).toContain("value: 'children'");
-    expect(requirementSource).toContain('title="添加子任务"');
-    expect(requirementSource).toContain('父级任务');
-    expect(requirementSource).toContain('openWorkItemDetail(child, selectedTask)');
-    expect(requirementSource).toContain('label="关联产品"><Input value={selectedTask?.productLineName || \'未设置\'} disabled');
-    expect(requirementSource).toContain('label="迭代版本"><Input value={selectedTask?.versionName || \'未设置\'} disabled');
-    expect(requirementSource).toContain('label="关联项目"><Input value={selectedTask?.projectName || \'未关联\'} disabled');
-  });
-
   it('consumes an iteration work-item target and opens the persisted real detail', () => {
     expect(requirementSource).toContain('pendingDetailTarget');
     expect(requirementSource).toContain('payload.itemId');
@@ -86,29 +74,11 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('setSelectedTask(storedTask(detail, fallback))');
   });
 
-  it('creates children only from the parent category and uses child-task copy', () => {
-    expect(requirementSource).toContain('{selectedTask && !childModalOpen && (');
-    expect(requirementSource).toContain('workItemCategoryLabel[selectedTask.category] === item.category');
-    expect(requirementSource).not.toContain('childCategoryOptions.some');
-    expect(requirementSource).not.toContain('<Form.Item label="子任务分类"');
-    expect(requirementSource).toContain('label="子任务类型"');
-    expect(requirementSource).toContain('子任务类型读取失败');
-    expect(requirementSource).toContain('placeholder="请选择时间"');
-    expect(requirementSource).toContain('onClose={cancelChildCreation}');
-    expect(requirementSource).toMatch(/const cancelChildCreation = \(\) => \{[\s\S]*setChildModalOpen\(false\);[\s\S]*setSelectedTask\(null\);[\s\S]*\};/);
-    expect(requirementSource).toMatch(/addToast\('success', '子任务已创建'\);[\s\S]*setChildModalOpen\(false\);[\s\S]*setSelectedTask\(null\);/);
-    expect(requirementSource).toContain('await Promise.allSettled(refreshes)');
-    expect(requirementSource).toContain('const [childDescriptionHtml, setChildDescriptionHtml]');
-    expect(requirementSource).toContain('descriptionHtml: childDescriptionHtml');
-    expect(requirementSource).toContain('editor={childDescriptionEditor}');
-    expect(requirementSource).not.toContain('<Form.Item label="任务描述"><Input.TextArea rows={8} value={childDescription}');
-    expect(requirementSource.match(/placeholder="请输入工时"/g)).toHaveLength(2);
-  });
-
-  it('passes test-task parent context into the custom detail instead of duplicating the generic reference', () => {
-    expect(requirementSource).toContain("taskKind !== 'test' && parentWorkItem");
-    expect(requirementSource).toContain('parent: parentWorkItem');
-    expect(requirementSource).toContain('onOpenParent: parentWorkItem ?');
+  it('does not expose removed child-task creation or parent detail extensions', () => {
+    expect(requirementSource).not.toContain('childModalOpen');
+    expect(requirementSource).not.toContain('title="添加子任务"');
+    expect(requirementSource).not.toContain('onOpenParent');
+    expect(requirementSource).not.toContain('allowedChildTypeNames');
   });
 
   it('uses fixed field contracts and Ant Design hour inputs', () => {
@@ -121,13 +91,10 @@ describe('requirement task Ant Design contract', () => {
     expect(requirementSource).toContain('className="requirement-hours-input w-full"');
   });
 
-  it('uses configured workflow states and keeps parents with children read-only', () => {
+  it('uses configured workflow states without old child-task controls', () => {
     expect(requirementSource).toContain('productRepository.workItemTransitions');
     expect(requirementSource).toContain('productRepository.transitionWorkItem');
-    expect(requirementSource).toContain("if (task.hasChildren) return <WorkItemStatusTag");
     expect(requirementSource).toContain('options.statuses');
-    expect(requirementSource).toContain("selectedTask.hasChildren ? 'pointer-events-none opacity-80' : ''");
-    expect(requirementSource).toContain('{hasChildren ? <PersonIdentity name={task.ownerName}');
     expect(requirementSource).toContain('onChange={(ownerName) => void updateTask(task.id, { ownerName })}');
   });
 

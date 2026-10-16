@@ -300,7 +300,7 @@ it.each([
   const view = render(<QueryClientProvider client={client}><RequirementTasksView taskKind={kind} itemLabel={kind === 'dev' ? '研发任务' : '测试任务'} initialDetail={task} /></QueryClientProvider>);
   await screen.findByRole('button', { name: expected[0] });
   if (kind === 'test') await screen.findByRole('button', { name: '测试计划 · 1' });
-  const expectedLabels = [...expected];
+  const expectedLabels: readonly string[] = expected;
   const associationTabs = [...document.querySelectorAll('button')].map(button => button.textContent?.trim() || '').filter(label => expectedLabels.includes(label));
   expect(associationTabs).toEqual(expected);
   if (kind === 'test') {
@@ -322,15 +322,15 @@ it('selects existing plans from the plan table and persists the relation on the 
   fireEvent.click(await screen.findByRole('button', { name: '测试计划 · 0' }));
   fireEvent.click(screen.getByRole('button', { name: '新增关联测试计划' }));
 
-  const picker = await screen.findByRole('dialog', { name: '选择关联测试计划' });
+  const picker = await screen.findByRole('dialog');
+  expect(within(picker).getByText('选择关联测试计划')).toBeInTheDocument();
   const row = await within(picker).findByRole('row', { name: /既有回归计划.*TEST-02.*来源测试任务/ });
   fireEvent.click(within(row).getByRole('checkbox'));
-  fireEvent.click(within(picker).getByRole('button', { name: '关联' }));
+  fireEvent.click(within(picker).getByRole('button', { name: /关\s*联/ }));
 
   await waitFor(() => expect(productRepository.associateTestPlans).toHaveBeenCalledWith(task.id, [plan.id]));
-  expect(await screen.findByText('既有回归计划')).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: '测试计划 · 1' })).toBeInTheDocument();
-  expect(await screen.queryByRole('dialog', { name: '选择关联测试计划' })).not.toBeInTheDocument();
+  expect(within(screen.getByRole('region', { name: '关联测试计划' })).getByText('既有回归计划')).toBeInTheDocument();
 });
 
 it('retains the selected plan and displays an error when the relation save fails', async () => {
@@ -342,13 +342,14 @@ it('retains the selected plan and displays an error when the relation save fails
   render(<QueryClientProvider client={client}><RequirementTasksView taskKind="test" itemLabel="测试任务" initialDetail={task} /></QueryClientProvider>);
   fireEvent.click(await screen.findByRole('button', { name: '测试计划 · 0' }));
   fireEvent.click(screen.getByRole('button', { name: '新增关联测试计划' }));
-  const picker = await screen.findByRole('dialog', { name: '选择关联测试计划' });
+  const picker = await screen.findByRole('dialog');
+  expect(within(picker).getByText('选择关联测试计划')).toBeInTheDocument();
   const row = await within(picker).findByRole('row', { name: /待关联计划.*TEST-02.*来源任务/ });
   fireEvent.click(within(row).getByRole('checkbox'));
-  fireEvent.click(within(picker).getByRole('button', { name: '关联' }));
+  fireEvent.click(within(picker).getByRole('button', { name: /关\s*联/ }));
   expect(await within(picker).findByText('保存失败，请重试')).toBeInTheDocument();
   expect(within(row).getByRole('checkbox')).toBeChecked();
-  expect(within(picker).getByRole('button', { name: '取消' })).toBeEnabled();
+  expect(within(picker).getByRole('button', { name: /取\s*消/ })).toBeEnabled();
 });
 
 it('shows empty and retryable error states for test plans in test task details', async () => {
@@ -364,23 +365,39 @@ it('shows empty and retryable error states for test plans in test task details',
   expect(await screen.findByText('暂无关联测试计划')).toBeInTheDocument();
 });
 
-it('defaults a new defect verifier to its selected owner, allows changing it, and labels its version as iteration', async () => {
+it('defaults a new defect owner and verifier to the creator and allows changing each independently', async () => {
   window.history.replaceState(null, '', '/app/prod_bugs');
+  vi.mocked(teamRepository.options).mockResolvedValue([{ id: 'user-admin', name: '当前用户' }, { id: 'owner-1', name: '负责人甲' }, { id: 'qa-2', name: '验证者乙' }] as never);
   vi.mocked(useApp).mockReturnValue({ ...useApp(), currentUser: { id: 'user-admin', name: '当前用户' }, productLines: [{ id: 'line-1', name: '协同产品' }], versions: [{ id: 'version-1', name: 'V1.0', productLineId: 'line-1', productLineName: '协同产品' }] } as unknown as ReturnType<typeof useApp>);
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" itemLabel="缺陷" /></QueryClientProvider>);
   fireEvent.click(await screen.findByRole('button', { name: '新建' }));
   const ownerItem = screen.getByText('负责人', { selector: '.ant-form-item-label label' }).closest('.ant-form-item')!;
   const owner = ownerItem.querySelector('.ant-select input')!;
-  fireEvent.mouseDown(owner);
-  fireEvent.click(await screen.findByText('负责人甲', { selector: '.ant-select-item-option-content' }));
+  expect(owner.closest('.ant-select')).toHaveTextContent('当前用户');
   const verifierItem = screen.getByText('验证者', { selector: '.ant-form-item-label label' }).closest('.ant-form-item')!;
   const verifier = verifierItem.querySelector('.ant-select input')!;
-  expect(verifier.closest('.ant-select')).toHaveTextContent('负责人甲');
+  expect(verifier.closest('.ant-select')).toHaveTextContent('当前用户');
+  fireEvent.mouseDown(owner);
+  fireEvent.click(await screen.findByText(/^负责人甲/, { selector: '.ant-select-item-option-content' }));
+  expect(verifier.closest('.ant-select')).toHaveTextContent('当前用户');
   fireEvent.mouseDown(verifier);
   fireEvent.click(await screen.findByText('验证者乙', { selector: '.ant-select-item-option-content' }));
   expect(verifier.closest('.ant-select')).toHaveTextContent('验证者乙');
-  expect(screen.getByText('迭代版本')).toBeInTheDocument();
+  expect(owner.closest('.ant-select')).toHaveTextContent('负责人甲');
+  expect(screen.getByText('迭代版本', { selector: '.ant-form-item-label label' })).toBeInTheDocument();
   expect(screen.queryByText('关联版本')).not.toBeInTheDocument();
+});
+
+it('keeps creator defaults when opening a defect from a collaboration item', async () => {
+  window.history.replaceState(null, '', '/app/wb_work_order');
+  vi.mocked(teamRepository.options).mockResolvedValue([{ id: 'user-admin', name: '当前用户' }] as never);
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), currentUser: { id: 'user-admin', name: '当前用户' }, productLines: [{ id: 'line-1', name: '协同产品' }] } as unknown as ReturnType<typeof useApp>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" itemLabel="缺陷" creationContext={{ productLineId: 'line-1', sourceWorkOrder: { id: 'matter-1', title: '来源事项' } as import('../../types').RequirementTask }} /></QueryClientProvider>);
+  await screen.findByText('新建缺陷');
+  const ownerItem = screen.getByText('负责人', { selector: '.ant-form-item-label label' }).closest('.ant-form-item')!;
+  const verifierItem = screen.getByText('验证者', { selector: '.ant-form-item-label label' }).closest('.ant-form-item')!;
+  expect(ownerItem.querySelector('.ant-select')).toHaveTextContent('当前用户');
+  expect(verifierItem.querySelector('.ant-select')).toHaveTextContent('当前用户');
 });
 
 it('shows fixed independent defect types and the requested bug creation fields', async () => {
@@ -436,4 +453,17 @@ it('refreshes design source ownership from the current product catalog after ren
   expect(screen.getByRole('cell', { name: '再次修改产品名 / V1.0' })).toBeVisible();
   expect(screen.getByText('保留的设计标题')).toBeVisible();
   expect(screen.queryByRole('cell', { name: '新产品名称 / V1.0' })).not.toBeInTheDocument();
+});
+
+it('shows saved collaboration choices as read-only in product task details', async () => {
+  window.history.replaceState(null, '', '/app/prod_req_tasks?detailId=shared-task&productLineId=line-1');
+  vi.mocked(productRepository.workItemDetail).mockResolvedValue({ id: 'shared-task', code: 'REQ-001', category: 'requirement', title: '产品任务', productLineId: 'line-1', needsCollaboration: ['design', 'test'], revision: 0 } as Awaited<ReturnType<typeof productRepository.workItemDetail>>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="requirement" /></QueryClientProvider>);
+  const design = await screen.findByRole('checkbox', { name: '设计' });
+  expect(design).toBeDisabled();
+  expect(design).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: '开发' })).toBeDisabled();
+  expect(screen.getByRole('checkbox', { name: '开发' })).not.toBeChecked();
+  expect(screen.getByRole('checkbox', { name: '测试' })).toBeDisabled();
+  expect(screen.getByRole('checkbox', { name: '测试' })).toBeChecked();
 });

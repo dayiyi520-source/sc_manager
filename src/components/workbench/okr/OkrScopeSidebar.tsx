@@ -92,9 +92,10 @@ export function OkrScopeSidebar({ people, records = [], settings, currentUserId,
   const normalizedQuery = query.trim().toLowerCase();
 
   return <aside className={`okr-scope-sidebar${collapsed ? ' is-collapsed' : ''}`} aria-label="目标范围导航">
-    <div className="okr-scope-search">
+    <div className={`okr-scope-search${currentUser?.rootFlag === 1 && companyEditor ? ' has-personal-action' : ''}`}>
       <Input value={query} onChange={event => setQuery(event.target.value)} prefix={<Search />} allowClear placeholder="搜索人名" aria-label="搜索人名" />
-      {goalLevel(currentUser) === '部门级' || companyEditor && currentUser?.rootFlag !== 1 ? <Dropdown trigger={['click']} disabled={addTargetDisabled} menu={{items:[...(companyEditor ? [{key:'company',label:'公司目标'}] : []),...(goalLevel(currentUser) === '部门级' ? [{key:'department',label:'部门目标'}] : []),{key:'personal',label:'我的目标'}],onClick:({key})=>onAddTarget(key as 'personal'|'department'|'company')}}><Button type="primary" icon={<Plus/>} aria-label="添加目标选项" disabled={addTargetDisabled}/></Dropdown> : <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} disabled={addTargetDisabled || !currentUser || currentUser.rootFlag === 1 && !companyEditor} onClick={()=>onAddTarget(currentUser?.rootFlag === 1 ? 'company' : 'personal')} /></Tooltip>}
+      {goalLevel(currentUser) === '部门级' || companyEditor && currentUser?.rootFlag !== 1 ? <Dropdown trigger={['click']} disabled={addTargetDisabled} menu={{items:[...(companyEditor ? [{key:'company',label:'公司目标'}] : []),...(goalLevel(currentUser) === '部门级' ? [{key:'department',label:'部门目标'}] : []),{key:'personal',label:'我的目标'}],onClick:({key})=>onAddTarget(key as 'personal'|'department'|'company')}}><Button type="primary" icon={<Plus/>} aria-label="添加目标选项" disabled={addTargetDisabled}/></Dropdown> : <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} disabled={addTargetDisabled || !currentUser} onClick={()=>onAddTarget(currentUser?.rootFlag === 1 && companyEditor ? 'company' : 'personal')} /></Tooltip>}
+      {currentUser?.rootFlag === 1 && companyEditor && <Tooltip title="添加我的目标"><Button icon={<User/>} aria-label="添加我的目标" disabled={addTargetDisabled} onClick={() => onAddTarget('personal')}/></Tooltip>}
     </div>
     <nav className="okr-scope-groups">
       {groups.map(group => {

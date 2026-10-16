@@ -113,16 +113,6 @@ describe('requirementRepository', () => {
     expect(result.revision).toBe(3);
   });
 
-  it('posts persisted memo content and revision', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', message: '', data: { id: 'req-1', status: '已完成', revision: 2 }, requestId: 'r-memo' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await requirementRepository.memo('req-1', { content: '无需继续处理', revision: 1 });
-
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/requirements/req-1/memo');
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ content: '无需继续处理', revision: 1 });
-  });
-
   it('posts an idempotent downstream retry request', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'OK', message: '', data: null, requestId: 'r3' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);

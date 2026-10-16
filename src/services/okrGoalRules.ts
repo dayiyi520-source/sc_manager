@@ -18,7 +18,7 @@ export function assignedGoalActions(records: OkrRecord[], person?: OkrPerson): O
   });
 }
 
-export const ownerGoalLevel = (person: OkrPerson | undefined, payload: OkrRecord['payload']) => goalLevel(person) === '部门级' && payload.goalLevel === 'personal' ? '个人级' : goalLevel(person);
+export const ownerGoalLevel = (person: OkrPerson | undefined, payload: OkrRecord['payload']) => payload.goalLevel === 'company' ? '公司级' : payload.goalLevel === 'department' ? '部门级' : payload.goalLevel === 'personal' ? '个人级' : goalLevel(person);
 
 export function autonomousAlignmentSource(source: OkrRecord, person: OkrPerson | undefined, personal: boolean, people: OkrPerson[]): boolean {
   if (!person) return false;

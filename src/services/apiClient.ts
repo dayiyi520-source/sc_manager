@@ -6,7 +6,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 export function resolveMockMode(env: { DEV?: boolean; MODE?: string; VITE_MOCK_MODE?: string }) {
   if (env.VITE_MOCK_MODE !== undefined) return env.VITE_MOCK_MODE === 'true'
   if (env.MODE === 'test') return false
-  return env.DEV === true
+  return true
 }
 const MOCK_MODE = resolveMockMode(import.meta.env)
 export class ApiError extends Error { constructor(public status: number, public code: string, message: string) { super(message) } }

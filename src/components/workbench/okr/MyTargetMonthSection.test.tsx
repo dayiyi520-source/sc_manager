@@ -178,7 +178,7 @@ describe('MyTargetMonthSection', () => {
     const staff:OkrRecord={id:'staff',kind:'objective',ownerId:'staff',periodKey:'2026-10',status:'active',version:1,payload:{title:'个人目标',goalLevel:'personal',sourceObjectiveId:'manager',sourceKrId:'k',keyResults:[{id:'k',title:'继承文字',weight:100,progress:0,executionActions:[{id:'a',ownerId:'staff',title:'本人计划',progress:0}]}]}};
     const rows=buildMyTargetViewItems([manager,staff],[],[manager,staff],people,'manager');
     const {container}=render(<MyTargetMonthSection periodKey="2026-10" targets={rows} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()}/>);
-    expect(screen.getByText('按期完成1个产品版本迭代计划 · 达到对应的验收阶段')).toBeInTheDocument();
+    expect(screen.getByText('按期完成1个产品版本迭代计划 · 达到对应的阶段')).toBeInTheDocument();
     expect(screen.getAllByText('产品部',{selector:'.okr-target-meta-line .ant-tag'})).toHaveLength(2);
     expect(container.querySelector('.okr-target-title-line .okr-target-action-alignment')).not.toBeInTheDocument();
   });

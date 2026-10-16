@@ -45,7 +45,7 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
   return <section className="space-y-4" aria-label={`主管 KR 复盘：${review.keyResultTitle}`}>
     <Table size="small" rowKey="id" pagination={false} scroll={{ x: true }} dataSource={review.detailRows?.length ? review.detailRows : [{ id: review.keyResultId, name: review.keyResultTitle }]} columns={[
       { title: review.detailRows?.length ? '产品' : 'KR名称', dataIndex: 'name', ellipsis: true },
-      ...(review.detailRows?.length ? [{ title: '迭代版本', dataIndex: 'version' }, { title: '达成阶段', dataIndex: 'stage' }, { title: '开始时间', dataIndex: 'plannedStartDate' }, { title: '结束时间', dataIndex: 'plannedEndDate' }] : []),
+      ...(review.detailRows?.length ? [{ title: '迭代版本', dataIndex: 'version' }, { title: '阶段', dataIndex: 'stage' }, { title: '开始时间', dataIndex: 'plannedStartDate' }, { title: '结束时间', dataIndex: 'plannedEndDate' }] : []),
       { title: '进度', render: (_, row) => { const value = review.detailProgress?.find(item => item.id === row.id); return <Button type="link" onClick={() => setProgressDetailId(row.id)}>{value?.previousProgress ?? 0}% → {value?.currentProgress ?? 0}%</Button>; } },
       { title: '更改进度', key: 'self', render: (_: unknown, row: { id: string; name: string; assigneeIds?: string[] }) => {
         if (!(review.detailRows?.length ? row.assigneeIds?.includes(viewerId || '') : selfAssigned)) return '——';

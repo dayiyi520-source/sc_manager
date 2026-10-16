@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { OkrPerson } from '../../../services/okrRepository';
+import type { OkrPerson, OkrSettings } from '../../../services/okrRepository';
 import { buildOkrScopeGroups, OkrScopeSidebar } from './OkrScopeSidebar';
 
 const people: OkrPerson[] = [
@@ -11,6 +11,21 @@ const people: OkrPerson[] = [
 ];
 
 describe('OkrScopeSidebar', () => {
+  it('keeps root personal creation available alongside company creation', () => {
+    const add=vi.fn();
+    render(<OkrScopeSidebar people={people} currentUserId="boss" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={add}/>);
+    fireEvent.click(screen.getByRole('button',{name:'添加我的目标'}));
+    expect(add).toHaveBeenLastCalledWith('personal');
+    fireEvent.click(screen.getByRole('button',{name:'添加目标'}));
+    expect(add).toHaveBeenLastCalledWith('company');
+  });
+  it('keeps the root personal entry enabled after company permission is revoked', () => {
+    const add=vi.fn();
+    const settings={administratorIds:['boss'],permissionGrants:{boss:[]}} as unknown as OkrSettings;
+    render(<OkrScopeSidebar settings={settings} people={people} currentUserId="boss" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={add}/>);
+    fireEvent.click(screen.getByRole('button',{name:'添加目标'}));
+    expect(add).toHaveBeenCalledWith('personal');
+  });
   it('provides direct department and company target scopes without member entries', () => {
     const groups = buildOkrScopeGroups(people, 'manager');
     expect(groups.map(group => group.key)).toEqual(['my', 'department', 'company', 'myDepartment', 'otherDepartments', 'confirmation']);

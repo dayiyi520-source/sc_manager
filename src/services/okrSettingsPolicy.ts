@@ -13,7 +13,7 @@ export function normalizedPolicy(settings: OkrSettings, people: OkrPerson[] = []
   const grants = { ...settings.permissionGrants };
   for (const id of administrators) if (!Object.hasOwn(grants, id)) grants[id] = [...OKR_PERMISSIONS];
   for (const id of settings.subAdministratorIds || []) if (!Object.hasOwn(grants, id)) grants[id] = [...OKR_PERMISSIONS];
-  for (const id of legacyEditors) if (!Object.hasOwn(settings.permissionGrants || {},id)) grants[id] = ['companyGoalEdit'];
+  for (const id of legacyEditors) if (!Object.hasOwn(grants,id)) grants[id] = ['companyGoalEdit'];
   const confirmation = {...defaultConfirmation(),...settings.confirmation} as OkrConfirmationSettings;
   delete confirmation.companyEditorIds;
   return { ...settings, ...(settings.reviewReportTemplates ? {reviewReportTemplates:normalizeLegacyReviewTemplates(settings.reviewReportTemplates)} : {}), administratorIds: administrators, subAdministratorIds: subAdministrators, permissionGrants: grants, cycles:materializePeriods({...defaultCycles(),...settings.cycles,schedules:{...defaultCycles().schedules,...settings.cycles?.schedules}}), confirmation };

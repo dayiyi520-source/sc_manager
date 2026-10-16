@@ -1,9 +1,13 @@
+import { mutateCollaboration } from './mockCollaborationMutations';
+import { newestCreatedFirst } from '../utils/creationOrder';
+import { SESSION_KEY } from './sessionStorage';
 import { validateReviewProgress, syncSubmittedReviewProgress } from './okrReviewProgressSync';
 import { bindReviewTemplate } from './reviewTemplateConfiguration';
 import { normalizeDefectStatusLabels } from './defectStatusLabels';
 import { syncOkrProductNames } from './okrProductNames';
 import { customerDirectoryRequest } from './customerDirectoryData';
 import { mockStateEndpoint } from './mockStateEndpoint';
+import { createMockReadWindow } from './mockReadWindow';
 import { createOkrFilePersistence } from './okrFilePersistence';
 import savedOkrState from '../data/mockOkrState.json';
 import { migrateWorkItems } from './workItemTemplateSync';
@@ -68,7 +72,6 @@ const KEYS = {
   researchRoles: 'shichuang.frontend.mock.researchRoles',
   researchStatuses: 'shichuang.frontend.mock.researchStatuses',
   researchCategories: 'shichuang.frontend.mock.researchCategories',
-  researchFields: 'shichuang.frontend.mock.researchFields',
   researchTypes: 'shichuang.frontend.mock.researchTypes',
   researchNotifications: 'shichuang.frontend.mock.researchNotifications',
   workItems: 'shichuang.frontend.mock.workItems',
@@ -106,7 +109,10 @@ const read = <T>(key: string, fallback: T): T => {
   }
   return value;
 };
-const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
+const write = (key: string, value: unknown) => {
+  const serialized = JSON.stringify(value);
+  if (localStorage.getItem(key) !== serialized) localStorage.setItem(key, serialized);
+};
 const bodyOf = (init?: RequestInit) => { try { return init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {}; } catch { return {}; } };
 const queryOf = (path: string) => new URL(path, window.location.origin).searchParams;
 const id = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -115,6 +121,13 @@ const getEmployeeOptions = (): EmployeeOption[] => getMembers().filter((member) 
   const seed = MOCK_USERS.find((user) => user.id === member.id);
   return { id: member.id, name: member.name, avatar: seed?.avatar, department: member.department || seed?.department, role: seed?.role || 'product_manager', jobTitle: member.jobTitle, roleTitle: member.jobTitle || seed?.roleTitle };
 });
+const taskOperator = () => {
+  let viewer: CurrentUser | undefined;
+  try { viewer = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')?.user; } catch { /* 兼容失效的演示会话。 */ }
+  const user = viewer || MOCK_USERS[0];
+  const member = getEmployeeOptions().find(member => member.id === user?.id);
+  return { id: user?.id || '', name: member?.name || user?.name || '当前用户' };
+};
 const initialWorkItems = [
   ...MOCK_REQUIREMENT_TASKS.map((task) => ({ ...task, category: 'requirement' })),
   ...MOCK_DESIGN_TASKS.map((task) => ({ ...task, category: 'design' })),
@@ -124,11 +137,12 @@ const initialWorkItems = [
 ];
 const snapshotWorkItems = new Map(MOCK_DATABASE.t_product_work_item.map(row => [row.id_, row]));
 const readWorkItems = () => {
+  const hadStoredItems = localStorage.getItem(KEYS.workItems) !== null;
   const tasks = read<any[]>(KEYS.workItems, initialWorkItems.map(item => ({ ...item })));
   const seedKey = KEYS.workItems + '.previewSeedVersion';
   if (localStorage.getItem(seedKey) !== PRODUCT_PREVIEW_SEED_VERSION) {
-    const ids = new Set(tasks.map(task => task.id));
-    const merged = [...tasks, ...productTaskPreviewSamples().filter(task => !ids.has(task.id))];
+    // Preview seed data is only added to a fresh browser. Never merge it into an explicit saved dataset.
+    const merged = hadStoredItems ? tasks : [...tasks, ...productTaskPreviewSamples()];
     write(KEYS.workItems, merged); localStorage.setItem(seedKey, PRODUCT_PREVIEW_SEED_VERSION);
     return merged;
   }
@@ -151,7 +165,7 @@ const getWorkItems = () => {
 });
  const migrated = migrateWorkItems(items, getProductLines(), getMembers(), templateTypes(true));
  if (JSON.stringify(migrated) !== JSON.stringify(items)) write(KEYS.workItems, migrated);
- return migrated;
+ return migrated.sort(newestCreatedFirst);
 };
 const workItemSummary = (task: Record<string, any>, taskType?: string): RequirementWorkItem => ({
   id: String(task.id),
@@ -163,28 +177,24 @@ const workItemSummary = (task: Record<string, any>, taskType?: string): Requirem
   revision: Number(task.revision || 0),
   createdAt: task.createdAt || now(),
 });
-const attachWorkItemToRequirement = (task: Record<string, any>, taskType?: string) => {
-  if (!task.requirementId) return;
+const taskLabels: Record<string, string> = { requirement: '产品需求', design: '设计任务', dev: '研发任务', test: '测试任务', bug: '缺陷管理', ops: '运维任务', presales: '售前任务', delivery: '交付任务' };
+const attachWorkItemToRequirement = (task: Record<string, any>, taskType?: string, previousTask?: Record<string, any>) => {
+  const parentIds = new Set([task.requirementId, ...(task.sourceWorkOrderIds || [])].filter(Boolean));
+  const previousParentIds = new Set([previousTask?.requirementId, ...(previousTask?.sourceWorkOrderIds || [])].filter(Boolean));
+  if (!parentIds.size && !previousParentIds.size) return;
   const items = getWorkItems();
-  const index = items.findIndex((item) => item.id === task.requirementId);
-  if (index < 0) return;
-  const current = items[index];
-  const summaries = Array.isArray(current.workItems) ? current.workItems : [];
-  const summary = workItemSummary(task, taskType);
-  items[index] = { ...current, workItems: [...summaries.filter((item: RequirementWorkItem) => item.id !== summary.id), summary] };
-  write(KEYS.workItems, items);
+  const updated = items.map(current => {
+    if (!parentIds.has(current.id) && !previousParentIds.has(current.id)) return current;
+    if (!parentIds.has(current.id)) return { ...current, workItems: (current.workItems || []).filter((item: RequirementWorkItem) => item.id !== task.id) };
+    const summaries = Array.isArray(current.workItems) ? current.workItems : [];
+    const previous = summaries.find((item: RequirementWorkItem) => item.id === task.id);
+    const summary = { ...previous, ...workItemSummary({ ...task, requirementId: current.id }, taskLabels[task.category] || taskType), category: task.category, productLineId: task.productLineId };
+    return { ...current, workItems: [...summaries.filter((item: RequirementWorkItem) => item.id !== task.id), summary] };
+  });
+  write(KEYS.workItems, updated);
 };
-const syncAttachedWorkItem = (task: Record<string, any>) => {
-  if (!task.requirementId) return;
-  const items = getWorkItems();
-  const index = items.findIndex((item) => item.id === task.requirementId);
-  if (index < 0) return;
-  const current = items[index];
-  const summaries = Array.isArray(current.workItems) ? current.workItems : [];
-  const summary = workItemSummary(task);
-  items[index] = { ...current, workItems: summaries.map((item: RequirementWorkItem) => item.id === summary.id ? { ...item, ...summary } : item) };
-  write(KEYS.workItems, items);
-};
+const syncAttachedWorkItem = attachWorkItemToRequirement;
+const visibleMatter = (item: any) => ({ ...item, events: (item.events || []).filter((event: any) => !event.metadata?.privateAuthorId || event.metadata.privateAuthorId === taskOperator().id) });
 const testTasks = MOCK_TEST_TASKS.map((task) => ({
   id: task.id,
   code: task.code || task.id,
@@ -253,7 +263,7 @@ const planCases = (caseIds: string[]): TestPlanCase[] => getCases().filter((item
 const databaseRows = (table: keyof typeof MOCK_DATABASE) => (MOCK_DATABASE[table] as unknown as Array<Record<string, any>>).filter((row) => Number(row.delete_flag_ || 0) === 0);
 const taskActivities = () => read<any[]>(KEYS.taskActivities, databaseRows('t_product_work_item_activity').map((row) => ({ id: row.id_, subjectId: row.subject_id_, productLineId: row.product_line_id_, eventType: row.event_type_, content: row.content_, operatorName: MOCK_USERS.find((user) => user.id === row.create_by_)?.name || row.create_by_, createdAt: row.create_time_ })));
 const recordTaskActivity = (subjectId: string, productLineId: string, eventType: string, content: Record<string, unknown>) => {
-  write(KEYS.taskActivities, [...taskActivities(), { id: id('activity'), subjectId, productLineId, eventType, content, operatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now() }]);
+  write(KEYS.taskActivities, [...taskActivities(), { id: id('activity'), subjectId, productLineId, eventType, content, operatorName: taskOperator().name, createdAt: now() }]);
 };
 const validateCompletion = (body: Record<string, any>) => {
   if (body.actualHours == null || typeof body.actualHours !== 'number' || !Number.isFinite(body.actualHours) || body.actualHours < 0 || body.actualHours > 99999999.99 || Math.abs(body.actualHours * 100 - Math.round(body.actualHours * 100)) > 1e-6) throw new Error('请填写有效的完成工时');
@@ -273,130 +283,6 @@ const isTestCaseCategory = (value: any) => String(value?.code || value?.category
 const templateCategories = () => withBusinessWorkItemCategories(read(KEYS.researchCategories, databaseRows('t_work_item_category_dictionary').map((row) => ({ id: row.id_, code: row.code_, name: row.name_, displayName: row.display_name_ || row.name_, iconKey: row.icon_key_ || row.code_, capabilityType: row.capability_type_ || 'STANDARD', sort: Number(row.sort_ || 0), enabled: Boolean(row.enabled_), builtIn: Boolean(row.built_in_), revision: Number(row.version_ || 0) }))).filter((item: any) => !isTestCaseCategory(item)));
 const templateRoles = () => read(KEYS.researchRoles, databaseRows('t_product_role_template').map((row) => ({ id: row.id_, name: row.name_, responsibility: row.responsibility_ || '', sort: Number(row.sort_ || 0), revision: Number(row.version_ || 0), updatedAt: row.update_time_ })));
 const templateStatuses = () => read(KEYS.researchStatuses, databaseRows('t_research_status_template').map((row) => ({ id: row.id_, scope: row.scope_, name: row.name_, phase: row.phase_, color: row.color_ || 'neutral', initial: Boolean(row.initial_), enabled: Boolean(row.enabled_), sort: Number(row.sort_ || 0), revision: Number(row.version_ || 0) })));
-const DETAIL_FIELD_DEFINITIONS: Record<string, Array<[string, string, string, string, boolean]>> = {
-  common: [
-    ['title', '标题', 'text', '详情页顶部任务标题，可点击修改', true], ['creator', '创建人', 'user', '任务创建人，只读', false], ['createdAt', '创建时间', 'date', '任务创建时间，只读', false], ['updater', '更新人', 'user', '最近一次修改人，只读', false], ['updatedAt', '更新时间', 'date', '最近一次修改时间，只读', false],
-    ['expectedGoal', '期望结果', 'text', '任务完成后预期达到的结果', true], ['parent', '主任务', 'relation', '当前任务所属的父任务，只读', false], ['description', '任务描述', 'text', '左侧描述区，可进入富文本编辑', true], ['status', '当前状态', 'select', '右侧基础字段中的任务状态', true], ['assignee', '负责人', 'user', '右侧基础字段中的负责人', true], ['priority', '优先级', 'select', '右侧基础字段中的优先级', true],
-    ['productLine', '归属产品', 'relation', '任务所属产品或产品线', true], ['version', '迭代版本', 'relation', '任务关联的迭代版本', true], ['plannedStartDate', '计划开始时间', 'date', '任务计划开始日期', true], ['dueDate', '计划完成时间', 'date', '任务计划完成日期', true], ['expectedCompleteDate', '期望完成时间', 'date', '业务期望完成日期', true],
-    ['customer', '关联客户', 'relation', '任务关联的客户对象', true], ['participants', '参与人', 'user', '需要同步或关注任务的成员', true], ['estimatedHours', '预计工时', 'number', '任务预计投入的小时数', true], ['actualHours', '实际工时', 'number', '任务实际投入的小时数', true], ['taskType', '任务类型', 'select', '工作项所属类型', true], ['relations', '关联对象', 'section', '详情页下方的关联产品任务和协同事项', true], ['support', '支撑项', 'section', '创建后关联测试计划等支撑事项', true], ['hours', '工时', 'section', '创建后登记和统计工时', true],
-  ],
-  dev: [['repo', '代码仓库', 'text', '研发任务关联的代码仓库地址或名称', true], ['branch', '特性分支', 'text', '研发任务对应的代码分支', true]],
-  bug: [['severity', '严重程度', 'select', '缺陷影响范围和紧急程度', true], ['type', '缺陷类型', 'select', '缺陷所属的问题类型', true], ['env', '所属环境', 'select', '缺陷出现或验证的运行环境', true]],
-};
-const DETAIL_FIELDS = (categoryCode: string) => [...DETAIL_FIELD_DEFINITIONS.common.flatMap((field): Array<[string, string, string, string, boolean]> => field[0] === 'relations' ? [['collaborationItems', '协同事项', 'section', '关联工作台中的协同事项', true], ['relatedTasks', '关联任务', 'section', '关联其他类型任务', true]] : field[0] === 'customer' ? [['project', '关联项目', 'relation', '任务关联的项目对象', true]] : [field]), ...(categoryCode === 'dev' ? DETAIL_FIELD_DEFINITIONS.dev : []), ...(categoryCode === 'bug' ? DETAIL_FIELD_DEFINITIONS.bug : [])].map(([fieldCode, label, fieldType, description, editable], index) => ({
-  fieldCode,
-  label,
-  fieldType,
-  description,
-  visible: true,
-  required: REQUIRED_FIELD_CODES.has(fieldCode),
-  editable: Boolean(editable),
-  sort: index + 1,
-  locked: REQUIRED_FIELD_CODES.has(fieldCode) || ['creator', 'createdAt', 'updater', 'updatedAt'].includes(fieldCode),
-}));
-const FIELD_METADATA: Record<string, { label: string; fieldType: string; description: string }> = {
-  title: { label: '标题', fieldType: 'text', description: '工作项标题' },
-  description: { label: '任务描述', fieldType: 'text', description: '工作项详细描述' },
-  expectedGoal: { label: '期望结果', fieldType: 'text', description: '任务完成后预期达到的结果' },
-  productLine: { label: '归属产品', fieldType: 'relation', description: '任务所属产品或产品线' },
-  taskType: { label: '任务类型', fieldType: 'select', description: '工作项所属类型' },
-  status: { label: '当前状态', fieldType: 'select', description: '工作项当前处理状态' },
-  assignee: { label: '负责人', fieldType: 'user', description: '负责处理该工作项的成员' },
-  creator: { label: '创建人', fieldType: 'user', description: '创建该工作项的成员' },
-  cc: { label: '参与人', fieldType: 'user', description: '需要同步或关注该工作项的成员' },
-  priority: { label: '优先级', fieldType: 'select', description: '工作项处理优先级' },
-  plannedStartDate: { label: '计划开始时间', fieldType: 'date', description: '任务计划开始日期' },
-  plannedEndDate: { label: '计划完成时间', fieldType: 'date', description: '任务计划完成日期' },
-  expectedCompleteDate: { label: '期望完成时间', fieldType: 'date', description: '业务期望完成日期' },
-  createdAt: { label: '创建时间', fieldType: 'date', description: '工作项创建时间' },
-  updatedAt: { label: '更新时间', fieldType: 'date', description: '工作项最近更新时间' },
-  version: { label: '迭代版本', fieldType: 'relation', description: '任务关联的迭代版本' },
-  requirement: { label: '关联对象', fieldType: 'relation', description: '任务关联的需求或其他工作项' },
-  customer: { label: '关联项目', fieldType: 'relation', description: '任务关联的项目对象' },
-  collaborationItems: { label: '协同事项', fieldType: 'relation', description: '关联工作台中的协同事项' },
-  relatedTasks: { label: '关联任务', fieldType: 'relation', description: '关联其他类型任务' },
-  project: { label: '关联项目', fieldType: 'relation', description: '任务关联的项目对象' },
-  needsCollaboration: { label: '需要协同', fieldType: 'multiSelect', description: '创建后下发到设计、开发或测试待分配任务' },
-  estimatedHours: { label: '预计工时', fieldType: 'number', description: '任务预计投入的小时数' },
-  actualHours: { label: '实际工时', fieldType: 'number', description: '任务实际投入的小时数' },
-  relations: { label: '关联对象', fieldType: 'section', description: '关联产品任务和协同事项' },
-  support: { label: '支撑项', fieldType: 'section', description: '创建后关联测试计划等支撑事项' },
-  hours: { label: '工时', fieldType: 'section', description: '创建后登记和统计工时' },
-  repo: { label: '代码仓库', fieldType: 'text', description: '研发任务关联的代码仓库' },
-  branch: { label: '特性分支', fieldType: 'text', description: '研发任务对应的代码分支' },
-  commitsCount: { label: '提交数', fieldType: 'number', description: '研发任务关联的代码提交数量' },
-  severity: { label: '严重程度', fieldType: 'select', description: '缺陷影响范围和紧急程度' },
-  type: { label: '缺陷类型', fieldType: 'select', description: '缺陷所属的问题类型' },
-  env: { label: '所属环境', fieldType: 'select', description: '缺陷出现或验证的运行环境' },
-  attachments: { label: '附件', fieldType: 'relation', description: '工作项关联的附件' },
-};
-const REQUIRED_FIELD_CODES = new Set(['title', 'status', 'assignee']);
-const DETAIL_SYSTEM_FIELD_CODES = new Set(['creator', 'createdAt', 'updater', 'updatedAt']);
-// 历史配置中曾使用 requirement 作为独立关联字段，现统一由 relations 关系区承载。
-const LEGACY_FIELD_CODES = new Set(['requirement']);
-const CREATE_ASSOCIATION_FIELD_CODES = ['collaborationItems', 'relatedTasks', 'support', 'hours'];
-const CREATE_COMMON_FIELD_CODES = ['title', 'expectedGoal', 'description', 'productLine', 'taskType', 'assignee', 'priority', 'plannedStartDate', 'plannedEndDate', 'version', 'project', 'cc', 'estimatedHours', 'actualHours', 'attachments'];
-const DEFAULT_HIDDEN_CREATE_FIELD_CODES = new Set(['expectedGoal', 'hours', 'collaborationItems', 'cc']);
-const DEFAULT_HIDDEN_DETAIL_FIELD_CODES = new Set(['support', 'participants', 'taskType']);
-const defaultFieldVisible = (scene: string, fieldCode: string) => scene === 'CREATE'
-  ? !DEFAULT_HIDDEN_CREATE_FIELD_CODES.has(fieldCode)
-  : scene === 'DETAIL' ? !DEFAULT_HIDDEN_DETAIL_FIELD_CODES.has(fieldCode) : true;
-const normalizeTemplateField = (field: any) => {
-  const metadata = FIELD_METADATA[field.fieldCode];
-  const detailSystemField = field.scene === 'DETAIL' && DETAIL_SYSTEM_FIELD_CODES.has(field.fieldCode);
-  const creationDate = field.scene === 'CREATE' && (field.fieldCode === 'plannedStartDate' || field.fieldCode === 'plannedEndDate');
-  const locked = REQUIRED_FIELD_CODES.has(field.fieldCode) || detailSystemField || creationDate;
-  return {
-    ...(metadata ? { ...field, ...metadata } : field),
-    required: locked ? true : Boolean(field.required),
-    visible: locked ? true : Boolean(field.visible),
-    locked: locked || Boolean(field.locked),
-  };
-};
-const templateFields = () => {
-  const stored = read<any[] | null>(KEYS.researchFields, null);
-  const base = (stored || databaseRows('t_work_item_field_configuration').map((row) => ({ categoryCode: row.category_code_, scene: row.scene_, fieldCode: row.field_code_, label: row.field_code_, fieldType: 'text', visible: defaultFieldVisible(row.scene_, row.field_code_) && Boolean(row.visible_), required: Boolean(row.required_), editable: true, defaultValue: null, sort: Number(row.sort_ || 0), locked: false })))
-    .flatMap((field) => field.fieldCode === 'relations' ? ['collaborationItems', 'relatedTasks'].filter((code) => !stored?.some((existing) => existing.categoryCode === field.categoryCode && existing.scene === field.scene && existing.fieldCode === code)).map((code) => ({ ...field, fieldCode: code })) : [{ ...field, fieldCode: field.fieldCode === 'customer' ? 'project' : field.fieldCode }])
-    .filter((field, index, all) => !LEGACY_FIELD_CODES.has(field.fieldCode) && all.findIndex((other) => other.categoryCode === field.categoryCode && other.scene === field.scene && other.fieldCode === field.fieldCode) === index)
-    .map(normalizeTemplateField);
-  const categories = [...new Set(['requirement', 'design', 'dev', 'test', 'bug', ...templateCategories().map((item: any) => item.code)])].filter((code) => code !== 'case');
-  // New categories inherit the common field contract until customized independently.
-  categories.forEach((code) => {
-    ['CREATE', 'LIST', 'ITERATION'].forEach((scene) => {
-      if (base.some((field) => field.categoryCode === code && field.scene === scene)) return;
-      base.push(...base.filter((field) => field.categoryCode === 'requirement' && field.scene === scene).map((field) => ({ ...field, categoryCode: code })));
-    });
-  });
-  const createScenes = ['CREATE'];
-  const baseWithCreateAssociations = [...base];
-  createScenes.forEach((scene) => {
-    if (!baseWithCreateAssociations.some((field) => field.categoryCode === 'requirement' && field.scene === scene && field.fieldCode === 'needsCollaboration')) baseWithCreateAssociations.push({ categoryCode: 'requirement', scene, fieldCode: 'needsCollaboration', ...FIELD_METADATA.needsCollaboration, visible: true, required: false, editable: true, defaultValue: ['dev', 'test'], sort: 12, locked: false });
-  });
-  // Sparse historical scenes must retain overrides while receiving missing common controls.
-  categories.forEach((categoryCode) => createScenes.forEach((scene) => {
-    CREATE_COMMON_FIELD_CODES.filter((fieldCode) => scene === 'CREATE' || fieldCode !== 'expectedGoal').forEach((fieldCode) => {
-      if (baseWithCreateAssociations.some((field) => field.categoryCode === categoryCode && field.scene === scene && field.fieldCode === fieldCode)) return;
-      const metadata = FIELD_METADATA[fieldCode];
-      const sort = Math.max(0, ...baseWithCreateAssociations.filter((field) => field.categoryCode === categoryCode && field.scene === scene).map((field) => field.sort)) + 1;
-      baseWithCreateAssociations.push(normalizeTemplateField({ categoryCode, scene, fieldCode, ...metadata, visible: defaultFieldVisible(scene, fieldCode), required: false, editable: fieldCode !== 'actualHours', defaultValue: fieldCode === 'priority' ? '中' : null, sort, locked: false }));
-    });
-  }));
-  categories.forEach((categoryCode) => createScenes.forEach((scene) => CREATE_ASSOCIATION_FIELD_CODES.forEach((fieldCode) => {
-    if (baseWithCreateAssociations.some((field) => field.categoryCode === categoryCode && field.scene === scene && field.fieldCode === fieldCode)) return;
-    const metadata = FIELD_METADATA[fieldCode];
-    baseWithCreateAssociations.push({ categoryCode, scene, fieldCode, label: metadata.label, fieldType: metadata.fieldType, description: metadata.description, visible: defaultFieldVisible(scene, fieldCode), required: false, editable: true, defaultValue: null, sort: baseWithCreateAssociations.filter((field) => field.categoryCode === categoryCode && field.scene === scene).length + 1, locked: false });
-  })));
-  const detail = categories.flatMap((categoryCode) => DETAIL_FIELDS(categoryCode).map((field) => ({ ...field, visible: defaultFieldVisible('DETAIL', field.fieldCode), categoryCode, scene: 'DETAIL' })));
-  const detailCodes = new Set(detail.map((field) => `${field.categoryCode}:${field.fieldCode}`));
-  const detailDefaults = new Map(detail.map((field) => [`${field.categoryCode}:${field.fieldCode}`, field]));
-  const normalizedBase = baseWithCreateAssociations.filter((field) => field.scene !== 'DETAIL' || detailCodes.has(`${field.categoryCode}:${field.fieldCode}`)).map((field) => {
-    if (field.scene !== 'DETAIL') return normalizeTemplateField(field);
-    const defaults = detailDefaults.get(`${field.categoryCode}:${field.fieldCode}`);
-    return defaults ? normalizeTemplateField({ ...defaults, ...field, label: defaults.label, fieldType: defaults.fieldType, description: defaults.description }) : normalizeTemplateField(field);
-  });
-  const existing = new Set(normalizedBase.filter((field) => field.scene === 'DETAIL').map((field) => `${field.categoryCode}:${field.fieldCode}`));
-  return [...normalizedBase, ...detail.filter((field) => !existing.has(`${field.categoryCode}:${field.fieldCode}`))];
-};
 const templateTypes = (includeArchived = false): any[] => {
   const workflows = databaseRows('t_work_item_template_workflow');
   return read(KEYS.researchTypes, databaseRows('t_work_item_template_type').map((row) => ({ id: row.id_, category: row.category_, name: row.name_, description: row.description_ || '', enabled: Boolean(row.enabled_), isDefault: Boolean(row.is_default_), revision: Number(row.version_ || 0), workflow: workflows.find((workflow) => workflow.template_type_id_ === row.id_) ? { id: workflows.find((workflow) => workflow.template_type_id_ === row.id_).id_, category: categoryCode(row.category_), taskTypeId: row.id_, name: workflows.find((workflow) => workflow.template_type_id_ === row.id_).name_, workflowVersion: 1, status: 'PUBLISHED', revision: Number(workflows.find((workflow) => workflow.template_type_id_ === row.id_).revision_ || 0), definition: workflows.find((workflow) => workflow.template_type_id_ === row.id_).definition_ } : undefined }))).filter((item: any) => !isTestCaseCategory(item) && (includeArchived || !item.archived));
@@ -517,7 +403,13 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     throw new Error('不支持的归档操作');
   }
   if (parts[0] === 'api' && ['presales-tasks', 'delivery-tasks', 'ops-tasks'].includes(parts[1])) {
-    return handleMockBusinessTasks(path, method, body, { activities: taskActivities, record: recordTaskActivity, changes: recordTaskChanges, validateCompletion });
+    const result = handleMockBusinessTasks(path, method, body, { activities: taskActivities, record: recordTaskActivity, changes: recordTaskChanges, validateCompletion });
+    if ((method === 'POST' && parts.length === 2) || (method === 'PUT' && parts.length === 3)) {
+      const taskId = parts[2] || (result as { id: string }).id;
+      const task = handleMockBusinessTasks(`/api/${parts[1]}/${taskId}`, 'GET', {}, { activities: taskActivities, record: recordTaskActivity, changes: recordTaskChanges, validateCompletion });
+      attachWorkItemToRequirement({ ...task, category: parts[1] === 'ops-tasks' ? 'ops' : parts[1] === 'presales-tasks' ? 'presales' : 'delivery' });
+    }
+    return result;
   }
   if (parts[1] === 'version-reviews' || (parts[1] === 'product-lines' && parts[3] === 'versions' && parts[5] === 'reviews')) {
     const reviews = getVersionReviews(); const products = getProductLines(); const members = getEmployeeOptions();
@@ -577,7 +469,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       return item;
     });
     const operatedAt = now();
-    targets.forEach((item: any) => Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt, operatorName: MOCK_USERS[0]?.name || '当前用户' }));
+    targets.forEach((item: any) => Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt, operatorName: taskOperator().name }));
     write(KEYS.workItems, items);
     return targets.length;
   }
@@ -588,7 +480,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (!item) throw new Error('任务不存在');
     if (item.deleted || item.deleteFlag) return null;
     if (query.get('revision') == null || Number(query.get('revision')) !== Number(item.revision || 0)) throw new Error('任务已更新，请刷新后重试');
-    Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt: now(), operatorName: MOCK_USERS[0]?.name || '当前用户' });
+    Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt: now(), operatorName: taskOperator().name });
     write(KEYS.workItems, items);
     return null;
   }
@@ -793,17 +685,21 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     members[index] = { ...members[index], status: body.status === 'disabled' ? 'disabled' : 'enabled', version: members[index].version + 1 };
     write(KEYS.members, members); return members[index];
   }
+  if (parts[1] === 'requirements' && ((parts.length === 2 && method === 'POST') || (parts.length === 3 && method === 'PUT') || (parts[3] === 'reassign' && method === 'POST') || (parts[2] === 'reassign' && ['accept', 'reject'].includes(parts[4]) && method === 'POST'))) {
+    const result = mutateCollaboration(parts, method, body, { items: getWorkItems(), people: getEmployeeOptions(), viewer: taskOperator(), save: items => write(KEYS.workItems, items), id: () => id('matter'), now: now() });
+    return visibleMatter(result);
+  }
   if (clean === '/api/requirements/departments' && method === 'GET') return getEmployeeOptions().map((item) => ({ id: item.id, name: item.department || '产品研发部', managerName: item.name }));
   if (clean === '/api/requirements' && method === 'GET') {
     const query = queryOf(path);
     const items = getWorkItems().filter((item) => item.category === 'requirement' && !item.deleted && !item.deleteFlag && (!query.get('status') || item.status === query.get('status')));
     const page = Math.max(1, Number(queryOf(path).get('page') || 1));
     const pageSize = Math.min(100, Math.max(1, Number(queryOf(path).get('pageSize') || 100)));
-    return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
+    return { items: items.slice((page - 1) * pageSize, page * pageSize).map(visibleMatter), page, pageSize, total: items.length };
   }
   if (clean === '/api/requirements/audit-events' && method === 'GET') {
     const query = queryOf(path);
-    const items = getWorkItems().filter((item) => item.category === 'requirement' && !item.deleted && !item.deleteFlag).flatMap((item) => (item.events || []).map((event) => ({ ...event, requirementId: item.id }))).filter((event) => (!query.get('eventType') || event.eventType === query.get('eventType')) && (!query.get('operatorName') || event.operatorName === query.get('operatorName')));
+    const items = getWorkItems().filter((item) => item.category === 'requirement' && !item.deleted && !item.deleteFlag).flatMap((item) => visibleMatter(item).events.map((event) => ({ ...event, requirementId: item.id }))).filter((event) => (!query.get('eventType') || event.eventType === query.get('eventType')) && (!query.get('operatorName') || event.operatorName === query.get('operatorName')));
     const page = Math.max(1, Number(query.get('page') || 1));
     const pageSize = Math.min(100, Math.max(1, Number(query.get('pageSize') || 100)));
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
@@ -812,10 +708,15 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const viewerId = queryOf(path).get('viewerId') || '';
     return viewerId ? myTasks(viewerId) : [];
   }
+  if (clean === '/api/requirements/work-order-candidates' && method === 'GET') {
+    const query = queryOf(path); const keyword = (query.get('keyword') || '').trim().toLowerCase();
+    return getWorkItems().filter(item => item.workOrderType && !item.deleted && !item.deleteFlag && item.id !== query.get('requirementId') && (!query.get('type') || item.workOrderType === query.get('type')) && (!keyword || [item.title, item.code, item.ownerName].some(value => String(value || '').toLowerCase().includes(keyword))))
+      .slice(0, Math.min(200, Number(query.get('limit')) || 100)).map(item => ({ id: item.id, code: item.code, title: item.title, type: 'requirement', typeLabel: '协同事项', creatorName: item.creatorName, expectedCompleteDate: item.expectedCompleteDate, summary: item.description, ownerName: item.ownerName, productLineId: item.productLineId, productLineName: item.productLineName, status: item.status, category: item.category, sourceType: 'WORK_ORDER' }));
+  }
   if (parts[1] === 'requirements' && parts[2] && parts.length === 3 && method === 'GET') {
     const item = getWorkItems().find((candidate) => candidate.id === parts[2]);
     if (!item) throw new Error('事项不存在');
-    return { ...item, events: item.events || [], workItems: item.workItems || [] };
+    return { ...visibleMatter(item), workItems: item.workItems || [] };
   }
   if (parts[1] === 'requirements' && parts[2] && parts[3] === 'comments' && method === 'POST') {
     const items = getWorkItems();
@@ -832,7 +733,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const previous = (current.events || []).find((event) => event.eventType === '发表评论' && event.metadata?.commentRequestId === requestId);
     if (previous) {
       if (previous.metadata?.commentContent !== content || previous.metadata?.commentAuthorId !== (viewer.id || viewer.name)) throw new Error('评论提交标识已使用，请重新提交');
-      return { ...current, events: current.events || [], workItems: current.workItems || [] };
+      return { ...visibleMatter(current), workItems: current.workItems || [] };
     }
     const revision = Number(current.revision ?? current.version ?? 0);
     if (body.revision !== revision) throw new Error('事项已被其他人更新，请刷新后重试');
@@ -840,7 +741,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const updated = { ...current, revision: revision + 1, events: [...(current.events || []), event] };
     items[index] = updated;
     write(KEYS.workItems, items);
-    return { ...updated, workItems: updated.workItems || [] };
+    return { ...visibleMatter(updated), workItems: updated.workItems || [] };
   }
   if (parts[1] === 'requirements' && parts[2] && method === 'POST' && (parts[3] === 'reopen' || parts[3] === 'acceptance-failed' || parts[3] === 'transition' && body.action === 'close')) {
     const items = getWorkItems();
@@ -856,7 +757,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       if (event?.metadata) event.metadata.attachments = staged.filter(attachment => ids.includes(attachment.id));
     }
     write(KEYS.workItems, items.map(item => item.id === updated.id ? updated : item));
-    return { ...updated, workItems: updated.workItems || [] };
+    return { ...visibleMatter(updated), workItems: updated.workItems || [] };
   }
   if (parts[1] === 'requirements' && parts[2] && parts[3] === 'transition' && method === 'POST') {
     const items = getWorkItems();
@@ -865,6 +766,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const current = items[index];
     const status = body.action === 'reject' ? '已退回' : body.action === 'hold' ? '已搁置' : body.status;
     if (!['处理中', '已退回', '已搁置'].includes(status)) throw new Error('不支持的事项状态');
+    if (current.pendingReassignment) throw new Error('请先处理待接收转派');
     if (status === '处理中' && current.status !== '待处理') throw new Error('事项状态已变化，请刷新');
     const returning = body.action === 'reject';
     if (returning && (current.status !== '待处理' || !text(body.reason).trim())) throw new Error('仅待处理事项可退回，请填写退回原因');
@@ -883,7 +785,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (ratedAcceptance && text(body.comment).length > 500) throw new Error('评价内容不能超过500字');
     const nextStatus = parts[3] === 'complete' ? '待验收' : parts[3] === 'acceptance-passed' ? '已完成' : '处理中';
     if ((parts[3] === 'complete' && current.status !== '处理中') || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
-    if (parts[3] === 'complete' && (current.workItems || []).some((item: RequirementWorkItem) => item.status !== '已完成' && item.assistanceTaskStatus !== 'COMPLETED')) throw new Error('存在未完成的关联任务');
+    if (parts[3] === 'complete' && (current.workItems || []).some((item: RequirementWorkItem) => item.blocksClosure !== false && item.status !== '已完成' && item.assistanceTaskStatus !== 'COMPLETED')) throw new Error('存在未完成的关联任务');
     const stagedAttachments = read<any[]>(KEYS.attachments, []);
     const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.map(String) : [];
     const previousOwnerName = String(current.ownerName || current.assigneeName || '').trim();
@@ -910,13 +812,16 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (['design-tasks', 'dev-tasks', 'bugs'].includes(parts[1]) && parts[2] && method === 'PUT') {
     const items = getWorkItems();
     const index = items.findIndex((item) => item.id === parts[2]);
-    if (index < 0) throw new Error('工作项不存在');
+    if (index < 0 || items[index].deleted || items[index].deleteFlag) throw new Error('工作项不存在或已归档');
     const current = items[index];
+    if (current.deleted || current.deleteFlag) throw new Error('工作项已归档');
     const revision = Number(current.revision || 0);
     if (body.revision != null && Number(body.revision) !== revision) throw new Error('工作项已被其他人更新，请刷新后重试');
     const assigneeName = body.assigneeName ?? body.developer ?? current.assigneeName ?? current.ownerName ?? '';
-    items[index] = { ...current, ...body, ownerName: assigneeName, assigneeName, revision: revision + 1 };
+    items[index] = { ...current, ...body, id: current.id, creatorId: current.creatorId, creatorName: current.creatorName, createdAt: current.createdAt, ownerName: assigneeName, assigneeName, revision: revision + 1 };
     write(KEYS.workItems, items);
+    syncAttachedWorkItem(items[index], undefined, current);
+    recordTaskChanges(current, items[index]);
     return items[index];
   }
   if (clean === '/api/okr/people' && method === 'GET') return getOkrPeople();
@@ -1083,8 +988,6 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   if (clean === '/api/work-item-categories' && method === 'POST') { const category = { id: id('category'), ...body, builtIn: false, revision: 0 }; write(KEYS.researchCategories, [...templateCategories(), category]); return category; }
   if (parts[1] === 'work-item-categories' && parts[2] && method === 'PUT') { const categories = templateCategories(); const index = categories.findIndex((item: any) => item.id === parts[2]); if (index >= 0) { categories[index] = { ...categories[index], ...body, revision: categories[index].revision + 1 }; write(KEYS.researchCategories, categories); return categories[index]; } }
   if (parts[1] === 'work-item-categories' && parts[2] && method === 'DELETE') { const category = templateCategories().find((item: any) => item.id === parts[2]); if (category?.builtIn) throw new Error('内置分类不可删除'); write(KEYS.researchCategories, templateCategories().filter((item: any) => item.id !== parts[2])); return null; }
-  if (clean === '/api/work-item-field-configurations' && method === 'GET') { const categoryCodeValue = queryOf(path).get('categoryCode') || ''; const fields = templateFields().filter((field: any) => field.categoryCode === categoryCodeValue); const scenes = Array.from(new Set(fields.map((field: any) => field.scene))).map((scene) => ({ scene, fields: fields.filter((field: any) => field.scene === scene).sort((a: any, b: any) => a.sort - b.sort) })); return { categoryCode: categoryCodeValue, scenes }; }
-  if (parts[1] === 'work-item-field-configurations' && parts[2] && parts[3] && method === 'PUT') { const categoryCodeValue = decodeURIComponent(parts[2]); const scene = decodeURIComponent(parts[3]); const current = templateFields().filter((field: any) => !(field.categoryCode === categoryCodeValue && field.scene === scene)); const next = (body.fields || []).map((field: any, index: number) => normalizeTemplateField({ ...field, categoryCode: categoryCodeValue, scene, sort: index + 1, defaultValue: field.defaultValue ?? null })); write(KEYS.researchFields, [...current, ...next]); const scenes = Array.from(new Set([...current, ...next].filter((field: any) => field.categoryCode === categoryCodeValue).map((field: any) => field.scene))).map((item) => ({ scene: item, fields: [...current, ...next].filter((field: any) => field.categoryCode === categoryCodeValue && field.scene === item).sort((a: any, b: any) => a.sort - b.sort) })); return { categoryCode: categoryCodeValue, scenes }; }
   if (clean === '/api/work-item-template' && method === 'GET') return templateTypes();
   if (clean === '/api/work-item-template/types' && method === 'POST') { const template = { id: id('type'), category: body.category, name: body.name, description: body.description || '', enabled: body.enabled !== false, isDefault: Boolean(body.isDefault), revision: 0, workflow: body.workflow ? { id: id('workflow'), category: body.workflow.category, taskTypeId: '', name: body.workflow.name, workflowVersion: 1, status: 'PUBLISHED', revision: 0, definition: body.workflow.definition } : undefined }; if (template.workflow) template.workflow.taskTypeId = template.id; write(KEYS.researchTypes, [...templateTypes(true), template]); return { id: template.id }; }
   if (parts[1] === 'work-item-template' && parts[2] === 'types' && parts[3] && parts[4] === 'workflow' && method === 'PUT') {
@@ -1111,7 +1014,6 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       .filter((item: any) => !category || categoryCode(item.category) === categoryCode(category));
     return inherited.map((item: any) => ({ ...item, productLineId: parts[2] }));
   }
-  if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'child-type-rules' && method === 'GET') return [];
   if (parts[1] === 'product-lines' && parts[2] && parts[3] === 'work-item-types' && parts[5] === 'workflows') {
     const products = getProductLines();
     const product = products.find((item) => item.id === parts[2]);
@@ -1194,6 +1096,15 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     return found ? unifiedWorkItem(found) : null;
   }
   if (parts[1] === 'work-items' && parts[2] && parts.length === 3 && method === 'PUT') {
+    if (body.assigneeName !== undefined || body.assigneeId !== undefined) {
+      const people = getEmployeeOptions();
+      const matches = people.filter(person => body.assigneeId ? person.id === body.assigneeId : person.name === body.assigneeName);
+      if (matches.length !== 1) throw new Error('请选择唯一有效的负责人');
+      body.assigneeId = matches[0].id;
+      body.assigneeName = matches[0].name;
+    }
+    if (body.plannedEndDate !== undefined) body.dueDate = body.plannedEndDate;
+
     if (body.verifierId != null) {
       const verifier = getEmployeeOptions().find(employee => employee.id === body.verifierId);
       if (!verifier) throw new Error('验证者不存在或已停用');
@@ -1213,12 +1124,21 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       return unifiedWorkItem({ ...updatedBug, category: 'bug', assigneeName: updatedBug.ownerName });
     }
     const current = items[index];
+    if (body.versionId !== undefined) {
+      const product = getProductLines().find(product => product.id === (body.productLineId || current.productLineId));
+      const version = product?.versions?.find(version => version.id === body.versionId);
+      if (body.versionId && !version) throw new Error('请选择当前产品的有效迭代版本');
+      body.versionName = version?.name || '';
+    }
+    if (current.category === 'requirement') delete body.needsCollaboration;
+
+    if (current.deleted || current.deleteFlag) throw new Error('工作项已归档');
     const revision = Number(current.revision || 0);
     if (body.revision != null && Number(body.revision) !== revision) throw new Error('工作项已被其他人更新，请刷新后重试');
-    const updated = { ...current, ...body, ownerName: body.assigneeName ?? current.ownerName, assigneeName: body.assigneeName ?? current.assigneeName ?? current.ownerName, revision: revision + 1 };
+    const updated = { ...current, ...body, id: current.id, creatorId: current.creatorId, creatorName: current.creatorName, createdAt: current.createdAt, ownerName: body.assigneeName ?? current.ownerName, assigneeName: body.assigneeName ?? current.assigneeName ?? current.ownerName, revision: revision + 1 };
     items[index] = updated;
     write(KEYS.workItems, items);
-    syncAttachedWorkItem(updated);
+    syncAttachedWorkItem(updated, undefined, current);
     recordTaskChanges(current, updated);
     return unifiedWorkItem(updated);
   }
@@ -1228,13 +1148,16 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const type = globalTaskTypes().find((item: any) => item.id === body.taskTypeId);
     if (!product || !type || !type.enabled || categoryCode(type.category) !== body.category) throw new Error('产品或工作项类型不可用，请刷新后重试');
     const items = getWorkItems(); const existing = items.find((item) => item.requestId && item.requestId === body.requestId);
-    if (existing) return unifiedWorkItem(existing);
+    if (existing) {
+      if (existing.creatorId !== taskOperator().id || existing.title !== String(body.title).trim() || existing.category !== body.category || existing.productLineId !== body.productLineId) throw new Error('提交标识已使用，请重新提交');
+      return unifiedWorkItem(existing);
+    }
     if (body.category === 'bug' && body.verifierId && !getEmployeeOptions().some(employee => employee.id === body.verifierId)) throw new Error('验证者不存在或已停用');
     const owner = getEmployeeOptions().find((employee) => employee.id === body.assigneeId);
     const workflow = (type.workflows || (type.workflow ? [type.workflow] : [])).find((flow: any) => flow.status === 'PUBLISHED');
     const initial = workflow?.definition?.states?.find((state: any) => state.initial && state.enabled !== false);
     if (!initial) throw new Error('当前工作项类型未配置已发布的初始状态');
-    const task = { ...body, verifierName: getEmployeeOptions().find(employee => employee.id === body.verifierId)?.name || '', id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: initial.name, statusKey: initial.key, workflowId: workflow.id, statusColor: initial.color, revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorName: MOCK_USERS[0]?.name || '当前用户', createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: body.category === 'bug' ? body.type || '系统缺陷' : type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
+    const task = { ...body, verifierName: getEmployeeOptions().find(employee => employee.id === body.verifierId)?.name || '', id: id(body.category), code: `${String(body.category).toUpperCase()}-${Date.now()}`, title: String(body.title).trim(), status: initial.name, statusKey: initial.key, workflowId: workflow.id, statusColor: initial.color, revision: 0, productLineName: product.name, ownerName: owner?.name || '', assigneeName: owner?.name || '', creatorId: taskOperator().id, creatorName: taskOperator().name, createdAt: now(), dueDate: body.plannedEndDate || '', requirementType: body.category === 'bug' ? body.type || '系统缺陷' : type.name, workItemTypeId: type.id, needsCollaboration: body.needsCollaboration ?? (body.category === 'requirement' ? ['dev', 'test'] : undefined) };
     write(KEYS.workItems, [task, ...items]);
     attachWorkItemToRequirement(task, type.name);
     recordTaskActivity(task.id, product.id, 'WORK_ITEM_CREATED', { title: task.title });
@@ -1309,7 +1232,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const updated = { ...current, status: state.name, statusKey: state.key, statusColor: state.color, revision: revision + 1, ...(state.name === '已完成' ? { actualHours: body.actualHours, completionReview: body.completionReview, completedAt: now() } : {}) };
     items[index] = updated;
     write(KEYS.workItems, items);
-    syncAttachedWorkItem(updated);
+    syncAttachedWorkItem(updated, undefined, current);
     recordTaskActivity(current.id, current.productLineId, 'WORK_ITEM_TRANSITIONED', { fromName: current.status, toName: state.name, reason: body.reason || '', ...(state.name === '已完成' ? { actualHours: body.actualHours } : {}) });
     if (updated.completionReview && state.name === '已完成') recordTaskActivity(current.id, current.productLineId, 'WORK_ITEM_REVIEWED', { review: { title: `${current.title}复盘总结`, ...updated.completionReview } });
     return unifiedWorkItem(updated);
@@ -1406,6 +1329,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       write(KEYS.plans, plans); return plans[index];
     }
   }
+  if (['requirements', 'work-items', 'design-tasks', 'dev-tasks', 'bugs'].includes(parts[1])) throw new Error('暂不支持此任务或事项操作，数据未保存');
   if (method === 'GET') return [];
   if (method === 'POST') return { id: id('mock'), code: `MOCK-${Date.now()}` };
   return null;
@@ -1416,17 +1340,17 @@ const templateRoutes: Record<string, string> = {
   '/api/research-template/roles': 'researchRoles',
   '/api/research-template/statuses': 'researchStatuses',
   '/api/work-item-categories': 'researchCategories',
-  '/api/work-item-field-configurations': 'researchFields',
   '/api/work-item-template': 'researchTypes',
   '/api/notification-template': 'researchNotifications',
 };
 const templateFileEndpoint = mockStateEndpoint('research-template');
 let templateFile: Record<string, unknown> = {};
-let templateReady: Promise<void> | undefined;
+const templateReadWindow = createMockReadWindow();
 let templateQueue: Promise<unknown> = Promise.resolve();
+let templateReadFailure: { error: unknown } | undefined;
 
 async function templateFileRequest(init?: RequestInit): Promise<Record<string, unknown>> {
-  const response = await fetch(templateFileEndpoint, init);
+  const response = await fetch(templateFileEndpoint, { ...init, signal: AbortSignal.timeout(8000) });
   const result = await response.json();
   if (!response.ok) throw new Error(result.message || '项目 Mock 保存失败');
   return result;
@@ -1434,32 +1358,35 @@ async function templateFileRequest(init?: RequestInit): Promise<Record<string, u
 
 let okrFilePersistence: ReturnType<typeof createOkrFilePersistence> | undefined;
 export async function mockApiRequest(path: string, init: RequestInit = {}): Promise<any> {
+  // Removed routes must not fall through to the permissive legacy Mock fallback.
+  if (/^\/api\/work-item-field-configurations(?:[/?]|$)/.test(path) || /^\/api\/product-lines\/[^/]+\/child-type-rules(?:[/?]|$)/.test(path)) {
+    throw new Error('旧字段配置与子任务规则功能已移除');
+  }
   if (path.split('?')[0].startsWith('/api/okr/') && import.meta.env.MODE !== 'test') {
     okrFilePersistence ??= createOkrFilePersistence(localStorage);
-    return okrFilePersistence.run(() => handleMockApiRequest(path, init));
+    return okrFilePersistence.run(() => handleMockApiRequest(path, init), (init.method || 'GET').toUpperCase() === 'GET');
   }
   if (import.meta.env.MODE === 'test') return handleMockApiRequest(path, init);
-  if (!templateReady) {
-    templateReady = templateFileRequest().then((data) => {
-      templateFile = data;
-      for (const key of Object.values(templateRoutes)) {
-        if (Object.prototype.hasOwnProperty.call(data, key)) write(`shichuang.frontend.mock.${key}`, data[key]);
-      }
-    }).catch((error) => { templateReady = undefined; throw error; });
-  }
-  await templateReady;
   const clean = path.split('?')[0];
   const route = Object.keys(templateRoutes).find((route) => clean === route || clean.startsWith(`${route}/`));
-  if (!route) return handleMockApiRequest(path, init);
+  // Task normalization depends on product workflows even outside product-line routes.
+  const needsTemplates = /^\/api\/(requirements|work-items|design-tasks|dev-tasks|bugs|test-cases|test-plans|test-case-directories|version-reviews)(\/|$)/.test(clean);
+  if (!route && !needsTemplates) return handleMockApiRequest(path, init);
+  const previousFailure = templateReadFailure;
   const operation = templateQueue.then(async () => {
-    if ((init.method || 'GET').toUpperCase() === 'GET') {
-      const latest = await templateFileRequest();
+    if (previousFailure !== templateReadFailure) throw templateReadFailure!.error;
+    const readOnly = (init.method || 'GET').toUpperCase() === 'GET';
+    if ((readOnly && !templateReadWindow.isFresh()) || !Object.keys(templateFile).length) {
+      let latest: Record<string, unknown>;
+      try { latest = await templateFileRequest(); }
+      catch (error) { templateReadFailure = { error }; throw error; }
       templateFile = latest;
       for (const key of Object.values(templateRoutes)) {
         if (Object.prototype.hasOwnProperty.call(latest, key)) write(`shichuang.frontend.mock.${key}`, latest[key]);
       }
-      return handleMockApiRequest(path, init);
+      templateReadWindow.markFresh();
     }
+    if (readOnly || !route) return handleMockApiRequest(path, init);
     const key = templateRoutes[route];
     const storageKey = `shichuang.frontend.mock.${key}`;
     const previousLocal = localStorage.getItem(storageKey);
@@ -1483,7 +1410,10 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
       const response = await templateFileRequest({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'productLines', value: latest.productLines, productPatch: { id: previousProduct.id, previous, changes } }) });
       if (!Array.isArray(response.value)) throw new Error('产品保存结果无效，请刷新核对');
       templateFile = { ...latest, productLines: response.value };
-      write(storageKey, response.value);
+      templateReadWindow.markFresh();
+      for (const templateKey of Object.values(templateRoutes)) {
+        if (Object.prototype.hasOwnProperty.call(templateFile, templateKey)) write(`shichuang.frontend.mock.${templateKey}`, templateFile[templateKey]);
+      }
       return (response.value as ProductLine[]).find(product => product.id === previousProduct.id);
     }
     try {
@@ -1496,11 +1426,12 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
       }
       return result;
     } catch (error) {
+      templateReadWindow.invalidate();
       if (previousLocal === null) localStorage.removeItem(storageKey);
       else localStorage.setItem(storageKey, previousLocal);
       throw error;
     }
   });
-  templateQueue = operation.catch(() => undefined);
+  templateQueue = operation.catch(() => { templateReadWindow.invalidate(); });
   return operation;
 }

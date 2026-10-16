@@ -14,7 +14,7 @@ describe('confirmation queue',()=>{
   const before={title:'部门目标',keyResults:[{id:'kr',title:'原KR',weight:100,progress:0,details:[{id:'d',name:'产品甲',version:'V1',stage:'设计',plannedStartDate:'2026-10-01',plannedEndDate:'2026-10-20'}]}]};
   const after={...before,keyResults:[{...before.keyResults[0],details:[{...before.keyResults[0].details[0],version:'V2',stage:'开发',plannedEndDate:'2026-10-25'}]}]};
   const rows=goalDifferences(before,after);
-  expect(rows.map(row=>row.label)).toEqual(expect.arrayContaining(['KR1 明细对象','KR1 · 产品甲 / V2 达成阶段','KR1 · 产品甲 / V2 结束时间']));
+  expect(rows.map(row=>row.label)).toEqual(expect.arrayContaining(['KR1 明细对象','KR1 · 产品甲 / V2 阶段','KR1 · 产品甲 / V2 结束时间']));
   expect(rows.some(row=>row.label==='KR1 内容')).toBe(false);
   expect(rows.some(row=>row.label.includes('开始时间'))).toBe(false);
  });

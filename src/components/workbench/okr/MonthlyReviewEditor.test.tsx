@@ -14,6 +14,19 @@ const initialPayload: OkrPayload = { title: '月报', suggestions: '问题\n建�
   knowledgeEntries: [{ id: 'k', title: '排查经验', category: '产研规范', content: '经验正文' }] };
 
 describe('personal monthly editor', () => {
+  it.each(['employee', 'supervisor'] as const)('connects %s progress loading, failure and retry to report records', async template => {
+    const retry = vi.fn();
+    const common = { ...props, template, onSaveDraft: vi.fn(async () => true), onSubmit: vi.fn(async () => true), onRefreshRecords: retry };
+    const { rerender } = render(<MonthlyReviewEditor {...common} recordsLoading/>);
+    expect(screen.getByRole('region', { name: '月度概览' }).querySelector('.okr-monthly-trend-metric')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByRole('img', { name: '本月周报与月报进度趋势' })).not.toBeInTheDocument();
+    rerender(<MonthlyReviewEditor {...common} recordsError={new Error('加载失败')}/>);
+    const alert = screen.getByText('月度进度加载失败').closest('.ant-alert')!;
+    fireEvent.click(within(alert as HTMLElement).getByRole('button', { name: /重\s*试/ }));
+    expect(retry).toHaveBeenCalled();
+    rerender(<MonthlyReviewEditor {...common}/>);
+    expect(await screen.findByRole('img', { name: '本月周报与月报进度趋势' })).toBeInTheDocument();
+  });
   it('explains missing knowledge titles and saves the entry after the title is filled', async () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
     const view = render(<MonthlyReviewEditor {...props} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);

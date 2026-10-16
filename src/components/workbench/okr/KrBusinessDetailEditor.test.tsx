@@ -35,7 +35,7 @@ describe('KR parent and multi-child selection', () => {
     render(<KrBusinessDetailEditor mode="product" rows={[]} parentOptions={['甲']} childOptions={{ 甲: ['V1'] }} stages={[]} disabled={false} onChange={onChange}/>);
     expect(screen.getAllByText('暂未选择')).toHaveLength(2);
     expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.getByLabelText('暂未选择 达成阶段')).toBeDisabled();
+    expect(screen.getByLabelText('暂未选择 阶段')).toBeDisabled();
     expect(screen.getByLabelText('暂未选择 开始时间')).toBeDisabled();
     expect(screen.queryByRole('button', { name: /移除.*明细/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '添加产品' }));

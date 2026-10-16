@@ -192,11 +192,10 @@ export const RequirementPoolView: React.FC = () => {
   const [media, setMedia] = useState<RequirementMedia[]>([]);
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
   const [workOpen, setWorkOpen] = useState(false);
-  const [workflowAction, setWorkflowAction] = useState<"convert" | "reassign" | "memo">("convert");
+  const [workflowAction, setWorkflowAction] = useState<"convert" | "reassign">("convert");
   const [subTasks, setSubTasks] = useState<Array<{ taskType: RequirementTaskType | ""; assignee: string; expectedDueDate: string; note: string }>>([{ taskType: "", assignee: "", expectedDueDate: "", note: "" }]);
   const [reassignAssignee, setReassignAssignee] = useState("");
   const [reassignReason, setReassignReason] = useState("");
-  const [memoContent, setMemoContent] = useState("");
   const [reasonType, setReasonType] = useState<"hold" | "reject" | null>(null);
   const [reason, setReason] = useState("");
   const [rejectCategory, setRejectCategory] = useState("");
@@ -413,31 +412,6 @@ export const RequirementPoolView: React.FC = () => {
       setSelected(next);
       setWorkOpen(false);
       addToast("success", "工单转派成功", `已成功转派给 ${selectedAssignee.name}`);
-    } else if (workflowAction === "memo") {
-      if (!memoContent.trim()) {
-        addToast("warning", "请输入个人备忘录内容");
-        return;
-      }
-      const next = {
-        ...selected,
-        status: "已完成" as RequirementTask["status"],
-        events: [
-          ...(selected.events || []),
-          {
-            id: `event-${Date.now()}`,
-            eventType: "个人备忘录",
-            fromStatus: selected.status,
-            toStatus: "已完成",
-            reason: memoContent.trim(),
-            operatorName: currentUser.name,
-            createdAt: now,
-          },
-        ],
-      };
-      setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
-      setSelected(next);
-      setWorkOpen(false);
-      addToast("success", "已保存为个人备忘录并归档工单");
     }
   };
   const transition = async (event: React.FormEvent) => {
@@ -944,7 +918,7 @@ export const RequirementPoolView: React.FC = () => {
               <RequirementActionButtons
                 status={selected.status}
                 hasWorkItem={taskLocked}
-                onWork={() => { setWorkflowAction("convert"); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "" }]); setReassignAssignee(""); setReassignReason(""); setMemoContent(""); setWorkOpen(true); }}
+                onWork={() => { setWorkflowAction("convert"); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "" }]); setReassignAssignee(""); setReassignReason(""); setWorkOpen(true); }}
                 onHold={() => setReasonType("hold")}
                 onReject={() => setReasonType("reject")}
               />
@@ -1073,7 +1047,6 @@ export const RequirementPoolView: React.FC = () => {
             >
               <option value="convert">转任务</option>
               <option value="reassign">转派给他人</option>
-              <option value="memo">个人备忘录</option>
             </select>
           </label>
 
@@ -1164,23 +1137,6 @@ export const RequirementPoolView: React.FC = () => {
             </>
           )}
 
-          {workflowAction === "memo" && (
-            <>
-              <label className="block text-xs text-[var(--text-muted)]">
-                个人备忘内容 *
-                <textarea
-                  value={memoContent}
-                  onChange={(e) => setMemoContent(e.target.value)}
-                  rows={4}
-                  placeholder="记录个人备忘信息或处理心得..."
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] text-xs"
-                  required
-                />
-              </label>
-              <p className="text-[11px] text-[var(--text-muted)]">保存为个人备忘录后，工单将归档或标记为已完成状态。</p>
-            </>
-          )}
-
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-main)]">
             <button
               type="button"
@@ -1193,7 +1149,7 @@ export const RequirementPoolView: React.FC = () => {
               type="submit"
               className="h-9 px-4 rounded-lg bg-[var(--primary)] text-xs font-semibold text-white"
             >
-              确认{workflowAction === "convert" ? "转任务" : workflowAction === "reassign" ? "转派" : "保存备忘"}
+              确认{workflowAction === "convert" ? "转任务" : "转派"}
             </button>
           </div>
         </form>

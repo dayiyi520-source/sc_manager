@@ -94,7 +94,7 @@ describe('三级目标沿用现有表单', () => {
       expect(screen.getByLabelText('第一条 目标里程碑')).toBeInTheDocument();
     }
     if (type === 'product') {
-      fireEvent.mouseDown(screen.getByLabelText('第二条 达成阶段'));
+      fireEvent.mouseDown(screen.getByLabelText('第二条 阶段'));
       fireEvent.click(screen.getByText('产品开发', { selector: '.ant-select-item-option-content' }));
     }
     const krs = ref.current?.snapshot().keyResults;
@@ -283,7 +283,7 @@ it('keeps the empty KR subtable as a disabled display-only placeholder', () => {
   render(<ObjectiveForm {...common} ref={ref} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="部门级" alignmentActions={[reference]} initialPayload={{goalModelVersion:2,goalLevel:'department',title:'产品交付',keyResults:[{id:'k',title:'交付',weight:100,progress:0,structureType:'product',details:[]}]}} onSave={vi.fn()}/>);
   expect(screen.queryByLabelText('A1 承接人员')).not.toBeInTheDocument();
   expect(screen.getAllByText('暂未选择')).toHaveLength(2);
-  expect(screen.getByLabelText('暂未选择 达成阶段')).toBeDisabled();
+  expect(screen.getByLabelText('暂未选择 阶段')).toBeDisabled();
   expect(screen.getByLabelText('暂未选择 结束时间')).toBeDisabled();
   expect(ref.current?.snapshot().keyResults?.[0].details).toEqual([]);
 });

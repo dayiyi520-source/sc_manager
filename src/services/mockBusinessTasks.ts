@@ -1,3 +1,4 @@
+import { newestCreatedFirst } from '../utils/creationOrder';
 import { BUSINESS_TASK_SEED_VERSION, MOCK_DELIVERY_TASKS, MOCK_PRESALES_TASKS } from '../data/mockBusinessTasks';
 import { MOCK_SNAPSHOT_VERSION, MOCK_USERS } from '../data/mockSnapshot';
 import { directoryProjects } from './customerDirectoryData';
@@ -18,7 +19,7 @@ function currentUser() {
   try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')?.user || MOCK_USERS[0]; }
   catch { return MOCK_USERS[0]; }
 }
-const normalize = (kind: Kind, tasks: RequirementTask[]) => kind === 'delivery' ? tasks.map(normalizeDeliveryTask) : tasks;
+const normalize = (kind: Kind, tasks: RequirementTask[]) => (kind === 'delivery' ? tasks.map(normalizeDeliveryTask) : [...tasks]).sort(newestCreatedFirst);
 function initialTasks(kind: Kind): RequirementTask[] {
   const projects = directoryProjects();
   const firstProject = projects[0];
@@ -41,7 +42,7 @@ function read(kind: Kind): RequirementTask[] {
   const tasks: unknown = saved ? JSON.parse(saved) : initialTasks(kind);
   if (!Array.isArray(tasks)) throw new Error('本地任务数据无效');
   if (localStorage.getItem(seedKey) !== BUSINESS_TASK_SEED_VERSION) {
-    const samples = kind === 'presales' ? MOCK_PRESALES_TASKS : MOCK_DELIVERY_TASKS;
+    const samples = kind === 'presales' ? MOCK_PRESALES_TASKS : kind === 'delivery' ? MOCK_DELIVERY_TASKS : [];
     const storedIds = new Set(tasks.map(task => task.id));
     const merged = normalize(kind, [...tasks, ...samples.filter(task => !storedIds.has(task.id))]);
     write(kind, merged);

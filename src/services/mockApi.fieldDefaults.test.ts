@@ -1,33 +1,15 @@
 /** @vitest-environment jsdom */
+import { afterEach, describe, expect, it } from 'vitest';
+import { renderHook, cleanup } from '@testing-library/react';
+import { useWorkItemFieldConfig } from '../components/product/useWorkItemFieldConfig';
 
-import { describe, expect, it, beforeEach } from 'vitest';
-import { mockApiRequest } from './mockApi';
-
-const fieldsFor = async (categoryCode: string, scene: 'CREATE' | 'DETAIL') => {
-  const result = await mockApiRequest(`/api/work-item-field-configurations?categoryCode=${categoryCode}`) as { scenes: Array<{ scene: string; fields: Array<{ fieldCode: string; visible: boolean }> }> };
-  return result.scenes.find((item) => item.scene === scene)?.fields || [];
-};
-
-describe('工作项字段默认显隐', () => {
-  beforeEach(() => localStorage.clear());
-
-  it('新建任务默认隐藏指定字段', async () => {
-    const fields = await fieldsFor('requirement', 'CREATE');
-    const hidden = new Set(['expectedGoal', 'hours', 'collaborationItems', 'children', 'cc']);
-    hidden.forEach((fieldCode) => expect(fields.find((field) => field.fieldCode === fieldCode)?.visible).toBe(false));
-  });
-
-  it('任务详情默认隐藏支撑项、参与人和任务类型', async () => {
-    const fields = await fieldsFor('requirement', 'DETAIL');
-    ['support', 'participants', 'taskType'].forEach((fieldCode) => expect(fields.find((field) => field.fieldCode === fieldCode)?.visible).toBe(false));
-  });
-
-  it('管理员保存的字段显隐优先于默认值', async () => {
-    const fields = await fieldsFor('requirement', 'CREATE');
-    const expectedGoal = fields.find((field) => field.fieldCode === 'expectedGoal');
-    await mockApiRequest('/api/work-item-field-configurations/requirement/CREATE', { method: 'PUT', body: JSON.stringify({ fields: fields.map((field) => field.fieldCode === 'expectedGoal' ? { ...field, visible: true } : field) }) });
-    const updated = await fieldsFor('requirement', 'CREATE');
-    expect(expectedGoal?.visible).toBe(false);
-    expect(updated.find((field) => field.fieldCode === 'expectedGoal')?.visible).toBe(true);
+afterEach(cleanup);
+describe('固定任务字段', () => {
+  it.each(['requirement', 'design', 'dev', 'test'])('%s 表单保留关联项，不恢复旧子任务及字段', category => {
+    const { result } = renderHook(() => useWorkItemFieldConfig(category, 'CREATE'));
+    expect(result.current.visible('collaborationItems')).toBe(true);
+    expect(result.current.visible('relatedTasks')).toBe(category !== 'requirement');
+    for (const field of ['expectedGoal', 'children', 'hours', 'cc']) expect(result.current.visible(field)).toBe(false);
+    expect(result.current.visible('estimatedHours')).toBe(true);
   });
 });

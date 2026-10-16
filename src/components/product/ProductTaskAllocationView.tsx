@@ -1,3 +1,4 @@
+import { newestCreatedFirst } from '../../utils/creationOrder';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Input, Select, Table, Tag } from 'antd';
 import type { ProductLine } from '../../types';
@@ -16,12 +17,12 @@ export const loadProductTaskAllocation = async (lines: ProductLine[], kind: 'des
   const results = await Promise.all(lines.map(async (line) => {
     const [requirements, downstream] = await Promise.all([load(line.id, 'requirement'), load(line.id, kind)]);
     return requirements.filter((task) => (task.needsCollaboration ?? ['dev', 'test']).includes(kind)).map((task) => {
-      const allocatedTask = downstream.find((child) => child.requirementId === task.id);
+      const allocatedTask = downstream.find((child) => child.requirementId === task.id || child.relatedTaskIds?.includes(task.id));
       const version = line.versions?.find((item) => item.id === task.versionId);
       return { ...task, productName: line.name, productLineName: line.name, versionName: version?.name || task.versionName || '', versionCode: version?.code || '', allocated: Boolean(allocatedTask), allocatedTask };
     });
   }));
-  return results.flat();
+  return results.flat().sort(newestCreatedFirst);
 };
 export type ProductAllocationRow = Awaited<ReturnType<typeof loadProductTaskAllocation>>[number];
 export type DesignAllocationExtra = ProductAllocationRow & { designVariant: 'product' | 'project' | 'other'; designStatus?: string; reason?: string; sourceTitle?: string };

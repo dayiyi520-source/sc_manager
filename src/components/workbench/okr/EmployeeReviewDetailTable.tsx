@@ -24,7 +24,7 @@ export function EmployeeReviewDetailTable({ rows, progress, productName, disable
     <Table<OkrKrDetail> size="small" rowKey="id" pagination={false} scroll={{ x: 1000 }} dataSource={rows} columns={[
       { title: '产品', key: 'name', render: (_: unknown, row) => productName && !row.version && /^v?\d+(?:\.\d+)*$/i.test(row.name.trim()) ? productName : row.name || '未设置' },
       { title: '迭代版本', key: 'version', render: (_: unknown, row) => row.version || (productName && /^v?\d+(?:\.\d+)*$/i.test(row.name.trim()) ? row.name : '未设置') },
-      { title: '达成阶段', dataIndex: 'stage', key: 'stage', render: (stage?: string) => stage || '未设置' },
+      { title: '阶段', dataIndex: 'stage', key: 'stage', render: (stage?: string) => stage || '未设置' },
       { title: '开始时间', dataIndex: 'plannedStartDate', key: 'plannedStartDate', render: (date?: string) => date || '未设置' },
       { title: '结束时间', dataIndex: 'plannedEndDate', key: 'plannedEndDate', render: (date?: string) => date || '未设置' },
       { title: '进度修改', key: 'reviewProgress', width: 290, render: (_, row) => {

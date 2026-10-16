@@ -16,6 +16,7 @@ type Props = {
   loading?: boolean;
   settingsLoading?: boolean;
   settingsError?: unknown;
+  error?: unknown;
   busy?: boolean;
   onRetry: () => void;
   onOpen: (type: ReviewType, period: ReviewPeriod, draft?: OkrRecord) => void;
@@ -23,7 +24,7 @@ type Props = {
   onViewReview: (id: string) => void;
 };
 
-export function ReviewLanding({ records, objectives, ownerId, settings, loading = false, settingsLoading = false, settingsError, busy = false, exempt = false, onRetry, onOpen, onViewAll, onViewReview }: Props) {
+export function ReviewLanding({ records, objectives, ownerId, settings, loading = false, settingsLoading = false, settingsError, error, busy = false, exempt = false, onRetry, onOpen, onViewAll, onViewReview }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [now, setNow] = useState(() => dayjs());
   useEffect(() => {
@@ -34,7 +35,7 @@ export function ReviewLanding({ records, objectives, ownerId, settings, loading 
   }, []);
   const recent = recentSubmittedReviews(records, ownerId);
   const backfills = backfillReviews(records, objectives, ownerId, settings, now);
-  const blocked = loading || settingsLoading || Boolean(settingsError) || !settings || busy;
+  const blocked = loading || settingsLoading || Boolean(settingsError || error) || !settings || busy;
   const openBackfill = (item: BackfillReview) => {
     setDrawerOpen(false);
     onOpen(item.type, { startDate: item.startDate, endDate: item.endDate }, item.draft);
@@ -44,8 +45,8 @@ export function ReviewLanding({ records, objectives, ownerId, settings, loading 
     const access = reviewWriteAccess(settings, type, now);
     const existing = records.find(record => record.kind === 'review' && record.ownerId === ownerId && record.payload.reviewType === type && record.payload.startDate === period.startDate && record.payload.endDate === period.endDate && record.status !== 'deleted');
     const alreadySubmitted = existing && ['active', 'submitted', 'reviewed'].includes(existing.status);
-    const disabled = exempt ? busy : blocked || !access.allowed || Boolean(alreadySubmitted);
-    const reason = exempt ? '你无需写复盘总结' : settingsError ? '填写日期配置加载失败，请重试' : settingsLoading || !settings ? '正在加载填写日期配置' : alreadySubmitted ? '本周期已提交，可在我的复盘列表查看' : access.reason;
+    const disabled = exempt ? busy || loading || Boolean(error) : blocked || !access.allowed || Boolean(alreadySubmitted);
+    const reason = error ? '复盘资料加载失败，请重试' : exempt ? '你无需写复盘总结' : settingsError ? '填写日期配置加载失败，请重试' : settingsLoading || !settings ? '正在加载填写日期配置' : alreadySubmitted ? '本周期已提交，可在我的复盘列表查看' : access.reason;
     return <Tooltip title={reason || undefined}><span tabIndex={disabled ? 0 : undefined} aria-label={reason || undefined}><Button type={type === 'week' ? 'primary' : 'default'} disabled={disabled} onClick={() => onOpen(type, period, existing)} icon={<CalendarIcon/>}>{type === 'week' ? '写周报' : '写月报'}</Button></span></Tooltip>;
   };
   const dueCycle = settings?.weeklyReviewCycles?.find(row => !now.isBefore(dayjs(row.notifyAt)) && !now.isAfter(dayjs(row.deadline)) && !records.some(record => record.kind === 'review' && record.ownerId === ownerId && ['submitted', 'reviewed', 'active'].includes(record.status) && record.payload.reviewType === 'week' && record.payload.startDate === row.startDate && record.payload.endDate === row.endDate));
@@ -58,7 +59,7 @@ export function ReviewLanding({ records, objectives, ownerId, settings, loading 
     </section>
     <section aria-label="最近提交的">
       <header className="review-landing-head"><h2>最近提交的</h2><Button type="text" onClick={onViewAll}>查看全部<ChevronRightIcon/></Button></header>
-      {loading ? <div className="review-landing-status"><Spin tip="正在加载最近提交"/></div> : recent.length ? <div className="review-recent-grid">{recent.map(record => {
+      {loading ? <div className="review-landing-status"><Spin tip="正在加载最近提交"/></div> : error ? <Alert type="error" showIcon title="最近提交加载失败" action={<Button onClick={onRetry}>重试</Button>}/> : recent.length ? <div className="review-recent-grid">{recent.map(record => {
         const time = record.submittedAt || record.createdAt;
         return <button type="button" key={record.id} className="review-recent-card" disabled={busy} onClick={() => onViewReview(record.id)} aria-label={`查看复盘：${record.payload.title}`}><div className="review-recent-title"><span className="review-cycle-icon"><CalendarIcon/></span><strong title={record.payload.title}>{record.payload.title}</strong></div><div className="review-recent-meta"><Tag color={record.payload.reviewType === 'week' ? 'blue' : 'purple'}>{record.payload.reviewType === 'week' ? '周报' : '月报'}</Tag><span>{time && dayjs(time).isValid() ? `${record.submittedAt ? '提交于' : '记录于'} ${dayjs(time).format('MM-DD HH:mm')}` : '时间未记录'}</span></div></button>;
       })}</div> : <Empty description="暂无已提交的复盘"/>}

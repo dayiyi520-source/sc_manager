@@ -42,6 +42,7 @@ describe('项目产研模板持久化', () => {
   });
   it('拒绝非模板字段和错误的数据形态', () => {
     expect(() => saveTemplateValue(file, '../other', [], null)).toThrow('不支持');
+    expect(() => saveTemplateValue(file, 'researchFields', [], null)).toThrow('不支持');
     expect(() => saveTemplateValue(file, 'researchTypes', {}, null)).toThrow('格式');
     expect(() => saveTemplateValue(file, 'researchAutomationSetting', [], null)).toThrow('格式');
     expect(readFileSync(file, 'utf8')).toBe('{}');

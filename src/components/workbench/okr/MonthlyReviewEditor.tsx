@@ -124,6 +124,8 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [metricsRevision, setMetricsRevision] = useState(0);
   const period = useMemo(() => monthPeriod(month), [month]);
+  const metricsScope = `${currentUserId}:${viewer?.department || ''}:${period.startDate}:${period.endDate}:${template}:${readOnly}`;
+  const lastMetricsScope = useRef(metricsScope);
   const reportTemplate = useReviewTemplateFields(reviewSettings, initialPayload, viewer?.department || '', template, 'month', period.startDate);
   useEffect(() => {
     if (readOnly) {
@@ -133,6 +135,10 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
       return;
     }
     let active = true;
+    if (lastMetricsScope.current !== metricsScope) {
+      setMetrics(undefined);
+      lastMetricsScope.current = metricsScope;
+    }
     setMetricsLoading(true);
     setMetricsError(false);
     if (workLoading || workError) {
@@ -146,7 +152,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
       .catch(() => { if (active) setMetricsError(true); })
       .finally(() => { if (active) setMetricsLoading(false); });
     return () => { active = false; };
-  }, [work, workLoading, workError, period, currentUserId, viewer?.name, viewer?.department, people, metricsRevision, readOnly, template, initialPayload?.monthlyMetrics]);
+  }, [work, workLoading, workError, period, currentUserId, viewer?.name, viewer?.department, people, metricsRevision, readOnly, template, initialPayload?.monthlyMetrics, metricsScope]);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [expandedKrs, setExpandedKrs] = useState<Record<string, boolean>>({});
@@ -221,7 +227,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
   const renderOverview = (rows?: OkrKrReview[]) => {
     const progress = rows && !readOnly ? monthlyOverallProgress(monthlyOkrs, rows) : overallProgress;
     const points = rows && !readOnly ? monthlyProgressTrend(weeklyReviews, progress ?? 0, period.endDate, template === 'supervisor') : progressTrend;
-    return <MonthlyOverview progress={progress} points={points} metrics={metrics} loading={metricsLoading} error={metricsError} department={template === 'supervisor'} onRetry={() => { onRefreshWork?.(); setMetricsRevision(value => value + 1); }}/>;
+    return <MonthlyOverview progress={progress} points={points} metrics={metrics} loading={metricsLoading} error={metricsError} progressLoading={!readOnly && recordsLoading} progressError={!readOnly && Boolean(recordsError)} onRetryProgress={onRefreshRecords} department={template === 'supervisor'} onRetry={() => { onRefreshWork?.(); setMetricsRevision(value => value + 1); }}/>;
   };
   const monthlyOverview = renderOverview();
   if (template === 'supervisor') return <WeeklyReviewEditor reviewSettings={reviewSettings} template="supervisor" reviewType="month" overview={rows => renderOverview(rows)} records={records} people={people} recordsLoading={recordsLoading} recordsError={recordsError} onRefreshRecords={onRefreshRecords}

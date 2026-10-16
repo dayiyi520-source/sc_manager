@@ -8,7 +8,7 @@ import dayjs from 'dayjs';
 import { useApp } from '../../../context/AppContext';
 import { customerDirectoryRepository } from '../../../services/customerDirectoryRepository';
 import { projectDeliveryMap, deliveryProjectNames, deliveryProductsByProject, deliveryStagesByProduct } from '../../../services/projectDeliveryMap';
-import { okrRepository, type OkrPayload, type OkrRecord, type OkrSettings } from '../../../services/okrRepository';
+import { okrRepository, type OkrPayload, type OkrRecord, type OkrSettings, type OkrWork } from '../../../services/okrRepository';
 import { productRepository } from '../../../services/productRepository';
 import { teamRepository } from '../../../services/teamRepository';
 import { loadReviewEvidence } from '../../../services/reviewEvidenceRepository';
@@ -28,6 +28,7 @@ export const findReviewForPayload = (records: OkrRecord[], ownerId: string, peri
   ));
 
 const EMPTY_PRODUCT_LINES: ProductLine[] = [];
+const EMPTY_WORK: OkrWork[] = [];
 
 export function useOriginalOkr() {
   const {currentUser, addToast, productLines: liveProducts = EMPTY_PRODUCT_LINES} = useApp();
@@ -51,7 +52,7 @@ export function useOriginalOkr() {
     },
     retry:false,
   });
-  const people = (peopleQuery.data || []).map(person => ({ ...person, department: teamMembersQuery.data?.find(member => member.id === person.id)?.department || person.department, jobTitle: teamMembersQuery.data?.find(member => member.id === person.id)?.jobTitle || teamMembersQuery.data?.find(member => member.id === person.id)?.roleTitle || person.jobTitle }));
+  const people = useMemo(() => (peopleQuery.data || []).map(person => ({ ...person, department: teamMembersQuery.data?.find(member => member.id === person.id)?.department || person.department, jobTitle: teamMembersQuery.data?.find(member => member.id === person.id)?.jobTitle || teamMembersQuery.data?.find(member => member.id === person.id)?.roleTitle || person.jobTitle })), [peopleQuery.data, teamMembersQuery.data]);
   const currentProducts = useMemo(() => {
     const catalog = new Map((productLinesQuery.data || []).map(product => [product.id, product]));
     for (const product of liveProducts) catalog.set(product.id, product);
@@ -118,18 +119,19 @@ export function useOriginalOkr() {
     catch(error){addToast('error',error instanceof Error?error.message:'拆解目标保存失败');return false;}
     finally{setBusy(false);}
   };
-  const submitReviewDraft = async (id:string) => {
+  const submitReviewDraft = async (id:string, exclusions?: OkrPayload['departmentReviewExclusions']) => {
     const record = all.find(item=>item.id===id && item.kind==='review');
     if(!record || record.ownerId !== currentUser.id){addToast('error','复盘记录不存在或无提交权限');return false;}
     if (settingsQuery.error) { addToast('warning', '填写日期配置加载失败，请重试'); return false; }
     const access = reviewSubmissionAccess(settingsQuery.data, record.payload);
     if (!access.allowed) { addToast('warning', access.reason); return false; }
     if (records.isPending || records.error || peopleQuery.isPending || peopleQuery.error) { addToast('warning', '人员或复盘数据尚未就绪，请刷新后重试'); return false; }
-    const errors = departmentSubmissionErrors(record.payload, all, people, currentUser.id);
+    const payload = exclusions === undefined ? record.payload : { ...record.payload, departmentReviewExclusions: exclusions };
+    const errors = departmentSubmissionErrors(payload, all, people, currentUser.id);
     if (errors.length) { addToast('warning', errors.join('；')); return false; }
     setBusy(true);
     try{
-      await okrRepository.update(record,'submit',{},currentUser.id);
+      await okrRepository.update(record,'submit',exclusions === undefined ? {} : { payload },currentUser.id);
       await refresh();
       addToast('success','复盘已提交');
       return true;
@@ -225,7 +227,7 @@ export function useOriginalOkr() {
     finally { setBusy(false); }
   };
   const saveSettings = async (settings: OkrSettings) => { setBusy(true); try { await okrRepository.saveSettings(settings, currentUser.id); await client.invalidateQueries({queryKey:['okr','settings']}); addToast('success','OKR 配置已保存'); return true; } catch(error) { addToast('error',error instanceof Error ? error.message : '配置保存失败'); return false; } finally { setBusy(false); } };
-  return {records:all,okrs,reviewableOkrs,performances,people,work:work.data || [],busy,loading:records.isPending || peopleQuery.isPending || settingsQuery.isPending,
+  return {records:all,okrs,reviewableOkrs,performances,people,work:work.data || EMPTY_WORK,busy,loading:records.isPending || peopleQuery.isPending || settingsQuery.isPending,
     error:records.error || peopleQuery.error || settingsQuery.error,workLoading:work.isPending,workError:work.error,refresh,refreshWork:()=>work.refetch(),
     productLineOptions,productLineVersionOptions,projectOptions,projectProductOptions,projectProductStageOptions,opportunityOptions,businessOptionsLoading:productLinesQuery.isPending || opportunitiesQuery.isPending,
     businessOptionsError:businessOptionsError instanceof Error ? businessOptionsError.message : businessOptionsError ? '业务数据加载失败' : undefined,

@@ -1,5 +1,5 @@
 {
-  "revision": 48,
+  "revision": 57,
   "okrRecords": [
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
@@ -2476,7 +2476,7 @@
                 "details": [
                   {
                     "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                    "name": "师创云�������台",
+                    "name": "师创云���������台",
                     "version": "V1.1.0",
                     "stage": "产品设计",
                     "plannedStartDate": "2026-10-14",
@@ -3138,7 +3138,7 @@
           "goalLevel": "personal",
           "origin": "assigned",
           "inherited": false,
-          "title": "师创云平台 · 师创云平台 / V1.1.0 · 产品设计；师创云平台 / V1.2.0 · 产品设计；师创云平台 / V1.0.0 · 产品设计",
+          "title": "师创云平台 · 师创云平����� / V1.1.0 · 产品设计；师创云平台 / V1.2.0 · 产品设计；师创云平台 / V1.0.0 · 产品设计",
           "sourceTitle": "师创云平台 · 师创云平台 / V1.1.0 · 产品设计；师创云平台 / V1.2.0 · 产品设计；师创云平台 / V1.0.0 · 产品设计",
           "sourceObjectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
           "sourceKrId": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
@@ -4087,7 +4087,7 @@
       "periodKey": "2026-10",
       "status": "active",
       "createdAt": "2026-10-14T14:41:43.581Z",
-      "version": 3,
+      "version": 4,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "personal",
@@ -4097,7 +4097,7 @@
         "sourceTitle": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
         "sourceObjectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
         "sourceKrId": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
-        "sourceVersion": 15,
+        "sourceVersion": 16,
         "alignments": [
           {
             "parentObjectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
@@ -4116,31 +4116,16 @@
             "deadline": "2026-10-31",
             "details": [
               {
-                "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                "name": "教师教学档案袋",
-                "version": "V1.1.0",
-                "stage": "产品设计",
-                "plannedStartDate": "2026-10-14",
-                "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
-              },
-              {
                 "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
                 "name": "教师教学档案袋",
                 "version": "V1.2.0",
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-22",
                 "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
-              },
-              {
-                "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                "name": "教师教学档案袋",
-                "version": "V1.0.0",
-                "stage": "产品设计",
-                "plannedStartDate": "2026-10-24",
-                "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
+                "assigneeIds": [
+                  "user-product-member"
+                ]
               },
               {
                 "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
@@ -4149,7 +4134,11 @@
                 "stage": "产品设计",
                 "plannedStartDate": "2026-10-21",
                 "plannedEndDate": "2026-10-22",
-                "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e"
+                "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ]
               }
             ],
             "businessObject": "教师教学档案袋,产教融合平台",
@@ -5144,7 +5133,7 @@
           },
           {
             "workId": "task:bde05e56-800e-425d-a68f-467d70d6eba7",
-            "title": "版本兼容性验证 1",
+            "title": "版本兼容性验��� 1",
             "status": "待测试",
             "workType": "task",
             "sourceLabel": "省级项目管理平台 / 省级项目管理平台 V1.1.0",
@@ -6266,8 +6255,8 @@
       "kind": "objective",
       "ownerId": "user-product",
       "periodKey": "2026-10",
-      "status": "active",
-      "version": 0,
+      "status": "deleted",
+      "version": 1,
       "createdAt": "2026-10-08T09:11:30.775Z",
       "payload": {
         "title": "完成核心产品体验优化",
@@ -6297,7 +6286,9 @@
             ]
           }
         ]
-      }
+      },
+      "deletedAt": "2026-10-16T14:02:22.995Z",
+      "deletedBy": "user-product"
     },
     {
       "id": "demo-month-2026-10-user-tech",
@@ -6374,6 +6365,367 @@
           }
         ]
       }
+    },
+    {
+      "id": "392aa864-6372-4465-9995-1237e52a063d",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "active",
+      "createdAt": "2026-10-16T14:40:26.036Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+        "sourceTitle": "明确跨部门交付里程碑",
+        "sourceObjectiveId": "demo-month-2026-10-user-admin",
+        "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+        "sourceVersion": 0,
+        "alignments": [
+          {
+            "parentObjectiveId": "demo-month-2026-10-user-admin",
+            "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+          }
+        ],
+        "weight": 50,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "8f4c85df-5ec5-4f80-afea-3f9663ba18bf",
+            "title": "师创内部管理后台产研板块设计 · 交付ui",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "support",
+            "deadline": "2026-10-31",
+            "action": "师创内部管理后台产研板块设计",
+            "result": "交付ui",
+            "assigneeIds": [
+              "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+              "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
+            ],
+            "plannedDeadline": "2026-10-31"
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+        "objectiveTemplateKrTypes": [
+          "product",
+          "support"
+        ],
+        "changeReason": "",
+        "note": "",
+        "plannedDeadline": "2026-10-31"
+      },
+      "changeRequest": {
+        "id": "937ee037-4f4a-4cb2-b95e-04bd249e4d42",
+        "status": "approved",
+        "purpose": "initial",
+        "reviewerId": "user-admin",
+        "reason": "自主目标首次提交",
+        "payload": {
+          "goalModelVersion": 2,
+          "goalLevel": "department",
+          "origin": "assigned",
+          "inherited": false,
+          "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+          "sourceTitle": "明确跨部门交付里程碑",
+          "sourceObjectiveId": "demo-month-2026-10-user-admin",
+          "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+          "sourceVersion": 0,
+          "alignments": [
+            {
+              "parentObjectiveId": "demo-month-2026-10-user-admin",
+              "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+            }
+          ],
+          "weight": 50,
+          "deadline": "2026-10-31",
+          "keyResults": [
+            {
+              "id": "8f4c85df-5ec5-4f80-afea-3f9663ba18bf",
+              "title": "师创内部管理后台产研板块设计 · 交付ui",
+              "weight": 100,
+              "progress": 0,
+              "structureType": "support",
+              "deadline": "2026-10-31",
+              "action": "师创内部管理后台产研板块设计",
+              "result": "交付ui",
+              "assigneeIds": [
+                "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
+              ]
+            }
+          ],
+          "objectiveType": "target",
+          "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+          "objectiveTemplateKrTypes": [
+            "product",
+            "support"
+          ],
+          "changeReason": "",
+          "note": ""
+        },
+        "baseVersion": 0,
+        "requestedAt": "2026-10-16T14:40:26.036Z",
+        "reviewedAt": "2026-10-16T14:44:33.478Z",
+        "feedback": ""
+      },
+      "changeHistory": [
+        {
+          "id": "937ee037-4f4a-4cb2-b95e-04bd249e4d42",
+          "status": "approved",
+          "purpose": "initial",
+          "reviewerId": "user-admin",
+          "reason": "自主目标首次提交",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "明确跨部门交付里程碑",
+            "sourceObjectiveId": "demo-month-2026-10-user-admin",
+            "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+            "sourceVersion": 0,
+            "alignments": [
+              {
+                "parentObjectiveId": "demo-month-2026-10-user-admin",
+                "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+              }
+            ],
+            "weight": 50,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "8f4c85df-5ec5-4f80-afea-3f9663ba18bf",
+                "title": "师创内部管理后台产研板块设计 · 交付ui",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "support",
+                "deadline": "2026-10-31",
+                "action": "师创内部管理后台产研板块设计",
+                "result": "交付ui",
+                "assigneeIds": [
+                  "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
+                ]
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "",
+            "note": ""
+          },
+          "baseVersion": 0,
+          "requestedAt": "2026-10-16T14:40:26.036Z",
+          "reviewedAt": "2026-10-16T14:44:33.478Z",
+          "feedback": ""
+        }
+      ]
+    },
+    {
+      "id": "8cd7e903-16d2-487c-bb67-5d90683c5e6a",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "active",
+      "createdAt": "2026-10-16T14:40:26.306Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "依托标准流程，在约定时限内闭环上下游协同事项；按时输出培训资料、组织产品赋能培训，建立协同规则、流程和边界，保障上下游业务平稳推进。",
+        "sourceTitle": "明确跨部门交付里程碑",
+        "sourceObjectiveId": "demo-month-2026-10-user-admin",
+        "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+        "sourceVersion": 0,
+        "alignments": [
+          {
+            "parentObjectiveId": "demo-month-2026-10-user-admin",
+            "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+          }
+        ],
+        "weight": 50,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "287e2ce6-a732-4c42-8304-24b4c197e419",
+            "title": "按期完成1个项目包含的产品推进计划 · 达到目标里程碑",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "delivery",
+            "deadline": "2026-10-31",
+            "details": [
+              {
+                "id": "f9fd5cd3-d04d-4541-9d11-41f0a133a190",
+                "name": "智慧校园一体化平台建设项目",
+                "version": "院校门户系统",
+                "currentStage": "系统部署",
+                "targetStage": "试运行",
+                "assigneeIds": [
+                  "user-product-member"
+                ]
+              }
+            ],
+            "assigneeIds": [
+              "user-product-member"
+            ],
+            "businessObject": "智慧校园一体化平台建设项目",
+            "version": "院校门户系统",
+            "plannedDeadline": "2026-10-31"
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "2475a064-2465-4b05-a38e-85be7c1188fa",
+        "objectiveTemplateKrTypes": [
+          "delivery",
+          "support"
+        ],
+        "changeReason": "",
+        "note": "",
+        "plannedDeadline": "2026-10-31"
+      },
+      "changeRequest": {
+        "id": "8cb53ea7-fede-4aba-89eb-218e65555afb",
+        "status": "approved",
+        "purpose": "initial",
+        "reviewerId": "user-admin",
+        "reason": "自主目标首次提交",
+        "payload": {
+          "goalModelVersion": 2,
+          "goalLevel": "department",
+          "origin": "assigned",
+          "inherited": false,
+          "title": "依托标准流程，在约定时限内闭环上下游协同事项；按时输出培训资料、组织产品赋能培训，建立协同规则、流程和边界，保障上下游业务平稳推进。",
+          "sourceTitle": "明确跨部门交付里程碑",
+          "sourceObjectiveId": "demo-month-2026-10-user-admin",
+          "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+          "sourceVersion": 0,
+          "alignments": [
+            {
+              "parentObjectiveId": "demo-month-2026-10-user-admin",
+              "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+            }
+          ],
+          "weight": 50,
+          "deadline": "2026-10-31",
+          "keyResults": [
+            {
+              "id": "287e2ce6-a732-4c42-8304-24b4c197e419",
+              "title": "按期完成1个项目包含的产品推进计划 · 达到目标里程碑",
+              "weight": 100,
+              "progress": 0,
+              "structureType": "delivery",
+              "deadline": "2026-10-31",
+              "details": [
+                {
+                  "id": "f9fd5cd3-d04d-4541-9d11-41f0a133a190",
+                  "name": "智慧校园一体化平台建设项目",
+                  "version": "院校门户系统",
+                  "currentStage": "系统部署",
+                  "targetStage": "试运行",
+                  "assigneeIds": [
+                    "user-product-member"
+                  ]
+                }
+              ],
+              "assigneeIds": [
+                "user-product-member"
+              ],
+              "businessObject": "智慧校园一体化平台建设项目",
+              "version": "院校门户系统"
+            }
+          ],
+          "objectiveType": "target",
+          "objectiveTitleTemplateId": "2475a064-2465-4b05-a38e-85be7c1188fa",
+          "objectiveTemplateKrTypes": [
+            "delivery",
+            "support"
+          ],
+          "changeReason": "",
+          "note": ""
+        },
+        "baseVersion": 0,
+        "requestedAt": "2026-10-16T14:40:26.306Z",
+        "reviewedAt": "2026-10-16T14:44:33.647Z",
+        "feedback": ""
+      },
+      "changeHistory": [
+        {
+          "id": "8cb53ea7-fede-4aba-89eb-218e65555afb",
+          "status": "approved",
+          "purpose": "initial",
+          "reviewerId": "user-admin",
+          "reason": "自主目标首次提交",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "依托标准流程，在约定时限内闭环上下游协同事项；按时输出培训资料、组织产品赋能培训，建立协同规则、流程和边界，保障上下游业务平稳推进。",
+            "sourceTitle": "明确跨部门交付里程碑",
+            "sourceObjectiveId": "demo-month-2026-10-user-admin",
+            "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+            "sourceVersion": 0,
+            "alignments": [
+              {
+                "parentObjectiveId": "demo-month-2026-10-user-admin",
+                "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+              }
+            ],
+            "weight": 50,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "287e2ce6-a732-4c42-8304-24b4c197e419",
+                "title": "按期完成1个项目包含的产品推进计划 · 达到目标里程碑",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "delivery",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "f9fd5cd3-d04d-4541-9d11-41f0a133a190",
+                    "name": "智慧校园一体化平台建设项目",
+                    "version": "院校门户系统",
+                    "currentStage": "系统部署",
+                    "targetStage": "试运行",
+                    "assigneeIds": [
+                      "user-product-member"
+                    ]
+                  }
+                ],
+                "assigneeIds": [
+                  "user-product-member"
+                ],
+                "businessObject": "智慧校园一体化平台建设项目",
+                "version": "院校门户系统"
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "2475a064-2465-4b05-a38e-85be7c1188fa",
+            "objectiveTemplateKrTypes": [
+              "delivery",
+              "support"
+            ],
+            "changeReason": "",
+            "note": ""
+          },
+          "baseVersion": 0,
+          "requestedAt": "2026-10-16T14:40:26.306Z",
+          "reviewedAt": "2026-10-16T14:44:33.647Z",
+          "feedback": ""
+        }
+      ]
     }
   ],
   "okrPeople": [
@@ -6838,12 +7190,12 @@
       "selfSupervisor": "auto",
       "exemptIds": []
     },
-    "version": 29,
+    "version": 32,
     "objectiveTitleTemplates": [
       {
         "id": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
         "department": "产品规划部",
-        "title": "模板标题1模板标题1模板标题1模板标题1模板标题1模板标题1",
+        "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
         "guidance": "",
         "enabled": true,
         "krTypes": [
@@ -6854,7 +7206,7 @@
       {
         "id": "2475a064-2465-4b05-a38e-85be7c1188fa",
         "department": "产品规划部",
-        "title": "模板标题2",
+        "title": "依托标准流程，在约定时限内闭环上下游协同事项；按时输出培训资料、组织产品赋能培训，建立协同规则、流程和边界，保障上下游业务平稳推进。",
         "guidance": "",
         "enabled": true,
         "krTypes": [
@@ -6865,7 +7217,7 @@
       {
         "id": "204c7623-fc37-4af9-9779-b2790f7c6636",
         "department": "产品规划部",
-        "title": "模板标题3",
+        "title": "按时制定月度/季度版本计划，管控版本范围与里程碑；保障迭代节奏稳定，重点需求按期推进、风险及时暴露，持续推动产品迭代升级",
         "guidance": "",
         "enabled": true,
         "krTypes": [

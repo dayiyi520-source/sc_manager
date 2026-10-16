@@ -29,3 +29,10 @@ it('loads all pages across accessible products and propagates failures', async (
   vi.mocked(productRepository.workItems).mockRejectedValueOnce(new Error('无权限'));
   await expect(loadCollaborationRelatedTasks('matter-1', direct, ['line-1'])).rejects.toThrow('无权限');
 });
+
+it('stops repeated or prematurely empty pages instead of requesting forever', async () => {
+  vi.mocked(productRepository.workItems).mockResolvedValue({ page: { items: [task('p-1', 'requirement')], total: 2 } } as never);
+  await expect(loadCollaborationRelatedTasks('matter-1', direct, ['line-1'])).rejects.toThrow('分页数据不完整');
+  vi.mocked(productRepository.workItems).mockResolvedValue({ page: { items: [], total: 2 } } as never);
+  await expect(loadCollaborationRelatedTasks('matter-1', direct, ['line-1'])).rejects.toThrow('分页数据不完整');
+});

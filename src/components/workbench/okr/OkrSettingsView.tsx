@@ -47,8 +47,6 @@ export function OkrSettingsView({ settings, viewerId, busy = false, readOnly = f
     return stored && Object.hasOwn(labels, stored) ? stored as keyof typeof labels : 'templates';
   });
   const sectionPermission = { templates:'okrTemplates', reviewTemplates:'reviewTemplates', administrators:'roleSettings', weeklyCycles:'weeklyCycles', confirmation:'confirmationSettings', defaultView:'okrTemplates' } as const;
-  const availableSections = (Object.keys(labels) as Array<keyof typeof labels>).filter(section => hasOkrPermission(viewerId || '', sectionPermission[section], settings, people));
-  useEffect(() => { if (viewerId && availableSections.length && !availableSections.includes(active)) { window.sessionStorage.setItem(activeSectionKey, availableSections[0]); setActive(availableSections[0]); } }, [viewerId, availableSections.join('|'), active]);
   const sectionReadOnly = readOnly || !!viewerId && !hasOkrPermission(viewerId, sectionPermission[active], settings, people);
   const selectSection = (section: keyof typeof labels) => { window.sessionStorage.setItem(activeSectionKey, section); setActive(section); };
   const [draft, setDraft] = useState(() => normalizedPolicy(normalizeSettings({...settings,templates:departmentOptions.length ? migrateTemplateDepartments(settings.templates || TEMPLATE_DEFAULTS,departmentOptions) : settings.templates}), people));
@@ -79,6 +77,7 @@ export function OkrSettingsView({ settings, viewerId, busy = false, readOnly = f
     finally { directLock.current = false; setSavingDirect(false); }
   };
   const save = async () => {
+    if (busy || sectionReadOnly) return;
     const next = { ...draft, objectiveTitleTemplates: (draft.objectiveTitleTemplates || []).map(row => ({ ...row, department: row.department.trim(), title: row.title.trim(), guidance: row.guidance.trim() })) };
     const error = validateSettings(next) || (people.length ? validatePolicy(next, people, settings) : undefined);
     if (error) { message.warning(error); return; }
@@ -99,18 +98,18 @@ export function OkrSettingsView({ settings, viewerId, busy = false, readOnly = f
   return <section className="okr-settings-page" aria-label="OKR 设置">
     <aside className="okr-settings-sidebar">
       <div className="okr-settings-sidebar-title"><h2>设置</h2><span>OKR</span></div>
-      <nav className="okr-settings-nav" aria-label="设置导航">{(Object.keys(labels) as Array<keyof typeof labels>).filter(key => !viewerId || availableSections.includes(key)).map(key => <button type="button" className={active === key ? 'is-active' : ''} key={key} disabled={busy || savingDirect} onClick={() => selectSection(key)}>{labels[key]}</button>)}</nav>
+      <nav className="okr-settings-nav" aria-label="设置导航">{(Object.keys(labels) as Array<keyof typeof labels>).map(key => <button type="button" className={active === key ? 'is-active' : ''} key={key} disabled={busy || savingDirect} onClick={() => selectSection(key)}>{labels[key]}</button>)}</nav>
       {onClose && <div className="okr-settings-sidebar-footer"><Button type="text" block icon={<ArrowLeft />} disabled={busy || savingDirect} onClick={onClose}>返回目标页</Button></div>}
     </aside>
     <main className="okr-settings-content">
       {!(active === 'reviewTemplates' && editingReviewTemplate) && <header className="okr-settings-page-head"><div><h2>{labels[active]}</h2></div>{!['templates', 'weeklyCycles', 'administrators', 'reviewTemplates'].includes(active) && <Space><Button type="primary" loading={busy} disabled={sectionReadOnly} onClick={() => void save()}>保存配置</Button></Space>}</header>}
-      <fieldset inert={sectionReadOnly} disabled={sectionReadOnly} style={{border:0,padding:0,margin:0}} aria-label="配置内容">
+      <fieldset style={{border:0,padding:0,margin:0}} aria-label="配置内容">
       {active === 'reviewTemplates' && <ReviewTemplateSettings onEditingChange={setEditingReviewTemplate} rows={draft.reviewReportTemplates || []} departments={departmentOptions} people={people} disabled={busy || sectionReadOnly || savingDirect} onSave={reviewReportTemplates => saveDirect({ reviewReportTemplates })}/>}
       {active === 'weeklyCycles' && <WeeklyCycleSettings rows={draft.weeklyReviewCycles || []} disabled={busy || sectionReadOnly || savingDirect} onChange={weeklyReviewCycles => saveDirect({ weeklyReviewCycles })}/>}
       {active === 'administrators' && <OkrRoleSettings draft={draft} people={people} disabled={busy || sectionReadOnly || savingDirect} onChange={next => saveDirect({ administratorIds: next.administratorIds, subAdministratorIds: next.subAdministratorIds, supervisorIds: next.supervisorIds, permissionGrants: next.permissionGrants })}/>}
       {active === 'confirmation' && <OkrPolicySettings active={active} draft={draft} people={people} busy={busy || sectionReadOnly} onChange={setDraft}/>}
       {active === 'templates' && <div className="okr-template-settings"><ObjectiveTitleConfiguration rows={draft.objectiveTitleTemplates || []} departments={departmentOptions} disabled={busy || sectionReadOnly} onSave={saveTemplates}/></div>}
-      {active === 'defaultView' && <Card title="默认视图"><Select value={draft.defaultView} options={[{value:'list',label:'列表视图'},{value:'card',label:'卡片视图'}]} onChange={value => setDraft(current => ({ ...current, defaultView: value }))}/></Card>}
+      {active === 'defaultView' && <Card title="默认视图"><Select disabled={busy || sectionReadOnly} value={draft.defaultView} options={[{value:'list',label:'列表视图'},{value:'card',label:'卡片视图'}]} onChange={value => setDraft(current => ({ ...current, defaultView: value }))}/></Card>}
       </fieldset>
     </main>
   </section>;

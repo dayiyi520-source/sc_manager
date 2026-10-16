@@ -1,6 +1,7 @@
+import { newestCreatedFirst } from '../../utils/creationOrder';
 import { collaborationDesignVariant, isCollaborationCreator, lastCollaborationProcessor } from '../../utils/collaborationWorkflow';
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Dropdown, Input, Rate, Select } from "antd";
+import { Button, Dropdown, Input, Modal as AntModal, Rate, Select } from "antd";
 import { openWorkItemDetailLink, workItemDetailLink } from '../../utils/workItemDetailLink';
 import { loadCollaborationRelatedTasks } from '../../services/collaborationRelatedTasks';
 import { workOrderDisplayName } from '../../utils/workOrderDisplay';
@@ -344,11 +345,11 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const productDescriptionEditor = useRef<HTMLDivElement>(null);
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
   const [workOpen, setWorkOpen] = useState(false);
-  const [workflowAction, setWorkflowAction] = useState<"" | "convert" | "reassign" | "memo">("");
+  const [workflowAction, setWorkflowAction] = useState<"" | "convert" | "reassign">("");
   const [subTasks, setSubTasks] = useState<AssistanceSubTask[]>([{ taskType: "", assignee: "", expectedDueDate: "", note: "", media: [] }]);
   const [reassignAssignee, setReassignAssignee] = useState("");
   const [reassignReason, setReassignReason] = useState("");
-  const [memoContent, setMemoContent] = useState("");
+  const [rejectReassignmentOpen, setRejectReassignmentOpen] = useState(false);
   const [flowMedia, setFlowMedia] = useState<RequirementMedia[]>([]);
   const [reasonType, setReasonType] = useState<"hold" | "reject" | null>(null);
   const [reason, setReason] = useState("");
@@ -765,29 +766,6 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       } finally {
         setWorkflowSubmitting(false);
       }
-    } else if (workflowAction === "memo") {
-      if (!memoContent.trim()) {
-        addToast("warning", "请输入个人备忘录内容");
-        return;
-      }
-      if (flowMedia.some((item) => item.id.startsWith("unstaged-"))) {
-        addToast("warning", "仍有附件上传失败", "请移除上传失败的附件或重新选择后再提交");
-        return;
-      }
-      setWorkflowSubmitting(true);
-      try {
-        const next = await requirementRepository.memo(selected.id, { content: memoContent.trim(), attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")), revision: selected.revision ?? selected.version ?? 0 });
-        setRequirementTasks((list) => list.map((item) => item.id === selected.id ? next : item));
-        setSelected(next);
-        setEvents(Array.isArray(next.events) ? next.events : []);
-        setWorkOpen(false);
-        setFlowMedia([]);
-        addToast("success", "个人备忘已保存", "事项状态保持不变，仅本人可见");
-      } catch (error) {
-        addToast("error", "个人备忘录保存失败", error instanceof Error ? error.message : "服务未确认本次保存，请稍后重试");
-      } finally {
-        setWorkflowSubmitting(false);
-      }
     }
   };
   const transition = async (event: React.FormEvent) => {
@@ -953,7 +931,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
           (status === "all" || item.status === status) &&
           (typeFilter === "all" || (item.workOrderType || "其他问题") === typeFilter)
         );
-      }),
+      }).sort(newestCreatedFirst),
     [
       listItems,
       query,
@@ -999,7 +977,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   ).length;
   const ownsSelected = Boolean(selected && (selected.assigneeId && currentUser.id
     ? selected.assigneeId === currentUser.id : samePerson(selected.ownerName, currentUser.name)));
-  const canReceive = ownsSelected && selected?.status === "待处理";
+  const canReceive = ownsSelected && selected?.status === "待处理" && !selected.pendingReassignment;
   const canAddTask = ownsSelected && selected?.status === "处理中";
   const openTaskCreation = (taskType: string) => {
     if (!selected || !canAddTask || receiving) return;
@@ -1015,6 +993,24 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }]);
     setReassignAssignee(""); setReassignReason(""); setFlowMedia([]);
     setWorkOpen(true);
+  };
+  const respondToReassignment = async (accept: boolean, reason = '') => {
+    if (!selected?.pendingReassignment || receiving) return;
+    setReceiving(true);
+    try {
+      const pending = selected.pendingReassignment;
+      if (accept) await requirementRepository.acceptReassignment(pending.id, selected.revision ?? 0);
+      else await requirementRepository.rejectReassignment(pending.id, reason, selected.revision ?? 0);
+      const detail = await requirementRepository.detail(selected.id);
+      setSelected(detail); setEvents(detail.events || []); setWorkItems(detail.workItems || []);
+      setRequirementTasks(items => items.map(item => item.id === detail.id ? detail : item));
+      setScopeReload(value => value + 1);
+      addToast('success', accept ? '已接受转派' : '已拒绝转派');
+      return true;
+    } catch (error) {
+      addToast('error', '转派处理失败', error instanceof Error ? error.message : '请重试');
+      return false;
+    } finally { setReceiving(false); }
   };
   const receiveMatter = async () => {
     if (!selected || !canReceive || receiveInFlight.current) return;
@@ -1270,6 +1266,11 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
           <div className="grid h-full min-h-0 grid-cols-1 gap-6 overflow-y-auto lg:grid-cols-3 lg:overflow-hidden">
             <div aria-label="事项内容" className="min-h-0 min-w-0 space-y-5 text-sm lg:col-span-2 lg:overflow-y-auto lg:overscroll-contain lg:pr-2">
               <section aria-label="基础字段" className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4">
+                {selected.pendingReassignment && <div role="status" className="mb-4 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4">
+                  <p className="text-sm">等待 {selected.pendingReassignment.assigneeName} 接收转派；接收前负责人保持不变。</p>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">{selected.pendingReassignment.reason}</p>
+                  {selected.pendingReassignment.assigneeId === currentUser.id && <div className="mt-3 flex gap-2"><Button type="primary" loading={receiving} onClick={() => void respondToReassignment(true)}>接受转派</Button><Button disabled={receiving} onClick={() => { setReassignReason(''); setRejectReassignmentOpen(true); }}>拒绝转派</Button></div>}
+                </div>}
                 <div className="flex items-start justify-between gap-4"><h2 className="break-words text-lg font-semibold text-[var(--text-primary)]">{selected.title}</h2><StatusTag status={selected.status} /></div>
                 <h3 className="my-4 text-sm font-semibold text-[var(--text-primary)]">基础字段</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1369,6 +1370,9 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
           </div>
         </Drawer>
       )}
+      <AntModal title="拒绝转派" open={rejectReassignmentOpen} confirmLoading={receiving} okText="确认拒绝" cancelText="取消" onCancel={() => setRejectReassignmentOpen(false)} onOk={() => { if (!reassignReason.trim()) { addToast('warning', '请填写拒绝原因'); return; } void respondToReassignment(false, reassignReason.trim()).then(success => { if (success) setRejectReassignmentOpen(false); }); }}>
+        <Input.TextArea aria-label="拒绝转派原因" value={reassignReason} maxLength={2000} onChange={event => setReassignReason(event.target.value)} placeholder="请填写拒绝原因" />
+      </AntModal>
       {taskCreationKind && selected && <RequirementTasksView
         key={taskCreationKind}
         taskKind={taskCreationKind}
@@ -1474,23 +1478,6 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
                 />
               </label>
               <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
-            </>
-          )}
-
-          {workflowAction === "memo" && (
-            <>
-              <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-                个人备忘内容 *
-                <Input.TextArea
-                  value={memoContent}
-                  onChange={(e) => setMemoContent(e.target.value)}
-                  rows={4}
-                  placeholder="记录个人备忘信息或处理心得..."
-                  required
-                />
-              </label>
-              <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
-              <p className="text-[11px] text-[var(--text-muted)]">个人备忘仅作者可见，不改变事项状态。</p>
             </>
           )}
 

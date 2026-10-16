@@ -290,7 +290,7 @@
 .okr-business-detail-editor .ant-empty { margin-block: var(--kr-detail-space); }
 .okr-business-detail-editor .okr-kr-detail-table { margin-top: 0; }
 .okr-objective-kr-title .okr-kr-add-business { margin-left: var(--company-space-lg); }
-.okr-kr-detail-table tr:has([aria-label="暂未选择 达成阶段"]) { color: var(--text-muted); }
+.okr-kr-detail-table tr:has([aria-label="暂未选择 阶段"]) { color: var(--text-muted); }
 
 .company-detail-summary > .company-detail-department { display:inline-flex; align-items:center; padding:.25rem var(--company-space-sm); border:1px solid var(--border-main); border-radius:var(--company-space-sm); font-size:var(--company-font-body); }
 
@@ -347,3 +347,20 @@
 .company-objective-drawer .goal-source-toggle.ant-btn { inset-block-start: 0; inset-inline-end: var(--company-space-lg); }
 .department-objective-editor .company-objective-weight-summary, .department-objective-editor .okr-objective-deadline { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--company-space-sm); }
 .goal-editor-metric-label { color: var(--text-muted); font-size: var(--company-font-caption); font-weight: 400; }
+.goal-reference-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--company-space-md); margin-bottom: var(--company-space-sm); }
+.goal-reference-toolbar > .ant-btn { margin-left: auto; }
+.goal-reference-kr-content { flex: 1; min-width: 0; }
+.goal-creation-reference .goal-source-node { margin-top: var(--company-space-md); }
+.goal-creation-reference .goal-source-kr.is-assigned { border-left-color: var(--primary); }
+.goal-creation-reference .goal-source-metrics { align-items: center; flex-wrap: wrap; }
+.goal-creation-source-label { padding: var(--company-space-md) var(--company-space-lg); color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.okr-objective-form-item.is-located { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.goal-creation-reference .goal-source-branch { padding-top: var(--company-space-sm); }
+.goal-creation-reference .goal-source-branch > .goal-source-node { margin-top: 0; }
+
+.goal-reference-status.is-draft { color: var(--text-muted); }
+.goal-reference-status.is-submitted { color: var(--primary); }
+
+.goal-creation-source-label { display: flex; align-items: center; gap: var(--company-space-sm); }
+.goal-creation-source-label > span { flex: 1; min-width: 0; }

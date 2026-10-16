@@ -19,19 +19,33 @@ const support: OkrRecord = { id: 'employee-review', ownerId: 'employee', kind: '
 const baseProps = { template: 'supervisor' as const, people: [manager, employee], viewer: { id: 'manager', name: '主管', department: '产品部' }, periodOverride: period, okrs: [objective], work: [], busy: false, workLoading: false, reviewerName: '老板', onCancel: vi.fn(), onRefreshWork: vi.fn(), onSubmit: vi.fn(async () => true) };
 
 describe('supervisor weekly review', () => {
-  it('blocks submission for missing or unread employee reports and proceeds only when read', () => {
+  it('opens the employee list before checking missing or unread reports', () => {
     const submit = vi.fn(async () => true);
     const { rerender } = render(<WeeklyReviewEditor {...baseProps} records={[]} onSubmit={submit} onSaveDraft={vi.fn(async () => true)}/>);
     fireEvent.click(screen.getByRole('button', { name: '提交周报' }));
+    expect(screen.getByRole('dialog', { name: '本轮部门周报提交' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^提\s*交$/ }));
     expect(screen.getByText(/本轮周报未提交：员工/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: '确认提交周报' })).not.toBeInTheDocument();
     rerender(<WeeklyReviewEditor {...baseProps} records={[support]} onSubmit={submit} onSaveDraft={vi.fn(async () => true)}/>);
     fireEvent.click(screen.getByRole('button', { name: '提交周报' }));
+    fireEvent.click(screen.getByRole('button', { name: /^提\s*交$/ }));
     expect(screen.getByText(/本轮复盘尚未读：员工/)).toBeInTheDocument();
     rerender(<WeeklyReviewEditor {...baseProps} records={[{ ...support, viewedBy: ['manager'] }]} onSubmit={submit} onSaveDraft={vi.fn(async () => true)}/>);
     fireEvent.click(screen.getByRole('button', { name: '提交周报' }));
-    expect(screen.getByRole('dialog', { name: '确认提交周报' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '本轮部门周报提交' })).toBeInTheDocument();
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  it.each(['week', 'month'] as const)('submits %s with the newly entered exclusion in the same click', async reviewType => {
+    const submit = vi.fn(async (_payload: OkrPayload) => true);
+    render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[]} onSubmit={submit} onSaveDraft={vi.fn(async () => true)}/>);
+    fireEvent.click(screen.getByRole('button', { name: reviewType === 'week' ? '提交周报' : '提交月报' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '排除员工' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '员工排除原因' }), { target: { value: ' 本轮休假 ' } });
+    fireEvent.click(screen.getByRole('button', { name: /^提\s*交$/ }));
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0][0]).toMatchObject({ reviewType, reviewMode: 'supervisor', departmentReviewExclusions: [{employeeId: 'employee', employeeName: '员工', reason: '本轮休假'}] });
   });
 
   it('shows department metrics and six sections and saves the restored summary and plan', () => {

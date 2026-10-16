@@ -3,15 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest, resolveMockMode } from './apiClient'
 
 describe('resolveMockMode', () => {
-  it('defaults to mock data only during local development', () => {
+  it('defaults to mock data during development and production builds, keeping transport tests isolated', () => {
     expect(resolveMockMode({ DEV: true })).toBe(true)
-    expect(resolveMockMode({ DEV: false })).toBe(false)
+    expect(resolveMockMode({ DEV: false })).toBe(true)
+    expect(resolveMockMode({ MODE: 'production', DEV: false })).toBe(true)
+    expect(resolveMockMode({})).toBe(true)
     expect(resolveMockMode({ DEV: true, MODE: 'test' })).toBe(false)
   })
 
   it('honors an explicit deployment override', () => {
     expect(resolveMockMode({ DEV: false, VITE_MOCK_MODE: 'true' })).toBe(true)
     expect(resolveMockMode({ DEV: true, VITE_MOCK_MODE: 'false' })).toBe(false)
+    expect(resolveMockMode({ MODE: 'production', DEV: false, VITE_MOCK_MODE: 'false' })).toBe(false)
   })
 })
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useApp } from '../../../context/AppContext';
 import { productRepository } from '../../../services/productRepository';
@@ -16,7 +16,25 @@ vi.mock('../../../services/okrRepository', () => ({ okrRepository: {
   people: vi.fn().mockResolvedValue([{ id: 'me', name: '本人', department: '产品', rootFlag: 1, supervisorId: null }]),
   settings: vi.fn().mockResolvedValue({}), actionParents: vi.fn().mockResolvedValue([])
 } }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+it('keeps monthly statistics inputs stable across rerenders and updates them when department membership changes', async () => {
+  vi.mocked(useApp).mockReturnValue({ currentUser: { id: 'me', name: '本人', department: '产品', role: 'admin' }, addToast: vi.fn() } as unknown as ReturnType<typeof useApp>);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const { result, rerender } = renderHook(() => useOriginalOkr(), { wrapper });
+  await waitFor(() => expect(result.current.loading || result.current.workLoading || result.current.businessOptionsLoading).toBe(false));
+  const people = result.current.people;
+  const work = result.current.work;
+  for (let i = 0; i < 5; i++) {
+    rerender();
+    expect(result.current.people).toBe(people);
+    expect(result.current.work).toBe(work);
+  }
+  act(() => { client.setQueryData(['team-member-options'], [{ id: 'me', name: '本人', department: '新部门' }]); });
+  await waitFor(() => expect(result.current.people[0].department).toBe('新部门'));
+  expect(result.current.people).not.toBe(people);
+  client.clear();
+});
 it('updates cached KR detail names when the live product catalog changes without rereading stale records', async () => {
   let products = [{ id: 'p', name: '原产品', versions: [], nameAliases: [] as string[] }];
   vi.mocked(useApp).mockImplementation(() => ({ currentUser: { id: 'me', name: '本人', department: '产品', role: 'admin' }, addToast: vi.fn(), productLines: products }) as unknown as ReturnType<typeof useApp>);

@@ -27,7 +27,7 @@ interface Props {
 export function KrDetailTable({ assigneeOptions, rows, label, stages = [], deliveryStageOptions = {}, disabled = false, deadlineLimit, lockedRows = [], onChange, mode = 'product', productOptions = {}, onAddVersion, onRemove, identityEditable = true, onSelectChildren, placeholder = false, removableIds }: Props) {
   if (!rows.length && !placeholder) return null;
   const displayRows: OkrKrDetail[] = rows.length ? rows : [{ id: 'placeholder', name: '', version: '' }];
-  const stageLabel = mode === 'delivery' ? '目标里程碑' : '达成阶段';
+  const stageLabel = mode === 'delivery' ? '目标里程碑' : '阶段';
   const patch = (id: string, value: Partial<OkrKrDetail>) => onChange?.(rows.map(row => row.id === id ? { ...row, ...value } : row));
   const dateColumn = (key: 'plannedStartDate' | 'plannedEndDate', title: string) => ({
     title: <span>{title} <span className="okr-required-marker">*</span></span>, key,

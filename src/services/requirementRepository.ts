@@ -30,13 +30,15 @@ export function normalizeRequirementTask(task: RequirementTask): RequirementTask
 
 export const requirementRepository = {
   allForScope: async () => {
-    const items: RequirementTask[] = [];
+    const items = new Map<string, RequirementTask>();
     for (let page = 1; ; page++) {
       const result = await requirementRepository.list({ page, pageSize: 100 });
-      items.push(...result.items);
-      if (!result.items.length || items.length >= result.total) break;
+      const previousSize = items.size;
+      result.items.forEach(item => items.set(item.id, item));
+      if (items.size >= result.total) break;
+      if (!result.items.length || items.size === previousSize) throw new Error('事项分页数据不完整，请重试');
     }
-    return items;
+    return [...items.values()];
   },
   transferredBy: async (operatorName: string) => {
     const ids = new Set<string>();
@@ -73,14 +75,13 @@ export const requirementRepository = {
   },
   reassign: (id: string, input: { assigneeId: string; reason: string; handoffNote?: string; attachmentIds?: string[]; revision: number }) => apiRequest<RequirementTask & { pendingReassignmentId: string; owner: string; revision: number; events?: RequirementTask['events'] }>(`/api/requirements/${id}/reassign`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
   acceptReassignment: (reassignmentId: string, revision: number) => apiRequest<{ id: string; status: string }>(`/api/requirements/reassign/${reassignmentId}/accept`, { method: 'POST', body: JSON.stringify({ revision }) }),
-  rejectReassignment: (reassignmentId: string, reason: string) => apiRequest<{ id: string; status: string }>(`/api/requirements/reassign/${reassignmentId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  rejectReassignment: (reassignmentId: string, reason: string, revision?: number) => apiRequest<{ id: string; status: string }>(`/api/requirements/reassign/${reassignmentId}/reject`, { method: 'POST', body: JSON.stringify({ reason, revision }) }),
   acceptanceFailed: (id: string, input: { reason: string; workItemId?: string; taskOwnerId: string; attachmentIds?: string[]; revision: number }) => apiRequest<{ id: string; status: string }>(`/api/requirements/${id}/acceptance-failed`, { method: 'POST', body: JSON.stringify(input) }),
   complete: (id: string, input: { revision: number; note?: string; noteHtml?: string; attachmentIds?: string[] }) => apiRequest<{ id: string; status: string }>(`/api/requirements/${id}/complete`, { method: 'POST', body: JSON.stringify(input) }),
   acceptancePassed: (id: string, input: { revision: number; rating: number; comment?: string }) => apiRequest<{ id: string; status: string }>(`/api/requirements/${id}/acceptance-passed`, { method: 'POST', body: JSON.stringify(input) }),
   reopen: (id: string, input: { assigneeId: string; revision: number; reason?: string; changes?: Partial<RequirementTask> }) => apiRequest<RequirementTask & { workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/reopen`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => ({ ...detail, ...normalizeRequirementTask(detail) })),
   close: (id: string, input: { revision: number; reason?: string }) => apiRequest<RequirementTask & { workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/transition`, { method: 'POST', body: JSON.stringify({ ...input, action: 'close' }) }),
   addComment: (id: string, input: { content: string; requestId: string; revision: number }) => apiRequest<RequirementTask>(`/api/requirements/${id}/comments`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeRequirementTask),
-  memo: (id: string, input: { content: string; attachmentIds?: string[]; revision: number }) => apiRequest<RequirementTask & { events?: RequirementTask['events']; workItems?: RequirementWorkItem[] }>(`/api/requirements/${id}/memo`, { method: 'POST', body: JSON.stringify(input) }).then((detail) => normalizeRequirementTask(detail) as typeof detail),
   stageAttachment: (file: { name: string; mimeType: string; size: number; dataUrl: string }) => apiRequest<AttachmentMetadata>('/api/attachments/stage', { method: 'POST', body: JSON.stringify(file) }),
   bindAttachment: (id: string, input: { subjectType: string; subjectId: string; visibility: string }) => apiRequest<AttachmentMetadata>(`/api/attachments/${id}/bind`, { method: 'POST', body: JSON.stringify(input) }),
   createWorkItem: (id: string, input: { title?: string; taskType: string; assigneeName: string; note?: string; expectedCompleteDate?: string }) => apiRequest<{ id: string; taskType: string; syncStatus?: string; retryCount?: number; syncError?: string }>(`/api/requirements/${id}/work-items`, { method: 'POST', body: JSON.stringify(input) }),

@@ -1,15 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
-import { productRepository } from '../../services/productRepository';
+import { afterEach, expect, it } from 'vitest';
 import { useWorkItemFieldConfig } from './useWorkItemFieldConfig';
 
-vi.mock('../../services/productRepository', () => ({ productRepository: { workItemFieldConfigurations: vi.fn() } }));
 afterEach(cleanup);
 
-it.each(['requirement', 'design', 'dev', 'test', 'bug', 'presales', 'delivery', 'ops'])('requires creation dates for %s despite hidden legacy settings', async (categoryCode) => {
+it.each(['requirement', 'design', 'dev', 'test', 'bug', 'presales', 'delivery', 'ops'])('requires creation dates for %s with fixed fields', async (categoryCode) => {
   for (const scene of ['CREATE'] as const) {
-    vi.mocked(productRepository.workItemFieldConfigurations).mockResolvedValue({ categoryCode, scenes: [{ scene, fields: ['plannedStartDate', 'plannedEndDate'].map((fieldCode) => ({ fieldCode, visible: false, required: false })) }] } as never);
     const { result, unmount } = renderHook(() => useWorkItemFieldConfig(categoryCode, scene));
     await waitFor(() => expect(result.current.loaded).toBe(true));
     for (const field of ['plannedStartDate', 'plannedEndDate']) {
@@ -20,8 +17,7 @@ it.each(['requirement', 'design', 'dev', 'test', 'bug', 'presales', 'delivery', 
   }
 });
 
-it('keeps creation dates required when configuration loading fails, without changing detail rules', async () => {
-  vi.mocked(productRepository.workItemFieldConfigurations).mockRejectedValue(new Error('配置不可用'));
+it('keeps fixed creation dates required without changing detail rules', async () => {
   for (const scene of ['CREATE', 'DETAIL'] as const) {
     const { result, unmount } = renderHook(() => useWorkItemFieldConfig('bug', scene));
     await waitFor(() => expect(result.current.loaded).toBe(true));

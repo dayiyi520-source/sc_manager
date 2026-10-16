@@ -144,3 +144,25 @@ it('persists role removal directly without saving unrelated draft fields', async
   expect(onSave.mock.calls[0][0]).toMatchObject({ administratorIds: ['a'], supervisorIds: [] });
   expect(screen.queryByText('乙')).not.toBeInTheDocument();
 });
+
+it.each([false, true])('keeps all sections viewable with partial permission %s and prevents unauthorized writes', async partial => {
+  const people = [{ id:'admin', name:'管理员', department:'研发', rootFlag:1, supervisorId:null, version:1 }, {id:'member',name:'员工',department:'研发',rootFlag:0,supervisorId:'admin',version:1}];
+  const onSave = vi.fn(async () => true);
+  render(<OkrSettingsView viewerId="member" settings={{...settings,administratorIds:['admin'],permissionGrants:{member:partial?['okrTemplates']:[]},objectiveTitleTemplates:[template]}} people={people} onSave={onSave}/>);
+  const nav = screen.getByRole('navigation',{name:'设置导航'});
+  for (const label of ['OKR模板','复盘总结模板','角色设置','周报周期配置','目标确认配置','默认视图']) expect(within(nav).getByRole('button',{name:label})).toBeEnabled();
+  expect(screen.getByRole('button',{name:'添加O模板'}).hasAttribute('disabled')).toBe(!partial);
+  fireEvent.click(within(nav).getByRole('button',{name:'角色设置'}));
+  expect(screen.getByRole('button',{name:'添加成员'})).toBeDisabled();
+  fireEvent.click(within(nav).getByRole('button',{name:'周报周期配置'}));
+  expect(screen.getByRole('button',{name:'增加周期'})).toBeDisabled();
+  fireEvent.click(within(nav).getByRole('button',{name:'目标确认配置'}));
+  expect(screen.getByRole('switch',{name:'目标确认'})).toBeDisabled();
+  fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
+  fireEvent.click(within(nav).getByRole('button',{name:'复盘总结模板'}));
+  expect(screen.getByRole('button',{name:'新建模板'})).toBeDisabled();
+  fireEvent.mouseDown(screen.getByRole('combobox',{name:'模板身份查询'}));
+  fireEvent.click(await screen.findByText('员工',{selector:'.ant-select-item-option-content'}));
+  expect(screen.getByRole('combobox',{name:'模板身份查询'}).closest('.ant-select')).toHaveTextContent('员工');
+  expect(onSave).not.toHaveBeenCalled();
+});

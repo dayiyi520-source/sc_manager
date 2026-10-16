@@ -18,6 +18,6 @@ export function isWorkOrderInScope(item: RequirementTask, scope: RequirementScop
   if (scope === 'mine_created') return matches(item.creatorId, item.creatorName, viewer);
   if (scope === 'mine_owned') return owned;
   if (scope === 'department') return Boolean(viewer.department) && ownerDepartment(item, employees) === viewer.department;
-  return !owned && (transferredIds.has(item.id) || Boolean(item.events?.some((event) =>
+  return !owned && (item.pendingReassignment?.assigneeId === viewer.id || transferredIds.has(item.id) || Boolean(item.events?.some((event) =>
     ['转派待受理', '事项转交', '转派给他人'].includes(event.eventType) && matches(undefined, event.operatorName, viewer))));
 }

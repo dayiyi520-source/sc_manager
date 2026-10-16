@@ -4,7 +4,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit
 
-TEMPLATE_KEYS = {'researchRoles','researchStatuses','researchCategories','researchFields','researchTypes','researchNotifications','researchAutomation','researchAutomationSetting','productLines'}
+TEMPLATE_KEYS = {'researchRoles','researchStatuses','researchCategories','researchTypes','researchNotifications','researchAutomation','researchAutomationSetting','productLines'}
 
 def validate_state(state):
     if not isinstance(state, dict) or type(state.get('revision')) is not int or state['revision'] < 0 or not isinstance(state.get('okrRecords'), list) or not isinstance(state.get('okrPeople'), list) or not isinstance(state.get('okrSettings'), dict):

@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Button, Checkbox, Empty, Input, Modal, Table, Tag } from 'antd';
 import { GearIcon } from '@primer/octicons-react';
 import type { DepartmentReviewExclusion, OkrPayload, OkrPerson, OkrRecord } from '../../../services/okrRepository';
 import { okrRepository } from '../../../services/okrRepository';
-import { departmentRoundReviews } from '../../../services/departmentReviewSubmission';
+import { departmentRoundReviews, departmentSubmissionErrors } from '../../../services/departmentReviewSubmission';
 import { ModernReviewReadOnlyView } from './ModernReviewReadOnlyView';
 import type { PerformanceReview } from '../../../types';
 
-export function DepartmentReviewSettings({ payload, records, people, ownerId, disabled, loading, error, onRefresh, onChange }: {
+export function DepartmentReviewSettings({ payload, records, people, ownerId, disabled, loading, error, onRefresh, onChange, submitOpen = false, showTrigger = true, onCloseSubmit, onSubmit }: {
   payload: OkrPayload; records: OkrRecord[]; people: OkrPerson[]; ownerId: string; disabled: boolean; loading: boolean; error?: unknown;
+  showTrigger?: boolean; submitOpen?: boolean; onCloseSubmit?: () => void; onSubmit?: (rows: DepartmentReviewExclusion[]) => Promise<boolean | string[]>;
   onRefresh?: () => void; onChange: (rows: DepartmentReviewExclusion[]) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -16,6 +17,12 @@ export function DepartmentReviewSettings({ payload, records, people, ownerId, di
   const [message, setMessage] = useState('');
   const [reading, setReading] = useState<OkrRecord>();
   const [marking, setMarking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    if (submitOpen) { setDraft((payload.departmentReviewExclusions || []).map(row => ({...row}))); setMessage(''); }
+  }, [submitOpen]);
+  const close = () => { if (!marking && !submitting && !disabled) { if (submitOpen) onCloseSubmit?.(); else setOpen(false); } };
+  const unavailable = disabled || loading || Boolean(error) || marking || submitting;
   const rows = departmentRoundReviews(payload, records, people, ownerId);
   const selected = (id: string) => draft.find(row => row.employeeId === id);
   const person = people.find(row => row.id === reading?.ownerId);
@@ -27,21 +34,34 @@ export function DepartmentReviewSettings({ payload, records, people, ownerId, di
     linkedWorkItems: reading.payload.items?.map(item => ({ id: item.workId, title: item.title, type: item.workType || 'task', status: item.status })),
   } : undefined;
   return <>
-    <Button aria-label="本轮提交设置" icon={<GearIcon/>} disabled={disabled || loading || Boolean(error)} onClick={() => { setDraft((payload.departmentReviewExclusions || []).map(row => ({ ...row }))); setMessage(''); setOpen(true); }}/>
-    <Modal open={open} title={`本轮部门${payload.reviewType === 'month' ? '月报' : '周报'}提交设置`} width="80%" onCancel={() => { if (!marking) setOpen(false); }} okText="应用设置" cancelText="取消" okButtonProps={{ disabled: disabled || loading || Boolean(error) || marking }} onOk={() => {
+    {showTrigger && <Button aria-label="本轮提交设置" icon={<GearIcon/>} disabled={disabled || loading || Boolean(error)} onClick={() => { setDraft((payload.departmentReviewExclusions || []).map(row => ({ ...row }))); setMessage(''); setOpen(true); }}/> }
+    <Modal open={open || submitOpen} title={`本轮部门${payload.reviewType === 'month' ? '月报' : '周报'}${submitOpen ? '提交' : '提交设置'}`} width={1000} onCancel={close} okText={submitOpen ? '提交' : '应用设置'} cancelText="取消" confirmLoading={submitting} cancelButtonProps={{disabled: submitting || marking || disabled}} okButtonProps={{ disabled: unavailable }} onOk={async () => {
+      if (unavailable) return;
       if (draft.some(row => !row.reason.trim())) { setMessage('请为每位排除员工填写原因'); return; }
-      onChange(draft.map(row => ({ ...row, reason: row.reason.trim() }))); setOpen(false);
+      const exclusions = draft.map(row => ({...row,reason:row.reason.trim()}));
+      if (!submitOpen) { onChange(exclusions); setOpen(false); return; }
+      const errors = departmentSubmissionErrors({...payload,reviewMode:'supervisor',departmentReviewExclusions:exclusions},records,people,ownerId);
+      if (errors.length) { setMessage(errors.join('；')); return; }
+      if (!onSubmit) return;
+      setSubmitting(true); setMessage('');
+      try {
+        const result = await onSubmit(exclusions);
+        if (Array.isArray(result)) setMessage(result.join('；'));
+        else if (result) { setOpen(false); onCloseSubmit?.(); }
+        else setMessage('提交未成功，请检查页面提示后重试，排除设置已保留');
+      } catch (cause) { setMessage(cause instanceof Error ? cause.message : '提交失败，请重试'); }
+      finally { setSubmitting(false); }
     }}>
       <div className="space-y-4">
         <p>{payload.startDate} 至 {payload.endDate}。排除仅对本轮生效，随草稿保存或提交；未排除员工必须已提交且主管已读。</p>
         {message && <Alert type="error" showIcon title={message}/>}
         {error && <Alert type="error" showIcon title="员工复盘加载失败" action={<Button onClick={onRefresh}>重试</Button>}/>}
-        <Table loading={loading} rowKey={row => row.employee.id} pagination={false} dataSource={rows} locale={{ emptyText: <Empty description="暂无部门员工"/> }} columns={[
-          { title: '员工', render: (_, row) => row.employee.name },
-          { title: '本轮复盘', render: (_, row) => <Tag color={!row.review ? 'warning' : row.review.viewedBy?.includes(ownerId) ? 'success' : 'processing'}>{!row.review ? '未提交' : row.review.viewedBy?.includes(ownerId) ? '已读' : '未读'}</Tag> },
-          { title: '查看', render: (_, row) => <Button type="link" disabled={!row.review || marking} onClick={() => { setMessage(''); setReading(row.review); }}>查看复盘</Button> },
-          { title: '不计入本轮判断', render: (_, row) => <Checkbox aria-label={`排除${row.employee.name}`} disabled={disabled || loading || Boolean(error) || marking} checked={Boolean(selected(row.employee.id))} onChange={event => setDraft(current => event.target.checked ? [...current, { employeeId: row.employee.id, employeeName: row.employee.name, reason: '' }] : current.filter(item => item.employeeId !== row.employee.id))}/> },
-          { title: '排除原因', render: (_, row) => <Input.TextArea aria-label={`${row.employee.name}排除原因`} autoSize={{ minRows: 1, maxRows: 3 }} maxLength={500} disabled={disabled || loading || Boolean(error) || marking || !selected(row.employee.id)} value={selected(row.employee.id)?.reason || ''} onChange={event => setDraft(current => current.map(item => item.employeeId === row.employee.id ? { ...item, reason: event.target.value } : item))} placeholder="请填写本轮排除原因"/> },
+        <Table scroll={{ x: 720 }} loading={loading} rowKey={row => row.employee.id} pagination={false} dataSource={rows} locale={{ emptyText: <Empty description="暂无部门员工"/> }} columns={[
+          { title: '员工', width: 112, render: (_, row) => row.employee.name },
+          { title: '本轮复盘', width: 112, render: (_, row) => <Tag color={!row.review ? 'warning' : row.review.viewedBy?.includes(ownerId) ? 'success' : 'processing'}>{!row.review ? '未提交' : row.review.viewedBy?.includes(ownerId) ? '已读' : '未读'}</Tag> },
+          { title: '查看', width: 120, render: (_, row) => <Button type="link" disabled={!row.review || marking || submitting} onClick={() => { setMessage(''); setReading(row.review); }}>查看复盘</Button> },
+          { title: '不计入本轮判断', width: 160, align: 'center', render: (_, row) => <Checkbox aria-label={`排除${row.employee.name}`} disabled={unavailable} checked={Boolean(selected(row.employee.id))} onChange={event => setDraft(current => event.target.checked ? [...current, { employeeId: row.employee.id, employeeName: row.employee.name, reason: '' }] : current.filter(item => item.employeeId !== row.employee.id))}/> },
+          { title: '排除原因', render: (_, row) => <Input.TextArea aria-label={`${row.employee.name}排除原因`} autoSize={{ minRows: 1, maxRows: 3 }} maxLength={500} disabled={unavailable || !selected(row.employee.id)} value={selected(row.employee.id)?.reason || ''} onChange={event => setDraft(current => current.map(item => item.employeeId === row.employee.id ? { ...item, reason: event.target.value } : item))} placeholder="请填写本轮排除原因"/> },
         ]}/>
       </div>
     </Modal>

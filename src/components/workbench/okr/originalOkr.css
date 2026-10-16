@@ -69,6 +69,7 @@
 .okr-scope-sidebar.is-collapsed .okr-scope-search, .okr-scope-sidebar.is-collapsed .okr-scope-groups { display:none; }
 .okr-scope-search { display: grid; grid-template-columns: minmax(0,1fr) 32px; gap: 8px; padding: 16px; border-bottom: 1px solid var(--border-main); }
 .okr-scope-search .ant-btn { width: 32px; padding-inline: 0; }
+.okr-scope-search.has-personal-action { grid-template-columns: minmax(0,1fr) 32px 32px; }
 .okr-scope-groups { min-height: 0; flex: 1 1 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 8px; }
 .okr-scope-group { display: grid; gap: 4px; }
 .okr-scope-group + .okr-scope-group { margin-top: 4px; }
@@ -370,8 +371,6 @@
 .okr-monthly-metrics { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); overflow: hidden; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-surface); }
 .okr-monthly-metrics > div { display: flex; min-height: 88px; align-items: center; gap: 16px; padding: 16px 24px; }
 .okr-monthly-metrics > div + div { border-left: 1px solid var(--border-main); }
-.okr-monthly-metrics > div > svg { width: 28px; height: 28px; color: var(--primary); }
-.okr-monthly-metrics > div:nth-child(3) > svg { color: var(--warning); }
 .okr-monthly-metrics span { display: grid; gap: 2px; }
 .okr-monthly-metrics strong { font-size: 14px; line-height: 20px; }
 .okr-monthly-metrics b { font-size: 24px; line-height: 28px; }
@@ -1311,10 +1310,14 @@
 .okr-monthly-metrics span { min-width: 0; }
 .okr-monthly-metrics b { overflow-wrap: anywhere; }
 .okr-monthly-metrics .okr-monthly-trend-metric { gap: 8px; }
-.okr-monthly-metrics .okr-monthly-sparkline { width: 50%; max-width: 160px; min-width: 0; height: 64px; flex: 1; color: var(--primary); }
+.okr-monthly-metrics .okr-monthly-sparkline, .okr-monthly-trend-placeholder { width: 50%; max-width: 160px; min-width: 0; height: 64px; flex: 1; color: var(--primary); }
+.okr-monthly-trend-placeholder { display: flex; align-items: center; overflow: hidden; }
+.okr-monthly-trend-placeholder .ant-skeleton, .okr-monthly-metrics .ant-skeleton-input { min-width: 0; max-width: 100%; }
+.okr-monthly-metrics .ant-skeleton { display: inline-flex; vertical-align: middle; }
+.okr-monthly-metrics small .ant-skeleton .ant-skeleton-input { height: 12px; }
 .okr-monthly-sparkline line { stroke: currentColor; stroke-width: 2; }
 .okr-monthly-sparkline circle { stroke: currentColor; stroke-width: 2; fill: currentColor; }
 .okr-monthly-sparkline line.is-monthly { stroke-dasharray: 4 4; }
-.okr-monthly-sparkline circle.is-monthly { fill: var(--bg-surface); stroke-dasharray: 2 2; }
+.okr-monthly-sparkline circle.is-monthly { fill: var(--bg-surface); }
 @media (max-width: 1180px) { .okr-monthly-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .okr-monthly-metrics { grid-template-columns: minmax(0, 1fr); } }

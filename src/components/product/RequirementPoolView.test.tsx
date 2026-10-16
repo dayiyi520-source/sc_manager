@@ -63,7 +63,7 @@ describe('work-order workflow form regression', () => {
     fireEvent.click(screen.getByRole('button', { name: '确认转派' }));
     expect(addToast).toHaveBeenCalledWith('warning', '请选择新的转派负责人', expect.any(String));
   });
-  it('keeps all three drafts independent and retains them across switches', async () => {
+  it('keeps task and reassignment drafts independent and retains them across switches', async () => {
     await openWorkflow();
     switchAction('reassign');
     selectAssignee('转派给负责人 *');
@@ -73,21 +73,15 @@ describe('work-order workflow form regression', () => {
     expect(screen.getByLabelText('任务描述')).toHaveValue('');
     expect(screen.getByLabelText('期望完成时间')).toHaveValue('2026-10-02');
     fireEvent.change(screen.getByLabelText('任务描述'), { target: { value: '任务独立描述' } });
-    switchAction('memo');
-    expect(screen.getByLabelText('个人备忘内容 *')).toHaveValue('');
-    fireEvent.change(screen.getByLabelText('个人备忘内容 *'), { target: { value: '独立备忘' } });
     switchAction('reassign');
     expect(screen.getByLabelText('转派给负责人 *')).toHaveValue('陈雅婷');
     expect(screen.getByLabelText('转派原因说明 *')).toHaveValue('转派独立原因');
     switchAction('convert');
     expect(screen.getByLabelText('任务描述')).toHaveValue('任务独立描述');
-    switchAction('memo');
-    fireEvent.click(screen.getByRole('button', { name: '确认保存备忘' }));
-    expect(records[0].events?.at(-1)?.reason).toBe('独立备忘');
   });
-  it('keeps the same wide dialog for all three workflow types', async () => {
+  it('keeps the same wide dialog for both workflow types', async () => {
     await openWorkflow();
-    for (const action of ['convert', 'reassign', 'memo', 'convert']) {
+    for (const action of ['convert', 'reassign', 'convert']) {
       switchAction(action);
       const dialog = screen.getByRole('heading', { name: '工单流转' }).parentElement?.parentElement;
       expect(dialog).toHaveClass('max-w-4xl');
@@ -122,15 +116,10 @@ describe('work-order workflow form regression', () => {
     fireEvent.click(screen.getByRole('button', { name: '确认转任务' }));
     expect(setRequirementTaskDraft).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '陈雅婷', dueDate: '2026-10-09', description: '任务描述独立提交' }));
   });
-  it('does not accept a reassignment reason as memo content', async () => {
+  it('does not offer the removed personal memo action', async () => {
     await openWorkflow();
-    switchAction('reassign');
-    fireEvent.change(screen.getByLabelText('转派原因说明 *'), { target: { value: '仅用于转派' } });
-    switchAction('memo');
-    fireEvent.change(screen.getByLabelText('个人备忘内容 *'), { target: { value: '   ' } });
-    fireEvent.click(screen.getByRole('button', { name: '确认保存备忘' }));
-    expect(addToast).toHaveBeenCalledWith('warning', '请输入个人备忘录内容');
-    expect(records[0].status).toBe('待处理');
+    expect(screen.queryByRole('option', { name: '个人备忘录' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('个人备忘内容 *')).not.toBeInTheDocument();
   });
   it('submits task-specific notes and retains them when the downstream request fails', async () => {
     await openWorkflow();

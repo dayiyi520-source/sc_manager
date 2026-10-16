@@ -1,3 +1,4 @@
+import { updateSessionUser } from '../services/session';
 import { loadKnowledgeDocs, saveKnowledgeDocs } from '../services/knowledgeRepository';
 import { directoryCustomers, directoryLeads, directoryOpportunities, directoryProjects } from '../services/customerDirectoryData';
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -457,6 +458,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const crmError = [customerQuery.error, leadQuery.error, opportunityQuery.error, followUpQuery.error, contractQuery.error].find(Boolean);
 
   const setCurrentUserRole = (target: CurrentUser) => {
+    updateSessionUser(target);
     setCurrentUser(target);
     addToast('info', `已切换身份视角：${target.name}`, `角色权限：${target.roleTitle}`);
   };
@@ -566,84 +568,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addRequirementTask = async (task: Partial<RequirementTask>, onCreated?: (task: RequirementTask) => void) => {
-    if (!requirementBackendEnabled) {
-      const selectedLocalProduct = task.productLineId ? productLines.find((item) => item.id === task.productLineId) : productLines.find((item) => item.name === task.productLineName) || productLines[0];
-      if (!selectedLocalProduct) { addToast('warning', '工单创建失败', '暂无可用的事项归属范围'); return false; }
-      const localTask = { ...task, id: task.id || `req-${Date.now()}`, title: task.title || '新产品任务', status: task.status || '待处理', priority: task.priority || '中', ownerName: task.ownerName || currentUser.name, creatorName: currentUser.name, department: task.department || currentUser.department, productLineId: selectedLocalProduct.id, productLineName: selectedLocalProduct.name, versionName: task.versionName || '', needsCollaboration: task.needsCollaboration || [] } as RequirementTask;
-      setRequirementTasks((prev) => [localTask, ...prev]);
-      window.dispatchEvent(new CustomEvent('product-task-created', { detail: { source: 'product-task', productLineId: localTask.productLineId, needsCollaboration: localTask.needsCollaboration } }));
-      addToast('success', '工单创建成功');
-      onCreated?.(localTask);
-      return true;
-    }
-    const selectedProductLine = task.productLineId
-      ? productLines.find((item) => item.id === task.productLineId)
-      : productLines.find((item) => item.name === task.productLineName) || productLines[0];
-    if (!selectedProductLine) {
-      addToast('warning', '工单创建失败', '暂无可用的事项归属范围');
-      return false;
-    }
-    const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
-    const newTask: RequirementTask = {
-      id: `req-${Date.now()}`,
-      title: task.title || '新产品任务',
-      needsCollaboration: task.needsCollaboration || [],
-      description: task.description || '任务详细描述',
-      expectedGoal: task.expectedGoal || '交付目标与指标验收标准',
-      status: task.status || '待处理',
-      priority: task.priority || '中',
-      ownerName: task.ownerName || currentUser.name,
-      creatorName: currentUser.name,
-      department: task.department || currentUser.department,
-      versionId: task.versionId || '',
-      versionName: task.versionName || '',
-      productLineId: selectedProductLine.id,
-      productLineName: selectedProductLine.name,
-      customerId: task.customerId,
-      customerName: task.customerName,
-      descriptionHtml: task.descriptionHtml,
-      media: task.media || [],
-      taskType: task.taskType,
-      workOrderType: task.workOrderType,
-      specialFields: task.specialFields,
-      sourceWorkOrderIds: task.sourceWorkOrderIds || [],
-      sourceWorkOrderTitles: task.sourceWorkOrderTitles || [],
-      requirementType: task.requirementType,
-      ccNames: task.ccNames || [],
-      plannedStartDate: task.plannedStartDate,
-      expectedCompleteDate: task.expectedCompleteDate,
-      assignedOwnerName: task.assignedOwnerName,
-      assignedNote: task.assignedNote,
-      estimatedHours: task.estimatedHours || 20,
-      actualHours: 0,
-      dueDate: task.dueDate || '2026-09-20',
-      createdAt,
-      events: [{
-        id: `event-${Date.now()}`,
-        eventType: '提需求',
-        operatorName: currentUser.name,
-        createdAt,
-        metadata: {
-          assigneeName: task.ownerName || currentUser.name
-        }
-      }],
-      category: 'my_responsible',
-      todoList: task.todoList || [
-        { id: `td-1`, text: '完成技术可行性评估与设计', done: false },
-        { id: `td-2`, text: '代码开发与本地单测覆盖', done: false },
-        { id: `td-3`, text: '提交测试环境集成回归', done: false }
-      ]
-    };
-    setRequirementTasks((prev) => [newTask, ...prev]);
     try {
-      const created = await requirementRepository.create(newTask);
-      await requirementQuery.refetch();
-      addToast('success', '工单创建成功', `已进入${newTask.department}工单中心`);
-      onCreated?.({ ...newTask, id: created.id });
+      const created = await requirementRepository.create(task);
+      const saved = await requirementRepository.detail(created.id);
+      if (saved.id !== created.id) throw new Error('事项保存结果无效，请刷新核对');
+      setRequirementTasks(prev => [saved, ...prev.filter(item => item.id !== saved.id)]);
+      addToast('success', '工单创建成功');
+      onCreated?.(saved);
       return true;
     } catch (error) {
-      setRequirementTasks((prev) => prev.filter((item) => item.id !== newTask.id));
-      addToast('error', '工单创建失败', error instanceof Error ? error.message : '服务暂不可用，请稍后重试');
+      addToast('error', '工单创建失败', error instanceof Error ? error.message : '请稍后重试');
       return false;
     }
   };
@@ -1393,10 +1327,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateRequirementTask = (id: string, updates: Partial<RequirementTask>) => {
-    if (!requirementBackendEnabled) {
-      addToast('error', '需求同步失败', '当前未连接后端服务，数据未保存');
-      return;
-    }
     const current = requirementTasks.find((task) => task.id === id);
     const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const events: RequirementEvent[] = [];
@@ -1439,8 +1369,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     setRequirementTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...nextUpdates } : t)));
-    requirementRepository.update(id, { ...updates, version: (current as RequirementTask & { version?: number }).version })
-      .then(() => requirementQuery.refetch())
+    requirementRepository.update(id, { ...updates, revision: current.revision ?? current.version ?? 0 })
+      .then(() => requirementRepository.detail(id)).then(saved => setRequirementTasks(items => items.map(item => item.id === id ? saved : item)))
       .catch((error) => {
         setRequirementTasks((prev) => prev.map((task) => task.id === id ? current : task));
         addToast('error', '需求同步失败', error instanceof Error ? error.message : '请稍后重试');

@@ -27,7 +27,7 @@ export function krDetailsError(kr: OkrKr): string | undefined {
       continue;
     }
     if (kr.structureType === 'product' && !row.version?.trim() && !isLegacyVersionRow(kr, row)) return '请选择每条产品明细的迭代版本';
-    if (!row.stage?.trim()) return '请填写每条 KR 明细的达成阶段';
+    if (!row.stage?.trim()) return '请填写每条 KR 明细的阶段';
     if (!validDate(row.plannedStartDate) || !validDate(row.plannedEndDate)) return '请设置每条 KR 明细的有效计划开始和结束时间';
     if (row.plannedStartDate! > row.plannedEndDate!) return 'KR 明细结束时间不能早于开始时间';
     if (kr.deadline && row.plannedEndDate! > kr.deadline) return 'KR 明细结束时间不能超过所属 KR 截止日期';
@@ -38,7 +38,7 @@ export function krDetailSummary(kr: OkrKr): string {
 }
 
 export function supervisorKrTitle(kr: OkrKr): string {
-  if (kr.structureType === 'product' && kr.details?.length) return `按期完成${kr.details.length}个产品版本迭代计划 · 达到对应的验收阶段`;
+  if (kr.structureType === 'product' && kr.details?.length) return `按期完成${kr.details.length}个产品版本迭代计划 · 达到对应的阶段`;
   if (kr.structureType === 'delivery' && kr.details?.length) return `按期完成${kr.details.length}个项目包含的产品推进计划 · 达到目标里程碑`;
   return kr.title;
 }

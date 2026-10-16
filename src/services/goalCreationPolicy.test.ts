@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { creationSources, creationPeriodError, unusedDepartmentTemplates } from './goalCreationPolicy';
+import { creationSources, creationPeriodError, unusedDepartmentTemplates, departmentCreationPayloads, challengeReferences } from './goalCreationPolicy';
+import { assignedReferences } from './okrThreeLevelRules';
 import { mutateOkrLifecycle } from './mockOkrLifecycle';
 import type { OkrRecord, OkrSettings, OkrPerson, OkrPayload } from './okrRepository';
 const people: OkrPerson[] = [{id:'boss',name:'老板',department:'公司',rootFlag:1,supervisorId:null,version:1},{id:'manager',name:'经理',department:'研发',jobTitle:'研发主管',rootFlag:0,supervisorId:'boss',version:1},{id:'staff',name:'员工',department:'研发',rootFlag:0,supervisorId:'manager',version:1}];
@@ -7,6 +8,19 @@ const company:OkrRecord={id:'company',kind:'objective',ownerId:'boss',periodKey:
 const department:OkrRecord={...company,id:'dept',ownerId:'manager',payload:{title:'部门O',goalLevel:'department',objectiveTitleTemplateId:'t1',keyResults:[{id:'dk',title:'部门KR',weight:100,progress:0,assigneeIds:['staff','manager']}]}};
 const settings:OkrSettings={defaultView:'list',timeRules:[],validation:{actionWeightTotal:100,maxActions:8,assigneeMultiple:true,keyNodeMultiple:true,resultRequired:true},dictionaries:{productNodes:[],deliveryNodes:[],presalesNodes:[],supportTypes:[]},templates:[],objectiveTitleTemplates:[1,2,3].map(i=>({id:'t'+i,title:'模板'+i,department:'研发',enabled:true,guidance:'',krTypes:['support']}))};
 describe('goal creation policy',()=>{
+ it('keeps distinct KR sources across multiple objectives, saves them independently and avoids regenerating accepted sources',()=>{
+  const second: OkrRecord = {...company,id:'company2',payload:{...company.payload,keyResults:[{id:'ck2',title:'第二公司KR',weight:100,progress:0,assigneeIds:['manager']}]}};
+  const third: OkrRecord = {...company,id:'company3',payload:{...company.payload,keyResults:[{id:'ck3',title:'第三公司KR',weight:100,progress:0,assigneeIds:['manager']}]}};
+  const config = {...settings,objectiveTitleTemplates:settings.objectiveTitleTemplates!.slice(0,1)};
+  let records = [company, second, third];
+  const refs = assignedReferences(records,people[1]);
+  const payloads = departmentCreationPayloads(config,records,people[1],'2026-10',people,refs);
+  expect(payloads.map(payload=>payload.sourceKrId)).toEqual(['ck','ck2','ck3']);
+  expect(payloads.filter(payload=>payload.objectiveTitleTemplateId)).toHaveLength(1);
+  for(const [i,payload] of payloads.entries()) records=mutateOkrLifecycle(undefined,{viewerId:'manager',periodKey:'2026-10',submit:false,payload:{...payload,title:payload.title || '独立承接'+i}},records,people,config)!.records;
+  expect(records.filter(record=>record.ownerId==='manager').map(record=>record.payload.sourceObjectiveId)).toEqual(['company','company2','company3']);
+  expect(departmentCreationPayloads(config,records,people[1],'2026-10',people,refs)).toEqual([]);
+ });
  it('limits periods to effective upstream goals and uses department goals for manager personal goals',()=>{
   const records=[company,department,{...company,id:'nov',periodKey:'2026-11'},{...department,id:'draft',status:'draft',periodKey:'2026-12'}];
   expect(creationSources(records,people[1],'department',people).map(r=>r.periodKey)).toEqual(['2026-10','2026-11']);
@@ -42,4 +56,14 @@ it('approves a manager personal goal aligned to the department without losing th
  const approved=mutateOkrLifecycle(pending.id,{viewerId:'boss',version:pending.version,action:'approve-change'},created.records,people,settings)!;
  expect(approved.records.at(-1)?.status).toBe('active');
  expect(approved.records.at(-1)?.payload.keyResults?.[0].executionActions?.[0].title).toBe('完成个人工作');
+});
+
+it('keeps each assigned KR available for challenges even after draft or submitted goals exist',()=>{
+ const source={...company,payload:{...company.payload,keyResults:[company.payload.keyResults![0],{...company.payload.keyResults![0],id:'second',title:'第二指派'},{...company.payload.keyResults![0],id:'other',assigneeIds:['staff']}]}};
+ const used={...department,status:'draft' as const,payload:{...department.payload,sourceObjectiveId:'company',sourceKrId:'ck'}};
+ const candidates=challengeReferences([source,used],people[1],'department',people,'2026-10',settings);
+ expect(candidates.map(row=>row.value)).toEqual(['company:ck','company:second']);
+ expect(candidates[1].alignment).toMatchObject({sourceObjectiveId:'company',sourceKrId:'second',sourceVersion:1});
+ expect(challengeReferences([source,used],people[1],'department',people,'2026-11',settings)).toEqual([]);
+ expect(challengeReferences([department],people[1],'personal',people,'2026-10',settings).map(row=>row.value)).toEqual(['dept:dk']);
 });

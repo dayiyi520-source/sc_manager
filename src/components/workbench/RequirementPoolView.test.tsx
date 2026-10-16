@@ -20,7 +20,7 @@ vi.mock('../product/RequirementTasksView', () => ({
   RequirementTasksView: ({ taskKind, itemLabel, designVariant, creationContext }: { taskKind: string; itemLabel: string; designVariant?: string; creationContext: { sourceWorkOrder?: RequirementTask; onClose?: () => void; onCreated?: () => void } }) => <section aria-label={`新建${itemLabel}`} data-testid="embedded-task-create" data-kind={taskKind} data-design-variant={designVariant} data-source={creationContext.sourceWorkOrder?.id}><h2>新建{itemLabel}</h2><button onClick={creationContext.onClose}>取消任务新建</button><button onClick={() => { creationContext.onCreated?.(); creationContext.onClose?.(); }}>模拟任务保存</button></section>,
 }));
 vi.mock('../../services/requirementRepository', () => ({
-  requirementRepository: { allForScope: vi.fn(), transferredBy: vi.fn(), employees: vi.fn(), detail: vi.fn(), receive: vi.fn(), transition: vi.fn(), acceptancePassed: vi.fn(), acceptanceFailed: vi.fn(), close: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), memo: vi.fn(), addComment: vi.fn(), complete: vi.fn(), createWorkItem: vi.fn() },
+  requirementRepository: { allForScope: vi.fn(), transferredBy: vi.fn(), employees: vi.fn(), detail: vi.fn(), receive: vi.fn(), transition: vi.fn(), acceptancePassed: vi.fn(), acceptanceFailed: vi.fn(), close: vi.fn(), reopen: vi.fn(), reassign: vi.fn(), addComment: vi.fn(), complete: vi.fn(), createWorkItem: vi.fn() },
   normalizeRequirementTask: (task: RequirementTask) => task,
 }));
 vi.mock('../product/LazyRichTextEditor', () => ({

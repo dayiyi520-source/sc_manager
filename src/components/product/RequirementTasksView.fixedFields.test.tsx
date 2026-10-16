@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RequirementTasksView } from './RequirementTasksView';
@@ -12,8 +12,7 @@ vi.mock('../../services/session', () => ({ readSession: () => ({ token: 'test-se
 vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.fn().mockResolvedValue([{ id: 'u1', name: '当前用户', department: '交付部' }, { id: 'u2', name: '部门同事', department: '交付部' }]) } }));
 vi.mock('../../services/requirementRepository', () => ({ requirementRepository: { workOrderCandidates: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../services/productRepository', () => ({ productRepository: {
-  designTasks: vi.fn().mockResolvedValue({ items: [], total: 0 }), workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }), tasks: vi.fn().mockResolvedValue({ items: [], total: 0 }), businessTasks: vi.fn(), updateBusinessTask: vi.fn().mockResolvedValue(null),
-  workItemFieldConfigurations: vi.fn().mockResolvedValue({ scenes: [{ scene: 'LIST', fields: [{ fieldCode: 'priority', visible: false }, { fieldCode: 'creator', visible: false }] }] }),
+  createWorkItem: vi.fn().mockResolvedValue({}), designTasks: vi.fn().mockResolvedValue({ items: [], total: 0 }), workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }), tasks: vi.fn().mockResolvedValue({ items: [], total: 0 }), businessTasks: vi.fn(), updateBusinessTask: vi.fn().mockResolvedValue(null),
   businessTask: vi.fn(), workItemDetail: vi.fn(), workItemTypes: vi.fn().mockResolvedValue([]),
   workItemReview: vi.fn().mockResolvedValue(null), workItemRelations: vi.fn().mockResolvedValue({ relations: [] }), businessTaskActivities: vi.fn().mockResolvedValue([])
 } }));
@@ -36,7 +35,7 @@ const profiles = [
   { kind: 'design', variant: 'project', fields: ['任务类型','负责人','优先级','关联项目','关联产品','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
   { kind: 'design', variant: 'other', fields: ['任务类型','负责人','优先级','来源部门','关联产品','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
 ] as const;
-it.each(profiles)('renders fixed $kind $variant creation fields even when old settings hide fields', async (profile) => {
+it.each(profiles)('renders fixed $kind $variant creation fields without a field configuration service', async (profile) => {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={profile.kind} designVariant={'variant' in profile ? profile.variant : 'product'} /></QueryClientProvider>);
   if (profile.kind === 'design') {
     fireEvent.click(screen.getByRole('button', { name: '新建设计任务' }));
@@ -50,7 +49,6 @@ it.each(profiles)('renders fixed $kind $variant creation fields even when old se
   expect(screen.getByRole('button',{name:'协同事项 · 0'})).toBeVisible();
   expect(Boolean(screen.queryByRole('button',{name:'关联任务 · 0'}))).toBe(profile.kind!=='requirement');
   expect(screen.queryByText('实际工时（小时）')).not.toBeInTheDocument();
-  expect(productRepository.workItemFieldConfigurations).not.toHaveBeenCalled();
 });
 
 it.each(['requirement', 'design', 'dev', 'test', 'presales', 'ops', 'delivery'] as const)('offers company scope after department for %s tasks', async kind => {
@@ -60,4 +58,117 @@ it.each(['requirement', 'design', 'dev', 'test', 'presales', 'ops', 'delivery'] 
   expect(tabs.indexOf(companyTab)).toBe(tabs.findIndex(tab => tab.textContent === '我部门的·0') + 1);
   fireEvent.click(companyTab);
   expect(companyTab).toHaveAttribute('aria-selected', 'true');
+});
+
+it('allows collaboration choices while creating a product task', async () => {
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="requirement" /></QueryClientProvider>);
+  fireEvent.click(screen.getByRole('button', { name: '新建' }));
+  const design = await screen.findByRole('checkbox', { name: '设计' });
+  expect(design).toBeEnabled();
+  expect(screen.getByRole('checkbox', { name: '开发' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: '测试' })).toBeChecked();
+  fireEvent.click(design);
+  expect(design).toBeChecked();
+});
+
+it('restores the hidden default type each time a product task form opens', async () => {
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '检查产品' }] } as unknown as ReturnType<typeof useApp>);
+  vi.mocked(productRepository.workItemTypes).mockResolvedValue([{ id: 'type-1', name: '默认需求', enabled: true, isDefault: true }] as never);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="requirement" productLineFilter="line-1" /></QueryClientProvider>);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    fireEvent.click(screen.getByRole('button', { name: '新建' }));
+    fireEvent.change(screen.getByPlaceholderText('例如：支持达梦DM8数据库读写分离与主备秒级切换'), { target: { value: '检查默认类型' } });
+    await waitFor(() => {
+      fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ }));
+      expect(screen.getByRole('alert')).toHaveTextContent('请选择关联产品的迭代版本');
+    });
+    expect(screen.queryByText('请选择产品任务类型')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '关闭面板' }));
+  }
+});
+
+it('offers an explicit type choice when the template has no default', async () => {
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '检查产品' }] } as unknown as ReturnType<typeof useApp>);
+  vi.mocked(productRepository.workItemTypes).mockResolvedValue([{ id: 'type-1', name: '手选需求', enabled: true }] as never);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="requirement" productLineFilter="line-1" /></QueryClientProvider>);
+  fireEvent.click(screen.getByRole('button', { name: '新建' }));
+  const label = await screen.findByText('任务类型', { selector: 'label' });
+  const typeItem = label.closest('.ant-form-item')!;
+  fireEvent.mouseDown(within(typeItem as HTMLElement).getByRole('combobox'));
+  fireEvent.click(await screen.findByText('手选需求', { selector: '.ant-select-item-option-content' }));
+  fireEvent.change(screen.getByPlaceholderText('例如：支持达梦DM8数据库读写分离与主备秒级切换'), { target: { value: '手选类型任务' } });
+  fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('请选择关联产品的迭代版本');
+});
+
+it('saves a new product task with the template default and preserves entered values on failure', async () => {
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '检查产品' }], versions: [{ id: 'version-1', name: '检查版本', productLineId: 'line-1' }] } as unknown as ReturnType<typeof useApp>);
+  vi.mocked(productRepository.workItemTypes).mockResolvedValue([{ id: 'type-1', name: '默认需求', enabled: true, isDefault: true }] as never);
+  vi.mocked(productRepository.createWorkItem).mockRejectedValueOnce(new Error('写入失败')).mockResolvedValue({} as never);
+  const onCreated = vi.fn();
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="requirement" creationContext={{ productLineId: 'line-1', versionId: 'version-1', assigneeName: '当前用户', title: '验收创建', onCreated }} /></QueryClientProvider>);
+  await screen.findByDisplayValue('验收创建');
+  const dates = screen.getAllByPlaceholderText('请选择日期');
+  for (const [index, value] of ['2026-10-16', '2026-10-17'].entries()) {
+    fireEvent.change(dates[index], { target: { value } });
+    fireEvent.keyDown(dates[index], { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(dates[index]);
+  }
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ })); });
+  await waitFor(() => expect(productRepository.createWorkItem).toHaveBeenCalledTimes(1));
+  expect(await screen.findByRole('alert')).toHaveTextContent('写入失败');
+  expect(screen.getByDisplayValue('验收创建')).toBeVisible();
+  const retrySave = screen.getByText('保 存').closest('button')!;
+  await waitFor(() => expect(retrySave).not.toHaveClass('ant-btn-loading'));
+  fireEvent.click(retrySave);
+  await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+  expect(productRepository.createWorkItem).toHaveBeenLastCalledWith(expect.objectContaining({ title: '验收创建', taskTypeId: 'type-1', needsCollaboration: ['dev', 'test'], plannedStartDate: '2026-10-16', plannedEndDate: '2026-10-17' }));
+});
+
+it('opens allocation and saves the downstream task with its source product task', async () => {
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '检查产品' }], versions: [{ id: 'version-1', name: '检查版本', productLineId: 'line-1' }] } as unknown as ReturnType<typeof useApp>);
+  vi.mocked(productRepository.workItemTypes).mockResolvedValue([{ id: 'type-dev', name: '默认研发', enabled: true, isDefault: true }] as never);
+  vi.mocked(productRepository.workItems).mockImplementation(async (_line, category) => ({ page: { items: category === 'requirement' ? [{ id: 'parent-1', title: '来源产品任务', category: 'requirement', productLineId: 'line-1', versionId: 'version-1', versionName: '检查版本', needsCollaboration: ['dev'] }] : [], total: category === 'requirement' ? 1 : 0 } }) as never);
+  vi.mocked(productRepository.createWorkItem).mockResolvedValue({} as never);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="dev" itemLabel="研发任务" /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('tab', { name: '待分配任务·1' }));
+  fireEvent.click(await screen.findByRole('button', { name: '分配任务' }));
+  await screen.findByRole('heading', { name: '新建研发任务' });
+  expect(screen.getByRole('button', { name: '关联任务 · 1' })).toBeVisible();
+  fireEvent.change(screen.getByPlaceholderText('例如：支持达梦DM8数据库读写分离与主备秒级切换'), { target: { value: '分配验收研发' } });
+  const ownerLabel = screen.getByText('负责人', { selector: 'label' });
+  fireEvent.mouseDown(within(ownerLabel.closest('.ant-form-item') as HTMLElement).getByRole('combobox'));
+  fireEvent.click(await screen.findByText(/^当前用户/, { selector: '.ant-select-item-option-content' }));
+  const dates = screen.getAllByPlaceholderText('请选择日期');
+  for (const [index, value] of ['2026-10-16', '2026-10-17'].entries()) {
+    fireEvent.change(dates[index], { target: { value } });
+    fireEvent.keyDown(dates[index], { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(dates[index]);
+  }
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ })); });
+  await waitFor(() => expect(productRepository.createWorkItem).toHaveBeenCalledWith(expect.objectContaining({ title: '分配验收研发', taskTypeId: 'type-dev', requirementId: 'parent-1', relatedTaskIds: ['parent-1'], versionId: 'version-1' })));
+  await waitFor(() => expect(screen.queryByRole('heading', { name: '新建研发任务' })).not.toBeInTheDocument());
+});
+
+it('selects and saves the version belonging to the chosen product when product names repeat or version names are stale', async () => {
+  vi.mocked(useApp).mockReturnValue({ ...useApp(), productLines: [{ id: 'line-1', name: '院校门户系统' }, { id: 'line-2', name: '院校门户系统' }], versions: [{ id: 'version-1', name: '正确迭代', productLineId: 'line-1', productLineName: '历史产品名' }, { id: 'version-2', name: '其他产品迭代', productLineId: 'line-2', productLineName: '院校门户系统' }] } as unknown as ReturnType<typeof useApp>);
+  vi.mocked(productRepository.workItemTypes).mockResolvedValue([{ id: 'type-1', name: '默认需求', enabled: true, isDefault: true }] as never);
+  vi.mocked(productRepository.createWorkItem).mockResolvedValue({} as never);
+  const onCreated = vi.fn();
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="requirement" creationContext={{ productLineId: 'line-1', assigneeName: '当前用户', title: '同名产品创建验收', onCreated }} /></QueryClientProvider>);
+  await screen.findByDisplayValue('同名产品创建验收');
+  const versionLabel = screen.getByText('迭代版本', { selector: 'label' });
+  fireEvent.mouseDown(within(versionLabel.closest('.ant-form-item') as HTMLElement).getByRole('combobox'));
+  const option = await screen.findByText('正确迭代', { selector: '.ant-select-item-option-content' });
+  expect(screen.queryByText('其他产品迭代', { selector: '.ant-select-item-option-content' })).not.toBeInTheDocument();
+  fireEvent.click(option);
+  const dates = screen.getAllByPlaceholderText('请选择日期');
+  for (const [index, value] of ['2026-10-16', '2026-10-17'].entries()) {
+    fireEvent.change(dates[index], { target: { value } });
+    fireEvent.keyDown(dates[index], { key: 'Enter', code: 'Enter' });
+    fireEvent.blur(dates[index]);
+  }
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ })); });
+  await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+  expect(productRepository.createWorkItem).toHaveBeenCalledWith(expect.objectContaining({ productLineId: 'line-1', versionId: 'version-1', title: '同名产品创建验收' }));
 });

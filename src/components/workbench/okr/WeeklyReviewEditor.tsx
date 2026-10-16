@@ -341,11 +341,11 @@ export function WeeklyReviewEditor({
   );
 
   const requestSubmit = () => {
+    if (supervisor) { setValidationErrors([]); setSubmitModalOpen(true); return; }
     const errors: string[] = reportTemplate.errors();
     if (!directSubmit && !reviewerName) {
       errors.push('尚未配置直属上级，无法确定审批人');
     }
-    if (supervisor) errors.push(...departmentSubmissionErrors(payload(), records, people, viewer?.id || ''));
     setValidationErrors(errors);
     if (errors.length === 0) setSubmitModalOpen(true);
   };
@@ -497,7 +497,17 @@ export function WeeklyReviewEditor({
             </Tag>
           </div>
           <div className="flex items-center gap-2.5">
-            {supervisor && <DepartmentReviewSettings payload={{ ...period, title: '', reviewType, departmentReviewExclusions: exclusions }} records={records} people={people} ownerId={viewer?.id || ''} disabled={busy || readOnly} loading={recordsLoading} error={recordsError} onRefresh={onRefreshRecords} onChange={rows => { setExclusions(rows); setValidationErrors([]); }}/>}
+            {supervisor && <DepartmentReviewSettings payload={{ ...period, title: '', reviewType, departmentReviewExclusions: exclusions }} records={records} people={people} ownerId={viewer?.id || ''} disabled={busy || readOnly} loading={recordsLoading} error={recordsError} onRefresh={onRefreshRecords} onChange={rows => { setExclusions(rows); setValidationErrors([]); }} submitOpen={submitModalOpen} onCloseSubmit={() => setSubmitModalOpen(false)} onSubmit={async rows => {
+              if (!editorState.editable || detachedTargets.length || recordsLoading || recordsError) return ['当前报告暂不可提交，请检查目标及员工复盘加载状态'];
+              const nextPayload = {...payload(),departmentReviewExclusions:rows};
+              const errors = reportTemplate.errors();
+              if (!directSubmit && !reviewerName) errors.push('尚未配置直属上级，无法确定审批人');
+              errors.push(...departmentSubmissionErrors(nextPayload,records,people,viewer?.id || ''));
+              setValidationErrors(errors);
+              if (errors.length) return errors;
+              setExclusions(rows);
+              return onSubmit(nextPayload);
+            }}/>}
             <Button onClick={onCancel}>
               取消
             </Button>
@@ -742,7 +752,7 @@ export function WeeklyReviewEditor({
 
       {(monthly || !reportTemplate.hasBlock('nextWeekPlan')) && <section className="okr-weekly-section" aria-label={monthly ? '部门反馈问题梳理与分析' : supervisor ? '部门下周计划' : '下周计划'}>
         <div className="okr-weekly-section-header okr-weekly-section-header-title text-sm font-semibold text-[var(--text-primary)]"><span className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" aria-hidden="true"/><span>{monthly ? '4. 部门反馈问题梳理与分析' : supervisor ? '4. 部门下周计划' : '3. 下周计划'}</span></div>
-        {monthly ? <><DepartmentFeedbackTable rows={feedbackRows} disabled={busy || readOnly || recordsLoading || Boolean(recordsError)} loading={recordsLoading} onChange={row => setFeedbackJudgments(current => [...current.filter(item => item.reviewId !== row.reviewId), row])}/>{readOnly && !feedbackRows.length && initialPayload?.suggestions && <p className="whitespace-pre-wrap break-words">{initialPayload.suggestions}</p>}</> : <Input.TextArea className="okr-weekly-plan-input" aria-label={supervisor ? '部门下周计划' : '下周计划'} value={nextWeekPlan} onChange={event => setNextWeekPlan(event.target.value)} rows={4} maxLength={10000} showCount placeholder="填写下周重点工作、预期结果与关键节点" disabled={busy || !editorState.editable}/>}
+        {monthly ? <><DepartmentFeedbackTable rows={feedbackRows} disabled={busy || readOnly || recordsLoading || Boolean(recordsError)} loading={!readOnly && recordsLoading} error={!readOnly && Boolean(recordsError)} onRetry={onRefreshRecords} onChange={row => setFeedbackJudgments(current => [...current.filter(item => item.reviewId !== row.reviewId), row])}/>{readOnly && !feedbackRows.length && initialPayload?.suggestions && <p className="whitespace-pre-wrap break-words">{initialPayload.suggestions}</p>}</> : <Input.TextArea className="okr-weekly-plan-input" aria-label={supervisor ? '部门下周计划' : '下周计划'} value={nextWeekPlan} onChange={event => setNextWeekPlan(event.target.value)} rows={4} maxLength={10000} showCount placeholder="填写下周重点工作、预期结果与关键节点" disabled={busy || !editorState.editable}/>}
       </section>}
 
       <section data-review-block="assistance" className="okr-weekly-section" aria-label="需要协助事项">
@@ -819,7 +829,7 @@ export function WeeklyReviewEditor({
 
       {/* 提交确认弹窗 (带中文界面及OKR系统进度同步勾选) */}
       <Modal
-        open={submitModalOpen}
+        open={submitModalOpen && !supervisor}
         title={monthly ? '确认提交部门月报' : '确认提交周报'}
         onCancel={() => setSubmitModalOpen(false)}
         okButtonProps={{ disabled: !editorState.editable || Boolean(detachedTargets.length) || (supervisor && (recordsLoading || Boolean(recordsError))) }}

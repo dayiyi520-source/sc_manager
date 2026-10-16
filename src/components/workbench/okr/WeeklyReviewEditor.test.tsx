@@ -146,7 +146,7 @@ describe('employee weekly personal progress', () => {
     render(<WeeklyReviewEditor {...props} onSaveDraft={save} viewer={{ id: 'me', name: '本人', department: '产品部' }} records={[]} okrs={[goal]} periodOverride={week} reviewerName="主管"/>);
     fireEvent.click(screen.getByText('我的计划：我的动作'));
     expect(screen.getByLabelText('KR子表进度更新')).toBeInTheDocument();
-    for (const heading of ['产品', '迭代版本', '达成阶段', '开始时间', '结束时间', '进度修改']) expect(screen.getByRole('columnheader', { name: heading })).toBeInTheDocument();
+    for (const heading of ['产品', '迭代版本', '阶段', '开始时间', '结束时间', '进度修改']) expect(screen.getByRole('columnheader', { name: heading })).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /师创云平台 V1.0.0 产品设计 2026-10-13 2026-10-16/ })).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /师创云平台 V1.1.0 测试 2026-10-17 2026-10-20/ })).toBeInTheDocument();
     expect(screen.getAllByText(/当前进度/)).toHaveLength(2);

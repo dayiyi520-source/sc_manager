@@ -9,6 +9,18 @@ const draft: OkrRecord = { id: 'old-draft', kind: 'review', ownerId: 'me', statu
 const props = { records: [] as OkrRecord[], objectives: [], ownerId: 'me', settings, onRetry: vi.fn(), onOpen: vi.fn(), onViewAll: vi.fn(), onViewReview: vi.fn() };
 
 describe('review landing interactions', () => {
+  it('blocks entry and does not show empty submission history after record or personnel reading fails', () => {
+    const { rerender } = render(<ReviewLanding {...props} error={new Error('无法连接复盘数据服务')}/>);
+    expect(screen.getByRole('button', { name: '写周报' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '写月报' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /可补交的/ })).toBeDisabled();
+    expect(screen.getByText('最近提交加载失败')).toBeInTheDocument();
+    expect(screen.queryByText('暂无已提交的复盘')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /重\s*试/ }));
+    expect(props.onRetry).toHaveBeenCalledOnce();
+    rerender(<ReviewLanding {...props}/>);
+    expect(screen.getByRole('button', { name: '写月报' })).toBeEnabled();
+  });
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-12T12:00:00')); vi.clearAllMocks(); });
   afterEach(() => vi.useRealTimers());
   it('opens the configured custom week and shows its due notification', () => {

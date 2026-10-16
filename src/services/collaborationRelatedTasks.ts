@@ -33,13 +33,15 @@ export function collaborationRelatedTasks(requirementId: string, direct: Require
 
 export async function loadCollaborationRelatedTasks(requirementId: string, direct: RequirementWorkItem[], productLineIds: string[]) {
   const groups = await Promise.all([...new Set(productLineIds)].map(async (id) => {
-    const items: UnifiedWorkItem[] = [];
+    const items = new Map<string, UnifiedWorkItem>();
     for (let page = 1; ; page++) {
       const result = await productRepository.workItems(id, '', '', { page });
-      items.push(...result.page.items);
-      if (!result.page.items.length || items.length >= result.page.total) break;
+      const previousSize = items.size;
+      result.page.items.forEach(item => items.set(item.id, item));
+      if (items.size >= result.page.total) break;
+      if (!result.page.items.length || items.size === previousSize) throw new Error('关联任务分页数据不完整，请重试');
     }
-    return items;
+    return [...items.values()];
   }));
   return collaborationRelatedTasks(requirementId, direct, groups.flat());
 }
