@@ -295,10 +295,17 @@ it('locks the initialized O template title and commitment type without an import
   expect(screen.queryByRole('button', { name: '导入O模板' })).not.toBeInTheDocument();
   expect(ref.current?.snapshot()).toMatchObject({ title: '协作提升', objectiveType: 'target', objectiveTitleTemplateId: 'title-support' });
 });
-it('does not render a delete control for the personal single plan', () => {
- render(<ObjectiveForm {...common} ownerId="employee" ownerName="员工" root={false} goalLevel="个人级" initialPayload={{goalModelVersion:2,goalLevel:'personal',origin:'autonomous',title:'本人工作'}} onSave={vi.fn()}/>);
+it.each(['assigned', 'autonomous'] as const)('does not offer batch removal for a personal %s goal', origin => {
+ const onRemove = vi.fn();
+ render(<ObjectiveForm {...common} ownerId="employee" ownerName="员工" root={false} goalLevel="个人级" objectiveIndex={1} onRemove={onRemove} initialPayload={{goalModelVersion:2,goalLevel:'personal',origin,title:'本人工作'}} onSave={vi.fn()}/>);
  expect(screen.getByLabelText('计划动作内容')).toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'删除计划动作'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'删除新增目标 O2'})).not.toBeInTheDocument();
+ expect(onRemove).not.toHaveBeenCalled();
+});
+it('keeps batch removal available for department goals', () => {
+ render(<ObjectiveForm {...common} ownerId="manager" ownerName="主管" root={false} goalLevel="部门级" objectiveIndex={1} onRemove={vi.fn()} initialPayload={{goalModelVersion:2,goalLevel:'department',origin:'autonomous',title:'部门目标'}} onSave={vi.fn()}/>);
+ expect(screen.getByRole('button',{name:'删除新增目标 O2'})).toBeInTheDocument();
 });
 
 it('submits a new supervisor own-personal target with one action and self ownership', async () => {
