@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canEditOkr, canUpdateOkrSettings, confirmationReviewer, defaultConfirmation, effectiveReviewer, hasOkrPermission, isOkrAdmin, normalizedPolicy, canViewPending, reconcileConfirmationRequests } from './okrSettingsPolicy';
+import { replaceOkrAdministrator, OKR_PERMISSIONS, canEditOkr, canUpdateOkrSettings, confirmationReviewer, defaultConfirmation, effectiveReviewer, hasOkrPermission, isOkrAdmin, normalizedPolicy, canViewPending, reconcileConfirmationRequests } from './okrSettingsPolicy';
 import { confirmationMembers, confirmationRequests } from '../components/workbench/okr/goalConfirmation';
 import { mutateOkrLifecycle } from './mockOkrLifecycle';
 import { ownerGoalLevel } from './okrGoalRules';
@@ -13,16 +13,16 @@ const people: OkrPerson[] = [
 const base = (): OkrSettings => normalizedPolicy({defaultView:'list',timeRules:[],validation:{actionWeightTotal:100,maxActions:8,assigneeMultiple:true,keyNodeMultiple:true,resultRequired:true},dictionaries:{productNodes:[],deliveryNodes:[],presalesNodes:[],supportTypes:[]},templates:[],administratorIds:['admin'],supervisorIds:['manager'],confirmation:defaultConfirmation()},people);
 const pending: OkrRecord = {id:'request',kind:'objective',ownerId:'employee',periodKey:'2026-10',status:'active',version:2,payload:{title:'原目标',goalModelVersion:2,goalLevel:'personal',origin:'autonomous',objectiveType:'challenge',weight:100,deadline:'2026-10-31',keyResults:[{id:'kr',title:'KR',weight:100,progress:0,deadline:'2026-10-31',executionActions:[{id:'a',ownerId:'employee',title:'执行动作',progress:0}]}]},changeRequest:{id:'change',status:'pending',purpose:'update',reason:'调整',reviewerId:'manager',payload:{title:'新目标',goalModelVersion:2,goalLevel:'personal',origin:'autonomous',objectiveType:'challenge',weight:100,deadline:'2026-10-31',keyResults:[{id:'kr',title:'KR',weight:100,progress:0,deadline:'2026-10-31',executionActions:[{id:'a',ownerId:'employee',title:'执行动作',progress:0}]}]},baseVersion:1,requestedAt:'2026-10-01'}};
 describe('OKR permission grants and effective reviewers',()=>{
- it('defaults administrator and sub-administrator roles to six individually revocable grants',()=>{
+ it('fixes administrator grants and defaults new sub-administrators to empty',()=>{
   const config=base();
   config.administratorIds=['admin','employee'];
   config.subAdministratorIds=['sub'];
   const normalized=normalizedPolicy(config,people);
   expect(normalized.permissionGrants?.admin).toHaveLength(6);
   expect(normalized.permissionGrants?.employee).toHaveLength(6);
-  expect(normalized.permissionGrants?.sub).toHaveLength(6);
+  expect(normalized.permissionGrants?.sub).toEqual([]);
   normalized.permissionGrants!.employee=normalized.permissionGrants!.employee.filter(p=>p!=='companyGoalEdit');
-  expect(hasOkrPermission('employee','companyGoalEdit',normalized,people)).toBe(false);
+  expect(hasOkrPermission('employee','companyGoalEdit',normalized,people)).toBe(true);
  });
  it('keeps company edit and personal edit as independent capabilities',()=>{
   const config=normalizedPolicy({...base(),administratorIds:['admin','employee']},people);
@@ -31,7 +31,7 @@ describe('OKR permission grants and effective reviewers',()=>{
   expect(canEditOkr(company,'employee',config,people)).toBe(true);
   expect(canEditOkr(own,'employee',config,people)).toBe(true);
   config.permissionGrants!.employee=config.permissionGrants!.employee.filter(permission=>permission!=='companyGoalEdit');
-  expect(canEditOkr(company,'employee',config,people)).toBe(false);
+  expect(canEditOkr(company,'employee',config,people)).toBe(true);
   expect(canEditOkr(own,'employee',config,people)).toBe(true);
   expect(isOkrAdmin('employee',config,people)).toBe(true);
   expect(ownerGoalLevel(people[0],own.payload)).toBe('个人级');
@@ -49,12 +49,19 @@ describe('OKR permission grants and effective reviewers',()=>{
   expect(migrated.permissionGrants?.employee).toHaveLength(6);
   expect(normalizedPolicy(migrated,people)).toEqual(migrated);
  });
- it('rejects company creation after revocation while allowing the root owner personal drafts',()=>{
+ it('keeps company creation available to administrators and rejects new personal drafts',()=>{
   const config=base();config.permissionGrants!.admin=[];
-  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'公司目标',goalModelVersion:2,goalLevel:'company'}},[],people,config)).toThrow('无公司级目标权限');
-  const draft=mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'个人目标',goalModelVersion:2,goalLevel:'personal',origin:'autonomous'}},[],people,config)!;
-  expect(draft.records[0].payload.goalLevel).toBe('personal');
-  expect(canEditOkr(draft.records[0],'admin',config,people)).toBe(true);
+  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'公司目标',goalModelVersion:2,goalLevel:'company'}},[],people,config)).not.toThrow();
+  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'个人目标',goalModelVersion:2,goalLevel:'personal',origin:'autonomous'}},[],people,config)).toThrow('无需填写个人目标');
+ });
+ it('replaces an administrator without changing other roles and rejects invalid replacements',()=>{
+  const config={...base(),subAdministratorIds:['sub'],permissionGrants:{admin:OKR_PERMISSIONS,sub:['companyGoalEdit' as const]}};
+  const next=replaceOkrAdministrator(config,people,'admin','sub');
+  expect(next.administratorIds).toEqual(['sub']);expect(next.subAdministratorIds).toEqual([]);
+  expect(next.permissionGrants?.sub).toEqual(OKR_PERMISSIONS);expect(next.permissionGrants?.admin).toBeUndefined();
+  expect(config.administratorIds).toEqual(['admin']);
+  expect(()=>replaceOkrAdministrator(config,people,'admin','admin')).toThrow('其他');
+  expect(()=>replaceOkrAdministrator(config,people,'admin','missing')).toThrow('已失效');
  });
  it('uses effective reviewer after supervisor reassignment for lists and visibility',()=>{
   const config=base();config.confirmation!.visiblePending=false;

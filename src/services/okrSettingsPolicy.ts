@@ -11,8 +11,8 @@ export function normalizedPolicy(settings: OkrSettings, people: OkrPerson[] = []
   const legacyEditors = settings.confirmation?.companyEditorIds || [];
   const subAdministrators = [...new Set([...(settings.subAdministratorIds || []), ...legacyEditors.filter(id => !administrators.includes(id))])];
   const grants = { ...settings.permissionGrants };
-  for (const id of administrators) if (!Object.hasOwn(grants, id)) grants[id] = [...OKR_PERMISSIONS];
-  for (const id of settings.subAdministratorIds || []) if (!Object.hasOwn(grants, id)) grants[id] = [...OKR_PERMISSIONS];
+  for (const id of administrators) grants[id] = [...OKR_PERMISSIONS];
+  for (const id of settings.subAdministratorIds || []) if (!Object.hasOwn(grants, id)) grants[id] = [];
   for (const id of legacyEditors) if (!Object.hasOwn(grants,id)) grants[id] = ['companyGoalEdit'];
   const confirmation = {...defaultConfirmation(),...settings.confirmation} as OkrConfirmationSettings;
   delete confirmation.companyEditorIds;
@@ -77,6 +77,7 @@ export function confirmationReviewer(owner: OkrPerson, action: 'create'|'update'
   return administrator;
 }
 export function validatePolicy(settings: OkrSettings, people: OkrPerson[], previous?: OkrSettings) {
+  if (previous?.administratorIds && (settings.administratorIds?.length !== previous.administratorIds.length || new Set(settings.administratorIds).size !== settings.administratorIds.length)) return '管理员仅支持更换，不可新增或移除';
   const templateError = validateReviewTemplates(settings.reviewReportTemplates || [], previous?.reviewReportTemplates || []);
   if (templateError) return templateError;
   const cycleError = validateWeeklyCycles(settings.weeklyReviewCycles || [], previous?.weeklyReviewCycles || settings.weeklyReviewCycles || []);
@@ -96,4 +97,15 @@ export function validatePolicy(settings: OkrSettings, people: OkrPerson[], previ
     for (const type of cycles.types) { const schedule = cycles.schedules[type]; if (!schedule || !Number.isInteger(schedule.daysBefore) || schedule.daysBefore<0 || schedule.daysBefore>31 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(schedule.time)) return '周期创建时间无效'; }
   }
   return undefined;
+}
+
+/** Replace a single administrator without changing employee identity or goal ownership. */
+export function replaceOkrAdministrator(settings: OkrSettings, people: OkrPerson[], previousId: string, nextId: string): OkrSettings {
+  if (!settings.administratorIds?.includes(previousId)) throw new Error('原管理员已变化，请刷新后重试');
+  if (previousId === nextId || settings.administratorIds.includes(nextId)) throw new Error('请选择其他非管理员成员');
+  if (!people.some(person => person.id === nextId)) throw new Error('所选成员已失效，请重新选择');
+  const grants = { ...settings.permissionGrants };
+  delete grants[previousId];
+  grants[nextId] = [...OKR_PERMISSIONS];
+  return { ...settings, administratorIds: settings.administratorIds.map(id => id === previousId ? nextId : id), subAdministratorIds: (settings.subAdministratorIds || []).filter(id => id !== nextId), permissionGrants: grants };
 }

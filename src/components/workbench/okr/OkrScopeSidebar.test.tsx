@@ -11,20 +11,19 @@ const people: OkrPerson[] = [
 ];
 
 describe('OkrScopeSidebar', () => {
-  it('keeps root personal creation available alongside company creation', () => {
+  it('only offers company creation for administrators', () => {
     const add=vi.fn();
     render(<OkrScopeSidebar people={people} currentUserId="boss" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={add}/>);
-    fireEvent.click(screen.getByRole('button',{name:'添加我的目标'}));
-    expect(add).toHaveBeenLastCalledWith('personal');
+    expect(screen.queryByRole('button',{name:'添加我的目标'})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'添加目标'}));
     expect(add).toHaveBeenLastCalledWith('company');
   });
-  it('keeps the root personal entry enabled after company permission is revoked', () => {
+  it('restores fixed administrator company permissions despite empty stored grants', () => {
     const add=vi.fn();
     const settings={administratorIds:['boss'],permissionGrants:{boss:[]}} as unknown as OkrSettings;
     render(<OkrScopeSidebar settings={settings} people={people} currentUserId="boss" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={add}/>);
     fireEvent.click(screen.getByRole('button',{name:'添加目标'}));
-    expect(add).toHaveBeenCalledWith('personal');
+    expect(add).toHaveBeenCalledWith('company');
   });
   it('provides direct department and company target scopes without member entries', () => {
     const groups = buildOkrScopeGroups(people, 'manager');

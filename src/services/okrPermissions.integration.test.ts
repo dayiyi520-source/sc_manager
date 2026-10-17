@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockApiRequest } from './mockApi';
-import { defaultConfirmation, normalizedPolicy } from './okrSettingsPolicy';
+import { defaultConfirmation, normalizedPolicy, replaceOkrAdministrator, OKR_PERMISSIONS } from './okrSettingsPolicy';
 import type { OkrPerson, OkrRecord, OkrSettings } from './okrRepository';
 
 const people = vi.hoisted((): OkrPerson[] => [
@@ -25,7 +25,7 @@ describe('OKR permissions through the persisted mock API',()=>{
   it('persists sub-administrator defaults and revocation, and rejects writes beyond grants',async()=>{
     await save({...await readSettings(),subAdministratorIds:['employee']});
     const granted=await readSettings();
-    expect(granted.permissionGrants?.employee).toHaveLength(6);
+    expect(granted.permissionGrants?.employee).toEqual([]);
     await save({...granted,permissionGrants:{...granted.permissionGrants,employee:[]}});
     const revoked=await readSettings();
     expect(revoked.permissionGrants?.employee).toEqual([]);
@@ -33,6 +33,21 @@ describe('OKR permissions through the persisted mock API',()=>{
     await expect(save({...revoked,defaultView:'card'},'employee')).rejects.toThrow('无保存权限');
     expect(localStorage.getItem(prefix+'okrSettings')).toBe(before);
     await expect(save(granted)).rejects.toThrow('配置已更新');
+  });
+  it('persists administrator replacement, transfers fixed grants and rejects stale or unauthorized writes', async () => {
+    const before = await readSettings();
+    await save(replaceOkrAdministrator(before, people, 'admin', 'employee'));
+    const after = await readSettings();
+    expect(after.administratorIds).toEqual(['employee']);
+    expect(after.permissionGrants?.employee).toEqual(OKR_PERMISSIONS);
+    expect(after.permissionGrants?.admin).toBeUndefined();
+    expect(after.supervisorIds).toEqual(before.supervisorIds);
+    const stored = localStorage.getItem(prefix+'okrSettings');
+    await expect(save({...after, defaultView:'card'}, 'admin')).rejects.toThrow('无保存权限');
+    await expect(save(before, 'employee')).rejects.toThrow('配置已更新');
+    expect(localStorage.getItem(prefix+'okrSettings')).toBe(stored);
+    await save({...after, defaultView:'card'}, 'employee');
+    expect((await readSettings()).defaultView).toBe('card');
   });
   it('reassigns pending requests on rule changes and rejects the old reviewer',async()=>{
     const config=await readSettings();

@@ -1,5 +1,5 @@
 {
-  "revision": 57,
+  "revision": 84,
   "okrRecords": [
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
@@ -1032,7 +1032,7 @@
       "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
       "periodKey": "2026-10",
       "status": "deleted",
-      "createdAt": "2026-10-13T01:09:45.410Z",
+      "createdAt": "2026-10-13T01:09:45.41Z",
       "version": 5,
       "payload": {
         "goalModelVersion": 2,
@@ -1509,9 +1509,9 @@
       "kind": "objective",
       "ownerId": "user-product",
       "periodKey": "2026-10",
-      "status": "active",
+      "status": "deleted",
       "createdAt": "2026-10-13T07:55:03.222Z",
-      "version": 16,
+      "version": 18,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "department",
@@ -1560,7 +1560,7 @@
                 "plannedEndDate": "2026-10-31",
                 "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
                 "assigneeIds": [
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ]
               },
               {
@@ -1584,7 +1584,7 @@
                 "plannedEndDate": "2026-10-22",
                 "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
                 "assigneeIds": [
-                  "user-product-member",
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                   "user-product"
                 ]
               }
@@ -1594,7 +1594,7 @@
             "stage": "产品设计",
             "assigneeIds": [
               "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
-              "user-product-member",
+              "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
               "558f155c-51ed-4802-8a85-e3c64a31a422",
               "user-product"
             ],
@@ -1694,7 +1694,7 @@
               "assigneeIds": [
                 "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
                 "user-product",
-                "user-product-member"
+                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
               ],
               "executionActions": [],
               "plannedDeadline": "2026-10-31"
@@ -1774,7 +1774,7 @@
                   "plannedEndDate": "2026-10-31",
                   "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
                   "assigneeIds": [
-                    "user-product-member"
+                    "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                   ]
                 },
                 {
@@ -1798,7 +1798,7 @@
                   "plannedEndDate": "2026-10-22",
                   "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
                   "assigneeIds": [
-                    "user-product-member",
+                    "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                     "user-product"
                   ]
                 }
@@ -1808,7 +1808,7 @@
               "stage": "产品设计",
               "assigneeIds": [
                 "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
-                "user-product-member",
+                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "558f155c-51ed-4802-8a85-e3c64a31a422",
                 "user-product"
               ],
@@ -2476,7 +2476,7 @@
                 "details": [
                   {
                     "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                    "name": "师创云���������台",
+                    "name": "师创云��������������台",
                     "version": "V1.1.0",
                     "stage": "产品设计",
                     "plannedStartDate": "2026-10-14",
@@ -2595,7 +2595,7 @@
                 "assigneeIds": [
                   "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
                   "user-product",
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ],
                 "executionActions": [],
                 "plannedDeadline": "2026-10-31"
@@ -2689,7 +2689,7 @@
                 "assigneeIds": [
                   "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
                   "user-product",
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ],
                 "executionActions": [],
                 "plannedDeadline": "2026-10-31"
@@ -2791,7 +2791,7 @@
                 "assigneeIds": [
                   "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
                   "user-product",
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ],
                 "executionActions": [],
                 "plannedDeadline": "2026-10-31"
@@ -2894,7 +2894,7 @@
                 "assigneeIds": [
                   "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
                   "user-product",
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ],
                 "executionActions": [],
                 "plannedDeadline": "2026-10-31"
@@ -2974,7 +2974,7 @@
                     "plannedEndDate": "2026-10-31",
                     "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
                     "assigneeIds": [
-                      "user-product-member"
+                      "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                     ]
                   },
                   {
@@ -2998,7 +2998,7 @@
                     "plannedEndDate": "2026-10-22",
                     "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
                     "assigneeIds": [
-                      "user-product-member",
+                      "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                       "user-product"
                     ]
                   }
@@ -3008,7 +3008,7 @@
                 "stage": "产品设计",
                 "assigneeIds": [
                   "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
-                  "user-product-member",
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                   "558f155c-51ed-4802-8a85-e3c64a31a422",
                   "user-product"
                 ],
@@ -3138,7 +3138,7 @@
           "goalLevel": "personal",
           "origin": "assigned",
           "inherited": false,
-          "title": "师创云平台 · 师创云平����� / V1.1.0 · 产品设计；师创云平台 / V1.2.0 · 产品设计；师创云平台 / V1.0.0 · 产品设计",
+          "title": "师创云平台 · 师创云平������� / V1.1.0 · 产品设计；师创云平台 / V1.2.0 · 产品设计；师创云平台 / V1.0.0 · 产品设计",
           "sourceTitle": "师创云平台 · 师创云平台 / V1.1.0 · 产品设计；师创云平台 / V1.2.0 · 产品设计；师创云平台 / V1.0.0 · 产品设计",
           "sourceObjectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
           "sourceKrId": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
@@ -3297,7 +3297,7 @@
         },
         "baseVersion": 5,
         "requestedAt": "2026-10-14T05:48:51.606Z",
-        "reviewedAt": "2026-10-14T06:01:18.310Z",
+        "reviewedAt": "2026-10-14T06:01:18.31Z",
         "feedback": ""
       },
       "changeHistory": [
@@ -3539,7 +3539,7 @@
           },
           "baseVersion": 5,
           "requestedAt": "2026-10-14T05:48:51.606Z",
-          "reviewedAt": "2026-10-14T06:01:18.310Z",
+          "reviewedAt": "2026-10-14T06:01:18.31Z",
           "feedback": ""
         }
       ]
@@ -3672,7 +3672,7 @@
       "periodKey": "2026-10",
       "status": "deleted",
       "createdAt": "2026-10-12T14:12:08.268Z",
-      "version": 4,
+      "version": 5,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "department",
@@ -3712,7 +3712,7 @@
             "version": "V1.0.0",
             "stage": "需求设计",
             "assigneeIds": [
-              "user-product-member",
+              "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
               "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
             ],
             "plannedDeadline": "2026-10-20"
@@ -3737,7 +3737,7 @@
             "version": "1.0.0",
             "stage": "UI设计",
             "assigneeIds": [
-              "user-product-member",
+              "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
               "user-product"
             ],
             "executionActions": [
@@ -3804,7 +3804,7 @@
               "version": "V1.0.0",
               "stage": "需求设计",
               "assigneeIds": [
-                "user-product-member",
+                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
               ]
             },
@@ -3828,7 +3828,7 @@
               "version": "1.0.0",
               "stage": "UI设计",
               "assigneeIds": [
-                "user-product-member",
+                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "user-product"
               ],
               "executionActions": [
@@ -3848,7 +3848,7 @@
           "note": ""
         },
         "baseVersion": 2,
-        "requestedAt": "2026-10-12T14:14:20.890Z",
+        "requestedAt": "2026-10-12T14:14:20.89Z",
         "reviewedAt": "2026-10-12T14:21:33.893Z",
         "feedback": ""
       },
@@ -3898,7 +3898,7 @@
                 "version": "V1.0.0",
                 "stage": "需求设计",
                 "assigneeIds": [
-                  "user-product-member",
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                   "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a"
                 ]
               },
@@ -3922,7 +3922,7 @@
                 "version": "1.0.0",
                 "stage": "UI设计",
                 "assigneeIds": [
-                  "user-product-member",
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                   "user-product"
                 ],
                 "executionActions": [
@@ -3942,7 +3942,7 @@
             "note": ""
           },
           "baseVersion": 2,
-          "requestedAt": "2026-10-12T14:14:20.890Z",
+          "requestedAt": "2026-10-12T14:14:20.89Z",
           "reviewedAt": "2026-10-12T14:21:33.893Z",
           "feedback": ""
         }
@@ -3951,11 +3951,11 @@
     {
       "id": "46fcc434-f2da-4a36-a2fc-66e10d91aa78",
       "kind": "objective",
-      "ownerId": "user-product-member",
+      "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
       "periodKey": "2026-10",
       "status": "deleted",
       "createdAt": "2026-10-13T13:18:34.727Z",
-      "version": 1,
+      "version": 2,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "personal",
@@ -3995,13 +3995,13 @@
             "version": "V1.0.0",
             "stage": "需求设计",
             "assigneeIds": [
-              "user-product-member"
+              "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
             ],
             "plannedDeadline": "2026-10-20",
             "executionActions": [
               {
                 "id": "b9716648-7d58-44f9-9ac8-2da0f72ed34d",
-                "ownerId": "user-product-member",
+                "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "title": "测试1",
                 "weight": 100,
                 "progress": 0
@@ -4017,11 +4017,11 @@
     {
       "id": "ead7c948-26df-4f1e-b8eb-3298d940711d",
       "kind": "objective",
-      "ownerId": "user-product-member",
+      "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
       "periodKey": "2026-10",
       "status": "deleted",
       "createdAt": "2026-10-13T13:18:34.853Z",
-      "version": 1,
+      "version": 2,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "personal",
@@ -4061,12 +4061,12 @@
             "version": "1.0.0",
             "stage": "UI设计",
             "assigneeIds": [
-              "user-product-member"
+              "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
             ],
             "executionActions": [
               {
                 "id": "53ae0cc7-5006-4a1b-bdc6-3aaed8c4d36d",
-                "ownerId": "user-product-member",
+                "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "title": "测试2",
                 "weight": 100,
                 "progress": 0
@@ -4083,11 +4083,11 @@
     {
       "id": "5be88232-9532-4a2a-ac2f-ec5d29a4f1a7",
       "kind": "objective",
-      "ownerId": "user-product-member",
+      "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
       "periodKey": "2026-10",
-      "status": "active",
+      "status": "deleted",
       "createdAt": "2026-10-14T14:41:43.581Z",
-      "version": 4,
+      "version": 6,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "personal",
@@ -4097,7 +4097,7 @@
         "sourceTitle": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
         "sourceObjectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
         "sourceKrId": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
-        "sourceVersion": 16,
+        "sourceVersion": 17,
         "alignments": [
           {
             "parentObjectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
@@ -4124,7 +4124,7 @@
                 "plannedEndDate": "2026-10-31",
                 "productLineId": "72685385-263d-40f5-b90e-55f815f71a83",
                 "assigneeIds": [
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ]
               },
               {
@@ -4136,7 +4136,7 @@
                 "plannedEndDate": "2026-10-22",
                 "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e",
                 "assigneeIds": [
-                  "user-product-member",
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                   "user-product"
                 ]
               }
@@ -4145,12 +4145,12 @@
             "version": "V1.1.0",
             "stage": "产品设计",
             "assigneeIds": [
-              "user-product-member"
+              "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
             ],
             "executionActions": [
               {
                 "id": "f18ab179-30c6-4177-8a6d-8229a7bf8ff2",
-                "ownerId": "user-product-member",
+                "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "title": "师创内部管理后台产研、协同、目标总结模块设计",
                 "weight": 100,
                 "progress": 0,
@@ -4232,12 +4232,12 @@
               "version": "V1.1.0",
               "stage": "产品设计",
               "assigneeIds": [
-                "user-product-member"
+                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
               ],
               "executionActions": [
                 {
                   "id": "f18ab179-30c6-4177-8a6d-8229a7bf8ff2",
-                  "ownerId": "user-product-member",
+                  "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                   "title": "师创内部管理后台产研、协同、目标总结模块设计",
                   "weight": 100,
                   "progress": 0,
@@ -4319,12 +4319,12 @@
                 "version": "V1.1.0",
                 "stage": "产品设计",
                 "assigneeIds": [
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ],
                 "executionActions": [
                   {
                     "id": "f18ab179-30c6-4177-8a6d-8229a7bf8ff2",
-                    "ownerId": "user-product-member",
+                    "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                     "title": "师创内部管理后台产研、协同、目标总结模块设计",
                     "weight": 100,
                     "progress": 0,
@@ -4348,10 +4348,10 @@
     {
       "id": "okr-1791989533407-muhdw",
       "kind": "review",
-      "ownerId": "user-product-member",
+      "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
       "periodKey": "2026-10-12/2026-10-18",
       "status": "draft",
-      "version": 0,
+      "version": 1,
       "createdAt": "2026-10-14T14:52:13.407Z",
       "payload": {
         "title": "[周报] 2026年第 41 周 (10.12 - 10.18)",
@@ -4517,10 +4517,10 @@
     {
       "id": "okr-1791989658957-29z7x",
       "kind": "review",
-      "ownerId": "user-product-member",
+      "ownerId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
       "periodKey": "2026-10-01/2026-10-31",
       "status": "submitted",
-      "version": 1,
+      "version": 2,
       "createdAt": "2026-10-14T14:54:18.957Z",
       "payload": {
         "title": "[月报] 2026年10月复盘",
@@ -4766,9 +4766,9 @@
       "kind": "objective",
       "ownerId": "user-admin",
       "periodKey": "2026-10",
-      "status": "active",
+      "status": "deleted",
       "createdAt": "2026-10-12T15:31:15.223Z",
-      "version": 1,
+      "version": 2,
       "payload": {
         "title": "验收目标：列表边界与卡片单行省略展示，这是一条用于验证长标题不会换行的目标内容",
         "goalModelVersion": 2,
@@ -4921,7 +4921,7 @@
       "periodKey": "2026-10-12/2026-10-18",
       "status": "submitted",
       "version": 1,
-      "createdAt": "2026-10-15T01:59:04.420Z",
+      "createdAt": "2026-10-15T01:59:04.42Z",
       "payload": {
         "title": "[周报] 2026年第 41 周 (10.12 - 10.18)",
         "startDate": "2026-10-12",
@@ -5153,7 +5153,7 @@
       "ownerId": "user-product",
       "periodKey": "2026-10-12/2026-10-18",
       "status": "draft",
-      "version": 1,
+      "version": 2,
       "createdAt": "2026-10-15T02:20:39.228Z",
       "payload": {
         "title": "2026年第 41 周 (10.12 - 10.18)—产品规划部",
@@ -5242,7 +5242,7 @@
                 "submitted": true
               },
               {
-                "authorId": "user-product-member",
+                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "authorName": "毛景强",
                 "detailId": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
                 "previousProgress": 0,
@@ -5250,7 +5250,7 @@
                 "submitted": false
               },
               {
-                "authorId": "user-product-member",
+                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "authorName": "毛景强",
                 "detailId": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
                 "previousProgress": 0,
@@ -5258,7 +5258,7 @@
                 "submitted": false
               },
               {
-                "authorId": "user-product-member",
+                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "authorName": "毛景强",
                 "detailId": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
                 "previousProgress": 0,
@@ -5738,7 +5738,7 @@
       "ownerId": "user-product",
       "periodKey": "2026-10-01/2026-10-31",
       "status": "draft",
-      "version": 0,
+      "version": 1,
       "createdAt": "2026-10-15T02:29:58.424Z",
       "payload": {
         "title": "2026年第10月 部门月报-产品规划部",
@@ -5815,7 +5815,7 @@
                 "submitted": false
               },
               {
-                "authorId": "user-product-member",
+                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "authorName": "毛景强",
                 "detailId": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
                 "previousProgress": 0,
@@ -5823,7 +5823,7 @@
                 "submitted": true
               },
               {
-                "authorId": "user-product-member",
+                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "authorName": "毛景强",
                 "detailId": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
                 "previousProgress": 0,
@@ -5831,7 +5831,7 @@
                 "submitted": true
               },
               {
-                "authorId": "user-product-member",
+                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "authorName": "毛景强",
                 "detailId": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
                 "previousProgress": 0,
@@ -5860,9 +5860,9 @@
             "employeeReviewSnapshots": [
               {
                 "id": "okr-1791989658957-29z7x",
-                "authorId": "user-product-member",
+                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
                 "authorName": "毛景强",
-                "title": "[月报] 2026年10月复盘",
+                "title": "[��报] 2026年10���复盘",
                 "startDate": "2026-10-01",
                 "endDate": "2026-10-31",
                 "status": "submitted",
@@ -6003,7 +6003,7 @@
         "departmentContentSnapshots": [
           {
             "id": "okr-1791989658957-29z7x",
-            "authorId": "user-product-member",
+            "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
             "authorName": "毛景强",
             "title": "[月报] 2026年10月复盘",
             "startDate": "2026-10-01",
@@ -6371,9 +6371,9 @@
       "kind": "objective",
       "ownerId": "user-product",
       "periodKey": "2026-10",
-      "status": "active",
+      "status": "deleted",
       "createdAt": "2026-10-16T14:40:26.036Z",
-      "version": 1,
+      "version": 2,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "department",
@@ -6535,9 +6535,9 @@
       "kind": "objective",
       "ownerId": "user-product",
       "periodKey": "2026-10",
-      "status": "active",
+      "status": "deleted",
       "createdAt": "2026-10-16T14:40:26.306Z",
-      "version": 1,
+      "version": 3,
       "payload": {
         "goalModelVersion": 2,
         "goalLevel": "department",
@@ -6572,12 +6572,12 @@
                 "currentStage": "系统部署",
                 "targetStage": "试运行",
                 "assigneeIds": [
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ]
               }
             ],
             "assigneeIds": [
-              "user-product-member"
+              "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
             ],
             "businessObject": "智慧校园一体化平台建设项目",
             "version": "院校门户系统",
@@ -6634,12 +6634,12 @@
                   "currentStage": "系统部署",
                   "targetStage": "试运行",
                   "assigneeIds": [
-                    "user-product-member"
+                    "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                   ]
                 }
               ],
               "assigneeIds": [
-                "user-product-member"
+                "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
               ],
               "businessObject": "智慧校园一体化平台建设项目",
               "version": "院校门户系统"
@@ -6700,12 +6700,12 @@
                     "currentStage": "系统部署",
                     "targetStage": "试运行",
                     "assigneeIds": [
-                      "user-product-member"
+                      "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                     ]
                   }
                 ],
                 "assigneeIds": [
-                  "user-product-member"
+                  "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
                 ],
                 "businessObject": "智慧校园一体化平台建设项目",
                 "version": "院校门户系统"
@@ -7190,7 +7190,7 @@
       "selfSupervisor": "auto",
       "exemptIds": []
     },
-    "version": 32,
+    "version": 51,
     "objectiveTitleTemplates": [
       {
         "id": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
@@ -7572,7 +7572,10 @@
         "allowBackfill": true
       }
     ],
-    "subAdministratorIds": [],
+    "subAdministratorIds": [
+      "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+      "user-product"
+    ],
     "permissionGrants": {
       "user-admin": [
         "okrTemplates",
@@ -7582,9 +7585,23 @@
         "confirmationSettings",
         "companyGoalEdit"
       ],
-      "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4": [
-        "companyGoalEdit"
+      "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a": [
+        "weeklyCycles"
+      ],
+      "user-product": [
+        "okrTemplates"
       ]
-    }
+    },
+    "supervisorIds": [
+      "1629cfd2-3d41-4cc2-b415-6aa9b3ee6b31",
+      "55b5604b-e203-49e3-ab90-059eb8fae9c9",
+      "674012ec-1573-47db-9170-12190e23a036",
+      "77387263-6110-4ea7-a6db-f0c3e5c75f7d",
+      "9a35d30f-2952-41ca-9ae0-7a2685556f7f",
+      "user-okr-supervisor",
+      "user-product",
+      "user-sales",
+      "user-tech"
+    ]
   }
 }

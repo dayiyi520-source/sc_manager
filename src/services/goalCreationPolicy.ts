@@ -1,3 +1,4 @@
+import { isOkrAdmin } from './okrSettingsPolicy';
 import { canAlignPeriod } from './okrPeriods';
 import { goalLevel } from './okrGoalRules';
 import { normalizeObjectiveTitleTemplates } from './okrObjectiveTitleTemplates';
@@ -10,6 +11,7 @@ export function creationSources(records: OkrRecord[], person: OkrPerson, level: 
     : record.payload.goalLevel !== 'personal' && (record.payload.goalLevel === 'department' || goalLevel(people.find(owner => owner.id === record.ownerId)) === '部门级') && (goalLevel(person) === '部门级' ? record.ownerId === person.id : record.ownerId === person.supervisorId)));
 }
 export function creationPeriodError(records: OkrRecord[], person: OkrPerson, level: GoalCreationLevel, people: OkrPerson[], period: string, settings?: OkrSettings) {
+  if (level === 'personal' && isOkrAdmin(person.id, settings, people)) return '公司级目标管理员无需填写个人目标';
   if (goalLevel(person) === '公司级') return undefined;
   return creationSources(records,person,level,people).some(source => canAlignPeriod(period,source.periodKey,settings?.cycles?.crossAlignment)) ? undefined : level === 'department' ? '公司级目标还未提交，暂时无法添加目标' : '部门级目标还未提交，暂时无法添加目标';
 }

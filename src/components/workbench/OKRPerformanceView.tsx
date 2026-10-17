@@ -568,7 +568,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
         settings={settings}
         initialPayload={editPayload}
         submitLabel={['draft','submitted'].includes(record.status) ? undefined : '保存修改'}
-        allowAddAnotherInDetail={!me?.rootFlag}
+        allowAddAnotherInDetail={!isOkrAdmin(currentUser.id, settings, people)}
         onAddAnother={() => openGoalCreation(record.periodKey, record.payload.goalLevel === 'department' ? 'department' : 'personal')}
         onCancel={closeEditor}
         onSave={payload => { if (!['draft','submitted'].includes(record.status)) { setApplicationReason(''); setChangeApplication({ record, payload }); return Promise.resolve(false); }          return updateOkr(record.id, payload, true).then(ok => { if (ok) setEditingObjectiveId(null); return ok; }); }}
@@ -781,7 +781,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               busy={busy || loading || !!error}
               draftCount={isMyOkrCategory || selectedScopeGroup === 'department' ? monthRecords.filter(record => record.status === 'draft' && !record.payload.inherited).length : 0}
               onSubmitDrafts={() => submitSavedGoalDrafts(monthRecords.filter(record => record.status === 'draft' && !record.payload.inherited))}
-              onAddGoal={isMyOkrCategory ? () => openGoalCreation(month, 'personal') : selectedScopeGroup === 'department' && level === '部门级' && !scopeSelection.personId ? () => openGoalCreation(month, 'department') : undefined}
+              onAddGoal={isMyOkrCategory && !isOkrAdmin(currentUser.id, settings, people) ? () => openGoalCreation(month, 'personal') : selectedScopeGroup === 'department' && level === '部门级' && !scopeSelection.personId ? () => openGoalCreation(month, 'department') : undefined}
               onEditTarget={targetId => {
                 setDeleteObjectiveId(null);
                 const target = targetItems.find(item => item.id === targetId);

@@ -1,6 +1,6 @@
 import { otherDepartmentPeople as getOtherDepartmentPeople, departmentName } from './departmentScope';
 import { confirmationMembers, confirmationRequests } from './goalConfirmation';
-import { hasOkrPermission } from '../../../services/okrSettingsPolicy';
+import { hasOkrPermission, isOkrAdmin } from '../../../services/okrSettingsPolicy';
 import { goalLevel } from '../../../services/okrGoalRules';
 import { ChecklistIcon } from '@primer/octicons-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -82,6 +82,7 @@ export function OkrScopeSidebar({ people, records = [], settings, currentUserId,
   const pendingOwnerIds = new Set(requests.map(record => record.ownerId));
   const currentUser = people.find(person => person.id === currentUserId);
   const companyEditor = !!currentUser && hasOkrPermission(currentUser.id,'companyGoalEdit',settings,people);
+  const companyAdministrator = !!currentUser && isOkrAdmin(currentUser.id, settings, people);
   const primaryActionLabel = !currentUser ? '组织信息加载中' : currentUser.rootFlag === 1 ? '添加目标' : '拆解目标';
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(defaultExpandMembers ? groups.filter(group => group.members.length).map(group => group.key) : []));
@@ -92,10 +93,9 @@ export function OkrScopeSidebar({ people, records = [], settings, currentUserId,
   const normalizedQuery = query.trim().toLowerCase();
 
   return <aside className={`okr-scope-sidebar${collapsed ? ' is-collapsed' : ''}`} aria-label="目标范围导航">
-    <div className={`okr-scope-search${currentUser?.rootFlag === 1 && companyEditor ? ' has-personal-action' : ''}`}>
+    <div className="okr-scope-search">
       <Input value={query} onChange={event => setQuery(event.target.value)} prefix={<Search />} allowClear placeholder="搜索人名" aria-label="搜索人名" />
-      {goalLevel(currentUser) === '部门级' || companyEditor && currentUser?.rootFlag !== 1 ? <Dropdown trigger={['click']} disabled={addTargetDisabled} menu={{items:[...(companyEditor ? [{key:'company',label:'公司目标'}] : []),...(goalLevel(currentUser) === '部门级' ? [{key:'department',label:'部门目标'}] : []),{key:'personal',label:'我的目标'}],onClick:({key})=>onAddTarget(key as 'personal'|'department'|'company')}}><Button type="primary" icon={<Plus/>} aria-label="添加目标选项" disabled={addTargetDisabled}/></Dropdown> : <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} disabled={addTargetDisabled || !currentUser} onClick={()=>onAddTarget(currentUser?.rootFlag === 1 && companyEditor ? 'company' : 'personal')} /></Tooltip>}
-      {currentUser?.rootFlag === 1 && companyEditor && <Tooltip title="添加我的目标"><Button icon={<User/>} aria-label="添加我的目标" disabled={addTargetDisabled} onClick={() => onAddTarget('personal')}/></Tooltip>}
+      {goalLevel(currentUser) === '部门级' || companyEditor && currentUser?.rootFlag !== 1 ? <Dropdown trigger={['click']} disabled={addTargetDisabled} menu={{items:[...(companyEditor ? [{key:'company',label:'公司目标'}] : []),...(goalLevel(currentUser) === '部门级' ? [{key:'department',label:'部门目标'}] : []),...(!companyAdministrator ? [{key:'personal',label:'我的目标'}] : [])],onClick:({key})=>onAddTarget(key as 'personal'|'department'|'company')}}><Button type="primary" icon={<Plus/>} aria-label="添加目标选项" disabled={addTargetDisabled}/></Dropdown> : <Tooltip title={primaryActionLabel}><Button type="primary" icon={<Plus />} aria-label={primaryActionLabel} disabled={addTargetDisabled || !currentUser} onClick={()=>onAddTarget(companyAdministrator || currentUser?.rootFlag === 1 && companyEditor ? 'company' : 'personal')} /></Tooltip>}
     </div>
     <nav className="okr-scope-groups">
       {groups.map(group => {
