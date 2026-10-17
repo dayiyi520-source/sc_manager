@@ -127,10 +127,11 @@ export function useOriginalOkr() {
     if (!access.allowed) { addToast('warning', access.reason); return false; }
     if (records.isPending || records.error || peopleQuery.isPending || peopleQuery.error) { addToast('warning', '人员或复盘数据尚未就绪，请刷新后重试'); return false; }
     const payload = exclusions === undefined ? record.payload : { ...record.payload, departmentReviewExclusions: exclusions };
-    const errors = departmentSubmissionErrors(payload, all, people, currentUser.id);
-    if (errors.length) { addToast('warning', errors.join('；')); return false; }
     setBusy(true);
     try{
+      const currentRecords = payload.reviewMode === 'supervisor' ? await okrRepository.records(currentUser.id) : all;
+      const errors = departmentSubmissionErrors(payload, currentRecords, people, currentUser.id);
+      if (errors.length) { addToast('warning', errors.join('；')); return false; }
       await okrRepository.update(record,'submit',exclusions === undefined ? {} : { payload },currentUser.id);
       await refresh();
       addToast('success','复盘已提交');
@@ -174,14 +175,17 @@ export function useOriginalOkr() {
   const save = async (kind: 'objective' | 'review', period:string, payload:OkrPayload, submit = true) => {
     if (kind === 'review' && submit) {
       if (records.isPending || records.error || peopleQuery.isPending || peopleQuery.error) { addToast('warning', '人员或复盘数据尚未就绪，请刷新后重试'); return false; }
-      const errors = departmentSubmissionErrors(payload, all, people, currentUser.id);
-      if (errors.length) { addToast('warning', errors.join('；')); return false; }
       if (settingsQuery.error) { addToast('warning', '填写日期配置加载失败，请重试'); return false; }
       const access = reviewSubmissionAccess(settingsQuery.data, payload);
       if (!access.allowed) { addToast('warning', access.reason); return false; }
     }
     setBusy(true);
     try {
+      if (kind === 'review' && submit && payload.reviewMode === 'supervisor') {
+        const currentRecords = await okrRepository.records(currentUser.id);
+        const errors = departmentSubmissionErrors(payload, currentRecords, people, currentUser.id);
+        if (errors.length) { addToast('warning', errors.join('；')); return false; }
+      }
       if (kind === 'review') {
         const existing = findReviewForPayload(all, currentUser.id, period, payload);
         if (existing) {

@@ -1,6 +1,6 @@
 import type { OkrPayload, OkrPerson, OkrRecord } from './okrRepository';
 import { monthlyReviewTargets } from './okrReviewTargets';
-import { saveKnowledgeValidation } from './knowledgeAttachments';
+import { validateReviewKnowledge } from './reviewKnowledge';
 import { reviewTemplateFor } from './okrReviewTemplates';
 
 const mean = (values: number[]) => values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length * 10) / 10 : 0;
@@ -14,7 +14,7 @@ const effective = (record: OkrRecord) => ['active', 'reviewed', 'completed', 'ar
 /** Validate draft and submit through the same authoritative target/assignment query. */
 export function validateReviewProgress(payload: OkrPayload, ownerId: string, records: OkrRecord[], people: OkrPerson[]) {
   if (!['week', 'month'].includes(payload.reviewType || '')) return;
-  for (const entry of payload.knowledgeEntries || []) saveKnowledgeValidation(entry.attachments || []);
+  for (const entry of payload.knowledgeEntries || []) validateReviewKnowledge(entry);
   const targets = monthlyReviewTargets(records, ownerId, people);
   const supervisor = reviewTemplateFor(people.find(person => person.id === ownerId), people) === 'supervisor';
   const ids = new Set<string>();

@@ -11,7 +11,8 @@ const effective = (record: OkrRecord) => ['active', 'reviewed', 'completed', 'ar
 export function monthlyReviewTargets(records: OkrRecord[], userId: string, people: OkrPerson[]): OKRItem[] {
   const person = people.find(member => member.id === userId);
   const supervisor = reviewTemplateFor(person, people) === 'supervisor';
-  const owned = records.filter(record => record.ownerId === userId && effective(record));
+  const owned = records.filter(record => record.ownerId === userId && effective(record)
+    && (!supervisor || record.kind === 'objective' && record.payload.goalLevel !== 'personal' && record.payload.goalLevel !== 'company' && record.changeRequest?.status !== 'pending'));
   const targets: OKRItem[] = owned.filter(record => record.kind === 'objective').map(record => {
     const personal = record.payload.goalLevel === 'personal';
     const keyResults = (record.payload.keyResults || []).flatMap(kr => {

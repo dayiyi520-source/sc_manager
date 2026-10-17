@@ -1,4 +1,5 @@
-import { KnowledgeAttachments } from '../KnowledgeAttachments';
+import { ReviewKnowledgeContent } from './ReviewKnowledgeContent';
+import { ReviewKnowledgeTable } from './ReviewKnowledgeTable';
 import { ReviewTemplateLayout, reviewBlockTitle, ReviewTemplateSection, useReviewTemplateFields } from './ReviewTemplateFields';
 import type { OkrSettings } from '../../../services/okrRepository';
 import { departmentKrAggregation } from '../../../services/departmentReviewAggregation';
@@ -21,7 +22,7 @@ import type { EvidenceViewer } from '../../../services/reviewEvidenceRepository'
 import type { OkrWork } from '../../../services/okrRepository';
 import type { ReviewPeriod } from '../../../services/okrReviewRules';
 import type { OkrReviewAssistance, OkrReviewKnowledge } from '../../../services/okrRepository';
-import { KnowledgeUploadModal } from '../KnowledgeUploadModal';
+import { ReviewKnowledgeModal } from './ReviewKnowledgeModal';
 import { RequirementPoolView } from '../RequirementPoolView';
 import { workOrderDisplayName } from '../../../utils/workOrderDisplay';
 import { loadMonthlyReviewMetrics, loadDepartmentMonthlyComparison, type MonthlyReviewMetrics } from '../../../services/monthlyReviewMetrics';
@@ -351,29 +352,16 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
           <Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setKnowledgeOpen(true)}>新建知识沉淀</Button>
         </div>
         <div className={knowledgeEntries.length ? 'okr-weekly-list-panel' : 'okr-weekly-empty-panel'}>
-        {knowledgeEntries.length > 0 ? <Table size="small" rowKey="id" pagination={false} dataSource={knowledgeEntries}
-          locale={{ emptyText: <Empty description="暂无知识沉淀" /> }} columns={[
-            { title: '标题', ellipsis: true, render: (_, row) => <Button type="link" onClick={() => setViewingKnowledge(row)}>{row.title}</Button> },
-            { title: '内容摘要', dataIndex: 'summary', ellipsis: true },
-            { title: '链接地址', render: (_, row) => row.linkUrl ? <a href={/^https?:\/\//i.test(row.linkUrl) ? row.linkUrl : undefined} target="_blank" rel="noreferrer">{row.linkUrl}</a> : '——' },
-            { title: '附件', render: (_, row) => <KnowledgeAttachments attachments={row.attachments}/> },
-            { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
-          ]}/> : <Empty description="暂无知识沉淀" />}
+        <ReviewKnowledgeTable entries={knowledgeEntries} readOnly={readOnly} disabled={busy || !editorState.editable} onView={setViewingKnowledge} onDelete={id => setKnowledgeEntries(rows => rows.filter(item => item.id !== id))}/>
         </div>
       <ReviewTemplateSection template={reportTemplate.snapshot} blockId="knowledge" values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}/>
       </section>
       </ReviewTemplateLayout>
       {viewingKnowledge && <Modal open title={viewingKnowledge.title} onCancel={() => setViewingKnowledge(null)} footer={<Button aria-label="关闭知识详情" onClick={() => setViewingKnowledge(null)}>关闭</Button>}>
-        <KnowledgeAttachments attachments={viewingKnowledge.attachments}/>
-        <p className="whitespace-pre-wrap break-words">{viewingKnowledge.summary}</p>
-        <p className="whitespace-pre-wrap break-words">{viewingKnowledge.content || '暂无正文'}</p>
-        <p className="break-words">{viewingKnowledge.tags?.join('、')}</p>
-        {viewingKnowledge.linkUrl && <p className="break-words">链接地址：{viewingKnowledge.linkUrl}</p>}
-        {viewingKnowledge.dingtalkUrl && <p className="break-words">钉钉文档：{viewingKnowledge.dingtalkUrl}</p>}
-        {viewingKnowledge.wecomUrl && <p className="break-words">企微文档：{viewingKnowledge.wecomUrl}</p>}
+        <ReviewKnowledgeContent entry={viewingKnowledge}/>
       </Modal>}
-      {knowledgeOpen && <KnowledgeUploadModal mode="review" isOpen onClose={() => setKnowledgeOpen(false)} onSubmit={doc => {
-        setKnowledgeEntries(rows => [...rows, { ...doc, id: crypto.randomUUID(), title: doc.title || '', category: doc.category || '应知应会' }]);
+      {knowledgeOpen && <ReviewKnowledgeModal onClose={() => setKnowledgeOpen(false)} onSubmit={doc => {
+        setKnowledgeEntries(rows => [...rows, { ...doc, id: crypto.randomUUID(), title: doc.title || '', category: '应知应会' }]);
       }}/>}
 
       {creationType && <Modal open title={`新建${workOrderDisplayName(creationType)}`} width={1120} footer={null} closable={false} mask={{ closable: false }} keyboard={false}>

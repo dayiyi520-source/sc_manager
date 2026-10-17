@@ -1,4 +1,5 @@
-import { KnowledgeAttachments } from '../KnowledgeAttachments';
+import { ReviewKnowledgeContent } from './ReviewKnowledgeContent';
+import { ReviewKnowledgeTable } from './ReviewKnowledgeTable';
 import { ReviewTemplateLayout, reviewBlockTitle, ReviewTemplateSection, useReviewTemplateFields } from './ReviewTemplateFields';
 import type { OkrSettings } from '../../../services/okrRepository';
 import { departmentSubmissionErrors, departmentMonthlyFeedback } from '../../../services/departmentReviewSubmission';
@@ -34,7 +35,7 @@ import { reviewDraftTargets, restoreReviewDraftTargets, reconcileReviewDraftTarg
 import { reviewEditorState } from '../../../services/okrReviewTemplates';
 import { WorkEvidencePicker } from './WorkEvidencePicker';
 import { RequirementPoolView } from '../RequirementPoolView';
-import { KnowledgeUploadModal } from '../KnowledgeUploadModal';
+import { ReviewKnowledgeModal } from './ReviewKnowledgeModal';
 import type { OkrReviewKnowledge } from '../../../services/okrRepository';
 import { workOrderDisplayName } from '../../../utils/workOrderDisplay';
 import { SupervisorObjectiveHeader } from './SupervisorObjectiveHeader';
@@ -282,7 +283,7 @@ export function WeeklyReviewEditor({
   const liveDepartmentContent = useMemo(() => supervisor && !readOnly ? departmentContentSnapshots(records, people, viewer?.id || '', period, reviewType) : [], [supervisor, readOnly, records, people, viewer?.id, period, reviewType]);
   const departmentContent = liveDepartmentContent.concat((initialPayload?.departmentContentSnapshots || []).filter(snapshot => !liveDepartmentContent.some(row => row.id === snapshot.id)));
   const displayedAssistance = [...new Map(assistance.concat(departmentContent.flatMap(snapshot => snapshot.assistance.map((row, index) => ({ ...row, rowId: `employee:${snapshot.id}:${index}`, content: row.content || row.result, subject: row.subject, sourceEmployee: snapshot.authorName })))).map(row => [row.workId || row.rowId!, row])).values()];
-  const displayedKnowledge = knowledgeEntries.concat(departmentContent.flatMap(snapshot => (snapshot.knowledgeEntries || []).map(row => ({ ...row, id: `employee:${snapshot.authorId}:${row.id}`, sourceEmployee: snapshot.authorName }))));
+  const displayedKnowledge = knowledgeEntries.concat(departmentContent.flatMap(snapshot => (snapshot.knowledgeEntries || []).map(row => ({ ...row, id: `employee:${snapshot.id}:${row.id}`, sourceReviewId: snapshot.id, sourceEmployee: snapshot.authorName }))));
   const workById = useMemo(() => new Map(work.map(item => [item.id, item])), [work]);
 
   const update = (id: string, p: Partial<KrReviewDraft>) =>
@@ -497,12 +498,12 @@ export function WeeklyReviewEditor({
             </Tag>
           </div>
           <div className="flex items-center gap-2.5">
-            {supervisor && <DepartmentReviewSettings payload={{ ...period, title: '', reviewType, departmentReviewExclusions: exclusions }} records={records} people={people} ownerId={viewer?.id || ''} disabled={busy || readOnly} loading={recordsLoading} error={recordsError} onRefresh={onRefreshRecords} onChange={rows => { setExclusions(rows); setValidationErrors([]); }} submitOpen={submitModalOpen} onCloseSubmit={() => setSubmitModalOpen(false)} onSubmit={async rows => {
+            {supervisor && <DepartmentReviewSettings payload={{ ...period, title: '', reviewType, departmentReviewExclusions: exclusions }} records={records} people={people} ownerId={viewer?.id || ''} disabled={busy || readOnly} loading={recordsLoading} error={recordsError} onRefresh={onRefreshRecords} onChange={rows => { setExclusions(rows); setValidationErrors([]); }} submitOpen={submitModalOpen} onCloseSubmit={() => setSubmitModalOpen(false)} onSubmit={async (rows, latestRecords) => {
               if (!editorState.editable || detachedTargets.length || recordsLoading || recordsError) return ['当前报告暂不可提交，请检查目标及员工复盘加载状态'];
               const nextPayload = {...payload(),departmentReviewExclusions:rows};
               const errors = reportTemplate.errors();
               if (!directSubmit && !reviewerName) errors.push('尚未配置直属上级，无法确定审批人');
-              errors.push(...departmentSubmissionErrors(nextPayload,records,people,viewer?.id || ''));
+              errors.push(...departmentSubmissionErrors(nextPayload,latestRecords,people,viewer?.id || ''));
               setValidationErrors(errors);
               if (errors.length) return errors;
               setExclusions(rows);
@@ -789,30 +790,16 @@ export function WeeklyReviewEditor({
           <Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setKnowledgeOpen(true)}>新建知识沉淀</Button>
         </div>
         <div className={displayedKnowledge.length ? 'okr-weekly-list-panel' : 'okr-weekly-empty-panel'}>
-        {displayedKnowledge.length > 0 ? <Table size="small" rowKey="id" pagination={false} dataSource={displayedKnowledge}
-          locale={{ emptyText: <Empty description="暂无知识沉淀" /> }} columns={[
-            { title: '标题', ellipsis: true, render: (_, row) => <Button type="link" onClick={() => setViewingKnowledge(row)}>{row.title}</Button> },
-            { title: '内容摘要', dataIndex: 'summary', ellipsis: true },
-            { title: '链接地址', render: (_, row) => row.linkUrl ? <a href={/^https?:\/\//i.test(row.linkUrl) ? row.linkUrl : undefined} target="_blank" rel="noreferrer">{row.linkUrl}</a> : '——' },
-            { title: '附件', render: (_, row) => <KnowledgeAttachments attachments={row.attachments}/> },
-            { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} aria-label={`删除知识沉淀${row.title}`} onClick={() => setKnowledgeEntries(rows => rows.filter(item => item.id !== row.id))}>删除</Button> },
-            ...(supervisor ? [{ title: '来源员工', render: (_: unknown, row: { sourceEmployee?: string }) => row.sourceEmployee || viewer?.name || '主管本人' }] : []),
-          ].filter(column => !supervisor || column.title !== '删除操作')}/> : <Empty description="暂无知识沉淀"/>}
+        <ReviewKnowledgeTable entries={displayedKnowledge} department={supervisor} viewerName={viewer?.name} readOnly={readOnly} disabled={busy || !editorState.editable} onView={setViewingKnowledge} onDelete={id => setKnowledgeEntries(rows => rows.filter(item => item.id !== id))}/>
         </div>
       <ReviewTemplateSection template={reportTemplate.snapshot} blockId="knowledge" values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}/>
       </section>
       </ReviewTemplateLayout>
       {viewingKnowledge && <Modal open title={viewingKnowledge.title} onCancel={() => setViewingKnowledge(null)} footer={<Button aria-label="关闭知识详情" onClick={() => setViewingKnowledge(null)}>关闭</Button>}>
-        <KnowledgeAttachments attachments={viewingKnowledge.attachments}/>
-        <p className="whitespace-pre-wrap break-words">{viewingKnowledge.summary}</p>
-        <p className="whitespace-pre-wrap break-words">{viewingKnowledge.content || '暂无正文'}</p>
-        <p className="break-words">{viewingKnowledge.tags?.join('、')}</p>
-        {viewingKnowledge.linkUrl && <p className="break-words">链接地址：{viewingKnowledge.linkUrl}</p>}
-        {viewingKnowledge.dingtalkUrl && <p className="break-words">钉钉文档：{viewingKnowledge.dingtalkUrl}</p>}
-        {viewingKnowledge.wecomUrl && <p className="break-words">企微文档：{viewingKnowledge.wecomUrl}</p>}
+        <ReviewKnowledgeContent entry={viewingKnowledge}/>
       </Modal>}
-      {knowledgeOpen && <KnowledgeUploadModal mode="review" isOpen onClose={() => setKnowledgeOpen(false)} onSubmit={doc => {
-        setKnowledgeEntries(rows => [...rows, { ...doc, id: crypto.randomUUID(), title: doc.title || '', category: doc.category || '应知应会' }]);
+      {knowledgeOpen && <ReviewKnowledgeModal onClose={() => setKnowledgeOpen(false)} onSubmit={doc => {
+        setKnowledgeEntries(rows => [...rows, { ...doc, id: crypto.randomUUID(), title: doc.title || '', category: '应知应会' }]);
       }}/>}
 
       {creationType && <Modal open title={`新建${workOrderDisplayName(creationType)}`} width={1120} footer={null} closable={false} mask={{ closable: false }} keyboard={false}>

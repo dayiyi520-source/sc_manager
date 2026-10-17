@@ -9,6 +9,7 @@ import { customerDirectoryRequest } from './customerDirectoryData';
 import { mockStateEndpoint } from './mockStateEndpoint';
 import { createMockReadWindow } from './mockReadWindow';
 import { createOkrFilePersistence } from './okrFilePersistence';
+import { createOkrFileCache } from './okrFileCache';
 import savedOkrState from '../data/mockOkrState.json';
 import { migrateWorkItems } from './workItemTemplateSync';
 import { submitDepartmentReview } from './departmentReviewAggregation';
@@ -89,6 +90,10 @@ if (typeof window !== 'undefined' && localStorage.getItem(KEYS.snapshot) !== run
   localStorage.setItem(KEYS.snapshot, runtimeMockVersion);
 }
 
+let okrFileCache: ReturnType<typeof createOkrFileCache> | undefined;
+const fileCache = () => okrFileCache ??= createOkrFileCache(localStorage);
+const stateStorage = (key: string) => import.meta.env.MODE !== 'test' && [KEYS.okrRecords, KEYS.okrPeople, KEYS.okrSettings].includes(key) ? fileCache() : localStorage;
+
 const now = () => new Date().toISOString();
 const text = (value: unknown) => value == null ? '' : String(value);
 const read = <T>(key: string, fallback: T): T => {
@@ -96,22 +101,22 @@ const read = <T>(key: string, fallback: T): T => {
   const savedState = templateKey.startsWith('okr') ? savedOkrState : savedResearchTemplate;
   const seed = Object.prototype.hasOwnProperty.call(savedState, templateKey) ? (savedState as Record<string, unknown>)[templateKey] as T : fallback;
   let value: T;
-  try { const stored = localStorage.getItem(key); value = stored ? JSON.parse(stored) as T : seed; } catch { value = seed; }
+  try { const stored = stateStorage(key).getItem(key); value = stored ? JSON.parse(stored) as T : seed; } catch { value = seed; }
   if ([KEYS.researchTypes, KEYS.researchStatuses, KEYS.productLines, KEYS.workItems].includes(key)) {
     const normalized = normalizeDefectStatusLabels(value);
-    if (normalized !== value) localStorage.setItem(key, JSON.stringify(normalized));
+    if (normalized !== value) stateStorage(key).setItem(key, JSON.stringify(normalized));
     value = normalized;
   }
   if (key === KEYS.okrRecords && Array.isArray(value)) {
     const normalized = syncOkrProductNames(value as OkrRecord[], getProductLines());
-    if (normalized.some((record, index) => record !== value[index])) localStorage.setItem(key, JSON.stringify(normalized));
+    if (normalized.some((record, index) => record !== value[index])) stateStorage(key).setItem(key, JSON.stringify(normalized));
     return normalized as T;
   }
   return value;
 };
 const write = (key: string, value: unknown) => {
   const serialized = JSON.stringify(value);
-  if (localStorage.getItem(key) !== serialized) localStorage.setItem(key, serialized);
+  if (stateStorage(key).getItem(key) !== serialized) stateStorage(key).setItem(key, serialized);
 };
 const bodyOf = (init?: RequestInit) => { try { return init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {}; } catch { return {}; } };
 const queryOf = (path: string) => new URL(path, window.location.origin).searchParams;
@@ -1363,7 +1368,7 @@ export async function mockApiRequest(path: string, init: RequestInit = {}): Prom
     throw new Error('旧字段配置与子任务规则功能已移除');
   }
   if (path.split('?')[0].startsWith('/api/okr/') && import.meta.env.MODE !== 'test') {
-    okrFilePersistence ??= createOkrFilePersistence(localStorage);
+    okrFilePersistence ??= createOkrFilePersistence(fileCache());
     return okrFilePersistence.run(() => handleMockApiRequest(path, init), (init.method || 'GET').toUpperCase() === 'GET');
   }
   if (import.meta.env.MODE === 'test') return handleMockApiRequest(path, init);

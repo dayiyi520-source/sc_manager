@@ -28,3 +28,18 @@ it('validates and persists fresh exclusions on the exact selected department dra
  expect(okrRepository.update).toHaveBeenCalledWith(expect.objectContaining({id:'department-draft',version:3}),'submit',{payload:{...(records[0] as OkrRecord).payload,departmentReviewExclusions:exclusions}},'m');
  unmount();client.clear();
 });
+
+it('submits using persisted read receipts when the cached report still says unread', async () => {
+ vi.clearAllMocks();
+ const employeeReport: OkrRecord = { id: 'employee-report', kind: 'review', ownerId: 'a', periodKey: '2026-10', status: 'submitted', version: 1, payload: { ...records[0].payload, title: '员工月报', reviewType: 'month', reviewMode: 'monthly' } };
+ vi.mocked(okrRepository.records).mockResolvedValue([...(records as OkrRecord[]), employeeReport]);
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ const wrapper=({children}:{children:React.ReactNode})=><QueryClientProvider client={client}>{children}</QueryClientProvider>;
+ const {result,unmount}=renderHook(()=>useOriginalOkr(),{wrapper});
+ await waitFor(()=>expect(result.current.loading || result.current.settingsLoading).toBe(false));
+ expect(result.current.records.find(record => record.id === employeeReport.id)?.viewedBy).toBeUndefined();
+ vi.mocked(okrRepository.records).mockResolvedValue([...(records as OkrRecord[]), { ...employeeReport, viewedBy: ['m'] }]);
+ await act(async()=>{expect(await result.current.submitReviewDraft('department-draft')).toBe(true);});
+ expect(update).toHaveBeenCalledWith(expect.objectContaining({id:'department-draft'}),'submit',{},'m');
+ unmount();client.clear();
+});

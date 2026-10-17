@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OkrPerson, OkrRecord } from './okrRepository';
+import { validateReviewProgress } from './okrReviewProgressSync';
 import { monthlyReviewTargets } from './okrReviewTargets';
 import { reviewTemplateFor, reviewEditorState } from './okrReviewTemplates';
 
@@ -51,5 +52,31 @@ describe('review template classification', () => {
     expect(reviewEditorState()).toMatchObject({ label: '待填写' });
     expect(reviewEditorState('draft')).toMatchObject({ label: '草稿' });
     expect(reviewEditorState('returned')).toMatchObject({ label: '已退回' });
+  });
+});
+
+describe('department review goal scope', () => {
+  const manager = { ...employee, id: 'supervisor', goalRole: 'supervisor' as const, supervisorId: 'boss' };
+  const department: OkrRecord = { ...personal, id: 'department', ownerId: manager.id, payload: { ...personal.payload, goalLevel: 'department', keyResults: [{ id: 'shared-kr', title: '部门交付结果', weight: 100, progress: 0, assigneeIds: ['me', manager.id], details: [{ id: 'v1', name: '产品', version: 'V1.0.0', assigneeIds: ['me'] }, { id: 'v2', name: '产品', version: 'V1.2.0', assigneeIds: [manager.id] }] }] } };
+  const pending = (purpose: 'initial' | 'update' | 'delete'): OkrRecord => ({ ...department, id: `pending-${purpose}`, changeRequest: { id: 'change', purpose, status: 'pending', reviewerId: 'boss', reason: '申请', requestedAt: '', baseVersion: 1, payload: department.payload } });
+  const managerPersonal: OkrRecord = { ...department, id: 'manager-personal', payload: { ...department.payload, goalLevel: 'personal', sourceObjectiveId: department.id, sourceKrId: 'shared-kr', keyResults: [{ ...department.payload.keyResults![0], details: [department.payload.keyResults![0].details![1]] }] } };
+  const records: OkrRecord[] = [department, managerPersonal, ...['draft', 'submitted', 'deleted'].map(status => ({ ...department, id: status, status })), pending('initial'), pending('update'), pending('delete'), { ...department, id: 'company', payload: { ...department.payload, goalLevel: 'company' as const } }, { ...department, id: 'old-action', kind: 'action' }];
+  it('uses the single effective department objective and all of its detail rows', () => {
+    const targets = monthlyReviewTargets(records, manager.id, [manager, employee]);
+    expect(targets.map(row => row.id)).toEqual(['department']);
+    expect(targets[0].keyResults).toHaveLength(1);
+    expect(targets[0].keyResults[0].details?.map(row => row.id)).toEqual(['v1', 'v2']);
+  });
+  it.each(['week', 'month'] as const)('rejects excluded goals at the %s save boundary', reviewType => {
+    const row = { objectiveId: department.id, objectiveTitle: '部门目标', keyResultId: 'shared-kr', keyResultTitle: '部门交付结果', previousProgress: 0, currentProgress: 0, health: 'normal' as const, achievement: '', blocker: '', nextPlan: '', workIds: [] };
+    const payload = { title: '部门复盘', reviewType, startDate: '2026-10-01', endDate: '2026-10-31', krReviews: [row] };
+    expect(() => validateReviewProgress(payload, manager.id, records, [manager, employee])).not.toThrow();
+    for (const objectiveId of ['manager-personal', 'draft', 'submitted', 'deleted', 'pending-initial', 'pending-update', 'pending-delete']) {
+      expect(() => validateReviewProgress({ ...payload, krReviews: [{ ...row, objectiveId }] }, manager.id, records, [manager, employee])).toThrow('复盘目标不属于本人或当前周期');
+    }
+  });
+  it('does not merge independent department goals merely because they share the same title', () => {
+    const second = { ...department, id: 'another-real-goal' };
+    expect(monthlyReviewTargets([department, second], manager.id, [manager, employee])).toHaveLength(2);
   });
 });

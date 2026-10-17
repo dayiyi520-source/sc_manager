@@ -65,7 +65,7 @@ describe('review period identity', () => {
   it('shows the two tables for saved rows', () => {
     render(<WeeklyReviewEditor {...props} initialPayload={{ title: '草稿', assistance: [{ workId: 'assist', subject: '协助验收', result: '', assistanceType: '售前支持', expectedAssignee: '同事', content: '', expectedDueDate: '' }], knowledgeEntries: [{ id: 'knowledge', title: '设计经验', category: '应知应会' }] }}/>)
     expect(screen.getByRole('columnheader', { name: '事项类型' })).toBeInTheDocument();
-    for (const name of ['标题', '内容摘要', '链接地址', '附件']) expect(screen.getAllByRole('columnheader', { name }).length).toBeGreaterThan(0);
+    for (const name of ['标题', '场景与痛点', '执行动作与复盘结论', '操作']) expect(screen.getAllByRole('columnheader', { name }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('columnheader', { name: '分类' })).not.toBeInTheDocument();
     expect(screen.queryByText('暂无需要协助事项')).not.toBeInTheDocument();
     expect(screen.queryByText('暂无知识沉淀')).not.toBeInTheDocument();

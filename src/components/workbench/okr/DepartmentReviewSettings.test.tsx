@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DepartmentReviewSettings } from './DepartmentReviewSettings';
 import { okrRepository } from '../../../services/okrRepository';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
+afterEach(() => vi.restoreAllMocks());
 const people: OkrPerson[] = [{ id: 'm', name: '主管', department: '产品', supervisorId: null, rootFlag: 0, version: 0 }, { id: 'a', name: '员工甲', department: '产品', supervisorId: 'm', rootFlag: 0, version: 0 }];
 const payload = { title: '部门周报', reviewType: 'week' as const, startDate: '2026-10-12', endDate: '2026-10-18' };
 const props = { payload, people, ownerId: 'm', records: [], disabled: false, loading: false, onChange: vi.fn() };
@@ -20,7 +21,7 @@ describe('本轮提交设置', () => {
   fireEvent.click(screen.getByRole('button', { name: '应用设置' }));
   expect(onChange).toHaveBeenCalledWith([{ employeeId: 'a', employeeName: '员工甲', reason: '本轮休假' }]);
  });
- it('views the full report before explicitly marking it read, preserving failures for retry', async () => {
+ it('automatically records reading when opened and preserves failures for retry', async () => {
   const record: OkrRecord = { id: 'r', kind: 'review', ownerId: 'a', periodKey: '', version: 1, status: 'submitted', payload: { ...payload, title: '员工甲周报', nextWeekPlan: '下轮计划' } };
   const mark = vi.spyOn(okrRepository, 'markViewed').mockRejectedValueOnce(new Error('网络中断')).mockResolvedValueOnce(undefined);
   const refresh = vi.fn();
@@ -28,10 +29,9 @@ describe('本轮提交设置', () => {
   fireEvent.click(screen.getByRole('button', { name: '本轮提交设置' }));
   fireEvent.click(screen.getByRole('button', { name: '查看复盘' }));
   expect(screen.getByText('下轮计划')).toBeInTheDocument();
-  expect(mark).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: '确认已读' }));
+  await waitFor(() => expect(mark).toHaveBeenCalledOnce());
   await waitFor(() => expect(screen.getAllByText('网络中断').length).toBeGreaterThan(0));
-  fireEvent.click(await screen.findByRole('button', { name: /确.*认.*已.*读/ }));
+  fireEvent.click(await screen.findByRole('button', { name: '重试记录已读' }));
   await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
   expect(mark).toHaveBeenCalledWith('r', 'm');
   mark.mockRestore();
@@ -61,5 +61,33 @@ it.each(['week', 'month'] as const)('keeps %s exclusions on submission failure a
  await waitFor(() => expect(screen.getByRole('button', {name: /提\s*交$/})).toBeEnabled());
  fireEvent.click(screen.getByRole('button', {name: /提\s*交$/}));
  await waitFor(()=>expect(onCloseSubmit).toHaveBeenCalledOnce());
- expect(onSubmit).toHaveBeenLastCalledWith([{employeeId:'a', employeeName:'员工甲', reason:'本轮休假'}]);
+ expect(onSubmit).toHaveBeenLastCalledWith([{employeeId:'a', employeeName:'员工甲', reason:'本轮休假'}], []);
+});
+
+it.each(['week', 'month'] as const)('shows read after closing the %s report and submits before props refresh', async reviewType => {
+  const record: OkrRecord = { id: 'r', kind: 'review', ownerId: 'a', periodKey: '', version: 1, status: 'submitted', payload: { ...payload, reviewType, title: '员工本轮复盘' } };
+  const mark = vi.spyOn(okrRepository, 'markViewed').mockResolvedValue(undefined);
+  const onSubmit = vi.fn().mockResolvedValue(true);
+  render(<DepartmentReviewSettings {...props} payload={{...payload, reviewType}} records={[record]} submitOpen onSubmit={onSubmit}/>);
+  expect(screen.getByText('未读')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '查看复盘' }));
+  await waitFor(() => expect(screen.getByText('已读')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: /^关\s*闭$/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^提\s*交$/ }));
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith([], [expect.objectContaining({ id: 'r', viewedBy: ['m'] })]));
+  expect(mark).toHaveBeenCalledTimes(1);
+  expect(record.viewedBy).toBeUndefined();
+  mark.mockRestore();
+});
+
+it('does not reuse an old read receipt for a newer report version', async () => {
+ const record: OkrRecord = { id: 'r', kind: 'review', ownerId: 'a', periodKey: '', version: 1, status: 'submitted', payload: { ...payload, title: '员工复盘' } };
+ const mark = vi.spyOn(okrRepository, 'markViewed').mockResolvedValue(undefined);
+ const view = render(<DepartmentReviewSettings {...props} records={[record]} submitOpen/>);
+ fireEvent.click(screen.getByRole('button', { name: '查看复盘' }));
+ await waitFor(() => expect(screen.getByText('已读')).toBeInTheDocument());
+ fireEvent.click(screen.getByRole('button', { name: /^关\s*闭$/ }));
+ view.rerender(<DepartmentReviewSettings {...props} records={[{ ...record, version: 2 }]} submitOpen/>);
+ expect(screen.getByText('未读')).toBeInTheDocument();
+ mark.mockRestore();
 });

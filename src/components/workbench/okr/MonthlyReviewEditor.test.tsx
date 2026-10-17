@@ -31,7 +31,8 @@ describe('personal monthly editor', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
     const view = render(<MonthlyReviewEditor {...props} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
     fireEvent.click(screen.getByRole('button', { name: '新建知识沉淀' }));
-    fireEvent.change(screen.getByRole('textbox', { name: '内容摘要' }), { target: { value: '月度经验摘要' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '场景与痛点' }), { target: { value: '月度经验摘要' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '执行动作与复盘结论' }), { target: { value: '先检查告警，再定位日志' } });
     fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
     expect(await screen.findByText('请输入标题')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: '标题' }), { target: { value: '  月度排查经验  ' } });
@@ -40,7 +41,7 @@ describe('personal monthly editor', () => {
     fireEvent.click(screen.getByRole('button', { name: '存草稿' }));
     await waitFor(() => expect(save).toHaveBeenCalledOnce());
     const saved = save.mock.calls[0][0];
-    expect(saved.knowledgeEntries).toEqual([expect.objectContaining({ title: '月度排查经验', summary: '月度经验摘要' })]);
+    expect(saved.knowledgeEntries).toEqual([expect.objectContaining({ title: '月度排查经验', scenarioAndPain: '月度经验摘要', actionsAndConclusion: '先检查告警，再定位日志' })]);
     view.unmount();
     render(<MonthlyReviewEditor {...props} initialPayload={saved} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
     expect(await screen.findByRole('button', { name: '月度排查经验' })).toBeInTheDocument();
@@ -59,7 +60,7 @@ describe('personal monthly editor', () => {
     render(<MonthlyReviewEditor {...props} initialPayload={initialPayload} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
     expect(screen.getByText('2026年第10月 月报-部门未设置')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '事项类型' })).toBeInTheDocument();
-    for (const name of ['标题', '内容摘要', '链接地址', '附件']) expect(screen.getAllByRole('columnheader', { name }).length).toBeGreaterThan(0);
+    for (const name of ['标题', '场景与痛点', '执行动作与复盘结论', '操作']) expect(screen.getAllByRole('columnheader', { name }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('columnheader', { name: '分类' })).not.toBeInTheDocument();
     expect(screen.queryByText('暂无需要协助事项')).not.toBeInTheDocument();
     expect(screen.queryByText('暂无知识沉淀')).not.toBeInTheDocument();
@@ -147,7 +148,7 @@ describe('personal monthly editor', () => {
     render(<MonthlyReviewEditor {...props} work={work} initialPayload={saved} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
     expect(screen.getByRole('textbox', { name: '对公司或部门发展有帮助的意见和建议' })).toHaveValue('新的问题\n新的建议');
     fireEvent.click(screen.getByRole('button', { name: '排查经验' }));
-    expect(screen.getByText('经验正文')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByText('经验正文')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '关闭知识详情' }));
     fireEvent.click(screen.getByRole('button', { name: '删除知识沉淀排查经验' }));
     fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));

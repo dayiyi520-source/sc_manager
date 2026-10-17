@@ -4,7 +4,7 @@ import type { OkrFileState } from '../../scripts/mock-okr-state-plugin';
 const keys = ['okrRecords','okrPeople','okrSettings'] as const;
 const storageKey = (key: string) => `shichuang.frontend.mock.${key}`;
 const migrationKey='shichuang.frontend.mock.okrFileMigration.v1';
-export function createOkrFilePersistence(storage: Storage, request: typeof fetch = fetch) {
+export function createOkrFilePersistence(storage: Pick<Storage, 'getItem' | 'setItem'>, request: typeof fetch = fetch) {
   const readWindow = createMockReadWindow();
   let cachedState: OkrFileState | undefined;
   let readFailure: { error: unknown } | undefined;

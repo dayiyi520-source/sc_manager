@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, Empty, Input, Modal, Table, Tag } from 'antd';
 import { GearIcon } from '@primer/octicons-react';
 import type { DepartmentReviewExclusion, OkrPayload, OkrPerson, OkrRecord } from '../../../services/okrRepository';
@@ -9,8 +9,8 @@ import type { PerformanceReview } from '../../../types';
 
 export function DepartmentReviewSettings({ payload, records, people, ownerId, disabled, loading, error, onRefresh, onChange, submitOpen = false, showTrigger = true, onCloseSubmit, onSubmit }: {
   payload: OkrPayload; records: OkrRecord[]; people: OkrPerson[]; ownerId: string; disabled: boolean; loading: boolean; error?: unknown;
-  showTrigger?: boolean; submitOpen?: boolean; onCloseSubmit?: () => void; onSubmit?: (rows: DepartmentReviewExclusion[]) => Promise<boolean | string[]>;
-  onRefresh?: () => void; onChange: (rows: DepartmentReviewExclusion[]) => void;
+  showTrigger?: boolean; submitOpen?: boolean; onCloseSubmit?: () => void; onSubmit?: (rows: DepartmentReviewExclusion[], latestRecords: OkrRecord[]) => Promise<boolean | string[]>;
+  onRefresh?: () => void | Promise<unknown>; onChange: (rows: DepartmentReviewExclusion[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DepartmentReviewExclusion[]>([]);
@@ -18,12 +18,28 @@ export function DepartmentReviewSettings({ payload, records, people, ownerId, di
   const [reading, setReading] = useState<OkrRecord>();
   const [marking, setMarking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const readingLock = useRef(false);
+  const [readReceipts, setReadReceipts] = useState<string[]>([]);
+  const receiptKey = (record: OkrRecord) => `${ownerId}:${record.id}:${record.version}`;
+  const roundRecords = records.map(record => readReceipts.includes(receiptKey(record)) && !record.viewedBy?.includes(ownerId)
+    ? { ...record, viewedBy: [...(record.viewedBy || []), ownerId] } : record);
+  const markRead = async (record: OkrRecord) => {
+    if (readingLock.current || record.viewedBy?.includes(ownerId) || readReceipts.includes(receiptKey(record))) return;
+    readingLock.current = true; setMarking(true); setMessage('');
+    try {
+      await okrRepository.markViewed(record.id, ownerId);
+      const key = receiptKey(record);
+      setReadReceipts(current => [...new Set([...current, key])]);
+      try { await onRefresh?.(); } catch { setMessage('已读已记录，列表刷新失败，请重试'); }
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : '记录已读失败，请重试'); }
+    finally { readingLock.current = false; setMarking(false); }
+  };
   useEffect(() => {
     if (submitOpen) { setDraft((payload.departmentReviewExclusions || []).map(row => ({...row}))); setMessage(''); }
   }, [submitOpen]);
   const close = () => { if (!marking && !submitting && !disabled) { if (submitOpen) onCloseSubmit?.(); else setOpen(false); } };
   const unavailable = disabled || loading || Boolean(error) || marking || submitting;
-  const rows = departmentRoundReviews(payload, records, people, ownerId);
+  const rows = departmentRoundReviews(payload, roundRecords, people, ownerId);
   const selected = (id: string) => draft.find(row => row.employeeId === id);
   const person = people.find(row => row.id === reading?.ownerId);
   const report: PerformanceReview | undefined = reading ? {
@@ -40,12 +56,12 @@ export function DepartmentReviewSettings({ payload, records, people, ownerId, di
       if (draft.some(row => !row.reason.trim())) { setMessage('请为每位排除员工填写原因'); return; }
       const exclusions = draft.map(row => ({...row,reason:row.reason.trim()}));
       if (!submitOpen) { onChange(exclusions); setOpen(false); return; }
-      const errors = departmentSubmissionErrors({...payload,reviewMode:'supervisor',departmentReviewExclusions:exclusions},records,people,ownerId);
+      const errors = departmentSubmissionErrors({...payload,reviewMode:'supervisor',departmentReviewExclusions:exclusions},roundRecords,people,ownerId);
       if (errors.length) { setMessage(errors.join('；')); return; }
       if (!onSubmit) return;
       setSubmitting(true); setMessage('');
       try {
-        const result = await onSubmit(exclusions);
+        const result = await onSubmit(exclusions, roundRecords);
         if (Array.isArray(result)) setMessage(result.join('；'));
         else if (result) { setOpen(false); onCloseSubmit?.(); }
         else setMessage('提交未成功，请检查页面提示后重试，排除设置已保留');
@@ -59,17 +75,15 @@ export function DepartmentReviewSettings({ payload, records, people, ownerId, di
         <Table scroll={{ x: 720 }} loading={loading} rowKey={row => row.employee.id} pagination={false} dataSource={rows} locale={{ emptyText: <Empty description="暂无部门员工"/> }} columns={[
           { title: '员工', width: 112, render: (_, row) => row.employee.name },
           { title: '本轮复盘', width: 112, render: (_, row) => <Tag color={!row.review ? 'warning' : row.review.viewedBy?.includes(ownerId) ? 'success' : 'processing'}>{!row.review ? '未提交' : row.review.viewedBy?.includes(ownerId) ? '已读' : '未读'}</Tag> },
-          { title: '查看', width: 120, render: (_, row) => <Button type="link" disabled={!row.review || marking || submitting} onClick={() => { setMessage(''); setReading(row.review); }}>查看复盘</Button> },
+          { title: '查看', width: 120, render: (_, row) => <Button type="link" disabled={!row.review || marking || submitting} onClick={() => { setMessage(''); setReading(row.review); if (row.review) void markRead(row.review); }}>查看复盘</Button> },
           { title: '不计入本轮判断', width: 160, align: 'center', render: (_, row) => <Checkbox aria-label={`排除${row.employee.name}`} disabled={unavailable} checked={Boolean(selected(row.employee.id))} onChange={event => setDraft(current => event.target.checked ? [...current, { employeeId: row.employee.id, employeeName: row.employee.name, reason: '' }] : current.filter(item => item.employeeId !== row.employee.id))}/> },
           { title: '排除原因', render: (_, row) => <Input.TextArea aria-label={`${row.employee.name}排除原因`} autoSize={{ minRows: 1, maxRows: 3 }} maxLength={500} disabled={unavailable || !selected(row.employee.id)} value={selected(row.employee.id)?.reason || ''} onChange={event => setDraft(current => current.map(item => item.employeeId === row.employee.id ? { ...item, reason: event.target.value } : item))} placeholder="请填写本轮排除原因"/> },
         ]}/>
       </div>
     </Modal>
-    {reading && report && <Modal open title={reading.payload.title} width="80%" onCancel={() => { if (!marking) setReading(undefined); }} cancelText="关闭" okText="确认已读" confirmLoading={marking} onOk={async () => {
-      setMarking(true);
-      try { await okrRepository.markViewed(reading.id, ownerId); onRefresh?.(); setReading(undefined); }
-      catch (cause) { setMessage(cause instanceof Error ? cause.message : '标记已读失败，请重试'); }
-      finally { setMarking(false); }
-    }}><ModernReviewReadOnlyView review={report}/>{message && <Alert type="error" title={message} showIcon/>}</Modal>}
+    {reading && report && <Modal open title={reading.payload.title} width="80%" onCancel={() => setReading(undefined)} footer={<>
+      {message && !reading.viewedBy?.includes(ownerId) && !readReceipts.includes(receiptKey(reading)) && <Button loading={marking} disabled={marking} onClick={() => void markRead(reading)}>重试记录已读</Button>}
+      <Button type="primary" onClick={() => setReading(undefined)}>关闭</Button>
+    </>}><ModernReviewReadOnlyView review={report}/>{message && <Alert type="error" title={message} showIcon/>}</Modal>}
   </>;
 }
