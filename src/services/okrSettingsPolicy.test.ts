@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
 import { canAlignPeriod, defaultCycles, materializePeriods, periodBounds } from './okrPeriods';
-import { canEditOkr, confirmationReviewer, defaultConfirmation, normalizedPolicy, validatePolicy } from './okrSettingsPolicy';
+import { canEditOkr, confirmationReviewer, defaultConfirmation, effectiveReviewer, reconcileConfirmationRequests, normalizedPolicy, validatePolicy } from './okrSettingsPolicy';
 import { mutateOkrLifecycle } from './mockOkrLifecycle';
 import { departmentTemplates } from './okrTemplates';
 import type { OkrPerson, OkrSettings, OkrPayload, OkrRecord } from './okrRepository';
@@ -82,5 +82,39 @@ describe('OKR周期与确认配置',()=>{
   expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:aligned},[source],people,config)).toThrow('公司级目标还未提交');
   const monthlySource={...source,id:'monthly-source',periodKey:'2026-10'};
   expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'manager',periodKey:'2026-10',payload:aligned},[source,monthlySource],people,config)).toThrow('只能对齐');
+ });
+});
+
+describe('supervisor personal goal confirmation', () => {
+ it('uses the self-supervisor policy for personal goals and the organizational superior for department goals', () => {
+  const config = settings();
+  const personal = { ...payload, goalLevel: 'personal' as const };
+  for (const action of ['create', 'update', 'delete'] as const) {
+   config.confirmation!.actions = ['create', 'update', 'delete'];
+   expect(confirmationReviewer(people[1], action, personal, config, people)).toBeUndefined();
+   expect(confirmationReviewer(people[1], action, payload, config, people)).toBe('admin');
+  }
+  config.confirmation!.selfSupervisor = 'upper';
+  expect(confirmationReviewer(people[1], 'create', personal, config, people)).toBe('admin');
+  expect(confirmationReviewer(people[2], 'create', personal, config, people)).toBe('manager');
+ });
+ it('respects configured supervisor roles rather than treating every personal goal as self-supervised', () => {
+  const config = settings();
+  const personal = { ...payload, goalLevel: 'personal' as const };
+  config.supervisorIds = ['manager'];
+  expect(confirmationReviewer({ ...people[1], jobTitle: '负责人' }, 'create', personal, config, people)).toBeUndefined();
+  config.supervisorIds = [];
+  expect(confirmationReviewer(people[1], 'create', personal, config, people)).toBe('admin');
+ });
+ it('automatically resolves existing personal requests and preserves pending department requests', () => {
+  const config = settings();
+  const pending: OkrRecord = { ...record, status: 'submitted', payload: { ...payload, goalLevel: 'personal' }, changeRequest: { id: 'change', status: 'pending', purpose: 'initial', reviewerId: 'admin', reason: '首次提交', requestedAt: '2026-10-17', baseVersion: record.version, payload: { ...payload, goalLevel: 'personal' } } };
+  expect(effectiveReviewer(pending, config, people)).toBeUndefined();
+  const department = { ...pending, id: 'department', payload, changeRequest: { ...pending.changeRequest!, payload } };
+  const [resolved, unchanged] = reconcileConfirmationRequests([pending, department], config, people);
+  expect(resolved.status).toBe('active');
+  expect(resolved.changeRequest).toMatchObject({ status: 'approved', reviewerId: 'system' });
+  expect(resolved.changeHistory).toHaveLength(1);
+  expect(unchanged).toEqual(department);
  });
 });

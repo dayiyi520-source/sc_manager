@@ -4,6 +4,7 @@ import { normalizeObjectiveTitleTemplates, validateObjectiveTitleTemplates } fro
 import type { OkrConfirmationSettings, OkrPerson, OkrRecord, OkrSettings, OkrPermission } from './okrRepository';
 import { defaultCycles, materializePeriods } from './okrPeriods';
 import { lockGoalPlan } from './okrThreeLevelRules';
+import { goalLevel } from './okrGoalRules';
 export const defaultConfirmation = (): OkrConfirmationSettings => ({ enabled:true,visiblePending:true,actions:['create','update'],types:['target','challenge'],missingSupervisor:'admin',selfSupervisor:'auto',exemptIds:[] });
 export const OKR_PERMISSIONS: OkrPermission[] = ['okrTemplates','reviewTemplates','roleSettings','weeklyCycles','confirmationSettings','companyGoalEdit'];
 export function normalizedPolicy(settings: OkrSettings, people: OkrPerson[] = []): OkrSettings {
@@ -59,7 +60,9 @@ export function confirmationReviewer(owner: OkrPerson, action: 'create'|'update'
   if (!settings?.confirmation) return owner.rootFlag || action === 'delete' || action === 'create' && payload.origin !== 'autonomous' ? undefined : owner.supervisorId || undefined;
   const policy = settings.confirmation;
   if (!policy.enabled || !policy.actions.includes(action) || !policy.types.includes(payload.objectiveType || 'target') || policy.exemptIds.includes(owner.id) || isOkrAdmin(owner.id,settings,people)) return undefined;
-  let supervisor = people.find(p=>p.id===owner.supervisorId);
+  const configuredRole = settings.supervisorIds ? settings.supervisorIds.includes(owner.id) ? 'supervisor' as const : 'employee' as const : owner.goalRole;
+  const ownDepartmentSupervisor = payload.goalLevel === 'personal' && goalLevel({ ...owner, goalRole: configuredRole }) === '部门级';
+  let supervisor = ownDepartmentSupervisor ? owner : people.find(p=>p.id===owner.supervisorId);
   if (!supervisor && policy.missingSupervisor === 'upper') { const candidates = people.filter(person => person.id !== owner.id && person.goalRole === 'supervisor' && person.department.trim() === owner.department.trim()); if (candidates.length === 1) supervisor = candidates[0]; }
   if (supervisor && supervisor.id !== owner.id) return supervisor.id;
   const fallback = supervisor?.id === owner.id ? policy.selfSupervisor : policy.missingSupervisor;
