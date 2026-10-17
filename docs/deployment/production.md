@@ -30,6 +30,9 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
+本次成功发布：2026-10-17；发布编号 `20261017T050931Z`；源码提交 `c7ff6caee88b95b3b1a61ec30912748787b0d215`；发布目录 `/opt/sc-manager-frontend/releases/20261017T050931Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261017T050931Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`，首页、入口资源、业务直达路由、Mock 健康接口和共享数据读取核验通过。
+
+
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
 
 失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
