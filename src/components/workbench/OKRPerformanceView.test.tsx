@@ -587,18 +587,18 @@ describe('OKRPerformanceView target navigation', () => {
     render(<OKRPerformanceView/>);
     fireEvent.click(screen.getByRole('button', { name: '添加目标选项' }));
     fireEvent.click(screen.getByRole('menuitem', { name: '部门目标' }));
-    expect(await screen.findAllByLabelText('目标名称')).toHaveLength(2);
+    expect(await screen.findAllByLabelText('目标名称')).toHaveLength(4);
     expect(screen.getByRole('combobox',{name:'目标归属周期'})).toBeEnabled();
     const editor=screen.getAllByLabelText('目标名称')[0].closest('.ant-drawer-body') as HTMLElement;
     expect(within(editor).getByRole('button',{name:'添加目标'})).toBeEnabled();
-    expect(screen.getAllByLabelText('目标名称')).toHaveLength(2);
+    expect(screen.getAllByLabelText('目标名称')).toHaveLength(4);
     expect(screen.queryByRole('button',{name:'选择对齐'})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'提交主管确认'}));
     const confirmation=(await screen.findByText('确认目标权重')).closest('[role="dialog"]') as HTMLElement;
-    expect(within(confirmation).getByLabelText('O2权重')).toBeDisabled();
+    expect(within(confirmation).getByLabelText('O4权重')).toBeDisabled();
     expect(okrState.saveObjective).not.toHaveBeenCalled();
     fireEvent.click(within(confirmation).getByRole('button',{name:/取\s*消/}));
-    expect(screen.getAllByLabelText('目标名称')).toHaveLength(2);
+    expect(screen.getAllByLabelText('目标名称')).toHaveLength(4);
     expect(okrState.saveObjective).not.toHaveBeenCalled();
   }, 15000);
 
@@ -609,21 +609,22 @@ describe('OKRPerformanceView target navigation', () => {
     render(<OKRPerformanceView/>);
     fireEvent.click(screen.getByRole('button',{name:'添加目标选项'}));
     fireEvent.click(await screen.findByRole('menuitem',{name:'部门目标'}));
-    expect(await screen.findByText('来源：O1 · 提升年度经营质量 / KR1 · 改善重点客户交付')).toBeVisible();
-    expect(screen.getByText('来源：O2 · 第二公司目标 / KR1 · 第二承接来源')).toBeVisible();
+    expect(await screen.findAllByText('来源：O1 · 提升年度经营质量 / KR1 · 改善重点客户交付')).toHaveLength(2);
+    expect(screen.getAllByText('来源：O2 · 第二公司目标 / KR1 · 第二承接来源')).toHaveLength(2);
     const inputs=await screen.findAllByLabelText('A1 期望达成的结果');
+    expect(inputs).toHaveLength(4);
     fireEvent.change(inputs[0],{target:{value:'保留第一条输入'}});
     fireEvent.change(inputs[1],{target:{value:'保留第二条输入'}});
     fireEvent.click(screen.getByText('全部目标'));
     expect(screen.getByText('其他承接参考')).toBeVisible();
     fireEvent.click(screen.getAllByRole('button',{name:'定位填写'})[1]);
-    expect(screen.getByRole('generic',{name:'目标填写块 2'})).toHaveClass('is-located');
+    expect(screen.getByRole('generic',{name:'目标填写块 3'})).toHaveClass('is-located');
     fireEvent.click(screen.getByText('我的承接'));
     expect(screen.getAllByLabelText('A1 期望达成的结果')[0]).toHaveValue('保留第一条输入');
     expect(screen.getAllByLabelText('A1 期望达成的结果')[1]).toHaveValue('保留第二条输入');
     fireEvent.click(screen.getByRole('button',{name:'存草稿'}));
-    await waitFor(()=>expect(okrState.saveObjectiveDraft).toHaveBeenCalledTimes(2));
-    expect(okrState.saveObjectiveDraft.mock.calls.map(call=>(call as unknown as [string,{sourceKrId:string}])[1].sourceKrId)).toEqual(['a1','a2']);
+    await waitFor(()=>expect(okrState.saveObjectiveDraft).toHaveBeenCalledTimes(4));
+    expect(okrState.saveObjectiveDraft.mock.calls.map(call=>(call as unknown as [string,{sourceKrId:string}])[1].sourceKrId)).toEqual(['a1','a1','a2','a2']);
   });
 
   it.each(['staff','manager'])('preserves both %s action blocks and their independent department sources across reference switches', async ownerId => {
@@ -813,7 +814,7 @@ describe('OKRPerformanceView target navigation', () => {
   it.each([2,3])('initializes only unused department templates with %s templates occupied', async occupied => {
     currentUser={id:'manager',name:'主管',department:'产品部'};
     okrState.settings.objectiveTitleTemplates=[1,2,3].map(i=>({id:'t'+i,title:'模板'+i,department:'产品部',enabled:true,guidance:'',krTypes:['support']}));
-    okrState.records=[objectiveRecord,...Array.from({length:occupied},(_,i)=>({...objectiveRecord,id:'used'+i,ownerId:'manager',status:'draft',payload:{title:'模板'+(i+1),goalLevel:'department' as const,objectiveTitleTemplateId:'t'+(i+1),sourceKrId:'other-source'}}))];
+    okrState.records=[objectiveRecord,...Array.from({length:occupied},(_,i)=>({...objectiveRecord,id:'used'+i,ownerId:'manager',status:'draft',payload:{title:'模板'+(i+1),goalLevel:'department' as const,objectiveTitleTemplateId:'t'+(i+1),sourceObjectiveId:objectiveRecord.id,sourceKrId:'a1'}}))];
     render(<OKRPerformanceView/>);
     fireEvent.click(screen.getByRole('button',{name:'添加目标选项'})); fireEvent.click(await screen.findByRole('menuitem',{name:'部门目标'}));
     const input=await screen.findByLabelText('目标名称');

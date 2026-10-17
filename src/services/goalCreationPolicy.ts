@@ -2,7 +2,7 @@ import { isOkrAdmin } from './okrSettingsPolicy';
 import { canAlignPeriod } from './okrPeriods';
 import { goalLevel } from './okrGoalRules';
 import { normalizeObjectiveTitleTemplates } from './okrObjectiveTitleTemplates';
-import { autonomousGoalPayload, inheritedGoalPayload, sourceKeyResults } from './okrThreeLevelRules';
+import { inheritedGoalPayload, sourceKeyResults } from './okrThreeLevelRules';
 import type { OkrPerson, OkrRecord, OkrSettings, OkrPayload } from './okrRepository';
 export type GoalCreationLevel = 'personal' | 'department';
 export function creationSources(records: OkrRecord[], person: OkrPerson, level: GoalCreationLevel, people: OkrPerson[]) {
@@ -29,14 +29,55 @@ export function departmentChallengeTypes(settings: OkrSettings | undefined, pers
   return types.length ? types : ['support' as const];
 }
 
-export function departmentCreationPayloads(settings: OkrSettings, records: OkrRecord[], person: OkrPerson, period: string, people: OkrPerson[], references: OkrRecord[]): OkrPayload[] {
-  const pending = references.filter(reference => !records.some(record => record.kind === 'objective' && record.status !== 'deleted' && record.ownerId === person.id && record.periodKey === period && record.payload.goalLevel !== 'personal' && [record.payload, ...(record.changeRequest?.status === 'pending' ? [record.changeRequest.payload] : [])].some(payload => payload.sourceObjectiveId === reference.payload.sourceObjectiveId && payload.sourceKrId === reference.id)));
-  const templates = unusedDepartmentTemplates(settings, records, person, period, people);
-  const payloads = templates.map((template, index): OkrPayload => ({
-    ...autonomousGoalPayload(person, 'department'), ...(pending.length ? inheritedGoalPayload(pending[index % pending.length], person) : {}),
-    inherited: false, goalLevel: 'department', title: template.title, objectiveType: 'target', objectiveTitleTemplateId: template.id, objectiveTemplateKrTypes: template.krTypes, keyResults: [],
-  }));
-  for (const reference of pending.slice(templates.length)) payloads.push({ ...inheritedGoalPayload(reference, person), inherited: false, objectiveType: 'challenge', objectiveTemplateKrTypes: departmentChallengeTypes(settings, person) });
+export function departmentTemplateUsageKey(payload: OkrPayload) {
+  if (!payload.sourceObjectiveId || !payload.sourceKrId || !payload.objectiveTitleTemplateId) return undefined;
+  return `${payload.sourceObjectiveId}:${payload.sourceKrId}:${payload.objectiveTitleTemplateId}`;
+}
+
+function departmentUsedTemplateKeys(records: OkrRecord[], person: OkrPerson, period: string, extraPayloads: OkrPayload[] = []) {
+  const keys = new Set<string>();
+  for (const record of records) {
+    if (record.kind !== 'objective' || record.ownerId !== person.id || record.periodKey !== period || record.status === 'deleted' || record.payload.goalLevel !== 'department') continue;
+    for (const payload of [record.payload, ...(record.changeRequest?.status === 'pending' ? [record.changeRequest.payload] : [])]) {
+      const key = departmentTemplateUsageKey(payload);
+      if (key) keys.add(key);
+    }
+  }
+  for (const payload of extraPayloads) {
+    const key = departmentTemplateUsageKey(payload);
+    if (key) keys.add(key);
+  }
+  return keys;
+}
+
+
+export function isDepartmentTemplateAvailable(settings: OkrSettings | undefined, records: OkrRecord[], person: OkrPerson, period: string, payload: OkrPayload) {
+  const template = (settings ? normalizeObjectiveTitleTemplates(settings) : []).find(row => row.id === payload.objectiveTitleTemplateId && row.enabled && row.department.trim() === person.department.trim());
+  const key = departmentTemplateUsageKey(payload);
+  return Boolean(template && key && !departmentUsedTemplateKeys(records, person, period).has(key));
+}
+
+export function departmentCreationPayloads(settings: OkrSettings, records: OkrRecord[], person: OkrPerson, period: string, people: OkrPerson[], references: OkrRecord[], extraPayloads: OkrPayload[] = []): OkrPayload[] {
+  const templates = normalizeObjectiveTitleTemplates(settings).filter(template => template.enabled && template.department.trim() === person.department.trim());
+  const usedKeys = departmentUsedTemplateKeys(records, person, period, extraPayloads);
+  const payloads: OkrPayload[] = [];
+  for (const reference of references) {
+    for (const template of templates) {
+      const key = `${reference.payload.sourceObjectiveId}:${reference.id}:${template.id}`;
+      if (usedKeys.has(key)) continue;
+      payloads.push({
+        ...inheritedGoalPayload(reference, person),
+        inherited: false,
+        goalLevel: 'department',
+        title: template.title,
+        objectiveType: 'target',
+        objectiveTitleTemplateId: template.id,
+        objectiveTemplateKrTypes: template.krTypes,
+        keyResults: [],
+      });
+      usedKeys.add(key);
+    }
+  }
   return payloads;
 }
 

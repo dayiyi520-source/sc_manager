@@ -1,4 +1,4 @@
-import { creationPeriodError, unusedDepartmentTemplates } from './goalCreationPolicy';
+import { creationPeriodError, isDepartmentTemplateAvailable } from './goalCreationPolicy';
 import { normalizeGoalAssignments, assignedDetailRows } from './okrAssignments';
 import { normalizeObjectiveTitleTemplates } from './okrObjectiveTitleTemplates';
 import { restoreReturnedInitialDraft } from './okrSubmissionState';
@@ -122,14 +122,14 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
   if (!record) {
     const unavailable = payload.goalLevel === 'company' ? undefined : creationPeriodError(records, owner, payload.goalLevel === 'department' ? 'department' : 'personal', people, body.periodKey || '',settings);
     if (unavailable) throw new Error(unavailable);
-    if (payload.goalLevel === 'department' && payload.objectiveTitleTemplateId && !unusedDepartmentTemplates(settings, records, owner, body.periodKey || '', people).some(template => template.id === payload.objectiveTitleTemplateId)) throw new Error('该周期部门 O 模板已占用或不可用，请重新添加目标');
+    if (payload.goalLevel === 'department' && payload.objectiveTitleTemplateId && !isDepartmentTemplateAvailable(settings, records, owner, body.periodKey || '', payload)) throw new Error('该周期部门 O 模板已占用或不可用，请重新添加目标');
   }
   const submission = record ? body.action === 'submit' || !['draft','submitted'].includes(record.status) : body.submit !== false;
   if (submission) { const error = validateThreeLevelGoal(payload, owner.id); if (error) throw new Error(error); }
   verifySource(payload, records, owner, record?.periodKey || body.periodKey || '', settings, people);
   if (record && !['draft','submitted'].includes(record.status) && (payload.deadline !== record.payload.deadline || record.payload.keyResults?.some(kr => { const next = payload.keyResults?.find(item => item.id === kr.id); return next && next.deadline !== kr.deadline; }))) throw new Error('目标及 KR 原计划日期已锁定');
   if (record && record.payload.goalModelVersion === 2 && records.some(child => child.status !== 'deleted' && child.payload.sourceObjectiveId === record.id && !payload.keyResults?.some(kr => kr.id === child.payload.sourceKrId))) throw new Error('已有下级承接的 KR 不能移除，请先处理承接关系');
-  if (payload.sourceKrId && !(payload.goalLevel === 'department' && payload.objectiveType === 'challenge' && !payload.objectiveTitleTemplateId) && records.some(item => item.id !== record?.id && item.status !== 'deleted' && item.kind === 'objective' && item.ownerId === person.id && item.periodKey === (record?.periodKey || body.periodKey) && (payload.goalLevel !== 'department' || !payload.objectiveTitleTemplateId || item.payload.objectiveTitleTemplateId === payload.objectiveTitleTemplateId) && (item.payload.sourceKrId === payload.sourceKrId || (item.changeRequest?.status === 'pending' && item.changeRequest.payload.sourceKrId === payload.sourceKrId)))) throw new Error('该指派已承接或正在关联确认，请继续编辑已有目标');
+  if (payload.sourceKrId && !(payload.goalLevel === 'department' && payload.objectiveType === 'challenge' && !payload.objectiveTitleTemplateId) && records.some(item => item.id !== record?.id && item.status !== 'deleted' && item.kind === 'objective' && item.ownerId === person.id && item.periodKey === (record?.periodKey || body.periodKey) && (payload.goalLevel !== 'department' || !payload.objectiveTitleTemplateId || (item.payload.objectiveTitleTemplateId === payload.objectiveTitleTemplateId && item.payload.sourceObjectiveId === payload.sourceObjectiveId)) && (item.payload.sourceObjectiveId === payload.sourceObjectiveId && item.payload.sourceKrId === payload.sourceKrId || item.changeRequest?.status === 'pending' && item.changeRequest.payload.sourceObjectiveId === payload.sourceObjectiveId && item.changeRequest.payload.sourceKrId === payload.sourceKrId))) throw new Error('该指派已承接或正在关联确认，请继续编辑已有目标');
   const reviewerId = submission ? confirmationReviewer(owner,record && !['draft','submitted'].includes(record.status) ? 'update' : 'create',payload,settings,people) : undefined;
   if (record && !['draft','submitted'].includes(record.status) && reviewerId) {
     if (!payload.changeReason?.trim()) throw new Error('请填写修改原因');

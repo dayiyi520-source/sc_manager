@@ -16,10 +16,20 @@ describe('goal creation policy',()=>{
   const refs = assignedReferences(records,people[1]);
   const payloads = departmentCreationPayloads(config,records,people[1],'2026-10',people,refs);
   expect(payloads.map(payload=>payload.sourceKrId)).toEqual(['ck','ck2','ck3']);
-  expect(payloads.filter(payload=>payload.objectiveTitleTemplateId)).toHaveLength(1);
+  expect(payloads.filter(payload=>payload.objectiveTitleTemplateId)).toHaveLength(3);
   for(const [i,payload] of payloads.entries()) records=mutateOkrLifecycle(undefined,{viewerId:'manager',periodKey:'2026-10',submit:false,payload:{...payload,title:payload.title || '独立承接'+i}},records,people,config)!.records;
   expect(records.filter(record=>record.ownerId==='manager').map(record=>record.payload.sourceObjectiveId)).toEqual(['company','company2','company3']);
   expect(departmentCreationPayloads(config,records,people[1],'2026-10',people,refs)).toEqual([]);
+ });
+ it('creates one承诺型 O for every unused template under every assigned KR',()=>{
+  const second: OkrRecord = {...company,id:'company2',payload:{...company.payload,keyResults:[{id:'ck2',title:'第二公司KR',weight:100,progress:0,assigneeIds:['manager']}]}};
+  const refs = assignedReferences([company, second], people[1]);
+  const payloads = departmentCreationPayloads(settings, [company, second], people[1], '2026-10', people, refs);
+  expect(payloads).toHaveLength(6);
+  expect(payloads.map(payload => `${payload.sourceKrId}:${payload.objectiveTitleTemplateId}`)).toEqual(['ck:t1','ck:t2','ck:t3','ck2:t1','ck2:t2','ck2:t3']);
+  expect(payloads.every(payload => payload.objectiveType === 'target')).toBe(true);
+  const partial = payloads.filter(payload => !(['ck:t3','ck2:t2','ck2:t3'] as string[]).includes(`${payload.sourceKrId}:${payload.objectiveTitleTemplateId}`));
+  expect(departmentCreationPayloads(settings, partial.map((payload, index) => ({ id:`used-${index}`, kind:'objective' as const, ownerId:'manager', periodKey:'2026-10', status:'draft' as const, version:1, payload })), people[1], '2026-10', people, refs).map(payload => `${payload.sourceKrId}:${payload.objectiveTitleTemplateId}`)).toEqual(['ck:t3','ck2:t2','ck2:t3']);
  });
  it('limits periods to effective upstream goals and uses department goals for manager personal goals',()=>{
   const records=[company,department,{...company,id:'nov',periodKey:'2026-11'},{...department,id:'draft',status:'draft',periodKey:'2026-12'}];
