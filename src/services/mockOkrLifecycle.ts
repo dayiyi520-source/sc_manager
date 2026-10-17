@@ -25,7 +25,8 @@ function verifySource(payload: OkrPayload, records: OkrRecord[], person: OkrPers
   }
   const source = records.find(record => record.id === payload.sourceObjectiveId && canAlignPeriod(period,record.periodKey,settings?.cycles?.crossAlignment) && ['active', 'reviewed'].includes(record.status));
   const kr = source && sourceKeyResults(source).find(item => item.id === payload.sourceKrId);
-  if (!source || (source.changeRequest?.purpose === 'initial' && source.changeRequest.status !== 'approved') || source.ownerId !== person.supervisorId || !kr?.assigneeIds?.includes(person.id)) throw new Error('上级关键结果已撤回或不再指派给本人，请刷新');
+  const supervisorOwnDepartmentSource = goalLevel(person) === '部门级' && source?.ownerId === person.id && source.payload.goalLevel === 'department';
+  if (!source || (source.changeRequest?.purpose === 'initial' && source.changeRequest.status !== 'approved') || (!supervisorOwnDepartmentSource && source.ownerId !== person.supervisorId) || !kr?.assigneeIds?.includes(person.id)) throw new Error('上级关键结果已撤回或不再指派给本人，请刷新');
   if (kr.deadline && (payload.deadline && payload.deadline > kr.deadline || payload.keyResults?.some(item => item.deadline && item.deadline > kr.deadline! || item.executionActions?.some(action => action.deadline && action.deadline > kr.deadline!)))) throw new Error('部门计划截止日期不能超过上级 KR 原计划');
   if (payload.sourceVersion !== source.version) throw new Error('上级目标已更新，请先确认同步再提交');
   if (payload.goalLevel === 'personal' && (payload.title !== kr.title || payload.keyResults?.length !== 1 || payload.keyResults[0].id !== kr.id || payload.keyResults[0].title !== kr.title || (!payload.keyResults[0].plannedDeadline && payload.keyResults[0].deadline !== kr.deadline) || payload.keyResults[0].weight !== 100 || payload.keyResults[0].businessObject !== kr.businessObject || payload.keyResults[0].stage !== kr.stage || payload.keyResults[0].version !== kr.version || JSON.stringify(payload.keyResults[0].details) !== JSON.stringify(assignedDetailRows(kr, person.id)) || payload.keyResults[0].progress !== 0 || payload.keyResults[0].structureType !== kr.structureType || payload.keyResults[0].action !== kr.action || payload.keyResults[0].result !== kr.result || (!payload.plannedDeadline && payload.deadline !== kr.deadline))) throw new Error('个人只能填写本人 A，不能修改上级 KR');
@@ -118,7 +119,7 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
   const owner = record ? people.find(p=>p.id===record.ownerId)! : person;
   const expectedLevel = goalLevel(owner) === '部门级' ? 'department' : 'personal';
   if (payload.goalLevel === 'company' && !hasOkrPermission(person.id,'companyGoalEdit',settings,people)) throw new Error('无公司级目标权限');
-  if (payload.goalLevel !== 'company' && payload.goalLevel !== expectedLevel && !(expectedLevel === 'department' && payload.goalLevel === 'personal' && payload.origin === 'autonomous')) throw new Error('目标层级与本人组织角色不匹配');
+  if (payload.goalLevel !== 'company' && payload.goalLevel !== expectedLevel && !(expectedLevel === 'department' && payload.goalLevel === 'personal' && ['autonomous', 'assigned'].includes(payload.origin || ''))) throw new Error('目标层级与本人组织角色不匹配');
   if (!record) {
     const unavailable = payload.goalLevel === 'company' ? undefined : creationPeriodError(records, owner, payload.goalLevel === 'department' ? 'department' : 'personal', people, body.periodKey || '',settings);
     if (unavailable) throw new Error(unavailable);

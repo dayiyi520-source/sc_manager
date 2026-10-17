@@ -351,7 +351,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     return true;
   };
   const appendAutonomousGoal = () => {
-    if (!me || creationLevel !== 'department' && !canAppendGoal()) return;
+    if (!me || creationLevel === 'personal' && !canAppendGoal()) return;
     const blocked = creationLevel === 'company' ? undefined : creationPeriodError(records, me, creationLevel, people, targetFormCycle, settings);
     if (blocked) { addToast('warning', blocked); return; }
     const candidates = creationLevel === 'company' ? [] : challengeReferences(records, me, creationLevel, people, targetFormCycle, settings);

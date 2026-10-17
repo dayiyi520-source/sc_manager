@@ -15,6 +15,12 @@ describe('自主目标与历史承接规则',()=>{
   const approved=mutateOkrLifecycle(record.id,{viewerId:'user-admin',action:'approve-change',version:record.version},created.records,people)!;
   expect(approved.records.at(-1)!.status).toBe('active');expect(approved.records.at(-1)!.payload.plannedDeadline).toBe('2026-09-30');
  });
+ it('allows a supervisor to save an assigned personal goal aligned to a department KR',()=>{
+  const department={...company,id:'department',ownerId:'manager',payload:{...company.payload,goalLevel:'department' as const,keyResults:[{id:'dept-kr',title:'部门结果',deadline:'2026-09-30',weight:100,progress:0,assigneeIds:['manager']}]}};
+  const reference=assignedReferences([department],{...people[1],supervisorId:'manager'})[0];
+  const payload={...inheritedGoalPayload(reference,people[1],'personal'),sourceVersion:department.version,inherited:false,keyResults:[{...inheritedGoalPayload(reference,people[1],'personal').keyResults![0],executionActions:[{id:'a',ownerId:'manager',title:'完成个人承接',weight:100,progress:0,deadline:'2026-09-25'}]}]};
+  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',periodKey:'2026-09',viewerId:'manager',payload,submit:false},[department],people)).not.toThrow();
+ });
  it('supports employee autonomous O/A with approval by manager and later update review',()=>{
   const created=mutateOkrLifecycle(undefined,{kind:'objective',periodKey:'2026-09',viewerId:'employee',payload:own('personal'),submit:true},[{...company,id:'upstream-dept',ownerId:'manager',payload:{...company.payload,goalLevel:'department'}}],people)!;
   const record=created.records.at(-1)!;expect(record.changeRequest?.reviewerId).toBe('manager');

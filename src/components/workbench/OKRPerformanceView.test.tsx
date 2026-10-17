@@ -660,6 +660,14 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument();
   });
 
+  it('allows company creation to append a blank target from the drawer footer', async () => {
+    render(<OKRPerformanceView />);
+    fireEvent.click(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' }));
+    const editor = document.querySelector('.company-objective-drawer .ant-drawer-body') as HTMLElement;
+    fireEvent.click(within(editor).getByRole('button', { name: '添加目标' }));
+    expect(screen.getAllByLabelText('目标名称')).toHaveLength(2);
+  }, 15000);
+
   it('protects the initial objective and removes only an added objective', async () => {
     render(<OKRPerformanceView />);
     fireEvent.click(within(screen.getByRole('complementary', { name: '目标范围导航' })).getByRole('button', { name: '添加目标' }));
