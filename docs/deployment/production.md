@@ -30,7 +30,7 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-本次成功发布：2026-10-17；发布编号 `20261017T075152Z`；源码提交 `d4504c9a8523406d59e6bc8982746348cbf16c2b`；发布目录 `/opt/sc-manager-frontend/releases/20261017T075152Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261017T075152Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`，首页、入口资源、业务直达路由、Mock 健康接口和共享数据读取核验通过。
+本次成功发布：2026-10-17；发布编号 `20261017T090548Z`；源码提交 `a1907de061e8be2669cb17e61bc152e4a4b8a9a0`；发布目录 `/opt/sc-manager-frontend/releases/20261017T090548Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261017T090548Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`，首页、入口资源、业务直达路由、确认规则资源、Mock 健康接口和共享数据读取核验通过。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
@@ -40,6 +40,18 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 上次已核实的发布：20261017T024552Z，源码 989db48。
 
 ## 最近成功发布
+
+- 发布时间：2026-10-17 17:05:48（北京时间，发布编号生成时间）。
+- 发布编号：20261017T090548Z；发布源码：a1907de061e8be2669cb17e61bc152e4a4b8a9a0。
+- 发布目录：/opt/sc-manager-frontend/releases/20261017T090548Z。
+- 回滚备份：/opt/sc-manager-frontend/backups/20261017T090548Z；上一版本目标记录于该目录 previous-target.txt。
+- 修复主管填写本人个人目标时确认人判断，按“直属主管是自己时”的配置自动通过或转交上级；部门目标和普通员工确认规则保持。
+- 发布前 52 项相关测试、类型检查和生产构建通过；使用已提交源码独立快照及发布前线上共享数据，通过既有 Python 发布入口构建和切换。未上传本地未提交业务数据。
+- 首页与入口资源、目标总结设置和月度目标直达路由、线上确认策略资源、Mock 健康接口和共享数据核验通过；当前 selfSupervisor=auto。
+- 发布后保留 46 条目标复盘记录，人员及配置保持；构建期间一条线上草稿版本递增，已按服务器备份与版本合并规则核验保留，目标状态修订号为 123。产研模板与发布前一致。
+- 回滚从本次备份 previous-target.txt 读取旧目录并切换 dist，再调用本次发布目录 mock-service/setup.py 的 --rollback 模式恢复服务、路由及共享数据。
+
+### 前次发布记录（20261017T075152Z）
 
 - 发布时间：2026-10-17 15:51:52（北京时间，发布编号生成时间）。
 - 发布编号：20261017T075152Z；发布源码：d4504c9a8523406d59e6bc8982746348cbf16c2b。
