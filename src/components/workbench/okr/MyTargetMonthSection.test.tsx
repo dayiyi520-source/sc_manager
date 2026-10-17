@@ -58,6 +58,7 @@ describe('MyTargetMonthSection', () => {
     const onDelete=vi.fn(),onOpen=vi.fn();
     const target={...targets[0],awaitingApproval:true,editable:false,deletable:true,actions:[{...targets[0].actions[0],executionActions:[{id:'a',title:'设计动作',weight:60,progress:25,deadline:'2026-10-20'}]}]};
     render(<MyTargetMonthSection periodKey="2026-10" targets={[target]} viewMode={viewMode} collapsed={false} onToggle={vi.fn()} onOpenTarget={onOpen} onDeleteTarget={onDelete}/>);
+    expect(screen.getAllByText('待上级审核')).toHaveLength(1);
     expect(screen.queryByLabelText(`编辑目标：${target.title}`)).not.toBeInTheDocument();
     if (viewMode === 'list') {
       expect(screen.getByText('设计动作')).toBeInTheDocument();

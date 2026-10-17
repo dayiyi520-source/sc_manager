@@ -287,7 +287,7 @@ const ListTarget: React.FC<{ target: MyTargetViewItem; index: number; onOpen: ()
   return <article className="okr-target-list-item" aria-label={`目标：${target.title}`}>
     <header>
       <div className="okr-target-list-copy">
-        {target.autonomous && <Tag>自主提出</Tag>}{target.status === 'draft' && <Tag className="okr-target-list-draft">草稿</Tag>}{target.status === 'partial-draft' && <Tag className="okr-target-list-draft">部分草稿</Tag>}
+        {target.awaitingApproval && <Tag color="processing">待上级审核</Tag>}{target.autonomous && <Tag>自主提出</Tag>}{target.status === 'draft' && <Tag className="okr-target-list-draft">草稿</Tag>}{target.status === 'partial-draft' && <Tag className="okr-target-list-draft">部分草稿</Tag>}
         <div className={`okr-target-hierarchy${target.alignmentLabel || target.sourceName || target.ownerNames.length ? ' has-links' : ''}`}>
           <span className="okr-target-hierarchy-source"><span className="okr-target-hierarchy-label">{target.alignmentLabel || target.sourceName || '未设置对齐'}</span></span>
           <div className="okr-target-title-line"><span className="okr-summary-index">{target.primaryLabel || 'O'}{index + 1}</span><h3>{target.title}</h3></div>

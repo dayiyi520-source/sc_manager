@@ -15,27 +15,27 @@ describe('三级目标沿用现有表单', () => {
  const selector=screen.getByRole('button',{name:'KR类型'});expect(selector).toBeEnabled();
  expect(selector).toHaveClass('okr-kr-template-switcher');
  fireEvent.click(selector);
- fireEvent.click(await screen.findByText('G- KR'));
+ fireEvent.click(await screen.findByText('通用KR'));
  expect(screen.queryByLabelText('A1 产品')).not.toBeInTheDocument();expect(screen.getByLabelText('A1 KR内容')).toBeInTheDocument();
  expect(ref.current!.snapshot().keyResults![0]).toMatchObject({structureType:'support',weight:100,assigneeIds:['manager'],executionActions:[{title:'本人行动'}]});expect(ref.current!.snapshot().keyResults![0].businessObject).toBeUndefined();expect(ref.current!.snapshot().keyResults![0].details).toBeUndefined();
  fireEvent.change(screen.getByLabelText('A1 KR内容'),{target:{value:'内部支持'}});expect(ref.current!.snapshot().keyResults![0].action).toBe('内部支持');
  });
  it('automatically selects and locks the only department KR type',()=>{
- render(<ObjectiveForm {...common} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="部门级" alignmentActions={[reference]} onSave={vi.fn()}/>);expect(screen.getByRole('button',{name:'KR类型'})).toBeEnabled();expect(screen.getByText('P- KR')).toBeInTheDocument();expect(screen.queryByText('KR1')).not.toBeInTheDocument();
+ render(<ObjectiveForm {...common} ownerId="manager" ownerName="主管" supervisor root={false} goalLevel="部门级" alignmentActions={[reference]} onSave={vi.fn()}/>);expect(screen.getByRole('button',{name:'KR类型'})).toBeEnabled();expect(screen.getByText('产研KR')).toBeInTheDocument();expect(screen.queryByText('KR1')).not.toBeInTheDocument();
  });
   it.each(['部门级', '个人级'])('uses the requested objective copy for %s autonomous goals', level => {
     render(<ObjectiveForm {...common} ownerId={level === '部门级' ? 'manager' : 'employee'} ownerName="本人" supervisor={level === '部门级'} root={false} goalLevel={level} initialPayload={{title:'',origin:'autonomous',goalModelVersion:2,goalLevel:level === '部门级' ? 'department' : 'personal'}} onSave={vi.fn()}/>);
     expect(document.querySelector('.okr-source-readiness')).not.toBeInTheDocument();
     expect(screen.queryByText(/已有指派给你的 KR|本部门已有生效目标，可选择对齐|本部门本月目标尚未生效，可先制定自主目标/)).not.toBeInTheDocument();
     if (level === '部门级') expect(screen.getByLabelText('目标名称')).toHaveAttribute('placeholder','输入目标名称：明确你要达成什么，不写含糊概括的目标。');
-    else { expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument(); expect(screen.getByLabelText('KR标识')).toBeInTheDocument(); }
-    if (level === '个人级') expect(screen.getByLabelText('计划动作内容')).toHaveAttribute('placeholder','输入你计划要做的动作内容');
+    else { expect(screen.queryByLabelText('目标名称')).not.toBeInTheDocument(); expect(screen.queryByLabelText('KR标识')).not.toBeInTheDocument(); }
+    if (level === '个人级') expect(screen.getByLabelText('计划动作内容')).toHaveAttribute('placeholder','简单描述一下你本月要做的事情');
   });
   it('preserves inherited O/KR when editing only one personal plan action', () => {
     const ref=createRef<ObjectiveFormHandle>();
     const original={goalModelVersion:2 as const,goalLevel:'personal' as const,origin:'assigned' as const,title:'主管原KR',sourceObjectiveId:'department',sourceKrId:'shared',deadline:'2026-10-25',keyResults:[{id:'shared',title:'主管原KR',weight:100,progress:0,deadline:'2026-10-25',assigneeIds:['employee'],executionActions:[{id:'a',ownerId:'employee',title:'原计划',weight:100,progress:0,deadline:'2026-10-25'}]}]};
     render(<ObjectiveForm {...common} ref={ref} ownerId="employee" ownerName="员工" root={false} goalLevel="个人级" alignmentActions={[]} initialPayload={original} onSave={vi.fn()}/>);
-    expect(screen.getByLabelText('KR标识')).toBeInTheDocument();
+    expect(screen.queryByLabelText('KR标识')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('计划动作内容'),{target:{value:'新计划'}});
     const next=ref.current!.snapshot();
     expect(next.title).toBe(original.title); expect(next.keyResults?.[0].title).toBe(original.keyResults[0].title);
@@ -136,7 +136,7 @@ describe('三级目标沿用现有表单', () => {
     expect(screen.queryByLabelText('KR1业务类型')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '添加关键结果' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '添加本人动作' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('计划动作内容')).toHaveAttribute('placeholder', '输入你计划要做的动作内容');
+    expect(screen.getByLabelText('计划动作内容')).toHaveAttribute('placeholder', '简单描述一下你本月要做的事情');
     expect(screen.queryByLabelText(/本人A1|A1/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('KR1 权重')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('KR1 截止日期')).not.toBeInTheDocument();
@@ -212,7 +212,7 @@ describe('三级目标沿用现有表单', () => {
     render(<ObjectiveForm {...common} ownerId="employee" ownerName="员工" supervisor root={false} goalLevel="个人级" alignmentActions={[source]} okrRecords={[parent]} onSave={vi.fn()}/>);
     expect(screen.getByRole('region', { name: '目标承接链路' })).toHaveTextContent('部门O：提升产品交付质量');
     expect(screen.queryByText(/——来源于上级主管/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText('计划动作内容')).toHaveAttribute('placeholder','输入你计划要做的动作内容');
+    expect(screen.getByLabelText('计划动作内容')).toHaveAttribute('placeholder','简单描述一下你本月要做的事情');
     expect(screen.queryByText('KR1')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/A1/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('KR1 权重')).not.toBeInTheDocument();

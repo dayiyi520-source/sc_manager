@@ -364,3 +364,7 @@
 
 .goal-creation-source-label { display: flex; align-items: center; gap: var(--company-space-sm); }
 .goal-creation-source-label > span { flex: 1; min-width: 0; }
+
+.company-objective-form .okr-personal-plan-section { display: flex; flex-direction: column; gap: var(--company-space-sm); margin-top: var(--company-space-md); }
+.company-objective-form .okr-personal-plan-section .company-objective-metadata { display: flex; align-items: center; flex-wrap: wrap; gap: var(--company-space-sm); margin: 0; padding: var(--company-space-md) 0 0 4rem; border-bottom: 0; }
+.company-objective-form .okr-personal-plan-section.has-kr-details .company-objective-metadata { border-top: 1px solid var(--border-main); }
