@@ -17,21 +17,23 @@ describe('configured weekly cycles', () => {
     expect(backfillReviews([], [], 'e', backfill, dayjs('2026-12-01')).some(row => row.startDate === cycle.startDate)).toBe(true);
     expect(activeWeeklyCycle(settings, dayjs('2026-11-04'))).toEqual(cycle);
   });
-  it('locks begun or finished cycles, permits future deletion and rejects overlap and invalid dates', () => {
+  it('permits past creation and edits while protecting begun cycles from deletion and validating dates', () => {
     expect(validateWeeklyCycles([cycle], [], dayjs('2026-10-15'))).toBeUndefined();
-    expect(validateWeeklyCycles([], [cycle], dayjs('2026-11-03'))).toContain('不能修改或删除');
-    expect(validateWeeklyCycles([{ ...cycle, allowBackfill: true }], [cycle], dayjs('2026-12-01'))).toContain('不能修改或删除');
+    expect(validateWeeklyCycles([], [cycle], dayjs('2026-11-03'))).toContain('不能删除');
+    expect(validateWeeklyCycles([{ ...cycle, allowBackfill: true }], [cycle], dayjs('2026-12-01'))).toBeUndefined();
+    expect(validateWeeklyCycles([cycle], [], dayjs('2026-12-01'))).toBeUndefined();
+    expect(validateWeeklyCycles([cycle], [], dayjs('2026-11-03'))).toBeUndefined();
     expect(validateWeeklyCycles([], [cycle], dayjs('2026-10-15'))).toBeUndefined();
-    expect(validateWeeklyCycles([{ ...cycle, startDate: '2026-10-01', month: '2026-10' }], [cycle], dayjs('2026-10-15'))).toContain('未开始');
+    expect(validateWeeklyCycles([{ ...cycle, startDate: '2026-10-01', month: '2026-10' }], [cycle], dayjs('2026-10-15'))).toBeUndefined();
     expect(validateWeeklyCycles([cycle, { ...cycle, id: 'other' }], [], dayjs('2026-10-15'))).toContain('重叠');
     expect(validateWeeklyCycles([{ ...cycle, notifyAt: '2026-11-11T09:00' }], [], dayjs('2026-10-15'))).toContain('通知');
     expect(validateWeeklyCycles([{ ...cycle, endDate: '2026-11-31' }], [], dayjs('2026-10-15'))).toContain('日期');
   });
-  it('validates titles and locks them after the cycle starts while accepting legacy records', () => {
+  it('validates titles and permits editing after the cycle starts while accepting legacy records', () => {
     expect(validateWeeklyCycles([cycle], [], dayjs('2026-10-15'))).toBeUndefined();
     expect(validateWeeklyCycles([{ ...cycle, title: '周报一期' }], [], dayjs('2026-10-15'))).toBeUndefined();
     for (const title of ['   ', '长'.repeat(101)]) expect(validateWeeklyCycles([{ ...cycle, title }], [], dayjs('2026-10-15'))).toContain('标题');
-    expect(validateWeeklyCycles([{ ...cycle, title: '调整标题' }], [cycle], dayjs('2026-11-04'))).toContain('不能修改或删除');
+    expect(validateWeeklyCycles([{ ...cycle, title: '调整标题' }], [cycle], dayjs('2026-11-04'))).toBeUndefined();
   });
   it('does not allow ordinary calendar weeks in a configured month and keeps legacy months', () => {
     expect(reviewSubmissionAccess(settings, { title: '', reviewType: 'week', startDate: '2026-11-02', endDate: '2026-11-08' }, dayjs('2026-11-04')).allowed).toBe(false);

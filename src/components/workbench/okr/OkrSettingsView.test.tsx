@@ -17,10 +17,10 @@ describe('goal summary settings navigation', () => {
   it('restores the weekly cycle list after a remount', () => {
     const onSave = vi.fn(async () => true);
     const view = render(<OkrSettingsView settings={settings} onSave={onSave}/>);
-    fireEvent.click(screen.getByRole('button', { name: '周报周期配置' }));
+    fireEvent.click(screen.getByRole('button', { name: '周期配置' }));
     view.unmount();
     render(<OkrSettingsView settings={settings} onSave={onSave}/>);
-    expect(screen.getByRole('button', { name: '周报周期配置' })).toHaveClass('is-active');
+    expect(screen.getByRole('button', { name: '周期配置' })).toHaveClass('is-active');
     expect(screen.getByRole('button', { name: '增加周期' })).toBeEnabled();
   });
 });
@@ -114,7 +114,7 @@ it('locks duplicate submissions until the batch save finishes', async () => {
 it('persists weekly cycles immediately, keeps the tab and preserves input on failure', async () => {
   const onSave = vi.fn(async (_settings: OkrSettings) => false);
   const view = render(<OkrSettingsView settings={settings} onSave={onSave}/>);
-  fireEvent.click(screen.getByRole('button', { name: '周报周期配置' }));
+  fireEvent.click(screen.getByRole('button', { name: '周期配置' }));
   expect(screen.queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '增加周期' }));
   fireEvent.change(screen.getByLabelText('周期标题'), { target: { value: '新增周期' } });
@@ -129,7 +129,7 @@ it('persists weekly cycles immediately, keeps the tab and preserves input on fai
   await waitFor(() => expect(screen.getByRole('cell', { name: '新增周期' })).toBeVisible());
   view.unmount();
   render(<OkrSettingsView settings={{ ...settings, weeklyReviewCycles: onSave.mock.calls[1][0].weeklyReviewCycles }} onSave={onSave}/>);
-  expect(screen.getByRole('button', { name: '周报周期配置' })).toHaveClass('is-active');
+  expect(screen.getByRole('button', { name: '周期配置' })).toHaveClass('is-active');
   expect(screen.getByRole('cell', { name: '新增周期' })).toBeVisible();
   expect(screen.getByRole('button', { name: '增加周期' })).toBeEnabled();
 });
@@ -150,11 +150,11 @@ it.each([false, true])('keeps all sections viewable with partial permission %s a
   const onSave = vi.fn(async () => true);
   render(<OkrSettingsView viewerId="member" settings={{...settings,administratorIds:['admin'],permissionGrants:{member:partial?['okrTemplates']:[]},objectiveTitleTemplates:[template]}} people={people} onSave={onSave}/>);
   const nav = screen.getByRole('navigation',{name:'设置导航'});
-  for (const label of ['OKR模板','复盘总结模板','角色设置','周报周期配置','目标确认配置','默认视图']) expect(within(nav).getByRole('button',{name:label})).toBeEnabled();
+  for (const label of ['OKR模板','复盘总结模板','角色设置','周期配置','目标确认配置','默认视图']) expect(within(nav).getByRole('button',{name:label})).toBeEnabled();
   expect(screen.getByRole('button',{name:'添加O模板'}).hasAttribute('disabled')).toBe(!partial);
   fireEvent.click(within(nav).getByRole('button',{name:'角色设置'}));
   expect(screen.getByRole('button',{name:'添加成员'})).toBeDisabled();
-  fireEvent.click(within(nav).getByRole('button',{name:'周报周期配置'}));
+  fireEvent.click(within(nav).getByRole('button',{name:'周期配置'}));
   expect(screen.getByRole('button',{name:'增加周期'})).toBeDisabled();
   fireEvent.click(within(nav).getByRole('button',{name:'目标确认配置'}));
   expect(screen.getByRole('switch',{name:'目标确认'})).toBeDisabled();

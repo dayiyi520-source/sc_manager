@@ -39,7 +39,7 @@ describe('goal summary settings entry',()=>{
     expect(save.mock.calls[1][0].version).toBe(2);
     expect(screen.getByRole('button',{name:section})).toHaveClass('is-active');
   });
-  it.each(['周报周期配置', '角色设置'])('removes the redundant save action from %s', async section => {
+  it.each(['周期配置', '角色设置'])('removes the redundant save action from %s', async section => {
     vi.spyOn(okrRepository,'settings').mockResolvedValue(settings);
     vi.spyOn(okrRepository,'people').mockResolvedValue([{id:'admin',name:'管理员',department:'公司',rootFlag:1,supervisorId:null,version:0}]);
     mount();

@@ -14,7 +14,7 @@ import { normalizeWeeklyReviewRule } from '../../../services/okrReviewRules';
 import type { OkrSettings, OkrTemplate, OkrTimeRule, OkrPerson, OkrObjectiveTitleTemplate } from '../../../services/okrRepository';
 
 type Props = { key?: Key; viewerId?: string; settings: OkrSettings; busy?: boolean; readOnly?: boolean; onSave: (settings: OkrSettings) => Promise<boolean>; onClose?: () => void; departments?: string[]; people?: OkrPerson[] };
-const labels = { templates: 'OKR模板', reviewTemplates: '复盘总结模板', administrators:'角色设置', weeklyCycles: '周报周期配置', confirmation:'目标确认配置', defaultView: '默认视图' };
+const labels = { templates: 'OKR模板', reviewTemplates: '复盘总结模板', administrators:'角色设置', weeklyCycles: '周期配置', confirmation:'目标确认配置', defaultView: '默认视图' };
 const activeSectionKey = 'okr.settings.activeSection';
 const TEMPLATE_DEFAULTS: OkrTemplate[] = [
   { department: '产研部门', type: 'product', fields: ['目标内容', '关联产品', '关键节点', '动作', '截止日期', '权重'] },
