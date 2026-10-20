@@ -75,7 +75,7 @@ it('loads business task shares independently of the list and copies the business
   await act(async () => fireEvent.click(copyNumber));
   await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith('PS-001'));
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '复制详情链接' })));
-  await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith(`${window.location.origin}/manager/app/crm_presales_tasks?detailId=shared-task`));
+  await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith(`${window.location.origin}/manager/app/crm_presales_tasks?detailId=shared-task&detailView=full`));
   expect(productRepository.businessTask).toHaveBeenCalledWith('presales', 'shared-task');
   fireEvent.click(screen.getByRole('button', { name: '关闭分享详情' }));
   expect(window.location.search).toBe('');
@@ -86,7 +86,7 @@ it('loads a product task share with product context when the list is empty', asy
   vi.mocked(productRepository.workItemDetail).mockResolvedValue({ id: 'shared-task', code: 'DEV-001', category: 'dev', title: '研发任务', productLineId: 'line-1' } as Awaited<ReturnType<typeof productRepository.workItemDetail>>);
   renderTasks('dev');
   fireEvent.click(await screen.findByRole('button', { name: '复制详情链接' }));
-  await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith(`${window.location.origin}/manager/app/prod_rd_tasks?detailId=shared-task&productLineId=line-1`));
+  await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith(`${window.location.origin}/manager/app/prod_rd_tasks?detailId=shared-task&detailView=full&productLineId=line-1`));
   expect(productRepository.workItemDetail).toHaveBeenCalledWith('line-1', 'shared-task');
 });
 
@@ -189,7 +189,7 @@ it('opens a source collaboration title in a new tab from task creation', async (
   await screen.findByText('新建产品任务');
   fireEvent.click(screen.getByRole('button', { name: '协同事项 · 1' }));
   fireEvent.click(screen.getByRole('button', { name: '来源协同标题' }));
-  expect(open).toHaveBeenCalledWith(`${window.location.origin}/manager/app/wb_work_order?detailId=m-1`, '_blank');
+  expect(open).toHaveBeenCalledWith(`${window.location.origin}/manager/app/wb_work_order?detailId=m-1&detailView=full`, '_blank', 'noopener,noreferrer');
   open.mockRestore();
 });
 
@@ -204,7 +204,7 @@ it.each(['design', 'dev', 'test'] as const)('shows product task cards with statu
   else { expect(screen.queryByRole('button', { name: '关联任务 · 1' })).not.toBeInTheDocument(); return; }
   fireEvent.click(await screen.findByRole('button', { name: '关联产品任务' }));
   expect(screen.getByText('状态：处理中')).toBeVisible();
-  expect(open).toHaveBeenCalledWith(`${window.location.origin}/app/prod_req_tasks?detailId=p-1&productLineId=line-1`, '_blank');
+  expect(open).toHaveBeenCalledWith(`${window.location.origin}/app/prod_req_tasks?detailId=p-1&detailView=full&productLineId=line-1`, '_blank', 'noopener,noreferrer');
   fireEvent.click(screen.getByRole('button', { name: /已关联 1 条事项/ }));
   expect(screen.queryByText('不应作为候选')).not.toBeInTheDocument();
   open.mockRestore();

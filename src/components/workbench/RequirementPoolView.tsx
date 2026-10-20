@@ -1,7 +1,7 @@
 import { newestCreatedFirst } from '../../utils/creationOrder';
 import { collaborationDesignVariant, isCollaborationCreator, lastCollaborationProcessor } from '../../utils/collaborationWorkflow';
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Dropdown, Input, Modal as AntModal, Rate, Select } from "antd";
+import { Button, Drawer as AntDrawer, Dropdown, Input, Modal as AntModal, Rate, Select } from "antd";
 import { openWorkItemDetailLink, workItemDetailLink } from '../../utils/workItemDetailLink';
 import { loadCollaborationRelatedTasks } from '../../services/collaborationRelatedTasks';
 import { workOrderDisplayName } from '../../utils/workOrderDisplay';
@@ -35,7 +35,7 @@ import {
 } from "../common/octicons-compat";
 import { Pagination } from "../common/Pagination";
 import { useApp } from "../../context/AppContext";
-import { StatusTag, Drawer, Modal } from "../common/UIComponents";
+import { StatusTag, Modal } from "../common/UIComponents";
 import { normalizeRequirementTask, requirementRepository } from "../../services/requirementRepository";
 import { LazyRichTextEditor as RichTextEditor } from "../product/LazyRichTextEditor";
 import { RequirementTasksView } from "../product/RequirementTasksView";
@@ -232,12 +232,15 @@ const WorkOrderInput: React.FC<{ label: string; value: string; placeholder: stri
 
 
 interface RequirementPoolViewProps {
+  initialDetail?: RequirementTask;
+  fullPage?: boolean;
+  onDetailClose?: () => void;
   creationType?: WorkOrderType;
   onCreated?: (task: RequirementTask) => void;
   onCancelCreation?: () => void;
 }
 
-export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creationType, onCreated, onCancelCreation }) => {
+export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creationType, onCreated, onCancelCreation, initialDetail, fullPage = false, onDetailClose }) => {
   const [detailSearch] = useState(() => window.location.search);
   const {
     requirementTasks,
@@ -277,7 +280,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const [closeSubmitting, setCloseSubmitting] = useState(false);
   const saveInFlight = useRef(false);
   const [workOrderType, setWorkOrderType] = useState<WorkOrderType | null>(creationType || null);
-  const [selected, setSelected] = useState<RequirementTask | null>(null);
+  const [selected, setSelected] = useState<RequirementTask | null>(initialDetail || null);
   const [taskCreationKind, setTaskCreationKind] = useState<'requirement' | 'design' | 'dev' | 'test' | 'bug' | 'presales' | 'delivery' | 'ops' | null>(null);
   const [receiving, setReceiving] = useState(false);
   const receiveInFlight = useRef(false);
@@ -630,7 +633,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     }
   };
   useEffect(() => {
-    const detailId = new URLSearchParams(detailSearch).get('detailId') || '';
+    const detailId = initialDetail?.id || new URLSearchParams(detailSearch).get('detailId') || '';
     if (!detailId) return;
     let active = true;
     requirementRepository.detail(detailId).then((detail) => {
@@ -640,10 +643,11 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       setWorkItems(Array.isArray(detail.workItems) ? detail.workItems : []);
     }).catch((error) => { if (active) addToast('error', '事项详情加载失败', error instanceof Error ? error.message : '事项不存在或无权访问'); });
     return () => { active = false; };
-  }, [detailSearch]);
+  }, [detailSearch, initialDetail?.id]);
   const closeDetail = () => {
     setTaskCreationKind(null);
     setSelected(null);
+    if (onDetailClose) { onDetailClose(); return; }
     const url = new URL(window.location.href);
     url.searchParams.delete('detailId');
     window.history.replaceState(null, '', url);
@@ -1132,7 +1136,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
             </form>
         </section>
       )}
-      {!creating && !creationType && (
+      {!creating && !creationType && !initialDetail && (
         <>
           <div className="dark-panel rounded-xl p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3 pb-1">
@@ -1241,15 +1245,17 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
         </>
       )}
       {selected && !creating && (
-        <Drawer
-          isOpen={!!selected}
-          width="max-w-6xl"
-          contentClassName="overflow-hidden"
+        <AntDrawer
+          open={!!selected}
+          placement="right"
+          size={fullPage ? '100%' : 'min(1200px, 88vw)'}
+          getContainer={fullPage ? false : undefined}
+          rootStyle={fullPage ? { position: 'absolute' } : undefined}
+          mask={!fullPage}
+          styles={{ body: { overflow: 'hidden' } }}
           onClose={closeDetail}
-          hideSubtitle
           title={<span className="flex min-w-0 items-center gap-2"><span className="shrink-0">事项编号</span><span className="truncate font-mono">{selected.code || selected.id}</span><DetailCopyButton label="复制事项编号" onCopy={copyDetailId} /></span>}
-          headerActions={<DetailCopyButton label="复制详情链接" link onCopy={copyDetailLink} />}
-          subtitle={`${selected.productLineName} · 负责人：${selected.ownerName || "未分配"}`}
+          extra={<DetailCopyButton label="复制详情链接" link onCopy={copyDetailLink} />}
           footer={
             <div className="flex w-full justify-between">
               <div className="flex items-center gap-2">
@@ -1368,7 +1374,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
             </section>
             </div>
           </div>
-        </Drawer>
+        </AntDrawer>
       )}
       <AntModal title="拒绝转派" open={rejectReassignmentOpen} confirmLoading={receiving} okText="确认拒绝" cancelText="取消" onCancel={() => setRejectReassignmentOpen(false)} onOk={() => { if (!reassignReason.trim()) { addToast('warning', '请填写拒绝原因'); return; } void respondToReassignment(false, reassignReason.trim()).then(success => { if (success) setRejectReassignmentOpen(false); }); }}>
         <Input.TextArea aria-label="拒绝转派原因" value={reassignReason} maxLength={2000} onChange={event => setReassignReason(event.target.value)} placeholder="请填写拒绝原因" />

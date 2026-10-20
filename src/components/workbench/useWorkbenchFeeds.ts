@@ -1,6 +1,9 @@
+import { useApp } from '../../context/AppContext';
+import { canViewWorkbenchFeed } from '../../services/workbenchFeeds';
 import { useCallback, useEffect, useState } from 'react';
 import { FEEDS_CHANGED, FEEDS_KEY, listWorkbenchFeeds, type WorkbenchFeed } from '../../services/workbenchFeeds';
 export function useWorkbenchFeeds() {
+  const { currentUser } = useApp();
   const [feeds, setFeeds] = useState<WorkbenchFeed[]>([]);
   const [error, setError] = useState<string>();
   const reload = useCallback(() => {
@@ -13,5 +16,5 @@ export function useWorkbenchFeeds() {
     window.addEventListener(FEEDS_CHANGED, reload); window.addEventListener('storage', changed);
     return () => { window.removeEventListener(FEEDS_CHANGED, reload); window.removeEventListener('storage', changed); };
   }, [reload]);
-  return { feeds, error, reload };
+  return { feeds: feeds.filter(feed => canViewWorkbenchFeed(feed, currentUser.id)), error, reload };
 }

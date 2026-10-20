@@ -2,10 +2,11 @@ import { apiRequest } from './apiClient'
 import type { CurrentUser } from '../types'
 import { MOCK_USERS } from '../data/mockSnapshot'
 export interface Session { token:string; user:CurrentUser; expiresAt:number }
-import { SESSION_KEY as KEY, SESSION_TOKEN_KEY as TOKEN_KEY, clearStoredSession } from './sessionStorage'
+import { SESSION_KEY as KEY, SESSION_TOKEN_KEY as TOKEN_KEY, SHARED_SESSION_KEY, clearStoredSession, restoreSharedSession, shareStoredSession } from './sessionStorage'
 function storage(){return window.sessionStorage}
 export function readSession(): Session | null {
   try {
+    restoreSharedSession();
     const value = storage().getItem(KEY);
     if (!value) return null;
     const session = JSON.parse(value) as Session;
@@ -19,12 +20,14 @@ export function readSession(): Session | null {
         storage().setItem(KEY, JSON.stringify(session));
       }
     }
+    // 兼容升级前已登录的窗口，不要求用户再次登录。
+    try { if (!window.localStorage?.getItem(SHARED_SESSION_KEY)) shareStoredSession(); } catch { /* 当前窗口仍可用。 */ }
     return session;
   } catch { return null; }
 }
 export function updateSessionUser(user: CurrentUser) {
   const session = readSession();
-  if (session) storage().setItem(KEY, JSON.stringify({ ...session, user }));
+  if (session) { storage().setItem(KEY, JSON.stringify({ ...session, user })); shareStoredSession(); }
 }
 export const clearSession = clearStoredSession;
 const ROLE_USERNAMES: Record<CurrentUser['role'], string> = {
@@ -49,5 +52,6 @@ export async function devLogin(username: string) {
   const session = {token:data.token, user:data.user, expiresAt:Date.now()+data.expiresIn*1000};
   storage().setItem(KEY, JSON.stringify(session));
   storage().setItem(TOKEN_KEY, data.token);
+  shareStoredSession();
   return session;
 }

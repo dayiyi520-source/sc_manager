@@ -20,7 +20,7 @@ import { toolbarIconMarkup } from './richTextToolbarIcons';
 
 export type RichTextEditorProps = {
   editor: React.RefObject<HTMLDivElement | null>;
-  size?: 'default' | 'work-order';
+  size?: 'default' | 'work-order' | 'feed';
   readOnly?: boolean;
   value?: string;
   htmlValue?: string;
@@ -110,7 +110,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ editor, size = '
   useEffect(() => { if (!markdownMode || !instanceRef.current) return; setMarkdownDraft(turndown.turndown(safeGetContent(instanceRef.current))); }, [markdownMode]);
 
   const init = useMemo(() => ({
-    height: size === 'work-order' ? 320 : 213, menubar: false, branding: false, promotion: false, language: 'zh-CN', skin: false, content_css: false, placeholder, resize: true,
+    height: size === 'work-order' || size === 'feed' ? 320 : 213, menubar: false, branding: false, promotion: false, language: 'zh-CN', skin: false, content_css: false, placeholder, resize: size !== 'feed',
     plugins: 'image link lists codesample table',
     toolbar: readOnly ? false : 'undo redo | removeformat | blocks fontfamily fontsize | bold italic strikethrough underline | textcolorpicker backgroundcolorpicker | imageupload table customlink blockquote codesample | alignleft aligncenter alignright | bullist numlist outdent indent | lineheight | markdown',
     readonly: readOnly,

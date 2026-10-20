@@ -9,6 +9,7 @@ it.each([
   const url = new URL(workItemDetailLink('task & 1', category, 'line-1', 'https://example.com/manager/app/wb_work_order?filter=old#tab'));
   expect(url.pathname).toBe(`/manager/app/${page}`);
   expect(url.searchParams.get('detailId')).toBe('task & 1');
+  expect(url.searchParams.get('detailView')).toBe('full');
   expect(url.searchParams.get('productLineId')).toBe(category === 'WORK_ORDER' ? null : 'line-1');
   expect(url.searchParams.has('filter')).toBe(false);
   expect(url.hash).toBe('');
@@ -17,6 +18,6 @@ it.each([
 it('opens a separate tab with the same detail URL used for copying', () => {
   const open = vi.spyOn(window, 'open').mockImplementation(() => null);
   openWorkItemDetailLink('d-1', 'design', 'line-1');
-  expect(open).toHaveBeenCalledWith(workItemDetailLink('d-1', 'design', 'line-1'), '_blank');
+  expect(open).toHaveBeenCalledWith(workItemDetailLink('d-1', 'design', 'line-1'), '_blank', 'noopener,noreferrer');
   open.mockRestore();
 });

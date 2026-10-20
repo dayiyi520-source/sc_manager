@@ -172,6 +172,7 @@ type RequirementTasksViewProps = {
   taskKind?: 'requirement' | 'design' | 'test' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops';
   initialScope?: 'all' | 'my_owned' | 'my_created' | 'my_participated' | 'my_department';
   initialDetail?: RequirementTask;
+  detailPresentation?: 'drawer' | 'page';
   onDetailClose?: () => void;
   renderDetail?: (context: WorkItemDetailContext) => React.ReactNode;
   creationContext?: WorkItemCreationContext;
@@ -186,7 +187,7 @@ const EMPTY_REQUIREMENT_TASKS: RequirementTask[] = [];
 const EMPTY_BUGS: DefectBug[] = [];
 const EMPTY_DEV_TASKS: DevTask[] = [];
 
-export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, onDetailClose, renderDetail, creationContext, designVariant = 'product', designVariantFilter = designVariant, designOwnershipFilter = '', onDesignVariantChange, designExtras = [] }) => {
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, detailPresentation = 'drawer', onDetailClose, renderDetail, creationContext, designVariant = 'product', designVariantFilter = designVariant, designOwnershipFilter = '', onDesignVariantChange, designExtras = [] }) => {
   const queryClient = useQueryClient();
   const [detailSearch] = useState(() => creationContext ? '' : window.location.search);
   const {
@@ -755,6 +756,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const closeTaskDetail = () => {
     setPendingDetailTarget(null);
     setSelectedTask(null);
+    if (initialDetail && onDetailClose) { onDetailClose(); return; }
     const url = new URL(window.location.href);
     url.searchParams.delete('detailId');
     url.searchParams.delete('productLineId');
@@ -782,6 +784,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   }, [taskKind]);
 
   useEffect(() => {
+    if (initialDetail) return;
     const params = new URLSearchParams(detailSearch);
     const id = params.get('detailId') || '';
     if (!id || handledDetailId.current === id) return;
@@ -1489,7 +1492,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
         try {
           if (isBusinessTask) await productRepository.archiveBusinessTask(taskKind, task.id);
           else await productRepository.deleteWorkItem(task.productLineId!, task.id, task.revision!);
-          if (selectedTask?.id === task.id) setSelectedTask(null);
+          if (selectedTask?.id === task.id) closeTaskDetail();
           await refreshTaskLists();
           addToast('success', '任务已归档');
         } catch (error) { addToast('error', '任务归档失败', error instanceof Error ? error.message : '请稍后重试'); }
@@ -1902,7 +1905,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
           title={<span className="flex min-w-0 items-center gap-2"><WorkItemCategoryIcon category={String(selectedTask.category || taskKind || 'requirement')} className="text-[var(--primary)]" /><span>任务编号</span><span className="truncate font-mono text-xs">{selectedTask.code || selectedTask.id}</span><DetailCopyButton label="复制任务编号" onCopy={() => copyTaskValue(false)} /></span>}
           headerActions={<><DetailCopyButton label="复制详情链接" link onCopy={() => copyTaskValue(true)} /><Dropdown menu={operationMenu(selectedTask)} trigger={['click']}><Button type="text" icon={<MoreOutlined />} aria-label={`操作${selectedTask.title}`} /></Dropdown></>}
           detailHeader={detailVisible('title') ? <WorkItemDetailHeader title={selectedTask.title} titleEditable={detailEditable('title')} creatorName={selectedTask.creatorName || currentUser.name} createdAt={selectedTask.createdAt} updaterName={(selectedTask as RequirementTask & { updaterName?: string }).updaterName || selectedTask.creatorName || currentUser.name} updatedAt={(selectedTask as RequirementTask & { updatedAt?: string }).updatedAt || selectedTask.createdAt} onTitleSave={(title) => { void saveDetailUpdates({ title }).then((saved) => saved && addToast('success', '标题修改成功', '')); }} /> : undefined}
-          presentation="drawer"
+          presentation={detailPresentation}
           showContinueOption={false}
           footer={
             <>

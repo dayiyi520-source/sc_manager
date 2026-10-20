@@ -10,7 +10,7 @@ export function useNavigationState(menuGroups: MainMenuGroup[], aliases: Partial
   const routeTab = (aliases[rawRouteTab] || rawRouteTab) as SubMenuId;
   const [activeTabId, setActiveTabId] = useState<SubMenuId>(routeTab);
   const [openTabs, setOpenTabs] = useState<PageTab[]>([
-    { id: 'wb_my_tasks', title: '我的任务', mainMenuId: 'workbench', iconName: 'CheckSquare', closable: false },
+    { id: 'wb_my_tasks', title: '我的待办', mainMenuId: 'workbench', iconName: 'CheckSquare', closable: false },
   ]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1200);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);

@@ -11,11 +11,11 @@ export function workItemDetailLink(id: string, category: string, productLineId?:
   url.search = '';
   url.hash = '';
   url.searchParams.set('detailId', id);
+  url.searchParams.set('detailView', 'full');
   if (productLineId && category !== 'WORK_ORDER') url.searchParams.set('productLineId', productLineId);
   return url.toString();
 }
 
 export function openWorkItemDetailLink(id: string, category: string, productLineId?: string): void {
-  // 保留 opener 以沿用当前标签页的 sessionStorage 登录会话，不复制或写入凭据。
-  window.open(workItemDetailLink(id, category, productLineId), '_blank');
+  window.open(workItemDetailLink(id, category, productLineId), '_blank', 'noopener,noreferrer');
 }

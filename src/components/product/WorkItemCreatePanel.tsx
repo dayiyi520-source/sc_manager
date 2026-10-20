@@ -80,7 +80,7 @@ export const WorkItemCreatePanel: React.FC<{
   showContinueOption?: boolean;
   continueChecked?: boolean;
   onContinueCheckedChange?: (checked: boolean) => void;
-  presentation?: 'workspace' | 'drawer';
+  presentation?: 'workspace' | 'drawer' | 'page';
 }> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, detailHeader, headerActions, showContinueOption = true, continueChecked, onContinueCheckedChange, presentation = 'workspace' }) => {
   useEffect(() => {
     if (!isOpen) return;
@@ -89,6 +89,13 @@ export const WorkItemCreatePanel: React.FC<{
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [isOpen, onClose]);
   if (!isOpen) return null;
+  if (presentation === 'page') {
+    return <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--bg-surface)] text-[var(--text-body)]" aria-label="任务详情">
+      <header className="flex min-h-12 items-center justify-between gap-4 border-b border-[var(--border-main)] px-6"><div className="min-w-0">{title}</div>{headerActions}</header>
+      <div className="min-h-0 flex-1 overflow-y-auto"><div className={properties ? 'work-item-panel-grid grid min-h-full lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]' : 'min-h-full'}><main className="min-w-0 px-6 py-6">{detailHeader}{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-6" aria-label="字段设置">{properties}</aside>}</div></div>
+      {footer && <footer className="flex shrink-0 items-center gap-3 border-t border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-3">{secondaryAction}<span className="flex-1" />{footer}</footer>}
+    </section>;
+  }
   if (presentation === 'drawer') {
     return <Drawer open onClose={onClose} closable={{ placement: 'end' }} title={title} extra={headerActions} size="min(1200px, 88vw)" destroyOnHidden footer={footer ? <div className="flex items-center gap-3">{secondaryAction}<span className="flex-1" />{footer}</div> : undefined}>
       <div className={properties ? 'work-item-panel-grid grid min-h-full lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]' : 'min-h-full'}><main className="min-w-0 px-2 py-2">{detailHeader}{editor || children}</main>{properties && <aside className="border-l border-[var(--border-main)] bg-[var(--bg-card)] px-6 py-6" aria-label="字段设置">{properties}</aside>}</div>

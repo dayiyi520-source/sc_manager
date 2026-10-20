@@ -1,4 +1,5 @@
 const ALLOWED_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'UL', 'OL', 'LI', 'A', 'IMG']);
+const RICH_TEXT_TAGS = new Set(['SPAN', 'DIV', 'S', 'DEL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'CODE', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH', 'HR']);
 const DROP_CONTENT_TAGS = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH']);
 
 const isSafeHref = (value: string) => {
@@ -28,7 +29,7 @@ const isSafeImageSrc = (value: string) => {
 };
 
 /** Sanitizes user-authored rich text before it is rendered as HTML. */
-export const sanitizeHtml = (html: string) => {
+export const sanitizeHtml = (html: string, options: { richText?: boolean } = {}) => {
   if (typeof DOMParser === 'undefined') return '';
   const document = new DOMParser().parseFromString(html, 'text/html');
   const root = document.body;
@@ -39,7 +40,7 @@ export const sanitizeHtml = (html: string) => {
       element.remove();
       return;
     }
-    if (!ALLOWED_TAGS.has(tagName)) {
+    if (!ALLOWED_TAGS.has(tagName) && !(options.richText && RICH_TEXT_TAGS.has(tagName))) {
       const parent = element.parentNode;
       if (!parent) return;
       while (element.firstChild) parent.insertBefore(element.firstChild, element);
@@ -49,6 +50,11 @@ export const sanitizeHtml = (html: string) => {
 
     Array.from(element.attributes).forEach((attribute) => {
       const name = attribute.name.toLowerCase();
+      if (options.richText && name === 'style') {
+        const safeStyles = attribute.value.split(';').map(declaration => declaration.trim()).filter(declaration => /^(?:color|background-color):\s*(?:#[\da-f]{3,8}|rgba?\([\d.,%\s]+\)|[a-z]+)$/i.test(declaration) || /^text-align:\s*(?:left|center|right|justify)$/i.test(declaration) || /^font-size:\s*\d+(?:\.\d+)?(?:px|pt|em|rem|%)$/i.test(declaration) || /^line-height:\s*\d+(?:\.\d+)?(?:px|em|%)?$/i.test(declaration));
+        if (safeStyles.length) { element.setAttribute('style', safeStyles.join('; ')); return; }
+      }
+      if (options.richText && ['TD', 'TH'].includes(tagName) && ['colspan', 'rowspan'].includes(name) && /^[1-9]\d{0,2}$/.test(attribute.value)) return;
       if (tagName === 'A' && name === 'href' && isSafeHref(attribute.value)) return;
       if (tagName === 'IMG' && name === 'src' && isSafeImageSrc(attribute.value)) return;
       element.removeAttribute(attribute.name);

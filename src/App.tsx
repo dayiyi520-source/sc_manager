@@ -9,12 +9,13 @@ import { GlobalSearchModal } from './components/layout/GlobalSearchModal';
 import { ToastContainer } from './components/common/UIComponents';
 import { Navigate, Route, Routes, useParams, useLocation } from 'react-router-dom';
 import { DevLoginPage } from './components/auth/DevLoginPage';
-import { clearSession, readSession } from './services/session';
+import { readSession } from './services/session';
 
-import { SESSION_CHANGED } from './services/sessionStorage';
+import { SESSION_CHANGED, SESSION_KEY, SESSION_TOKEN_KEY, SHARED_SESSION_KEY, invalidateSession } from './services/sessionStorage';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select } from 'antd';
 import { ProductNavigation } from './components/product/ProductNavigation';
+import { FullPageWorkItemDetail, isFullPageDetail } from './components/workbench/FullPageWorkItemDetail';
 
 const lazyNamed = (loader: () => Promise<Record<string, unknown>>, exportName: string) => lazy(async () => {
   const module = await loader();
@@ -215,6 +216,9 @@ const MainContent: React.FC = () => {
 };
 
 const AppShell: React.FC = () => {
+  const location = useLocation();
+  const viewId = location.pathname.startsWith('/app/') ? location.pathname.slice('/app/'.length) : '';
+  const fullPage = isFullPageDetail(viewId, location.search);
   return (
     <AppProvider>
         <div className="tech-shell flex flex-col h-screen w-screen overflow-hidden font-sans antialiased selection:bg-cyan-400 selection:text-slate-950">
@@ -228,10 +232,10 @@ const AppShell: React.FC = () => {
             {/* Main body layout */}
             <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
               {/* Multitask Tabs Bar */}
-              <TabsBar />
+              {!fullPage && <TabsBar />}
 
               {/* Dynamic Content Body */}
-              <MainContent />
+              {fullPage ? <FullPageWorkItemDetail viewId={viewId} search={location.search}/> : <MainContent />}
             </div>
           </div>
         </div>
@@ -255,15 +259,25 @@ const ProtectedApp: React.FC = () => {
     };
     window.addEventListener(SESSION_CHANGED, check);
     window.addEventListener('focus', check);
-    const current = readSession();
-    const timer = current ? window.setTimeout(() => clearSession(), Math.min(current.expiresAt - Date.now(), 2147483647)) : undefined;
+    const syncSession = (event: StorageEvent) => {
+      if (event.key !== SHARED_SESSION_KEY && event.key !== null) return;
+      sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      check();
+    };
+    window.addEventListener('storage', syncSession);
     check();
     return () => {
       window.removeEventListener(SESSION_CHANGED, check);
       window.removeEventListener('focus', check);
-      window.clearTimeout(timer);
+      window.removeEventListener('storage', syncSession);
     };
   }, [queryClient]);
+  useEffect(() => {
+    if (!session) return;
+    const timer = window.setTimeout(() => invalidateSession(session.token), Math.min(session.expiresAt - Date.now(), 2147483647));
+    return () => window.clearTimeout(timer);
+  }, [session?.token, session?.expiresAt]);
   if (!session) return <Navigate to="/login" replace state={{from: location.pathname + location.search, sessionExpired: true}} />;
   return <AppShell />;
 };

@@ -10,6 +10,21 @@ import type { SaveVersionReviewInput, VersionReviewConclusion, VersionReviewList
 import { employeeSelectOptions } from '../common/PersonIdentity';
 import { showDeleteConfirm } from '../common/Feedback';
 
+const newestReviewFirst = (left: VersionReviewListItem, right: VersionReviewListItem) => {
+  const leftTime = Date.parse(left.meetingTime || left.reviewDate || left.updatedAt || left.createdAt || '');
+  const rightTime = Date.parse(right.meetingTime || right.reviewDate || right.updatedAt || right.createdAt || '');
+  const leftOrder = Number.isNaN(leftTime) ? Number.NEGATIVE_INFINITY : leftTime;
+  const rightOrder = Number.isNaN(rightTime) ? Number.NEGATIVE_INFINITY : rightTime;
+  return rightOrder - leftOrder;
+};
+const formatReviewTime = (value?: string, fallback?: string) => {
+  const source = value || fallback;
+  if (!source) return '--';
+  const parsed = dayjs(source);
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : source;
+};
+
+
 type AttachmentValue = { name: string; url?: string; size?: number };
 type FormValues = {
   meetingTopic: string; reviewType: string; productLineId?: string; versionId?: string; meetingTime?: Dayjs;
@@ -63,7 +78,7 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
   const employeeOptions = useMemo(() => employeeSelectOptions(employees.data || []), [employees.data]);
   const taskItems = ((tasks.data as { page?: { items?: UnifiedWorkItem[] } } | undefined)?.page?.items || []) as UnifiedWorkItem[];
   const taskOptions = taskItems.map((item) => ({ value: item.id, label: `${item.code || ''} ${item.title}`.trim() }));
-  const listItems = (globalReviews.data || []).filter((item) => !fixedLineId || item.productLineId === fixedLineId);
+  const listItems = (globalReviews.data || []).filter((item) => !fixedLineId || item.productLineId === fixedLineId).sort(newestReviewFirst);
   const payload = (values: FormValues): SaveVersionReviewInput => ({
     meetingTopic: values.meetingTopic.trim(), reviewType: values.reviewType, productLineId: values.productLineId, versionId: values.versionId,
     meetingTime: values.meetingTime?.toISOString(), reviewDate: values.meetingTime?.format('YYYY-MM-DD'),
@@ -136,7 +151,7 @@ export const VersionReviewView: React.FC<{ productLineFilter?: string }> = ({ pr
         { title: '迭代版本', dataIndex: 'versionName', width: 180, ellipsis: true },
         { title: '发起人', dataIndex: 'initiatorName', width: 120 },
         { title: '参与人', dataIndex: 'participantNames', width: 220, ellipsis: true, render: (value) => value || '--' },
-        { title: '评审时间', dataIndex: 'meetingTime', width: 160, render: (value, item) => value || item.reviewDate || '--' },
+        { title: '评审时间', dataIndex: 'meetingTime', width: 160, render: (value, item) => formatReviewTime(value, item.reviewDate) },
         { title: '操作', key: 'actions', width: 150, render: (_, item) => <div className="flex gap-1"><Button type="link" size="small" onClick={(event) => { event.stopPropagation(); openReview(item); }}>编辑</Button><Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={(event) => { event.stopPropagation(); void remove(item); }}>删除</Button></div> }
       ]} />
     </div>}

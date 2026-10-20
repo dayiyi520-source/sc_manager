@@ -1,3 +1,4 @@
+import { TodoDetail } from './TodoDetail';
 import { ArrowLeftIcon, PencilIcon } from '@primer/octicons-react';
 import { canUpdateMyTaskProgress, myTaskProgress, validateMyTaskProgress } from '../../services/myTaskProgress';
 import { TODO_TAB_KEY, readWorkbenchTab, rememberWorkbenchTab } from '../../services/workbenchPreferences';
@@ -24,13 +25,14 @@ function TodoPage({ onBack }: { onBack: () => void }) {
   const [page, setPage] = useState(1);
   const [type, setType] = useState<string>();
   const [owner, setOwner] = useState<string>();
+  const [selected, setSelected] = useState<MyTask>();
   const [editing, setEditing] = useState<MyTask>();
   const [progress, setProgress] = useState<number | null>(0);
   const [saving, setSaving] = useState(false);
   const saveLock = useRef(false);
   const [progressError, setProgressError] = useState<string>();
   useEffect(() => {
-    let active = true; setLoading(true); setError(undefined); setRows([]);
+    let active = true; setLoading(true); setError(undefined);
     requirementRepository.myTasks(currentUser.id, true).then(rows => { if (!Array.isArray(rows)) throw new Error('待办数据格式异常，请重试'); if (active) setRows(rows); }).catch(error => { if (active) setError(error instanceof Error ? error.message : '待办加载失败'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [currentUser.id, revision]);
@@ -50,7 +52,7 @@ function TodoPage({ onBack }: { onBack: () => void }) {
     finally { saveLock.current = false; setSaving(false); }
   };
   return <div className="space-y-4">
-    <div className="flex items-center justify-between gap-4"><Button type="text" icon={<ArrowLeftIcon/>} onClick={onBack}>返回我的任务</Button><Button loading={loading} onClick={() => setRevision(value => value + 1)}>刷新</Button></div>
+    <div className="flex items-center justify-between gap-4"><Button type="text" icon={<ArrowLeftIcon/>} onClick={onBack}>返回我的待办</Button><Button loading={loading} onClick={() => setRevision(value => value + 1)}>刷新</Button></div>
     {error && <Alert type="error" showIcon title={error} action={<Button onClick={() => setRevision(value => value + 1)}>重试</Button>}/>}
     <section className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
       <Tabs activeKey={tab} onChange={key => { setTab(key as TodoTab); rememberWorkbenchTab(TODO_TAB_KEY, key); setPage(1); }} items={todoTabs.map(type => ({ key: type.key, label: `${type.label} (${rows.filter(row => matchesTodoTab(row, type.key)).length})` }))}/>
@@ -61,7 +63,7 @@ function TodoPage({ onBack }: { onBack: () => void }) {
         <Select className="min-w-40" aria-label="待办状态" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value: 'all', label: '全部状态' }, { value: 'pending', label: '未结束' }, { value: 'finished', label: '已结束（含已完成）' }]}/>
       </div>
       <Table loading={loading} rowKey="id" dataSource={filtered} scroll={{ x: true }} pagination={{ current: page, pageSize: 20, onChange: setPage, showSizeChanger: false, hideOnSinglePage: true }} locale={{ emptyText: error ? '加载失败，请重试' : <Empty description="暂无工作事项"/> }} columns={[
-        { title: '标题', dataIndex: 'title', render: (_, row) => <a className="break-words" href={todoDetailUrl(row)} target="_blank" rel="noopener noreferrer">{row.title}</a> },
+        { title: '标题', dataIndex: 'title', render: (_, row) => <button type="button" className="break-words text-left text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelected(row)}>{row.title}</button> },
         { title: '类型', render: (_, row) => taskTypes[row.type] || row.type },
         { title: '状态', dataIndex: 'status', render: value => <Tag>{value}</Tag> },
         { title: '负责人', render: (_, row) => row.assigneeName || '未分配' },
@@ -69,6 +71,7 @@ function TodoPage({ onBack }: { onBack: () => void }) {
         { title: '进度', render: (_, row) => <div className="flex min-w-40 items-center gap-2"><Progress percent={myTaskProgress(row.progress, row.status)} size="small"/><Button type="text" size="small" aria-label={`修改进度：${row.title}`} disabled={loading || !canUpdateMyTaskProgress(row.status)} icon={<PencilIcon/>} onClick={() => { setEditing(row); setProgress(myTaskProgress(row.progress, row.status)); setProgressError(undefined); }}/></div> },
       ]}/>
     </section>
+    {selected && <TodoDetail task={selected} onClose={() => { setSelected(undefined); setRevision(value => value + 1); }}/> }
     <Modal open={Boolean(editing)} title="更新任务进度" onCancel={() => { if (!saving) setEditing(undefined); }} onOk={() => void saveProgress()} confirmLoading={saving} cancelButtonProps={{ disabled: saving }} mask={{ closable: !saving }} keyboard={!saving} okText="保存" cancelText="取消" destroyOnHidden>
       <div className="space-y-4">
         <p className="break-words font-medium text-[var(--text-primary)]">{editing?.title}</p>
@@ -78,7 +81,4 @@ function TodoPage({ onBack }: { onBack: () => void }) {
       </div>
     </Modal>
   </div>;
-}
-export function todoDetailUrl(row: MyTask) {
-  return `${import.meta.env.BASE_URL}app/${row.taskGroup === 'assist' ? 'wb_work_order' : row.targetPage}?detailId=${encodeURIComponent(row.sourceId)}${row.productLineId && row.taskGroup !== 'assist' ? `&productLineId=${encodeURIComponent(row.productLineId)}` : ''}`;
 }

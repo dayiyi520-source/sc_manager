@@ -4,11 +4,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyTasksView } from './MyTasksView';
 import { requirementRepository } from '../../services/requirementRepository';
+import { FEEDS_KEY } from '../../services/workbenchFeeds';
 
 const openPageTab = vi.fn();
-afterEach(cleanup);
-vi.mock('./TodoCenterView', () => ({ TodoCenterView: ({ onBack }: { onBack: () => void }) => <section>内嵌待办中心<button onClick={onBack}>返回我的任务</button></section> }));
-vi.mock('./WorkbenchFeedsView', () => ({ WorkbenchFeedsView: ({ onBack }: { onBack: () => void }) => <section>内嵌动态与评价<button onClick={onBack}>返回我的任务</button></section> }));
+afterEach(() => { cleanup(); localStorage.removeItem(FEEDS_KEY); });
+vi.mock('./TodoDetail', () => ({ TodoDetail: ({ task, onClose }: { task: { sourceId: string }; onClose: () => void }) => <div role="dialog">{task.sourceId}<button onClick={onClose}>关闭待办详情</button></div> }));
+vi.mock('./TodoCenterView', () => ({ TodoCenterView: ({ onBack }: { onBack: () => void }) => <section>内嵌待办中心<button onClick={onBack}>返回我的待办</button></section> }));
+vi.mock('./WorkbenchFeedsView', () => ({ WorkbenchFeedsView: ({ onBack }: { onBack: () => void }) => <section>内嵌动态与评价<button onClick={onBack}>返回我的待办</button></section> }));
 
 vi.mock('../../context/AppContext', () => ({
   useApp: () => ({
@@ -55,7 +57,7 @@ describe('我的工作指标卡片', () => {
     expect(await screen.findByText('内嵌待办中心')).toBeInTheDocument();
     expect(openPageTab).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('shichuang.workbench.todoTab')).toBe('work_order');
-    fireEvent.click(screen.getByRole('button', { name: '返回我的任务' }));
+    fireEvent.click(screen.getByRole('button', { name: '返回我的待办' }));
     await waitFor(() => expect(screen.queryByText('正在加载我的工作...')).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /评价吐槽/ }));
     fireEvent.click(screen.getAllByRole('button', { name: '查看更多' })[1]);
@@ -63,4 +65,29 @@ describe('我的工作指标卡片', () => {
     expect(openPageTab).not.toHaveBeenCalled();
     await waitFor(() => expect(sessionStorage.getItem('shichuang.workbench.feedTab')).toBe('feedback'));
   });
+});
+
+it('首页仅点击待办标题打开详情并保持当前工作标签', async () => {
+  vi.mocked(requirementRepository.myTasks).mockResolvedValue([{ id: 't', sourceId: 'source-1', title: '验收待办', status: '处理中', taskGroup: 'mine', type: 'dev', assigneeName: '本人' }] as never);
+  render(<MyTasksView/>);
+  const title = await screen.findByRole('button', { name: '验收待办' });
+  fireEvent.click(title.closest('.rounded-lg')!);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  fireEvent.click(title);
+  expect(screen.getByRole('dialog')).toHaveTextContent('source-1');
+  expect(openPageTab).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText('关闭待办详情'));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '验收待办' })).toBeInTheDocument();
+});
+
+it('首页动态仅点击标题打开详情', async () => {
+  vi.mocked(requirementRepository.myTasks).mockResolvedValue([]);
+  localStorage.setItem(FEEDS_KEY, JSON.stringify([{ id: 'feed-1', type: 'dynamic', title: '首页动态标题', content: '首页动态简介', time: '2026-10-20T00:00:00Z', visibility: 'all' }]));
+  render(<MyTasksView/>);
+  const title = await screen.findByRole('button', { name: '首页动态标题' });
+  fireEvent.click(screen.getByText('首页动态简介'));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  fireEvent.click(title);
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
 });

@@ -17,7 +17,12 @@ type ReportAttachment = { name: string; url: string; size: number; type: string 
 type ReportForm = { name: string; reportType: ReportType; productLineId?: string; versionId?: string; attachments: ReportAttachment[] };
 const reportTypeOptions = ['功能测试', '安全测试', '回归测试'].map((value) => ({ value, label: value }));
 
-const dateTime = (value?: string) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '--';
+const dateTime = (value?: string) => {
+  if (!value) return '--';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(parsed);
+};
+const newestReportFirst = (left: VersionTestReportListItem, right: VersionTestReportListItem) => Date.parse(right.createdAt || '') - Date.parse(left.createdAt || '');
 const readFile = (file: File) => new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
 export const VersionTestReportPanel: React.FC<Props> = ({ productLineId, versionId, versionName }) => {
   const { productLines } = useApp();
@@ -75,7 +80,7 @@ export const VersionTestReportPanel: React.FC<Props> = ({ productLineId, version
     finally { setDownloadingId(''); }
   };
 
-  const data = (reports.data || []).filter((item) => !productLineId || item.productLineId === productLineId);
+  const data = (reports.data || []).filter((item) => !productLineId || item.productLineId === productLineId).sort(newestReportFirst);
   return <div className="space-y-4">
     {actionError && <Alert type="error" showIcon title={actionError} closable onClose={() => setActionError('')} />}
     {reports.isError ? <Alert type="error" showIcon title="测试报告加载失败" description={reports.error instanceof Error ? reports.error.message : '请稍后重试。'} action={<Button onClick={() => reports.refetch()}>重试</Button>} /> : reports.isLoading ? <div className="flex min-h-56 items-center justify-center"><Spin /></div> : data.length === 0 ? <div className="flex min-h-56 flex-col items-center justify-center gap-3"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无测试报告" /><Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setActionError(''); setCreateOpen(true); }}>新建报告</Button></div> : <><div className="flex justify-end"><Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setActionError(''); setCreateOpen(true); }}>新建报告</Button></div><Table rowKey="id" dataSource={data} pagination={false} scroll={{ x: 1180 }} columns={[{ title: '报告名称', dataIndex: 'name', width: 180, ellipsis: true }, { title: '报告类型', dataIndex: 'reportType', width: 110, render: (value) => value || '测试报告' }, { title: '产品', dataIndex: 'productLineName', width: 160, ellipsis: true }, { title: '版本', dataIndex: 'versionName', width: 140, ellipsis: true }, { title: '创建人', dataIndex: 'creatorName', width: 140, render: (value) => <PersonIdentity name={value} emptyLabel="未设置" variant="list" /> }, { title: '创建时间', dataIndex: 'createdAt', width: 180, render: dateTime }, { title: '操作', key: 'actions', width: 150, fixed: 'right', render: (_, item) => <div className="flex gap-1"><Button type="text" size="small" aria-label="编辑报告" title="编辑报告" icon={<EditOutlined />} onClick={() => { setActionError(''); setSelectedReport(item); }} /><Dropdown trigger={['click']} menu={{ items: [{ key: 'download', label: '下载报告', icon: <DownloadOutlined /> }, { key: 'delete', label: '删除', danger: true, icon: <DeleteOutlined /> }], onClick: ({ key }) => { if (key === 'download') void download(item); if (key === 'delete') remove(item); } }}><Button type="text" size="small" aria-label="更多报告操作" title="更多报告操作" loading={downloadingId === item.id} disabled={Boolean(downloadingId)} icon={<MoreOutlined />} /></Dropdown></div> }]} /></>}

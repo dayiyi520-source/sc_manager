@@ -258,7 +258,7 @@ describe('workbench work-order creation layout', () => {
     ], indirectIds: new Set(['d-1']) });
     await renderDetail({ status: '处理中', productLineId: 'line-1' });
     fireEvent.click(await screen.findByRole('button', { name: '设计任务 · 反向关联设计' }));
-    expect(open).toHaveBeenCalledWith(`${window.location.origin}/app/prod_design_tasks?detailId=d-1&productLineId=line-2`, '_blank');
+    expect(open).toHaveBeenCalledWith(`${window.location.origin}/app/prod_design_tasks?detailId=d-1&detailView=full&productLineId=line-2`, '_blank', 'noopener,noreferrer');
     expect(screen.queryByRole('button', { name: '验收通过' })).not.toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeVisible();
     open.mockRestore();
@@ -464,9 +464,9 @@ describe('workbench work-order creation layout', () => {
     fireEvent.click(await screen.findByRole('button', { name: '复制事项编号' }));
     await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith('WO-20261008-01'));
     fireEvent.click(screen.getByRole('button', { name: '复制详情链接' }));
-    await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith(`${window.location.origin}/manager/app/wb_work_order?detailId=shared-item`));
+    await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith(`${window.location.origin}/manager/app/wb_work_order?detailId=shared-item&detailView=full`));
     expect(screen.queryByRole('button', { name: '事项搁置' })).not.toBeInTheDocument();
-    fireEvent.click(document.getElementById('btn-drawer-close')!);
+    fireEvent.click(screen.getByRole('dialog').querySelector('.ant-drawer-close')!);
     expect(window.location.search).toBe('');
   });
 

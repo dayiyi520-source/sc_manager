@@ -1,3 +1,6 @@
+import { TodoDetail, type TodoRecord } from './TodoDetail';
+import { FeedDetail } from './FeedDetail';
+import { type WorkbenchFeed } from '../../services/workbenchFeeds';
 import { FeedSummary } from './FeedSummary';
 import { FEED_TAB_KEY, TODO_TAB_KEY, rememberWorkbenchTab } from '../../services/workbenchPreferences';
 import dayjs from 'dayjs';
@@ -29,20 +32,7 @@ import { hasUnreadFeed, unreadFeedIds } from './feedUnread';
 const TodoCenterView = React.lazy(() => import('./TodoCenterView').then(module => ({ default: module.TodoCenterView })));
 const WorkbenchFeedsView = React.lazy(() => import('./WorkbenchFeedsView').then(module => ({ default: module.WorkbenchFeedsView })));
 
-type MyTaskRecord = {
-  id: string;
-  type: string;
-  title: string;
-  status: string;
-  assigneeName?: string;
-  time?: string;
-  dueDate?: string;
-  progress?: number;
-  overdueRisk?: boolean;
-  taskGroup: 'mine' | 'assist';
-  targetPage: string;
-  sourceId: string;
-};
+type MyTaskRecord = TodoRecord;
 
 type TabType = 'all' | 'mine' | 'assist' | 'work_order';
 type ApprovalTabType = 'pending' | 'my_apply' | 'cc_me';
@@ -58,6 +48,8 @@ export const MyTasksView: React.FC = () => {
   } = useApp();
 
   const { feeds: WORKBENCH_FEEDS, error: feedError, reload: reloadFeeds } = useWorkbenchFeeds();
+  const [selectedTask, setSelectedTask] = useState<TodoRecord>();
+  const [selectedFeed, setSelectedFeed] = useState<WorkbenchFeed>();
   const [innerView, setInnerView] = useState<'home' | 'todos' | 'feeds'>('home');
   const [taskRevision, setTaskRevision] = useState(0);
   const returnToMyTasks = () => { setInnerView('home'); setTaskRevision(value => value + 1); };
@@ -134,6 +126,8 @@ export const MyTasksView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {selectedTask && <TodoDetail task={selectedTask} onClose={() => { setSelectedTask(undefined); setTaskRevision(value => value + 1); }}/>}
+      <FeedDetail key={selectedFeed?.id || 'closed'} feed={selectedFeed ? WORKBENCH_FEEDS.find(feed => feed.id === selectedFeed.id) : undefined} onClose={() => setSelectedFeed(undefined)}/>
       {/* 顶部核心指标 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -188,27 +182,25 @@ export const MyTasksView: React.FC = () => {
 
           <div className="p-5 max-h-80 overflow-y-auto">
             <div className="space-y-3">
-              {taskLoading ? (
+              {taskLoading && !realTasks.length ? (
                 <div className="text-center py-8 text-[var(--text-muted)] text-sm">正在加载我的工作...</div>
               ) : taskError ? (
                 <div className="text-center py-8 text-[var(--danger)] text-sm"><AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-70" /><div>我的工作加载失败，请稍后重试</div><div className="mt-1 text-xs text-[var(--text-muted)]">{taskError}</div></div>
               ) : displayTodos.length === 0 ? (
                 todoTab === 'work_order' ? <Empty description="暂无工单" /> : (
                   <div className="text-center py-8 text-[var(--text-muted)] text-sm">
-                    <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    暂无相关工作
+                    <Empty description="暂无相关工作"/>
                   </div>
                 )
               ) : (
                 displayTodos.map((task) => (
                   <div
                     key={task.id}
-                    onClick={() => openPageTab(task.taskGroup === 'assist' ? 'wb_work_order' : task.targetPage)}
-                    className="p-4 bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-hover)] border border-[var(--border-main)] rounded-lg cursor-pointer transition-colors"
+                    className="p-4 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg"
                   >
                     <div className="flex items-center gap-2 mb-2">
                       {task.type === 'assistance' ? <Users className="w-4 h-4 shrink-0 text-[var(--primary)]" /> : <CheckSquare className="w-4 h-4 shrink-0 text-[var(--primary)]" />}
-                      <div className="font-medium text-sm text-[var(--text-primary)] truncate">{task.title}</div>
+                      <button type="button" className="min-w-0 truncate text-left font-medium text-sm text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedTask(task)}>{task.title}</button>
                     </div>
                     <div className="flex items-center justify-between gap-3 mb-2 text-xs text-[var(--text-muted)]">
                       <span>负责人：{task.assigneeName || '未分配'}</span>
@@ -399,14 +391,16 @@ export const MyTasksView: React.FC = () => {
 
           <div className="p-5 max-h-[520px] overflow-y-auto text-xs">
             {feedError ? <div role="alert" className="space-y-2 text-[var(--danger)]">{feedError}<button className="ml-3 hover:underline" onClick={reloadFeeds}>重试</button></div> : !WORKBENCH_FEEDS.some(feed => feed.type === feedTab) ? <Empty description="暂无动态与评价"/> : feedTab === 'dynamic' ? (
-              <div className="relative ml-2 border-l border-[var(--primary)] pl-5 space-y-5">
+              <div className="divide-y divide-[var(--border-main)]">
                 {WORKBENCH_FEEDS.filter((f) => f.type === 'dynamic').slice(0, 5).map((feed) => (
-                  <div key={feed.id} className="relative space-y-1.5">
-                    <span className="absolute -left-[26px] top-0.5 w-3 h-3 rounded-full border-2 border-[var(--primary)] bg-[var(--bg-surface)]" />
-                    <div className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</div>
-                    <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-1">
-                      {feed.title}{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 text-[var(--danger)]" />}
+                  <div key={feed.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="min-w-0 font-semibold text-sm text-[var(--primary)] flex items-center gap-1">
+                        <button type="button" className="min-w-0 truncate text-left hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedFeed(feed)}>{feed.title}</button>{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 shrink-0 text-[var(--danger)]" />}
+                      </span>
+                      <span className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</span>
                     </div>
+                    <div className="text-xs text-[var(--text-muted)]">{[feed.productName, feed.versionName, feed.projectName, feed.source?.module].filter(Boolean).join(' · ')}</div>
                     <FeedSummary content={feed.content}/>
                   </div>
                 ))}
@@ -416,12 +410,12 @@ export const MyTasksView: React.FC = () => {
                 {WORKBENCH_FEEDS.filter((f) => f.type === feedTab).slice(0, 5).map((feed) => (
                   <div key={feed.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-1">
-                        {feed.title}{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 text-[var(--danger)]" />}
+                      <span className="min-w-0 font-semibold text-sm text-[var(--primary)] flex items-center gap-1">
+                        <button type="button" className="min-w-0 truncate text-left hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedFeed(feed)}>{feed.title}</button>{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 shrink-0 text-[var(--danger)]" />}
                       </span>
                       <span className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</span>
                     </div>
-                    <FeedSummary content={feed.content}/>
+                    <div className="text-xs text-[var(--text-muted)]">{[feed.productName, feed.versionName, feed.projectName, feed.source?.module].filter(Boolean).join(' · ')}</div><FeedSummary content={feed.content}/>
                     <div className="text-xs text-[var(--text-muted)]">
                       {feed.type === 'competitor' && feed.newsType ? `${feed.newsType} · ` : ''}{(feed.type !== 'competitor' ? feed.customer : undefined) || feed.author}
                     </div>
