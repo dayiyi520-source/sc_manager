@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, useState, type ReactNode } from 'react';
+import { Fragment, Children, cloneElement, isValidElement, useState, type ReactNode } from 'react';
 import { Button, DatePicker, Input, InputNumber, Select, Space, Table, Tag } from 'antd';
 import dayjs from 'dayjs';
 import type { OkrPayload, OkrPerson, OkrSettings } from '../../../services/okrRepository';
@@ -16,14 +16,15 @@ export function useReviewTemplateFields(settings: OkrSettings | undefined, initi
   return { snapshot, values, setValues, hasBlock, textValue, payload: { reviewTemplateSnapshot: snapshot, reviewTemplateValues: values }, errors: () => reviewTemplateErrors(snapshot, values) };
 }
 
-type Props = { block: ReviewTemplateBlock; values: ReviewTemplateValues; onChange: (values: ReviewTemplateValues) => void; people?: OkrPerson[]; departments?: string[]; disabled?: boolean };
-export function ReviewTemplateFields({ block, values, onChange, people = [], departments = [], disabled }: Props) {
+type Props = { block: ReviewTemplateBlock; values: ReviewTemplateValues; onChange: (values: ReviewTemplateValues) => void; people?: OkrPerson[]; departments?: string[]; disabled?: boolean; standaloneText?: boolean };
+export function ReviewTemplateFields({ block, values, onChange, people = [], departments = [], disabled, standaloneText = false }: Props) {
   const update = (id: string, value: unknown) => onChange({ ...values, [id]: value });
-  return <div className="grid gap-4 p-4">
+  if (!block.fields.length && !block.guidance.trim()) return null;
+  return <div className={standaloneText ? "grid gap-4" : "grid gap-4 p-4"}>
     {block.guidance && <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{block.guidance}</p>}
     {block.fields.map(field => {
       const value = values[field.id];
-      const common = { 'aria-label': field.label, disabled, style: { width: '100%' } };
+      const common = { 'aria-label': field.label, 'aria-required': field.required, disabled, style: { width: '100%' } };
       let control;
       switch (field.type) {
         case 'number': case 'percentage': control = <InputNumber {...common} min={field.type === 'percentage' ? 0 : undefined} max={field.type === 'percentage' ? 100 : undefined} value={value as number | undefined} onChange={next => update(field.id, next)}/>; break;
@@ -39,16 +40,21 @@ export function ReviewTemplateFields({ block, values, onChange, people = [], dep
           const rows = (Array.isArray(value) ? value : []) as Record<string, string>[];
           control = <Space orientation="vertical" style={{ width: '100%' }}><Table size="small" pagination={false} rowKey={(_, index) => String(index)} dataSource={rows} columns={[...(field.columns || []).map(column => ({ title: column, key: column, render: (_: unknown, row: Record<string, string>, index: number) => <Input aria-label={`${field.label}-${column}-${index + 1}`} disabled={disabled} value={row[column]} onChange={event => update(field.id, rows.map((item, i) => i === index ? { ...item, [column]: event.target.value } : item))}/> })), ...(!disabled ? [{ title: '操作', key: 'action', render: (_: unknown, _row: unknown, index: number) => <Button type="text" danger onClick={() => update(field.id, rows.filter((_, i) => i !== index))}>删除行</Button> }] : [])]}/>{!disabled && <Button disabled={rows.length >= 100} onClick={() => update(field.id, [...rows, Object.fromEntries((field.columns || []).map(column => [column, '']))])}>添加行</Button>}</Space>; break;
         }
-        case 'textarea': control = <Input.TextArea {...common} rows={4} showCount placeholder={field.placeholder} maxLength={field.maxLength || 10000} value={value as string || ''} onChange={event => update(field.id, event.target.value)}/>; break;
+        case 'textarea': control = <Input.TextArea {...common} className="okr-weekly-plan-input" rows={4} showCount placeholder={field.placeholder} maxLength={field.maxLength || 10000} value={value as string || ''} onChange={event => update(field.id, event.target.value)}/>; break;
         default: control = <Input {...common} maxLength={10000} placeholder={field.type === 'link' ? 'https://' : undefined} value={value as string || ''} onChange={event => update(field.id, event.target.value)}/>;
       }
-      return <label key={field.id} className="grid gap-2 text-sm"><span>{field.required && <Tag color="red">必填</Tag>}{field.label}</span>{control}</label>;
+      return <label key={field.id} className="grid gap-2 text-sm">{!standaloneText && <span>{field.required && <Tag color="red">必填</Tag>}{field.label}</span>}{control}</label>;
     })}
   </div>;
 }
+function ReviewTemplateHeading({ block, title }: { block: ReviewTemplateBlock; title: string }) {
+  return <div className="okr-weekly-section-header"><h3 className="okr-weekly-section-header-title flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block"/><span>{title}</span>{block.fields.length === 1 && block.fields[0].type === 'textarea' && block.fields[0].required && <Tag color="red">必填</Tag>}</h3></div>;
+}
+const isStandaloneText = (block: ReviewTemplateBlock) => block.fields.length === 1 && block.fields[0].type === 'textarea';
+
 export function ReviewTemplateSection({ template, blockId, ...props }: Omit<Props, 'block'> & { template?: ReviewReportTemplate | null; blockId: string }) {
-  const blocks = template?.blocks.filter(block => blockId === 'extensions' ? !['goals', 'extra', 'assistance', 'knowledge'].includes(block.id) : block.id === blockId) || [];
-  return <>{blocks.map(block => blockId === 'extensions' ? <section className="okr-weekly-section" aria-label={block.title} key={block.id}><div className="okr-weekly-section-header"><h3>{block.title}</h3></div><ReviewTemplateFields {...props} block={block}/></section> : <div key={block.id}><ReviewTemplateFields {...props} block={block}/></div>)}</>;
+  const blocks = template?.blocks.filter(block => blockId === 'extensions' ? !['goals', 'extra', 'assistance', 'knowledge'].includes(block.id) : block.id === blockId && (block.fields.length > 0 || Boolean(block.guidance.trim()))) || [];
+  return <>{blocks.map(block => blockId === 'extensions' ? <section className="okr-weekly-section" aria-label={block.title} key={block.id}><ReviewTemplateHeading block={block} title={reviewBlockTitle(template || null, block.id, block.title)}/><ReviewTemplateFields {...props} block={block} standaloneText={isStandaloneText(block)}/></section> : <Fragment key={block.id}><ReviewTemplateFields {...props} block={block}/></Fragment>)}</>;
 }
 
 export function reviewBlockTitle(template: ReviewReportTemplate | null, id: string, fallback: string) {
@@ -67,6 +73,6 @@ export function ReviewTemplateLayout({ template, children, ...props }: Omit<Prop
       const supplement = content.find(node => isValidElement(node) && node.type === ReviewTemplateSection);
       return cloneElement(section, { key: block.id, 'aria-label': block.title, children: [content[0], supplement, ...content.slice(1).filter(node => node !== supplement)] });
     }
-    return <section key={block.id} className="okr-weekly-section" aria-label={block.title}><div className="okr-weekly-section-header"><h3>{index + 1}. {block.title}</h3></div><ReviewTemplateFields {...props} block={block}/></section>;
+    return <section key={block.id} className="okr-weekly-section" aria-label={block.title}><ReviewTemplateHeading block={block} title={`${index + 1}. ${block.title}`}/><ReviewTemplateFields {...props} block={block} standaloneText={isStandaloneText(block)}/></section>;
   })}{nodes.filter(node => !isValidElement<{ 'data-review-block'?: string }>(node) || !node.props['data-review-block'])}</>;
 }
