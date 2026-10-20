@@ -1023,6 +1023,19 @@ describe('OKRPerformanceView target navigation', () => {
     expect(screen.queryByRole('button', { name: '目标设置' })).not.toBeInTheDocument();
   });
 
+  it('shares period selections with goal confirmation without pending data', () => {
+    const { container } = render(<OKRPerformanceView />);
+    fireEvent.mouseDown(container.querySelector('.okr-cycle-filter .ant-select-content') as HTMLElement);
+    fireEvent.click(screen.getByText('已结束'));
+    fireEvent.click(screen.getByText(dayjs().subtract(1, 'month').format('YYYY年MM月')));
+    fireEvent.click(screen.getByRole('button', { name: '目标确认' }));
+    expect(screen.getByRole('combobox', { name: '周期筛选' })).toBeInTheDocument();
+    expect(container.querySelectorAll('.okr-cycle-filter')).toHaveLength(1);
+    expect(container.querySelector('.okr-cycle-filter')).toHaveTextContent('周期：2个周期');
+    fireEvent.click(screen.getByRole('button', { name: '我的目标' }));
+    expect(container.querySelector('.okr-cycle-filter')).toHaveTextContent('周期：2个周期');
+  });
+
   it('shows the selected cycle count after selecting a second month', () => {
     const { container } = render(<OKRPerformanceView />);
     fireEvent.mouseDown(container.querySelector('.okr-cycle-filter .ant-select-content') as HTMLElement);

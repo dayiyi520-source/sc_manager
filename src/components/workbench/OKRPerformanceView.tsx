@@ -1,3 +1,4 @@
+import { OkrCycleFilter } from './okr/OkrCycleFilter';
 import { creationSources, creationPeriodError, departmentCreationPayloads, sourceAlignment, departmentChallengeTypes, challengeReferences } from '../../services/goalCreationPolicy';
 import { DepartmentReviewSettings } from './okr/DepartmentReviewSettings';
 import { GoalCreationReference } from './okr/GoalCreationReference';
@@ -17,7 +18,7 @@ import { autonomousGoalPayload, assignedReferences, inheritedGoalPayload, source
 import { GoalConfirmationWorkspace } from './okr/GoalConfirmationWorkspace';
 import { GoalChangePanel } from './okr/GoalChangePanel';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Checkbox, Drawer, Dropdown, Empty, Input, Modal, Progress, Cascader, Select, Spin, Tag, Tabs, Flex, Typography, Tooltip } from 'antd';
+import { Alert, Button, Checkbox, Drawer, Dropdown, Empty, Input, Modal, Progress, Select, Spin, Tag, Tabs, Flex, Typography, Tooltip } from 'antd';
 import Card from 'antd/es/card/Card';
 import dayjs from 'dayjs';
 import { useOriginalOkr } from './okr/useOriginalOkr';
@@ -191,10 +192,6 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   const reviewTemplate = reviewTemplateFor(me, people);
   const reviewRecordStatus = copiedReviewId ? undefined : records.find(record => record.id === reviewDraftId && record.kind === 'review' && record.ownerId === currentUser.id)?.status;
   const periods = cycleOptions(records, currentUser.id, undefined, settings);
-  const cyclePaths = periods.flatMap(group => group.children.filter(child => selectedCycles.includes(child.value)).map(child => [group.value, child.value]));
-  const cycleSummary = selectedCycles.length === 1
-    ? `周期：${periodLabel(selectedCycles[0])}`
-    : `周期：${selectedCycles.length}个周期`;
   const parents = okrs.filter(o => o.ownerId === me?.supervisorId && o.cycle === targetFormCycle && o.status === 'active');
   const selectedScopeGroup = scopeSelection.scope;
   const otherOwners = new Set(otherDepartmentPeople(people, currentUser.id, currentUser.department).map(person => person.id));
@@ -676,7 +673,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
           {scopeSelection.scope === 'confirmation' ? <GoalConfirmationWorkspace settings={settings} records={records} people={people} viewerId={currentUser.id} selectedMemberId={scopeSelection.personId} selectedCycles={selectedCycles} onSelectCycles={setSelectedCycles} onSelectMember={id=>handleScopeChange({scope:'confirmation',personId:id})} onRefresh={refresh} loading={loading} loadError={error} work={work} workLoading={workLoading} workError={workError} onRetryWork={()=>void refreshWork()}/> : <>
           <div className="okr-context-heading"><h2>{contextTitle}</h2><div className="okr-target-tools">
             <ViewModeSwitch value={targetViewMode} onChange={setTargetViewMode} ariaLabel="目标视图" />
-            <Cascader aria-label="周期筛选" className="okr-cycle-filter" multiple options={periods} value={cyclePaths} showCheckedStrategy={Cascader.SHOW_CHILD} allowClear maxTagCount={0} maxTagPlaceholder={() => cycleSummary} placeholder="周期：请选择" onChange={paths => setSelectedCycles(paths.map(path => String(path[path.length - 1])))} />
+            <OkrCycleFilter records={records} viewerId={currentUser.id} settings={settings} value={selectedCycles} onChange={setSelectedCycles}/>
           </div></div>
 
           {objectiveForms.length > 0 && (

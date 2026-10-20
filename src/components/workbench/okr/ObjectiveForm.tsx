@@ -7,7 +7,7 @@ import { KrBusinessDetailEditor } from './KrBusinessDetailEditor';
 import { KrDetailTable } from './KrDetailTable';
 import { krDetails, krDetailContentComplete, supervisorKrTitle } from '../../../services/okrKrDetails';
 import { GoalAlignmentDrawer } from './GoalAlignmentDrawer';
-import { goalContentComplete, GOAL_ADDITION_MESSAGE } from './goalAdditionRules';
+import { goalContentComplete } from './goalAdditionRules';
 import { inheritedGoalPayload, validateThreeLevelGoal, sourceKeyResults, assignedReferences } from '../../../services/okrThreeLevelRules';
 import { GoalExecutionFields } from './GoalExecutionFields';
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
@@ -242,11 +242,11 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     return orderedRows.length ? <div className="supervisor-stage-deadlines" aria-label="同产品版本阶段截止时间">{orderedRows.join('；')}</div> : null;
   };
   const canAddContent = () => {
-    if (!goalContentComplete(payload())) { setError(GOAL_ADDITION_MESSAGE); return false; }
+    if (!goalContentComplete(payload())) { setError('请先填写当前已有的KR的内容后再继续'); return false; }
     setError(''); return true;
   };
   useEffect(() => {
-    if (error === GOAL_ADDITION_MESSAGE && goalContentComplete(payload())) setError('');
+    if (error === '请先填写当前已有的KR的内容后再继续' && goalContentComplete(payload())) setError('');
   }, [error, title, krs]);
   const moveKr = (from: number, to: number) => setKrs(items => { const copy = [...items]; [copy[from], copy[to]] = [copy[to], copy[from]]; return copy; });
   return <Form className={`okr-objective-form${isCompanyStyle || personal || ownPersonal ? ' company-objective-form' : ''}${supervisor ? ' supervisor-objective-form' : ''}${threeLevel && !root && !personal && !ownPersonal ? ' department-objective-editor' : ''}`} disabled={busy || readOnly} onFinish={() => void submit()}>

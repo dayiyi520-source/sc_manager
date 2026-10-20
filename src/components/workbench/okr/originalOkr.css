@@ -99,7 +99,7 @@
 .okr-context-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
 .okr-context-heading h2 { min-width: 0; margin: 0; color: var(--text-primary); font-size: 18px; line-height: 26px; }
 .okr-target-tools { display: flex; flex-shrink: 0; align-items: center; gap: 8px; }
-.okr-target-tools .okr-cycle-filter { width: 224px; }
+.okr-target-tools .okr-cycle-filter, .okr-confirmation-tools .okr-cycle-filter { width: calc(var(--spacing) * 56); }
 .okr-target-empty { display: grid; grid-column: 1 / -1; width: 100%; min-height: 240px; place-items: center; padding: 24px; border: 1px dashed var(--border-main); border-radius: 8px; background: var(--bg-surface); }
 .okr-empty-period-state { display: grid; min-height: 240px; place-items: center; padding: 32px; }
 .okr-settings-panel { display: grid; gap: 16px; }

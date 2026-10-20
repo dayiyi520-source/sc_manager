@@ -4,6 +4,20 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest';
 import { ObjectiveForm, type ObjectiveFormHandle } from './ObjectiveForm';
 
+describe('ObjectiveForm KR addition feedback', () => {
+  it('shows the requested message for an incomplete KR and clears it after completion', () => {
+    render(<ObjectiveForm cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn(async () => true)}/>);
+    fireEvent.change(screen.getByLabelText('目标名称'), { target: { value: '目标内容' } });
+    fireEvent.click(screen.getByRole('button', { name: '添加关键结果' }));
+    expect(screen.getByText('请先填写当前已有的KR的内容后再继续')).toBeInTheDocument();
+    expect(screen.queryByLabelText('A2 名称')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('A1 名称'), { target: { value: '已填写的关键结果' } });
+    expect(screen.queryByText('请先填写当前已有的KR的内容后再继续')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '添加关键结果' }));
+    expect(screen.getByLabelText('A2 名称')).toBeInTheDocument();
+  });
+});
+
 describe('ObjectiveForm A dragging', () => {
   it('starts dragging only after pressing the handle and moves the whole row', () => {
     render(<ObjectiveForm cycle="2026-09" ownerName="测试用户" parents={[]} busy={false} unavailable={false} root onCancel={vi.fn()} onSave={vi.fn(async () => true)}/>);
