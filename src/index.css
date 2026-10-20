@@ -13,6 +13,7 @@
 
 @layer base {
   :root {
+    --workbench-query-width: 15.625rem;
     --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --bg-overlay: color-mix(in srgb, var(--color-black) 70%, transparent);
     --bg-main: #0C0F13;
@@ -2475,3 +2476,10 @@ html:not(.dark) .tech-main .notification-category-tabs .ant-tabs-tab-btn[role="t
 .delivery-map-empty { flex-direction: column; gap: 12px; }
 .delivery-map-empty .ant-empty { margin: 0; }
 @media (max-width: 920px) { .delivery-map-heading { align-items: flex-start; flex-direction: column; gap: 12px; } .delivery-map-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .delivery-map-filter-actions { grid-column: 1 / -1; } .delivery-map-legend { justify-content: flex-start; } }
+
+.workbench-feed-summary.ant-typography {
+  margin-bottom: 0;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

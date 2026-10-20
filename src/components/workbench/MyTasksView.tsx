@@ -1,3 +1,6 @@
+import { FeedSummary } from './FeedSummary';
+import { FEED_TAB_KEY, TODO_TAB_KEY, rememberWorkbenchTab } from '../../services/workbenchPreferences';
+import dayjs from 'dayjs';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   CheckSquare,
@@ -15,15 +18,16 @@ import {
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag } from '../common/UIComponents';
-import { Empty } from 'antd';
+import { Empty, Skeleton } from 'antd';
 import { StatusBadge } from '@/components/common';
 import { requirementRepository } from '../../services/requirementRepository';
-import { MOCK_WORKBENCH_FEEDS } from '../../data/mockSnapshot';
+import { useWorkbenchFeeds } from './useWorkbenchFeeds';
 import { projectDeliveryMap } from '../../services/projectDeliveryMap';
 import { getMyTaskMetrics } from './myTasksMetrics';
 import { hasUnreadFeed, unreadFeedIds } from './feedUnread';
 
-const WORKBENCH_FEEDS: Array<{ id: string; type: FeedTabType; time: string; title: string; content: string; customer?: string; author?: string }> = MOCK_WORKBENCH_FEEDS;
+const TodoCenterView = React.lazy(() => import('./TodoCenterView').then(module => ({ default: module.TodoCenterView })));
+const WorkbenchFeedsView = React.lazy(() => import('./WorkbenchFeedsView').then(module => ({ default: module.WorkbenchFeedsView })));
 
 type MyTaskRecord = {
   id: string;
@@ -53,6 +57,10 @@ export const MyTasksView: React.FC = () => {
     currentUser
   } = useApp();
 
+  const { feeds: WORKBENCH_FEEDS, error: feedError, reload: reloadFeeds } = useWorkbenchFeeds();
+  const [innerView, setInnerView] = useState<'home' | 'todos' | 'feeds'>('home');
+  const [taskRevision, setTaskRevision] = useState(0);
+  const returnToMyTasks = () => { setInnerView('home'); setTaskRevision(value => value + 1); };
   const [todoTab, setTodoTab] = useState<TabType>('all');
   const [approvalTab, setApprovalTab] = useState<ApprovalTabType>('pending');
   const [feedTab, setFeedTab] = useState<FeedTabType>('dynamic');
@@ -71,10 +79,10 @@ export const MyTasksView: React.FC = () => {
       .catch((error) => { if (active) { setRealTasks([]); setTaskError(error instanceof Error ? error.message : '产品任务和协同事项服务暂不可用'); } })
       .finally(() => { if (active) setTaskLoading(false); });
     return () => { active = false; };
-  }, [currentUser.id]);
+  }, [currentUser.id, taskRevision]);
 
   const pendingTodos = useMemo(() => realTasks, [realTasks]);
-  const feedUnreadIds = useMemo(() => unreadFeedIds(WORKBENCH_FEEDS, readFeedIds), [readFeedIds]);
+  const feedUnreadIds = useMemo(() => unreadFeedIds(WORKBENCH_FEEDS, readFeedIds), [WORKBENCH_FEEDS, readFeedIds]);
   const markFeedTabRead = (nextTab: FeedTabType) => {
     setFeedTab(nextTab);
     setReadFeedIds((current) => {
@@ -122,6 +130,8 @@ export const MyTasksView: React.FC = () => {
     </button>
   );
 
+  if (innerView !== 'home') return <React.Suspense fallback={<Skeleton active/>}>{innerView === 'todos' ? <TodoCenterView onBack={returnToMyTasks}/> : <WorkbenchFeedsView onBack={returnToMyTasks}/>}</React.Suspense>;
+
   return (
     <div className="space-y-6">
       {/* 顶部核心指标 */}
@@ -132,16 +142,13 @@ export const MyTasksView: React.FC = () => {
           unit="项"
           icon={<CheckSquare className="w-5 h-5" />}
           iconBgColor="bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
-          onClick={() => openPageTab('prod_req_tasks')}
         />
         <StatCard
           title="协同事项/工单"
-          value={dashboardMetrics.collaborationCount}
+          value={dashboardMetrics.collaborationAndWorkOrderCount}
           unit="项"
-          subText={`工单 ${dashboardMetrics.workOrderCount} 项`}
           icon={<MessageSquare className="w-5 h-5" />}
           iconBgColor="bg-cyan-50 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-400"
-          onClick={() => openPageTab('wb_work_order')}
         />
         <StatCard
           title="跟进商机数"
@@ -149,7 +156,6 @@ export const MyTasksView: React.FC = () => {
           unit="家"
           icon={<Users className="w-5 h-5" />}
           iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400"
-          onClick={() => openPageTab('crm_opportunities')}
         />
         <StatCard
           title="项目交付数"
@@ -157,7 +163,6 @@ export const MyTasksView: React.FC = () => {
           unit="项"
           icon={<Briefcase className="w-5 h-5" />}
           iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
-          onClick={() => openPageTab('proj_delivery_map')}
         />
       </div>
 
@@ -165,8 +170,8 @@ export const MyTasksView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* 待办中心 */}
         <div className="lg:col-span-7 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border-main)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-[var(--primary)]" />
                 待办中心
@@ -178,6 +183,7 @@ export const MyTasksView: React.FC = () => {
                 <TabButton active={todoTab === 'work_order'} onClick={() => setTodoTab('work_order')}>工单 ({dashboardMetrics.workOrderCount})</TabButton>
               </div>
             </div>
+            <button className="shrink-0 text-xs text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => { rememberWorkbenchTab(TODO_TAB_KEY, todoTab); setInnerView('todos'); }}>查看更多</button>
           </div>
 
           <div className="p-5 max-h-80 overflow-y-auto">
@@ -221,8 +227,8 @@ export const MyTasksView: React.FC = () => {
 
         {/* 审批中心 */}
         <div className="lg:col-span-5 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border-main)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
                 <FileCheck className="w-4 h-4 text-[var(--danger)]" />
                 审批中心
@@ -285,7 +291,7 @@ export const MyTasksView: React.FC = () => {
 
         {/* OKR进度 */}
         <div className="lg:col-span-7 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border-main)] flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
             <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
               <Target className="w-4 h-4 text-[var(--warning)]" />
               我的目标进度
@@ -361,8 +367,8 @@ export const MyTasksView: React.FC = () => {
 
         {/* 动态与评价 */}
         <div className="lg:col-span-5 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border-main)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-[var(--success)]" />
                 动态与评价
@@ -388,39 +394,36 @@ export const MyTasksView: React.FC = () => {
                 </TabButton>
               </div>
             </div>
+            <button className="shrink-0 text-xs text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => { rememberWorkbenchTab(FEED_TAB_KEY, feedTab); setInnerView('feeds'); }}>查看更多</button>
           </div>
 
           <div className="p-5 max-h-[520px] overflow-y-auto text-xs">
-            {feedTab === 'dynamic' ? (
+            {feedError ? <div role="alert" className="space-y-2 text-[var(--danger)]">{feedError}<button className="ml-3 hover:underline" onClick={reloadFeeds}>重试</button></div> : !WORKBENCH_FEEDS.some(feed => feed.type === feedTab) ? <Empty description="暂无动态与评价"/> : feedTab === 'dynamic' ? (
               <div className="relative ml-2 border-l border-[var(--primary)] pl-5 space-y-5">
-                {WORKBENCH_FEEDS.filter((f) => f.type === 'dynamic').map((feed) => (
+                {WORKBENCH_FEEDS.filter((f) => f.type === 'dynamic').slice(0, 5).map((feed) => (
                   <div key={feed.id} className="relative space-y-1.5">
                     <span className="absolute -left-[26px] top-0.5 w-3 h-3 rounded-full border-2 border-[var(--primary)] bg-[var(--bg-surface)]" />
-                    <div className="text-xs text-[var(--text-muted)]">{feed.time}</div>
+                    <div className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</div>
                     <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-1">
                       {feed.title}{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 text-[var(--danger)]" />}
                     </div>
-                    <p className="text-[var(--text-body)] leading-relaxed">
-                      {feed.content}
-                    </p>
+                    <FeedSummary content={feed.content}/>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="divide-y divide-[var(--border-main)]">
-                {WORKBENCH_FEEDS.filter((f) => f.type === feedTab).map((feed) => (
+                {WORKBENCH_FEEDS.filter((f) => f.type === feedTab).slice(0, 5).map((feed) => (
                   <div key={feed.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-1">
                         {feed.title}{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 text-[var(--danger)]" />}
                       </span>
-                      <span className="text-xs text-[var(--text-muted)]">{feed.time}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</span>
                     </div>
-                    <p className="text-[var(--text-body)] leading-relaxed">
-                      {feed.content}
-                    </p>
+                    <FeedSummary content={feed.content}/>
                     <div className="text-xs text-[var(--text-muted)]">
-                      {feed.customer || feed.author}
+                      {feed.type === 'competitor' && feed.newsType ? `${feed.newsType} · ` : ''}{(feed.type !== 'competitor' ? feed.customer : undefined) || feed.author}
                     </div>
                   </div>
                 ))}

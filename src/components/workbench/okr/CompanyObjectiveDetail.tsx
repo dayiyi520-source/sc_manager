@@ -1,3 +1,5 @@
+import { goalReviewEvidence, goalEvidenceProducts, goalEvidenceProjects } from '../../../services/goalReviewEvidence';
+import { GoalEvidencePanel } from './GoalEvidencePanel';
 import { PieChartOutlined } from '@ant-design/icons';
 import { goalBusinessAssociations } from './goalBusinessAssociations';
 import { GoalActivityTimeline } from './GoalActivityTimeline';
@@ -6,7 +8,7 @@ import { periodLabel } from '../../../services/okrPeriods';
 import { KrDetailTable } from './KrDetailTable';
 import { krDetails, supervisorKrTitle } from '../../../services/okrKrDetails';
 import { useState, type ReactNode } from 'react';
-import { Alert, Button, Drawer, Empty, Progress, Skeleton, Tooltip } from 'antd';
+import { Alert, Button, Drawer, Empty, Progress, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, GitBranchIcon, TrashIcon, XIcon } from '@primer/octicons-react';
 import { PersonAvatar } from '../../common/PersonIdentity';
@@ -105,7 +107,7 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
         {assignedPersonal && (baseRecord.payload.keyResults || []).map(kr => <KrDetailTable key={kr.id} rows={krDetails(kr)} label={kr.structureType === 'delivery' ? '项目产品' : '迭代版本'} mode={kr.structureType === 'delivery' ? 'delivery' : 'product'}/>)}
         {!objective?.children.length && <Empty description={ownPersonal ? '暂无 A 执行动作' : '暂无 KR 关键结果'}/>}
         {objective?.children.map((action, index) => {
-          const tasks = companyActionTasks(action, selectedRecord.kind === 'action' ? selectedRecord.payload.parentObjectiveId || record.id : record.id, work, records);
+          const tasks = goalReviewEvidence(baseRecord, action.referenceId, records, work, people);
           const activeSection = selectedSections[action.id];
           const open = !!expanded[action.id];
           const linkedIds = new Set(descendants(action).map(node => node.referenceId));
@@ -120,7 +122,9 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
           const projects = [...new Set([...associations.projects, ...linkedActions.filter(item=>item.payload.structureType==='delivery').map(item=>item.payload.businessObject?.trim()).filter((value): value is string=>!!value)])];
           const products = [...new Set([...associations.products, ...linkedActions.map(item=>item.payload.productLine?.trim()).filter((value): value is string=>!!value)])];
           const selectSection = (section: ActionSection) => { setSelectedSections(current => ({ ...current, [action.id]: section })); setExpanded(current => ({ ...current, [action.id]: activeSection === section ? !current[action.id] : true })); };
-          const sections: Array<{key: ActionSection; label: string; count: string | number; aria: string}> = [{key:'tasks',label:'所有任务',count:workLoading ? '加载中' : workError ? '加载失败' : tasks.length,aria:'关联任务'},{key:'projects',label:'项目',count:projects.length,aria:'项目'},{key:'products',label:'产品',count:products.length,aria:'产品'},{key:'alignments',label:'对齐我的',count:alignmentRows.length,aria:'下级对齐'}];
+          const productRows = goalEvidenceProducts(tasks, products);
+          const projectRows = goalEvidenceProjects(tasks, projects);
+          const sections: Array<{key: ActionSection; label: string; count: string | number; aria: string}> = [{key:'tasks',label:'所有任务',count:tasks.length || (workLoading ? '加载中' : workError ? '加载失败' : 0),aria:'关联任务'},{key:'projects',label:'项目',count:projectRows.length,aria:'项目'},{key:'products',label:'产品',count:productRows.length,aria:'产品'},{key:'alignments',label:'对齐我的',count:alignmentRows.length,aria:'下级对齐'}];
           return <section className="company-action-card" key={action.id}>
             <div className="company-action-content"><div className="company-action-heading">{resultLabel !== 'A' && <span className="company-action-number">{resultLabel}{index + 1}</span>}<div className="company-action-title"><h4>{record.payload.goalLevel === 'department' ? supervisorKrTitle(record.payload.keyResults?.find(item=>item.id===action.referenceId) || {id:'',title:action.title,weight:action.weight,progress:action.progress}) : action.title}</h4>{!ownPersonal && <div className="company-action-assignees">{action.assigneeIds.length ? action.assigneeIds.map(id => {
               const aligned = records.some(item => item.ownerId === id && hasDownstreamAlignment(item, record.id, action.referenceId, record.ownerId, record.periodKey, people));
@@ -130,7 +134,7 @@ export function CompanyObjectiveDetail({ record: selectedRecord, records, people
             {(() => { const kr = record.payload.keyResults?.find(item => item.id === action.referenceId); return kr && ['product', 'delivery'].includes(kr.structureType || '') ? <KrDetailTable rows={krDetails(kr)} label={kr.structureType === 'product' ? '迭代版本' : '项目产品'} mode={kr.structureType === 'delivery' ? 'delivery' : 'product'}/> : null; })()}
             <div className="company-execution-actions">{(record.payload.keyResults?.find(kr => kr.id === action.referenceId)?.executionActions || []).filter(item => item.ownerId === record.ownerId).map((item, i) => <div key={item.id} className="company-action-content"><div className="company-action-heading"><div className="company-action-title"><h4>{item.title}</h4></div></div><div className="company-action-metrics"><Button type="text" onClick={() => onProgress?.(selectedRecord.id, item.id)} className="company-detail-progress" aria-label={`A${i + 1}进度：${item.progress}%`}><Progress type="circle" percent={item.progress} size="small" showInfo={false}/><span>{item.progress}%</span></Button><span aria-label={`A${i + 1}权重：${item.weight ?? 0}%`}><PieChartOutlined/>{item.weight ?? 0}%</span><span aria-label={`A${i + 1}截止日期：${item.deadline || '未设置'}`}><CalendarIcon/>{item.deadline ? dayjs(item.deadline).format('MM-DD') : '未设置'}</span></div></div>)}</div>
             <div className="company-action-tabs"><Button type="text" className="company-action-toggle" aria-label={`${resultLabel}${index + 1}${open ? '收起' : '展开'}关联内容`} aria-expanded={open} aria-controls={`company-action-panel-${action.id}`} icon={open ? <ChevronDownIcon/> : <ChevronRightIcon/>} onClick={() => { if (!activeSection) setSelectedSections(current => ({...current,[action.id]: 'tasks'})); setExpanded(current => ({...current,[action.id]: !current[action.id]})); }}/>{sections.map(section => <Button key={section.key} type="text" aria-label={`${resultLabel}${index + 1}${section.aria}`} aria-pressed={open && activeSection === section.key} className={open && activeSection === section.key ? 'is-active' : ''} onClick={() => selectSection(section.key)}>{section.label}（{section.count}）</Button>)}</div>
-            {open && <div className="company-action-expanded" id={`company-action-panel-${action.id}`}>{activeSection === 'projects' || activeSection === 'products' ? (activeSection === 'projects' ? projects : products).length ? (activeSection === 'projects' ? projects : products).map(value => <div className="company-linked-row" key={value}>{value}</div>) : <p>{activeSection === 'projects' ? '暂无关联项目' : '暂无关联产品'}</p> : activeSection === 'alignments' ? alignmentRows.length ? alignmentRows.map(child => <div className="company-linked-row" key={child.id}><span>{child.title}</span><span>{child.ownerName} · {child.progress}%</span></div>) : <p>暂无下级对齐</p> : workLoading ? <Skeleton active paragraph={{rows: 2}}/> : workError ? <Alert type="error" title="关联任务加载失败" action={<Button onClick={onRetryWork}>重试</Button>}/> : tasks.length ? tasks.map(task => <div className="company-linked-row" key={task.id}><span>{task.title}</span><span>{task.ownerName || '未指定'} · {task.status}</span></div>) : <p>暂无可查看的关联任务</p>}</div>}
+            {open && <div className="company-action-expanded" id={`company-action-panel-${action.id}`}>{activeSection === 'alignments' ? alignmentRows.length ? alignmentRows.map(child => <div className="company-linked-row" key={child.id}><span>{child.title}</span><span>{child.ownerName} · {child.progress}%</span></div>) : <Empty description="暂无下级对齐"/> : <GoalEvidencePanel section={activeSection || 'tasks'} tasks={tasks} productNames={products} projectNames={projects} loading={workLoading} error={workError} onRetry={onRetryWork}/>}</div>}
           </section>;
         })}
       </main>

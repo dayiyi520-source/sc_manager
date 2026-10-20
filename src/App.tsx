@@ -88,6 +88,9 @@ const MainContent: React.FC = () => {
       // Workbench
       case 'wb_my_tasks':
         return <MyTasksView />;
+      case 'wb_feeds':
+      case 'wb_todo_center':
+        return <Navigate to="/app/wb_my_tasks" replace/>;
       case 'wb_okr_perf':
         return <OKRPerformanceView />;
       case 'wb_reviews':

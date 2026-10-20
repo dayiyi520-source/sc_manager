@@ -1,3 +1,4 @@
+import { reviewEvidenceMetadata } from '../../../services/reviewEvidenceSnapshot';
 import { ReviewKnowledgeContent } from './ReviewKnowledgeContent';
 import { ReviewKnowledgeTable } from './ReviewKnowledgeTable';
 import { ReviewTemplateLayout, reviewBlockTitle, ReviewTemplateSection, useReviewTemplateFields } from './ReviewTemplateFields';
@@ -216,7 +217,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
     helpNeeded: assistance.map(row => row.content || row.result).filter(Boolean).join('；') || initialPayload?.helpNeeded || '',
     extraWork: { ...extraWork, impact: 'none' },
     syncKrProgress: false,
-    items: evidenceItems
+    items: evidenceItems.map(item => { const current = work.find(row => row.id === item.workId); return current ? { ...item, ...reviewEvidenceMetadata(current) } : item; })
   });
 
   const requestSubmit = () => {
@@ -377,7 +378,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
         if (pickerKrId === 'extra') setExtraWork(value => ({ ...value, workIds: ids }));
         else if (pickerKr.keyResultId) updateKr(pickerKr.keyResultId, { workIds: ids });
         const selectedWork = work.filter(item => ids.includes(item.id));
-        setEvidenceItems(rows => [...rows.filter(item => !pickerKr.workIds.includes(item.workId) || ids.includes(item.workId)), ...selectedWork.filter(item => !rows.some(row => row.workId === item.id)).map(item => ({ workId: item.id, title: item.title, status: item.status, workType: 'task' as const, sourceLabel: [item.productLineName, item.versionName].filter(Boolean).join(' / '), actualHours: item.actualHours, objectiveId: pickerKr.objectiveId, keyResultId: pickerKr.keyResultId, result: '', impact: '' }))]);
+        setEvidenceItems(rows => [...rows.filter(item => !pickerKr.workIds.includes(item.workId) || ids.includes(item.workId)), ...selectedWork.filter(item => !rows.some(row => row.workId === item.id)).map(item => ({ workId: item.id, ...reviewEvidenceMetadata(item), title: item.title, status: item.status, workType: 'task' as const, sourceLabel: [item.productLineName, item.versionName].filter(Boolean).join(' / '), actualHours: item.actualHours, objectiveId: pickerKr.objectiveId, keyResultId: pickerKr.keyResultId, result: '', impact: '' }))]);
         setPickerKrId(null);
       }}/>}
 

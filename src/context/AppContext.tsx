@@ -162,6 +162,8 @@ export const MENU_GROUPS: MainMenuGroup[] = [
 ];
 
 const ALIAS_MAP: Record<string, SubMenuId> = {
+  'wb_todo_center': 'wb_my_tasks',
+  'wb_feeds': 'wb_my_tasks',
   'approval_center': 'comp_approval',
   'crm_bid_review': 'crm_bidding_review',
   'prod_reqs': 'prod_req_tasks',

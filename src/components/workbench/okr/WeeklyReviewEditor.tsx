@@ -1,3 +1,4 @@
+import { reviewEvidenceMetadata } from '../../../services/reviewEvidenceSnapshot';
 import { ReviewKnowledgeContent } from './ReviewKnowledgeContent';
 import { ReviewKnowledgeTable } from './ReviewKnowledgeTable';
 import { ReviewTemplateLayout, reviewBlockTitle, ReviewTemplateSection, useReviewTemplateFields } from './ReviewTemplateFields';
@@ -403,6 +404,7 @@ export function WeeklyReviewEditor({
     items: [
       ...selectedWorks.map(item => ({
         workId: item.id,
+        ...reviewEvidenceMetadata(item),
         title: item.title,
         status: item.status,
         workType: workSource(item),

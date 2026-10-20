@@ -1,3 +1,4 @@
+import { myTaskProgress, canUpdateMyTaskProgress, validateMyTaskProgress } from './myTaskProgress';
 import { mutateCollaboration } from './mockCollaborationMutations';
 import { newestCreatedFirst } from '../utils/creationOrder';
 import { SESSION_KEY } from './sessionStorage';
@@ -335,29 +336,37 @@ const unfinishedTask = (status: unknown, assistanceStatus?: unknown) => {
     && assistanceState !== 'COMPLETED';
 };
 
-const myTasks = (viewerId: string) => {
+const myTasks = (viewerId: string, includeFinished = false) => {
   const viewerName = MOCK_USERS.find((user) => user.id === viewerId)?.name || '';
-  const workItems = getWorkItems()
-    .filter((item) => !item.deleted && !item.deleteFlag && (item.assigneeId === viewerId || (!item.assigneeId && item.ownerName === viewerName)) && item.requirementType !== '协助事项' && unfinishedTask(item.status))
+  const sourceItems = getWorkItems();
+  const workItems = sourceItems
+    .filter((item) => !item.deleted && !item.deleteFlag && (item.assigneeId === viewerId || (viewerName && !item.assigneeId && item.ownerName === viewerName)) && item.requirementType !== '协助事项' && (includeFinished || unfinishedTask(item.status)))
     .map((item) => ({
       id: `task-${item.id}`,
       type: item.category || 'requirement',
       title: item.title,
       status: item.status || '未设置',
       taskTypeId: item.taskTypeId || item.workItemTypeId,
-  assigneeName: item.assigneeName ?? item.ownerName ?? '',
+      assigneeName: item.assigneeName ?? item.ownerName ?? '',
+      assigneeId: item.assigneeId, revision: Number(item.revision || 0),
       time: item.createdAt || '',
       dueDate: item.dueDate || '',
-      progress: Number(item.progress || 0),
+      progress: myTaskProgress(item.progress, item.status),
       overdueRisk: false,
       taskGroup: 'mine' as const,
       targetPage: item.category === 'design' ? 'prod_design_tasks' : item.category === 'dev' ? 'prod_rd_tasks' : item.category === 'test' ? 'prod_test_tasks' : item.category === 'bug' ? 'prod_bugs' : 'prod_req_tasks',
-      sourceId: item.id,
+      sourceId: item.id, productLineId: item.productLineId,
     }));
   const assistanceItems = databaseRows('t_product_work_item')
+    .map((row) => {
+      const current = sourceItems.find(item => item.id === text(row.id_));
+      if (!current) return row;
+      const ownerChanged = current.assigneeId && current.assigneeId !== text(row.assignee_id_);
+      return { ...row, status_name_: current.status ?? row.status_name_, progress_: current.progress ?? row.progress_, revision_: current.revision ?? row.version_, delete_flag_: current.deleted || current.deleteFlag || row.delete_flag_, assistance_task_status_: current.assistanceTaskStatus ?? row.assistance_task_status_, ...(ownerChanged ? { assistance_owner_id_: current.assigneeId, assignee_name_: current.assigneeName || current.ownerName } : {}) };
+    })
     .filter((row) => text(row.requirement_type_) === '协助事项')
     .filter((row) => text(row.assistance_owner_id_ || row.assignee_id_) === viewerId)
-    .filter((row) => unfinishedTask(row.status_name_, row.assistance_task_status_))
+    .filter((row) => !Number(row.delete_flag_ || 0) && (includeFinished || unfinishedTask(row.status_name_, row.assistance_task_status_)))
     .map((row) => ({
       id: `assistance-${text(row.id_)}`,
       type: 'assistance',
@@ -366,7 +375,8 @@ const myTasks = (viewerId: string) => {
       assigneeName: text(row.assignee_name_) || MOCK_USERS.find((user) => user.id === text(row.assistance_owner_id_ || row.assignee_id_))?.name || '',
       time: text(row.create_time_).slice(0, 10),
       dueDate: text(row.expected_complete_date_ || row.planned_end_date_).slice(0, 10),
-      progress: Number(row.progress_ || 0),
+      progress: myTaskProgress(row.progress_, text(row.status_name_)),
+      revision: Number(row.revision_ ?? row.version_ ?? 0), assigneeId: text(row.assistance_owner_id_ || row.assignee_id_),
       overdueRisk: false,
       taskGroup: 'assist' as const,
       targetPage: 'wb_work_order',
@@ -709,9 +719,31 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const pageSize = Math.min(100, Math.max(1, Number(query.get('pageSize') || 100)));
     return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length };
   }
+  if (parts.length === 5 && parts[1] === 'requirements' && parts[2] === 'work-items' && parts[4] === 'progress' && method === 'PATCH') {
+    validateMyTaskProgress(body.progress);
+    const operator = taskOperator();
+    const taskId = decodeURIComponent(parts[3]);
+    const visible = myTasks(operator.id, true).find(row => row.sourceId === taskId);
+    if (!visible) throw new Error('任务已删除或负责人已变更，只能修改本人待办进度');
+    if (!canUpdateMyTaskProgress(visible.status)) throw new Error('已结束事项不能修改进度');
+    if (!Number.isInteger(body.revision) || body.revision !== visible.revision) throw new Error('任务已被更新，请刷新后重试');
+    if (visible.progress === body.progress) return { id: taskId, progress: body.progress, revision: visible.revision };
+    const items = getWorkItems();
+    let index = items.findIndex(item => item.id === taskId);
+    if (index < 0) {
+      const seed = initialWorkItems.find(item => item.id === taskId);
+      if (!seed) throw new Error('任务不存在，请刷新后重试');
+      items.push({ ...seed }); index = items.length - 1;
+    }
+    const current = items[index];
+    const revision = visible.revision + 1;
+    items[index] = { ...current, progress: body.progress, revision, updatedAt: now(), events: [...(current.events || []), { id: id('progress'), eventType: '更新进度', operatorName: operator.name, createdAt: now(), metadata: { from: visible.progress, to: body.progress } }] };
+    write(KEYS.workItems, items);
+    return { id: taskId, progress: body.progress, revision };
+  }
   if (clean === '/api/requirements/my-tasks' && method === 'GET') {
     const viewerId = queryOf(path).get('viewerId') || '';
-    return viewerId ? myTasks(viewerId) : [];
+    return viewerId ? myTasks(viewerId, queryOf(path).get('includeFinished') === 'true') : [];
   }
   if (clean === '/api/requirements/work-order-candidates' && method === 'GET') {
     const query = queryOf(path); const keyword = (query.get('keyword') || '').trim().toLowerCase();

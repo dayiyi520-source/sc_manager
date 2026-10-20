@@ -22,6 +22,7 @@ describe('design task navigation', () => {
     const product = MENU_GROUPS.find((group) => group.id === 'product')!.subMenus;
 
     expect(workbench.find((menu) => menu.id === 'wb_work_order')?.title).toBe('协同事项');
+    expect(workbench.some(menu => ['wb_feeds', 'wb_todo_center'].includes(menu.id))).toBe(false);
     expect(product).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'prod_test_tasks', title: '测试任务' }),
       expect.objectContaining({ id: 'prod_test_management', title: '测试管理' }),

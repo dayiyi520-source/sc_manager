@@ -93,7 +93,7 @@ export const requirementRepository = {
   },
   updateWorkItemStatus: (id: string, status: string) => apiRequest<void>(`/api/requirements/work-items/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   updateWorkItemProgress: (id: string, progress: number, revision?: number, reason?: string) => apiRequest<{ id: string; progress: number; revision: number }>(`/api/requirements/work-items/${id}/progress`, { method: 'PATCH', body: JSON.stringify({ progress, revision, reason }) }),
-  myTasks: (viewerId?: string) => apiRequest<Array<{ id: string; type: string; title: string; status: string; assigneeName?: string; time?: string; dueDate?: string; progress?: number; overdueRisk?: boolean; taskGroup: 'mine' | 'assist'; targetPage: string; sourceId: string }>>(`/api/requirements/my-tasks${viewerId ? `?viewerId=${encodeURIComponent(viewerId)}` : ''}`),
+  myTasks: (viewerId?: string, includeFinished = false) => apiRequest<Array<{ revision?: number; assigneeId?: string; productLineId?: string; id: string; type: string; title: string; status: string; assigneeName?: string; time?: string; dueDate?: string; progress?: number; overdueRisk?: boolean; taskGroup: 'mine' | 'assist'; targetPage: string; sourceId: string }>>(`/api/requirements/my-tasks${viewerId ? `?viewerId=${encodeURIComponent(viewerId)}${includeFinished ? '&includeFinished=true' : ''}` : ''}`),
   acceptWorkItem: (requirementId: string, workItemId: string) => apiRequest<{ id: string; status: string }>(`/api/requirements/${requirementId}/work-items/${workItemId}/acceptance`, { method: 'POST' }),
   retryWorkItem: (id: string) => apiRequest<{ syncStatus: string; retryableFailures: number; syncError?: string }>(`/api/requirements/work-items/${id}/retry`, { method: 'POST' })
 };

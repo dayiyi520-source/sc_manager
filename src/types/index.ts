@@ -26,6 +26,8 @@ export type SubMenuId =
   | 'training_admin'
   // 工作台
   | 'wb_my_tasks'
+  | 'wb_todo_center'
+  | 'wb_feeds'
   | 'wb_okr_perf'
   | 'wb_reviews'
   | 'wb_knowledge'
