@@ -1248,7 +1248,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const matchingWorkflow = workflows.find((workflow: any) => workflow.status === 'PUBLISHED' && (!current.workflowId || workflow.id === current.workflowId));
     const snapshotWorkflow = current.workflowId ? databaseRows('t_product_workflow').find(flow => flow.id_ === current.workflowId && flow.product_line_id_ === current.productLineId && !flow.delete_flag_ && flow.status_ === 'PUBLISHED') : undefined;
     const workflow = matchingWorkflow || (snapshotWorkflow ? { id: snapshotWorkflow.id_, status: snapshotWorkflow.status_, definition: snapshotWorkflow.definition_ } : workflows.find((flow: any) => flow.status === 'PUBLISHED' && flow.definition?.states?.some((state: any) => state.key === current.statusKey || state.name === current.status)));
-    if (!workflow?.definition?.states?.length) throw new Error('任务绑定的状态流程已失效，请检查产研模板中发布的流程');
+    if (!workflow?.definition?.states?.length) throw new Error('任务绑定的状态流程已失效，请检查工作项设置中发布的流程');
     const states = workflow?.definition?.states?.filter((state: any) => state.enabled !== false) || [];
     const currentKey = states.find((state: any) => state.key === current.statusKey)?.key || states.find((state: any) => state.name === current.status)?.key;
     let role = '';

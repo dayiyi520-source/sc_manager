@@ -182,7 +182,7 @@ export const PermissionDemoView: React.FC = () => {
 
       <div className="flex flex-col gap-2 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-3 text-xs md:flex-row md:items-center md:justify-between">
         <div>
-          <strong className="font-medium text-[var(--text-primary)]">系统与组织 · 产研模板</strong>
+          <strong className="font-medium text-[var(--text-primary)]">系统与组织 · 工作项设置</strong>
           <p className="mt-1 text-[var(--text-muted)]">{templateStatus === '编辑权限' ? '可以查看、新增、编辑、删除子类型并维护状态流程。' : '可以查看模板配置，不能新增、编辑或删除。'}</p>
         </div>
         {statusTag(templateStatus)}

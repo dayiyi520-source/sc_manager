@@ -880,7 +880,7 @@ export const VersionIterationView: React.FC = () => {
       }
       Modal.confirm({
         title: `归档任务“${item.title}”？`,
-        content: '归档后任务将从当前列表移除，可在系统与组织的产研模板中恢复。',
+        content: '归档后任务将从当前列表移除，可在系统与组织的工作项设置中恢复。',
         okText: '归档',
         cancelText: '取消',
         okButtonProps: { danger: true },

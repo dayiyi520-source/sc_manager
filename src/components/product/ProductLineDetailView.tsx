@@ -143,7 +143,7 @@ const ProductLineSettingsPanel: React.FC<{
   ];
 
   const operationCopy = {
-    archive: { title: '归档产品', description: '归档后，产品将从产品管理列表移至产研模板的归档列表。', confirm: '确认归档' }
+    archive: { title: '归档产品', description: '归档后，产品将从产品管理列表移至工作项设置的归档列表。', confirm: '确认归档' }
   } as const;
   const executeOperation = async () => {
     if (!pendingOperation) return;
@@ -215,7 +215,7 @@ const ProductLineSettingsPanel: React.FC<{
               <div className="flex justify-end"><Button type="primary" htmlType="submit" loading={isSavingBasic}>保存基本信息</Button></div>
             </form>
           )}
-          {section === 'other' && <div className="w-full space-y-5 px-0 text-xs sm:px-2 lg:px-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品操作</h3><p className="mt-1 text-[var(--text-muted)]">管理产品归档。</p></div><div className="space-y-3"><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">产品归档</h4><p className="mt-1 text-[var(--text-muted)]">产品完成后可归档，归档产品统一在产研模板中管理。</p></div><Button className="!h-9" type="primary" onClick={() => setPendingOperation('archive')}>归档</Button></div></div></div>}
+          {section === 'other' && <div className="w-full space-y-5 px-0 text-xs sm:px-2 lg:px-4"><div><h3 className="text-sm font-bold text-[var(--text-primary)]">产品操作</h3><p className="mt-1 text-[var(--text-muted)]">管理产品归档。</p></div><div className="space-y-3"><div className="flex min-h-16 flex-col justify-between gap-4 rounded-md border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-4 sm:flex-row sm:items-center"><div><h4 className="text-sm font-semibold text-[var(--text-primary)]">产品归档</h4><p className="mt-1 text-[var(--text-muted)]">产品完成后可归档，归档产品统一在工作项设置中管理。</p></div><Button className="!h-9" type="primary" onClick={() => setPendingOperation('archive')}>归档</Button></div></div></div>}
         </section>
       </div>
       <Modal isOpen={Boolean(pendingOperation)} onClose={() => !isOperating && setPendingOperation(null)} title={pendingOperation ? operationCopy[pendingOperation].title : ''} footer={<><Button disabled={isOperating} onClick={() => setPendingOperation(null)}>取消</Button><Button type="primary" danger loading={isOperating} onClick={() => void executeOperation()}>{pendingOperation ? operationCopy[pendingOperation].confirm : '确认'}</Button></>}><p className="text-sm text-[var(--text-body)]">{pendingOperation ? operationCopy[pendingOperation].description : ''}</p></Modal>

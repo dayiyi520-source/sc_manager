@@ -81,10 +81,10 @@ const DictionaryPanel = () => <div className="w-full space-y-5 text-xs">
 export const ResearchTemplateView: React.FC = () => {
   const [section, setSection] = useState<Section>('work-items');
   return <div className="research-template-view space-y-5 animate-in fade-in duration-200">
-    <header className="border-b border-[var(--border-main)] pb-3"><h1 className="text-lg font-bold text-[var(--text-primary)]">产研模板</h1><p className="mt-1 text-xs text-[var(--text-muted)]">统一管理工作项类型、状态、通知和归档。</p></header>
+    <header className="border-b border-[var(--border-main)] pb-3"><h1 className="text-lg font-bold text-[var(--text-primary)]">工作项设置</h1><p className="mt-1 text-xs text-[var(--text-muted)]">统一管理工作项类型、状态、通知和归档。</p></header>
     <div className="grid min-h-[520px] grid-cols-1 border border-[var(--border-main)] bg-[var(--bg-surface)] md:grid-cols-[190px_minmax(0,1fr)]">
-      <nav aria-label="产研模板菜单" className="flex gap-1 overflow-x-auto border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:block md:overflow-visible md:border-b-0 md:border-r">
-        <div className="mb-4 hidden border-b border-[var(--border-main)] px-3 pb-4 select-none md:block"><h2 className="text-base font-bold text-[var(--text-primary)]">产研模板</h2><p className="mt-2 text-xs text-[var(--text-muted)]">统一配置</p></div>
+      <nav aria-label="工作项设置菜单" className="flex gap-1 overflow-x-auto border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-3 md:block md:overflow-visible md:border-b-0 md:border-r">
+        <div className="mb-4 hidden border-b border-[var(--border-main)] px-3 pb-4 select-none md:block"><h2 className="text-base font-bold text-[var(--text-primary)]">工作项设置</h2><p className="mt-2 text-xs text-[var(--text-muted)]">统一配置</p></div>
         {SECTIONS.map((item) => <button key={item.id} type="button" onClick={() => setSection(item.id)} aria-current={section === item.id ? 'page' : undefined} className={`mb-1 flex h-9 shrink-0 items-center rounded-md px-3 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] md:w-full ${section === item.id ? 'bg-[var(--primary)]/12 text-[var(--active-text)]' : 'text-[var(--text-body)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'}`}>{item.label}</button>)}
       </nav>
       <section className="min-w-0 p-4 md:p-6" aria-label={SECTIONS.find((item) => item.id === section)?.label}>
