@@ -8,8 +8,22 @@ const review: PerformanceReview & {authorId:string} = { id:'r',authorId:'e',auth
 describe('personal review card and detail',()=>{
  it('uses saved personal fields without old score/summary filler',()=>{
   const view=vi.fn(); render(<MyReviewCard review={review} onView={view} onCopy={vi.fn()} onSubmit={vi.fn()}/>);
-  expect(screen.getByText('我的计划进度')).toBeInTheDocument();expect(screen.getByText('60%')).toBeInTheDocument();expect(screen.queryByText(/自评/)).not.toBeInTheDocument();expect(screen.getByText('下周计划内容')).toBeInTheDocument();
+  expect(screen.getByText('我的计划进度')).toBeInTheDocument();expect(screen.getByText('60%')).toBeInTheDocument();expect(screen.queryByText(/自评/)).not.toBeInTheDocument();expect(screen.queryByText('下周计划内容')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'查看详情'}));expect(view).toHaveBeenCalledOnce();
+ });
+ it.each([
+  {type:'week',reviewMode:'structured'},
+  {type:'month',reviewMode:'structured'},
+  {type:'week',reviewMode:'supervisor'},
+  {type:'month',reviewMode:'supervisor'},
+ ] as const)('hides configurable content from $reviewMode $type cards while retaining statistics and actions',({type,reviewMode})=>{
+  const copy=vi.fn(),submit=vi.fn();
+  render(<MyReviewCard review={{...review,type,reviewMode,status:'draft',summary:'已保存的补充总结',suggestions:'已保存的问题建议',nextWeekPlan:'已保存的下周计划'}} onView={vi.fn()} onCopy={copy} onSubmit={submit}/>);
+  for(const content of ['已保存的补充总结','已保存的问题建议','已保存的下周计划','下周计划','问题与建议','部门补充总结','本月部门补充总结','部门下周计划','部门反馈问题梳理与分析']) expect(screen.queryByText(content)).not.toBeInTheDocument();
+  expect(screen.getByLabelText('复盘内容统计').children).toHaveLength(3);
+  expect(screen.getByRole('button',{name:'查看详情'})).toBeEnabled();
+  fireEvent.click(screen.getByRole('button',{name:'复制为本期'}));expect(copy).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button',{name:'提 交'}));expect(submit).toHaveBeenCalledOnce();
  });
  it('aligns detail fields with the new form and preserves detail snapshots',()=>{
   render(<ReviewReadOnlyView review={review} onBack={vi.fn()} onCopy={vi.fn()}/>);
@@ -19,8 +33,8 @@ describe('personal review card and detail',()=>{
   render(<MyReviewCard review={{...review,type:'month',reviewMode:'supervisor',summary:'部门成果',suggestions:'问题分析',monthlyMetrics:{taskCount:5,collaborationCount:1,totalHours:12}}} onView={vi.fn()} onCopy={vi.fn()} onSubmit={vi.fn()}/>);
   expect(screen.getByText('部门月报')).toBeInTheDocument();
   expect(screen.getByLabelText('月度统计')).toBeInTheDocument();
-  expect(screen.getByText('本月部门补充总结')).toBeInTheDocument();
-  expect(screen.getByText('部门反馈问题梳理与分析')).toBeInTheDocument();
+  expect(screen.queryByText('本月部门补充总结')).not.toBeInTheDocument();
+  expect(screen.queryByText('部门反馈问题梳理与分析')).not.toBeInTheDocument();
   expect(screen.getByLabelText('复盘内容统计').children).toHaveLength(3);
  });
 });
