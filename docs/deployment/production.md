@@ -30,16 +30,25 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-本次成功发布：2026-10-20；发布编号 `20261020T092321Z`；源码提交 `fb6393bfe7703f6379f4e804a0fa3f1fbd45e50e`；发布目录 `/opt/sc-manager-frontend/releases/20261020T092321Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261020T092321Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`，首页、入口资源、复盘与目标绩效直达页面、Mock 健康接口和共享数据核验通过。
+本次成功发布：2026-10-20；发布编号 `20261020T151724Z`；源码提交 `db8f93bfc45b77ba162d343e72d2cce11d83d72e`；发布目录 `/opt/sc-manager-frontend/releases/20261020T151724Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261020T151724Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`，首页、入口资源、我的待办及协同事项直达页面、Mock 健康接口和共享数据核验通过。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
 
 失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
 
-上次已核实的发布：20261020T092321Z，源码 fb6393b。
+上次已核实的发布：20261020T151724Z，源码 db8f93b。
 
 ## 最近成功发布
+
+- 发布时间：2026-10-20 23:17:24（北京时间）。发布编号 `20261020T151724Z`，发布源码 `db8f93bfc45b77ba162d343e72d2cce11d83d72e`。
+- 发布目录：`/opt/sc-manager-frontend/releases/20261020T151724Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261020T151724Z`。上一版本目标记录于该目录的 `previous-target.txt`。
+- 我的待办和动态与评价仅标题打开详情；待办详情等待数据及组件准备后打开原抽屉，动态新建、详情及编辑使用居中弹窗。包含独立整页详情链接及同源新标签会话恢复。
+- 相关定向测试通过，类型检查和生产构建通过。扩大回归中剩余 30 项失败在未修改基线同样复现，未作为本次通过项。
+- 使用已推送提交的独立源码快照构建及部署；公网发布清单与源码提交一致，首页、我的待办及协同事项直达地址返回 200，Mock 健康接口报告本次发布编号，共享数据读取通过。未上传本地未提交的临时文件。
+- 回滚时读取本次备份中的 `previous-target.txt` 切回旧 `dist`，再运行本次发布目录 `mock-service/setup.py` 的 `--rollback` 模式恢复路由、服务与共享文件。
+
+### 前次发布记录（20261020T092321Z）
 
 - 发布时间：2026-10-20 17:23:21（北京时间，发布编号生成时间）。
 - 发布编号：20261020T092321Z；发布源码：fb6393bfe7703f6379f4e804a0fa3f1fbd45e50e。
