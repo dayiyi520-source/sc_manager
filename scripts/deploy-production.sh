@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # EAF_DEPLOY_SCRIPT_STATUS=verified
-# Last verified: 2026-10-20; release 20261020T074926Z; source 06fcc9c.
+# Last verified: 2026-10-20; release 20261020T082014Z; source 2a9472f.
 # Static Mock site: /sc-manager-frontend/ and namespace /sc-manager-frontend/api/.
 # Existing application deployment /manage-admin/ remains separate; no database replacement.
 PUBLIC_PATH="sc-manager-frontend"
