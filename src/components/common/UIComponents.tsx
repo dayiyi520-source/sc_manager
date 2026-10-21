@@ -161,7 +161,8 @@ export const Modal: React.FC<{
   headerIcon?: React.ReactNode;
   subtitle?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
-}> = ({ isOpen, onClose, title, children, footer, headerIcon, subtitle, maxWidth = 'xl' }) => {
+  zIndex?: number;
+}> = ({ isOpen, onClose, title, children, footer, headerIcon, subtitle, maxWidth = 'xl', zIndex }) => {
   if (!isOpen) return null;
 
   const maxWidthClasses = {
@@ -175,7 +176,7 @@ export const Modal: React.FC<{
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4" style={zIndex === undefined ? undefined : { zIndex }}>
       <div className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity" onClick={onClose} />
       <div
         className={`relative bg-[var(--bg-surface)] text-[var(--text-body)] rounded-xl shadow-2xl border border-[var(--border-main)] w-full ${maxWidthClasses[maxWidth]} my-8 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}

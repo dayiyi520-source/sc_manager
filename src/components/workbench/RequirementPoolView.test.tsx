@@ -120,6 +120,19 @@ describe('workbench work-order creation layout', () => {
     return task;
   };
 
+  it.each([
+    ['待处理', '事项转交', '转交他人'],
+    ['待处理', '事项退回', '事项驳回'],
+    ['处理中', '事项完成', '事项完成'],
+    ['待验收', '验收通过', '验收评价'],
+    ['待验收', '验收未通过', '验收未通过'],
+    ['已退回', '事项关闭', '事项关闭'],
+  ])('%s 状态下的%s弹窗显示在详情抽屉上方', async (status, action, heading) => {
+    await renderDetail({ status, revision: 2 });
+    fireEvent.click(screen.getByRole('button', { name: action }));
+    expect(screen.getByRole('heading', { name: heading }).closest('.fixed.inset-0')).toHaveStyle({ zIndex: 1001 });
+  });
+
   it('评论发表后更新讨论和历程，历程入口打开全部评论并定位', async () => {
     Element.prototype.scrollIntoView = vi.fn();
     const task = await renderDetail({ revision: 2 });

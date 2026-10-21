@@ -1376,7 +1376,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
           </div>
         </AntDrawer>
       )}
-      <AntModal title="拒绝转派" open={rejectReassignmentOpen} confirmLoading={receiving} okText="确认拒绝" cancelText="取消" onCancel={() => setRejectReassignmentOpen(false)} onOk={() => { if (!reassignReason.trim()) { addToast('warning', '请填写拒绝原因'); return; } void respondToReassignment(false, reassignReason.trim()).then(success => { if (success) setRejectReassignmentOpen(false); }); }}>
+      <AntModal title="拒绝转派" open={rejectReassignmentOpen} zIndex={1001} confirmLoading={receiving} okText="确认拒绝" cancelText="取消" onCancel={() => setRejectReassignmentOpen(false)} onOk={() => { if (!reassignReason.trim()) { addToast('warning', '请填写拒绝原因'); return; } void respondToReassignment(false, reassignReason.trim()).then(success => { if (success) setRejectReassignmentOpen(false); }); }}>
         <Input.TextArea aria-label="拒绝转派原因" value={reassignReason} maxLength={2000} onChange={event => setReassignReason(event.target.value)} placeholder="请填写拒绝原因" />
       </AntModal>
       {taskCreationKind && selected && <RequirementTasksView
@@ -1396,6 +1396,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       />}
       <Modal
         isOpen={workOpen}
+        zIndex={1001}
         onClose={() => setWorkOpen(false)}
         title={workflowAction === "reassign" ? "转交他人" : "新增任务"}
         maxWidth="4xl"
@@ -1506,7 +1507,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
           </div>
         </form>
       </Modal>
-      <Modal isOpen={completeModalOpen} onClose={() => { if (!completeSubmitting) setCompleteModalOpen(false); }} title="事项完成">
+      <Modal isOpen={completeModalOpen} zIndex={1001} onClose={() => { if (!completeSubmitting) setCompleteModalOpen(false); }} title="事项完成">
         <form onSubmit={submitComplete} className="work-order-dialog space-y-4">
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">事项备注<RichTextEditor editor={completeEditor} size="work-order" value={completeNote} htmlValue={completeNoteHtml} onInput={(text, html) => { setCompleteNote(text); setCompleteNoteHtml(html); }} placeholder="请输入事项完成备注" /></label>
           <FlowAttachmentPicker media={flowMedia} onChange={setFlowMedia} onPick={onFlowMedia} />
@@ -1515,6 +1516,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       </Modal>
       <Modal
         isOpen={!!reasonType}
+        zIndex={1001}
         onClose={() => setReasonType(null)}
         title={reasonType === "hold" ? "事项搁置" : "事项驳回"}
       >
@@ -1553,7 +1555,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
           </div>
         </form>
       </Modal>
-      <Modal isOpen={ratingModalOpen} onClose={() => { if (!acceptanceSubmitting) setRatingModalOpen(false); }} title="验收评价">
+      <Modal isOpen={ratingModalOpen} zIndex={1001} onClose={() => { if (!acceptanceSubmitting) setRatingModalOpen(false); }} title="验收评价">
         <form className="work-order-dialog space-y-4" onSubmit={(event) => { event.preventDefault(); void passAcceptance(); }}>
           <p className="text-sm text-[var(--text-primary)]">{selected?.title}</p>
           <p className="text-xs text-[var(--text-muted)]">请选择星级，确认评价后事项将变为已完成，评价会记录在事项全历程中。</p>
@@ -1564,6 +1566,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       </Modal>
       <Modal
         isOpen={acceptanceModalOpen}
+        zIndex={1001}
         onClose={() => setAcceptanceModalOpen(false)}
         title="验收未通过"
       >
@@ -1590,7 +1593,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
           </div>
         </form>
       </Modal>
-      <Modal isOpen={closeModalOpen} title="事项关闭" onClose={() => { if (!closeSubmitting) setCloseModalOpen(false); }}>
+      <Modal isOpen={closeModalOpen} zIndex={1001} title="事项关闭" onClose={() => { if (!closeSubmitting) setCloseModalOpen(false); }}>
         <p className="text-sm text-[var(--text-body)]">确认结束“{selected?.title}”协同事项？关闭后代表该事项的本次流转已结束。</p>
         <div className="mt-4 flex justify-end gap-2"><Button disabled={closeSubmitting} onClick={() => setCloseModalOpen(false)}>取消</Button><Button danger type="primary" loading={closeSubmitting} disabled={closeSubmitting} onClick={() => void submitClose()}>确认关闭</Button></div>
       </Modal>

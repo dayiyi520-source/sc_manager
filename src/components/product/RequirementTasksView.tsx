@@ -2122,6 +2122,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       )}
       <WorkItemCreatePanel
         isOpen={isModalOpen}
+        zIndex={creationContext ? 1001 : undefined}
         onClose={() => { setIsModalOpen(false); creationContext?.onClose?.(); }}
         title={editingTask ? `编辑${itemLabel}` : `新建${itemLabel}`}
         showContinueOption={!editingTask && !creationContext}

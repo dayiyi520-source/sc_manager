@@ -81,7 +81,8 @@ export const WorkItemCreatePanel: React.FC<{
   continueChecked?: boolean;
   onContinueCheckedChange?: (checked: boolean) => void;
   presentation?: 'workspace' | 'drawer' | 'page';
-}> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, detailHeader, headerActions, showContinueOption = true, continueChecked, onContinueCheckedChange, presentation = 'workspace' }) => {
+  zIndex?: number;
+}> = ({ isOpen, onClose, title, children, properties, editor, footer, secondaryAction, detailHeader, headerActions, showContinueOption = true, continueChecked, onContinueCheckedChange, presentation = 'workspace', zIndex }) => {
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
@@ -102,7 +103,7 @@ export const WorkItemCreatePanel: React.FC<{
     </Drawer>;
   }
   return createPortal(
-    <div className="fixed inset-0 z-[60] overflow-hidden" role="dialog" aria-modal="true" aria-label={title}>
+    <div className="fixed inset-0 z-[60] overflow-hidden" style={zIndex === undefined ? undefined : { zIndex }} role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" aria-label="关闭面板" className="absolute inset-0 h-full w-full cursor-default bg-black/40" onClick={onClose} />
       <aside className={`work-item-panel ${presentation === 'drawer' ? 'absolute inset-y-0 right-0 flex w-[min(100%,1280px)] flex-col overflow-hidden border-l border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl' : 'absolute inset-4 flex flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] text-[var(--text-body)] shadow-2xl sm:inset-6 lg:inset-y-8 lg:inset-x-[clamp(32px,10vw,192px)]'}`}>
         <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-card)] px-6">

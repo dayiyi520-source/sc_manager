@@ -61,7 +61,7 @@ export const WorkOrderDiscussion: React.FC<Props> = ({ events, formatTime, open,
       {composer('评论内容')}
       <div aria-label="最近评论" className="space-y-3">{comments.length ? comments.slice(0, 3).map((comment) => card(comment, false)) : <p className="text-xs text-[var(--text-muted)]">暂无评论，欢迎补充信息或交流建议。</p>}</div>
     </section>
-    <Modal isOpen={open} onClose={onClose} title={`全部评论（${comments.length}）`} maxWidth="2xl">
+    <Modal isOpen={open} onClose={onClose} title={`全部评论（${comments.length}）`} maxWidth="2xl" zIndex={1001}>
       <div className="space-y-4">
         {composer('全部评论中的评论内容')}
         <div aria-label="全部评论列表" className="max-h-[50vh] space-y-3 overflow-y-auto overscroll-contain">{comments.length ? comments.map((comment) => card(comment, true)) : <p className="text-xs text-[var(--text-muted)]">暂无评论</p>}</div>
