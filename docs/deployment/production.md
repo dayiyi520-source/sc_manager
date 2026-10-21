@@ -41,6 +41,12 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 最近成功发布
 
+- 发布时间：2026-10-21 23:40:33（北京时间）；发布编号 `20261021T154033Z`；发布源码 `86419e5b036ee5b3f01dcb6f99fc1273ed165f12`。
+- 发布目录：`/opt/sc-manager-frontend/releases/20261021T154033Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261021T154033Z`。
+- 修复协同事项详情抽屉遮挡转交、退回、完成、验收、评论及新增任务操作界面的问题；使用已提交并推送的独立源码快照和既有部署入口发布，未包含工作区临时文件。
+- 定向测试 7 项、类型检查及发布构建通过；扩大回归仍有 18 项旧测试候选数据不匹配失败，不计为本次通过。公网发布清单和 Mock 健康接口对应本次版本，协同事项与我的待办直达路由均返回 200。
+- 回滚从本次备份的 `previous-target.txt` 读取旧目录切回 `dist`，并调用本次发布目录 `mock-service/setup.py` 的 `--rollback` 模式恢复服务、路由与共享文件。
+
 - 发布时间：2026-10-21；发布编号 `20261021T125208Z`；发布源码 `1d484b56c78db112c1a5b6336c42c0a358060cf7`。
 - 发布目录：`/opt/sc-manager-frontend/releases/20261021T125208Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261021T125208Z`。
 - 部门月报“主管判断”新增“无需处理”；选择后可随反馈和月报提交保存。
