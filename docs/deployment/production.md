@@ -30,16 +30,22 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-本次成功发布：2026-10-21；发布编号 `20261021T080527Z`；源码提交 `0fa7f49e09f3685d58f15b621d404977b417a8c3`；发布目录 `/opt/sc-manager-frontend/releases/20261021T080527Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261021T080527Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`，首页、入口资源、我的待办、产品任务和缺陷管理直达页面、Mock 健康接口及共享数据核验通过。
+最近成功发布：2026-10-21；发布编号 `20261021T125208Z`；源码提交 `1d484b56c78db112c1a5b6336c42c0a358060cf7`；发布目录 `/opt/sc-manager-frontend/releases/20261021T125208Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261021T125208Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
 
 失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
 
-上次已核实的发布：20261021T080527Z，源码 0fa7f49。
+上次已核实的发布：20261021T125208Z，源码 1d484b5。
 
 ## 最近成功发布
+
+- 发布时间：2026-10-21；发布编号 `20261021T125208Z`；发布源码 `1d484b56c78db112c1a5b6336c42c0a358060cf7`。
+- 发布目录：`/opt/sc-manager-frontend/releases/20261021T125208Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261021T125208Z`。
+- 部门月报“主管判断”新增“无需处理”；选择后可随反馈和月报提交保存。
+- 已通过 `bash scripts/deploy-production.sh --source-dir <已提交源码快照> --revision <源码提交号>` 发布。构建固定使用 `/sc-manager-frontend/` 子路径及持久化 Mock 模式，发布前检查专属 Nginx 路由和 `nginx -t`；切换前备份站点、服务和共享数据，公网验收失败时自动回滚。
+- 公网首页与入口资源、`/app/wb_work_order` 直达路由、Mock 健康接口及目标复盘和产研模板共享数据读取均通过；发布清单源码版本与本次提交一致。
 
 - 发布时间：2026-10-21 16:05:27（北京时间，发布编号生成时间）。
 - 发布编号：20261021T080527Z；发布源码：0fa7f49e09f3685d58f15b621d404977b417a8c3。
