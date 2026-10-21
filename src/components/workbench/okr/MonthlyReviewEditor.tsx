@@ -281,16 +281,16 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
                   <span>进度: {kr.previousProgress}% → {kr.currentProgress}%</span><Progress percent={kr.currentProgress} showInfo={false} size="small" className="okr-review-progress-compact"/>
                 </div>}
               {(health === '风险' || health === '逾期') && <ReviewRiskCallout value={kr.blocker} onChange={value => updateKr(kr.keyResultId, { blocker: value })} disabled={busy || !editorState.editable} label={`${kr.keyResultTitle}风险原因及所需支持`}/>}
-              <div className="okr-weekly-section-header"><h4>本期关联工作证据</h4><Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5"/>} onClick={() => setPickerKrId(kr.keyResultId)}>关联工作证据</Button></div>
+              <div className="okr-weekly-section-header"><h4>本期关联工作任务</h4><Button disabled={busy || !editorState.editable} icon={<Plus className="h-3.5 w-3.5"/>} onClick={() => setPickerKrId(kr.keyResultId)}>关联工作任务</Button></div>
               {kr.workIds.length > 0 ? <div className="border border-[var(--border-main)] rounded overflow-hidden bg-[var(--bg-card)]"><Table size="small" rowKey="workId" pagination={false} dataSource={kr.workIds.map(id => {
                 const live = readOnly ? undefined : work.find(item => item.id === id);
                 const saved = evidenceItems.find(item => item.workId === id);
-                return { workId: id, title: live?.title || saved?.title || '历史工作证据', sourceLabel: live ? [live.productLineName, live.versionName].filter(Boolean).join(' / ') : saved?.sourceLabel, status: live?.status || saved?.status, actualHours: live?.actualHours ?? saved?.actualHours };
-              })} locale={{ emptyText: <Empty description="暂无关联工作证据"/> }} columns={[
+                return { workId: id, title: live?.title || saved?.title || '历史工作任务', sourceLabel: live ? [live.productLineName, live.versionName].filter(Boolean).join(' / ') : saved?.sourceLabel, status: live?.status || saved?.status, actualHours: live?.actualHours ?? saved?.actualHours };
+              })} locale={{ emptyText: <Empty description="暂无关联工作任务"/> }} columns={[
                 { title: '标题', dataIndex: 'title', ellipsis: true }, { title: '来源归属', render: (_, row) => row.sourceLabel || '—' }, { title: '状态', dataIndex: 'status' },
                 { title: '任务工时', render: (_, row) => row.actualHours == null ? '—' : `${row.actualHours} 小时` },
                 { title: '删除操作', hidden: readOnly, render: (_, row) => <Button type="text" danger disabled={busy || !editorState.editable} onClick={() => { updateKr(kr.keyResultId, { workIds: kr.workIds.filter(id => id !== row.workId) }); setEvidenceItems(rows => rows.filter(item => item.workId !== row.workId)); }}>删除</Button> },
-              ]}/></div> : <div className="p-3 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-main)] rounded bg-[var(--bg-card)]">(暂未关联本期工作证据)</div>}
+              ]}/></div> : <div className="p-3 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-main)] rounded bg-[var(--bg-card)]">(暂未关联本期工作任务)</div>}
 
             </div>,
           }]}/>;
@@ -299,12 +299,12 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
       <ReviewTemplateSection template={reportTemplate.snapshot} blockId="goals" values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}/>
       </section>
       <section data-review-block="extra" className="okr-weekly-section" aria-label="插播任务">
-        <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />{reviewBlockTitle(reportTemplate.snapshot, 'extra', '2. 插播任务')}</h3><Button icon={<Plus className="h-3.5 w-3.5" />} disabled={busy || !editorState.editable} onClick={() => setPickerKrId('extra')}>关联工作证据</Button></div>
+        <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />{reviewBlockTitle(reportTemplate.snapshot, 'extra', '2. 插播任务')}</h3><Button icon={<Plus className="h-3.5 w-3.5" />} disabled={busy || !editorState.editable} onClick={() => setPickerKrId('extra')}>关联工作任务</Button></div>
         <div className="bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-4 shadow-sm">
         {extraWork.workIds.length > 0 ? <div className="border border-[var(--border-main)] rounded overflow-hidden"><Table size="small" rowKey="workId" pagination={false} dataSource={extraWork.workIds.map(id => {
           const live = readOnly ? undefined : work.find(item => item.id === id);
           const saved = evidenceItems.find(item => item.workId === id);
-          return { workId: id, title: live?.title || saved?.title || '历史工作证据', sourceLabel: live ? [live.productLineName, live.versionName].filter(Boolean).join(' / ') : saved?.sourceLabel, status: live?.status || saved?.status, actualHours: live?.actualHours ?? saved?.actualHours };
+          return { workId: id, title: live?.title || saved?.title || '历史工作任务', sourceLabel: live ? [live.productLineName, live.versionName].filter(Boolean).join(' / ') : saved?.sourceLabel, status: live?.status || saved?.status, actualHours: live?.actualHours ?? saved?.actualHours };
         })} locale={{ emptyText: <Empty description="暂无插播任务" /> }} columns={[
           { title: '标题', dataIndex: 'title', ellipsis: true },
           { title: '来源归属', render: (_, row) => row.sourceLabel || '—' },

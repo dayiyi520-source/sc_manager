@@ -35,10 +35,10 @@ describe('review writing adjustments', () => {
     const initialPayload: OkrPayload = { title: '草稿', reviewType: 'week', startDate: '2026-10-12', endDate: '2026-10-18', krReviews: [{ objectiveId: 'o', objectiveTitle: '目标', keyResultId: 'a', keyResultTitle: '动作', previousProgress: 30, currentProgress: 40, health: 'risk', blocker: '缺少资源', achievement: '历史成果', nextPlan: '历史计划', workIds: [] }] };
     render(<WeeklyReviewEditor {...props} initialPayload={initialPayload}/>);
     const risk = screen.getByText('风险原因及所需支持');
-    const evidence = screen.getByText('本期关联工作证据');
+    const evidence = screen.getByText('本期关联工作任务');
     expect(risk.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name: '关联工作证据' })[0]);
-    const dialog = screen.getByRole('dialog', { name: '关联工作证据' });
+    fireEvent.click(screen.getAllByRole('button', { name: '关联工作任务' })[0]);
+    const dialog = screen.getByRole('dialog', { name: '关联工作任务' });
     expect(within(dialog).queryByRole('tab')).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('tab', { name: /^协同事项/ })).not.toBeInTheDocument();
   });
@@ -58,7 +58,7 @@ describe('review writing adjustments', () => {
     render(<MonthlyReviewEditor okrs={[objective]} records={[]} currentUserId="me" busy={false} onSaveDraft={props.onSaveDraft} onSubmit={props.onSubmit} onCancel={props.onCancel}/>);
     expect(screen.queryByPlaceholderText('归纳本月结果，不要逐周重复罗列')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('A1：动作'));
-    expect(screen.getAllByRole('button', { name: '关联工作证据' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: '关联工作任务' })).toHaveLength(2);
   });
 });
 

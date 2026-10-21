@@ -96,7 +96,7 @@ describe('supervisor weekly review', () => {
   });
   it('defaults to the progress card, expands a calculated employee table and removes manual judgment', () => {
     render(<WeeklyReviewEditor {...baseProps} records={[goal, support]} onSaveDraft={vi.fn(async () => true)}/>);
-    expect(screen.getByText('员工支撑 1 人 · 工作证据 0 项')).toBeInTheDocument();
+    expect(screen.getByText('员工支撑 1 人 · 工作任务 0 项')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '主管 KR 复盘：部门 KR' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('KR1：部门 KR'));
     expect(screen.getByRole('columnheader', { name: 'KR名称' })).toBeInTheDocument();
@@ -139,7 +139,7 @@ describe('supervisor self-assignment editing and saved recovery', () => {
     const { unmount } = render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} work={work} onSaveDraft={save}/>);
     fireEvent.click(screen.getByText('KR1：部门 KR'));
     fireEvent.change(screen.getByRole('spinbutton', { name: '主管进度：部门 KR' }), { target: { value: '70' } });
-    fireEvent.click(within(screen.getByRole('region', { name: '主管 KR 复盘：部门 KR' })).getByRole('button', { name: '关联工作证据' }));
+    fireEvent.click(within(screen.getByRole('region', { name: '主管 KR 复盘：部门 KR' })).getByRole('button', { name: '关联工作任务' }));
     expect(screen.getByText(/全部产品/)).toBeInTheDocument();
     const picker = screen.getByRole('dialog');
     const choices = within(picker).getAllByRole('checkbox');
@@ -163,7 +163,7 @@ it('offers supervisor pending tasks in extra work and saves their source as the 
   const work = [{ id: 'pending-own', sourceId: 'pending-own', title: '主管待测试工作', kind: 'task', status: '待测试', assigneeId: manager.id, ownerName: manager.name, createdAt: '2026-10-12', updatedAt: '2026-10-12', dueDate: '', actualHours: 0, estimatedHours: 1, linkVersion: 0, sourceWorkOrderIds: '[]' }];
   render(<WeeklyReviewEditor {...baseProps} records={[]} work={work} onSaveDraft={save}/>);
   const extra = screen.getByText('2. 插播任务').closest('section')!;
-  fireEvent.click(within(extra).getByRole('button', { name: '关联工作证据' }));
+  fireEvent.click(within(extra).getByRole('button', { name: '关联工作任务' }));
   const picker = screen.getByRole('dialog');
   expect(within(picker).getByText(/主管待测试工作/)).toBeInTheDocument();
   const choices = within(picker).getAllByRole('checkbox');

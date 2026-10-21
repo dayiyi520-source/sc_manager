@@ -19,16 +19,16 @@ export function WorkEvidencePicker({ includePending = false, requireProduct = fa
   const eligible = useMemo(() => requireProduct && !product ? [] : filterEvidence(work, { viewer, product, startDate, endDate, source: 'task', includePending }), [work, viewer, product, startDate, endDate, requireProduct, includePending]);
   const matchesKeyword = (item: OkrWork) => !keyword.trim() || `${item.title} ${item.sourceId}`.toLowerCase().includes(keyword.trim().toLowerCase());
   const rows = eligible.filter(item => matchesKeyword(item) && (status === 'all' || status === item.status));
-  return <Modal open className="okr-work-association-modal" title="关联工作证据" width={1120} onCancel={onCancel} footer={[
-    <span key="count" className="okr-work-association-count">已选 <strong>{selection.length}</strong> 项工作证据</span>,
+  return <Modal open className="okr-work-association-modal" title="关联工作任务" width={1120} onCancel={onCancel} footer={[
+    <span key="count" className="okr-work-association-count">已选 <strong>{selection.length}</strong> 项工作任务</span>,
     <Button key="cancel" onClick={onCancel}>取消</Button>,
     <Button key="confirm" type="primary" disabled={loading || Boolean(error) || (requireProduct && !product)} onClick={() => onConfirm([...new Set<string>(selection)].filter(id => selectedIds.includes(id) || eligible.some(item => item.id === id)))}>确认关联</Button>,
   ]}>
     <div className="okr-work-association-body">
       <p className="okr-work-association-context">{product ? `关联产品：${product}` : requireProduct ? '当前 A 未选择产品，暂无可关联任务' : '全部产品'} · 周期：{startDate} 至 {endDate}</p>
-      <div className="okr-work-association-filters"><Input allowClear prefix={<SearchIcon/>} value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索任务名称或编号"/><Select aria-label="工作证据状态" value={status} onChange={setStatus} options={[{ value: 'all', label: '全部状态' }, ...[...new Set(eligible.map(item => item.status))].map(value => ({ value, label: value }))]}/></div>
-      {error ? <Alert type="error" title="工作证据加载失败" showIcon action={<Button onClick={onRetry}>重试</Button>}/> : null}
-      <Table<OkrWork> rowKey="id" loading={loading} dataSource={rows} pagination={{ pageSize: 20 }} scroll={{ x: 760, y: 420 }} locale={{ emptyText: <Empty description="当前条件下暂无可关联工作证据"/> }} rowSelection={{
+      <div className="okr-work-association-filters"><Input allowClear prefix={<SearchIcon/>} value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索任务名称或编号"/><Select aria-label="工作任务状态" value={status} onChange={setStatus} options={[{ value: 'all', label: '全部状态' }, ...[...new Set(eligible.map(item => item.status))].map(value => ({ value, label: value }))]}/></div>
+      {error ? <Alert type="error" title="工作任务加载失败" showIcon action={<Button onClick={onRetry}>重试</Button>}/> : null}
+      <Table<OkrWork> rowKey="id" loading={loading} dataSource={rows} pagination={{ pageSize: 20 }} scroll={{ x: 760, y: 420 }} locale={{ emptyText: <Empty description="当前条件下暂无可关联工作任务"/> }} rowSelection={{
         selectedRowKeys: selection, preserveSelectedRowKeys: true,
         onChange: keys => {
           const visible = new Set(rows.map(row => row.id));

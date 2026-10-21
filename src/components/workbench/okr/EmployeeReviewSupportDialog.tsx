@@ -21,7 +21,7 @@ export function EmployeeReviewSupportDialog({ target, supports, savedSnapshots =
           <p className="text-xs text-[var(--text-muted)]">{row.startDate} 至 {row.endDate}</p>
           {row.contributions.map(contribution => <div key={`${contribution.objectiveId}:${contribution.keyResultId}`} className="space-y-2 border-t border-[var(--border-main)] pt-3">
             <div className="flex flex-wrap justify-between gap-2"><b className="break-words">{contribution.keyResultTitle}</b><span>{contribution.previousProgress}% → {contribution.currentProgress}%</span></div>
-            {contribution.evidenceNote && <p className="whitespace-pre-wrap break-words">工作证据说明：{contribution.evidenceNote}</p>}
+            {contribution.evidenceNote && <p className="whitespace-pre-wrap break-words">工作任务说明：{contribution.evidenceNote}</p>}
             {contribution.achievement && <p className="whitespace-pre-wrap break-words">本期成果：{contribution.achievement}</p>}
             {contribution.blocker && <p className="whitespace-pre-wrap break-words">风险与所需支持：{contribution.blocker}</p>}
             {contribution.nextPlan && <p className="whitespace-pre-wrap break-words">后续计划：{contribution.nextPlan}</p>}

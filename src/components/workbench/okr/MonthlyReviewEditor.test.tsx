@@ -51,7 +51,7 @@ describe('personal monthly editor', () => {
     render(<MonthlyReviewEditor {...props} viewer={{ id: 'me', name: '本人', department: '产品部' }} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
     expect(screen.getByText('月报')).toBeInTheDocument();
     expect(screen.getByText('2026年第10月 月报-产品部')).toBeInTheDocument();
-    expect(screen.queryByText('复盘本月目标、工作证据、问题建议与协助事项')).not.toBeInTheDocument();
+    expect(screen.queryByText('复盘本月目标、工作任务、问题建议与协助事项')).not.toBeInTheDocument();
     for (const text of ['暂无插播任务', '暂无需要协助事项', '暂无知识沉淀']) expect(screen.getByText(text)).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '事项类型' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '内容摘要' })).not.toBeInTheDocument();
@@ -70,7 +70,7 @@ describe('personal monthly editor', () => {
     const objective: OKRItem = { id: 'mine', ownerId: 'me', ownerName: '本人', department: '产品部', cycle: '2026-10', category: 'my', objective: '月度目标', primaryLabel: 'KR', progress: 0, weight: 100, deadline: '2026-10-31', keyResults: [{ id: 'a', content: '我的动作', progress: 0, weight: 100, deadline: '2026-10-31' }] };
     const empty = render(<MonthlyReviewEditor {...props} okrs={[objective]} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
     fireEvent.click(screen.getByText('我的计划：我的动作'));
-    expect(screen.getByText('(暂未关联本期工作证据)')).toBeInTheDocument();
+    expect(screen.getByText('(暂未关联本期工作任务)')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '来源归属' })).not.toBeInTheDocument();
     empty.unmount();
     const draft: OkrPayload = { title: '月报草稿', reviewType: 'month', startDate: '2026-10-01', endDate: '2026-10-31', krReviews: [{ objectiveId: 'mine', objectiveTitle: '月度目标', keyResultId: 'a', keyResultTitle: '我的动作', previousProgress: 0, currentProgress: 0, health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: ['task'] }], items: [{ workId: 'task', title: '实际任务', status: '进行中', sourceLabel: '产品线 / V1', result: '', impact: '' }] };

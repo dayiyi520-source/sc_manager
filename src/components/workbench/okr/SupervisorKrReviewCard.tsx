@@ -78,11 +78,11 @@ export function SupervisorKrReviewCard({ review, employeeActions, supports, busy
       }]}/>
       <Collapse defaultActiveKey={['evidence']} expandIconPosition="end" items={[{
         key: 'evidence',
-        label: <div className="okr-supervisor-panel-title"><strong>关联工作证据</strong><span>{count(new Set([...evidence.map(item => item.workId), ...ownEvidence.map(item => item.id)]).size)}项</span></div>,
-        extra: <Button onClick={event => { event.stopPropagation(); onAddEvidence?.(); }} disabled={busy || !editable || supportLoading || Boolean(supportError)}>关联工作证据</Button>,
-        children: <div aria-label="统一工作证据列表">
+        label: <div className="okr-supervisor-panel-title"><strong>关联工作任务</strong><span>{count(new Set([...evidence.map(item => item.workId), ...ownEvidence.map(item => item.id)]).size)}项</span></div>,
+        extra: <Button onClick={event => { event.stopPropagation(); onAddEvidence?.(); }} disabled={busy || !editable || supportLoading || Boolean(supportError)}>关联工作任务</Button>,
+        children: <div aria-label="统一工作任务列表">
           {error ? error : <Spin spinning={supportLoading}><div className="border border-[var(--border-main)] rounded overflow-hidden bg-[var(--bg-card)]">
-            <Table size="small" rowKey="id" pagination={false} dataSource={[...evidenceRows.values()]} locale={{ emptyText: <Empty description="暂无关联工作证据"/> }} columns={[
+            <Table size="small" rowKey="id" pagination={false} dataSource={[...evidenceRows.values()]} locale={{ emptyText: <Empty description="暂无关联工作任务"/> }} columns={[
               { title: '标题', dataIndex: 'title', ellipsis: true },
               { title: '来源归属', dataIndex: 'sourceLabel', ellipsis: true },
               { title: '状态', dataIndex: 'status' },

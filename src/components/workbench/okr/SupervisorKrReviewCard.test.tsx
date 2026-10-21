@@ -11,13 +11,13 @@ describe('主管本人进度和证据', () => {
     render(<SupervisorKrReviewCard {...props} selfAssigned onUpdate={update} onAddEvidence={add} onRemoveEvidence={remove} ownEvidence={[{ id: 'work', title: '本人证据', status: '已完成' } as OkrWork]}/>);
     fireEvent.change(screen.getByRole('spinbutton', { name: '主管进度：KR' }), { target: { value: '70' } });
     expect(update).toHaveBeenCalledWith({ supervisorProgress: [{ id: 'kr', currentProgress: 70 }] });
-    fireEvent.click(screen.getByRole('button', { name: '关联工作证据' })); expect(add).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: '关联工作任务' })); expect(add).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: '移除本人证据：本人证据' })); expect(remove).toHaveBeenCalledWith('work');
   });
   it('disables editing submitted progress and keeps evidence visible', () => {
     render(<SupervisorKrReviewCard {...props} editable={false} selfAssigned/>);
     expect(screen.getByRole('spinbutton')).toBeDisabled();
-    expect(screen.getByRole('button', { name: '关联工作证据' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '关联工作任务' })).toBeDisabled();
   });
   it('offers no progress editor for an employee-only KR', () => {
     render(<SupervisorKrReviewCard {...props}/>);
@@ -31,7 +31,7 @@ it('merges employee and supervisor evidence in one table with names and owner-on
   render(<SupervisorKrReviewCard {...props} viewerName="陈宇璋" selfAssigned review={{ ...review, employeeReviewSnapshots: [employeeSnapshot] }} ownEvidence={[{ id: 'owner-work', title: '主管验证', status: '已完成', productLineName: '产品乙', versionName: 'V2', actualHours: 3, ownerName: '任务负责人' } as OkrWork]}/>);
   expect(screen.getByRole('columnheader', { name: '更改进度' })).toBeInTheDocument();
   expect(screen.queryByText('本人进度')).not.toBeInTheDocument();
-  expect(screen.queryByText('主管本人工作证据')).not.toBeInTheDocument();
+  expect(screen.queryByText('主管本人工作任务')).not.toBeInTheDocument();
   const employeeRow = screen.getByText('员工验证').closest('tr')!;
   const ownerRow = screen.getByText('主管验证').closest('tr')!;
   expect(employeeRow.closest('table')).toBe(ownerRow.closest('table'));
@@ -40,7 +40,7 @@ it('merges employee and supervisor evidence in one table with names and owner-on
   expect(within(employeeRow).queryByRole('button')).not.toBeInTheDocument();
   expect(within(ownerRow).getByRole('button', { name: '移除本人证据：主管验证' })).toBeEnabled();
   expect(within(ownerRow).getByText('产品乙 / V2')).toBeInTheDocument();
-  expect(screen.getAllByRole('button', { name: '关联工作证据' })).toHaveLength(1);
+  expect(screen.getAllByRole('button', { name: '关联工作任务' })).toHaveLength(1);
 });
 
 it('never inherits main KR permission for unassigned sub KR rows', () => {

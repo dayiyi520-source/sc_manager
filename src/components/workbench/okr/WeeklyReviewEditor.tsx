@@ -467,7 +467,7 @@ export function WeeklyReviewEditor({
 
     const employeeRows = departmentContent.flatMap(snapshot => (snapshot.extraWork?.workIds || []).map(id => {
       const item = snapshot.items.find(row => row.workId === id);
-      return { id, content: item?.title || '已失效的工作证据', source: item?.sourceLabel || '—', status: item?.status || '无法读取', hours: item && completedActualHours(item) != null ? `${completedActualHours(item)} 小时` : '—', impact: '', isManual: false, sourceEmployee: snapshot.authorName || '人员已停用' };
+      return { id, content: item?.title || '已失效的工作任务', source: item?.sourceLabel || '—', status: item?.status || '无法读取', hours: item && completedActualHours(item) != null ? `${completedActualHours(item)} 小时` : '—', impact: '', isManual: false, sourceEmployee: snapshot.authorName || '人员已停用' };
     }));
     const employeeManualRows = departmentContent.flatMap(snapshot => {
       const description = snapshot.extraWork?.description;
@@ -611,7 +611,7 @@ export function WeeklyReviewEditor({
                   return (
                     <Collapse key={kr.keyResultId} className="okr-review-a-collapse" activeKey={collapsed ? [] : [kr.keyResultId]} expandIconPosition="end" onChange={keys => setCollapsedKrs(current => ({ ...current, [kr.keyResultId]: !keys.length }))} items={[{
                       key: kr.keyResultId,
-                      label: supervisor ? <div className="min-w-0 space-y-2 w-full"><strong className="block truncate" title={kr.keyResultTitle}>KR{krIdx + 1}：{kr.keyResultTitle}</strong><div className="flex items-center gap-3"><Progress percent={kr.currentProgress} showInfo={false} size="small"/><span>{kr.currentProgress}%</span></div><div className="text-xs text-[var(--text-muted)]">员工支撑 {new Set(kr.contributors?.map(row => row.authorId)).size} 人 · 工作证据 {employeeEvidenceForKr(supportsByKr.get(kr.keyResultId) || [], kr.employeeReviewSnapshots || []).length} 项</div></div> : <div className="flex flex-wrap items-center gap-3"><strong>{supervisor ? `KR${krIdx + 1}：` : '我的计划：'}{kr.keyResultTitle}</strong><Tag>{supervisor ? `${kr.previousProgress}% → ${kr.currentProgress}%` : `${personalProgress}%`}</Tag>{!supervisor && <Tag color={health === '超预期' ? 'success' : health === '风险' ? 'warning' : health === '逾期' ? 'error' : undefined}>{health || '暂无预期'}</Tag>}{defaultCollapsedReview(kr) && kr.currentProgress < 100 ? <Tag>本周无变化</Tag> : null}</div>,
+                      label: supervisor ? <div className="min-w-0 space-y-2 w-full"><strong className="block truncate" title={kr.keyResultTitle}>KR{krIdx + 1}：{kr.keyResultTitle}</strong><div className="flex items-center gap-3"><Progress percent={kr.currentProgress} showInfo={false} size="small"/><span>{kr.currentProgress}%</span></div><div className="text-xs text-[var(--text-muted)]">员工支撑 {new Set(kr.contributors?.map(row => row.authorId)).size} 人 · 工作任务 {employeeEvidenceForKr(supportsByKr.get(kr.keyResultId) || [], kr.employeeReviewSnapshots || []).length} 项</div></div> : <div className="flex flex-wrap items-center gap-3"><strong>{supervisor ? `KR${krIdx + 1}：` : '我的计划：'}{kr.keyResultTitle}</strong><Tag>{supervisor ? `${kr.previousProgress}% → ${kr.currentProgress}%` : `${personalProgress}%`}</Tag>{!supervisor && <Tag color={health === '超预期' ? 'success' : health === '风险' ? 'warning' : health === '逾期' ? 'error' : undefined}>{health || '暂无预期'}</Tag>}{defaultCollapsedReview(kr) && kr.currentProgress < 100 ? <Tag>本周无变化</Tag> : null}</div>,
                       children: supervisor ? <SupervisorKrReviewCard review={kr} employeeActions={readOnly ? [] : employeeActionsForKr(records, people, viewer?.id || '', kr, period)} supports={supportsByKr.get(kr.keyResultId) || []}
                         viewerId={viewer?.id} viewerName={viewer?.name} selfAssigned={Boolean(records.find(row => row.id === kr.objectiveId)?.payload.keyResults?.find(row => row.id === kr.keyResultId)?.assigneeIds?.includes(viewer?.id || ''))}
                         ownEvidence={evidence} onAddEvidence={() => openPicker(kr.keyResultId)} onRemoveEvidence={id => removeWork(kr.keyResultId, id)}
@@ -634,7 +634,7 @@ export function WeeklyReviewEditor({
                       <div className="space-y-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-xs font-semibold text-[var(--text-body)] flex items-center gap-1.5">
-                            <span className="text-[var(--primary)]">▶</span> 本期关联工作证据
+                            <span className="text-[var(--primary)]">▶</span> 本期关联工作任务
                           </span>
                           <Button
                             size="middle"
@@ -642,7 +642,7 @@ export function WeeklyReviewEditor({
                             disabled={busy || readOnly}
                             onClick={() => openPicker(kr.keyResultId)}
                           >
-                            关联工作证据
+                            关联工作任务
                           </Button>
                         </div>
 
@@ -664,7 +664,7 @@ export function WeeklyReviewEditor({
                           </div>
                         ) : (
                           <div className="p-3 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-main)] rounded bg-[var(--bg-card)]">
-                            (暂未关联本期工作证据)
+                            (暂未关联本期工作任务)
                           </div>
                         )}
                       </div>
@@ -697,7 +697,7 @@ export function WeeklyReviewEditor({
               disabled={busy || !editorState.editable}
               onClick={() => openPicker('extra')}
             >
-              关联工作证据
+              关联工作任务
             </Button>
           </div>
         </div>

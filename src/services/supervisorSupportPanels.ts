@@ -39,7 +39,7 @@ export function employeeEvidenceForKr(supports: EmployeeReviewSupport[], snapsho
     for (const workId of new Set(report.krReviews.flatMap(row => row.workIds))) {
       const item = report.items.find(row => row.workId === workId);
       const previous = result.get(workId);
-      const row: EmployeeEvidence = item ? { ...item, employeeNames: [] } : { workId, title: `已失效的工作证据（${workId}）`, status: '无法读取', result: '', impact: '', employeeNames: [], missing: true };
+      const row: EmployeeEvidence = item ? { ...item, employeeNames: [] } : { workId, title: `已失效的工作任务（${workId}）`, status: '无法读取', result: '', impact: '', employeeNames: [], missing: true };
       result.set(workId, { ...(previous && !previous.missing ? previous : row), employeeNames: [...new Set([...(previous?.employeeNames || []), report.authorName || '人员已停用'])] });
     }
   }

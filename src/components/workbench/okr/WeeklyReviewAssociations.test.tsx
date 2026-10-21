@@ -18,16 +18,16 @@ describe('weekly review associations', () => {
     const onCopy = vi.fn();
     const payload: OkrPayload = { title: '历史周报', reviewType: 'week', startDate: '2026-09-14', endDate: '2026-09-20', nextWeekPlan: '已存计划',
       krReviews: [{ objectiveId: 'removed', objectiveTitle: '原目标', keyResultId: 'a', keyResultTitle: '原个人计划', previousProgress: 0, currentProgress: 40, executionHealth: '正常', health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: ['work'] }],
-      items: [{ workId: 'work', title: '保存时的工作证据', status: '已完成', actualHours: 8, result: '', impact: '' }] };
+      items: [{ workId: 'work', title: '保存时的工作任务', status: '已完成', actualHours: 8, result: '', impact: '' }] };
     render(<WeeklyReviewEditor {...props} recordStatus="submitted" initialPayload={payload} periodOverride={{ startDate: '2026-09-14', endDate: '2026-09-20' }}
       work={[{ id: 'work', title: '后续改名', status: '已完成', actualHours: 99 } as any]} onCopy={onCopy}/>);
     expect(screen.getByText('原目标')).toBeInTheDocument();
     expect(screen.getByText('我的计划：原个人计划')).toBeInTheDocument();
-    expect(screen.getByText('保存时的工作证据')).toBeInTheDocument();
+    expect(screen.getByText('保存时的工作任务')).toBeInTheDocument();
     expect(screen.queryByText('后续改名')).not.toBeInTheDocument();
     expect(screen.queryByText('月度目标已变化，请确认失效内容')).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '下周计划' })).toBeDisabled();
-    expect(screen.getAllByRole('button', { name: '关联工作证据' }).every(button => button.hasAttribute('disabled'))).toBe(true);
+    expect(screen.getAllByRole('button', { name: '关联工作任务' }).every(button => button.hasAttribute('disabled'))).toBe(true);
     expect(screen.queryByRole('button', { name: '存草稿' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '提交周报' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '移除关联工作' })).not.toBeInTheDocument();
