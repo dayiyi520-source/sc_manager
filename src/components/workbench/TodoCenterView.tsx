@@ -55,7 +55,7 @@ function TodoPage({ onBack }: { onBack: () => void }) {
     <section className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
       <Tabs activeKey={tab} onChange={key => { setTab(key as TodoTab); rememberWorkbenchTab(TODO_TAB_KEY, key); setPage(1); }} items={todoTabs.map(type => ({ key: type.key, label: `${type.label} (${rows.filter(row => matchesTodoTab(row, type.key)).length})` }))}/>
       <div className="mb-4 flex flex-wrap gap-4">
-        <div className="w-[var(--workbench-query-width)] max-w-full"><Input.Search className="todo-center-search" aria-label="搜索待办" allowClear placeholder="搜索标题" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }}/></div>
+        <div className="w-[var(--workbench-query-width)] max-w-full"><Input.Search className="workbench-search todo-center-search" aria-label="搜索待办" allowClear placeholder="搜索标题" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }}/></div>
         <Select className="min-w-40" aria-label="待办类型" placeholder="全部类型" allowClear value={type} onChange={value => { setType(value); setPage(1); }} options={typeOptions}/>
         <Select className="min-w-40" aria-label="待办状态" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value: 'all', label: '全部状态' }, { value: 'pending', label: '未结束' }, { value: 'finished', label: '已结束（含已完成）' }]}/>
       </div>

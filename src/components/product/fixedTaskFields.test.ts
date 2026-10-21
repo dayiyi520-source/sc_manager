@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fixedTaskFields } from './fixedTaskFields';
 
 const properties = (kind: string, scene: 'CREATE' | 'DETAIL', variant: 'product' | 'project' | 'other' = 'product') => fixedTaskFields(kind, scene, variant).fields.filter((field) => field.sort >= 0).map((field) => field.fieldCode);
-const dates = ['plannedStartDate', 'plannedEndDate', 'estimatedHours'];
+const dates = ['plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours'];
 describe('fixed task field contracts', () => {
   it.each(['requirement', 'bug'])('positions optional project directly below version in %s creation and detail', kind => {
     for (const scene of ['CREATE', 'DETAIL'] as const) {
@@ -13,12 +13,12 @@ describe('fixed task field contracts', () => {
     }
   });
 
-  it.each(['requirement', 'design', 'dev', 'test', 'bug', 'ops', 'presales', 'delivery'])('removes expected completion from all %s task surfaces while keeping planned dates', kind => {
+  it.each(['requirement', 'design', 'dev', 'test', 'bug', 'ops', 'presales', 'delivery'])('restores optional expected completion on all %s task surfaces while keeping planned dates', kind => {
     for (const scene of ['CREATE', 'DETAIL', 'LIST', 'ITERATION'] as const) {
       const config = fixedTaskFields(kind, scene);
-      expect(config.visible('expectedCompleteDate')).toBe(false);
+      expect(config.visible('expectedCompleteDate')).toBe(true);
       expect(config.required('expectedCompleteDate')).toBe(false);
-      expect(config.fields.some(field => field.fieldCode === 'expectedCompleteDate')).toBe(false);
+      expect(config.fields.some(field => field.fieldCode === 'expectedCompleteDate')).toBe(scene === 'CREATE' || scene === 'DETAIL');
       expect(config.visible('plannedStartDate')).toBe(true);
       expect(config.visible('plannedEndDate')).toBe(true);
     }
@@ -51,9 +51,9 @@ describe('fixed task field contracts', () => {
   });
 
   it.each([
-    ['ops', ['assignee', 'priority', 'project', 'productLine', 'plannedStartDate', 'plannedEndDate', 'estimatedHours', 'attachments']],
-    ['presales', ['assignee', 'priority', 'source', 'customer', 'plannedStartDate', 'plannedEndDate', 'estimatedHours', 'attachments']],
-    ['delivery', ['assignee', 'priority', 'project', 'customer', 'plannedStartDate', 'plannedEndDate', 'estimatedHours', 'attachments']],
+    ['ops', ['assignee', 'priority', 'project', 'productLine', 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', 'attachments']],
+    ['presales', ['assignee', 'priority', 'source', 'customer', 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', 'attachments']],
+    ['delivery', ['assignee', 'priority', 'project', 'customer', 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', 'attachments']],
   ] as const)('fixes %s business task fields', (kind, expected) => {
     const fields = fixedTaskFields(kind, 'CREATE');
     expect(fields.fields.filter((field) => field.sort >= 0).map((field) => field.fieldCode)).toEqual(expected);

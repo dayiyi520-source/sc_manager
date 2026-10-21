@@ -29,13 +29,13 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const profiles = [
-  { kind: 'bug', fields: ['负责人','验证者','优先级','关联产品','迭代版本','关联项目','缺陷类型','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
-  { kind: 'requirement', fields: ['需要协同','负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
-  { kind: 'dev', fields: ['负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
-  { kind: 'test', fields: ['负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
-  { kind: 'design', variant: 'product', fields: ['任务类型','负责人','优先级','关联产品','迭代版本','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
-  { kind: 'design', variant: 'project', fields: ['任务类型','负责人','优先级','关联项目','关联产品','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
-  { kind: 'design', variant: 'other', fields: ['任务类型','负责人','优先级','来源部门','关联产品','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
+  { kind: 'bug', fields: ['负责人','验证者','优先级','关联产品','迭代版本','关联项目','缺陷类型','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
+  { kind: 'requirement', fields: ['需要协同','负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
+  { kind: 'dev', fields: ['负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
+  { kind: 'test', fields: ['负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
+  { kind: 'design', variant: 'product', fields: ['任务类型','负责人','优先级','关联产品','迭代版本','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
+  { kind: 'design', variant: 'project', fields: ['任务类型','负责人','优先级','关联项目','关联产品','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
+  { kind: 'design', variant: 'other', fields: ['任务类型','负责人','优先级','来源部门','关联产品','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
 ] as const;
 it.each(profiles)('renders fixed $kind $variant creation fields without a field configuration service', async (profile) => {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={profile.kind} designVariant={'variant' in profile ? profile.variant : 'product'} /></QueryClientProvider>);
@@ -45,7 +45,7 @@ it.each(profiles)('renders fixed $kind $variant creation fields without a field 
     fireEvent.click(await screen.findByRole('menuitem', { name: label }));
   } else fireEvent.click(screen.getByRole('button', { name: '新建' }));
   await screen.findByText('标题', { selector: 'label' });
-  expect(screen.queryByText('期望完成时间', { exact: true })).not.toBeInTheDocument();
+  expect(screen.getByText('期望完成时间', { exact: true })).toBeInTheDocument();
   const propertyForm = document.querySelector('.requirement-new-properties')!;
   const items = Array.from(propertyForm.querySelectorAll(':scope > .ant-form-item')).sort((a,b)=>Number((a as HTMLElement).style.order)-Number((b as HTMLElement).style.order));
   expect(items.map((item)=>item.querySelector('label')?.textContent)).toEqual(profile.fields);
@@ -176,12 +176,12 @@ it('selects and saves the version belonging to the chosen product when product n
   expect(productRepository.createWorkItem).toHaveBeenCalledWith(expect.objectContaining({ productLineId: 'line-1', versionId: 'version-1', title: '同名产品创建验收' }));
 });
 
-it.each(['requirement', 'design', 'dev', 'test', 'bug', 'ops', 'presales', 'delivery'] as const)('omits expected completion from existing %s task details without clearing its historical value', async kind => {
+it.each(['requirement', 'design', 'dev', 'test', 'bug', 'ops', 'presales', 'delivery'] as const)('restores optional expected completion in existing %s task details and displays its historical value', async kind => {
   const historic = task('history-' + kind, { expectedCompleteDate: '2026-12-31', plannedStartDate: '2026-10-21', dueDate: '2026-10-30' });
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} initialDetail={historic}/></QueryClientProvider>);
   await screen.findByRole('button', { name: `操作${historic.title}` });
-  expect(screen.queryByText('期望完成时间', { exact: true })).not.toBeInTheDocument();
-  expect(screen.queryByDisplayValue('2026-12-31')).not.toBeInTheDocument();
+  expect(screen.getByText('期望完成时间', { exact: true })).toBeInTheDocument();
+  expect(screen.getByDisplayValue('2026-12-31')).toBeInTheDocument();
   expect(historic.expectedCompleteDate).toBe('2026-12-31');
 });
 

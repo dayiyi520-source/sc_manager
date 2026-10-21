@@ -1,3 +1,4 @@
+import type { WorkbenchFeed } from '../services/workbenchFeeds';
 import directorySnapshot from './mockCustomerDirectory.json';
 import collaborationTypes from './mockCollaborationTypes.json';
 import type { ApprovalFlow, Contract, CurrentUser, Customer, DefectBug, DeliveryMapProject, FollowUpRecord, Lead, Opportunity, ProductLine, RequirementTask, TeamMember, VersionIteration } from '../types';
@@ -121,7 +122,7 @@ export const MOCK_APPROVALS: ApprovalFlow[] = [
   },
 ];
 
-export const MOCK_WORKBENCH_FEEDS = [
+export const LEGACY_WORKBENCH_FEEDS = [
   { id: 'feed-product-1', type: 'dynamic' as const, time: '2026-10-03 14:20', title: 'V4.2 版本完成测试计划关联', content: '测试团队已补充回归测试用例，版本评审进入待确认阶段。' },
   { id: 'feed-product-2', type: 'dynamic' as const, time: '2026-10-02 17:10', title: '产品需求“统一工作项”已发布', content: '需求完成评审并下发设计、研发和测试任务。' },
   { id: 'feed-feedback-1', type: 'feedback' as const, time: '2026-10-03 10:30', title: '客户反馈：列表筛选响应较慢', content: '国家电网华东分部建议优化大数据量下的筛选体验。', customer: '国家电网华东分部数智调度中心' },
@@ -304,3 +305,23 @@ planCaseRows.forEach((row) => {
   planCasesByPlan.set(planId, [...(planCasesByPlan.get(planId) || []), { linkId: text(row.id_), testCaseId: source.id, sort: Number(row.sort_ || 0), code: source.code, title: source.title, priority: source.priority, ownerName: source.ownerName, enabled: source.enabled, latestResult: source.latestResult }]);
 });
 export const MOCK_TEST_PLANS: TestPlan[] = rows('t_product_test_plan').filter((row) => Number(row.delete_flag_ || 0) === 0).map((row) => ({ id: text(row.id_), workItemId: text(row.work_item_id_), name: text(row.name_), environment: text(row.environment_) || null, startDate: date(row.start_date_), endDate: date(row.end_date_), ownerId: text(row.owner_id_), ownerName: text(row.owner_name_), executable: Boolean(row.executable_), revision: Number(row.revision_ || 0), cases: planCasesByPlan.get(text(row.id_)) || [] }));
+
+/** Complete demonstration records use the same catalog relationships as the creation form. */
+const feedDemoProducts = ['师创云平台', '部门考核管理系统'].map(name => MOCK_PRODUCT_LINES.find(product => product.name === name)!);
+export const MOCK_WORKBENCH_FEEDS: WorkbenchFeed[] = LEGACY_WORKBENCH_FEEDS.map((legacy, index) => {
+  const product = feedDemoProducts[index % feedDemoProducts.length];
+  const author = MOCK_USERS.find(user => user.name === product.ownerName) || MOCK_USERS[0];
+  const common = { ...legacy, authorId: author.id, author: author.name, visibility: 'all' as const, productId: product.id, productName: product.name };
+  if (legacy.type === 'dynamic') {
+    const version = MOCK_VERSIONS.find(version => version.productLineId === product.id && version.name.endsWith('V1.0.0'))!;
+    const title = index === 0 ? `${version.name} 完成测试计划关联` : legacy.title;
+    return { ...common, title, versionId: version.id, versionName: version.name, contentHtml: `<p>${legacy.content}</p>` };
+  }
+  if (legacy.type === 'feedback') {
+    const project = MOCK_PROJECT_DELIVERY_MAP[index - 2];
+    const customer = directorySnapshot.customers.find(customer => customer.name === project.customerName)!;
+    const content = index === 2 ? `${customer.name}建议优化大数据量下的筛选体验。` : legacy.content;
+    return { ...common, content, contentHtml: `<p>${content}</p>`, projectId: project.id, projectName: project.name, customerId: customer.id, customer: customer.name };
+  }
+  return { ...common, newsType: '友商动态', contentHtml: `<p>${legacy.content}</p>` };
+});

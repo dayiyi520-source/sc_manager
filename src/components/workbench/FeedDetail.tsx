@@ -1,6 +1,6 @@
 import { openFeedMessage } from '../../services/workbenchFeedReading';
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Descriptions, Modal, Space, Tag, message } from 'antd';
+import { Button, Descriptions, Modal, Space, message } from 'antd';
 import { useApp } from '../../context/AppContext';
 import { showDeleteConfirm } from '../common/Feedback';
 import { WorkbenchFeedEditor, type WorkbenchFeedEditorHandle } from './WorkbenchFeedEditor';
@@ -47,12 +47,17 @@ export const FeedDetail: React.FC<{ feed?: WorkbenchFeed; onClose: () => void; i
       <aside className="min-w-0 lg:border-l lg:border-[var(--border-main)] lg:pl-4">
       <Descriptions column={1} size="small" items={[
         { key: 'type', label: '类型', children: feedTypes.find(type => type.key === feed.type)?.label },
-        ...(feed.type === 'competitor' ? [{ key: 'news', label: '资讯类别', children: feed.newsType || '未分类' }] : []),
+        ...(feed.type === 'competitor' ? [{ key: 'news', label: '资讯类型', children: feed.newsType || '未分类' }] : []),
+        ...[
+          ['project', '关联项目', feed.type === 'feedback' ? feed.projectName : undefined],
+          ['product', '关联产品', feed.productName],
+          ['version', '迭代版本', feed.type === 'dynamic' ? feed.versionName : undefined],
+          ['customer', '关联客户', feed.type === 'feedback' ? feed.customer : undefined],
+        ].filter(([, , value]) => value).map(([key, label, value]) => ({ key: key!, label, children: value })),
         { key: 'scope', label: '可见范围', children: feed.visibility === 'specified' ? '指定人员' : '全员' },
         { key: 'source', label: '来源', children: feed.source?.module || '工作台' },
         { key: 'author', label: '发布人', children: feed.author || '未记录发布人' },
         { key: 'time', label: '发布时间', children: dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time },
-        ...[['product', '关联产品', feed.productName], ['version', '关联版本', feed.versionName], ['project', '关联项目', feed.projectName], ['customer', '客户', feed.type !== 'competitor' ? feed.customer : undefined], ['activity', '关联活动', feed.type !== 'competitor' ? feed.activityName : undefined]].filter(([, , value]) => value).map(([key, label, value]) => ({ key: key!, label, children: <Tag>{value}</Tag> })),
       ]}/>
       </aside>
     </div>)}

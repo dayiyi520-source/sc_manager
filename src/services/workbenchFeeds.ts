@@ -1,6 +1,6 @@
 import { projectDeliveryMap, resolveProjectProductLines } from './projectDeliveryMap';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
-import { MOCK_WORKBENCH_FEEDS } from '../data/mockSnapshot';
+import { LEGACY_WORKBENCH_FEEDS, MOCK_WORKBENCH_FEEDS } from '../data/mockSnapshot';
 import type { ProductLine, ProjectItem, Customer, VersionIteration } from '../types';
 
 export const newsTypes = ['专家报告', '政策文件', '友商动态'] as const;
@@ -22,7 +22,24 @@ export function listWorkbenchFeeds(): WorkbenchFeed[] {
   let rows: unknown;
   try { rows = JSON.parse(stored); } catch { throw new Error('动态与评价保存数据无法读取，请检查浏览器存储'); }
   if (!Array.isArray(rows) || rows.some(row => !row || typeof row.id !== 'string' || !feedTypes.some(type => type.key === row.type) || typeof row.title !== 'string' || typeof row.content !== 'string' || typeof row.time !== 'string')) throw new Error('动态与评价保存数据格式异常');
-  return (rows as WorkbenchFeed[]).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  // Only exact original demo snapshots qualify; custom, edited and source records remain intact.
+  let upgraded = false;
+  const completed = (rows as WorkbenchFeed[]).map(row => {
+    const legacy = LEGACY_WORKBENCH_FEEDS.find(legacy => legacy.id === row.id);
+    if (!legacy) return row;
+    const original = legacy as unknown as Record<string, unknown>;
+    const storedRow = row as unknown as Record<string, unknown>;
+    if (Object.keys(original).length !== Object.keys(storedRow).length || !Object.entries(original).every(([key, value]) => storedRow[key] === value)) return row;
+    const replacement = MOCK_WORKBENCH_FEEDS.find(feed => feed.id === row.id);
+    if (!replacement) return row;
+    upgraded = true;
+    return { ...replacement };
+  });
+  if (upgraded) {
+    try { localStorage.setItem(FEEDS_KEY, JSON.stringify(completed)); }
+    catch { throw new Error('历史演示信息补全保存失败，请检查浏览器存储后重试'); }
+  }
+  return completed.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 }
 export function productVersions(catalog: FeedCatalog, productId?: string) {
   return [...new Map([...(catalog.products.find(row => row.id === productId)?.versions || []), ...catalog.versions.filter(row => row.productLineId === productId)].map(row => [row.id, row])).values()];

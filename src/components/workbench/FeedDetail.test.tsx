@@ -1,0 +1,30 @@
+// @vitest-environment jsdom
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FeedDetail } from './FeedDetail';
+import type { WorkbenchFeed } from '../../services/workbenchFeeds';
+vi.mock('../../context/AppContext', () => ({ useApp: () => ({ currentUser: { id: 'viewer' } }) }));
+vi.mock('./WorkbenchFeedEditor', () => ({ WorkbenchFeedEditor: () => null }));
+beforeEach(() => localStorage.clear());
+afterEach(cleanup);
+const feed: WorkbenchFeed = { id: 'detail', type: 'dynamic', title: '详情顺序验收', content: '正文', time: '2026-10-21T10:00:00', author: '发布人甲', projectName: '项目甲', productName: '产品甲', versionName: 'V1', customer: '客户甲', newsType: '专家报告', activityName: '历史活动' };
+const labels = () => [...document.querySelectorAll('aside .ant-descriptions-item-label')].map(item => item.textContent?.trim());
+describe('feed detail metadata order and applicable fields', () => {
+  it.each([
+    ['dynamic', ['类型', '关联产品', '迭代版本', '可见范围', '来源', '发布人', '发布时间']],
+    ['feedback', ['类型', '关联项目', '关联产品', '关联客户', '可见范围', '来源', '发布人', '发布时间']],
+    ['competitor', ['类型', '资讯类型', '关联产品', '可见范围', '来源', '发布人', '发布时间']],
+  ] as const)('orders %s metadata and hides fields that do not apply even if legacy values remain', async (type, expected) => {
+    render(<FeedDetail feed={{...feed,type}} onClose={vi.fn()}/>);
+    await screen.findByRole('heading', {name:'详情顺序验收'});
+    expect(labels()).toEqual(expected);
+    expect(screen.queryByText('关联活动')).not.toBeInTheDocument();
+    expect(screen.queryByText('关联版本')).not.toBeInTheDocument();
+    expect(screen.queryByText('资讯类别')).not.toBeInTheDocument();
+  });
+  it('hides empty associations while retaining common metadata', async () => {
+    render(<FeedDetail feed={{...feed,type:'feedback',projectName:undefined,productName:undefined,versionName:undefined,customer:undefined}} onClose={vi.fn()}/>);
+    await screen.findByRole('heading', {name:'详情顺序验收'});
+    expect(labels()).toEqual(['类型', '可见范围', '来源', '发布人', '发布时间']);
+  });
+});

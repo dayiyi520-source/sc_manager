@@ -25,6 +25,7 @@ describe('动态与评价新增', () => {
     fireEvent.click(await screen.findByRole('tab', { name: '评价吐槽 (1)' }));
     expect(feedReading('me').browsed).toContain(feed.id);
     expect(feedReading('me').opened).not.toContain(feed.id);
+    expect(screen.getByLabelText('搜索动态与评价').closest('.workbench-search')).toBeInTheDocument();
     expect(screen.getByLabelText('新消息')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '产品动态 (0)' }));
     fireEvent.click(screen.getByRole('tab', { name: '评价吐槽 (1)' }));
