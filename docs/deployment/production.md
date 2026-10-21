@@ -30,16 +30,30 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-本次成功发布：2026-10-20；发布编号 `20261020T151724Z`；源码提交 `db8f93bfc45b77ba162d343e72d2cce11d83d72e`；发布目录 `/opt/sc-manager-frontend/releases/20261020T151724Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261020T151724Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`，首页、入口资源、我的待办及协同事项直达页面、Mock 健康接口和共享数据核验通过。
+本次成功发布：2026-10-21；发布编号 `20261021T022225Z`；源码提交 `e3bfcea2a3e94c4244a28ea85f3cf37d1b536b2a`；发布目录 `/opt/sc-manager-frontend/releases/20261021T022225Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261021T022225Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`，首页、入口资源、我的待办、产品任务和缺陷管理直达页面、Mock 健康接口及共享数据核验通过。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
 
 失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
 
-上次已核实的发布：20261020T151724Z，源码 db8f93b。
+上次已核实的发布：20261021T022225Z，源码 e3bfcea。
 
 ## 最近成功发布
+
+- 发布时间：2026-10-21 10:22:25（北京时间，发布编号生成时间）。
+- 发布编号：20261021T022225Z；发布源码：e3bfcea2a3e94c4244a28ea85f3cf37d1b536b2a。
+- 发布目录：/opt/sc-manager-frontend/releases/20261021T022225Z。
+- 回滚备份：/opt/sc-manager-frontend/backups/20261021T022225Z；上一版本目标记录于该目录 previous-target.txt。
+- 待办中心统一搜索输入与按钮高度，移除负责人筛选；动态与评价将分类浏览红点与单条新消息分开，按用户保存，详情成功展示后清除单条新消息，首页及完整列表同步。
+- 八类任务移除新建、编辑和详情的期望完成时间输入及展示，保留计划日期与历史数据；产品任务及缺陷的可选关联项目位于迭代版本下方，支持选择、清空、保存及重新读取。
+- 联合回归 98 项中 97 项通过、1 项动态表单未完成；该文件单独复跑 11 项全部通过。此前定向测试、类型检查及本次生产构建通过。PRD 校验仍有原有文档用词及登记数量问题。
+- 通过既有 Python 入口部署已推送源码的独立快照，发布前读取线上两份共享 Mock 数据，未上传本地未提交业务数据。
+- 首页、入口资源、我的待办、产品任务及缺陷管理直达页面、发布清单、Mock 健康及共享数据核验通过；消息阅读、任务关联及搜索样式共 3 份线上资源与本次构建逐字节一致。
+- 发布前后均为 51 条目标复盘记录，无记录缺失或版本回退；人员、目标设置和工作项配置保持一致。
+- 回滚从本次备份 previous-target.txt 读取旧目录并切换 dist，再调用本次发布目录 mock-service/setup.py 的 --rollback 模式恢复服务、路由及共享数据。
+
+### 前次发布记录（20261020T151724Z）
 
 - 发布时间：2026-10-20 23:17:24（北京时间）。发布编号 `20261020T151724Z`，发布源码 `db8f93bfc45b77ba162d343e72d2cce11d83d72e`。
 - 发布目录：`/opt/sc-manager-frontend/releases/20261020T151724Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261020T151724Z`。上一版本目标记录于该目录的 `previous-target.txt`。
