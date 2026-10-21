@@ -24,7 +24,6 @@ function TodoPage({ onBack }: { onBack: () => void }) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [type, setType] = useState<string>();
-  const [owner, setOwner] = useState<string>();
   const [selected, setSelected] = useState<MyTask>();
   const [editing, setEditing] = useState<MyTask>();
   const [progress, setProgress] = useState<number | null>(0);
@@ -36,10 +35,9 @@ function TodoPage({ onBack }: { onBack: () => void }) {
     requirementRepository.myTasks(currentUser.id, true).then(rows => { if (!Array.isArray(rows)) throw new Error('待办数据格式异常，请重试'); if (active) setRows(rows); }).catch(error => { if (active) setError(error instanceof Error ? error.message : '待办加载失败'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [currentUser.id, revision]);
-  const filtered = rows.filter(row => matchesTodoTab(row, tab) && (!type || row.type === type) && (!owner || (row.assigneeId || row.assigneeName || 'unassigned') === owner) && (status === 'all' || (status === 'finished' ? completed(row.status) : !completed(row.status))) && row.title.toLowerCase().includes(query.trim().toLowerCase()));
+  const filtered = rows.filter(row => matchesTodoTab(row, tab) && (!type || row.type === type) && (status === 'all' || (status === 'finished' ? completed(row.status) : !completed(row.status))) && row.title.toLowerCase().includes(query.trim().toLowerCase()));
   const taskTypes: Record<string, string> = { requirement: '产品任务', dev: '研发任务', design: '设计任务', test: '测试任务', bug: '缺陷任务', assistance: '协同事项', work_order: '工单' };
   const typeOptions = [...new Set<string>(rows.map(row => row.type))].map(value => ({ value, label: taskTypes[value] || value }));
-  const ownerOptions = [...new Map(rows.map(row => [row.assigneeId || row.assigneeName || 'unassigned', { value: row.assigneeId || row.assigneeName || 'unassigned', label: row.assigneeName || '未分配' }])).values()];
   const saveProgress = async () => {
     if (!editing || saveLock.current) return;
     try { validateMyTaskProgress(progress); } catch (error) { setProgressError((error as Error).message); return; }
@@ -57,9 +55,8 @@ function TodoPage({ onBack }: { onBack: () => void }) {
     <section className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
       <Tabs activeKey={tab} onChange={key => { setTab(key as TodoTab); rememberWorkbenchTab(TODO_TAB_KEY, key); setPage(1); }} items={todoTabs.map(type => ({ key: type.key, label: `${type.label} (${rows.filter(row => matchesTodoTab(row, type.key)).length})` }))}/>
       <div className="mb-4 flex flex-wrap gap-4">
-        <div className="w-[var(--workbench-query-width)] max-w-full"><Input.Search aria-label="搜索待办" allowClear placeholder="搜索标题" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }}/></div>
+        <div className="w-[var(--workbench-query-width)] max-w-full"><Input.Search className="todo-center-search" aria-label="搜索待办" allowClear placeholder="搜索标题" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }}/></div>
         <Select className="min-w-40" aria-label="待办类型" placeholder="全部类型" allowClear value={type} onChange={value => { setType(value); setPage(1); }} options={typeOptions}/>
-        <Select className="min-w-40" aria-label="待办负责人" placeholder="全部负责人" showSearch optionFilterProp="label" allowClear value={owner} onChange={value => { setOwner(value); setPage(1); }} options={ownerOptions}/>
         <Select className="min-w-40" aria-label="待办状态" value={status} onChange={value => { setStatus(value); setPage(1); }} options={[{ value: 'all', label: '全部状态' }, { value: 'pending', label: '未结束' }, { value: 'finished', label: '已结束（含已完成）' }]}/>
       </div>
       <Table loading={loading} rowKey="id" dataSource={filtered} scroll={{ x: true }} pagination={{ current: page, pageSize: 20, onChange: setPage, showSizeChanger: false, hideOnSinglePage: true }} locale={{ emptyText: error ? '加载失败，请重试' : <Empty description="暂无工作事项"/> }} columns={[

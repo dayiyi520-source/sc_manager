@@ -161,7 +161,6 @@ const FlowAttachmentPicker: React.FC<{ media: RequirementMedia[]; onChange: Reac
 type AssistanceSubTask = {
   taskType: RequirementTaskType | "";
   assignee: string;
-  expectedDueDate: string;
   note: string;
   media: RequirementMedia[];
 };
@@ -349,7 +348,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
   const [workOpen, setWorkOpen] = useState(false);
   const [workflowAction, setWorkflowAction] = useState<"" | "convert" | "reassign">("");
-  const [subTasks, setSubTasks] = useState<AssistanceSubTask[]>([{ taskType: "", assignee: "", expectedDueDate: "", note: "", media: [] }]);
+  const [subTasks, setSubTasks] = useState<AssistanceSubTask[]>([{ taskType: "", assignee: "", note: "", media: [] }]);
   const [reassignAssignee, setReassignAssignee] = useState("");
   const [reassignReason, setReassignReason] = useState("");
   const [rejectReassignmentOpen, setRejectReassignmentOpen] = useState(false);
@@ -700,7 +699,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       let results: Array<{ task: typeof singleTask.task; assignee: NonNullable<typeof singleTask.assignee>; result: Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }>;
       setWorkflowSubmitting(true);
       try {
-        const batch = await requirementRepository.createWorkItemsBatch(selected.id, taskInputs.map(({ task, assignee }) => ({ taskType: task.taskType!, assigneeName: assignee!.name, note: task.note, expectedCompleteDate: task.expectedDueDate, attachmentIds: task.media.map((item) => item.id), blocksClosure: true })));
+        const batch = await requirementRepository.createWorkItemsBatch(selected.id, taskInputs.map(({ task, assignee }) => ({ taskType: task.taskType!, assigneeName: assignee!.name, note: task.note, attachmentIds: task.media.map((item) => item.id), blocksClosure: true })));
         results = taskInputs.map(({ task, assignee }, index) => ({ task, assignee: assignee!, result: batch.items[index] as Awaited<ReturnType<typeof requirementRepository.createWorkItem>> }));
       } catch {
         addToast("error", "下游任务创建失败", "本次批量操作未保存，请检查后重试");
@@ -994,7 +993,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const openWorkflow = (action: "convert" | "reassign") => {
     if ((action === "convert" && !canAddTask) || (action === "reassign" && !canReceive)) return;
     setWorkflowAction(action);
-    setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }]);
+    setSubTasks([{ taskType: "", assignee: "", note: "", media: [] }]);
     setReassignAssignee(""); setReassignReason(""); setFlowMedia([]);
     setWorkOpen(true);
   };
@@ -1409,7 +1408,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
                 <span className="text-xs font-semibold text-[var(--text-primary)]">任务配置 ({subTasks.length})</span>
                 <button
                   type="button"
-                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", expectedDueDate: selected?.expectedCompleteDate || "", note: "", media: [] }])}
+                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", note: "", media: [] }])}
                   className="px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border-main)] text-xs text-[var(--primary)] font-medium hover:bg-[var(--bg-hover)]"
                 >
                   + 增加任务
@@ -1447,7 +1446,6 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
                   <div className="min-w-0 lg:col-span-3 [&>label]:block">
                   <EmployeeSearchSelect label="任务负责人 *" value={t.assignee} employees={employees} placeholder="搜索姓名或职位" onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))} />
                   </div>
-                  <div className="min-w-0 lg:col-span-2"><DateField label="期望完成时间" value={t.expectedDueDate} onChange={(value) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, expectedDueDate: value } : item))} /></div>
                   <label className="work-order-dialog-field block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-4">
                     任务描述
                     <Input

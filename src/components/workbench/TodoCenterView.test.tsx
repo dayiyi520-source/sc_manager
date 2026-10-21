@@ -32,8 +32,9 @@ describe('完整待办中心', () => {
     fireEvent.click(screen.getByRole('tab', { name: '全部 (2)' }));
     fireEvent.mouseDown(screen.getByLabelText('待办类型'));
     fireEvent.click(await screen.findByText('研发任务', { selector: '.ant-select-item-option-content' }));
-    fireEvent.mouseDown(screen.getByLabelText('待办负责人'));
-    fireEvent.click(await screen.findByText('本人', { selector: '.ant-select-item-option-content' }));
+    expect(screen.queryByLabelText('待办负责人')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('搜索待办').closest('.todo-center-search')).toBeInTheDocument();
+    expect(screen.getByLabelText('待办状态')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '已完成研发' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '处理中协同' })).not.toBeInTheDocument();
   });

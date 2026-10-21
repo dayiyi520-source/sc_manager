@@ -1,3 +1,4 @@
+import { directoryProjects } from '../../services/customerDirectoryData';
 // @vitest-environment jsdom
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -13,7 +14,7 @@ vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.
 vi.mock('../../services/requirementRepository', () => ({ requirementRepository: { workOrderCandidates: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../services/productRepository', () => ({ productRepository: {
   createWorkItem: vi.fn().mockResolvedValue({}), designTasks: vi.fn().mockResolvedValue({ items: [], total: 0 }), workItems: vi.fn().mockResolvedValue({ page: { items: [], total: 0 } }), tasks: vi.fn().mockResolvedValue({ items: [], total: 0 }), businessTasks: vi.fn(), updateBusinessTask: vi.fn().mockResolvedValue(null),
-  businessTask: vi.fn(), workItemDetail: vi.fn(), workItemTypes: vi.fn().mockResolvedValue([]),
+  workItemActivities: vi.fn().mockResolvedValue([]), updateWorkItem: vi.fn(), businessTask: vi.fn(), workItemDetail: vi.fn(), workItemTypes: vi.fn().mockResolvedValue([]),
   workItemReview: vi.fn().mockResolvedValue(null), workItemRelations: vi.fn().mockResolvedValue({ relations: [] }), businessTaskActivities: vi.fn().mockResolvedValue([])
 } }));
 vi.mock('./LazyRichTextEditor', () => ({ LazyRichTextEditor: () => <div /> }));
@@ -28,12 +29,13 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const profiles = [
-  { kind: 'requirement', fields: ['需要协同','负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
-  { kind: 'dev', fields: ['负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
-  { kind: 'test', fields: ['负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
-  { kind: 'design', variant: 'product', fields: ['任务类型','负责人','优先级','关联产品','迭代版本','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
-  { kind: 'design', variant: 'project', fields: ['任务类型','负责人','优先级','关联项目','关联产品','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
-  { kind: 'design', variant: 'other', fields: ['任务类型','负责人','优先级','来源部门','关联产品','计划开始时间','计划完成时间','期望完成时间','预计工时（小时）','附件'] },
+  { kind: 'bug', fields: ['负责人','验证者','优先级','关联产品','迭代版本','关联项目','缺陷类型','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
+  { kind: 'requirement', fields: ['需要协同','负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
+  { kind: 'dev', fields: ['负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
+  { kind: 'test', fields: ['负责人','优先级','关联产品','迭代版本','关联项目','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
+  { kind: 'design', variant: 'product', fields: ['任务类型','负责人','优先级','关联产品','迭代版本','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
+  { kind: 'design', variant: 'project', fields: ['任务类型','负责人','优先级','关联项目','关联产品','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
+  { kind: 'design', variant: 'other', fields: ['任务类型','负责人','优先级','来源部门','关联产品','计划开始时间','计划完成时间','预计工时（小时）','附件'] },
 ] as const;
 it.each(profiles)('renders fixed $kind $variant creation fields without a field configuration service', async (profile) => {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={profile.kind} designVariant={'variant' in profile ? profile.variant : 'product'} /></QueryClientProvider>);
@@ -43,6 +45,7 @@ it.each(profiles)('renders fixed $kind $variant creation fields without a field 
     fireEvent.click(await screen.findByRole('menuitem', { name: label }));
   } else fireEvent.click(screen.getByRole('button', { name: '新建' }));
   await screen.findByText('标题', { selector: 'label' });
+  expect(screen.queryByText('期望完成时间', { exact: true })).not.toBeInTheDocument();
   const propertyForm = document.querySelector('.requirement-new-properties')!;
   const items = Array.from(propertyForm.querySelectorAll(':scope > .ant-form-item')).sort((a,b)=>Number((a as HTMLElement).style.order)-Number((b as HTMLElement).style.order));
   expect(items.map((item)=>item.querySelector('label')?.textContent)).toEqual(profile.fields);
@@ -171,4 +174,32 @@ it('selects and saves the version belonging to the chosen product when product n
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^保\s*存$/ })); });
   await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
   expect(productRepository.createWorkItem).toHaveBeenCalledWith(expect.objectContaining({ productLineId: 'line-1', versionId: 'version-1', title: '同名产品创建验收' }));
+});
+
+it.each(['requirement', 'design', 'dev', 'test', 'bug', 'ops', 'presales', 'delivery'] as const)('omits expected completion from existing %s task details without clearing its historical value', async kind => {
+  const historic = task('history-' + kind, { expectedCompleteDate: '2026-12-31', plannedStartDate: '2026-10-21', dueDate: '2026-10-30' });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} initialDetail={historic}/></QueryClientProvider>);
+  await screen.findByRole('button', { name: `操作${historic.title}` });
+  expect(screen.queryByText('期望完成时间', { exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByDisplayValue('2026-12-31')).not.toBeInTheDocument();
+  expect(historic.expectedCompleteDate).toBe('2026-12-31');
+});
+
+it.each(['requirement', 'bug'] as const)('shows an optional project after version in %s details and restores its saved value', async kind => {
+  const project = directoryProjects()[0];
+  const historic = task('project-' + kind, { productLineId: 'line-1', projectId: project.id, projectName: project.name, revision: 0 });
+  vi.mocked(productRepository.workItemDetail).mockResolvedValue(historic);
+  vi.mocked(productRepository.updateWorkItem).mockResolvedValue({ ...historic, projectId: '', projectName: '', revision: 1 });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} initialDetail={historic} detailPresentation="page"/></QueryClientProvider>);
+  await screen.findByRole('button', { name: `操作${historic.title}` });
+  const label = await screen.findByText('关联项目', { selector: 'label' });
+  expect(label).not.toHaveClass('ant-form-item-required');
+  const item = label.closest('.ant-form-item') as HTMLElement;
+  const version = screen.getByText('迭代版本', { selector: 'label' }).closest('.ant-form-item') as HTMLElement;
+  expect(Number(item.style.order)).toBe(Number(version.style.order) + 1);
+  expect(within(item).getByRole('combobox')).toBeEnabled();
+  expect(item).toHaveTextContent(project.name);
+  fireEvent.mouseDown(item.querySelector('.ant-select-clear')!);
+  fireEvent.click(item.querySelector('.ant-select-clear')!);
+  await waitFor(() => expect(productRepository.updateWorkItem).toHaveBeenCalledWith('line-1', historic.id, expect.objectContaining({ projectId: '', projectName: '' })));
 });

@@ -155,3 +155,9 @@
   color: #60a5fa !important;
   background-color: rgba(96, 165, 250, 0.15) !important;
 }
+
+/* Keep both halves of the todo search aligned with the platform input baseline. */
+.tech-shell .todo-center-search .ant-btn {
+  height: calc(var(--spacing) * 9) !important;
+  min-height: calc(var(--spacing) * 9) !important;
+}

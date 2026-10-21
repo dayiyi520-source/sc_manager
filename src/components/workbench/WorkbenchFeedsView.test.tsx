@@ -1,3 +1,4 @@
+import { feedReading } from '../../services/workbenchFeedReading';
 // @vitest-environment jsdom
 import React from 'react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
@@ -17,6 +18,26 @@ async function option(label: string, text: string) {
   fireEvent.click(await screen.findByText(text, { selector: '.ant-select-item-option-content' }));
 }
 describe('动态与评价新增', () => {
+  it('clears category updates independently and marks a message read only after details open', async () => {
+    const feed = { id: 'reading-one', type: 'feedback', title: '阅读机制验收', content: '内容', time: '2026-10-21', authorId: 'other' };
+    localStorage.setItem(FEEDS_KEY, JSON.stringify([feed]));
+    const view = render(<WorkbenchFeedsView onBack={vi.fn()}/>);
+    fireEvent.click(await screen.findByRole('tab', { name: '评价吐槽 (1)' }));
+    expect(feedReading('me').browsed).toContain(feed.id);
+    expect(feedReading('me').opened).not.toContain(feed.id);
+    expect(screen.getByLabelText('新消息')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '产品动态 (0)' }));
+    fireEvent.click(screen.getByRole('tab', { name: '评价吐槽 (1)' }));
+    expect(screen.getByLabelText('新消息')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: feed.title }));
+    await waitFor(() => expect(feedReading('me').opened).toContain(feed.id));
+    expect(screen.queryByLabelText('新消息')).not.toBeInTheDocument();
+    view.unmount();
+    render(<WorkbenchFeedsView onBack={vi.fn()}/>);
+    await screen.findByRole('button', { name: feed.title });
+    expect(screen.queryByLabelText('新消息')).not.toBeInTheDocument();
+  });
+
   it('产品版本联动清空旧值，保存后刷新恢复', async () => {
     const result = render(<WorkbenchFeedsView onBack={vi.fn()}/>);
     fireEvent.click(screen.getByRole('button', { name: '新建' }));

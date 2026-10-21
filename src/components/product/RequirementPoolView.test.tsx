@@ -71,7 +71,7 @@ describe('work-order workflow form regression', () => {
     switchAction('convert');
     expect(screen.getByLabelText('任务负责人 *')).toHaveValue('');
     expect(screen.getByLabelText('任务描述')).toHaveValue('');
-    expect(screen.getByLabelText('期望完成时间')).toHaveValue('2026-10-02');
+    expect(screen.queryByLabelText('期望完成时间')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('任务描述'), { target: { value: '任务独立描述' } });
     switchAction('reassign');
     expect(screen.getByLabelText('转派给负责人 *')).toHaveValue('陈雅婷');
@@ -93,10 +93,10 @@ describe('work-order workflow form regression', () => {
     const options = Array.from((screen.getByLabelText('任务类型 *') as HTMLSelectElement).options).map((option) => option.text);
     expect(options).toEqual(['选择任务类型', '产品需求', '缺陷管理', '设计任务', '研发任务']);
   });
-  it('resets drafts on reopening and inherits dates for new rows', async () => {
+  it('resets drafts on reopening and omits expected completion dates for new rows', async () => {
     await openWorkflow();
     fireEvent.click(screen.getByRole('button', { name: '+ 增加任务' }));
-    expect(screen.getAllByLabelText('期望完成时间').map(input => (input as HTMLInputElement).value)).toEqual(['2026-10-02', '2026-10-02']);
+    expect(screen.queryByLabelText('期望完成时间')).not.toBeInTheDocument();
     switchAction('reassign');
     fireEvent.change(screen.getByLabelText('转派原因说明 *'), { target: { value: '不应残留' } });
     fireEvent.click(screen.getByRole('button', { name: '取消' }));
@@ -105,16 +105,14 @@ describe('work-order workflow form regression', () => {
     switchAction('reassign');
     expect(screen.getByLabelText('转派原因说明 *')).toHaveValue('');
   });
-  it('uses the task description and edited deadline in the requirement draft', async () => {
+  it('uses the task description and existing planned date without an expected completion input', async () => {
     await openWorkflow();
     fireEvent.change(screen.getByLabelText('任务类型 *'), { target: { value: '产品需求' } });
     selectAssignee('任务负责人 *');
     fireEvent.change(screen.getByLabelText('任务描述'), { target: { value: '任务描述独立提交' } });
-    const deadline = screen.getByLabelText('期望完成时间');
-    fireEvent.change(deadline, { target: { value: '2026-10-09' } });
-    fireEvent.keyDown(deadline, { key: 'Enter', code: 'Enter' });
+    expect(screen.queryByLabelText('期望完成时间')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '确认转任务' }));
-    expect(setRequirementTaskDraft).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '陈雅婷', dueDate: '2026-10-09', description: '任务描述独立提交' }));
+    expect(setRequirementTaskDraft).toHaveBeenCalledWith(expect.objectContaining({ ownerName: '陈雅婷', dueDate: '2026-10-02', description: '任务描述独立提交' }));
   });
   it('does not offer the removed personal memo action', async () => {
     await openWorkflow();

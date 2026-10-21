@@ -1,3 +1,4 @@
+import { useFeedReading } from './useFeedReading';
 import { FeedDetail } from './FeedDetail';
 import { WorkbenchFeedEditor, type WorkbenchFeedEditorHandle } from './WorkbenchFeedEditor';
 import { FeedSummary } from './FeedSummary';
@@ -16,6 +17,7 @@ export function WorkbenchFeedsView({ onBack, editFeedId }: { onBack: () => void;
 function FeedsPage({ onBack, editFeedId }: { onBack: () => void; editFeedId?: string }) {
   const { productLines, currentUser } = useApp();
   const { feeds, error, reload } = useWorkbenchFeeds();
+  const reading = useFeedReading(currentUser.id, feeds);
   const [tab, setTab] = useState<FeedType>(() => { const saved = readWorkbenchTab(FEED_TAB_KEY); return feedTypes.find(row => row.key === saved)?.key || 'dynamic'; });
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -36,12 +38,12 @@ function FeedsPage({ onBack, editFeedId }: { onBack: () => void; editFeedId?: st
     <div className="flex flex-wrap items-center justify-between gap-4"><Button type="text" icon={<ArrowLeftIcon/>} onClick={onBack}>返回我的待办</Button><Button type="primary" icon={<PlusIcon/>} disabled={Boolean(error)} onClick={startCreate}>新建</Button></div>
     {error && <Alert type="error" showIcon title={error} action={<Button onClick={reload}>重试</Button>}/>}
     <section className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
-      <Tabs activeKey={tab} onChange={key => { setTab(key as FeedType); rememberWorkbenchTab(FEED_TAB_KEY, key); setPage(1); }} items={feedTypes.map(type => ({ key: type.key, label: `${type.label} (${feeds.filter(row => row.type === type.key).length})` }))}/>
+      <Tabs activeKey={tab} onTabClick={key => reading.browse(key as FeedType)} onChange={key => { setTab(key as FeedType); reading.browse(key as FeedType); rememberWorkbenchTab(FEED_TAB_KEY, key); setPage(1); }} items={feedTypes.map(type => ({ key: type.key, label: <span>{`${type.label} (${feeds.filter(row => row.type === type.key).length})`}{reading.hasUpdates(type.key) && <i aria-hidden="true" title={`${type.label}有更新`} className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--danger)]"/>}</span> }))}/>
       <div className="mb-4 flex flex-wrap gap-4"><div className="w-[var(--workbench-query-width)] max-w-full"><Input.Search aria-label="搜索动态与评价" placeholder="搜索标题、信息简介或关联信息" allowClear value={query} onChange={event => { setQuery(event.target.value); setPage(1); }}/></div><Select aria-label="筛选关联产品" placeholder="全部产品" allowClear showSearch optionFilterProp="label" className="min-w-40" value={productFilter} onChange={value => { setProductFilter(value); setPage(1); }} options={productLines.map(row => ({ value: row.id, label: row.name }))}/></div>
       <div className="divide-y divide-[var(--border-main)]">
         {!error && !filtered.length && <Empty className="py-8" description="暂无动态与评价"/>}
         {filtered.slice((page - 1) * 10, page * 10).map(feed => <article key={feed.id} className="space-y-3 px-3 py-4">
-          <h2 className="break-words text-base font-semibold"><button type="button" className="text-left text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelected(feed)}>{feed.title}</button></h2>
+          <h2 aria-label={feed.title} className="break-words text-base font-semibold"><button type="button" className="text-left text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelected(feed)}>{feed.title}</button>{reading.isNew(feed.id) && <span aria-label="新消息" className="ml-2 text-xs text-[var(--danger)]">新</span>}</h2>
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--text-muted)]"><span>{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</span><span>{feed.author || '未记录发布人'}</span><span>来源：{feed.source?.module || '工作台'}</span><span>范围：{feed.visibility === 'specified' ? '指定人员' : '全员'}</span></div>
           <Space wrap className="text-sm text-[var(--text-muted)]">{feed.productName && <span>产品：{feed.productName}</span>}{feed.versionName && <span>版本：{feed.versionName}</span>}{feed.projectName && <span>项目：{feed.projectName}</span>}{feed.type !== 'competitor' && feed.customer && <span>客户：{feed.customer}</span>}{feed.type === 'competitor' && <span>资讯类型：{feed.newsType || '未分类'}</span>}{feed.activityName && <span>活动：{feed.activityName}</span>}</Space>
           <FeedSummary content={feed.content}/>

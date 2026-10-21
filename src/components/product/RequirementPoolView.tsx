@@ -193,7 +193,7 @@ export const RequirementPoolView: React.FC = () => {
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
   const [workOpen, setWorkOpen] = useState(false);
   const [workflowAction, setWorkflowAction] = useState<"convert" | "reassign">("convert");
-  const [subTasks, setSubTasks] = useState<Array<{ taskType: RequirementTaskType | ""; assignee: string; expectedDueDate: string; note: string }>>([{ taskType: "", assignee: "", expectedDueDate: "", note: "" }]);
+  const [subTasks, setSubTasks] = useState<Array<{ taskType: RequirementTaskType | ""; assignee: string; note: string }>>([{ taskType: "", assignee: "", note: "" }]);
   const [reassignAssignee, setReassignAssignee] = useState("");
   const [reassignReason, setReassignReason] = useState("");
   const [reasonType, setReasonType] = useState<"hold" | "reject" | null>(null);
@@ -337,7 +337,7 @@ export const RequirementPoolView: React.FC = () => {
       }
       const singleTask = taskInputs[0];
       if (subTasks.length === 1 && singleTask.task.taskType === "产品需求") {
-        setRequirementTaskDraft({ title: selected.title, description: singleTask.task.note || selected.description, expectedGoal: selected.expectedGoal || eventMetadata(selected.specialFields).expectedResult, ownerName: singleTask.assignee!.name, priority: selected.priority, productLineName: selected.productLineName, customerName: selected.customerName, dueDate: singleTask.task.expectedDueDate || selected.dueDate, sourceWorkOrderIds: [selected.id], requirementType: "业务需求" });
+        setRequirementTaskDraft({ title: selected.title, description: singleTask.task.note || selected.description, expectedGoal: selected.expectedGoal || eventMetadata(selected.specialFields).expectedResult, ownerName: singleTask.assignee!.name, priority: selected.priority, productLineName: selected.productLineName, customerName: selected.customerName, dueDate: selected.dueDate, sourceWorkOrderIds: [selected.id], requirementType: "业务需求" });
         setRequirementTasks((list) => list.map((item) => item.id === selected.id ? { ...item, status: "处理中" as RequirementTask["status"], assignedOwnerName: singleTask.assignee!.name } : item));
         setSelected((item) => item ? { ...item, status: "处理中" as RequirementTask["status"], assignedOwnerName: singleTask.assignee!.name } : item);
         setWorkOpen(false);
@@ -918,7 +918,7 @@ export const RequirementPoolView: React.FC = () => {
               <RequirementActionButtons
                 status={selected.status}
                 hasWorkItem={taskLocked}
-                onWork={() => { setWorkflowAction("convert"); setSubTasks([{ taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "" }]); setReassignAssignee(""); setReassignReason(""); setWorkOpen(true); }}
+                onWork={() => { setWorkflowAction("convert"); setSubTasks([{ taskType: "", assignee: "", note: "" }]); setReassignAssignee(""); setReassignReason(""); setWorkOpen(true); }}
                 onHold={() => setReasonType("hold")}
                 onReject={() => setReasonType("reject")}
               />
@@ -1056,7 +1056,7 @@ export const RequirementPoolView: React.FC = () => {
                 <span className="text-xs font-semibold text-[var(--text-primary)]">任务配置 ({subTasks.length})</span>
                 <button
                   type="button"
-                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", expectedDueDate: selected?.dueDate || "", note: "" }])}
+                  onClick={() => setSubTasks([...subTasks, { taskType: "", assignee: "", note: "" }])}
                   className="px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border-main)] text-xs text-[var(--primary)] font-medium hover:bg-[var(--bg-hover)]"
                 >
                   + 增加任务
@@ -1103,7 +1103,6 @@ export const RequirementPoolView: React.FC = () => {
                     onChange={(val) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, assignee: val } : item))}
                   />
                   </div>
-                  <DateField label="期望完成时间" value={t.expectedDueDate} onChange={(value) => setSubTasks(subTasks.map((item, i) => i === idx ? { ...item, expectedDueDate: value } : item))} />
                   <label className="block min-w-0 text-xs text-[var(--text-muted)] lg:col-span-4">
                     任务描述
                     <input

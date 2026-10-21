@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import { openFeedMessage } from '../../services/workbenchFeedReading';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button, Descriptions, Modal, Space, Tag, message } from 'antd';
 import { useApp } from '../../context/AppContext';
 import { showDeleteConfirm } from '../common/Feedback';
@@ -8,6 +9,14 @@ import dayjs from 'dayjs';
 import { deleteWorkbenchFeed, feedTypes, type WorkbenchFeed } from '../../services/workbenchFeeds';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { feedModalStyles } from './feedModalStyles';
+
+function FeedReadReceipt({ userId, feed }: { userId: string; feed: WorkbenchFeed }) {
+  useEffect(() => {
+    try { openFeedMessage(userId, feed); }
+    catch { void message.warning('已读状态保存失败，刷新后可能再次显示新消息'); }
+  }, [userId, feed.id]);
+  return null;
+}
 
 export const FeedDetail: React.FC<{ feed?: WorkbenchFeed; onClose: () => void; initiallyEditing?: boolean }> = ({ feed, onClose, initiallyEditing = false }) => {
   const { currentUser } = useApp();
@@ -28,6 +37,7 @@ export const FeedDetail: React.FC<{ feed?: WorkbenchFeed; onClose: () => void; i
   })();
   return <Modal className="workbench-feed-modal" aria-label={editing ? '编辑' : '信息详情'} width="min(1040px, calc(100vw - 32px))" centered styles={feedModalStyles} open={Boolean(feed)} onCancel={close} title={editing ? '编辑' : '信息详情'} destroyOnHidden footer={editing ? null : <Space><Button onClick={close}>关闭</Button>{canEdit && <><Button aria-label="编辑" icon={<EditOutlined/>} onClick={() => setEditing(true)}>编辑</Button><Button aria-label="删除" danger icon={<DeleteOutlined/>} onClick={confirmDelete}>删除</Button></>}</Space>}>
     {feed && (editing && canEdit ? <WorkbenchFeedEditor key={feed.id} ref={editorRef} feed={feed} onCancel={() => setEditing(false)} onSaved={() => setEditing(false)}/> : <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-4 lg:p-6">
+      <FeedReadReceipt userId={currentUser.id} feed={feed}/>
       <div className="min-w-0 space-y-6">
         <h2 className="break-words text-lg font-semibold text-[var(--text-primary)]">{feed.title}</h2>
         <p className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</p>

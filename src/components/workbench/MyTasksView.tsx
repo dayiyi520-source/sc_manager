@@ -1,3 +1,4 @@
+import { useFeedReading } from './useFeedReading';
 import { TodoDetail, type TodoRecord } from './TodoDetail';
 import { FeedDetail } from './FeedDetail';
 import { type WorkbenchFeed } from '../../services/workbenchFeeds';
@@ -16,7 +17,6 @@ import {
   CheckCircle2,
   Calendar,
   MessageSquare,
-  Bell,
   AlertCircle,
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
@@ -27,7 +27,6 @@ import { requirementRepository } from '../../services/requirementRepository';
 import { useWorkbenchFeeds } from './useWorkbenchFeeds';
 import { projectDeliveryMap } from '../../services/projectDeliveryMap';
 import { getMyTaskMetrics } from './myTasksMetrics';
-import { hasUnreadFeed, unreadFeedIds } from './feedUnread';
 
 const TodoCenterView = React.lazy(() => import('./TodoCenterView').then(module => ({ default: module.TodoCenterView })));
 const WorkbenchFeedsView = React.lazy(() => import('./WorkbenchFeedsView').then(module => ({ default: module.WorkbenchFeedsView })));
@@ -56,9 +55,6 @@ export const MyTasksView: React.FC = () => {
   const [todoTab, setTodoTab] = useState<TabType>('all');
   const [approvalTab, setApprovalTab] = useState<ApprovalTabType>('pending');
   const [feedTab, setFeedTab] = useState<FeedTabType>('dynamic');
-  const [readFeedIds, setReadFeedIds] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('shichuang.frontend.mock.workbench.feedRead') || '[]')); } catch { return new Set(); }
-  });
   const [realTasks, setRealTasks] = useState<MyTaskRecord[]>([]);
   const [taskLoading, setTaskLoading] = useState(true);
   const [taskError, setTaskError] = useState<string | null>(null);
@@ -74,16 +70,8 @@ export const MyTasksView: React.FC = () => {
   }, [currentUser.id, taskRevision]);
 
   const pendingTodos = useMemo(() => realTasks, [realTasks]);
-  const feedUnreadIds = useMemo(() => unreadFeedIds(WORKBENCH_FEEDS, readFeedIds), [WORKBENCH_FEEDS, readFeedIds]);
-  const markFeedTabRead = (nextTab: FeedTabType) => {
-    setFeedTab(nextTab);
-    setReadFeedIds((current) => {
-      const next = new Set(current);
-      WORKBENCH_FEEDS.filter((feed) => feed.type === nextTab).forEach((feed) => next.add(feed.id));
-      try { localStorage.setItem('shichuang.frontend.mock.workbench.feedRead', JSON.stringify([...next])); } catch { /* browser storage unavailable */ }
-      return next;
-    });
-  };
+  const reading = useFeedReading(currentUser.id, WORKBENCH_FEEDS);
+  const markFeedTabRead = (nextTab: FeedTabType) => { setFeedTab(nextTab); reading.browse(nextTab); };
 
   const dashboardMetrics = useMemo(() => getMyTaskMetrics(realTasks, opportunities, projectDeliveryMap()), [realTasks, opportunities]);
   const displayTodos = useMemo(() => {
@@ -370,23 +358,23 @@ export const MyTasksView: React.FC = () => {
                   active={feedTab === 'dynamic'}
                   onClick={() => markFeedTabRead('dynamic')}
                 >
-                  <span className="relative">产品动态{hasUnreadFeed(WORKBENCH_FEEDS, readFeedIds, 'dynamic') && <i aria-label="产品动态有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
+                  <span className="relative">产品动态{reading.hasUpdates('dynamic') && <i aria-label="产品动态有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
                 </TabButton>
                 <TabButton
                   active={feedTab === 'feedback'}
                   onClick={() => markFeedTabRead('feedback')}
                 >
-                  <span className="relative">评价吐槽{hasUnreadFeed(WORKBENCH_FEEDS, readFeedIds, 'feedback') && <i aria-label="评价吐槽有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
+                  <span className="relative">评价吐槽{reading.hasUpdates('feedback') && <i aria-label="评价吐槽有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
                 </TabButton>
                 <TabButton
                   active={feedTab === 'competitor'}
                   onClick={() => markFeedTabRead('competitor')}
                 >
-                  <span className="relative">行业资讯{hasUnreadFeed(WORKBENCH_FEEDS, readFeedIds, 'competitor') && <i aria-label="行业资讯有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
+                  <span className="relative">行业资讯{reading.hasUpdates('competitor') && <i aria-label="行业资讯有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
                 </TabButton>
               </div>
             </div>
-            <button className="shrink-0 text-xs text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => { rememberWorkbenchTab(FEED_TAB_KEY, feedTab); setInnerView('feeds'); }}>查看更多</button>
+            <button className="shrink-0 text-xs text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => { rememberWorkbenchTab(FEED_TAB_KEY, feedTab); reading.browse(feedTab); setInnerView('feeds'); }}>查看更多</button>
           </div>
 
           <div className="p-5 max-h-[520px] overflow-y-auto text-xs">
@@ -396,7 +384,7 @@ export const MyTasksView: React.FC = () => {
                   <div key={feed.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="min-w-0 font-semibold text-sm text-[var(--primary)] flex items-center gap-1">
-                        <button type="button" className="min-w-0 truncate text-left hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedFeed(feed)}>{feed.title}</button>{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 shrink-0 text-[var(--danger)]" />}
+                        <button type="button" className="min-w-0 truncate text-left hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedFeed(feed)}>{feed.title}</button>{reading.isNew(feed.id) && <span aria-label="新消息" className="shrink-0 text-xs text-[var(--danger)]">新</span>}
                       </span>
                       <span className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</span>
                     </div>
@@ -411,7 +399,7 @@ export const MyTasksView: React.FC = () => {
                   <div key={feed.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="min-w-0 font-semibold text-sm text-[var(--primary)] flex items-center gap-1">
-                        <button type="button" className="min-w-0 truncate text-left hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedFeed(feed)}>{feed.title}</button>{feedUnreadIds.has(feed.id) && <Bell aria-label="有新内容" className="h-3.5 w-3.5 shrink-0 text-[var(--danger)]" />}
+                        <button type="button" className="min-w-0 truncate text-left hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedFeed(feed)}>{feed.title}</button>{reading.isNew(feed.id) && <span aria-label="新消息" className="shrink-0 text-xs text-[var(--danger)]">新</span>}
                       </span>
                       <span className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</span>
                     </div>
