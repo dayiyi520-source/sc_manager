@@ -47,6 +47,15 @@ describe('部门复盘本轮提交规则', () => {
     expect(result.payload.departmentReviewExclusions?.[0]).toMatchObject({ employeeName: '员工乙', reason: '本轮休假' });
     expect(() => submitDepartmentReview(submitted, 'm', [report('a', { viewedBy: [] })], people)).toThrow('尚未读');
   });
+  it('接受并保存无需处理的主管判断', () => {
+    const submitted = {
+      ...payload,
+      departmentReviewExclusions: [{ employeeId: 'b', reason: '本轮休假' }],
+      departmentFeedbackRows: [{ employeeId: 'a', employeeName: '员工甲', reviewId: 'a', suggestion: '改善协作', judgment: '无需处理' as const }],
+    };
+    const result = submitDepartmentReview(submitted, 'm', [report()], people);
+    expect(result.payload.departmentFeedbackRows?.[0]).toMatchObject({ employeeName: '员工甲', judgment: '无需处理' });
+  });
 });
 describe('他人复盘读取范围', () => {
   it('管理员全员、成员同部门，草稿始终仅本人可见', () => {

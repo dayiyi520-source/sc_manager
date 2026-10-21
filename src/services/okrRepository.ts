@@ -21,7 +21,7 @@ export interface OkrWeeklyReviewSnapshot {
   krReviews:OkrKrReview[]; assistance:OkrReviewAssistance[]; extraWork?:OkrExtraWork; items:OkrReviewItem[];
 }
 export interface DepartmentReviewExclusion { employeeId: string; employeeName?: string; reason: string }
-export interface DepartmentReviewFeedback { employeeId: string; employeeName: string; reviewId: string; suggestion: string; judgment?: '已内部解决' | '需公司解决' }
+export interface DepartmentReviewFeedback { employeeId: string; employeeName: string; reviewId: string; suggestion: string; judgment?: '已内部解决' | '需公司解决' | '无需处理' }
 export interface OkrPayload extends GoalTiming {
   reviewTemplateSnapshot?: import('./reviewTemplateConfiguration').ReviewReportTemplate | null;
   reviewTemplateValues?: import('./reviewTemplateConfiguration').ReviewTemplateValues;

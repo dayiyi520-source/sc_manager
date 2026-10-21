@@ -26,7 +26,7 @@ describe('部门月报建议列表', () => {
   render(<DepartmentFeedbackTable rows={[]} loading/>);
   expect(screen.queryByText('本轮暂无员工意见和建议')).not.toBeInTheDocument();
  });
- it('shows real names and suggestions, offers exactly the two judgments and saves selection', () => {
+ it('shows real names and suggestions, offers all three judgments and saves selection', () => {
   const row = { employeeId: 'a', employeeName: '员工甲', reviewId: 'r', suggestion: '建议改善协作' };
   const change = vi.fn();
   render(<DepartmentFeedbackTable rows={[row]} disabled={false} onChange={change}/>);
@@ -35,6 +35,9 @@ describe('部门月报建议列表', () => {
   fireEvent.mouseDown(screen.getByRole('combobox', { name: '员工甲主管判断' }));
   fireEvent.click(screen.getByTitle('需公司解决'));
   expect(change).toHaveBeenCalledWith({ ...row, judgment: '需公司解决' });
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '员工甲主管判断' }));
+  fireEvent.click(screen.getByTitle('无需处理'));
+  expect(change).toHaveBeenLastCalledWith({ ...row, judgment: '无需处理' });
  });
  it('shows saved judgments read-only', () => {
   render(<DepartmentFeedbackTable rows={[{ employeeId: 'a', employeeName: '员工甲', reviewId: 'r', suggestion: '建议', judgment: '已内部解决' }]}/>);

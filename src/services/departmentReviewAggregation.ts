@@ -83,7 +83,7 @@ export function submitDepartmentReview(payload: OkrPayload, ownerId: string, rec
   const errors = departmentSubmissionErrors(payload, records, people, ownerId);
   if (errors.length) throw new Error(errors.join('；'));
   const feedback = payload.reviewType === 'month' ? departmentMonthlyFeedback(payload, records, people, ownerId) : undefined;
-  if (feedback?.some(row => row.judgment && !['已内部解决', '需公司解决'].includes(row.judgment))) throw new Error('主管判断选项无效');
+  if (feedback?.some(row => row.judgment && !['已内部解决', '需公司解决', '无需处理'].includes(row.judgment))) throw new Error('主管判断选项无效');
   const reviewType = payload.reviewType as 'week' | 'month';
   const period = { startDate: payload.startDate, endDate: payload.endDate };
   const objectives = monthlyReviewTargets(records, ownerId, people).filter(objective => [period.startDate.slice(0,7),period.endDate.slice(0,7)].includes(objective.cycle));
