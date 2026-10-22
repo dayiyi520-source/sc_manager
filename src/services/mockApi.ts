@@ -57,6 +57,7 @@ import type { AttachmentMetadata, CurrentUser, EmployeeOption } from '../types';
 import type {
   SaveTestPlanInput,
   TestCase,
+  TestCaseDirectory,
   TestPlan,
   TestPlanCase,
 } from '../types/testManagement';
@@ -68,6 +69,7 @@ const KEYS = {
   plans: 'shichuang.frontend.mock.testPlans',
   planAssociations: 'shichuang.frontend.mock.testPlanAssociations',
   cases: 'shichuang.frontend.mock.testCases',
+  caseDirectories: 'shichuang.frontend.mock.testCaseDirectories',
   okrRecords: 'shichuang.frontend.mock.okrRecords',
   okrPeople: 'shichuang.frontend.mock.okrPeople',
   okrSettings: 'shichuang.frontend.mock.okrSettings',
@@ -220,6 +222,12 @@ const testTasks = MOCK_TEST_TASKS.map((task) => ({
 
 const defaultCases = (): TestCase[] => MOCK_TEST_CASES.map((item) => ({ ...item, steps: [...item.steps] }));
 
+const getCaseDirectories = () => {
+  const products = new Map(getProductLines().map((item) => [item.id, item.name]));
+  return read<TestCaseDirectory[]>(KEYS.caseDirectories, MOCK_TEST_CASE_DIRECTORIES).map((item) => ({
+    ...item, productLineName: products.get(item.productLineId || '') || item.productLineName || '',
+  }));
+};
 const getCases = () => read<TestCase[]>(KEYS.cases, defaultCases());
 const getPlans = () => read<TestPlan[]>(KEYS.plans, MOCK_TEST_PLANS.map((item) => ({ ...item, cases: [...item.cases] })));
 const getTestPlanAssociations = () => read<Record<string, string[]>>(KEYS.planAssociations, {});
@@ -1303,20 +1311,79 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   }
 
   if (parts[1] === 'requirements' && parts[2] && parts[3] === 'summary' && method === 'GET') { const requirement = [...getWorkItems()].find((item) => item.id === parts[2]); return { requirement: requirement || undefined, linkedItems: [] }; }
+  if (parts[1] === 'product-lines' && parts[3] === 'test-case-directories' && method !== 'GET') {
+    const directories = getCaseDirectories();
+    const lineId = decodeURIComponent(parts[2]);
+    const directoryId = parts[4] ? decodeURIComponent(parts[4]) : '';
+    const current = directories.find((item) => item.id === directoryId);
+    if (directoryId && (!current || (lineId !== 'all' && current.productLineId !== lineId))) throw new Error('目录不存在或不属于当前产品');
+    const productLineId = current?.productLineId || (lineId === 'all' ? body.productLineId : lineId);
+    const product = getProductLines().find((item) => item.id === productLineId);
+    if (!product) throw new Error('请选择有效的产品');
+    const name = String(body.name ?? (parts[5] === 'copy' ? `${current?.name} - 副本` : '')).trim();
+    const parentId = body.parentId ?? current?.parentId ?? null;
+    const validateName = (parent: string | null | undefined, excludedId?: string) => {
+      if (!name || name.length > 120) throw new Error('目录名称须为1至120个字符');
+      if (directories.some((item) => item.id !== excludedId && item.productLineId === productLineId && (item.parentId || null) === (parent || null) && item.name === name)) throw new Error('同级目录名称不能重复');
+    };
+    if (method === 'POST' && parts.length === 4) {
+      validateName(parentId);
+      if (parentId && !directories.some((item) => item.id === parentId && item.productLineId === productLineId)) throw new Error('父目录不存在或不属于当前产品');
+      const created: TestCaseDirectory = { id: id('directory'), parentId, productLineId, productLineName: product.name, name, sort: Number(body.sort || 0), caseCount: 0 };
+      write(KEYS.caseDirectories, [...directories, created]);
+      return created;
+    }
+    if (current && method === 'PUT' && parts.length === 5) {
+      validateName(current.parentId, current.id);
+      const updated = { ...current, name };
+      write(KEYS.caseDirectories, directories.map((item) => item.id === current.id ? updated : item));
+      return updated;
+    }
+    if (current && method === 'DELETE' && parts.length === 5) {
+      if (directories.some((item) => item.parentId === current.id) || getCases().some((item) => item.directoryId === current.id)) throw new Error('目录包含子目录或测试用例，无法删除');
+      write(KEYS.caseDirectories, directories.filter((item) => item.id !== current.id));
+      return null;
+    }
+    if (current && method === 'POST' && parts[5] === 'copy' && parts.length === 6) {
+      validateName(parentId);
+      if (parentId && !directories.some((item) => item.id === parentId && item.productLineId === productLineId)) throw new Error('父目录不存在或不属于当前产品');
+      const copies: TestCaseDirectory[] = [];
+      const copiedIds = new Map<string, string>();
+      const copy = (source: TestCaseDirectory, targetParent: string | null) => {
+        if (copiedIds.has(source.id)) throw new Error('目录层级异常，无法复制');
+        const created = { ...source, id: id('directory'), parentId: targetParent, name: source.id === current.id ? name : source.name };
+        copiedIds.set(source.id, created.id);
+        copies.push(created);
+        directories.filter((item) => item.parentId === source.id).forEach((item) => copy(item, created.id));
+      };
+      copy(current, parentId);
+      const cases = getCases();
+      const copiedCases = cases.filter((item) => copiedIds.has(item.directoryId)).map((item) => ({
+        ...item, id: id('case'), code: id('CASE'), directoryId: copiedIds.get(item.directoryId)!,
+        directoryName: copies.find((directory) => directory.id === copiedIds.get(item.directoryId))!.name,
+        revision: 0, referenceCount: 0, latestResult: null, createdAt: now(), updatedAt: now(),
+        steps: item.steps.map((step) => ({ ...step, id: id('step') })),
+      }));
+      write(KEYS.caseDirectories, [...directories, ...copies]);
+      write(KEYS.cases, [...cases, ...copiedCases]);
+      return copies[0];
+    }
+    throw new Error('不支持的目录操作，数据未保存');
+  }
   if (clean.endsWith('/test-case-directories') && method === 'GET') {
     const lineId = parts[2] || '';
     const allCases = getCases();
     const children = new Map<string, string[]>();
-    MOCK_TEST_CASE_DIRECTORIES.forEach((item) => { if (item.parentId) children.set(item.parentId, [...(children.get(item.parentId) || []), item.id]); });
+    getCaseDirectories().forEach((item) => { if (item.parentId) children.set(item.parentId, [...(children.get(item.parentId) || []), item.id]); });
     const descendants = (directoryId: string): string[] => [directoryId, ...(children.get(directoryId) || []).flatMap(descendants)];
-    return MOCK_TEST_CASE_DIRECTORIES.filter((item) => !lineId || lineId === 'all' || item.productLineId === lineId).map((item) => ({ ...item, caseCount: allCases.filter((testCase) => testCase.directoryId && descendants(item.id).includes(testCase.directoryId)).length }));
+    return getCaseDirectories().filter((item) => !lineId || lineId === 'all' || item.productLineId === lineId).map((item) => ({ ...item, caseCount: allCases.filter((testCase) => testCase.directoryId && descendants(item.id).includes(testCase.directoryId)).length }));
   }
   if (clean.endsWith('/test-cases') && method === 'GET') {
     const query = queryOf(path); const lineId = parts[2] || query.get('productLineId') || ''; let items = getCases().filter((item) => !lineId || lineId === 'all' || item.productLineId === lineId);
     const directoryId = query.get('directoryId');
     if (directoryId) {
       const children = new Map<string, string[]>();
-      MOCK_TEST_CASE_DIRECTORIES.forEach((item) => { if (item.parentId) children.set(item.parentId, [...(children.get(item.parentId) || []), item.id]); });
+      getCaseDirectories().forEach((item) => { if (item.parentId) children.set(item.parentId, [...(children.get(item.parentId) || []), item.id]); });
       const descendants = (id: string): string[] => [id, ...(children.get(id) || []).flatMap(descendants)];
       const allowed = query.get('includeDescendants') === 'true' ? descendants(directoryId) : [directoryId];
       items = items.filter((item) => allowed.includes(item.directoryId));

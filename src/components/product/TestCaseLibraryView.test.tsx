@@ -89,6 +89,22 @@ describe('TestCaseLibraryView', () => {
     expect(screen.queryByText('测试任务')).not.toBeInTheDocument();
   });
 
+  it('shows current product names and locks a child directory to its parent product', async () => {
+    mocks.productLines.mockResolvedValue([{ id: 'line-1', name: '当前产品名称' }, { id: 'line-2', name: '其他产品' }]);
+    mocks.testCaseDirectories.mockResolvedValue([{ id: 'root', parentId: null, name: '登录目录', productLineId: 'line-1', productLineName: '历史产品名称', caseCount: 0, sort: 0 }]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TestCaseLibraryView productLineFilter="all" /></QueryClientProvider>);
+    expect(await screen.findByText('当前产品名称')).toBeInTheDocument();
+    expect(screen.queryByText('历史产品名称')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('当前产品名称').closest('[role=treeitem]')!.querySelector('.ant-tree-switcher')!);
+    fireEvent.click(await screen.findByRole('button', { name: '在登录目录下新建子目录' }));
+    expect(screen.getByRole('dialog', { name: '新建子目录' })).toBeInTheDocument();
+    expect(screen.getByLabelText('目录所属产品')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }));
+    fireEvent.click(screen.getByRole('button', { name: '新建功能目录' }));
+    expect(screen.getByLabelText('目录所属产品')).not.toBeDisabled();
+  });
+
   it('groups cases by directory path and keeps uncategorized cases visible', () => {
     const directories = [
       { id: 'root', parentId: null, name: '登录', sort: 1, caseCount: 1, productLineName: '全部用例' },
