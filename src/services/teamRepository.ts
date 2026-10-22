@@ -1,7 +1,7 @@
 import { apiRequest } from './apiClient';
 import type { EmployeeOption, TeamMember } from '../types';
 
-export type TeamMemberInput = Pick<TeamMember, 'name' | 'department' | 'jobTitle' | 'phone' | 'email'>;
+export type TeamMemberInput = Pick<TeamMember, 'name' | 'department' | 'jobTitle' | 'phone' | 'email' | 'organizationId'>;
 
 const queryString = (values: Record<string, string>) => {
   const query = new URLSearchParams(Object.entries(values).filter(([, value]) => value)).toString();

@@ -86,6 +86,7 @@ export function loadTraining(userId: string): TrainingState {
 }
 export function saveTraining(userId: string, state: TrainingState) {
   localStorage.setItem(storageKey(userId), JSON.stringify(state));
+  window.dispatchEvent(new Event('shichuang.training.changed'));
 }
 
 export function updateLearning(state: TrainingState, courseId: string, lessonId: string, status: LearningStatus): TrainingState {

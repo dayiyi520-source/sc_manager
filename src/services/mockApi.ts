@@ -125,7 +125,7 @@ const id = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString
 
 const getEmployeeOptions = (): EmployeeOption[] => getMembers().filter((member) => member.status === 'enabled').map((member) => {
   const seed = MOCK_USERS.find((user) => user.id === member.id);
-  return { id: member.id, name: member.name, avatar: seed?.avatar, department: member.department || seed?.department, role: seed?.role || 'product_manager', jobTitle: member.jobTitle, roleTitle: member.jobTitle || seed?.roleTitle };
+  return { id: member.id, organizationId: member.organizationId || 'shichuang', name: member.name, avatar: seed?.avatar, department: member.department || seed?.department, role: seed?.role || 'product_manager', jobTitle: member.jobTitle, roleTitle: member.jobTitle || seed?.roleTitle };
 });
 const taskOperator = () => {
   let viewer: CurrentUser | undefined;
@@ -649,10 +649,11 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (!current) throw new Error('版本不存在');
     if (body.status !== undefined) {
       const previousStatus = normalizeVersionStatus(current.status, current.statusPhase);
-      if (body.status !== previousStatus && !((previousStatus === '待开始' && body.status === '进行中') || (previousStatus === '进行中' && body.status === '已完成'))) throw new Error('迭代状态已变化，请刷新后重试');
+      if (body.status !== current.status && body.status !== previousStatus && !((previousStatus === '待开始' && body.status === '进行中') || (previousStatus === '进行中' && body.status === '已完成') || (previousStatus === '已完成' && body.status === '已发布'))) throw new Error('迭代状态已变化，请刷新后重试');
     }
     Object.assign(current, body, { id: current.id, productLineId: product.id, productLineName: product.name });
     if (body.status !== undefined) current.statusPhase = body.status === '进行中' ? '处理中' : body.status;
+    if (body.status === '已发布' && !current.releaseDate) current.releaseDate = now();
     write(KEYS.productLines, products);
     return current;
   }
@@ -703,12 +704,14 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     return getMembers().filter((member) => (!department || member.department === department) && (!status || member.status === status) && (!keyword || [member.name, member.department, member.jobTitle, member.phone, member.email].some((value) => String(value || '').toLowerCase().includes(keyword))));
   }
   if (clean === '/api/team-members' && method === 'POST') {
-    const member = { id: id('member'), name: String(body.name || ''), department: String(body.department || ''), jobTitle: String(body.jobTitle || ''), phone: body.phone ? String(body.phone) : undefined, email: body.email ? String(body.email) : undefined, status: 'enabled' as const, loginEnabled: false, version: 0 };
+    if (body.organizationId && !['shichuang', 'agency'].includes(body.organizationId)) throw new Error('请选择有效的所属组织');
+    const member = { organizationId: body.organizationId || 'shichuang', id: id('member'), name: String(body.name || ''), department: String(body.department || ''), jobTitle: String(body.jobTitle || ''), phone: body.phone ? String(body.phone) : undefined, email: body.email ? String(body.email) : undefined, status: 'enabled' as const, loginEnabled: false, version: 0 };
     write(KEYS.members, [...getMembers(), member]); return member;
   }
   if (parts[1] === 'team-members' && parts[2] && method === 'PUT') {
     const members = getMembers(); const index = members.findIndex((member) => member.id === parts[2]); if (index < 0) throw new Error('成员不存在');
-    members[index] = { ...members[index], name: String(body.name || members[index].name), department: String(body.department || members[index].department), jobTitle: String(body.jobTitle || members[index].jobTitle), phone: body.phone ? String(body.phone) : undefined, email: body.email ? String(body.email) : undefined, version: members[index].version + 1 };
+    if (body.organizationId && !['shichuang', 'agency'].includes(body.organizationId)) throw new Error('请选择有效的所属组织');
+    members[index] = { ...members[index], organizationId: body.organizationId || members[index].organizationId || 'shichuang', name: String(body.name || members[index].name), department: String(body.department || members[index].department), jobTitle: String(body.jobTitle || members[index].jobTitle), phone: body.phone ? String(body.phone) : undefined, email: body.email ? String(body.email) : undefined, version: members[index].version + 1 };
     write(KEYS.members, members); return members[index];
   }
   if (parts[1] === 'team-members' && parts[2] && parts[3] === 'status' && method === 'PATCH') {

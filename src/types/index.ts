@@ -1,6 +1,7 @@
 export type SystemRole = 'admin' | 'sales_director' | 'product_manager' | 'tech_lead';
 
 export interface CurrentUser {
+  organizationId?: string;
   id: string;
   name: string;
   avatar: string;
@@ -26,6 +27,7 @@ export type SubMenuId =
   | 'training_admin'
   // 工作台
   | 'wb_my_tasks'
+  | 'wb_agent_tasks'
   | 'wb_todo_center'
   | 'wb_feeds'
   | 'wb_okr_perf'
@@ -747,6 +749,7 @@ export interface DepartmentOption {
 }
 
 export interface EmployeeOption {
+  organizationId?: string;
   id: string;
   username?: string;
   name: string;
@@ -770,6 +773,7 @@ export interface AttachmentMetadata {
 }
 
 export interface TeamMember {
+  organizationId?: string;
   id: string;
   name: string;
   department: string;

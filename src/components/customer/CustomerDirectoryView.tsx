@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+import { WorkbenchFeedEditor, type WorkbenchFeedEditorHandle } from '../workbench/WorkbenchFeedEditor';
+import { feedModalStyles } from '../workbench/feedModalStyles';
+import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Empty, Input, Space, Table, theme } from 'antd';
+import { Alert, Button, Empty, Input, Space, Table, Modal, theme } from 'antd';
 import type { Customer, Lead, Opportunity } from '../../types';
 import type { PageResult } from '../../services/apiClient';
 import { customerDirectoryRepository } from '../../services/customerDirectoryRepository';
@@ -14,6 +17,9 @@ const fields: Record<Kind, Array<[string, string, number?]>> = {
 };
 export function CustomerDirectoryView({ kind }: { kind: Kind }) {
   const { token } = theme.useToken();
+  const { currentUser, addToast } = useApp();
+  const [sharing, setSharing] = useState<Customer | Lead | Opportunity>();
+  const shareEditor = useRef<WorkbenchFeedEditorHandle>(null);
   const [draft, setDraft] = useState('');
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
@@ -29,6 +35,9 @@ export function CustomerDirectoryView({ kind }: { kind: Kind }) {
     </Space>
     {kind === 'leads' && <h2 style={{ fontSize: 14, marginBottom: 16 }}>全部线索（{query.data?.total || 0}）</h2>}
     {query.error && <Alert type="error" showIcon title="数据加载失败" description={query.error.message} action={<Button onClick={() => query.refetch()}>重试</Button>} />}
-    <Table rowKey="id" size="middle" loading={query.isFetching} dataSource={query.data?.items || []} scroll={{ x: kind === 'customers' ? 1200 : 1900 }} locale={{ emptyText: <Empty /> }} columns={fields[kind].map(([key, title, width]) => ({ key, dataIndex: key, title, width: width || 120, render: (value: unknown) => value === true ? '是' : value === false ? '否' : Array.isArray(value) ? value.join('、') || '—' : value === 0 ? '0' : value ? String(value) : '—' }))} pagination={{ current: page, pageSize, total: query.data?.total || 0, showSizeChanger: true, showTotal: total => `共 ${total} 条数据`, onChange: (next, size) => { setPage(next); setPageSize(size); } }} />
+    <Table rowKey="id" size="middle" loading={query.isFetching} dataSource={query.data?.items || []} scroll={{ x: kind === 'customers' ? 1200 : 1900 }} locale={{ emptyText: <Empty /> }} columns={[...fields[kind].map(([key, title, width]) => ({ key, dataIndex: key, title, width: width || 120, render: (value: unknown) => value === true ? '是' : value === false ? '否' : Array.isArray(value) ? value.join('、') || '—' : value === 0 ? '0' : value ? String(value) : '—' })), { key: 'share', title: '操作', fixed: 'right', width: 160, render: (_: unknown, row: Customer | Lead | Opportunity) => <Button size="small" type="link" onClick={() => setSharing(row)}>共享到信息广场</Button> }]} pagination={{ current: page, pageSize, total: query.data?.total || 0, showSizeChanger: true, showTotal: total => `共 ${total} 条数据`, onChange: (next, size) => { setPage(next); setPageSize(size); } }} />
+    <Modal className="workbench-feed-modal" title="共享到信息广场" open={Boolean(sharing)} centered width="min(1040px, calc(100vw - 32px))" styles={feedModalStyles} footer={null} onCancel={() => shareEditor.current?.cancel(() => setSharing(undefined))} destroyOnHidden>
+      {sharing && <WorkbenchFeedEditor ref={shareEditor} source={{ module: title, recordId: `${sharing.id}:${currentUser.id}`, detailUrl: `${import.meta.env.BASE_URL}app/${kind === 'customers' ? 'crm_customers' : kind === 'leads' ? 'crm_leads' : 'crm_opportunities'}` }} preset={{ title: sharing.name?.slice(0,120), content: `${title}：${sharing.name}`, tags: [kind === 'opportunities' ? '商机信息' : '客户信息'], customerId: kind === 'customers' ? sharing.id : (sharing as Lead | Opportunity).customerId }} onCancel={() => setSharing(undefined)} onSaved={() => { setSharing(undefined); addToast('success', '已共享到信息广场'); }}/>}
+    </Modal>
   </section>;
 }

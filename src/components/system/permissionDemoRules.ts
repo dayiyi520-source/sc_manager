@@ -33,7 +33,7 @@ export function demoPermissions(domain: DemoDomain, identity: DemoIdentity, stat
   if(domain === 'feeds') {
     const feed={id:'demo-only',type:'feedback' as const,title:'演示信息',content:'只读演示',time:'',authorId:'creator',visibility:specified?'specified' as const:'all' as const,audienceIds:['audience']};
     return [
-      {name:'查看工作台消息',allowed:canViewWorkbenchFeed(feed,user.id),reason:'全员信息所有人可见；指定人员信息仅作者及指定人员可见，管理员不自动越过指定范围。'},
+      {name:'查看工作台消息',allowed:canViewWorkbenchFeed(feed,{...user, department: specified ? identity : '产研部门'}),reason:'新信息按组织和部门范围可见；历史指定人员信息仍仅作者及指定人员可见，管理员不自动越过指定范围。'},
       {name:'编辑 / 删除工作台新建信息',allowed:creator && !sourceMessage,reason:'仅本人从工作台创建的信息；删除二次确认，来源板块信息须回来源维护。'},
       {name:'修改分类浏览 / 单条阅读状态',allowed:true,reason:'每位用户只记录自己的状态；进入分类清红点，详情成功显示后清除单条“新”。'},
     ];

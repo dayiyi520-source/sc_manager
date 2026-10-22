@@ -12,8 +12,8 @@ export type TodoTab = 'all' | 'mine' | 'assist' | 'work_order';
 export const todoTabs: Array<{ key: TodoTab; label: string }> = [{ key: 'all', label: '全部' }, { key: 'mine', label: '任务' }, { key: 'assist', label: '协同事项' }, { key: 'work_order', label: '工单' }];
 export const matchesTodoTab = (row: MyTask, tab: TodoTab) => tab === 'all' || (tab === 'mine' ? row.taskGroup === 'mine' : tab === 'assist' ? row.taskGroup === 'assist' && row.type !== 'work_order' : row.type === 'work_order');
 const completed = (status: string) => ['已完成', '已关闭', '已取消', '已驳回'].includes(status);
-export function TodoCenterView({ onBack }: { onBack: () => void }) { return <OkrProvider><TodoPage onBack={onBack}/></OkrProvider>; }
-function TodoPage({ onBack }: { onBack: () => void }) {
+export function TodoCenterView({ onBack, backLabel }: { onBack: () => void; backLabel?: string }) { return <OkrProvider><TodoPage onBack={onBack} backLabel={backLabel}/></OkrProvider>; }
+function TodoPage({ onBack, backLabel = '返回我的待办' }: { onBack: () => void; backLabel?: string }) {
   const { currentUser } = useApp();
   const [rows, setRows] = useState<MyTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +50,7 @@ function TodoPage({ onBack }: { onBack: () => void }) {
     finally { saveLock.current = false; setSaving(false); }
   };
   return <div className="space-y-4">
-    <div className="flex items-center justify-between gap-4"><Button type="text" icon={<ArrowLeftIcon/>} onClick={onBack}>返回我的待办</Button><Button loading={loading} onClick={() => setRevision(value => value + 1)}>刷新</Button></div>
+    <div className="flex items-center justify-between gap-4"><Button type="text" icon={<ArrowLeftIcon/>} onClick={onBack}>{backLabel}</Button><Button loading={loading} onClick={() => setRevision(value => value + 1)}>刷新</Button></div>
     {error && <Alert type="error" showIcon title={error} action={<Button onClick={() => setRevision(value => value + 1)}>重试</Button>}/>}
     <section className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-surface)] p-4">
       <Tabs activeKey={tab} onChange={key => { setTab(key as TodoTab); rememberWorkbenchTab(TODO_TAB_KEY, key); setPage(1); }} items={todoTabs.map(type => ({ key: type.key, label: `${type.label} (${rows.filter(row => matchesTodoTab(row, type.key)).length})` }))}/>

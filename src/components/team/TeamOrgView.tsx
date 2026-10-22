@@ -1,3 +1,4 @@
+import { WORKBENCH_ORGANIZATIONS } from '../../services/workbenchAudience';
 import React, { useMemo, useState } from 'react';
 import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Table, Tag, Tooltip } from 'antd';
 import { EditOutlined, MailOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, StopOutlined, UndoOutlined } from '@ant-design/icons';
@@ -9,7 +10,7 @@ import { teamRepository, type TeamMemberInput } from '../../services/teamReposit
 import type { TeamMember } from '../../types';
 import { PersonIdentity } from '../common/PersonIdentity';
 
-type FormValues = Required<Pick<TeamMemberInput, 'name' | 'department' | 'jobTitle'>> & Pick<TeamMemberInput, 'phone' | 'email'>;
+type FormValues = Required<Pick<TeamMemberInput, 'name' | 'department' | 'jobTitle'>> & Pick<TeamMemberInput, 'phone' | 'email' | 'organizationId'>;
 
 export const TeamOrgView: React.FC = () => {
   const { addToast } = useApp();
@@ -67,7 +68,7 @@ export const TeamOrgView: React.FC = () => {
   };
   const openEdit = (member: TeamMember) => {
     setEditing(member);
-    form.setFieldsValue({ name: member.name, department: member.department, jobTitle: member.jobTitle, phone: member.phone, email: member.email });
+    form.setFieldsValue({ organizationId: member.organizationId || 'shichuang', name: member.name, department: member.department, jobTitle: member.jobTitle, phone: member.phone, email: member.email });
     setFormOpen(true);
   };
   const confirmStatus = (member: TeamMember) => {
@@ -83,6 +84,7 @@ export const TeamOrgView: React.FC = () => {
 
   const columns = [
     { title: '成员', dataIndex: 'name', key: 'name', render: (name: string, member: TeamMember) => <PersonIdentity name={name} subtitle={member.jobTitle || '未设置职位'} size={32} /> },
+    { title: '组织', key: 'organization', render: (_: unknown, member: TeamMember) => WORKBENCH_ORGANIZATIONS.find(org => org.id === (member.organizationId || 'shichuang'))?.name || '组织已失效' },
     { title: '部门', dataIndex: 'department', key: 'department', render: (value: string) => <span className="inline-flex items-center gap-2 text-[var(--text-body)]"><Building className="h-4 w-4 text-[var(--text-muted)]" />{value}</span> },
     { title: '联系方式', key: 'contact', render: (_: unknown, member: TeamMember) => <div className="space-y-1 text-xs text-[var(--text-muted)]"><div className="flex items-center gap-2"><PhoneOutlined />{member.phone || '未填写'}</div><div className="flex items-center gap-2"><MailOutlined />{member.email || '未填写'}</div></div> },
     { title: '状态', dataIndex: 'status', key: 'status', render: (value: TeamMember['status'], member: TeamMember) => <Space size={6}><Tag color={value === 'enabled' ? 'success' : 'default'}>{value === 'enabled' ? '在职' : '已停用'}</Tag>{member.loginEnabled && <Tooltip title="唯一登录账号"><Tag color="blue">超级管理员</Tag></Tooltip>}</Space> },
@@ -111,8 +113,9 @@ export const TeamOrgView: React.FC = () => {
       </section>
     </div>
     <Modal open={formOpen} title={editing ? '编辑团队成员' : '添加团队成员'} okText="保存" cancelText="取消" confirmLoading={saveMutation.isPending} onCancel={() => { if (!saveMutation.isPending) { setFormOpen(false); setEditing(null); form.resetFields(); } }} onOk={() => form.submit()} destroyOnHidden>
-      <Form<FormValues> form={form} layout="vertical" requiredMark="optional" className="pt-3" onFinish={(values) => saveMutation.mutate(values)}>
+      <Form<FormValues> form={form} initialValues={{ organizationId: 'shichuang' }} layout="vertical" requiredMark="optional" className="pt-3" onFinish={(values) => saveMutation.mutate(values)}>
         <Form.Item name="name" label="姓名" rules={[{ required: true, whitespace: true, message: '请输入员工姓名' }, { max: 128, message: '姓名不能超过128个字符' }]}><Input placeholder="请输入员工姓名" autoFocus /></Form.Item>
+        <Form.Item name="organizationId" label="所属组织" rules={[{ required: true, message: '请选择所属组织' }]}><Select options={WORKBENCH_ORGANIZATIONS.map(org => ({ value: org.id, label: org.name }))}/></Form.Item>
         <Form.Item name="department" label="所属部门" rules={[{ required: true, message: '请选择所属部门' }]}><Select showSearch optionFilterProp="label" placeholder="请选择所属部门" options={departments.map((item) => ({ value: item, label: item }))} /></Form.Item>
         <Form.Item name="jobTitle" label="职位" rules={[{ required: true, whitespace: true, message: '请输入职位' }, { max: 128, message: '职位不能超过128个字符' }]}><Input placeholder="例如：产品经理" /></Form.Item>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

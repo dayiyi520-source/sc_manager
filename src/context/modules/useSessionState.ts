@@ -15,6 +15,7 @@ export function useSessionState(fallbackUser: CurrentUser) {
   const resolvedUser = member ? {
     ...currentUser,
     name: member.name,
+    organizationId: member.organizationId || 'shichuang',
     department: member.department || '',
     roleTitle: member.jobTitle || member.roleTitle || '团队成员',
     avatar: member.avatar || currentUser.avatar,

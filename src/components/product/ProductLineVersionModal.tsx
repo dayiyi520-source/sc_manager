@@ -28,6 +28,8 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
   productLine
 }) => {
   const { versions, updateVersion, addToast } = useApp();
+  const [publishingId, setPublishingId] = useState('');
+  const publishingRef = React.useRef(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   if (!isOpen) return null;
@@ -36,9 +38,13 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
     (v) => v.productLineId === productLine.id || v.productLineName === productLine.name
   );
 
-  const handlePublish = (ver: VersionIteration) => {
-    updateVersion(ver.id, { status: '已发布' });
-    addToast('success', `版本 ${ver.code} 已成功发布上线`);
+  const handlePublish = async (ver: VersionIteration) => {
+    if (publishingRef.current) return;
+    publishingRef.current = true;
+    setPublishingId(ver.id);
+    try {
+      if (await updateVersion(ver.id, { status: '已发布' })) addToast('success', `版本 ${ver.code || ver.name} 已成功发布上线`);
+    } finally { publishingRef.current = false; setPublishingId(''); }
   };
 
   return (
@@ -123,7 +129,7 @@ export const ProductLineVersionModal: React.FC<ProductLineVersionModalProps> = (
                       {v.status !== '已发布' && (
                         <Button
                           type="link"
-                          onClick={() => handlePublish(v)}
+                          loading={publishingId === v.id} disabled={Boolean(publishingId) || !['已完成', '已结束'].includes(v.status)} onClick={() => void handlePublish(v)}
                         >
                           发布上线
                         </Button>

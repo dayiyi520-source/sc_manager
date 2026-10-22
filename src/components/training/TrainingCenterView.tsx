@@ -39,6 +39,16 @@ function TrainingWorkspace() {
     catch (cause) { setError(cause instanceof Error ? cause.message : '培训数据加载失败'); }
   };
   useEffect(reload, [currentUser.id]);
+  useEffect(() => {
+    if (!state || activeTabId !== 'training_learning') return;
+    const courseId = sessionStorage.getItem('shichuang.training.openCourse');
+    if (!courseId) return;
+    sessionStorage.removeItem('shichuang.training.openCourse');
+    const course = state.courses.find(item => item.id === courseId && item.published);
+    if (course) { setSelected(undefined); setDetailCourseId(course.id); }
+    else message.warning('课程已停用或不存在，请选择其他课程');
+  }, [state, activeTabId]);
+
   const commit = (next: TrainingState) => {
     try { saveTraining(currentUser.id, next); setState(next); return true; }
     catch { message.error('保存失败，浏览器存储不可用，请重试'); return false; }

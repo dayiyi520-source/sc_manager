@@ -54,3 +54,9 @@ describe('design task navigation', () => {
     expect(system[templateIndex + 3]).toEqual(expect.objectContaining({ id: 'sys_workflow_demo', title: '工作流演示' }));
   });
 });
+
+it('places the agent dashboard directly below My Tasks',()=>{
+ const workbench=MENU_GROUPS.find(group=>group.id==='workbench')!.subMenus;
+ const index=workbench.findIndex(menu=>menu.id==='wb_my_tasks');
+ expect(workbench[index+1]).toMatchObject({id:'wb_agent_tasks',title:'代理商待办'});
+});

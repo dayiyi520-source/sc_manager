@@ -1,3 +1,4 @@
+import { FeedReadingStats } from './FeedReadingStats';
 import { openFeedMessage } from '../../services/workbenchFeedReading';
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, Descriptions, Modal, Space, message } from 'antd';
@@ -6,7 +7,7 @@ import { showDeleteConfirm } from '../common/Feedback';
 import { WorkbenchFeedEditor, type WorkbenchFeedEditorHandle } from './WorkbenchFeedEditor';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { deleteWorkbenchFeed, feedTypes, type WorkbenchFeed } from '../../services/workbenchFeeds';
+import { deleteWorkbenchFeed, feedCategory, feedScopeLabel, feedTypes, type WorkbenchFeed } from '../../services/workbenchFeeds';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { feedModalStyles } from './feedModalStyles';
 
@@ -32,7 +33,7 @@ export const FeedDetail: React.FC<{ feed?: WorkbenchFeed; onClose: () => void; i
     } });
   };
   const sourceUrl = (() => {
-    if (!feed?.source?.detailUrl) return undefined;
+    if (!feed || feedCategory(feed) === 'dynamic' || !feed.source?.detailUrl) return undefined;
     try { const url = new URL(feed.source.detailUrl, window.location.origin); return url.origin === window.location.origin && url.pathname.startsWith(import.meta.env.BASE_URL + 'app/') ? url.href : undefined; } catch { return undefined; }
   })();
   return <Modal className="workbench-feed-modal" aria-label={editing ? '编辑' : '信息详情'} width="min(1040px, calc(100vw - 32px))" centered styles={feedModalStyles} open={Boolean(feed)} onCancel={close} title={editing ? '编辑' : '信息详情'} destroyOnHidden footer={editing ? null : <Space><Button onClick={close}>关闭</Button>{canEdit && <><Button aria-label="编辑" icon={<EditOutlined/>} onClick={() => setEditing(true)}>编辑</Button><Button aria-label="删除" danger icon={<DeleteOutlined/>} onClick={confirmDelete}>删除</Button></>}</Space>}>
@@ -46,19 +47,20 @@ export const FeedDetail: React.FC<{ feed?: WorkbenchFeed; onClose: () => void; i
       </div>
       <aside className="min-w-0 lg:border-l lg:border-[var(--border-main)] lg:pl-4">
       <Descriptions column={1} size="small" items={[
-        { key: 'type', label: '类型', children: feedTypes.find(type => type.key === feed.type)?.label },
-        ...(feed.type === 'competitor' ? [{ key: 'news', label: '资讯类型', children: feed.newsType || '未分类' }] : []),
+        { key: 'type', label: '类型', children: feedTypes.find(type => type.key === feedCategory(feed))?.label },
+        ...(feedCategory(feed) === 'square' ? [{ key: 'tags', label: '信息标签', children: feed.tags?.join('、') || feed.newsType || (feed.type === 'feedback' ? '评价吐槽' : '产品信息') }] : []),
         ...[
-          ['project', '关联项目', feed.type === 'feedback' ? feed.projectName : undefined],
+          ['project', '关联项目', feedCategory(feed) === 'square' ? feed.projectName : undefined],
           ['product', '关联产品', feed.productName],
-          ['version', '迭代版本', feed.type === 'dynamic' ? feed.versionName : undefined],
-          ['customer', '关联客户', feed.type === 'feedback' ? feed.customer : undefined],
+          ['version', '迭代版本', feedCategory(feed) === 'dynamic' ? feed.versionName : undefined],
+          ['customer', '关联客户', feedCategory(feed) === 'square' ? feed.customer : undefined],
         ].filter(([, , value]) => value).map(([key, label, value]) => ({ key: key!, label, children: value })),
-        { key: 'scope', label: '可见范围', children: feed.visibility === 'specified' ? '指定人员' : '全员' },
-        { key: 'source', label: '来源', children: feed.source?.module || '工作台' },
+        { key: 'scope', label: '可见范围', children: feedScopeLabel(feed) },
+        { key: 'source', label: '来源', children: feedCategory(feed) === 'dynamic' ? '产品发布' : feed.source?.module || '工作台' },
         { key: 'author', label: '发布人', children: feed.author || '未记录发布人' },
         { key: 'time', label: '发布时间', children: dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time },
       ]}/>
+      <FeedReadingStats feed={feed}/>
       </aside>
     </div>)}
   </Modal>;

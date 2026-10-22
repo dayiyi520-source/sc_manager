@@ -93,6 +93,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     icon: 'LayoutDashboard',
     subMenus: [
       { id: 'wb_my_tasks', title: '我的待办', mainMenuId: 'workbench', icon: 'CheckSquare', badge: 4, badgeType: 'danger' },
+      { id: 'wb_agent_tasks', title: '代理商待办', mainMenuId: 'workbench', icon: 'Users' },
       { id: 'wb_okr_perf', title: '月度目标', mainMenuId: 'workbench', icon: 'Target' },
       { id: 'wb_reviews', title: '复盘总结', mainMenuId: 'workbench', icon: 'FileText' },
       { id: 'wb_work_order', title: '协同事项', mainMenuId: 'workbench', icon: 'Database' }

@@ -87,6 +87,8 @@ const MainContent: React.FC = () => {
       case 'training_admin':
         return <TrainingCenterView key={routedTabId} />;
       // Workbench
+      case 'wb_agent_tasks':
+        return <MyTasksView key="agent" variant="agent" />;
       case 'wb_my_tasks':
         return <MyTasksView />;
       case 'wb_feeds':

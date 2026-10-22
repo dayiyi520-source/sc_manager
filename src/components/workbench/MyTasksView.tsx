@@ -1,26 +1,25 @@
+import { WorkbenchFeedCard } from './WorkbenchFeedCard';
+import { WorkbenchLearningCard } from './WorkbenchLearningCard';
+import { MyGoalProgressMetric } from './MyGoalProgressMetric';
 import { useFeedReading } from './useFeedReading';
 import { TodoDetail, type TodoRecord } from './TodoDetail';
 import { FeedDetail } from './FeedDetail';
 import { type WorkbenchFeed } from '../../services/workbenchFeeds';
-import { FeedSummary } from './FeedSummary';
 import { FEED_TAB_KEY, TODO_TAB_KEY, rememberWorkbenchTab } from '../../services/workbenchPreferences';
-import dayjs from 'dayjs';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   CheckSquare,
   FileCheck,
   Users,
   Briefcase,
-  Target,
   Clock,
   ArrowRight,
-  CheckCircle2,
   Calendar,
   MessageSquare,
   AlertCircle,
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { StatCard, StatusTag } from '../common/UIComponents';
+import { StatCard } from '../common/UIComponents';
 import { Empty, Skeleton } from 'antd';
 import { StatusBadge } from '@/components/common';
 import { requirementRepository } from '../../services/requirementRepository';
@@ -35,14 +34,13 @@ type MyTaskRecord = TodoRecord;
 
 type TabType = 'all' | 'mine' | 'assist' | 'work_order';
 type ApprovalTabType = 'pending' | 'my_apply' | 'cc_me';
-type FeedTabType = 'dynamic' | 'feedback' | 'competitor';
+type FeedTabType = 'dynamic' | 'square';
 
-export const MyTasksView: React.FC = () => {
+export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant = 'staff' }) => {
   const {
     openPageTab,
     opportunities,
     approvals,
-    okrs,
     currentUser
   } = useApp();
 
@@ -54,7 +52,7 @@ export const MyTasksView: React.FC = () => {
   const returnToMyTasks = () => { setInnerView('home'); setTaskRevision(value => value + 1); };
   const [todoTab, setTodoTab] = useState<TabType>('all');
   const [approvalTab, setApprovalTab] = useState<ApprovalTabType>('pending');
-  const [feedTab, setFeedTab] = useState<FeedTabType>('dynamic');
+
   const [realTasks, setRealTasks] = useState<MyTaskRecord[]>([]);
   const [taskLoading, setTaskLoading] = useState(true);
   const [taskError, setTaskError] = useState<string | null>(null);
@@ -71,7 +69,7 @@ export const MyTasksView: React.FC = () => {
 
   const pendingTodos = useMemo(() => realTasks, [realTasks]);
   const reading = useFeedReading(currentUser.id, WORKBENCH_FEEDS);
-  const markFeedTabRead = (nextTab: FeedTabType) => { setFeedTab(nextTab); reading.browse(nextTab); };
+  const openFeeds = (category: FeedTabType) => { rememberWorkbenchTab(FEED_TAB_KEY, category); reading.browse(category); setInnerView('feeds'); };
 
   const dashboardMetrics = useMemo(() => getMyTaskMetrics(realTasks, opportunities, projectDeliveryMap()), [realTasks, opportunities]);
   const displayTodos = useMemo(() => {
@@ -87,10 +85,6 @@ export const MyTasksView: React.FC = () => {
     if (approvalTab === 'my_apply') return a.applicantName === currentUser.name && ['审批中', '待审批', '已驳回'].includes(a.status);
     return (a.ccNames || []).includes(currentUser.name) && ['审批中', '待审批'].includes(a.status);
   });
-
-  // 获取用户OKR
-  const currentCycle = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
-  const myOkr = okrs.find((o) => o.cycle === currentCycle && (o.ownerId === currentUser.id || o.keyResults.some((keyResult) => keyResult.assigneeIds?.includes(currentUser.id))));
 
   // Tab组件
   const TabButton: React.FC<{
@@ -110,14 +104,14 @@ export const MyTasksView: React.FC = () => {
     </button>
   );
 
-  if (innerView !== 'home') return <React.Suspense fallback={<Skeleton active/>}>{innerView === 'todos' ? <TodoCenterView onBack={returnToMyTasks}/> : <WorkbenchFeedsView onBack={returnToMyTasks}/>}</React.Suspense>;
+  if (innerView !== 'home') return <React.Suspense fallback={<Skeleton active/>}>{innerView === 'todos' ? <TodoCenterView onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/> : <WorkbenchFeedsView onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/>}</React.Suspense>;
 
   return (
     <div className="space-y-6">
       {selectedTask && <TodoDetail task={selectedTask} onClose={() => { setSelectedTask(undefined); setTaskRevision(value => value + 1); }}/>}
       <FeedDetail key={selectedFeed?.id || 'closed'} feed={selectedFeed ? WORKBENCH_FEEDS.find(feed => feed.id === selectedFeed.id) : undefined} onClose={() => setSelectedFeed(undefined)}/>
       {/* 顶部核心指标 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="待办任务"
           value={dashboardMetrics.todoTaskCount}
@@ -146,12 +140,13 @@ export const MyTasksView: React.FC = () => {
           icon={<Briefcase className="w-5 h-5" />}
           iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
         />
+        <MyGoalProgressMetric />
       </div>
 
       {/* 主要内容区域 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* 待办中心 */}
-        <div className="lg:col-span-7 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
+        <div className="lg:col-span-6 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
             <div className="flex flex-wrap items-center gap-3">
               <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
@@ -205,8 +200,8 @@ export const MyTasksView: React.FC = () => {
           </div>
         </div>
 
-        {/* 审批中心 */}
-        <div className="lg:col-span-5 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
+        {variant === 'agent' ? <WorkbenchLearningCard /> :
+        <div className="lg:col-span-6 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
             <div className="flex flex-wrap items-center gap-3">
               <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
@@ -267,152 +262,10 @@ export const MyTasksView: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>}
 
-        {/* OKR进度 */}
-        <div className="lg:col-span-7 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
-            <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
-              <Target className="w-4 h-4 text-[var(--warning)]" />
-              我的目标进度
-            </div>
-            <button
-              onClick={() => openPageTab('wb_okr_perf')}
-              className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1"
-            >
-              查看详情
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          </div>
-
-          <div className="p-5 max-h-[520px] overflow-y-auto">
-            {myOkr ? (
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="font-semibold text-sm text-[var(--text-primary)] mb-1">
-                      {myOkr.objective}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
-                      <span>周期: {myOkr.cycle}</span>
-                      <span>•</span>
-                      <span>截止: {myOkr.deadline}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-[var(--primary)]">
-                      {myOkr.progress}%
-                    </div>
-                    <div className="text-xs text-[var(--text-muted)]">整体进度</div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {myOkr.keyResults.map((kr, idx) => {
-                    const actions = (kr.executionActions || []).filter((action) => !action.ownerId || action.ownerId === currentUser.id);
-                    const hasEmployeeActions = actions.length > 0;
-                    return (
-                      <div key={kr.id} className="p-3 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="text-sm text-[var(--text-primary)] font-medium">{myOkr.primaryLabel === 'KR' ? `个人动作${idx + 1}` : hasEmployeeActions ? `部门 KR${idx + 1}` : `KR${idx + 1}`}: {kr.content}</span>
-                          <span className="font-semibold text-[var(--text-primary)] shrink-0">{kr.progress}%</span>
-                        </div>
-                        <div className="w-full bg-[var(--bg-main)] rounded-full h-1.5 overflow-hidden">
-                          <div className="h-full bg-[var(--primary)] rounded-full transition-all" style={{ width: `${kr.progress}%` }} />
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
-                          <span>权重: {kr.weight}%</span>
-                          <span>截止: {kr.deadline}</span>
-                        </div>
-                        {hasEmployeeActions && <div className="ml-3 border-l-2 border-[var(--primary)]/30 pl-3 space-y-2" aria-label="个人动作">
-                          <div className="text-xs font-medium text-[var(--text-muted)]">个人动作</div>
-                          {actions.map((action) => <div key={action.id} className="flex items-start justify-between gap-3 rounded-md bg-[var(--bg-main)] px-3 py-2 text-xs">
-                            <span className="min-w-0 text-[var(--text-body)]">{action.title}</span>
-                            <span className="shrink-0 font-semibold text-[var(--text-primary)]">{action.progress}%</span>
-                          </div>)}
-                        </div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-[var(--text-muted)] text-sm">
-                <Target className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                暂无OKR数据
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 动态与评价 */}
-        <div className="lg:col-span-5 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-[var(--success)]" />
-                动态与评价
-              </div>
-              <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5">
-                <TabButton
-                  active={feedTab === 'dynamic'}
-                  onClick={() => markFeedTabRead('dynamic')}
-                >
-                  <span className="relative">产品动态{reading.hasUpdates('dynamic') && <i aria-label="产品动态有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
-                </TabButton>
-                <TabButton
-                  active={feedTab === 'feedback'}
-                  onClick={() => markFeedTabRead('feedback')}
-                >
-                  <span className="relative">评价吐槽{reading.hasUpdates('feedback') && <i aria-label="评价吐槽有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
-                </TabButton>
-                <TabButton
-                  active={feedTab === 'competitor'}
-                  onClick={() => markFeedTabRead('competitor')}
-                >
-                  <span className="relative">行业资讯{reading.hasUpdates('competitor') && <i aria-label="行业资讯有更新" className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--danger)]" />}</span>
-                </TabButton>
-              </div>
-            </div>
-            <button className="shrink-0 text-xs text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => { rememberWorkbenchTab(FEED_TAB_KEY, feedTab); reading.browse(feedTab); setInnerView('feeds'); }}>查看更多</button>
-          </div>
-
-          <div className="p-5 max-h-[520px] overflow-y-auto text-xs">
-            {feedError ? <div role="alert" className="space-y-2 text-[var(--danger)]">{feedError}<button className="ml-3 hover:underline" onClick={reloadFeeds}>重试</button></div> : !WORKBENCH_FEEDS.some(feed => feed.type === feedTab) ? <Empty description="暂无动态与评价"/> : feedTab === 'dynamic' ? (
-              <div className="divide-y divide-[var(--border-main)]">
-                {WORKBENCH_FEEDS.filter((f) => f.type === 'dynamic').slice(0, 5).map((feed) => (
-                  <div key={feed.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="min-w-0 font-semibold text-sm text-[var(--primary)] flex items-center gap-1">
-                        <button type="button" className="min-w-0 truncate text-left hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedFeed(feed)}>{feed.title}</button>{reading.isNew(feed.id) && <span aria-label="新消息" className="shrink-0 text-xs text-[var(--danger)]">新</span>}
-                      </span>
-                      <span className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</span>
-                    </div>
-                    <div className="text-xs text-[var(--text-muted)]">{[feed.productName, feed.versionName, feed.projectName, feed.source?.module].filter(Boolean).join(' · ')}</div>
-                    <FeedSummary content={feed.content}/>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--border-main)]">
-                {WORKBENCH_FEEDS.filter((f) => f.type === feedTab).slice(0, 5).map((feed) => (
-                  <div key={feed.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="min-w-0 font-semibold text-sm text-[var(--primary)] flex items-center gap-1">
-                        <button type="button" className="min-w-0 truncate text-left hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedFeed(feed)}>{feed.title}</button>{reading.isNew(feed.id) && <span aria-label="新消息" className="shrink-0 text-xs text-[var(--danger)]">新</span>}
-                      </span>
-                      <span className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time}</span>
-                    </div>
-                    <div className="text-xs text-[var(--text-muted)]">{[feed.productName, feed.versionName, feed.projectName, feed.source?.module].filter(Boolean).join(' · ')}</div><FeedSummary content={feed.content}/>
-                    <div className="text-xs text-[var(--text-muted)]">
-                      {feed.type === 'competitor' && feed.newsType ? `${feed.newsType} · ` : ''}{(feed.type !== 'competitor' ? feed.customer : undefined) || feed.author}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <WorkbenchFeedCard category="square" feeds={WORKBENCH_FEEDS} error={feedError} onRetry={reloadFeeds} onMore={() => openFeeds('square')} onOpen={setSelectedFeed} isNew={reading.isNew} hasUpdates={reading.hasUpdates('square')}/>
+        <WorkbenchFeedCard category="dynamic" feeds={WORKBENCH_FEEDS} error={feedError} onRetry={reloadFeeds} onMore={() => openFeeds('dynamic')} onOpen={setSelectedFeed} isNew={reading.isNew} hasUpdates={reading.hasUpdates('dynamic')}/>
       </div>
     </div>
   );

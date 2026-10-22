@@ -17,11 +17,11 @@ describe('complete original workbench demonstration messages', () => {
       expect(feed.contentHtml).toContain(feed.content);
       expect(MOCK_USERS.find(user => user.id === feed.authorId)?.name).toBe(feed.author);
       expect(MOCK_PRODUCT_LINES.find(product => product.id === feed.productId)?.name).toBe(feed.productName);
-      if (feed.type === 'dynamic') {
+      if (original.type === 'dynamic') {
         expect(productVersions(catalog, feed.productId).find(version => version.id === feed.versionId)?.name).toBe(feed.versionName);
         expect(feed.projectId).toBeUndefined();
         expect(feed.customerId).toBeUndefined();
-      } else if (feed.type === 'feedback') {
+      } else if (original.type === 'feedback') {
         const project = catalog.projects.find(project => project.id === feed.projectId)!;
         expect(project.name).toBe(feed.projectName);
         expect(project.customerId).toBe(feed.customerId);
@@ -54,7 +54,7 @@ describe('complete original workbench demonstration messages', () => {
     localStorage.setItem(FEEDS_KEY, JSON.stringify([edited, associated, created, shared, LEGACY_WORKBENCH_FEEDS[4]]));
     const rows = listWorkbenchFeeds();
     expect(rows).toHaveLength(5);
-    for (const original of [edited, associated, created, shared]) expect(rows.find(row => row.id === original.id)).toEqual(original);
+    for (const original of [edited, associated, created, shared]) expect(rows.find(row => row.id === original.id)).toMatchObject({...original,type:'square'});
     expect(rows.find(row => row.id === LEGACY_WORKBENCH_FEEDS[4].id)?.newsType).toBe('友商动态');
     expect(rows.some(row => row.id === LEGACY_WORKBENCH_FEEDS[5].id)).toBe(false);
     localStorage.setItem(FEEDS_KEY, '[]');

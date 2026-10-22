@@ -8,6 +8,7 @@ import { FEEDS_KEY } from '../../services/workbenchFeeds';
 
 const openPageTab = vi.fn();
 afterEach(() => { cleanup(); localStorage.removeItem(FEEDS_KEY); });
+vi.mock('./MyGoalProgressMetric', () => ({ MyGoalProgressMetric: () => <button onClick={() => openPageTab('wb_okr_perf')}>我的目标进度 40%</button> }));
 vi.mock('./TodoDetail', () => ({ TodoDetail: ({ task, onClose }: { task: { sourceId: string }; onClose: () => void }) => <div role="dialog">{task.sourceId}<button onClick={onClose}>关闭待办详情</button></div> }));
 vi.mock('./TodoCenterView', () => ({ TodoCenterView: ({ onBack }: { onBack: () => void }) => <section>内嵌待办中心<button onClick={onBack}>返回我的待办</button></section> }));
 vi.mock('./WorkbenchFeedsView', () => ({ WorkbenchFeedsView: ({ onBack }: { onBack: () => void }) => <section>内嵌动态与评价<button onClick={onBack}>返回我的待办</button></section> }));
@@ -59,11 +60,10 @@ describe('我的工作指标卡片', () => {
     expect(sessionStorage.getItem('shichuang.workbench.todoTab')).toBe('work_order');
     fireEvent.click(screen.getByRole('button', { name: '返回我的待办' }));
     await waitFor(() => expect(screen.queryByText('正在加载我的工作...')).not.toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /评价吐槽/ }));
-    fireEvent.click(screen.getAllByRole('button', { name: '查看更多' })[1]);
+    fireEvent.click(screen.getByRole('button', { name: '查看更多信息广场' }));
     expect(await screen.findByText('内嵌动态与评价')).toBeInTheDocument();
     expect(openPageTab).not.toHaveBeenCalled();
-    await waitFor(() => expect(sessionStorage.getItem('shichuang.workbench.feedTab')).toBe('feedback'));
+    await waitFor(() => expect(sessionStorage.getItem('shichuang.workbench.feedTab')).toBe('square'));
   });
 });
 
@@ -90,4 +90,16 @@ it('首页动态仅点击标题打开详情', async () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   fireEvent.click(title);
   expect(await screen.findByRole('dialog')).toBeInTheDocument();
+});
+
+it('replaces approvals with learning only in the agent dashboard while retaining both information cards',async()=>{
+ vi.mocked(requirementRepository.myTasks).mockResolvedValue([]);
+ const view=render(<MyTasksView/>);
+ expect(screen.getByText('审批中心')).toBeInTheDocument();expect(screen.queryByRole('region',{name:'我的学习'})).not.toBeInTheDocument();
+ view.unmount();render(<MyTasksView variant="agent"/>);
+ expect(screen.queryByText('审批中心')).not.toBeInTheDocument();
+ expect(await screen.findByRole('region',{name:'我的学习'})).toBeInTheDocument();
+ expect(screen.getByRole('region',{name:'信息广场'})).toBeInTheDocument();
+ expect(screen.getByRole('region',{name:'产品动态'})).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'我的目标进度 40%'}));expect(openPageTab).toHaveBeenCalledWith('wb_okr_perf');
 });
