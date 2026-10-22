@@ -30,16 +30,24 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-最近成功发布：2026-10-21；发布编号 `20261021T125208Z`；源码提交 `1d484b56c78db112c1a5b6336c42c0a358060cf7`；发布目录 `/opt/sc-manager-frontend/releases/20261021T125208Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261021T125208Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
+最近成功发布：2026-10-22 11:35:16（北京时间）；发布编号 `20261022T033516Z`；源码提交 `8fcca7b15d326a69e9faf9e7287bcb1d7cd9f313`；发布目录 `/opt/sc-manager-frontend/releases/20261022T033516Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261022T033516Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
 
 失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
 
-上次已核实的发布：20261021T125208Z，源码 1d484b5。
+上次已核实的发布：20261022T033516Z，源码 8fcca7b。
 
 ## 最近成功发布
+
+- 发布时间：2026-10-22 11:35:16（北京时间）；发布编号 `20261022T033516Z`；发布源码 `8fcca7b15d326a69e9faf9e7287bcb1d7cd9f313`。
+- 发布目录：`/opt/sc-manager-frontend/releases/20261022T033516Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261022T033516Z`。
+- 产品、设计、研发、测试、缺陷、运维、交付、售前任务增加“我归档的”范围，按归档操作人身份筛选，沿用原列表字段；更多菜单支持取消归档、计数更新和任务还原。
+- 相关测试 106 项、类型检查及生产构建通过；扩大回归的 12 项历史失败已用修改前代码复现，PRD 校验仍有原有禁词及登记数量问题。
+- 使用已推送提交的独立源码快照，通过既有 Python 部署入口发布；构建前读取线上两份共享 Mock 数据。发布前后均为 57 条目标复盘记录，无记录缺失或版本回退，人员、目标设置和工作项配置保持一致。
+- 公网首页、八类任务直达路由、发布清单和 Mock 健康检查通过；包含个人归档功能的 3 份线上资源与发布构建逐字节一致。线上浏览器使用 1920×1080 视口，八类任务的标签顺序、列表字段一致性及官方空状态检查均通过，无页面运行异常；取消归档和刷新恢复已在本地八类任务交互检查及持久化测试中验证。
+- 回滚从本次备份的 `previous-target.txt` 读取旧目录切回 `dist`，并调用本次发布目录 `mock-service/setup.py` 的 `--rollback` 模式恢复服务、路由与共享文件。
 
 - 发布时间：2026-10-21 23:40:33（北京时间）；发布编号 `20261021T154033Z`；发布源码 `86419e5b036ee5b3f01dcb6f99fc1273ed165f12`。
 - 发布目录：`/opt/sc-manager-frontend/releases/20261021T154033Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261021T154033Z`。
