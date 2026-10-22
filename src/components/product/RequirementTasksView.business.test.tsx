@@ -32,7 +32,7 @@ beforeEach(() => {
   vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
 });
 afterEach(cleanup);
-const mount = (kind: 'presales' | 'delivery') => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} itemLabel={kind === 'presales' ? '售前任务' : '交付任务'} /></QueryClientProvider>);
+const mount = (kind: 'presales' | 'delivery' | 'ops', businessGroupFilter?: string) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind={kind} itemLabel={kind === 'presales' ? '售前任务' : kind === 'ops' ? '运维任务' : '交付任务'} businessGroupFilter={businessGroupFilter} /></QueryClientProvider>);
 it.each(['presales', 'delivery'] as const)('shows exact %s columns and the shared text-only empty state', async kind => {
   const { container } = mount(kind);
   await screen.findByText('没有符合当前搜索、过滤或分组条件的' + (kind === 'presales' ? '售前任务' : '交付任务'));
@@ -186,6 +186,21 @@ it('filters by project and uses business statuses instead of the generic develop
   expect(screen.getByRole('button', { name: one.title })).toBeVisible();
   expect(screen.queryByRole('button', { name: two.title })).not.toBeInTheDocument();
   expect(screen.getByText(`关联项目 包含 ${project.name}`)).toBeVisible();
+});
+
+it.each([
+  ['presales', 'opp-1', { specialFields: { opportunityId: 'opp-1', opportunityName: '商机甲' } }],
+  ['delivery', 'project-1', { projectId: 'project-1', projectName: '项目甲' }],
+  ['ops', 'project-1', { projectId: 'project-1', projectName: '项目甲' }]
+] as const)('filters %s by the selected business group', async (kind, groupId, selectedFields) => {
+  const selected = task('selected-' + kind, selectedFields);
+  const other = task('other-' + kind, kind === 'presales'
+    ? { specialFields: { opportunityId: 'opp-2', opportunityName: '商机乙' } }
+    : { projectId: 'project-2', projectName: '项目乙' });
+  vi.mocked(productRepository.businessTasks).mockResolvedValue({ items: [selected, other], total: 2, page: 1, pageSize: 200 });
+  mount(kind, groupId);
+  expect(await screen.findByRole('button', { name: selected.title })).toBeVisible();
+  expect(screen.queryByRole('button', { name: other.title })).not.toBeInTheDocument();
 });
 
 const archiveKinds = ['requirement', 'design', 'dev', 'test', 'bug', 'ops', 'delivery', 'presales'] as const;

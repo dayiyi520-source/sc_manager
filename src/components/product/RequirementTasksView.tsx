@@ -170,6 +170,7 @@ export type WorkItemCreationContext = {
 };
 type RequirementTasksViewProps = {
   productLineFilter?: string;
+  businessGroupFilter?: string;
   itemLabel?: string;
   taskKind?: 'requirement' | 'design' | 'test' | 'bug' | 'dev' | 'presales' | 'delivery' | 'ops';
   initialScope?: 'all' | 'my_owned' | 'my_created' | 'my_participated' | 'my_department';
@@ -189,7 +190,7 @@ const EMPTY_REQUIREMENT_TASKS: RequirementTask[] = [];
 const EMPTY_BUGS: DefectBug[] = [];
 const EMPTY_DEV_TASKS: DevTask[] = [];
 
-export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, detailPresentation = 'drawer', onDetailClose, renderDetail, creationContext, designVariant = 'product', designVariantFilter = designVariant, designOwnershipFilter = '', onDesignVariantChange, designExtras = [] }) => {
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', businessGroupFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, detailPresentation = 'drawer', onDetailClose, renderDetail, creationContext, designVariant = 'product', designVariantFilter = designVariant, designOwnershipFilter = '', onDesignVariantChange, designExtras = [] }) => {
   const queryClient = useQueryClient();
   const [detailSearch] = useState(() => creationContext ? '' : window.location.search);
   const {
@@ -1627,13 +1628,22 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   );
   const designVariantTasks = taskKind === 'design' && designVariantFilter !== 'all' ? activeTasks.filter((task) => designTaskTypeOf(task) === designVariantFilter) : activeTasks;
   const designOwnershipTasks = taskKind === 'design' && designOwnershipFilter ? designVariantTasks.filter(task => designGroupOf(task).key === designOwnershipFilter) : designVariantTasks;
+  const businessGroupValue = (task: RequirementTask) => {
+    const fields = typeof task.specialFields === 'string' ? (() => { try { return JSON.parse(task.specialFields) as Record<string, unknown>; } catch { return {}; } })() : task.specialFields || {};
+    if (taskKind === 'presales') {
+      return String((task as RequirementTask & { opportunityId?: string; opportunityName?: string }).opportunityId || (task as RequirementTask & { opportunityId?: string; opportunityName?: string }).opportunityName || (fields as Record<string, unknown>).opportunityId || (fields as Record<string, unknown>).opportunityName || '');
+    }
+    return String(task.projectId || task.projectName || (fields as Record<string, unknown>).projectId || (fields as Record<string, unknown>).projectName || '');
+  };
   const productLineTasks = productLineFilter === 'all' ? designOwnershipTasks : designOwnershipTasks.filter((task) => task.productLineId === productLineFilter || task.productLineName === selectedProductLine?.name);
+  const businessGroupTasks = isBusinessTask && businessGroupFilter !== 'all' ? productLineTasks.filter((task) => businessGroupValue(task) === businessGroupFilter) : productLineTasks;
   const archivedScopeTasks = archivedTasks.filter(task =>
     (productLineFilter === 'all' || task.productLineId === productLineFilter || task.productLineName === selectedProductLine?.name) &&
+    (!isBusinessTask || businessGroupFilter === 'all' || businessGroupValue(task) === businessGroupFilter) &&
     (taskKind !== 'design' || designVariantFilter === 'all' || designTaskTypeOf(task) === designVariantFilter) &&
     (taskKind !== 'design' || !designOwnershipFilter || designGroupOf(task).key === designOwnershipFilter)
   );
-  const baseTasks = activeTab === 'my_archived' ? archivedScopeTasks : remoteEnabled && !unifiedCategory && taskKind !== 'ops' && !isCommercialTask ? productLineTasks : productLineTasks.filter((task) => categoryMatch(task, activeTab));
+  const baseTasks = activeTab === 'my_archived' ? archivedScopeTasks : remoteEnabled && !unifiedCategory && taskKind !== 'ops' && !isCommercialTask ? businessGroupTasks : businessGroupTasks.filter((task) => categoryMatch(task, activeTab));
   const filteredTasks = baseTasks.filter((task) => {
     if (remoteEnabled && !unifiedCategory && taskKind !== 'ops' && !isCommercialTask) return true;
     const titlePart = searchQuery.trim().toLocaleLowerCase();

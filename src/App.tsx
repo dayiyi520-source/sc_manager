@@ -65,12 +65,16 @@ const RequirementWorkItemsView = lazyNamed(() => import('./components/common/Req
 
 const MainContent: React.FC = () => {
   const { activeTabId, openTabs } = useAppNavigation();
-  const { crmLoading, crmError, retryCrm, addToast, productLines } = useApp();
+  const { crmLoading, crmError, retryCrm, addToast, productLines, projects, opportunities } = useApp();
   const { viewId } = useParams();
   // 标签点击后以 activeTabId 为准；URL 参数只用于首次进入页面
   const routedTabId = activeTabId as typeof activeTabId;
   const [productLineFilter, setProductLineFilter] = useState('all');
-  const taskNavigation = ['prod_req_tasks', 'prod_rd_tasks', 'prod_dev_tasks', 'prod_bugs', 'prod_version_reviews'].includes(routedTabId);
+  const taskNavigation = ['prod_req_tasks', 'prod_rd_tasks', 'prod_dev_tasks', 'prod_bugs', 'prod_version_reviews', 'crm_presales_tasks', 'crm_presales_tickets', 'proj_delivery_tasks', 'proj_delivery_tickets', 'proj_ops_tasks'].includes(routedTabId);
+  const businessTaskNavigation = ['crm_presales_tasks', 'crm_presales_tickets', 'proj_delivery_tasks', 'proj_delivery_tickets', 'proj_ops_tasks'].includes(routedTabId);
+  const businessTaskKind = routedTabId.startsWith('crm_presales') ? 'presales' : routedTabId.startsWith('proj_ops') ? 'ops' : 'delivery';
+  const businessNavigationItems = businessTaskKind === 'presales' ? opportunities : projects;
+  const businessNavigationTitle = businessTaskKind === 'presales' ? '商机' : '项目';
   useEffect(() => {
     const pending = sessionStorage.getItem('shichuang.productLineFilter');
     if (pending && routedTabId !== 'prod_versions') {
@@ -78,6 +82,7 @@ const MainContent: React.FC = () => {
       sessionStorage.removeItem('shichuang.productLineFilter');
     }
   }, [routedTabId]);
+  useEffect(() => { setProductLineFilter('all'); }, [routedTabId]);
 
   const renderView = () => {
     switch (routedTabId) {
@@ -111,7 +116,7 @@ const MainContent: React.FC = () => {
         return <CustomerDirectoryView kind="opportunities" />;
       case 'crm_presales_tasks':
       case 'crm_presales_tickets':
-        return <RequirementTasksView itemLabel="售前任务" taskKind="presales" />;
+        return <RequirementTasksView itemLabel="售前任务" taskKind="presales" businessGroupFilter={productLineFilter} />;
 
       // Product & Dev
       case 'prod_planning':
@@ -168,9 +173,9 @@ const MainContent: React.FC = () => {
         return <ProjectDeliveryMapView />;
       case 'proj_delivery_tickets':
       case 'proj_delivery_tasks':
-        return <RequirementTasksView itemLabel="交付任务" taskKind="delivery" />;
+        return <RequirementTasksView itemLabel="交付任务" taskKind="delivery" businessGroupFilter={productLineFilter} />;
       case 'proj_ops_tasks':
-        return <RequirementTasksView itemLabel="运维任务" taskKind="ops" />;
+        return <RequirementTasksView itemLabel="运维任务" taskKind="ops" businessGroupFilter={productLineFilter} />;
 
       // Team & System
       case 'team_org':
@@ -206,7 +211,7 @@ const MainContent: React.FC = () => {
         )}
         <Suspense fallback={<div className="dark-panel flex min-h-80 items-center justify-center rounded-lg text-sm text-[var(--text-muted)]">正在加载页面…</div>}>
           <div className={taskNavigation ? 'grid h-[calc(100vh-190px)] min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3 animate-in fade-in duration-200' : 'animate-in fade-in duration-200'}>
-            {taskNavigation && <ProductNavigation productLines={productLines} value={productLineFilter} onChange={setProductLineFilter} />}
+            {taskNavigation && <ProductNavigation productLines={businessTaskNavigation ? businessNavigationItems : productLines} value={productLineFilter} onChange={setProductLineFilter} title={businessTaskNavigation ? businessNavigationTitle : '产品'} itemLabel={businessTaskNavigation ? businessNavigationTitle : '产品'} ariaLabel={`${businessTaskNavigation ? businessNavigationTitle : '产品'}导航栏`} />}
             <div className={taskNavigation ? 'min-h-0 min-w-0 overflow-y-auto' : ''}>
             {routedTabId === 'prod_req_tasks' ? <RequirementTasksView key={routedTabId} productLineFilter={productLineFilter} itemLabel="产品任务" taskKind="requirement" /> : renderView()}
             </div>
