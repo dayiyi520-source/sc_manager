@@ -1,11 +1,13 @@
+import { isArchivedByUser } from './taskArchiveScope';
 import type { CurrentUser, Customer, EmployeeOption, Opportunity, ProjectRecord, RequirementTask, TenderBidding } from '../../types';
 
-export type BusinessTaskScope = 'my_owned' | 'my_created' | 'my_department' | 'all';
+export type BusinessTaskScope = 'my_owned' | 'my_created' | 'my_department' | 'all' | 'my_archived';
 export const BUSINESS_TASK_SCOPES = [
-  ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_department', '我部门的'], ['all', '全公司的'],
+  ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_department', '我部门的'], ['all', '全公司的'], ['my_archived', '我归档的'],
 ] as const;
 
 export function matchesBusinessTaskScope(task: RequirementTask, scope: BusinessTaskScope, user: CurrentUser, employees: EmployeeOption[]) {
+  if (scope === 'my_archived') return isArchivedByUser(task, user, employees);
   if (scope === 'all') return true;
   if (scope === 'my_owned') return task.assigneeId ? task.assigneeId === user.id : task.ownerName?.trim() === user.name.trim();
   if (scope === 'my_created') return task.creatorId ? task.creatorId === user.id : task.creatorName?.trim() === user.name.trim();

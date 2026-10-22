@@ -564,6 +564,10 @@ export interface ProductLine {
 export type TaskCompletionReview = { content: string; media: RequirementMedia[] };
 
 export interface RequirementTask {
+  archived?: boolean;
+  archivedById?: string;
+  operatorName?: string;
+  operatedAt?: string;
   pendingReassignment?: { id: string; assigneeId: string; assigneeName: string; reason: string; attachmentIds: string[] };
   completionApproval?: 'pending' | 'approved' | 'rejected';
   completionRequestedAt?: string;

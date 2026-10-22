@@ -23,7 +23,7 @@ import { applyCollaborationWorkflow } from './mockCollaborationWorkflow';
 import type { OkrSettings } from './okrRepository';
 import { reviewSubmissionAccess } from './okrReviewRules';
 import { canReadReviewRecord } from './supervisorReview';
-import { archivedBusinessTasks, handleMockBusinessTasks, mutateArchivedBusinessTask } from './mockBusinessTasks';
+import { archivedBusinessTaskRecords, archivedBusinessTasks, handleMockBusinessTasks, mutateArchivedBusinessTask } from './mockBusinessTasks';
 import { assignedGoalActions, legacyGoalActions } from './okrGoalRules';
 import collaborationTypes from '../data/mockCollaborationTypes.json';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
@@ -392,6 +392,22 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
   const body = bodyOf(init);
   if (clean.startsWith('/api/customer-directory/')) return customerDirectoryRequest(path, method);
   if (clean === '/api/archived-tasks' && method === 'GET') {
+    const query = queryOf(path);
+    if (query.get('records') === 'true') {
+      const category = query.get('category') || '';
+      if (['presales', 'delivery', 'ops'].includes(category)) return archivedBusinessTaskRecords(category as 'presales' | 'delivery' | 'ops');
+      const products = getProductLines();
+      const versions = products.flatMap(product => product.versions || []);
+      return getWorkItems().filter(item => (item.deleted || item.deleteFlag) && item.category === category).map(item => {
+        const record = unifiedWorkItem(item);
+        return { ...record, archived: true, status: record.status?.name || item.status || '未设置',
+          ownerName: record.assigneeName || '', productLineName: products.find(line => line.id === item.productLineId)?.name || item.productLineName || '',
+          versionName: versions.find(version => version.id === item.versionId)?.name || item.versionName || '',
+          workItemTypeId: record.taskTypeId, estimatedHours: Number(item.estimatedHours || 0), dueDate: item.dueDate || '',
+          requirementType: category === 'bug' ? item.type || item.requirementType : item.requirementType };
+      });
+    }
+
     const names = new Map(getProductLines().map((line) => [line.id, line.name]));
     const categories: Record<string, string> = { requirement: '产品任务', design: '设计任务', dev: '研发任务', test: '测试任务', bug: '缺陷任务' };
     return [...getWorkItems().filter((item) => item.deleted || item.deleteFlag).map((item) => ({
@@ -412,7 +428,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (!item) throw new Error('归档任务不存在');
     if (Number(item.revision || 0) !== revision) throw new Error('任务已更新，请刷新后重试');
     if (method === 'POST' && parts[4] === 'restore') {
-      Object.assign(item, { deleted: false, deleteFlag: 0, revision: revision + 1 }); write(KEYS.workItems, items); return null;
+      Object.assign(item, { deleted: false, deleteFlag: 0, archivedById: undefined, operatorName: undefined, operatedAt: undefined, revision: revision + 1 }); write(KEYS.workItems, items); return null;
     }
     if (method === 'DELETE') { write(KEYS.workItems, items.filter((task) => task.id !== item.id)); return null; }
     throw new Error('不支持的归档操作');
@@ -484,7 +500,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
       return item;
     });
     const operatedAt = now();
-    targets.forEach((item: any) => Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt, operatorName: taskOperator().name }));
+    targets.forEach((item: any) => Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt, archivedById: taskOperator().id, operatorName: taskOperator().name }));
     write(KEYS.workItems, items);
     return targets.length;
   }
@@ -495,7 +511,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (!item) throw new Error('任务不存在');
     if (item.deleted || item.deleteFlag) return null;
     if (query.get('revision') == null || Number(query.get('revision')) !== Number(item.revision || 0)) throw new Error('任务已更新，请刷新后重试');
-    Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt: now(), operatorName: taskOperator().name });
+    Object.assign(item, { deleted: true, deleteFlag: 1, revision: Number(item.revision || 0) + 1, operatedAt: now(), archivedById: taskOperator().id, operatorName: taskOperator().name });
     write(KEYS.workItems, items);
     return null;
   }

@@ -55,6 +55,10 @@ function read(kind: Kind): RequirementTask[] {
 }
 const write = (kind: Kind, tasks: RequirementTask[]) => localStorage.setItem(storageKey(kind), JSON.stringify(tasks));
 
+export function archivedBusinessTaskRecords(kind: Kind) {
+  return read(kind).filter(task => task.archived);
+}
+
 export function archivedBusinessTasks() {
   return (['presales', 'delivery', 'ops'] as const).flatMap((kind) => read(kind)
     .filter((task) => (task as RequirementTask & { archived?: boolean }).archived)
@@ -71,7 +75,7 @@ export function mutateArchivedBusinessTask(kind: Kind, id: string, revision: num
   const task = tasks.find((item) => item.id === id) as (RequirementTask & { archived?: boolean; revision?: number }) | undefined;
   if (!task?.archived) throw new Error('归档任务不存在');
   if (Number(task.revision || 0) !== revision) throw new Error('任务已更新，请刷新后重试');
-  write(kind, action === 'purge' ? tasks.filter((item) => item.id !== id) : tasks.map((item) => item.id === id ? { ...item, archived: false, revision: revision + 1 } : item));
+  write(kind, action === 'purge' ? tasks.filter((item) => item.id !== id) : tasks.map((item) => item.id === id ? { ...item, archived: false, archivedById: undefined, operatorName: undefined, operatedAt: undefined, revision: revision + 1 } : item));
 }
 
 export function handleMockBusinessTasks(path: string, method: string, body: Record<string, unknown>, audit: AuditContext) {
@@ -111,8 +115,9 @@ export function handleMockBusinessTasks(path: string, method: string, body: Reco
     return { items: visibleTasks.slice((page - 1) * pageSize, page * pageSize), total: visibleTasks.length, page, pageSize };
   }
   if (method === 'DELETE' && task) {
+    if (task.archived) return null;
     const user = currentUser();
-    write(kind, tasks.map(item => item.id === taskId ? { ...item, archived: true, revision: Number((item as RequirementTask & { revision?: number }).revision || 0) + 1, operatorName: user.name, operatedAt: new Date().toISOString() } : item));
+    write(kind, tasks.map(item => item.id === taskId ? { ...item, archived: true, revision: Number((item as RequirementTask & { revision?: number }).revision || 0) + 1, archivedById: user.id, operatorName: user.name, operatedAt: new Date().toISOString() } : item));
     audit.record(taskId, task.productLineId || '', 'WORK_ITEM_ARCHIVED', { title: task.title });
     return null;
   }
@@ -122,7 +127,7 @@ export function handleMockBusinessTasks(path: string, method: string, body: Reco
     let user = MOCK_USERS[0];
     try { user = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')?.user || user; } catch { /* 失效本地会话使用演示账号。 */ }
     const created: RequirementTask = {
-      ...body, id: kind + '-' + crypto.randomUUID(), code: (kind === 'presales' ? 'PS-' : 'DL-') + crypto.randomUUID().slice(0, 8),
+      ...body, archived: false, archivedById: undefined, operatorName: undefined, operatedAt: undefined, revision: 0, id: kind + '-' + crypto.randomUUID(), code: (kind === 'presales' ? 'PS-' : 'DL-') + crypto.randomUUID().slice(0, 8),
       title: text(body.title).trim(), status: kind === 'delivery' ? '待处理' : text(body.status) || '待处理', completionApproval: undefined, completionRequestedAt: undefined, reviewedAt: undefined, reviewedBy: undefined, reviewComment: undefined, priority: text(body.priority) || '中',
       ownerName: text(body.ownerName) || user.name, assigneeId: text(body.assigneeId) || (text(body.ownerName) === user.name || !body.ownerName ? user.id : undefined),
       creatorId: user.id, creatorName: user.name, department: text(body.department) || undefined,

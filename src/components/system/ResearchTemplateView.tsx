@@ -26,6 +26,7 @@ const ArchivedTasksPanel = () => {
       if (action === 'restore') await productRepository.restoreArchivedTask(item.category, item.id, item.revision);
       else await productRepository.purgeArchivedTask(item.category, item.id, item.revision);
       await query.refetch();
+      await queryClient.invalidateQueries({ queryKey: ['my-archived-task-records'] });
       if (action === 'restore') await Promise.all(['unified-task-page', 'requirements', 'design-tasks', 'product-dev-tasks', 'product-bugs', 'presales-tasks', 'delivery-tasks', 'ops-tasks'].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
       addToast('success', action === 'restore' ? '任务已恢复' : '任务已彻底删除');
     } catch (error) {

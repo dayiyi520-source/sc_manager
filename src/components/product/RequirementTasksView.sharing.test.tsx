@@ -15,6 +15,7 @@ vi.mock('../../services/session', () => ({ readSession: vi.fn(() => null) }));
 vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../services/requirementRepository', () => ({ requirementRepository: { workOrderCandidates: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../services/productRepository', () => ({ productRepository: {
+  archivedTaskRecords: vi.fn().mockResolvedValue([]),
   businessTasks: vi.fn().mockResolvedValue({ items: [], total: 0 }),
   createBusinessTask: vi.fn().mockResolvedValue(undefined),
   businessTask: vi.fn(), workItemDetail: vi.fn(), requirementSummary: vi.fn().mockResolvedValue({ linkedItems: [] }),
@@ -430,7 +431,7 @@ it('filters defects awaiting my verification and offers the full company scope i
   vi.mocked(productRepository.workItems).mockResolvedValue({ page: { items: records, total: records.length } } as never);
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RequirementTasksView taskKind="bug" /></QueryClientProvider>);
   const pending = await screen.findByRole('tab', { name: '待我验证的·1' });
-  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['我负责的·3', '我创建的·0', '待我验证的·1', '我部门的·0', '全公司的·3']);
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['我负责的·3', '我创建的·0', '待我验证的·1', '我部门的·0', '全公司的·3', '我归档的·0']);
   fireEvent.click(pending);
   expect(await screen.findByText('待我验证缺陷')).toBeVisible();
   expect(screen.queryByText('已关闭缺陷')).not.toBeInTheDocument();

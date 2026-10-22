@@ -100,6 +100,7 @@ export const productRepository = {
   deleteProductLine: (id: string) => apiRequest<void>(`/api/product-lines/${id}`, { method: 'DELETE' }),
   recycleBin: (id: string) => apiRequest<RecycleBinItem[]>(`/api/product-lines/${id}/recycle-bin`),
   archivedTasks: () => apiRequest<ArchivedTask[]>('/api/archived-tasks'),
+  archivedTaskRecords: (category: string) => apiRequest<RequirementTask[]>(`/api/archived-tasks?category=${encodeURIComponent(category)}&records=true`),
   restoreArchivedTask: (category: string, id: string, revision: number) => apiRequest<void>(`/api/archived-tasks/${encodeURIComponent(category)}/${encodeURIComponent(id)}/restore`, { method: 'POST', body: JSON.stringify({ revision }) }),
   purgeArchivedTask: (category: string, id: string, revision: number) => apiRequest<void>(`/api/archived-tasks/${encodeURIComponent(category)}/${encodeURIComponent(id)}?revision=${revision}`, { method: 'DELETE' }),
   restoreRecycleBinItem: (lineId: string, id: string, revision: number) => apiRequest<void>(`/api/product-lines/${lineId}/recycle-bin/${id}/restore`, { method: 'POST', body: JSON.stringify({ revision }) }),
