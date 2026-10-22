@@ -41,6 +41,13 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 最近成功发布
 
+- 发布时间：2026-10-22 20:13:05 UTC；发布编号 `20261022T201305Z`；发布源码 `ba926a7876cc6007a69a0e4e3f7c7ffa958c60ca`。
+- 修复用例库目录新增、重命名、复制、删除及刷新恢复；目录统一展示当前产品名称，子目录继承父目录所属产品。
+- 已推送源码的独立快照通过 9 项相关测试、类型检查及发布构建，使用 `bash scripts/deploy-production.sh --project <项目目录> --source-dir <独立源码快照> --revision ba926a7876cc6007a69a0e4e3f7c7ffa958c60ca` 发布。团队部署准备工具在当前环境缺失；执行现有脚本内专属路由、Nginx、共享服务及公网核验。
+- 发布前读取线上共享数据；发布后 64 条目标记录无缺失或版本回退，人员、目标设置及产研模板保持。公网首页、业务直达路由、入口资源、Mock 健康与发布清单通过，包含目录修复的线上资源与构建逐字节一致。
+- 发布目录 `/opt/sc-manager-frontend/releases/20261022T201305Z`，备份 `/opt/sc-manager-frontend/backups/20261022T201305Z`；回滚沿用上述 previous-target.txt 与 setup.py --rollback 流程。
+
+
 - 发布时间：2026-10-22 16:54:23（北京时间）；发布编号 `20261022T085423Z`；发布源码 `a3f9289e8e180710fa9317e9063d573d79c1def4`。
 - 发布目录：`/opt/sc-manager-frontend/releases/20261022T085423Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261022T085423Z`。
 - 工作台拆分信息广场与产品动态，新增目标进度指标、代理商待办及培训学习摘要；信息发布支持组织至部门级联范围及客户、线索、商机来源共享。产品版本发布后同步只读动态。
