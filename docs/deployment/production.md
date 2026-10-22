@@ -30,16 +30,25 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-最近成功发布：2026-10-22 11:35:16（北京时间）；发布编号 `20261022T033516Z`；源码提交 `8fcca7b15d326a69e9faf9e7287bcb1d7cd9f313`；发布目录 `/opt/sc-manager-frontend/releases/20261022T033516Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261022T033516Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
+最近成功发布：2026-10-22 16:54:23（北京时间）；发布编号 `20261022T085423Z`；源码提交 `a3f9289e8e180710fa9317e9063d573d79c1def4`；发布目录 `/opt/sc-manager-frontend/releases/20261022T085423Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261022T085423Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
 
 失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
 
-上次已核实的发布：20261022T033516Z，源码 8fcca7b。
+上次已核实的发布：20261022T085423Z，源码 a3f9289。
 
 ## 最近成功发布
+
+- 发布时间：2026-10-22 16:54:23（北京时间）；发布编号 `20261022T085423Z`；发布源码 `a3f9289e8e180710fa9317e9063d573d79c1def4`。
+- 发布目录：`/opt/sc-manager-frontend/releases/20261022T085423Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261022T085423Z`。
+- 工作台拆分信息广场与产品动态，新增目标进度指标、代理商待办及培训学习摘要；信息发布支持组织至部门级联范围及客户、线索、商机来源共享。产品版本发布后同步只读动态。
+- 两套首页上下卡片等宽对齐；产品动态详情移除来源跳转，信息广场手动信息来源显示工作台；详情新增已读与未读人数，悬浮显示员工、状态和首次阅读时间。
+- 发布前 79 项相关测试、类型检查及生产构建通过；PRD 校验仍有已确认的历史禁词和登记数量问题。采用 GitHub 已推送提交的独立源码快照，通过既有 Python 部署入口发布；工作区临时文件及未提交业务数据未纳入发布包。
+- 构建前同步线上两份共享 Mock 数据，发布前后均为 58 条目标复盘记录，无记录缺失或版本回退；人员、目标设置和工作项配置保持一致。首页、七个业务直达路由、Mock 健康与发布清单检查通过，承载新功能的两份线上资源与发布构建逐字节一致。
+- 公网浏览器以 1920×1080 视口核验我的待办和代理商待办：四张上下卡片宽度均为 788 像素且左右边界对齐；学习卡片替换审批中心、来源文案、已读未读人数及员工时间悬浮名单、产品动态无来源按钮、完整列表两分类和产品动态禁止新建均通过，无页面运行异常。
+- 回滚从本次备份的 `previous-target.txt` 读取旧目录切回 `dist`，并调用本次发布目录 `mock-service/setup.py` 的 `--rollback` 模式恢复服务、路由与共享文件。
 
 - 发布时间：2026-10-22 11:35:16（北京时间）；发布编号 `20261022T033516Z`；发布源码 `8fcca7b15d326a69e9faf9e7287bcb1d7cd9f313`。
 - 发布目录：`/opt/sc-manager-frontend/releases/20261022T033516Z`；回滚备份：`/opt/sc-manager-frontend/backups/20261022T033516Z`。
