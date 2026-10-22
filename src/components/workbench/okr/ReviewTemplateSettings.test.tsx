@@ -1,15 +1,21 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
-import { ConfigProvider } from 'antd';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { ConfigProvider, Modal } from 'antd';
 import { ReviewTemplateSettings } from './ReviewTemplateSettings';
 import { WeeklyReviewEditor } from './WeeklyReviewEditor';
 import { MonthlyReviewEditor } from './MonthlyReviewEditor';
 import { type ReviewReportTemplate, type ReviewTemplateBlock, newReviewTemplate } from '../../../services/reviewTemplateConfiguration';
-import type { OkrPayload, OkrSettings } from '../../../services/okrRepository';
+import type { OkrPayload, OkrPerson, OkrRecord, OkrSettings } from '../../../services/okrRepository';
 import { createReviewCopyDraft } from './reviewCopy';
 import seed from '../../../data/mockOkrState.json';
-afterEach(cleanup);
+beforeAll(() => ConfigProvider.config({ holderRender: children => <ConfigProvider theme={{ token: { motion: false } }}>{children}</ConfigProvider> }));
+afterAll(() => ConfigProvider.config({ holderRender: undefined }));
+afterEach(async () => {
+  cleanup();
+  await act(async () => { Modal.destroyAll(); });
+  await waitFor(() => expect(document.querySelector('.ant-modal-root')).toBeNull());
+});
 globalThis.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof IntersectionObserver;
 const row = { ...newReviewTemplate(), id: 't', name: '研发总结', effectiveFrom: '2099-01-01' };
 const configured = (): ReviewReportTemplate => ({ ...structuredClone(row), status: 'published' as const, blocks: row.blocks.map<ReviewTemplateBlock>((block, index) => ({ ...block, fields: index === 0 ? [{ id: 'risk', label: '风险说明', type: 'textarea' as const, required: true }] : [] })).concat([{ id: 'quality', title: '质量分析', guidance: '说明本期质量情况', fields: [{ id: 'score', label: '质量分', type: 'number' as const, required: false }] }]) });
@@ -110,6 +116,48 @@ it('uses monthly templates for new employee and supervisor monthly reports', () 
 it('new-period copies drop old template and custom answers', () => {
   const source = { title: '旧报告', startDate: '2099-01-01', reviewTemplateSnapshot: configured(), reviewTemplateValues: { risk: '旧答案' } };
   expect(createReviewCopyDraft(source)).toMatchObject({ startDate: undefined, reviewTemplateSnapshot: undefined, reviewTemplateValues: undefined });
+});
+
+it('saves configured judgments and shows saved employee content in read-only reports', async () => {
+  const employeeTemplate = configured();
+  employeeTemplate.blocks.push({ id: 'ideas', title: '流程建议', guidance: '', fields: [{ id: 'idea-text', label: '建议', type: 'textarea', required: false }], departmentLink: { reportType: 'week' } });
+  const managerTemplate = { ...configured(), audience: 'supervisor' as const };
+  managerTemplate.blocks[0].fields = [];
+  managerTemplate.blocks.push({ id: 'summary', title: '员工建议汇总', guidance: '', fields: [], aggregation: { sourceBlockId: 'ideas', sourceReportType: 'week', needsJudgment: true, judgmentLabel: '后续动作', judgmentOptions: ['安排试点', '继续观察'] } });
+  const people: OkrPerson[] = [
+    { id: 'm', name: '主管', department: '研发', supervisorId: '', rootFlag: 0, goalRole: 'supervisor', version: 0 },
+    { id: 'e', name: '员工', department: '研发', supervisorId: 'm', rootFlag: 0, goalRole: 'employee', version: 0 },
+  ];
+  const records: OkrRecord[] = [{ id: 'employee-review', kind: 'review', ownerId: 'e', status: 'submitted', version: 0, periodKey: '2099-01-01', payload: { title: '员工周报', ...props.periodOverride, reviewType: 'week', reviewTemplateSnapshot: employeeTemplate, reviewTemplateValues: { 'idea-text': '先做小范围试点' } } }];
+  const save = vi.fn(async (_payload: OkrPayload) => true);
+  const managerProps = { ...props, people, records, currentUserId: 'm', viewer: people[0], template: 'supervisor' as const, onSaveDraft: save };
+  const { rerender } = render(<WeeklyReviewEditor {...managerProps} recordStatus="draft" initialPayload={{ title: '部门周报', ...props.periodOverride, reviewType: 'week', reviewTemplateSnapshot: managerTemplate }}/>);
+  expect(screen.getByText('先做小范围试点')).toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '员工的后续动作' }));
+  fireEvent.click(await screen.findByText('安排试点', { selector: '.ant-select-item-option-content' }));
+  fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
+  const saved = save.mock.calls[0][0];
+  expect(saved.reviewTemplateAggregations?.summary).toEqual([expect.objectContaining({ employeeId: 'e', content: '先做小范围试点', judgment: '安排试点' })]);
+  rerender(<WeeklyReviewEditor {...managerProps} recordStatus="submitted" initialPayload={saved} records={records.map(record => ({ ...record, payload: { ...record.payload, reviewTemplateValues: { 'idea-text': '后来改为全面推广' } } }))}/>);
+  expect(screen.getByText('先做小范围试点')).toBeInTheDocument();
+  expect(screen.getByText('安排试点')).toBeInTheDocument();
+  expect(screen.queryByText('后来改为全面推广')).not.toBeInTheDocument();
+  expect(screen.queryByRole('combobox', { name: '员工的后续动作' })).not.toBeInTheDocument();
+});
+
+it.each(['week', 'month'] as const)('hides fixed and custom modules in %s reports without legacy fallback or required validation', async type => {
+  const template = configured();
+  template.reportType = type;
+  template.blocks.forEach(block => { block.visible = false; });
+  const Component = type === 'month' ? MonthlyReviewEditor : WeeklyReviewEditor;
+  render(<Component {...props} directSubmit reviewSettings={{ reviewReportTemplates: [template] } as OkrSettings}/>);
+  expect(document.querySelector('[data-review-block]')).toBeNull();
+  expect(screen.queryByRole('textbox', { name: '风险说明' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: '对公司或部门发展有帮助的意见和建议' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: '下周计划' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: type === 'month' ? '提交月报' : '提交周报' }));
+  expect(screen.queryByText('请填写风险说明')).not.toBeInTheDocument();
+  expect(await screen.findByRole('dialog', { name: type === 'month' ? '提交月报确认' : '确认提交周报' })).toBeInTheDocument();
 });
 
 it('applies saved card order and renamed titles in weekly and monthly report DOM', () => {

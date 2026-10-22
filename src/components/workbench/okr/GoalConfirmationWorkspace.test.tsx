@@ -13,7 +13,7 @@ afterEach(()=>{vi.restoreAllMocks();vi.clearAllMocks();});
 describe('goal confirmation workspace',()=>{
  it('shows total and member badges and only appropriate confirmation members',()=>{
  render(<OkrScopeSidebar people={people} records={[record]} currentUserId="manager" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={vi.fn()}/>);
- expect(screen.getByText('目标确认')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'展开目标确认成员'}));expect(screen.getByRole('button',{name:'员工甲'})).toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'目标确认'})).not.toBeInTheDocument();
  });
  it('submits approval and renders an empty pending workspace after refreshed data',async()=>{
  const update=vi.spyOn(okrRepository,'update').mockResolvedValue(undefined);

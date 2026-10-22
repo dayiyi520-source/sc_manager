@@ -23,7 +23,8 @@ it('drags cards before or after another card, rejects moving ahead of goals and 
   const custom = screen.getByTestId(`template-block-${saved[4].id}`);
   fireEvent.change(within(custom).getByRole('textbox', { name: '扩展板块名称' }), { target: { value: '质量分析' } });
   expect(saved[4].fields[0]).toMatchObject({ type: 'textarea', label: '质量分析', required: false });
-  expect(within(screen.getByTestId('template-block-goals')).queryByRole('switch')).not.toBeInTheDocument();
+  expect(within(screen.getByTestId('template-block-goals')).getByRole('switch', { name: '目标复盘是否显示' })).toBeChecked();
+  expect(within(screen.getByTestId('template-block-goals')).queryByRole('switch', { name: '目标复盘是否必填' })).not.toBeInTheDocument();
 });
 it('preserves existing additional fields when editing a legacy block', () => {
   let saved = [...newReviewTemplate().blocks, { id: 'legacy', title: '旧板块', guidance: '', fields: [

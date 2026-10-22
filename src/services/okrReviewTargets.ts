@@ -1,13 +1,13 @@
 import type { OKRItem } from '../types';
 import type { OkrPerson, OkrRecord } from './okrRepository';
-import { assignedDetailRows } from './okrAssignments';
+import { assignedDetailRows, personalAssignedObjectives } from './okrAssignments';
 import { reviewTemplateFor } from './okrReviewTemplates';
 
 const effective = (record: OkrRecord) => ['active', 'reviewed', 'completed', 'archived'].includes(record.status)
   && !record.payload.inherited
   && !(record.changeRequest?.purpose === 'initial' && record.changeRequest.status !== 'approved');
 
-/** Use the same persisted monthly records as My Targets, preserving personal A identities. */
+/** Read live department assignments while preserving existing personal A identities. */
 export function monthlyReviewTargets(records: OkrRecord[], userId: string, people: OkrPerson[]): OKRItem[] {
   const person = people.find(member => member.id === userId);
   const supervisor = reviewTemplateFor(person, people) === 'supervisor';
@@ -67,6 +67,27 @@ export function monthlyReviewTargets(records: OkrRecord[], userId: string, peopl
         }];
       }),
     });
+  }
+  if (!supervisor) {
+    for (const record of personalAssignedObjectives(records.filter(effective), person, people)) {
+      const keyResults = (record.payload.keyResults || []).filter(kr => !targets.some(target =>
+        target.cycle === record.periodKey && target.keyResults.some(action => {
+          const source = records.find(item => item.id === target.id || item.kind === 'action' && item.id === action.id);
+          return (source?.payload.sourceObjectiveId || source?.payload.parentObjectiveId) === record.id
+            && (source?.payload.sourceKrId || source?.payload.parentKeyResultId || source?.payload.parentActionId) === kr.id;
+        }))).map(kr => ({
+          id: kr.id, content: kr.title, progress: kr.progress, weight: kr.weight ?? 100, deadline: kr.deadline || '',
+          assigneeIds: [userId], businessObject: kr.businessObject, version: kr.version,
+          parentKeyResultId: kr.id, parentKeyResultTitle: kr.title, parentKeyResultProgress: kr.progress,
+          parentKeyResultDetails: kr.details, plannedStartDate: kr.actualStartedAt,
+        }));
+      if (keyResults.length) targets.push({
+        id: record.id, cycle: record.periodKey, ownerId: userId, ownerName: person?.name || '本人',
+        department: person?.department || '', category: 'my', objective: record.payload.title, primaryLabel: 'O',
+        weight: record.payload.weight ?? 100, progress: record.payload.progress || 0,
+        deadline: record.payload.deadline || '', status: record.status as OKRItem['status'], keyResults,
+      });
+    }
   }
   return targets;
 }

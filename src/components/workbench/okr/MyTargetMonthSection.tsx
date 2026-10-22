@@ -39,6 +39,7 @@ export type MyTargetViewItem = {
   status: string;
   sourceName?: string;
   alignmentLabel?: string;
+  readOnly?: boolean;
   editable?: boolean;
   deletable?: boolean;
   ownerNames: string[];
@@ -276,6 +277,7 @@ const ActionRow: React.FC<{ action: MyTargetActionViewItem; index: number; submi
 
 const TargetToolbar: React.FC<{ target: MyTargetViewItem; onEdit?: () => void; onDelete?: () => void; onOpen: () => void; busy?: boolean }> = ({ target, onEdit, onDelete, onOpen, busy }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  if (target.readOnly) return null;
   return <div className={`okr-target-list-toolbar okr-target-toolbar${menuOpen ? ' is-open' : ''}`} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
     {!target.awaitingApproval && <Tooltip title={target.editable ? '编辑目标' : '仅制定人可编辑'}><Button type="text" aria-label={`编辑目标：${target.title}`} icon={<PencilIcon/>} disabled={busy || !target.editable || !onEdit} onClick={onEdit}/></Tooltip>}
     <Dropdown disabled={busy} onOpenChange={setMenuOpen} menu={{ items: [{ key: 'detail', label: '查看详情' }, ...(target.deletable && onDelete ? [{ key: 'delete', label: target.awaitingApproval ? '撤回' : '删除', danger: !target.awaitingApproval }] : [])], onClick: ({ key, domEvent }) => { domEvent.stopPropagation(); setMenuOpen(false); if (key === 'detail') onOpen(); else onDelete?.(); } }} trigger={['click']}><Button type="text" aria-label={`更多操作：${target.title}`} icon={<KebabHorizontalIcon/>} disabled={busy}/></Dropdown>

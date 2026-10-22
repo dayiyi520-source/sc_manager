@@ -30,7 +30,6 @@ export function krDetailsError(kr: OkrKr): string | undefined {
     if (!row.stage?.trim()) return '请填写每条 KR 明细的阶段';
     if (!validDate(row.plannedStartDate) || !validDate(row.plannedEndDate)) return '请设置每条 KR 明细的有效计划开始和结束时间';
     if (row.plannedStartDate! > row.plannedEndDate!) return 'KR 明细结束时间不能早于开始时间';
-    if (kr.deadline && row.plannedEndDate! > kr.deadline) return 'KR 明细结束时间不能超过所属 KR 截止日期';
   }
 }
 export function krDetailSummary(kr: OkrKr): string {

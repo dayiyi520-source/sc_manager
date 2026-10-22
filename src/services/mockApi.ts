@@ -1,3 +1,4 @@
+import { reviewTemplateAggregations } from './reviewTemplateAggregation';
 import { myTaskProgress, canUpdateMyTaskProgress, validateMyTaskProgress } from './myTaskProgress';
 import { mutateCollaboration } from './mockCollaborationMutations';
 import { newestCreatedFirst } from '../utils/creationOrder';
@@ -931,6 +932,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     if (record.kind === 'review') {
       if (!owner) throw new Error('复盘人员不存在');
       record.payload = bindReviewTemplate(record.payload, settings, owner, getOkrPeople(), body.submit !== false);
+      record.payload.reviewTemplateAggregations = reviewTemplateAggregations(record.payload, records, getOkrPeople(), ownerId, body.submit !== false);
       validateReviewProgress(record.payload, ownerId, records, getOkrPeople());
     }
     const reviewerId = record.kind === 'objective' && body.submit !== false && owner && settings.confirmation ? confirmationReviewer(owner,'create',record.payload,settings,getOkrPeople()) : undefined;
@@ -965,6 +967,7 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
         const access = reviewSubmissionAccess(read<OkrSettings>(KEYS.okrSettings, MOCK_OKR_SETTINGS as OkrSettings), payload);
         if (!access.allowed) throw new Error(access.reason);
       }
+      payload.reviewTemplateAggregations = reviewTemplateAggregations(payload, records, getOkrPeople(), record.ownerId, body.action === 'submit');
       validateReviewProgress(payload, record.ownerId, records, getOkrPeople());
       const department = body.action === 'submit' ? submitDepartmentReview(payload, record.ownerId, records, getOkrPeople()) : { records, payload };
       const next = { ...record, payload: department.payload, status: body.action === 'submit' ? 'submitted' : record.status, ...(body.action === 'submit' ? { submittedAt: now() } : {}), version: record.version + 1 };

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SupervisorKrReviewCard } from './SupervisorKrReviewCard';
 import type { OkrKrReview, OkrWork } from '../../../services/okrRepository';
 const review: OkrKrReview = { objectiveId: 'o', objectiveTitle: '目标', keyResultId: 'kr', keyResultTitle: 'KR', previousProgress: 0, currentProgress: 0, workIds: [], health: 'normal', achievement: '', blocker: '', nextPlan: '' };
-const props = { review, employeeActions: [], supports: [], busy: false, editable: true, supportLoading: false, onUpdate: vi.fn(), onEmployeeSupport: vi.fn(), viewerId: 'm' };
+const props = { review, supports: [], busy: false, editable: true, supportLoading: false, onUpdate: vi.fn(), onEmployeeSupport: vi.fn(), viewerId: 'm' };
 describe('主管本人进度和证据', () => {
   it('allows self-assigned progress and evidence actions below employee evidence', () => {
     const add = vi.fn(), remove = vi.fn(), update = vi.fn();
@@ -57,4 +57,27 @@ it('never inherits main KR permission for unassigned sub KR rows', () => {
     expect(row.queryByRole('spinbutton')).not.toBeInTheDocument();
     expect(row.getByText('——')).toBeInTheDocument();
   }
+});
+
+
+it('lists only assigned employees, hides plans and leaves unsubmitted progress blank', () => {
+  const onView = vi.fn();
+  const snapshot = { id: 'report', authorId: 'e', authorName: '已提交员工', title: '周报', startDate: '2026-10-12', endDate: '2026-10-18', status: 'submitted', krReviews: [{ ...review, keyResultTitle: '不应展示的个人计划', previousProgress: 20, currentProgress: 60 }], assistance: [], items: [] };
+  render(<SupervisorKrReviewCard {...props} onEmployeeSupport={onView} assignedEmployees={[{ authorId: 'e', authorName: '已提交员工' }, { authorId: 'pending', authorName: '未提交员工' }]} review={{ ...review, employeeReviewSnapshots: [snapshot, { ...snapshot, id: 'outsider', authorId: 'other', authorName: '未指派员工' }] }}/>);
+  fireEvent.click(screen.getByText('员工复盘支撑'));
+  for (const title of ['员工', '复盘前进度', '当前进度', '是否提交', '查看']) expect(screen.getByRole('columnheader', { name: title })).toBeInTheDocument();
+  expect(screen.queryByText('不应展示的个人计划')).not.toBeInTheDocument();
+  expect(screen.queryByText('未指派员工')).not.toBeInTheDocument();
+  const pending = within(screen.getByText('未提交员工').closest('tr')!);
+  expect(pending.getAllByText('——')).toHaveLength(2);
+  expect(pending.getByRole('button')).toBeDisabled();
+  const submitted = within(screen.getByText('已提交员工').closest('tr')!);
+  expect(submitted.getByText('20%')).toBeInTheDocument();
+  expect(submitted.getByText('60%')).toBeInTheDocument();
+  fireEvent.click(submitted.getByRole('button'));
+  expect(onView).toHaveBeenCalledWith('e', ['report']);
+  const progress = screen.getByText('0% → 0%');
+  expect(progress.closest('button')).toBeNull();
+  fireEvent.click(progress);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });

@@ -2,6 +2,7 @@ import type { OkrPayload, OkrPerson, OkrRecord } from './okrRepository';
 import { monthlyReviewTargets } from './okrReviewTargets';
 import { validateReviewKnowledge } from './reviewKnowledge';
 import { reviewTemplateFor } from './okrReviewTemplates';
+import { reviewBlockVisible } from './reviewTemplateConfiguration';
 
 const mean = (values: number[]) => values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length * 10) / 10 : 0;
 const weighted = (rows: Array<{ progress: number; weight?: number }>) => {
@@ -14,7 +15,8 @@ const effective = (record: OkrRecord) => ['active', 'reviewed', 'completed', 'ar
 /** Validate draft and submit through the same authoritative target/assignment query. */
 export function validateReviewProgress(payload: OkrPayload, ownerId: string, records: OkrRecord[], people: OkrPerson[]) {
   if (!['week', 'month'].includes(payload.reviewType || '')) return;
-  for (const entry of payload.knowledgeEntries || []) validateReviewKnowledge(entry);
+  if (reviewBlockVisible(payload, 'knowledge')) for (const entry of payload.knowledgeEntries || []) validateReviewKnowledge(entry);
+  if (!reviewBlockVisible(payload, 'goals')) return;
   const targets = monthlyReviewTargets(records, ownerId, people);
   const supervisor = reviewTemplateFor(people.find(person => person.id === ownerId), people) === 'supervisor';
   const ids = new Set<string>();
@@ -45,8 +47,8 @@ export function validateReviewProgress(payload: OkrPayload, ownerId: string, rec
 
 /** Absolute snapshots, ordered by business period then submission time: week/month never add. */
 export function syncSubmittedReviewProgress(records: OkrRecord[], trigger: OkrRecord, people: OkrPerson[]): OkrRecord[] {
-  if (trigger.kind !== 'review' || !['submitted', 'reviewed', 'active'].includes(trigger.status) || !['week', 'month'].includes(trigger.payload.reviewType || '')) return records;
-  const reports = records.filter(record => record.kind === 'review' && ['submitted', 'reviewed', 'active'].includes(record.status) && ['week', 'month'].includes(record.payload.reviewType || ''))
+  if (trigger.kind !== 'review' || !['submitted', 'reviewed', 'active'].includes(trigger.status) || !['week', 'month'].includes(trigger.payload.reviewType || '') || !reviewBlockVisible(trigger.payload, 'goals')) return records;
+  const reports = records.filter(record => record.kind === 'review' && ['submitted', 'reviewed', 'active'].includes(record.status) && ['week', 'month'].includes(record.payload.reviewType || '') && reviewBlockVisible(record.payload, 'goals'))
     .sort((a, b) => (a.payload.endDate || '').localeCompare(b.payload.endDate || '') || (a.submittedAt || '').localeCompare(b.submittedAt || '') || a.id.localeCompare(b.id));
   let next: OkrRecord[] = records.map(record => ({ ...record, payload: { ...record.payload, keyResults: record.payload.keyResults?.map(kr => ({ ...kr, details: kr.details?.map(row => ({ ...row })), executionActions: kr.executionActions?.map(action => ({ ...action })) })) } }));
   // Only authoritative, still-assigned snapshots participate. Old snapshots remain readable.
@@ -85,7 +87,19 @@ export function syncSubmittedReviewProgress(records: OkrRecord[], trigger: OkrRe
             if (aligns) {
               const permitted = snapshot.target.parentKeyResultDetails;
               const progress = kr.details?.length ? permitted?.some(row => row.id === detailId) ? snapshot.row.detailProgress?.find(row => row.id === detailId)?.currentProgress : undefined : snapshot.row.currentProgress;
-              if (progress !== undefined) actionContributions.set(`${snapshot.report.ownerId}:${snapshot.row.objectiveId}:${snapshot.row.keyResultId}`, { ownerId: snapshot.report.ownerId, value: progress });
+              if (progress !== undefined) {
+                actionContributions.delete(snapshot.report.ownerId);
+                actionContributions.set(`${snapshot.report.ownerId}:${snapshot.row.objectiveId}:${snapshot.row.keyResultId}`, { ownerId: snapshot.report.ownerId, value: progress });
+              }
+            }
+            if (snapshot.report.ownerId !== record.ownerId && snapshot.row.objectiveId === record.id && snapshot.row.keyResultId === kr.id) {
+              const progress = kr.details?.length
+                ? snapshot.target.parentKeyResultDetails?.some(row => row.id === detailId) ? snapshot.row.detailProgress?.find(row => row.id === detailId)?.currentProgress : undefined
+                : snapshot.row.currentProgress;
+              if (progress !== undefined) {
+                for (const [key, value] of actionContributions) if (value.ownerId === snapshot.report.ownerId) actionContributions.delete(key);
+                actionContributions.set(snapshot.report.ownerId, { ownerId: snapshot.report.ownerId, value: progress });
+              }
             }
             if (snapshot.report.ownerId === record.ownerId && snapshot.row.objectiveId === record.id && snapshot.row.keyResultId === kr.id) {
               const progress = snapshot.row.supervisorProgress?.find(row => row.id === detailId)?.currentProgress;

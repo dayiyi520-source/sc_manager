@@ -130,12 +130,12 @@ describe('employee weekly personal progress', () => {
   it('renders shared KR progress read-only and a single personal progress input without subtable', () => {
     render(<WeeklyReviewEditor {...props} viewer={{ id: 'me', name: '本人', department: '产品部' }} records={[]} okrs={[employeeGoal]} periodOverride={week} reviewerName="主管"/>);
     expect(screen.queryByText('目标1：承接目标')).not.toBeInTheDocument();
-    expect(screen.getByText('KR1')).toBeInTheDocument();
-    expect(screen.getByText('承接目标').parentElement).toHaveTextContent('70%');
-    expect(screen.getByText('我的计划：我的动作')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('我的计划：我的动作'));
+    expect(screen.getByText('O1')).toBeInTheDocument();
+    expect(screen.getByLabelText('部门KR进度')).toHaveTextContent('70%');
+    expect(screen.getByText('我负责的部门KR：我的动作')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('我负责的部门KR：我的动作'));
     expect(screen.queryByText(/所属 KR：/)).not.toBeInTheDocument();
-    expect(screen.getByText('承接目标').parentElement).toHaveTextContent('70%');
+    expect(screen.getByLabelText('部门KR进度')).toHaveTextContent('70%');
     expect(screen.getByRole('spinbutton', { name: '本期更新进度' })).toHaveValue('0');
     expect(screen.queryByText('健康状态:')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('KR子表进度更新')).not.toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('employee weekly personal progress', () => {
     const goal = { ...employeeGoal, keyResults: [{ ...employeeGoal.keyResults[0], businessObject: '师创云平台', parentKeyResultDetails: [{ id: 'd1', name: 'V1.0.0', stage: '产品设计', plannedStartDate: '2026-10-13', plannedEndDate: '2026-10-16' }, { id: 'd2', name: 'V1.1.0', stage: '测试', plannedStartDate: '2026-10-17', plannedEndDate: '2026-10-20' }] }] };
     const save = vi.fn(async (_payload: OkrPayload) => true);
     render(<WeeklyReviewEditor {...props} onSaveDraft={save} viewer={{ id: 'me', name: '本人', department: '产品部' }} records={[]} okrs={[goal]} periodOverride={week} reviewerName="主管"/>);
-    fireEvent.click(screen.getByText('我的计划：我的动作'));
+    fireEvent.click(screen.getByText('我负责的部门KR：我的动作'));
     expect(screen.getByLabelText('KR子表进度更新')).toBeInTheDocument();
     for (const heading of ['产品', '迭代版本', '阶段', '开始时间', '结束时间', '进度修改']) expect(screen.getByRole('columnheader', { name: heading })).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /师创云平台 V1.0.0 产品设计 2026-10-13 2026-10-16/ })).toBeInTheDocument();
@@ -162,7 +162,7 @@ describe('employee weekly personal progress', () => {
     const goal = { ...employeeGoal, keyResults: [{ ...employeeGoal.keyResults[0], parentKeyResultDetails: [{ id: 'd1', name: '产品甲', version: 'V1', stage: '产品设计', plannedStartDate: '2026-10-13', plannedEndDate: '2026-10-16' }] }] };
     const initialPayload: OkrPayload = { title: '已存草稿', ...week, reviewType: 'week', krReviews: [{ ...reviewDraftTargets([goal])[0], currentProgress: 10, health: 'risk', blocker: '等资源', detailProgress: [{ id: 'd1', previousProgress: 0, currentProgress: 10 }] }] };
     render(<WeeklyReviewEditor {...props} viewer={{ id: 'me', name: '本人', department: '产品部' }} records={[]} okrs={[goal]} periodOverride={week} initialPayload={initialPayload} recordStatus="submitted" reviewerName="主管"/>);
-    fireEvent.click(screen.getByText('我的计划：我的动作'));
+    fireEvent.click(screen.getByText('我负责的部门KR：我的动作'));
     expect(screen.getByRole('spinbutton', { name: '产品甲 V1本期更新进度' })).toHaveValue('10');
     expect(screen.getByRole('spinbutton', { name: '产品甲 V1本期更新进度' })).toBeDisabled();
     expect(screen.getByRole('textbox', { name: '我的动作风险原因及所需支持' })).toHaveValue('等资源');
@@ -171,7 +171,7 @@ describe('employee weekly personal progress', () => {
   it('shows risk support only for an automatically risky plan and preserves its text when status recovers', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
     render(<WeeklyReviewEditor {...props} onSaveDraft={save} viewer={{ id: 'me', name: '本人', department: '产品部' }} records={[]} okrs={[employeeGoal]} periodOverride={week} reviewerName="主管"/>);
-    fireEvent.click(screen.getByText('我的计划：我的动作'));
+    fireEvent.click(screen.getByText('我负责的部门KR：我的动作'));
     const reason = screen.getByRole('textbox', { name: '我的动作风险原因及所需支持' });
     fireEvent.change(reason, { target: { value: '等待协作方确认' } });
     fireEvent.change(screen.getByRole('spinbutton', { name: '本期更新进度' }), { target: { value: '100' } });

@@ -9,6 +9,13 @@ import type { OkrPayload, OkrPerson, OkrRecord, OkrSettings } from './okrReposit
 import { saveOkrState, type OkrFileState } from '../../scripts/mock-okr-state-plugin';
 import { currentReviewPeriod } from './okrReviewRules';
 import dayjs from 'dayjs';
+vi.mock('../data/mockSnapshot', async importOriginal => {
+  const original = await importOriginal<typeof import('../data/mockSnapshot')>();
+  return { ...original, MOCK_OKR_PEOPLE: [...original.MOCK_OKR_PEOPLE,
+    { id: 'm', name: '主管', department: '研发', supervisorId: '', goalRole: 'supervisor', rootFlag: 0, version: 0 },
+    { id: 'e', name: '员工', department: '研发', supervisorId: 'm', goalRole: 'employee', rootFlag: 0, version: 0 },
+  ] };
+});
 const settingsKey = 'shichuang.frontend.mock.okrSettings';
 const recordKey = 'shichuang.frontend.mock.okrRecords';
 const settings: OkrSettings = { version: 0, administratorIds: ['user-admin'], supervisorIds: [], defaultView: 'list', templates: [], timeRules: [], validation: { actionWeightTotal: 100, maxActions: 8, assigneeMultiple: true, keyNodeMultiple: true, resultRequired: true }, dictionaries: { productNodes: [], deliveryNodes: [], presalesNodes: [], supportTypes: [] } };
@@ -76,6 +83,40 @@ it('persists disable, re-enable and deletion through settings requests', async (
   current = await mockApiRequest('/api/okr/settings') as OkrSettings;
   await saveSettings({ ...current, reviewReportTemplates: [] });
   expect((await mockApiRequest('/api/okr/settings') as OkrSettings).reviewReportTemplates).toEqual([]);
+});
+
+it('round-trips configurable employee linkage and judgment, preserves report snapshots after disabling templates', async () => {
+  const people: OkrPerson[] = [
+    { id: 'm', name: '主管', department: '研发', supervisorId: '', goalRole: 'supervisor', rootFlag: 0, version: 0 },
+    { id: 'e', name: '员工', department: '研发', supervisorId: 'm', goalRole: 'employee', rootFlag: 0, version: 0 },
+  ];
+  localStorage.setItem('shichuang.frontend.mock.okrPeople', JSON.stringify(people));
+  const employeeTemplate = { ...newReviewTemplate(), id: 'employee-link', name: '员工联动周报', department: '研发', status: 'published' as const, effectiveFrom: '2099-01-01' };
+  employeeTemplate.blocks.push({ id: 'ideas', title: '流程建议', guidance: '', fields: [{ id: 'idea-text', label: '建议内容', type: 'textarea', required: false }], departmentLink: { reportType: 'week' } });
+  const managerTemplate = { ...newReviewTemplate(), id: 'manager-link', name: '部门联动周报', department: '研发', audience: 'supervisor' as const, status: 'published' as const, effectiveFrom: '2099-01-01' };
+  managerTemplate.blocks.push({ id: 'summary', title: '员工建议', guidance: '', fields: [], aggregation: { sourceBlockId: 'ideas', sourceReportType: 'week', needsJudgment: true, judgmentLabel: '后续动作', judgmentOptions: ['安排试点', '继续观察'] } });
+  await saveSettings({ ...settings, supervisorIds: ['m'], reviewReportTemplates: [employeeTemplate, managerTemplate] });
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2099-01-15T12:00:00'));
+  const period = currentReviewPeriod('week', dayjs());
+  const employeePayload: OkrPayload = { title: '员工周报', reviewType: 'week', ...period, reviewTemplateSnapshot: employeeTemplate, reviewTemplateValues: { 'idea-text': '先做小范围试点' } };
+  const employee = await mockApiRequest('/api/okr/records', { method: 'POST', body: JSON.stringify({ viewerId: 'e', kind: 'review', periodKey: period.startDate, payload: employeePayload }) });
+  await mockApiRequest(`/api/okr/records/${employee.id}/viewed`, { method: 'POST', body: JSON.stringify({ viewerId: 'm' }) });
+  const managerPayload: OkrPayload = { title: '部门周报', reviewType: 'week', reviewMode: 'supervisor', ...period, reviewTemplateSnapshot: managerTemplate };
+  const manager = await mockApiRequest('/api/okr/records', { method: 'POST', body: JSON.stringify({ viewerId: 'm', kind: 'review', periodKey: period.startDate, payload: managerPayload, submit: false }) });
+  let reloaded = (await mockApiRequest('/api/okr/records?viewerId=m') as OkrRecord[]).find(row => row.id === manager.id)!;
+  expect(reloaded.payload.reviewTemplateAggregations?.summary).toEqual([{ employeeId: 'e', employeeName: '员工', reviewId: employee.id, content: '先做小范围试点' }]);
+  const patch = (payload: OkrPayload, viewerId = 'm') => mockApiRequest(`/api/okr/records/${manager.id}`, { method: 'PATCH', body: JSON.stringify({ payload, viewerId, version: 0, action: 'submit' }) });
+  await expect(patch(reloaded.payload, 'e')).rejects.toThrow('本人');
+  await expect(patch(reloaded.payload)).rejects.toThrow('后续动作');
+  const current = await mockApiRequest('/api/okr/settings') as OkrSettings;
+  await saveSettings({ ...current, reviewReportTemplates: current.reviewReportTemplates!.map(row => ({ ...row, enabled: false })) });
+  reloaded.payload.reviewTemplateAggregations!.summary[0].judgment = '安排试点';
+  await patch(reloaded.payload);
+  reloaded = (await mockApiRequest('/api/okr/records?viewerId=m') as OkrRecord[]).find(row => row.id === manager.id)!;
+  expect(reloaded.status).toBe('submitted');
+  expect(reloaded.payload.reviewTemplateSnapshot).toEqual(managerTemplate);
+  expect(reloaded.payload.reviewTemplateAggregations?.summary[0]).toMatchObject({ content: '先做小范围试点', judgment: '安排试点' });
+  expect(reloaded.payload.reviewTemplateSnapshot?.blocks.at(-1)?.aggregation?.judgmentOptions).toEqual(['安排试点', '继续观察']);
 });
 it('round-trips template configuration and report snapshots through an isolated state file', () => {
   const dir = mkdtempSync(join(tmpdir(), 'review-template-'));

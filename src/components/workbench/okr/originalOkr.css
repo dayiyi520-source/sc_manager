@@ -982,7 +982,6 @@
 .okr-target-list-item .okr-target-action-index { position: absolute; left: -48px; top: 16px; width: 40px; }
 .okr-target-list-item .okr-kr-detail-table { grid-column: 1 / -1; margin-left: 0; }
 .okr-target-list-item .okr-target-execution-actions { grid-template-columns: subgrid; }
-.okr-target-grid-card .okr-target-card-title h3,
 .okr-target-grid-card .okr-target-action-content strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
 .okr-target-grid-card .okr-target-action-content { display: block; min-width: 0; }
 .okr-period-progress { display: flex; align-items: center; gap: 12px; width: 180px; margin-left: auto; }
@@ -1321,3 +1320,5 @@
 .okr-monthly-sparkline circle.is-monthly { fill: var(--bg-surface); }
 @media (max-width: 1180px) { .okr-monthly-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .okr-monthly-metrics { grid-template-columns: minmax(0, 1fr); } }
+
+.okr-target-grid-card .okr-target-card-title h3 { display:block; white-space:normal; overflow-wrap:anywhere; -webkit-line-clamp:unset; }

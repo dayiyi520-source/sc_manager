@@ -52,7 +52,7 @@ describe('OKR permission grants and effective reviewers',()=>{
  it('keeps company creation available to administrators and rejects new personal drafts',()=>{
   const config=base();config.permissionGrants!.admin=[];
   expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'公司目标',goalModelVersion:2,goalLevel:'company'}},[],people,config)).not.toThrow();
-  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'个人目标',goalModelVersion:2,goalLevel:'personal',origin:'autonomous'}},[],people,config)).toThrow('无需填写个人目标');
+  expect(()=>mutateOkrLifecycle(undefined,{kind:'objective',viewerId:'admin',periodKey:'2026-10',submit:false,payload:{title:'个人目标',goalModelVersion:2,goalLevel:'personal',origin:'autonomous'}},[],people,config)).toThrow('无需自行添加');
  });
  it('replaces an administrator without changing other roles and rejects invalid replacements',()=>{
   const config={...base(),subAdministratorIds:['sub'],permissionGrants:{admin:OKR_PERMISSIONS,sub:['companyGoalEdit' as const]}};

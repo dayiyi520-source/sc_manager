@@ -27,6 +27,7 @@ export interface OkrPayload extends GoalTiming {
   reviewTemplateValues?: import('./reviewTemplateConfiguration').ReviewTemplateValues;
   departmentReviewExclusions?: DepartmentReviewExclusion[];
   departmentFeedbackRows?: DepartmentReviewFeedback[];
+  reviewTemplateAggregations?: Record<string, Array<{ employeeId: string; employeeName: string; reviewId: string; content: string; judgment?: string }>>;
   departmentObjectiveVersions?: Record<string, number>;
   departmentContentSnapshots?: OkrWeeklyReviewSnapshot[];
   objectiveTitleTemplateId?: string; objectiveTemplateKrTypes?: OkrTemplateKrType[];

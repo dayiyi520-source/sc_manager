@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import type { OkrPerson, OkrRecord, OkrKrReview } from './okrRepository';
+import type { OkrPerson, OkrRecord, OkrKrReview, OkrSettings } from './okrRepository';
 import { mockApiRequest } from './mockApi';
+import { MOCK_OKR_SETTINGS } from '../data/mockSnapshot';
 import { monthlyReviewTargets } from './okrReviewTargets';
 import { departmentKrAggregation, submitDepartmentReview } from './departmentReviewAggregation';
 const people = vi.hoisted(() => ([{ id: 'm', name: '主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 1 }, ...['a','b'].map(id => ({ id, name: id, department: '产品部', supervisorId: 'm', rootFlag: 0, version: 1 }))] as OkrPerson[]));
@@ -60,6 +61,7 @@ describe('department review authoritative aggregation', () => {
 describe('department review submission storage', () => {
   it('keeps a draft isolated then synchronizes shared progress atomically on submission', async () => {
     const records = [department,goal('a'),goal('b'),report('a',[40,80]),report('b',[60,80])];
+    localStorage.setItem('shichuang.frontend.mock.okrSettings', JSON.stringify({ ...(MOCK_OKR_SETTINGS as OkrSettings), supervisorIds: ['m'] }));
     localStorage.setItem('shichuang.frontend.mock.okrPeople',JSON.stringify(people));
     localStorage.setItem('shichuang.frontend.mock.okrRecords',JSON.stringify(records));
     const payload = { title:'部门周报',reviewType:'week',reviewMode:'supervisor',...period,krReviews:[target],departmentObjectiveVersions:{o:1} };

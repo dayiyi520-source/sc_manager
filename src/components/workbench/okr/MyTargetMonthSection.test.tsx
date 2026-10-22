@@ -367,3 +367,12 @@ it('opens objective history from the list progress without opening details', () 
   expect(onProgress).toHaveBeenCalledWith('active-target', 'active-target');
   expect(onOpenTarget).not.toHaveBeenCalled();
 });
+
+it.each(['list', 'card'] as const)('shows read-only assigned targets without edit or more in %s', viewMode => {
+  const open = vi.fn();
+  render(<MyTargetMonthSection periodKey="2026-09" targets={[{ ...targets[1], readOnly: true }]} viewMode={viewMode} collapsed={false} onToggle={vi.fn()} onOpenTarget={open} onEditTarget={vi.fn()} onDeleteTarget={vi.fn()}/>);
+  expect(screen.queryByRole('button', { name: /^编辑目标：/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^更多操作：/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('heading', { name: targets[1].title }));
+  expect(open).not.toHaveBeenCalled();
+});

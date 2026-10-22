@@ -9,8 +9,14 @@ export const FIXED_REVIEW_BLOCKS = [
 export const REVIEW_FIELD_TYPES = { text: '单行文本', textarea: '多行文本', number: '数值', percentage: '百分比', date: '日期', select: '单选', multiselect: '多选', boolean: '是 / 否', person: '人员', department: '部门', link: '链接', table: '明细表格' } as const;
 export type ReviewFieldType = keyof typeof REVIEW_FIELD_TYPES;
 export interface ReviewTemplateField { id: string; label: string; type: ReviewFieldType; required: boolean; options?: string[]; columns?: string[]; placeholder?: string; maxLength?: number }
-export interface ReviewTemplateBlock { id: string; title: string; guidance: string; fields: ReviewTemplateField[] }
+export interface ReviewTemplateBlock {
+  id: string; title: string; guidance: string; fields: ReviewTemplateField[]; visible?: boolean;
+  departmentLink?: { reportType: 'week' | 'month' };
+  aggregation?: { sourceBlockId: string; sourceReportType: 'week' | 'month'; needsJudgment: boolean; judgmentLabel: string; judgmentOptions: string[] };
+}
+export const parseJudgmentOptions = (text: string) => text.split(/[,，]/).map(value => value.trim()).filter(Boolean);
 export interface ReviewReportTemplate {
+  configurationVersion?: 2;
   id: string; name: string; department: string; audience: 'employee' | 'supervisor'; reportType: 'week' | 'month';
   version: number; status: 'draft' | 'published'; enabled?: boolean; effectiveFrom: string; blocks: ReviewTemplateBlock[];
 }
@@ -30,8 +36,22 @@ export function activateReviewTemplate(rows: ReviewReportTemplate[], target: Rev
   return [...rows.filter(row => row.id !== target.id).map(row => sameScope(row, target) && reviewTemplateEnabled(row) ? { ...row, enabled: false } : row), next];
 }
 export function newReviewTemplate(): ReviewReportTemplate {
-  return { id: crypto.randomUUID(), name: '', department: '*', audience: 'employee', reportType: 'week', version: 1, status: 'draft', effectiveFrom: dayjs().add(1, 'day').format('YYYY-MM-DD'), blocks: FIXED_REVIEW_BLOCKS.map(block => ({ ...block, guidance: '', fields: [] })) };
+  return { configurationVersion: 2, id: crypto.randomUUID(), name: '', department: '*', audience: 'employee', reportType: 'week', version: 1, status: 'draft', effectiveFrom: dayjs().add(1, 'day').format('YYYY-MM-DD'), blocks: FIXED_REVIEW_BLOCKS.map(block => ({ ...block, guidance: '', fields: [] })) };
 }
+/** Convert legacy defaults only when explicitly creating a new template version. */
+export function configurableReviewTemplate(template: ReviewReportTemplate): ReviewReportTemplate {
+  if (template.configurationVersion === 2) return template;
+  const next = structuredClone(template);
+  next.configurationVersion = 2;
+  if (next.audience === 'employee' && next.reportType === 'month') {
+    const source = next.blocks.find(block => block.id === 'suggestions');
+    if (source) source.departmentLink = { reportType: 'month' };
+    else next.blocks.push({ id: 'suggestions', title: '对公司或部门发展有帮助的意见和建议', guidance: '', departmentLink: { reportType: 'month' }, fields: [{ id: 'suggestions-text', label: '意见和建议', type: 'textarea', required: false, maxLength: 10000 }] });
+  }
+  if (next.audience === 'supervisor' && next.reportType === 'month' && !next.blocks.some(block => block.aggregation)) next.blocks.push({ id: 'employeeSuggestions', title: '部门反馈问题梳理与分析', guidance: '', fields: [], aggregation: { sourceBlockId: 'suggestions', sourceReportType: 'month', needsJudgment: true, judgmentLabel: '主管判断', judgmentOptions: ['已内部解决', '需公司解决', '无需处理'] } });
+  return next;
+}
+export const reviewBlockVisible = (payload: OkrPayload, id: string) => !payload.reviewTemplateSnapshot?.blocks.some(block => block.id === id && block.visible === false);
 const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && dayjs(value).isValid() && dayjs(value).format('YYYY-MM-DD') === value;
 export function validateReviewTemplates(rows: ReviewReportTemplate[], previous: ReviewReportTemplate[] = [], today = dayjs().format('YYYY-MM-DD')): string | undefined {
   if (rows.length > 200 || new Set(rows.map(row => row.id)).size !== rows.length) return '模板数量超限或编号重复';
@@ -52,6 +72,15 @@ export function validateReviewTemplates(rows: ReviewReportTemplate[], previous: 
     const ids = new Set<string>();
     for (const block of row.blocks) {
       if (!block.title.trim() || block.title.length > 100 || block.fields.length > 30) return '板块名称必填，每个板块最多30个字段';
+      if (block.visible !== undefined && typeof block.visible !== 'boolean') return '板块显示状态无效';
+      const fixed = FIXED_REVIEW_BLOCKS.some(item => item.id === block.id);
+      if (block.departmentLink && (fixed || row.audience !== 'employee' || block.departmentLink.reportType !== row.reportType)) return '员工扩展板块仅可联动同类型部门报告';
+      if (block.aggregation) {
+        const config = block.aggregation;
+        if (fixed || row.audience !== 'supervisor' || !config.sourceBlockId || config.sourceReportType !== row.reportType || typeof config.needsJudgment !== 'boolean') return '请选择同类型员工报告的有效来源板块';
+        if (config.needsJudgment && (!config.judgmentLabel.trim() || config.judgmentLabel.length > 100 || !config.judgmentOptions.length || config.judgmentOptions.length > 30 || config.judgmentOptions.some(option => !option.trim() || option.length > 100) || new Set(config.judgmentOptions).size !== config.judgmentOptions.length)) return '判断名称必填，选项须为1至30个不重复且不超过100字的内容';
+        if (row.status === 'published' && !previous.some(old => old.id === row.id && old.status === 'published') && block.visible !== false && !rows.some(source => source.audience === 'employee' && source.reportType === config.sourceReportType && (source.department === row.department || source.department === '*') && reviewTemplateEnabled(source) && source.effectiveFrom <= row.effectiveFrom && source.blocks.some(item => item.id === config.sourceBlockId && item.visible !== false && item.departmentLink?.reportType === row.reportType))) return '汇总来源未发布、已隐藏或未开启联动，请先配置员工模板';
+      }
       for (const field of block.fields) {
         if (!field.id || ids.has(field.id) || !field.label.trim() || field.label.length > 100 || !Object.hasOwn(REVIEW_FIELD_TYPES, field.type) || typeof field.required !== 'boolean') return '字段名称、类型无效或编号重复';
         ids.add(field.id);
@@ -70,7 +99,7 @@ export function matchReviewTemplate(settings: OkrSettings | undefined, departmen
 }
 export function reviewTemplateErrors(template: ReviewReportTemplate | null | undefined, values: ReviewTemplateValues = {}, required = true): string[] {
   const errors: string[] = [];
-  for (const field of template?.blocks.flatMap(block => block.fields) || []) {
+  for (const field of template?.blocks.filter(block => block.visible !== false && !block.aggregation).flatMap(block => block.fields) || []) {
     const value = values[field.id];
     const empty = value == null || typeof value === 'string' && !value.trim() || Array.isArray(value) && !value.length;
     if (empty) { if (required && field.required) errors.push(`请填写${field.label}`); continue; }
@@ -94,10 +123,16 @@ export function bindReviewTemplate(payload: OkrPayload, settings: OkrSettings, o
   const audience = reviewTemplateFor(owner, people) === 'supervisor' ? 'supervisor' : 'employee';
   const template = previous ? previous.reviewTemplateSnapshot || null : matchReviewTemplate(settings, owner.department, audience, payload.reviewType || 'week', payload.startDate || '') || null;
   if (!previous && JSON.stringify(payload.reviewTemplateSnapshot || null) !== JSON.stringify(template)) throw new Error('适用模板已变化，请重新打开填写页面');
-  const values = template ? Object.fromEntries(template.blocks.flatMap(block => block.fields).map(field => [field.id, payload.reviewTemplateValues?.[field.id]]).filter(([, value]) => value !== undefined)) : {};
+  const values = template ? Object.fromEntries(template.blocks.flatMap(block => block.fields.map(field => [field.id, (block.visible === false ? previous?.reviewTemplateValues : payload.reviewTemplateValues)?.[field.id]])).filter(([, value]) => value !== undefined)) : {};
   const errors = reviewTemplateErrors(template, values, submit);
   if (errors.length) throw new Error(errors.join('；'));
-  return { ...payload, reviewTemplateSnapshot: template ? structuredClone(template) : null, reviewTemplateValues: values };
+  const bound = { ...payload, reviewTemplateSnapshot: template ? structuredClone(template) : null, reviewTemplateValues: values };
+  // Hidden business sections retain their saved values and cannot accept new edits.
+  if (!reviewBlockVisible(bound, 'goals')) bound.krReviews = previous?.krReviews || [];
+  if (!reviewBlockVisible(bound, 'knowledge')) bound.knowledgeEntries = previous?.knowledgeEntries || [];
+  if (!reviewBlockVisible(bound, 'extra')) { bound.items = previous?.items || []; bound.extraWork = previous?.extraWork; }
+  if (!reviewBlockVisible(bound, 'assistance')) bound.assistance = previous?.assistance || [];
+  return bound;
 }
 
 export function moveReviewBlock(blocks: ReviewTemplateBlock[], sourceId: string, targetId: string, after = false): ReviewTemplateBlock[] {

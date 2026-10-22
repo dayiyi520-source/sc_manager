@@ -11,6 +11,16 @@ const people: OkrPerson[] = [
 ];
 
 describe('OkrScopeSidebar', () => {
+  it('lists departments without employee entries and selects the department directly', () => {
+    const select = vi.fn();
+    render(<OkrScopeSidebar people={people} currentUserId="boss" selection={{scope:'my'}} onSelect={select} onAddTarget={vi.fn()}/>);
+    fireEvent.click(screen.getByRole('button', {name:'其他部门'}));
+    fireEvent.click(screen.getByRole('button', {name:'产品部'}));
+    expect(select).toHaveBeenLastCalledWith({scope:'otherDepartments',department:'产品部'});
+    expect(screen.queryByRole('button', {name:'刘员工'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name:'林主管'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name:'展开产品部'})).not.toBeInTheDocument();
+  });
   it('only offers company creation for administrators', () => {
     const add=vi.fn();
     render(<OkrScopeSidebar people={people} currentUserId="boss" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={add}/>);
@@ -27,10 +37,10 @@ describe('OkrScopeSidebar', () => {
   });
   it('provides direct department and company target scopes without member entries', () => {
     const groups = buildOkrScopeGroups(people, 'manager');
-    expect(groups.map(group => group.key)).toEqual(['my', 'department', 'company', 'myDepartment', 'otherDepartments', 'confirmation']);
+    expect(groups.map(group => group.key)).toEqual(['my', 'department', 'company', 'otherDepartments']);
     expect(groups.find(group => group.key === 'department')?.members).toEqual([]);
     expect(groups.find(group => group.key === 'company')?.members).toEqual([]);
-    expect(groups.find(group => group.key === 'myDepartment')?.members.map(person => person.id)).toEqual(['staff']);
+    expect(groups.some(group => group.key === 'confirmation')).toBe(false);
   });
 
   it('selects department and company targets directly', () => {
@@ -40,25 +50,22 @@ describe('OkrScopeSidebar', () => {
     expect(onSelect).toHaveBeenCalledWith({ scope: 'department' });
     fireEvent.click(screen.getByRole('button', { name: '公司目标' }));
     expect(onSelect).toHaveBeenCalledWith({ scope: 'company' });
-    fireEvent.click(screen.getByRole('button', { name: '我部门的' }));
-    expect(onSelect).toHaveBeenCalledWith({ scope: 'myDepartment' });
+    expect(screen.queryByRole('button', { name: '我部门的' })).not.toBeInTheDocument();
     expect(screen.queryByText('直属上级')).not.toBeInTheDocument();
     expect(screen.queryByText('直属下级')).not.toBeInTheDocument();
   });
-  it('offers manager department and own-personal creation without a new navigation group', async () => {
+  it('offers department creation without personal creation', async () => {
     const add=vi.fn();
     render(<OkrScopeSidebar people={people} currentUserId="manager" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={add}/>);
-    fireEvent.click(screen.getByRole('button',{name:'添加目标选项'}));
-    fireEvent.click(await screen.findByRole('menuitem',{name:'部门目标'}));
+    fireEvent.click(screen.getByRole('button',{name:'添加部门目标'}));
     expect(add).toHaveBeenCalledWith('department');
-    fireEvent.click(screen.getByRole('button',{name:'添加目标选项'}));
-    fireEvent.click(await screen.findByRole('menuitem',{name:'我的目标'}));
-    expect(add).toHaveBeenCalledWith('personal');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem',{name:'我的目标'})).not.toBeInTheDocument();
     expect(screen.queryByRole('button',{name:'个人目标'})).not.toBeInTheDocument();
   });
   it('hides confirmation for individual employees but keeps my department', () => {
     const groups = buildOkrScopeGroups(people, 'staff');
-    expect(groups.map(group => group.label)).toEqual(['我的目标', '部门目标', '公司目标', '我部门的', '其他部门']);
-    expect(groups.find(group => group.key === 'myDepartment')?.members.map(person => person.id)).toEqual(['manager']);
+    expect(groups.map(group => group.label)).toEqual(['我的目标', '部门目标', '公司目标', '其他部门']);
+    for (const person of people) expect(buildOkrScopeGroups(people, person.id).some(group => group.key === 'myDepartment')).toBe(false);
   });
 });

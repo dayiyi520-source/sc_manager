@@ -26,6 +26,7 @@ export const hasOkrPermission = (viewer: string, permission: OkrPermission, sett
   return !!policy.permissionGrants?.[viewer]?.includes(permission);
 };
 export const canEditOkr = (record: OkrRecord, viewer: string, settings?: OkrSettings, people: OkrPerson[] = []) => {
+  if (record.payload.goalLevel === 'personal' && (record.payload.origin === 'assigned' || record.payload.sourceObjectiveId) && goalLevel(people.find(person => person.id === viewer)) === '个人级') return false;
   const companyGoal = record.payload.goalLevel === 'company' || record.payload.goalModelVersion !== 2 && record.kind === 'objective' && !!people.find(person => person.id === record.ownerId)?.rootFlag;
   return companyGoal ? hasOkrPermission(viewer,'companyGoalEdit',settings,people) : record.ownerId === viewer;
 };

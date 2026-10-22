@@ -37,7 +37,7 @@ describe('goal creation policy',()=>{
   expect(creationSources(records,people[1],'personal',people).map(r=>r.id)).toEqual(['dept']);
   expect(creationSources(records,people[2],'personal',people).map(r=>r.id)).toEqual(['dept']);
   expect(creationPeriodError(records,people[1],'department',people,'2026-12')).toBe('公司级目标还未提交，暂时无法添加目标');
-  expect(creationPeriodError(records,people[2],'personal',people,'2026-11')).toBe('部门级目标还未提交，暂时无法添加目标');
+  expect(creationPeriodError(records,people[2],'personal',people,'2026-11')).toBe('个人月度目标由部门指派，无需自行添加');
  });
  it('reserves templates across KR sources and statuses, releases deleted records and separates periods',()=>{
   const records=[department,{...department,id:'second',status:'draft',payload:{...department.payload,sourceKrId:'another',objectiveTitleTemplateId:'t2'}},{...department,id:'old',status:'deleted',payload:{...department.payload,objectiveTitleTemplateId:'t3'}}];
@@ -59,13 +59,9 @@ describe('goal creation policy',()=>{
  });
 });
 
-it('approves a manager personal goal aligned to the department without losing the action',()=>{
- const payload:OkrPayload={title:'完成个人工作',goalModelVersion:2,goalLevel:'personal',origin:'autonomous',sourceObjectiveId:'dept',sourceKrId:'dk',sourceVersion:1,weight:100,deadline:'2026-10-31',keyResults:[{id:'mine',title:'完成个人工作',weight:100,progress:0,deadline:'2026-10-31',assigneeIds:['manager'],executionActions:[{id:'a',ownerId:'manager',title:'完成个人工作',weight:100,progress:0,deadline:'2026-10-31'}]}]};
- const created=mutateOkrLifecycle(undefined,{viewerId:'manager',periodKey:'2026-10',submit:true,payload},[company,department],people,settings)!;
- const pending=created.records.at(-1)!;
- const approved=mutateOkrLifecycle(pending.id,{viewerId:'boss',version:pending.version,action:'approve-change'},created.records,people,settings)!;
- expect(approved.records.at(-1)?.status).toBe('active');
- expect(approved.records.at(-1)?.payload.keyResults?.[0].executionActions?.[0].title).toBe('完成个人工作');
+it('blocks manager personal creation even with a department source',()=>{
+ const payload:OkrPayload={title:'完成个人工作',goalModelVersion:2,goalLevel:'personal',origin:'autonomous',sourceObjectiveId:'dept',sourceKrId:'dk',sourceVersion:1};
+ expect(()=>mutateOkrLifecycle(undefined,{viewerId:'manager',periodKey:'2026-10',submit:true,payload},[company,department],people,settings)).toThrow('无需自行添加');
 });
 
 it('keeps each assigned KR available for challenges even after draft or submitted goals exist',()=>{

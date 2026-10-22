@@ -69,13 +69,13 @@ describe('personal monthly editor', () => {
   it('keeps goal evidence in a weekly-style empty panel, then shows its table for saved links', () => {
     const objective: OKRItem = { id: 'mine', ownerId: 'me', ownerName: '本人', department: '产品部', cycle: '2026-10', category: 'my', objective: '月度目标', primaryLabel: 'KR', progress: 0, weight: 100, deadline: '2026-10-31', keyResults: [{ id: 'a', content: '我的动作', progress: 0, weight: 100, deadline: '2026-10-31' }] };
     const empty = render(<MonthlyReviewEditor {...props} okrs={[objective]} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
-    fireEvent.click(screen.getByText('我的计划：我的动作'));
+    fireEvent.click(screen.getByText('我负责的部门KR：我的动作'));
     expect(screen.getByText('(暂未关联本期工作任务)')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '来源归属' })).not.toBeInTheDocument();
     empty.unmount();
     const draft: OkrPayload = { title: '月报草稿', reviewType: 'month', startDate: '2026-10-01', endDate: '2026-10-31', krReviews: [{ objectiveId: 'mine', objectiveTitle: '月度目标', keyResultId: 'a', keyResultTitle: '我的动作', previousProgress: 0, currentProgress: 0, health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: ['task'] }], items: [{ workId: 'task', title: '实际任务', status: '进行中', sourceLabel: '产品线 / V1', result: '', impact: '' }] };
     render(<MonthlyReviewEditor {...props} okrs={[objective]} initialPayload={draft} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
-    fireEvent.click(screen.getByText('我的计划：我的动作'));
+    fireEvent.click(screen.getByText('我负责的部门KR：我的动作'));
     expect(screen.getByRole('columnheader', { name: '来源归属' })).toBeInTheDocument();
     expect(screen.getByText('实际任务')).toBeInTheDocument();
   });
@@ -94,14 +94,15 @@ describe('personal monthly editor', () => {
     expect(screen.queryByRole('columnheader', { name: '员工甲' })).not.toBeInTheDocument();
     expect(screen.queryByText('个人动作：个人动作甲')).not.toBeInTheDocument();
     expect(screen.getByText('——')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '0% → 60%' }));
-    await waitFor(() => expect(screen.getByText('本期员工进度更新')).toBeInTheDocument());
-    const progressDialog = screen.getByText('本期员工进度更新').closest('.ant-modal')! as HTMLElement;
-    expect(within(progressDialog).getByText('员工甲')).toBeInTheDocument();
-    expect(within(progressDialog).getByText('60%')).toBeInTheDocument();
-    fireEvent.click(within(progressDialog).getByRole('button', { name: /关\s*闭/ }));
+    expect(screen.queryByRole('button', { name: '0% → 60%' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('员工复盘支撑'));
+    const supportTable = screen.getByRole('columnheader', { name: '是否提交' }).closest('table')!;
+    const supportRow = within(within(supportTable).getByText('员工甲').closest('tr')!);
+    expect(supportRow.getByText('60%')).toBeInTheDocument();
+    expect(supportRow.getByText('已提交')).toBeInTheDocument();
+    expect(screen.queryByText('本期员工进度更新')).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: '本月部门补充总结' }), { target: { value: '部门总结' } });
-    expect(screen.getByRole('columnheader', { name: '员工' })).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader', { name: '员工' }).length).toBeGreaterThan(0);
     expect(screen.getByRole('columnheader', { name: '意见和建议' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '主管判断' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /存草稿/ }));
@@ -121,9 +122,9 @@ describe('personal monthly editor', () => {
     render(<MonthlyReviewEditor {...props} okrs={[objective]} onSaveDraft={save} onSubmit={vi.fn(async () => true)}/>);
     expect(screen.queryByText('本月总结')).not.toBeInTheDocument();
     expect(screen.queryByText('目标1：承接目标')).not.toBeInTheDocument();
-    expect(screen.getByText('承接目标').parentElement).toHaveTextContent('70%');
-    expect(screen.getByText('我的计划：我的动作')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('我的计划：我的动作'));
+    expect(screen.getByLabelText('部门KR进度')).toHaveTextContent('70%');
+    expect(screen.getByText('我负责的部门KR：我的动作')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('我负责的部门KR：我的动作'));
     expect(screen.getByLabelText('KR子表进度更新')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '我的动作风险原因及所需支持' })).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: '我的动作风险原因及所需支持' }), { target: { value: '资源协调' } });
@@ -179,10 +180,10 @@ describe('personal monthly editor', () => {
         detailRows: [{ id: 'detail', name: '原产品', version: 'V1.0', stage: '产品设计' }], detailProgress: [{ id: 'detail', previousProgress: 0, currentProgress: 80 }] }] };
     render(<MonthlyReviewEditor {...props} recordStatus="submitted" initialPayload={saved} work={[{ id: 't', title: '后续改名任务', actualHours: 99 } as OkrWork]}
       onCopy={onCopy} onSaveDraft={vi.fn(async () => true)} onSubmit={vi.fn(async () => true)}/>);
-    expect(screen.getByText('我的计划：已保存的个人计划')).toBeInTheDocument();
+    expect(screen.getByText('我负责的部门KR：已保存的个人计划')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '本月周报与月报进度趋势' })).toBeInTheDocument();
     expect(screen.getByText('2026-10-10：30%')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('我的计划：已保存的个人计划'));
+    fireEvent.click(screen.getByText('我负责的部门KR：已保存的个人计划'));
     expect(screen.getByText('原产品')).toBeInTheDocument();
     expect(screen.getByRole('spinbutton')).toHaveValue('80');
     expect(screen.getByRole('spinbutton')).toBeDisabled();

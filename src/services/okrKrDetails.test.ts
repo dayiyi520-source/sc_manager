@@ -16,11 +16,13 @@ describe('KR 明细计划校验', () => {
     [{ ...kr.details![1], plannedEndDate: undefined }, '有效计划'],
     [{ ...kr.details![1], plannedStartDate: '2026-02-30' }, '有效计划'],
     [{ ...kr.details![1], plannedStartDate: '2026-10-31' }, '早于'],
-    [{ ...kr.details![1], plannedEndDate: '2026-11-01' }, '超过'],
     [{ ...kr.details![1], stage: '' }, '阶段'],
     [{ ...kr.details![1], name: 'V1' }, '重复'],
   ])('rejects invalid row %#', (row, message) => {
     expect(krDetailsError({ ...kr, details: [kr.details![0], row] })).toContain(message);
+  });
+  it('accepts child KR dates across months beyond its parent deadline', () => {
+    expect(krDetailsError({ ...kr, details: [{ ...kr.details![0], plannedEndDate: '2026-12-01' }] })).toBeUndefined();
   });
   it('keeps legacy records readable without rewriting them', () => {
     const legacy = { ...kr, details: undefined, version: 'V1', stage: '设计' };

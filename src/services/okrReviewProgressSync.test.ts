@@ -80,3 +80,17 @@ it.each(['week', 'month'] as const)('uses approved live assignments for %s, igno
   expect(monthlyReviewTargets(approved, 'a', people)[0].keyResults[0].parentKeyResultDetails?.map(row => row.id)).toEqual(['d2']);
   expect(() => validateReviewProgress({ ...report('a', 40).payload, reviewType }, 'a', approved, people)).toThrow('子 KR');
 });
+
+it.each(['week', 'month'] as const)('reviews direct department assignments without personal copies in %s', reviewType => {
+  const records = [company, department];
+  const targets = monthlyReviewTargets(records, 'a', people);
+  expect(targets).toMatchObject([{ id: 'dept', keyResults: [{ id: 'k', parentKeyResultDetails: [{ id: 'd1' }] }] }]);
+  const submitted = report('a', 60);
+  submitted.payload = { ...submitted.payload, reviewType, krReviews: [{ ...row('a', 60), objectiveId: 'dept', keyResultId: 'k' }] };
+  expect(() => validateReviewProgress(submitted.payload, 'a', records, people)).not.toThrow();
+  const saved = syncSubmittedReviewProgress([...records, submitted], submitted, people);
+  expect(saved.find(record => record.id === 'dept')!.payload.keyResults![0].details![0].progress).toBe(30);
+  expect(syncSubmittedReviewProgress(saved, submitted, people)).toEqual(saved);
+  const revoked = { ...department, payload: { ...department.payload, keyResults: department.payload.keyResults!.map(kr => ({ ...kr, details: kr.details?.map(detail => ({ ...detail, assigneeIds: ['b'] })) })) } };
+  expect(() => validateReviewProgress(submitted.payload, 'a', [revoked], people)).toThrow('本人');
+});

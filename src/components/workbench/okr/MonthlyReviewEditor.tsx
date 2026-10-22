@@ -1,3 +1,4 @@
+import { EmployeeObjectiveHeader } from './EmployeeObjectiveHeader';
 import { reviewEvidenceMetadata } from '../../../services/reviewEvidenceSnapshot';
 import { ReviewKnowledgeContent } from './ReviewKnowledgeContent';
 import { ReviewKnowledgeTable } from './ReviewKnowledgeTable';
@@ -112,7 +113,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
     setSelectedKrIds(previous => [...new Set([...previous, ...added])]);
     lastTargetIds.current = new Set(currentTargets.map(row => row.keyResultId));
   }, [currentTargets, readOnly]);
-  const detachedTargets = krs.filter(row => !currentTargets.some(target => target.objectiveId === row.objectiveId && target.keyResultId === row.keyResultId));
+  const detachedTargets = initialPayload?.reviewTemplateSnapshot?.blocks.some(block => block.id === 'goals' && block.visible === false) ? [] : krs.filter(row => !currentTargets.some(target => target.objectiveId === row.objectiveId && target.keyResultId === row.keyResultId));
   const [selectedKrIds, setSelectedKrIds] = useState(() => initialPayload?.startDate ? initialKrs.filter(item => initialPayload.krReviews?.some(kr => kr.keyResultId === item.keyResultId)).map(item => item.keyResultId) : initialKrs.map(item => item.keyResultId));
   const [suggestions, setSuggestions] = useState(initialPayload?.suggestions || initialPayload?.otherNotes || '');
   const [extraWork, setExtraWork] = useState(initialPayload?.extraWork || { workIds: [], description: '', impact: 'none' });
@@ -261,8 +262,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
         <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />{reviewBlockTitle(reportTemplate.snapshot, 'goals', '1. 本月目标复盘')}</h3></div>
       {monthlyOkrs.length === 0 ? <Empty description="本月暂无 OKR" /> : monthlyOkrs.map((objective, objectiveIndex) => <Collapse key={objective.id} className="okr-review-objective-collapse" defaultActiveKey={[objective.id]} expandIconPosition="end" items={[{
         key: objective.id,
-        label: <div className="flex items-center gap-2"><Tag color="blue">{objective.primaryLabel || 'O'}{objectiveIndex + 1}</Tag><strong>{objective.primaryLabel === 'KR' ? '' : `目标${objectiveIndex + 1}：`}{objective.objective}</strong>{objective.primaryLabel === 'KR' && !readOnly && <Tag>{objective.keyResults[0]?.parentKeyResultProgress ?? objective.progress}%</Tag>}</div>,
-        children: <div className="okr-review-a-list grid gap-4 p-4">{krs.filter(kr => kr.objectiveId === objective.id && objective.keyResults.some(target => target.id === kr.keyResultId)).map((kr, index) => {
+        label: <EmployeeObjectiveHeader objective={objective} records={records} index={objectiveIndex} startDate={period.startDate} endDate={period.endDate} reviewType="month"/>,         children: <div className="okr-review-a-list grid gap-4 p-4">{krs.filter(kr => kr.objectiveId === objective.id && objective.keyResults.some(target => target.id === kr.keyResultId)).map((kr, index) => {
           const expanded = expandedKrs[kr.keyResultId] ?? !defaultCollapsedReview(kr);
           const selected = selectedKrIds.includes(kr.keyResultId);
           const action = objective.keyResults.find(item => item.id === kr.keyResultId);
@@ -271,7 +271,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
           const progress = planProgress(kr);
           return <Collapse key={kr.keyResultId} className="okr-review-a-collapse" activeKey={expanded && selected ? [kr.keyResultId] : []} expandIconPosition="end" onChange={keys => setExpandedKrs(rows => ({ ...rows, [kr.keyResultId]: Boolean(keys.length) }))} items={[{
             key: kr.keyResultId,
-            label: <div className="flex items-center gap-3"><span onClick={event => event.stopPropagation()}><Checkbox checked={selected} disabled={busy || !editorState.editable} aria-label={`选择 KR${index + 1}`} onChange={event => toggleKr(kr.keyResultId, event.target.checked)}/></span><strong>我的计划：{kr.keyResultTitle}</strong><Tag>{progress}%</Tag><Tag color={health === '超预期' ? 'success' : health === '风险' ? 'warning' : health === '逾期' ? 'error' : undefined}>{health || '暂无预期'}</Tag></div>,
+            label: <div className="min-w-0 space-y-2 w-full"><div className="flex flex-wrap items-center gap-3"><span onClick={event => event.stopPropagation()}><Checkbox checked={selected} disabled={busy || !editorState.editable} aria-label={`选择 KR${index + 1}`} onChange={event => toggleKr(kr.keyResultId, event.target.checked)}/></span><strong>我负责的部门KR：{kr.keyResultTitle}</strong><Tag>{progress}%</Tag><Tag color={health === '超预期' ? 'success' : health === '风险' ? 'warning' : health === '逾期' ? 'error' : undefined}>{health || '暂无预期'}</Tag></div><div className="flex items-center gap-3" aria-label="部门KR进度"><Progress percent={action?.parentKeyResultProgress ?? action?.progress ?? 0} showInfo={false} size="small"/><span>{action?.parentKeyResultProgress ?? action?.progress ?? 0}%</span></div></div>,
             children: <div className="space-y-4">
               {details.length ? <EmployeeReviewDetailTable rows={details} productName={action?.businessObject} progress={kr.detailProgress || []}
                 disabled={busy || !editorState.editable} onChange={detailProgress => updateKr(kr.keyResultId, { detailProgress })}/>
@@ -316,7 +316,7 @@ export function MonthlyReviewEditor({ reviewSettings, template = 'employee', peo
         </div>
       <ReviewTemplateSection template={reportTemplate.snapshot} blockId="extra" values={reportTemplate.values} onChange={reportTemplate.setValues} people={people} disabled={busy || readOnly}/>
       </section>
-      {!reportTemplate.hasBlock('suggestions') && <section className="okr-weekly-section" aria-label="对公司或部门发展有帮助的意见和建议">
+      {reportTemplate.snapshot?.configurationVersion !== 2 && !reportTemplate.hasBlock('suggestions') && <section className="okr-weekly-section" aria-label="对公司或部门发展有帮助的意见和建议">
         <div className="okr-weekly-section-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block" />3. 对公司或部门发展有帮助的意见和建议</h3></div>
         <Input.TextArea className="okr-weekly-plan-input" aria-label="对公司或部门发展有帮助的意见和建议" rows={4} maxLength={10000} showCount value={suggestions} onChange={event => setSuggestions(event.target.value)} disabled={busy || !editorState.editable} placeholder="填写对公司或部门发展有帮助的意见和建议" />
       </section>}

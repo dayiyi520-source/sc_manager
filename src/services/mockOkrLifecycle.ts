@@ -35,6 +35,7 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
   if (body.payload && body.kind !== 'review') {
     body = { ...body, payload: normalizeGoalAssignments(body.payload) };
     const payload = body.payload!;
+    if (!recordId && payload.goalLevel === 'personal') throw new Error('个人月度目标由部门指派，无需自行添加');
     if (!recordId && payload.goalModelVersion === 2) {
       const owner = people.find(person => person.id === body.viewerId);
       if (owner) { const unavailable = payload.goalLevel === 'company' ? undefined : creationPeriodError(records, owner, payload.goalLevel === 'department' ? 'department' : 'personal', people, body.periodKey || '',settings); if (unavailable) throw new Error(unavailable); }
@@ -84,7 +85,7 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
       const reviewed: OkrGoalChange = { ...change, previousPayload: change.previousPayload || (change.purpose === 'initial' ? undefined : record.payload), status: body.action === 'approve-change' ? 'approved' : 'returned', reviewedAt: timestamp(), feedback: body.feedback?.trim(), ...(body.suggestedSource ? { payload: { ...change.payload, reviewerSuggestedSource: body.suggestedSource } } : {}) };
       return replace({ ...record, payload: body.action === 'return-change' && change.purpose === 'initial' ? change.payload : body.action === 'approve-change' && change.purpose !== 'delete' ? change.payload.goalModelVersion === 2 ? lockGoalPlan(change.payload) : change.payload : record.payload, status: body.action === 'return-change' && change.purpose === 'initial' ? 'draft' : body.action === 'approve-change' && change.purpose === 'delete' ? 'deleted' : body.action === 'approve-change' && change.purpose === 'initial' ? 'active' : record.status, changeRequest: reviewed, changeHistory: [...(record.changeHistory || []), reviewed], version: record.version + 1 });
     }
-    if (!canEditOkr(record,person.id,settings,people)) throw new Error('只能修改本人目标或已授权的公司级目标');
+    if (body.action === 'acknowledge-source' ? record.ownerId !== person.id : !canEditOkr(record,person.id,settings,people)) throw new Error('只能修改本人目标或已授权的公司级目标');
     if (body.action === 'withdraw-change') {
       if (record.changeRequest?.status !== 'pending') throw new Error('没有待审核申请');
       if (record.ownerId !== person.id) throw new Error('仅申请人可撤回确认流程');
@@ -98,9 +99,8 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
       if (!source || source.status === 'deleted' || (record.payload.origin !== 'autonomous' && !sourceKr?.assigneeIds?.includes(person.id))) {
         return replace({ ...record, payload: { ...record.payload, sourceObjectiveId: undefined, sourceKrId: undefined, sourceVersion: undefined, sourceTitle: undefined, sourceWithdrawalAcknowledged: true }, version: record.version + 1 });
       }
-      const updated = { ...record.payload, sourceWithdrawalAcknowledged: false, sourceVersion: source.version, sourceTitle: sourceKr?.title || source.payload.title,
+      const updated = { ...record.payload, sourceWithdrawalAcknowledged: false, sourceVersion: source.version, sourceTitle: sourceKr?.title || source.payload.title, sourceKrData: sourceKr,
         ...(record.payload.goalLevel === 'personal' && record.payload.origin !== 'autonomous' && sourceKr ? { title: sourceKr.title, keyResults: [{ ...sourceKr, details: assignedDetailRows(sourceKr, person.id), weight: 100, progress: 0, deadline: record.payload.keyResults?.[0]?.deadline || sourceKr.deadline, plannedDeadline: record.payload.keyResults?.[0]?.plannedDeadline, forecastDeadline: record.payload.keyResults?.[0]?.forecastDeadline, assigneeIds: [person.id], executionActions: record.payload.keyResults?.[0]?.executionActions || [] }] } : {}) };
-      verifySource(updated, records, person, record.periodKey, settings, people);
       return replace({ ...record, payload: updated, version: record.version + 1 });
     }
     if (body.action === 'delete') {

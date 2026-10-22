@@ -5,6 +5,8 @@ import type { ReviewPeriod } from './okrReviewRules';
 import { employeeActionsForKr } from './supervisorSupportPanels';
 import { employeeSupportsForKr } from './supervisorReview';
 import { monthlyReviewTargets } from './okrReviewTargets';
+import { reviewTemplateAggregations } from './reviewTemplateAggregation';
+import { reviewBlockVisible } from './reviewTemplateConfiguration';
 
 const average = (values: number[]) => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 10) / 10 : 0;
 const submitted = (record: OkrRecord, reviewType: 'week' | 'month' = 'week') => record.kind === 'review' && record.payload.reviewType === reviewType && ['submitted', 'reviewed', 'active'].includes(record.status);
@@ -82,12 +84,13 @@ export function submitDepartmentReview(payload: OkrPayload, ownerId: string, rec
   if (!people.some(person => person.supervisorId === ownerId && person.id !== ownerId)) throw new Error('当前人员无部门周报汇总权限');
   const errors = departmentSubmissionErrors(payload, records, people, ownerId);
   if (errors.length) throw new Error(errors.join('；'));
-  const feedback = payload.reviewType === 'month' ? departmentMonthlyFeedback(payload, records, people, ownerId) : undefined;
+  const aggregations = reviewTemplateAggregations(payload, records, people, ownerId, true);
+  const feedback = payload.reviewType === 'month' && payload.reviewTemplateSnapshot?.configurationVersion !== 2 ? departmentMonthlyFeedback(payload, records, people, ownerId) : undefined;
   if (feedback?.some(row => row.judgment && !['已内部解决', '需公司解决', '无需处理'].includes(row.judgment))) throw new Error('主管判断选项无效');
   const reviewType = payload.reviewType as 'week' | 'month';
   const period = { startDate: payload.startDate, endDate: payload.endDate };
   const objectives = monthlyReviewTargets(records, ownerId, people).filter(objective => [period.startDate.slice(0,7),period.endDate.slice(0,7)].includes(objective.cycle));
-  const reviews = (payload.krReviews || []).map(review => {
+  const reviews = (reviewBlockVisible(payload, 'goals') ? payload.krReviews || [] : []).map(review => {
     const objective = objectives.find(row => row.id === review.objectiveId && row.keyResults.some(kr => kr.id === review.keyResultId));
     if (!objective) throw new Error('部门目标已变化，请刷新后重新提交');
     return departmentKrAggregation(objective, review, records, people, ownerId, period, reviewType);
@@ -101,5 +104,5 @@ export function submitDepartmentReview(payload: OkrPayload, ownerId: string, rec
     if (record.ownerId !== ownerId || record.status === 'deleted') throw new Error('无权更新此部门目标');
     return record;
   });
-  return { records: next, payload: { ...payload, departmentFeedbackRows: feedback, departmentReviewExclusions: payload.departmentReviewExclusions?.map(row => ({ ...row, employeeName: people.find(person => person.id === row.employeeId)?.name, reason: row.reason.trim() })), krReviews: reviews, syncKrProgress: false, objectiveSnapshots: next.filter(record => reviews.some(row => row.objectiveId === record.id)).map(record => ({ id: record.id, period: record.periodKey, payload: record.payload })), departmentContentSnapshots: departmentContentSnapshots(records, people, ownerId, period, reviewType) } };
+  return { records: next, payload: { ...payload, reviewTemplateAggregations: aggregations, departmentFeedbackRows: feedback, departmentReviewExclusions: payload.departmentReviewExclusions?.map(row => ({ ...row, employeeName: people.find(person => person.id === row.employeeId)?.name, reason: row.reason.trim() })), krReviews: reviewBlockVisible(payload, 'goals') ? reviews : payload.krReviews, syncKrProgress: false, objectiveSnapshots: next.filter(record => reviews.some(row => row.objectiveId === record.id)).map(record => ({ id: record.id, period: record.periodKey, payload: record.payload })), departmentContentSnapshots: departmentContentSnapshots(records, people, ownerId, period, reviewType) } };
 }

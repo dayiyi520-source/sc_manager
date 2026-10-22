@@ -48,31 +48,32 @@ export function ReviewTemplateFields({ block, values, onChange, people = [], dep
   </div>;
 }
 function ReviewTemplateHeading({ block, title }: { block: ReviewTemplateBlock; title: string }) {
-  return <div className="okr-weekly-section-header"><h3 className="okr-weekly-section-header-title flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block"/><span>{title}</span>{block.fields.length === 1 && block.fields[0].type === 'textarea' && block.fields[0].required && <Tag color="red">必填</Tag>}</h3></div>;
+  return <div className="okr-weekly-section-header"><h3 className="okr-weekly-section-header-title flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><span aria-hidden="true" className="w-1.5 h-4 bg-[var(--primary)] rounded-full inline-block"/><span>{title}</span>{!block.aggregation && block.fields.length === 1 && block.fields[0].type === 'textarea' && block.fields[0].required && <Tag color="red">必填</Tag>}</h3></div>;
 }
 const isStandaloneText = (block: ReviewTemplateBlock) => block.fields.length === 1 && block.fields[0].type === 'textarea';
 
 export function ReviewTemplateSection({ template, blockId, ...props }: Omit<Props, 'block'> & { template?: ReviewReportTemplate | null; blockId: string }) {
-  const blocks = template?.blocks.filter(block => blockId === 'extensions' ? !['goals', 'extra', 'assistance', 'knowledge'].includes(block.id) : block.id === blockId && (block.fields.length > 0 || Boolean(block.guidance.trim()))) || [];
+  const blocks = template?.blocks.filter(block => block.visible !== false && !block.aggregation && (blockId === 'extensions' ? !['goals', 'extra', 'assistance', 'knowledge'].includes(block.id) : block.id === blockId && (block.fields.length > 0 || Boolean(block.guidance.trim())))) || [];
   return <>{blocks.map(block => blockId === 'extensions' ? <section className="okr-weekly-section" aria-label={block.title} key={block.id}><ReviewTemplateHeading block={block} title={reviewBlockTitle(template || null, block.id, block.title)}/><ReviewTemplateFields {...props} block={block} standaloneText={isStandaloneText(block)}/></section> : <Fragment key={block.id}><ReviewTemplateFields {...props} block={block}/></Fragment>)}</>;
 }
 
 export function reviewBlockTitle(template: ReviewReportTemplate | null, id: string, fallback: string) {
-  const index = template?.blocks.findIndex(block => block.id === id) ?? -1;
-  return index >= 0 ? `${index + 1}. ${template!.blocks[index].title}` : fallback;
+  const blocks = template?.blocks.filter(block => block.visible !== false) || [];
+  const index = blocks.findIndex(block => block.id === id);
+  return index >= 0 ? `${index + 1}. ${blocks[index].title}` : fallback;
 }
 /** Render the business sections in saved template order; legacy reports retain their original layout. */
-export function ReviewTemplateLayout({ template, children, ...props }: Omit<Props, 'block'> & { template: ReviewReportTemplate | null; children: ReactNode }) {
+export function ReviewTemplateLayout({ template, children, renderAggregation, ...props }: Omit<Props, 'block'> & { template: ReviewReportTemplate | null; children: ReactNode; renderAggregation?: (block: ReviewTemplateBlock) => ReactNode }) {
   if (!template) return <>{children}</>;
   const nodes = Children.toArray(children);
   const sections = new Map<string, ReactNode>(nodes.flatMap(node => isValidElement<{ 'data-review-block'?: string }>(node) && node.props['data-review-block'] ? [[node.props['data-review-block']!, node] as const] : []));
-  return <>{template.blocks.map((block, index) => {
+  return <>{template.blocks.filter(block => block.visible !== false).map((block, index) => {
     const section = sections.get(block.id);
     if (section && isValidElement<{ children: ReactNode; 'aria-label'?: string }>(section)) {
       const content = Children.toArray(section.props.children);
       const supplement = content.find(node => isValidElement(node) && node.type === ReviewTemplateSection);
       return cloneElement(section, { key: block.id, 'aria-label': block.title, children: [content[0], supplement, ...content.slice(1).filter(node => node !== supplement)] });
     }
-    return <section key={block.id} className="okr-weekly-section" aria-label={block.title}><ReviewTemplateHeading block={block} title={`${index + 1}. ${block.title}`}/><ReviewTemplateFields {...props} block={block} standaloneText={isStandaloneText(block)}/></section>;
+    return <section key={block.id} className="okr-weekly-section" aria-label={block.title}><ReviewTemplateHeading block={block} title={`${index + 1}. ${block.title}`}/>{block.aggregation ? renderAggregation?.(block) : <ReviewTemplateFields {...props} block={block} standaloneText={isStandaloneText(block)}/>}</section>;
   })}{nodes.filter(node => !isValidElement<{ 'data-review-block'?: string }>(node) || !node.props['data-review-block'])}</>;
 }

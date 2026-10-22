@@ -4,9 +4,10 @@ import { Button, DatePicker, Dropdown, Empty, Input, Modal, Select, Space, Tabs,
 import dayjs from 'dayjs';
 import { EllipsisOutlined } from '@ant-design/icons';
 import type { OkrPerson } from '../../../services/okrRepository';
-import { FIXED_REVIEW_BLOCKS, newReviewTemplate, validateReviewTemplates, activateReviewTemplate, reviewTemplateEnabled, type ReviewReportTemplate } from '../../../services/reviewTemplateConfiguration';
+import { FIXED_REVIEW_BLOCKS, configurableReviewTemplate, newReviewTemplate, validateReviewTemplates, activateReviewTemplate, reviewTemplateEnabled, type ReviewReportTemplate } from '../../../services/reviewTemplateConfiguration';
 import { ReviewTemplateBlockCards } from './ReviewTemplateBlockCards';
 import { ReviewTemplateFields } from './ReviewTemplateFields';
+import { ReviewTemplateAggregationTable } from './ReviewTemplateAggregationTable';
 
 type Props = { rows: ReviewReportTemplate[]; departments: string[]; people: OkrPerson[]; disabled?: boolean; onEditingChange?: (editing: boolean) => void; onSave: (rows: ReviewReportTemplate[]) => Promise<boolean> };
 export function ReviewTemplateSettings({ rows, departments, people, disabled, onEditingChange, onSave }: Props) {
@@ -32,12 +33,12 @@ export function ReviewTemplateSettings({ rows, departments, people, disabled, on
   };
   const saveEditing = (status: 'draft' | 'published') => {
     if (!editing) return;
-    const next = { ...editing, name: editing.name.trim(), status, blocks: editing.blocks.map(block => ({ ...block, title: block.title.trim(), fields: block.fields.map(field => ({ ...field, label: field.label.trim() })) })) };
+    const next = { ...editing, name: editing.name.trim(), status, blocks: editing.blocks.map(block => ({ ...block, title: block.title.trim(), aggregation: block.aggregation ? { ...block.aggregation, judgmentLabel: block.aggregation.judgmentLabel.trim(), judgmentOptions: block.aggregation.judgmentOptions.map(value => value.trim()).filter(Boolean) } : undefined, fields: block.fields.map(field => ({ ...field, label: field.label.trim() })) })) };
     void persist(status === 'published' ? activateReviewTemplate(rows, next) : rows.some(row => row.id === next.id) ? rows.map(row => row.id === next.id ? next : row) : [...rows, next], true);
   };
   const copy = (row: ReviewReportTemplate) => {
     const version = Math.max(0, ...rows.filter(item => item.department === row.department && item.audience === row.audience && item.reportType === row.reportType).map(item => item.version)) + 1;
-    setEditing({ ...structuredClone(row), id: crypto.randomUUID(), version, status: 'draft', enabled: false, effectiveFrom: row.reportType === 'month' ? dayjs().add(1, 'month').startOf('month').format('YYYY-MM-DD') : dayjs().add(1, 'day').format('YYYY-MM-DD') });
+    setEditing({ ...configurableReviewTemplate(row), id: crypto.randomUUID(), version, status: 'draft', enabled: false, effectiveFrom: row.reportType === 'month' ? dayjs().add(1, 'month').startOf('month').format('YYYY-MM-DD') : dayjs().add(1, 'day').format('YYYY-MM-DD') });
   };
   return <div className="grid gap-4">
     <>
@@ -71,11 +72,11 @@ export function ReviewTemplateSettings({ rows, departments, people, disabled, on
         <label>适用身份<Select aria-label="适用身份" disabled={locked} style={{ width: '100%' }} value={editing.audience} options={[{ value: 'employee', label: '员工' }, { value: 'supervisor', label: '主管' }]} onChange={audience => setEditing({ ...editing, audience, version: Math.max(0, ...rows.filter(row => row.id !== editing.id && row.department === editing.department && row.audience === audience && row.reportType === editing.reportType).map(row => row.version)) + 1 })}/></label>
         <label>报告类型<Select aria-label="报告类型" disabled={locked} style={{ width: '100%' }} value={editing.reportType} options={[{ value: 'week', label: '周报' }, { value: 'month', label: '月报' }]} onChange={reportType => setEditing({ ...editing, reportType, effectiveFrom: reportType === 'month' ? dayjs().add(1, 'month').startOf('month').format('YYYY-MM-DD') : editing.effectiveFrom, version: Math.max(0, ...rows.filter(row => row.id !== editing.id && row.department === editing.department && row.audience === editing.audience && row.reportType === reportType).map(row => row.version)) + 1 })}/></label>
         <label>生效日期<DatePicker aria-label="生效日期" disabled={locked} style={{ width: '100%' }} picker={editing.reportType === 'month' ? 'month' : 'date'} value={dayjs(editing.effectiveFrom)} onChange={value => value && setEditing({ ...editing, effectiveFrom: (editing.reportType === 'month' ? value.startOf('month') : value).format('YYYY-MM-DD') })}/></label><label>版本<Input aria-label="版本" disabled value={`V${editing.version}`}/></label></div> },
-        { key: 'blocks', label: '模块配置', children: <div className="pt-4"><ReviewTemplateBlockCards blocks={editing.blocks} disabled={locked} onChange={blocks => setEditing({ ...editing, blocks })}/></div> },
+        { key: 'blocks', label: '模块配置', children: <div className="grid gap-4 pt-4"><ReviewTemplateBlockCards template={editing} templates={rows} blocks={editing.blocks} disabled={locked} onChange={blocks => setEditing({ ...editing, blocks })}/></div> },
       ]}/>
     </section></Modal>}
     <Modal title={preview ? `${preview.name || '模板预览'} · V${preview.version}` : '模板预览'} open={!!preview} width={900} styles={{ body: { maxHeight: '65vh', overflowY: 'auto' } }} footer={<Button onClick={() => setPreview(null)}>关闭预览</Button>} onCancel={() => setPreview(null)}>
-      <div className="grid gap-4">{preview?.blocks.map(block => <Card key={block.id} size="small" title={block.title}>{FIXED_REVIEW_BLOCKS.some(fixed => fixed.id === block.id) && <p className="text-sm text-[var(--text-secondary)]">保留现有{block.title}业务内容与关联操作</p>}<ReviewTemplateFields block={block} values={{}} onChange={() => {}} people={people} departments={departments} disabled/></Card>)}</div>
+      <div className="grid gap-4">{preview?.blocks.filter(block => block.visible !== false).map(block => <Card key={block.id} size="small" title={block.title}>{FIXED_REVIEW_BLOCKS.some(fixed => fixed.id === block.id) && <p className="text-sm text-[var(--text-secondary)]">保留现有{block.title}业务内容与关联操作</p>}{block.departmentLink && <p className="text-sm text-[var(--text-secondary)]">此板块联动到同部门同周期的部门{block.departmentLink.reportType === 'month' ? '月报' : '周报'}</p>}{block.aggregation ? <><p className="text-sm text-[var(--text-secondary)]">员工来源板块：{rows.flatMap(row => row.blocks).find(item => item.id === block.aggregation!.sourceBlockId)?.title || '未选择或不可用'}</p><ReviewTemplateAggregationTable block={block} rows={[]} disabled onChange={() => {}}/>{block.aggregation.needsJudgment && <p className="text-sm text-[var(--text-secondary)]">{block.aggregation.judgmentLabel}：{block.aggregation.judgmentOptions.join('、') || '尚未配置选项'}</p>}</> : <ReviewTemplateFields block={block} values={{}} onChange={() => {}} people={people} departments={departments} disabled/>}</Card>)}</div>
     </Modal>
   </div>;
 }

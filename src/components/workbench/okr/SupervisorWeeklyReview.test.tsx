@@ -12,7 +12,7 @@ globalThis.IntersectionObserver = Observer as unknown as typeof IntersectionObse
 const period = { startDate: '2026-10-12', endDate: '2026-10-18' };
 const manager: OkrPerson = { id: 'manager', name: '主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, version: 0 };
 const employee: OkrPerson = { ...manager, id: 'employee', name: '员工', supervisorId: 'manager' };
-const objective: OKRItem = { id: 'manager-o', ownerId: 'manager', ownerName: '主管', cycle: '2026-10', category: 'my', department: '产品部', objective: '部门月度目标', progress: 40, weight: 100, deadline: '', status: 'active', keyResults: [{ id: 'manager-kr', content: '部门 KR', progress: 40, weight: 100, deadline: '', businessObject: '产品甲', version: 'V1' }] };
+const objective: OKRItem = { id: 'manager-o', ownerId: 'manager', ownerName: '主管', cycle: '2026-10', category: 'my', department: '产品部', objective: '部门月度目标', progress: 40, weight: 100, deadline: '', status: 'active', keyResults: [{ id: 'manager-kr', content: '部门 KR', assigneeIds: ['employee'], progress: 40, weight: 100, deadline: '', businessObject: '产品甲', version: 'V1' }] };
 const goal: OkrRecord = { id: 'employee-goal', ownerId: 'employee', kind: 'objective', periodKey: '2026-10', status: 'active', version: 1, payload: { title: '员工目标', sourceObjectiveId: 'manager-o', sourceKrId: 'manager-kr', keyResults: [{ id: 'manager-kr', title: '承接 KR', weight: 100, progress: 0, executionActions: [{ id: 'employee-a', ownerId: 'employee', title: '员工 A', progress: 60 }] }] } };
 const contribution = { objectiveId: 'employee-goal', objectiveTitle: '员工目标', keyResultId: 'employee-a', keyResultTitle: '员工 A', previousProgress: 20, currentProgress: 60, health: 'normal' as const, achievement: '', blocker: '', nextPlan: '', workIds: [], evidenceNote: '已完成关键验证' };
 const support: OkrRecord = { id: 'employee-review', ownerId: 'employee', kind: 'review', periodKey: `${period.startDate}/${period.endDate}`, status: 'submitted', version: 1, payload: { title: '员工本周复盘', reviewType: 'week', ...period, krReviews: [contribution] } };
@@ -81,6 +81,7 @@ describe('supervisor weekly review', () => {
     const { rerender } = render(<WeeklyReviewEditor {...baseProps} records={[goal, riskReport]} onSaveDraft={vi.fn(async () => true)}/>);
     expect(within(screen.getByRole('region', { name: '待确认风险' })).getByText('1')).toBeInTheDocument();
     fireEvent.click(screen.getByText('KR1：部门 KR'));
+    fireEvent.click(screen.getByText('员工复盘支撑'));
     fireEvent.click(screen.getByRole('button', { name: '查看本期复盘' }));
     expect(within(screen.getByRole('region', { name: '待确认风险' })).getByText('0')).toBeInTheDocument();
     rerender(<WeeklyReviewEditor {...baseProps} records={[]} recordsLoading onSaveDraft={vi.fn(async () => true)}/>);
@@ -100,21 +101,21 @@ describe('supervisor weekly review', () => {
     expect(screen.queryByRole('region', { name: '主管 KR 复盘：部门 KR' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('KR1：部门 KR'));
     expect(screen.getByRole('columnheader', { name: 'KR名称' })).toBeInTheDocument();
+    fireEvent.click(screen.getByText('员工复盘支撑'));
     expect(screen.getByRole('columnheader', { name: /^员工$/ })).toBeInTheDocument();
-    expect(screen.getByText('个人动作：员工 A · 当前进度60%')).toBeInTheDocument();
+    expect(screen.queryByText(/个人动作：/)).not.toBeInTheDocument();
     expect(screen.queryByText('主管判断与协调')).not.toBeInTheDocument();
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
   });
-  it('uses employee names as columns and shows saved action health with an icon', () => {
+  it('shows employee progress columns without personal action health', () => {
     const member = { ...employee, name: '张三' };
-    const report = { ...support, payload: { ...support.payload, krReviews: [{ ...contribution, executionHealth: '风险' as const }] } };
-    render(<WeeklyReviewEditor {...baseProps} people={[manager, member]} records={[goal, report]} onSaveDraft={vi.fn(async () => true)}/>);
+    render(<WeeklyReviewEditor {...baseProps} people={[manager, member]} records={[goal, support]} onSaveDraft={vi.fn(async () => true)}/>);
     fireEvent.click(screen.getByText('KR1：部门 KR'));
-    expect(screen.getByRole('columnheader', { name: '张三' })).toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: /^员工$/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('本周未提交')).not.toBeInTheDocument();
-    const status = screen.getByText('风险', { selector: 'span' });
-    expect(status.querySelector('svg')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('员工复盘支撑'));
+    expect(screen.getByRole('columnheader', { name: '员工' })).toBeInTheDocument();
+    expect(screen.getByText('张三')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '当前进度' })).toBeInTheDocument();
+    expect(screen.queryByText(/个人动作：/)).not.toBeInTheDocument();
   });
   it('merges employee extra work, assistance and knowledge without deletion and saves their source snapshot', () => {
     const save = vi.fn(async (_payload: OkrPayload) => true);
@@ -136,7 +137,7 @@ describe('supervisor self-assignment editing and saved recovery', () => {
     const source: OkrRecord = { id: objective.id, ownerId: manager.id, kind: 'objective', status: 'active', version: 1, periodKey: '2026-10', payload: { title: '部门 O', goalLevel: 'department', keyResults: [{ id: 'manager-kr', title: '部门 KR', weight: 100, progress: 0, assigneeIds: [manager.id] }] } };
     const save = vi.fn(async (_payload: OkrPayload) => true);
     const work = [{ id: 'owner-task', sourceId: 'owner-task', title: '主管验证任务', kind: 'task', status: '已完成', assigneeId: manager.id, ownerName: manager.name, createdAt: '2026-10-12', completedAt: '2026-10-13', updatedAt: '2026-10-13', dueDate: '', actualHours: 1, estimatedHours: 1, linkVersion: 0, sourceWorkOrderIds: '[]' }];
-    const { unmount } = render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} work={work} onSaveDraft={save}/>);
+    const { unmount } = render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} okrs={[{ ...objective, keyResults: objective.keyResults.map(kr => ({ ...kr, assigneeIds: [manager.id] })) }]} work={work} onSaveDraft={save}/>);
     fireEvent.click(screen.getByText('KR1：部门 KR'));
     fireEvent.change(screen.getByRole('spinbutton', { name: '主管进度：部门 KR' }), { target: { value: '70' } });
     fireEvent.click(within(screen.getByRole('region', { name: '主管 KR 复盘：部门 KR' })).getByRole('button', { name: '关联工作任务' }));
@@ -151,7 +152,7 @@ describe('supervisor self-assignment editing and saved recovery', () => {
     const payload = save.mock.calls[0][0];
     expect(payload.objectiveSnapshots?.[0].payload.keyResults?.[0].progress).toBe(70);
     unmount();
-    render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} initialPayload={payload} onSaveDraft={save}/>);
+    render(<WeeklyReviewEditor {...baseProps} reviewType={reviewType} records={[source]} okrs={[{ ...objective, keyResults: objective.keyResults.map(kr => ({ ...kr, assigneeIds: [manager.id] })) }]} initialPayload={payload} onSaveDraft={save}/>);
     fireEvent.click(screen.getByText('KR1：部门 KR'));
     expect(screen.getByRole('spinbutton', { name: '主管进度：部门 KR' })).toHaveValue('70');
     expect(screen.getByText('主管验证任务')).toBeInTheDocument();
