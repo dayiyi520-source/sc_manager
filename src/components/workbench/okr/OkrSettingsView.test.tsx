@@ -133,16 +133,22 @@ it('persists weekly cycles immediately, keeps the tab and preserves input on fai
   expect(screen.getByRole('cell', { name: '新增周期' })).toBeVisible();
   expect(screen.getByRole('button', { name: '增加周期' })).toBeEnabled();
 });
-it('persists role removal directly without saving unrelated draft fields', async () => {
-  const people = [{ id: 'a', name: '甲', department: '研发', rootFlag: 1, supervisorId: null, version: 0 }, { id: 's', name: '乙', department: '研发', rootFlag: 0, supervisorId: 'a', version: 0 }];
+it.each(['administrators', 'confirmation'])('hides restricted settings and restores a visible section from stale %s navigation', async section => {
   const onSave = vi.fn(async (_settings: OkrSettings) => true);
-  render(<OkrSettingsView settings={{ ...settings, administratorIds: ['a'], supervisorIds: ['s'] }} people={people} onSave={onSave}/>);
-  fireEvent.click(screen.getByRole('button', { name: '角色设置' }));
-  expect(screen.queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument();
-  await act(async () => { fireEvent.click(within(screen.getByText('乙').closest('tr')!).getByRole('button', { name: '移除' })); });
+  const original = { ...settings, administratorIds: ['admin'], supervisorIds: ['supervisor'], permissionGrants: { admin: ['roleSettings' as const] }, confirmation: { enabled: true, visiblePending: true, actions: ['create' as const], types: ['target' as const], missingSupervisor: 'auto' as const, selfSupervisor: 'auto' as const, exemptIds: [] }, objectiveTitleTemplates: [template] };
+  window.sessionStorage.setItem('okr.settings.activeSection', section);
+  render(<OkrSettingsView settings={original} onSave={onSave}/>);
+  const nav = screen.getByRole('navigation', { name: '设置导航' });
+  expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['OKR模板', '复盘总结模板', '周期配置']);
+  expect(screen.getByRole('button', { name: 'OKR模板' })).toHaveClass('is-active');
+  expect(screen.queryByRole('region', { name: '角色设置' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('switch', { name: '目标确认' })).not.toBeInTheDocument();
+  expect(onSave).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '编辑原目标' }));
+  fireEvent.change(screen.getByLabelText('第1条O标题'), { target: { value: '新目标' } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '提交模板' })); });
   expect(onSave).toHaveBeenCalledOnce();
-  expect(onSave.mock.calls[0][0]).toMatchObject({ administratorIds: ['a'], supervisorIds: [] });
-  expect(screen.queryByText('乙')).not.toBeInTheDocument();
+  expect(onSave.mock.calls[0][0]).toMatchObject({ administratorIds: original.administratorIds, supervisorIds: original.supervisorIds, permissionGrants: original.permissionGrants, confirmation: original.confirmation });
 });
 
 it.each([false, true])('keeps all sections viewable with partial permission %s and prevents unauthorized writes', async partial => {
@@ -150,16 +156,13 @@ it.each([false, true])('keeps all sections viewable with partial permission %s a
   const onSave = vi.fn(async () => true);
   render(<OkrSettingsView viewerId="member" settings={{...settings,administratorIds:['admin'],permissionGrants:{member:partial?['okrTemplates']:[]},objectiveTitleTemplates:[template]}} people={people} onSave={onSave}/>);
   const nav = screen.getByRole('navigation',{name:'设置导航'});
-  for (const label of ['OKR模板','复盘总结模板','角色设置','周期配置','目标确认配置']) expect(within(nav).getByRole('button',{name:label})).toBeEnabled();
+  for (const label of ['OKR模板','复盘总结模板','周期配置']) expect(within(nav).getByRole('button',{name:label})).toBeEnabled();
   expect(within(nav).queryByRole('button',{name:'默认视图'})).not.toBeInTheDocument();
   expect(screen.getByRole('button',{name:'添加模板'}).hasAttribute('disabled')).toBe(!partial);
-  fireEvent.click(within(nav).getByRole('button',{name:'角色设置'}));
-  expect(screen.getByRole('button',{name:'添加成员'})).toBeDisabled();
+  expect(within(nav).queryByRole('button',{name:'角色设置'})).not.toBeInTheDocument();
+  expect(within(nav).queryByRole('button',{name:'目标确认配置'})).not.toBeInTheDocument();
   fireEvent.click(within(nav).getByRole('button',{name:'周期配置'}));
   expect(screen.getByRole('button',{name:'增加周期'})).toBeDisabled();
-  fireEvent.click(within(nav).getByRole('button',{name:'目标确认配置'}));
-  expect(screen.getByRole('switch',{name:'目标确认'})).toBeDisabled();
-  fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
   fireEvent.click(within(nav).getByRole('button',{name:'复盘总结模板'}));
   expect(screen.getByRole('button',{name:'新建模板'})).toBeDisabled();
   fireEvent.mouseDown(screen.getByRole('combobox',{name:'模板身份查询'}));

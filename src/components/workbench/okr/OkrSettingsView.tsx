@@ -14,6 +14,7 @@ import type { OkrSettings, OkrTemplate, OkrTimeRule, OkrPerson, OkrObjectiveTitl
 
 type Props = { key?: Key; viewerId?: string; settings: OkrSettings; busy?: boolean; readOnly?: boolean; onSave: (settings: OkrSettings) => Promise<boolean>; onClose?: () => void; departments?: string[]; people?: OkrPerson[] };
 const labels = { templates: 'OKR模板', reviewTemplates: '复盘总结模板', administrators:'角色设置', weeklyCycles: '周期配置', confirmation:'目标确认配置' };
+const visibleSections = ['templates', 'reviewTemplates', 'weeklyCycles'] as const;
 const activeSectionKey = 'okr.settings.activeSection';
 const TEMPLATE_DEFAULTS: OkrTemplate[] = [
   { department: '产研部门', type: 'product', fields: ['目标内容', '关联产品', '关键节点', '动作', '截止日期', '权重'] },
@@ -43,7 +44,7 @@ export function OkrSettingsView({ settings, viewerId, busy = false, readOnly = f
   const departmentOptions = [...new Set([...departments, ...people.map(person=>person.department)].map(value=>value.trim()).filter(Boolean))];
   const [active, setActive] = useState<keyof typeof labels>(() => {
     const stored = window.sessionStorage.getItem(activeSectionKey);
-    return stored && Object.hasOwn(labels, stored) ? stored as keyof typeof labels : 'templates';
+    return stored && visibleSections.some(section => section === stored) ? stored as keyof typeof labels : 'templates';
   });
   const sectionPermission = { templates:'okrTemplates', reviewTemplates:'reviewTemplates', administrators:'roleSettings', weeklyCycles:'weeklyCycles', confirmation:'confirmationSettings' } as const;
   const sectionReadOnly = readOnly || !!viewerId && !hasOkrPermission(viewerId, sectionPermission[active], settings, people);
@@ -97,7 +98,7 @@ export function OkrSettingsView({ settings, viewerId, busy = false, readOnly = f
   return <section className="okr-settings-page" aria-label="OKR 设置">
     <aside className="okr-settings-sidebar">
       <div className="okr-settings-sidebar-title"><h2>设置</h2><span>OKR</span></div>
-      <nav className="okr-settings-nav" aria-label="设置导航">{(Object.keys(labels) as Array<keyof typeof labels>).map(key => <button type="button" className={active === key ? 'is-active' : ''} key={key} disabled={busy || savingDirect} onClick={() => selectSection(key)}>{labels[key]}</button>)}</nav>
+      <nav className="okr-settings-nav" aria-label="设置导航">{visibleSections.map(key => <button type="button" className={active === key ? 'is-active' : ''} key={key} disabled={busy || savingDirect} onClick={() => selectSection(key)}>{labels[key]}</button>)}</nav>
       {onClose && <div className="okr-settings-sidebar-footer"><Button type="text" block icon={<ArrowLeft />} disabled={busy || savingDirect} onClick={onClose}>返回目标页</Button></div>}
     </aside>
     <main className="okr-settings-content">
