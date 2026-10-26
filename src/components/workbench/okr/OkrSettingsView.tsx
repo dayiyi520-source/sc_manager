@@ -7,14 +7,13 @@ import { OkrPolicySettings } from './OkrPolicySettings';
 import { hasOkrPermission, normalizedPolicy, validatePolicy } from '../../../services/okrSettingsPolicy';
 import { migrateTemplateDepartments } from '../../../services/okrTemplates';
 import { Button, Select, Space, message } from 'antd';
-import Card from 'antd/es/card/Card';
 import { useEffect, useRef, useState, type Key } from 'react';
 import { ArrowLeft } from '@/components/common/octicons-compat';
 import { normalizeWeeklyReviewRule } from '../../../services/okrReviewRules';
 import type { OkrSettings, OkrTemplate, OkrTimeRule, OkrPerson, OkrObjectiveTitleTemplate } from '../../../services/okrRepository';
 
 type Props = { key?: Key; viewerId?: string; settings: OkrSettings; busy?: boolean; readOnly?: boolean; onSave: (settings: OkrSettings) => Promise<boolean>; onClose?: () => void; departments?: string[]; people?: OkrPerson[] };
-const labels = { templates: 'OKR模板', reviewTemplates: '复盘总结模板', administrators:'角色设置', weeklyCycles: '周期配置', confirmation:'目标确认配置', defaultView: '默认视图' };
+const labels = { templates: 'OKR模板', reviewTemplates: '复盘总结模板', administrators:'角色设置', weeklyCycles: '周期配置', confirmation:'目标确认配置' };
 const activeSectionKey = 'okr.settings.activeSection';
 const TEMPLATE_DEFAULTS: OkrTemplate[] = [
   { department: '产研部门', type: 'product', fields: ['目标内容', '关联产品', '关键节点', '动作', '截止日期', '权重'] },
@@ -46,7 +45,7 @@ export function OkrSettingsView({ settings, viewerId, busy = false, readOnly = f
     const stored = window.sessionStorage.getItem(activeSectionKey);
     return stored && Object.hasOwn(labels, stored) ? stored as keyof typeof labels : 'templates';
   });
-  const sectionPermission = { templates:'okrTemplates', reviewTemplates:'reviewTemplates', administrators:'roleSettings', weeklyCycles:'weeklyCycles', confirmation:'confirmationSettings', defaultView:'okrTemplates' } as const;
+  const sectionPermission = { templates:'okrTemplates', reviewTemplates:'reviewTemplates', administrators:'roleSettings', weeklyCycles:'weeklyCycles', confirmation:'confirmationSettings' } as const;
   const sectionReadOnly = readOnly || !!viewerId && !hasOkrPermission(viewerId, sectionPermission[active], settings, people);
   const selectSection = (section: keyof typeof labels) => { window.sessionStorage.setItem(activeSectionKey, section); setActive(section); };
   const [draft, setDraft] = useState(() => normalizedPolicy(normalizeSettings({...settings,templates:departmentOptions.length ? migrateTemplateDepartments(settings.templates || TEMPLATE_DEFAULTS,departmentOptions) : settings.templates}), people));
@@ -109,7 +108,6 @@ export function OkrSettingsView({ settings, viewerId, busy = false, readOnly = f
       {active === 'administrators' && <OkrRoleSettings draft={draft} people={people} disabled={busy || sectionReadOnly || savingDirect} onChange={next => saveDirect({ administratorIds: next.administratorIds, subAdministratorIds: next.subAdministratorIds, supervisorIds: next.supervisorIds, permissionGrants: next.permissionGrants })}/>}
       {active === 'confirmation' && <OkrPolicySettings active={active} draft={draft} people={people} busy={busy || sectionReadOnly} onChange={setDraft}/>}
       {active === 'templates' && <div className="okr-template-settings"><ObjectiveTitleConfiguration rows={draft.objectiveTitleTemplates || []} departments={departmentOptions} disabled={busy || sectionReadOnly} onSave={saveTemplates}/></div>}
-      {active === 'defaultView' && <Card title="默认视图"><Select disabled={busy || sectionReadOnly} value={draft.defaultView} options={[{value:'list',label:'列表视图'},{value:'card',label:'卡片视图'}]} onChange={value => setDraft(current => ({ ...current, defaultView: value }))}/></Card>}
       </fieldset>
     </main>
   </section>;

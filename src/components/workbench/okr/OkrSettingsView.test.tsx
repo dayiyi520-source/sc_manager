@@ -36,13 +36,15 @@ it('uses a batch modal and saves multiple O titles directly with multiselect KR 
   render(<OkrSettingsView settings={settings} departments={['研发']} onSave={onSave}/>);
   expect(screen.getByRole('heading', { name: 'OKR模板' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '添加O模板' }));
+  fireEvent.click(screen.getByRole('button', { name: '添加模板' }));
   expect(document.querySelector('.ant-modal')).toBeInTheDocument();
   expect(document.querySelector('.ant-drawer')).not.toBeInTheDocument();
   fireEvent.mouseDown(screen.getByLabelText('模板适用部门'));
   fireEvent.click(screen.getByText('研发', { selector: '.ant-select-item-option-content' }));
   fireEvent.change(screen.getByLabelText('第1条O标题'), { target: { value: '版本交付' } });
   chooseKr(1, '产研 KR'); chooseKr(1, '通用 KR');
+  expect(screen.getByText('添加模板', { selector: '.ant-modal-title' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '移除第1条O模板' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: '继续添加O标题' }));
   fireEvent.change(screen.getByLabelText('第2条O标题'), { target: { value: '质量提升' } });
   chooseKr(2, '通用 KR');
@@ -78,23 +80,21 @@ it('deletes a saved row directly after confirmation and keeps it when saving fai
   expect(screen.getByRole('button', { name: '编辑原目标' })).toBeInTheDocument();
   expect(screen.getByText('保存失败，请重试，当前内容已保留')).toBeInTheDocument();
 });
-it('saves edits directly while preserving saved settings from other tabs', async () => {
+it('removes default view from navigation and preserves its stored value when saving another section', async () => {
   const onSave = vi.fn(async (_settings: OkrSettings) => true);
-  render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} onSave={onSave}/>);
-  fireEvent.click(screen.getByRole('button', { name: '默认视图' }));
-  expect(screen.getByRole('button', { name: '保存配置' })).toBeInTheDocument();
-  fireEvent.mouseDown(screen.getAllByRole('combobox')[0]);
-  fireEvent.click(screen.getByText('卡片视图', { selector: '.ant-select-item-option-content' }));
-  fireEvent.click(screen.getByRole('button', { name: 'OKR模板' }));
+  window.sessionStorage.setItem('okr.settings.activeSection', 'defaultView');
+  render(<OkrSettingsView settings={{ ...settings, defaultView:'card', objectiveTitleTemplates: [template] }} onSave={onSave}/>);
+  expect(screen.queryByRole('button', { name: '默认视图' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '添加模板' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '编辑原目标' }));
   fireEvent.change(screen.getByLabelText('第1条O标题'), { target: { value: '新目标' } });
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '提交模板' })); });
-  expect(onSave.mock.calls[0][0].defaultView).toBe('list');
+  expect(onSave.mock.calls[0][0].defaultView).toBe('card');
   expect(onSave.mock.calls[0][0].objectiveTitleTemplates?.[0].title).toBe('新目标');
 });
 it('read-only users cannot add, edit or delete templates', () => {
   render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} readOnly onSave={vi.fn(async () => true)}/>);
-  expect(screen.getByRole('button', { name: '添加O模板' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '添加模板' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '编辑原目标' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '删除原目标' })).toBeDisabled();
 });
@@ -150,8 +150,9 @@ it.each([false, true])('keeps all sections viewable with partial permission %s a
   const onSave = vi.fn(async () => true);
   render(<OkrSettingsView viewerId="member" settings={{...settings,administratorIds:['admin'],permissionGrants:{member:partial?['okrTemplates']:[]},objectiveTitleTemplates:[template]}} people={people} onSave={onSave}/>);
   const nav = screen.getByRole('navigation',{name:'设置导航'});
-  for (const label of ['OKR模板','复盘总结模板','角色设置','周期配置','目标确认配置','默认视图']) expect(within(nav).getByRole('button',{name:label})).toBeEnabled();
-  expect(screen.getByRole('button',{name:'添加O模板'}).hasAttribute('disabled')).toBe(!partial);
+  for (const label of ['OKR模板','复盘总结模板','角色设置','周期配置','目标确认配置']) expect(within(nav).getByRole('button',{name:label})).toBeEnabled();
+  expect(within(nav).queryByRole('button',{name:'默认视图'})).not.toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'添加模板'}).hasAttribute('disabled')).toBe(!partial);
   fireEvent.click(within(nav).getByRole('button',{name:'角色设置'}));
   expect(screen.getByRole('button',{name:'添加成员'})).toBeDisabled();
   fireEvent.click(within(nav).getByRole('button',{name:'周期配置'}));
@@ -165,4 +166,24 @@ it.each([false, true])('keeps all sections viewable with partial permission %s a
   fireEvent.click(await screen.findByText('员工',{selector:'.ant-select-item-option-content'}));
   expect(screen.getByRole('combobox',{name:'模板身份查询'}).closest('.ant-select')).toHaveTextContent('员工');
   expect(onSave).not.toHaveBeenCalled();
+});
+
+it('retains at least one editable O-title row in both add and edit dialogs', () => {
+  render(<OkrSettingsView settings={{ ...settings, objectiveTitleTemplates: [template] }} departments={['研发']} onSave={vi.fn(async () => true)}/>);
+  fireEvent.click(screen.getByRole('button', { name: '添加模板' }));
+  expect(screen.getByText('添加模板', { selector: '.ant-modal-title' })).toBeInTheDocument();
+  const onlyRow = screen.getByRole('button', { name: '移除第1条O模板' });
+  expect(onlyRow).toBeDisabled();
+  expect(screen.getByLabelText('第1条O标题')).toBeInTheDocument();
+  fireEvent.click(onlyRow);
+  expect(screen.getByLabelText('第1条O标题')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '继续添加O标题' }));
+  expect(screen.getByRole('button', { name: '移除第1条O模板' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: '移除第2条O模板' }));
+  expect(screen.getByRole('button', { name: '移除第1条O模板' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: /^取\s*消$/ }));
+  fireEvent.click(screen.getByRole('button', { name: '编辑原目标' }));
+  expect(screen.getByText('编辑模板', { selector: '.ant-modal-title' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '移除第1条O模板' })).toBeDisabled();
+  expect(screen.getByLabelText('第1条O标题')).toHaveValue('原目标');
 });

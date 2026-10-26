@@ -57,7 +57,7 @@ export function ObjectiveTitleConfiguration({ rows, departments, disabled, onSav
   return <div className="okr-title-template-configuration">
     <div className="okr-title-template-toolbar">
       <Select aria-label="按部门筛选目标模板" allowClear placeholder="全部部门" value={department} options={departmentOptions} onChange={setDepartment}/>
-      <Button type="primary" icon={<PlusIcon/>} disabled={locked} onClick={() => open()}>添加O模板</Button>
+      <Button type="primary" icon={<PlusIcon/>} disabled={locked} onClick={() => open()}>添加模板</Button>
     </div>
     <p className="okr-title-template-help">按部门维护 O 标题及支持的 KR 模板，可一次添加多条。</p>
     {listError && <Alert type="error" showIcon title={listError}/>}
@@ -73,7 +73,7 @@ export function ObjectiveTitleConfiguration({ rows, departments, disabled, onSav
         </Popconfirm>
       </Space> },
     ]}/>
-    <Modal title={editingExisting ? '编辑O模板' : '添加O模板'} open={editingRows !== null} onCancel={() => { if (!saving) setEditingRows(null); }} closable={!saving} maskClosable={!saving} keyboard={!saving} destroyOnHidden width="min(64rem, calc(100vw - 2rem))" className="okr-template-modal" footer={<Space><Button disabled={saving} onClick={() => setEditingRows(null)}>取消</Button><Button type="primary" aria-label="提交模板" loading={saving} disabled={disabled} onClick={() => void submit()}>提交</Button></Space>}>
+    <Modal title={editingExisting ? '编辑模板' : '添加模板'} open={editingRows !== null} onCancel={() => { if (!saving) setEditingRows(null); }} closable={!saving} maskClosable={!saving} keyboard={!saving} destroyOnHidden width="min(64rem, calc(100vw - 2rem))" className="okr-template-modal" footer={<Space><Button disabled={saving} onClick={() => setEditingRows(null)}>取消</Button><Button type="primary" aria-label="提交模板" loading={saving} disabled={disabled} onClick={() => void submit()}>提交</Button></Space>}>
       <Form layout="vertical">
         <Form.Item label="适用部门" required><Select aria-label="模板适用部门" placeholder="请选择部门" disabled={locked} value={batchDepartment || undefined} showSearch optionFilterProp="label" options={departmentOptions} onChange={value => { setBatchDepartment(value); setError(''); }}/></Form.Item>
       </Form>
@@ -82,7 +82,7 @@ export function ObjectiveTitleConfiguration({ rows, departments, disabled, onSav
         { title: 'KR 模板（多选）', key: 'krTypes', width: 260, render: (_, row, index) => <Select aria-label={`第${index + 1}条KR模板`} mode="multiple" placeholder="请选择 KR 模板" options={KR_TEMPLATE_OPTIONS} disabled={locked} value={row.krTypes} onChange={values => patch(row.id, { krTypes: values })}/> },
         { title: '填写说明', key: 'guidance', width: 200, render: (_, row, index) => <Input aria-label={`第${index + 1}条填写说明`} placeholder="选填" maxLength={500} disabled={locked} value={row.guidance} onChange={event => patch(row.id, { guidance: event.target.value })}/> },
         { title: '启用', key: 'enabled', width: 64, render: (_, row, index) => <Switch aria-label={`启用第${index + 1}条模板`} disabled={locked} checked={row.enabled} onChange={enabled => patch(row.id, { enabled })}/> },
-        { title: '操作', key: 'remove', width: 64, render: (_, row, index) => <Button type="text" danger icon={<TrashIcon/>} aria-label={`移除第${index + 1}条O模板`} disabled={locked} onClick={() => { setEditingRows(current => current?.filter(item => item.id !== row.id) || []); setError(''); }}/> },
+        { title: '操作', key: 'remove', width: 64, render: (_, row, index) => <Button type="text" danger icon={<TrashIcon/>} aria-label={`移除第${index + 1}条O模板`} disabled={locked || editingRows?.length === 1} onClick={() => { setEditingRows(current => current && current.length > 1 ? current.filter(item => item.id !== row.id) : current); setError(''); }}/> },
       ]}/>
       <Button className="okr-template-add-row" icon={<PlusIcon/>} disabled={locked} onClick={() => { setEditingRows(current => [...(current || []), newRow()]); setError(''); }}>继续添加O标题</Button>
       {error && <Alert type="error" showIcon title={error}/>}

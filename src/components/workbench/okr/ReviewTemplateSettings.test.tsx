@@ -42,6 +42,63 @@ it('preserves draft input after a failed save and closes only after successful s
   await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(screen.queryByRole('textbox', { name: '模板名称' })).not.toBeInTheDocument());
 });
+it('labels the list column 模板类型 and combines status with department, identity and type filters', async () => {
+  const draft = { ...row, id: 'draft', name: '草稿模板', department: '研发', status: 'draft' as const, reportType: 'week' as const };
+  const ongoing = { ...row, id: 'active', name: '进行中模板', department: '研发', status: 'published' as const, enabled: true, reportType: 'month' as const };
+  const ended = { ...row, id: 'ended', name: '已结束模板', department: '市场', status: 'published' as const, enabled: false, reportType: 'week' as const };
+  render(<ReviewTemplateSettings rows={[draft, ongoing, ended]} people={[]} departments={['研发', '市场']} onSave={vi.fn()}/>);
+  expect(screen.getByRole('columnheader', { name: '模板类型' })).toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: '报告类型' })).not.toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: '模板状态查询' }).closest('.ant-select')).toHaveTextContent('全部状态');
+  const visible = () => [...document.querySelectorAll('.ant-table-tbody tr.ant-table-row')].map(tr => tr.textContent || '').filter(text => text.includes('模板'));
+  expect(visible()).toHaveLength(3);
+  const select = async (label: string, option: string) => {
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: label }));
+    fireEvent.click(await screen.findByText(option, { selector: '.ant-select-item-option-content' }));
+  };
+  await select('模板状态查询', '进行中');
+  expect(visible()).toHaveLength(1); expect(visible()[0]).toContain('进行中模板');
+  await select('模板部门查询', '市场'); expect(visible()).toHaveLength(0);
+  await select('模板状态查询', '全部状态'); expect(visible()).toHaveLength(1); expect(visible()[0]).toContain('已结束模板');
+  await select('模板状态查询', '已结束'); expect(visible()).toHaveLength(1);
+  await select('模板身份查询', '主管'); expect(visible()).toHaveLength(0);
+  await select('模板身份查询', '员工'); expect(visible()).toHaveLength(1);
+  await select('报告类型查询', '月报'); expect(visible()).toHaveLength(0);
+  await select('报告类型查询', '周报'); expect(visible()).toHaveLength(1);
+  expect(screen.getByRole('columnheader', { name: '模板类型' })).toBeInTheDocument();
+});
+it('starts a new template without identity or date and retains required validation', async () => {
+  const onSave = vi.fn(async () => true);
+  render(<ReviewTemplateSettings rows={[row]} people={[]} departments={['研发']} onSave={onSave}/>);
+  fireEvent.click(screen.getByRole('button', { name: '新建模板' }));
+  const editor = await screen.findByRole('region', { name: '配置复盘总结模板' });
+  expect(within(editor).getByRole('textbox', { name: '模板名称' })).toHaveAttribute('placeholder', '请输入模板名称');
+  expect(within(editor).getByRole('combobox', { name: '适用身份' }).closest('.ant-select')).toHaveTextContent('请选择适用身份');
+  expect(within(editor).getByRole('combobox', { name: '模板类型' }).closest('.ant-select')).toHaveTextContent('周报');
+  expect(within(editor).queryByRole('combobox', { name: '报告类型' })).not.toBeInTheDocument();
+  expect(within(editor).getByRole('textbox', { name: '生效日期' })).toHaveAttribute('placeholder', '请选择日期');
+  fireEvent.click(within(editor).getByRole('button', { name: /保存草稿/ }));
+  expect(onSave).not.toHaveBeenCalled();
+  fireEvent.mouseDown(within(editor).getByRole('combobox', { name: '模板类型' }));
+  fireEvent.click(await screen.findByText('月报', { selector: '.ant-select-item-option-content' }));
+  expect(within(editor).getByRole('textbox', { name: '生效日期' })).toHaveAttribute('placeholder', '请选择日期');
+  fireEvent.click(within(editor).getByRole('button', { name: /保存草稿/ }));
+  expect(onSave).not.toHaveBeenCalled();
+  fireEvent.mouseDown(within(editor).getByRole('combobox', { name: '适用身份' }));
+  fireEvent.click(await screen.findByText('员工', { selector: '.ant-select-item-option-content' }));
+  fireEvent.change(within(editor).getByRole('textbox', { name: '模板名称' }), { target: { value: '新模板' } });
+  fireEvent.click(within(editor).getByRole('button', { name: /保存草稿/ }));
+  expect(onSave).not.toHaveBeenCalled();
+  expect(within(editor).getByRole('textbox', { name: '生效日期' })).toHaveAttribute('placeholder', '请选择日期');
+});
+it('keeps existing identity and effective date when editing a saved template', async () => {
+  render(<ReviewTemplateSettings rows={[row]} people={[]} departments={['研发']} onSave={vi.fn()}/>);
+  fireEvent.click(screen.getByRole('button', { name: /更多操作/ }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: '编辑' }));
+  const editor = await screen.findByRole('region', { name: '配置复盘总结模板' });
+  expect(within(editor).getByRole('combobox', { name: '适用身份' }).closest('.ant-select')).toHaveTextContent('员工');
+  expect(within(editor).getByRole('textbox', { name: '生效日期' })).toHaveValue('2099-01-01');
+});
 it('ongoing templates expose stop, preview and copy, with deletion locked until stopped', async () => {
   render(<ReviewTemplateSettings rows={[{ ...row, status: 'published' }]} people={[]} departments={[]} onSave={vi.fn()}/>);
   expect(screen.queryByRole('button', { name: '编辑' })).not.toBeInTheDocument();
