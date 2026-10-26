@@ -30,16 +30,23 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-最近成功发布：2026-10-26 13:22:03（北京时间）；发布编号 `20261026T052203Z`；源码提交 `da79c0d2e45f89c9f9ae9d8285538186fb9235e8`；发布目录 `/opt/sc-manager-frontend/releases/20261026T052203Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261026T052203Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
+最近成功发布：2026-10-26 14:38:16（北京时间）；发布编号 `20261026T063816Z`；源码提交 `bbc92039146ccfda0834a265bd2a34dff57d21bf`；发布目录 `/opt/sc-manager-frontend/releases/20261026T063816Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261026T063816Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
 
 失败时切回上一 dist，并调用该发布目录 mock-service/setup.py 的 --rollback 模式恢复本次 backups 中保存的 Nginx、服务单元及原共享文件。手工回滚时从 backups/<发布编号>/previous-target.txt 读取旧目录；首次目录切换的旧站位于 backups/<发布编号>/dist。不得删除其他应用、数据库或历史备份。
 
-上次已核实的发布：20261026T052203Z，源码 da79c0d。
+上次已核实的发布：20261026T063816Z，源码 bbc9203。
 
 ## 最近成功发布
+
+- 发布时间：2026-10-26 14:38:16（北京时间）；发布编号 `20261026T063816Z`；发布源码 `bbc92039146ccfda0834a265bd2a34dff57d21bf`。
+- 目标总结设置隐藏角色设置与目标确认配置入口，保留已有角色权限和确认规则；浏览器此前停留在隐藏页面时回到 OKR 模板页。周期列表删除规则不变。
+- 发布前 25 项相关测试、类型检查及生产构建通过；PRD 校验仍有已存在的文档用词及登记数量问题。部署准备工具预检通过，沿用既有 Python 发布入口及已推送提交的独立源码快照。
+- 构建前读取线上两份共享数据，发布前后均为 64 条目标复盘记录，无记录缺失或版本回退，人员、角色权限、目标确认、周报周期和产研模板配置保持一致。
+- 公网首页、三个业务直达路由、发布清单及 Mock 健康检查通过，设置页面线上资源与发布构建逐字节一致。浏览器以 1920×1080 核验仅保留三个设置入口、两种历史导航恢复，以及 4 条已开始或已结束周期的删除按钮禁用，无页面运行异常。
+- 发布目录 `/opt/sc-manager-frontend/releases/20261026T063816Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261026T063816Z`。回滚从备份 `previous-target.txt` 读取旧目录并切回 `dist`，再调用本次发布目录 `mock-service/setup.py --rollback` 恢复服务、路由及共享文件。
 
 - 发布时间：2026-10-26 13:22:03（北京时间）；发布编号 `20261026T052203Z`；发布源码 `da79c0d2e45f89c9f9ae9d8285538186fb9235e8`。
 - OKR 与复盘总结模板布局适配不同宽度，保留添加按钮可见；移除默认视图入口，目标模板统一添加及编辑文案并至少保留一行 O 标题。
