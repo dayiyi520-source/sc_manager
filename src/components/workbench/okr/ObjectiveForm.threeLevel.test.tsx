@@ -249,11 +249,11 @@ it('inherits the source deadline and disables later KR and action calendar dates
   expect(visibleDates.length).toBeGreaterThan(0);
   visibleDates.forEach(date => expect(date).toHaveClass('ant-picker-cell-disabled'));
 });
-it('distributes three KR weights as five-percent increments', () => {
+it('distributes three KR weights as integer percentages summing to 100', () => {
   const ref = createRef<ObjectiveFormHandle>();
   render(<ObjectiveForm {...common} ref={ref} ownerId="user-admin" ownerName="老板" root initialPayload={{title:'目标',keyResults:[{id:'a',title:'第一条',weight:50,progress:0},{id:'b',title:'第二条',weight:50,progress:0}]}} onSave={vi.fn()}/>);
   fireEvent.click(screen.getByRole('button',{name:'添加关键结果'}));
-  expect(ref.current?.snapshot().keyResults?.map(kr => kr.weight)).toEqual([35,35,30]);
+  expect(ref.current?.snapshot().keyResults?.map(kr => kr.weight)).toEqual([34,33,33]);
 });
 
 it('shows project map milestones only for the selected project product', async () => {

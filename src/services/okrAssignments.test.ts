@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { personalAssignedObjectives } from './okrAssignments';
+import { personalAssignedObjectives, isAssigneeOnlyDepartmentChange } from './okrAssignments';
 import { canEditOkr } from './okrSettingsPolicy';
 import { mutateOkrLifecycle } from './mockOkrLifecycle';
 import type { OkrPerson, OkrRecord } from './okrRepository';
@@ -20,10 +20,21 @@ describe('personal department assignments', () => {
     expect(result[0].payload.keyResults?.[0].details?.map(row => row.id)).toEqual(['mine']);
     expect(goal.payload.keyResults?.[0].details).toHaveLength(2);
   });
+  it('does not expose other employees sub KRs through a parent KR assignment', () => {
+    const source = { ...goal, payload: { ...goal.payload, keyResults: [{ ...goal.payload.keyResults![0], details: [{ id: 'other', name: '他人版本', assigneeIds: ['manager'] }] }] } };
+    expect(personalAssignedObjectives([source], people[1], people)).toEqual([]);
+  });
   it('includes supervisor self assignments and reads current reassignment', () => {
     expect(personalAssignedObjectives([goal], people[0], people)[0].payload.keyResults).toHaveLength(2);
     const removed = { ...goal, payload: { ...goal.payload, keyResults: [] } };
     expect(personalAssignedObjectives([removed], people[1], people)).toEqual([]);
+  });
+  it('recognizes only assignee changes in department goals', () => {
+    const before = goal.payload;
+    const reassigned = { ...before, changeReason: '', keyResults: before.keyResults?.map((kr, index) => index ? kr : { ...kr, details: kr.details?.map((row, rowIndex) => rowIndex ? row : { ...row, assigneeIds: ['staff', 'manager'] }) }) };
+    expect(isAssigneeOnlyDepartmentChange(before, reassigned)).toBe(true);
+    expect(isAssigneeOnlyDepartmentChange(before, { ...reassigned, title: '新目标' })).toBe(false);
+    expect(isAssigneeOnlyDepartmentChange(before, { ...before })).toBe(false);
   });
   it('excludes drafts, deleted, company, personal, and other departments', () => {
     const records = [ { ...goal, status: 'draft' }, { ...goal, status: 'deleted' }, { ...goal, payload: { ...goal.payload, goalLevel: 'company' } }, { ...goal, payload: { ...goal.payload, goalLevel: 'personal' } } ] as OkrRecord[];

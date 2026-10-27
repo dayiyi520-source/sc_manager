@@ -1,4 +1,4 @@
-import { Alert, Button, Empty } from 'antd';
+import { Alert, Button, Empty, Tag } from 'antd';
 import { CommentDiscussionIcon, PackageIcon } from '@primer/octicons-react';
 import dayjs from 'dayjs';
 import { feedCategory, type FeedCategory, type WorkbenchFeed } from '../../services/workbenchFeeds';
@@ -21,6 +21,7 @@ export function WorkbenchFeedCard({ category, feeds, error, onRetry, onMore, onO
         <div className="text-xs text-[var(--text-muted)]">{dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time} · {feed.author || '未记录发布人'}</div>
         <div className="text-xs text-[var(--text-muted)]">{[feed.productName, feed.versionName, feed.projectName, feed.customer, feed.source?.module].filter(Boolean).join(' · ')}</div>
         <FeedSummary content={feed.content}/>
+        {category === 'square' && Boolean(feed.tags?.length) && <div className="flex flex-wrap gap-2">{feed.tags?.map(tag => <Tag key={tag}>{tag}</Tag>)}</div>}
       </article>)}
     </div>
   </section>;

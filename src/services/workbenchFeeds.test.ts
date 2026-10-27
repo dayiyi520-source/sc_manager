@@ -52,10 +52,11 @@ describe('信息广场与组织部门范围',()=>{
   const shared={id:'shared',type:'square' as const,title:'商机共享',content:'业务内容',time:'2026-10-20',source:{module:'商机管理',recordId:'opp'},tags:['商机信息'],audienceScopes:[['shichuang']] as [string][]};
   syncWorkbenchFeeds('商机管理',[shared]);syncWorkbenchFeeds('商机管理',[{...shared,title:'更新共享'}]);
   expect(listWorkbenchFeeds().filter(row=>row.source?.recordId==='opp')).toHaveLength(1);
-  expect(()=>deleteWorkbenchFeed(own.id,'other')).toThrow('不可在工作台删除');
+  const updated=createWorkbenchFeed({...input,title:'他人更新'},catalog,{id:'other',name:'其他人'},own.id);
+  expect(updated.authorId).toBe('me');expect(updated.author).toBe('本人');
   const source=listWorkbenchFeeds().find(row=>row.source)!;
-  expect(()=>createWorkbenchFeed(input,catalog,author,source.id)).toThrow('不可在工作台编辑');
-  expect(()=>deleteWorkbenchFeed(source.id,'me')).toThrow('不可在工作台删除');
+  expect(createWorkbenchFeed(input,catalog,{id:'other',name:'其他人'},source.id)).toMatchObject({id:source.id,source:source.source});
+  deleteWorkbenchFeed(source.id,'other');expect(listWorkbenchFeeds().some(row=>row.id===source.id)).toBe(false);
   syncWorkbenchFeeds('商机管理',[]);expect(listWorkbenchFeeds().some(row=>row.id===own.id)).toBe(true);
   deleteWorkbenchFeed(own.id,'me');expect(listWorkbenchFeeds().some(row=>row.id===own.id)).toBe(false);
  });

@@ -4,8 +4,10 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyTasksView } from './MyTasksView';
 import { requirementRepository } from '../../services/requirementRepository';
+import { openWorkItemDetailLink } from '../../utils/workItemDetailLink';
 import { FEEDS_KEY } from '../../services/workbenchFeeds';
 
+vi.mock('../../utils/workItemDetailLink', () => ({ openWorkItemDetailLink: vi.fn() }));
 const openPageTab = vi.fn();
 afterEach(() => { cleanup(); localStorage.removeItem(FEEDS_KEY); });
 vi.mock('./MyGoalProgressMetric', () => ({ MyGoalProgressMetric: () => <button onClick={() => openPageTab('wb_okr_perf')}>我的目标进度 40%</button> }));
@@ -67,18 +69,16 @@ describe('我的工作指标卡片', () => {
   });
 });
 
-it('首页仅点击待办标题打开详情并保持当前工作标签', async () => {
-  vi.mocked(requirementRepository.myTasks).mockResolvedValue([{ id: 't', sourceId: 'source-1', title: '验收待办', status: '处理中', taskGroup: 'mine', type: 'dev', assigneeName: '本人' }] as never);
+it('首页标题在新标签打开整页任务详情，卡片其他位置不触发', async () => {
+  vi.mocked(openWorkItemDetailLink).mockClear();
+  vi.mocked(requirementRepository.myTasks).mockResolvedValue([{ id: 't', sourceId: 'source-1', title: '验收待办', status: '处理中', taskGroup: 'mine', type: 'dev', productLineId: 'p', assigneeName: '本人' }] as never);
   render(<MyTasksView/>);
   const title = await screen.findByRole('button', { name: '验收待办' });
   fireEvent.click(title.closest('.rounded-lg')!);
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(openWorkItemDetailLink).not.toHaveBeenCalled();
   fireEvent.click(title);
-  expect(screen.getByRole('dialog')).toHaveTextContent('source-1');
-  expect(openPageTab).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByText('关闭待办详情'));
+  expect(openWorkItemDetailLink).toHaveBeenCalledWith('source-1', 'dev', 'p');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '验收待办' })).toBeInTheDocument();
 });
 
 it('首页动态仅点击标题打开详情', async () => {
@@ -95,11 +95,14 @@ it('首页动态仅点击标题打开详情', async () => {
 it('replaces approvals with learning only in the agent dashboard while retaining both information cards',async()=>{
  vi.mocked(requirementRepository.myTasks).mockResolvedValue([]);
  const view=render(<MyTasksView/>);
- expect(screen.getByText('审批中心')).toBeInTheDocument();expect(screen.queryByRole('region',{name:'我的学习'})).not.toBeInTheDocument();
+ expect(screen.getByText('审批中心')).toBeInTheDocument();expect(screen.getByRole('region',{name:'我的学习'})).toBeInTheDocument();
  view.unmount();render(<MyTasksView variant="agent"/>);
  expect(screen.queryByText('审批中心')).not.toBeInTheDocument();
  expect(await screen.findByRole('region',{name:'我的学习'})).toBeInTheDocument();
  expect(screen.getByRole('region',{name:'信息广场'})).toBeInTheDocument();
  expect(screen.getByRole('region',{name:'产品动态'})).toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:'我的目标进度 40%'}));expect(openPageTab).toHaveBeenCalledWith('wb_okr_perf');
+ expect(screen.queryByRole('button',{name:'我的目标进度 40%'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:/^工单/})).not.toBeInTheDocument();
+ expect(within(screen.getAllByTestId('metric-card')[1]).getByText('协同事项')).toBeInTheDocument();
+ expect([...document.querySelectorAll('section[aria-label]')].map(node=>node.getAttribute('aria-label'))).toEqual(['信息广场','我的学习','产品动态']);
 });

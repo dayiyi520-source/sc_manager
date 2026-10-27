@@ -21,7 +21,7 @@ function FeedReadReceipt({ userId, feed }: { userId: string; feed: WorkbenchFeed
 
 export const FeedDetail: React.FC<{ feed?: WorkbenchFeed; onClose: () => void; initiallyEditing?: boolean }> = ({ feed, onClose, initiallyEditing = false }) => {
   const { currentUser } = useApp();
-  const canEdit = Boolean(feed && !feed.source && feed.authorId === currentUser.id);
+  const canEdit = Boolean(feed && feedCategory(feed) === 'square');
   const [editing, setEditing] = useState(initiallyEditing);
   const editorRef = useRef<WorkbenchFeedEditorHandle>(null);
   const close = () => { if (editing) editorRef.current?.cancel(onClose); else onClose(); };
@@ -56,7 +56,7 @@ export const FeedDetail: React.FC<{ feed?: WorkbenchFeed; onClose: () => void; i
           ['customer', '关联客户', feedCategory(feed) === 'square' ? feed.customer : undefined],
         ].filter(([, , value]) => value).map(([key, label, value]) => ({ key: key!, label, children: value })),
         { key: 'scope', label: '可见范围', children: feedScopeLabel(feed) },
-        { key: 'source', label: '来源', children: feedCategory(feed) === 'dynamic' ? '产品发布' : feed.source?.module || '工作台' },
+        { key: 'source', label: '来源', children: feedCategory(feed) === 'dynamic' ? '产品发布' : feed.source?.module || '工作台发布' },
         { key: 'author', label: '发布人', children: feed.author || '未记录发布人' },
         { key: 'time', label: '发布时间', children: dayjs(feed.time).isValid() ? dayjs(feed.time).format('YYYY-MM-DD HH:mm') : feed.time },
       ]}/>

@@ -86,7 +86,7 @@ describe('动态与评价新增', () => {
   it('retains search and returns to the originating page', async () => {
     const back=vi.fn();render(<WorkbenchFeedsView onBack={back} backLabel="返回代理商待办"/>);
     fireEvent.click(screen.getByRole('button',{name:'返回代理商待办'}));expect(back).toHaveBeenCalledOnce();
-    expect(screen.getByLabelText('搜索动态与评价')).toHaveAttribute('placeholder','搜索标题、信息简介或关联信息');
+    expect(screen.getByLabelText('搜索动态与评价')).toHaveAttribute('placeholder','搜索标题');
   });
   const seed = () => localStorage.setItem(FEEDS_KEY, JSON.stringify([{ id: 'editable', type: 'competitor', title: '可编辑资讯', content: '原简介', contentHtml: '<p>原简介</p>', newsType: '专家报告', tags:['专家报告'], audienceScopes:[['shichuang']], time: '2026-10-20T00:00:00Z', authorId: 'me', visibility: 'all' }]));
   it('完整列表仅点击标题打开详情', async () => {
@@ -160,13 +160,30 @@ describe('动态与评价新增', () => {
     expect(listWorkbenchFeeds()).toHaveLength(0);
     expect(screen.getByRole('tab', { name: '信息广场 (0)' })).toBeInTheDocument();
   });
-  it('来源同步的信息不显示编辑和删除', async () => {
+  it('来源同步的信息暂时开放编辑和删除', async () => {
     seed(); const [feed] = listWorkbenchFeeds();
     localStorage.setItem(FEEDS_KEY, JSON.stringify([{ ...feed, source: { module: '产品', recordId: 'source' } }]));
     sessionStorage.setItem('shichuang.workbench.feedTab', 'competitor');
     render(<WorkbenchFeedsView onBack={vi.fn()}/>);
     fireEvent.click(await screen.findByRole('button', { name: '可编辑资讯' }));
-    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /编\s*辑|删\s*除/ })).toBeNull();
+    expect(within(screen.getByRole('dialog')).getAllByRole('button', { name: /编\s*辑|删\s*除/ })).toHaveLength(2);
   });
 
+});
+
+it('信息广场按标签与标题组合筛选，产品动态保留产品筛选', async () => {
+ localStorage.setItem(FEEDS_KEY,JSON.stringify([{id:'a',type:'square',title:'报告标题',content:'正文关键词',time:'2026-10-22',tags:['专家报告']},{id:'b',type:'square',title:'分享标题',content:'正文',time:'2026-10-22',tags:['经验分享']}]));
+ sessionStorage.setItem('shichuang.workbench.feedTab','square');
+ render(<WorkbenchFeedsView onBack={vi.fn()}/>);
+ expect(await screen.findByRole('button',{name:'报告标题'})).toBeInTheDocument();
+ expect(screen.queryByLabelText('筛选关联产品')).not.toBeInTheDocument();
+ await option('选择标签','专家报告');
+ expect(screen.queryByRole('button',{name:'分享标题'})).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('搜索动态与评价'),{target:{value:'正文关键词'}});
+ expect(screen.queryByRole('button',{name:'报告标题'})).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('搜索动态与评价'),{target:{value:'报告'}});
+ expect(screen.getByRole('button',{name:'报告标题'})).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('tab',{name:/产品动态/}));
+ expect(screen.getByLabelText('筛选关联产品')).toBeInTheDocument();
+ expect(screen.queryByLabelText('选择标签')).not.toBeInTheDocument();
 });

@@ -35,12 +35,12 @@ describe('OkrScopeSidebar', () => {
     fireEvent.click(screen.getByRole('button',{name:'添加目标'}));
     expect(add).toHaveBeenCalledWith('company');
   });
-  it('provides direct department and company target scopes without member entries', () => {
+  it('shows department members and supervisor confirmation scope', () => {
     const groups = buildOkrScopeGroups(people, 'manager');
-    expect(groups.map(group => group.key)).toEqual(['my', 'department', 'company', 'otherDepartments']);
-    expect(groups.find(group => group.key === 'department')?.members).toEqual([]);
+    expect(groups.map(group => group.key)).toEqual(['my', 'department', 'company', 'otherDepartments', 'confirmation']);
+    expect(groups.find(group => group.key === 'department')?.members.map(person => person.id)).toEqual(['staff']);
     expect(groups.find(group => group.key === 'company')?.members).toEqual([]);
-    expect(groups.some(group => group.key === 'confirmation')).toBe(false);
+    expect(groups.some(group => group.key === 'confirmation')).toBe(true);
   });
 
   it('selects department and company targets directly', () => {

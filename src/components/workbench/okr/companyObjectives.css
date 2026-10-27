@@ -260,12 +260,25 @@
 .company-objective-form .okr-personal-kr-details { margin-inline-start: var(--okr-result-indent); }
 
 .okr-weight-confirmation-rows { display: grid; gap: var(--company-space-md); padding-block: var(--company-space-md); }
-.okr-weight-confirmation-row { display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem; gap: var(--company-space-md); align-items: center; }
-.okr-weight-confirmation-row > div { display: flex; gap: var(--company-space-sm); min-width: 0; }
-.okr-weight-confirmation-row > div > span:last-child { overflow-wrap: anywhere; }
-.okr-weight-confirmation-label { flex: none; color: var(--text-muted); }
+.okr-weight-confirmation-row { display: grid; grid-template-columns: minmax(0, 1fr) 4.75rem; gap: var(--company-space-md); align-items: center; min-width: 0; }
+.okr-weight-confirmation-copy { display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: var(--company-space-sm); min-width: 0; align-items: center; }
+.okr-weight-confirmation-row.is-kr { margin-left: 16px; width: calc(100% - 16px); }
+.okr-weight-confirmation-row > div { min-width: 0; }
+.okr-weight-confirmation-label { color: var(--text-muted); white-space: nowrap; }
+.okr-weight-confirmation-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .okr-weight-confirmation-row .ant-input-number { width: 100%; }
 .okr-weight-confirmation .ant-alert { margin-block: var(--company-space-sm); }
+.okr-weight-confirmation-kr-group { margin-top: calc(var(--company-space-sm) * -1); }
+.okr-weight-confirmation-footer { display:flex; align-items:center; justify-content:space-between; gap:var(--company-space-md); width:100%; }
+.okr-weight-confirmation-footer > span { color:var(--text-muted); font-size:var(--company-font-caption); }
+.okr-weight-confirmation-footer > span.is-valid { color:var(--success); }
+.okr-weight-confirmation-footer > span.is-error { color:var(--danger); }
+.okr-weight-confirmation-footer > div { display:flex; gap:var(--company-space-sm); }
+
+@media (max-width: 720px) {
+  .okr-weight-confirmation-row { grid-template-columns: minmax(0, 1fr) 4.75rem; gap: var(--company-space-sm); }
+  .okr-weight-confirmation-copy { grid-template-columns: 2.5rem minmax(0, 1fr); }
+}
 
 /* Match the inherited KR text edge, including the marker-to-title gap. */
 .company-objective-form .okr-source-heading > .is-personal-alignment,

@@ -13,16 +13,23 @@ vi.mock('../../context/AppContext',()=>({useApp:()=>({currentUser:{id:'me',name:
 vi.mock('../../services/okrRepository',()=>({okrRepository:{records:vi.fn(),people:vi.fn(),settings:vi.fn()}}));
 beforeEach(()=>{localStorage.clear();sessionStorage.clear();vi.clearAllMocks();vi.mocked(okrRepository.records).mockResolvedValue([]);vi.mocked(okrRepository.people).mockResolvedValue([{id:'me',name:'本人',department:'产品部',supervisorId:null,rootFlag:1,version:0}]);vi.mocked(okrRepository.settings).mockResolvedValue({} as never);});
 afterEach(cleanup);
-it('aggregates all effective monthly targets and navigates to monthly goals',async()=>{
- const record=(id:string,progress:number,weight:number)=>({id,kind:'objective',ownerId:'me',periodKey:dayjs().format('YYYY-MM'),status:'active',version:1,payload:{title:id,weight,keyResults:[{id:id+'-kr',title:'成果',weight:100,progress}]}} as OkrRecord);
- vi.mocked(okrRepository.records).mockResolvedValue([record('a',20,25),record('b',60,75),{...record('other',100,100),ownerId:'other'},{...record('old',100,100),periodKey:'2020-01'},{...record('draft',100,100),status:'draft'},{...record('deleted',100,100),status:'deleted'}]);
- render(<MyGoalProgressMetric/>);expect(await screen.findByText('50%')).toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:'我的目标进度，进入月度目标'}));expect(openPageTab).toHaveBeenCalledWith('wb_okr_perf');
+it('shows related department objectives, assigned KRs and sub KRs with progress', async () => {
+ const month=dayjs().format('YYYY-MM');
+ vi.mocked(okrRepository.people).mockResolvedValue([{id:'me',name:'本人',department:'产品部',supervisorId:'boss',rootFlag:0,version:0},{id:'boss',name:'主管',department:'产品部',supervisorId:null,rootFlag:0,goalRole:'supervisor',version:0}]);
+ const record={id:'department',kind:'objective',ownerId:'boss',periodKey:month,status:'active',version:1,payload:{goalLevel:'department',title:'部门交付目标',deadline:month+'-28',keyResults:[{id:'kr',title:'关键成果',weight:100,progress:40,details:[{id:'mine',name:'本人子成果',progress:20,assigneeIds:['me']},{id:'other',name:'其他人子成果',progress:80,assigneeIds:['other']}]},{id:'hidden',title:'其他人成果',weight:0,progress:0,assigneeIds:['other']}]}} as OkrRecord;
+ vi.mocked(okrRepository.records).mockResolvedValue([record,{...record,id:'old',periodKey:'2020-01'},{...record,id:'draft',status:'draft'}]);
+ render(<MyGoalProgressMetric/>);
+ expect(await screen.findByText('O：部门交付目标')).toBeInTheDocument();
+ expect(screen.getByText(/子 KR1.1：本人子成果/)).toBeInTheDocument();
+ expect(screen.queryByText(/其他人子成果|其他人成果/)).not.toBeInTheDocument();
+ expect(screen.getByText('整体进度').previousSibling).toHaveTextContent('40%');
+ fireEvent.click(screen.getByRole('button',{name:'查看更多我的目标进度'}));
+ expect(openPageTab).toHaveBeenCalledWith('wb_okr_perf');
 });
-it('distinguishes missing goals from zero progress and provides retry after failure',async()=>{
+it('shows the official empty state and retries a failed read',async()=>{
  vi.mocked(okrRepository.records).mockRejectedValueOnce(new Error('offline')).mockResolvedValue([]);
  render(<MyGoalProgressMetric/>);expect(await screen.findByText('目标进度加载失败')).toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:/重\s*试/}));expect(await screen.findByText('—')).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:/重\s*试/}));expect(await screen.findByText('本月暂无与我有关的部门目标')).toBeInTheDocument();
 });
 it('reads current training records, prioritizes unfinished courses and opens the selected course',async()=>{
  const state=createTrainingState();state.courses=state.courses.slice(0,2);state.records=[{courseId:state.courses[1].id,lessonId:state.courses[1].lessons[0].id,status:'学习中',updatedAt:'2026-10-22'}];

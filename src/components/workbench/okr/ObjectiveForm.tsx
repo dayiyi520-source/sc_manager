@@ -158,7 +158,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     return [kr.action, kr.result].filter(value => value?.trim()).join('，');
   };
   const changeKr = (id: string, patch: Partial<OkrKr>) => setKrs(items => items.map(kr => kr.id === id ? { ...kr, ...patch } : kr));
-  const distribute = (items: OkrKr[]) => items.map((kr, i) => ({ ...kr, weight: (Math.floor(20 / items.length) + (i < 20 % items.length ? 1 : 0)) * 5 }));
+  const distribute = (items: OkrKr[]) => items.map((kr, i) => ({ ...kr, weight: Math.floor(100 / items.length) + (i < 100 % items.length ? 1 : 0) }));
   const isCompanyStyle = root || supervisor;
   const payload = (): OkrPayload => {
     const latestKrDate = krs.map(kr => kr.deadline).filter(Boolean).sort().at(-1) || '';
@@ -189,7 +189,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
     if (!isSubmissionWeight(objectiveWeight)) { setError('目标权重须为 1-100 的整数。'); return false; }
     if (krs.some(kr => !isSubmissionDeadline(kr.deadline))) { setError('请设置每条 KR的有效截止日期。'); return false; }
     if (supervisor && !initialPayload?.parentObjectiveId && krs.some((kr, index) => actionTypeForKr(index) === 'support' ? !kr.action?.trim() || !kr.result?.trim() : ['product', 'delivery'].includes(actionTypeForKr(index)) ? !krDetailContentComplete(kr) : !kr.businessObject?.trim() || !kr.version?.trim() || !kr.stage?.trim())) { setError('请按每条 KR 的模板填写完整业务字段。'); return false; }
-    if (krs.some(kr => !isSubmissionWeight(kr.weight) || kr.weight % 5 !== 0) || !krs.some(kr => kr.weight > 20) || (krWeightTotal !== 100 && !(initialPayload?.parentObjectiveId && krWeightTotal === calculateKrWeightTotal(initialPayload.keyResults || [])))) { setError('KR 权重须为 5% 的倍数，合计为 100%，且至少一条大于 20%。'); return false; }
+    if (krs.some(kr => !isSubmissionWeight(kr.weight)) || (krWeightTotal !== 100 && !(initialPayload?.parentObjectiveId && krWeightTotal === calculateKrWeightTotal(initialPayload.keyResults || [])))) { setError('KR 权重须为 1-100 的整数，合计为 100%。'); return false; }
     setError('');
     return onSave(submittedPayload);
   };
@@ -275,7 +275,7 @@ export const ObjectiveForm = forwardRef<ObjectiveFormHandle, Props>(function Obj
       <div className="okr-objective-krs">
         {(ownPersonal || personal ? [] : krs).map((kr, index) => <div key={kr.id} draggable={!busy} className={`okr-objective-columns okr-objective-kr${draggingIndex === index ? ' is-dragging' : ''}${dragOverIndex === index && draggingIndex !== index ? ' is-drag-over' : ''}`} onPointerDown={event => { dragHandleIndex.current = (event.target as Element).closest('.okr-kr-drag') ? index : null; }} onDragStart={event => { if (dragHandleIndex.current !== index) { event.preventDefault(); return; } event.dataTransfer.setData('text/plain', String(index)); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setDragImage(event.currentTarget, 24, 20); setDraggingIndex(index); }} onDragEnd={() => { dragHandleIndex.current = null; setDraggingIndex(null); setDragOverIndex(null); }} onDragOver={event => { if (draggingIndex === null) return; event.preventDefault(); if (krs.length > 1) setDragOverIndex(index); }} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (krs.length > 1 && Number.isInteger(from) && from !== index) moveKr(from, index); dragHandleIndex.current = null; setDraggingIndex(null); setDragOverIndex(null); }}>
           <div className="okr-objective-kr-title"><span className="okr-kr-drag" title="拖动调整顺序" aria-label="拖动 KR"><GrabberIcon/></span>{renderKrTemplateSelector(kr, index)}{personal && <Typography.Text>{personalKrTitle(kr) || kr.title}</Typography.Text>}{(!supervisor || !threeLevel) && !personal && <Input aria-label={`A${index + 1} 名称`} variant="borderless" maxLength={2000} value={kr.title} onChange={event => changeKr(kr.id, { title: event.target.value })} placeholder={threeLevel ? '输入关键结果名称' : '输入你计划要做的动作描述'}/>}</div>
-          {!personal && <InputNumber aria-label={`A${index + 1} 权重`} min={5} max={100} step={5} precision={0} suffix="%" value={kr.weight} onChange={value => changeKr(kr.id, { weight: value ?? 0 })}/>}
+          {!personal && <InputNumber aria-label={`A${index + 1} 权重`} min={1} max={100} precision={0} suffix="%" value={kr.weight} onChange={value => changeKr(kr.id, { weight: value ?? 0 })}/>}
           {!personal && <DatePicker aria-label={`KR${index + 1} 截止日期`} placeholder="截止日期" disabled={planLocked && !!initialPayload?.keyResults?.some(item => item.id === kr.id && !!item.deadline)} disabledDate={date => Boolean((parentDeadline || objectiveTiming.deadline) && date.isAfter(dayjs(parentDeadline || objectiveTiming.deadline), 'day'))} value={kr.deadline ? dayjs(kr.deadline) : null} onChange={value => changeKr(kr.id, { deadline: value?.format('YYYY-MM-DD') })}/>}
           <Tooltip title="删除动作"><Button aria-label={`删除 A${index + 1}`} type="text" icon={<TrashIcon/>} disabled={busy || personal || krs.length === 1} onClick={() => setKrs(items => distribute(items.filter(item => item.id !== kr.id)))}/></Tooltip>
           {supervisor && !personal && !ownPersonal && (!templateMissing || kr.structureType) && <div className="supervisor-action-fields"> {renderSupervisorFields(kr, index)}</div>}

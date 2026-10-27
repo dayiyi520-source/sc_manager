@@ -1,5 +1,6 @@
 import { otherDepartmentPeople as getOtherDepartmentPeople, departmentName } from './departmentScope';
 import { confirmationMembers, confirmationRequests } from './goalConfirmation';
+import { listOkrWeightPlans } from '../../../services/okrWeightPlans';
 import { hasOkrPermission } from '../../../services/okrSettingsPolicy';
 import { goalLevel } from '../../../services/okrGoalRules';
 import { ChecklistIcon } from '@primer/octicons-react';
@@ -45,19 +46,22 @@ const groupMeta: Array<Pick<OkrScopeGroup, 'key' | 'label' | 'icon'>> = [
 export function buildOkrScopeGroups(people: OkrPerson[], currentUserId: string, records: OkrRecord[] = [], settings?: import('../../../services/okrRepository').OkrSettings): OkrScopeGroup[] {
   const current = people.find(person => person.id === currentUserId);
   const otherDepartmentPeople = getOtherDepartmentPeople(people, currentUserId);
+  const weightPlanOwners = new Set(listOkrWeightPlans().filter(plan => plan.status === 'submitted' && people.some(person => person.id === plan.userId && person.supervisorId === currentUserId && person.id !== currentUserId)).map(plan => plan.userId));
+  const confirmationOwnerIds = new Set(confirmationMembers(people, currentUserId, records, settings).map(person => person.id));
   const departmentGroups = Array.from(new Set(otherDepartmentPeople.map(person => departmentName(person.department)))).sort().map(department => ({
     department,
     members: otherDepartmentPeople.filter(person => departmentName(person.department) === department),
   }));
   const membersByScope: Record<OkrScopeKey, OkrPerson[]> = {
     my: [],
-    department: [],
+    department: people.filter(person => person.id !== currentUserId && departmentName(person.department) === departmentName(current?.department)),
     company: [],
     myDepartment: people.filter(person => person.id !== currentUserId && departmentName(person.department) === departmentName(current?.department)),
     otherDepartments: otherDepartmentPeople,
-    confirmation: confirmationMembers(people, currentUserId, records, settings),
+    confirmation: people.filter(person => weightPlanOwners.has(person.id) || confirmationOwnerIds.has(person.id)),
   };
-  const meta = [...groupMeta, ...((goalLevel(current) !== '部门级' && (goalLevel(current) !== '个人级' || (settings?.administratorIds || []).includes(currentUserId) || (settings?.subAdministratorIds || []).includes(currentUserId) || confirmationRequests(records, people, currentUserId, settings).length > 0)) ? [{ key: 'confirmation' as const, label: '目标确认', icon: <ChecklistIcon/> }] : [])];
+  const canReviewGoals = goalLevel(current) === '部门级' || goalLevel(current) === '公司级' || (settings?.administratorIds || []).includes(currentUserId) || (settings?.subAdministratorIds || []).includes(currentUserId) || confirmationRequests(records, people, currentUserId, settings).length > 0 || weightPlanOwners.size > 0;
+  const meta = [...groupMeta, ...(canReviewGoals ? [{ key: 'confirmation' as const, label: '目标确认', icon: <ChecklistIcon/> }] : [])];
   return meta.map(group => ({ ...group, members: membersByScope[group.key], ...(group.key === 'otherDepartments' ? { departmentGroups } : {}) }));
 }
 
@@ -78,7 +82,8 @@ type Props = {
 export function OkrScopeSidebar({ people, records = [], settings, currentUserId, selection, defaultExpandMembers = false, onSelect, onAddTarget, addTargetDisabled = false, collapsed = false, onToggleCollapse }: Props) {
   const groups = useMemo(() => buildOkrScopeGroups(people, currentUserId, records, settings), [people, currentUserId, records, settings]);
   const requests = confirmationRequests(records, people, currentUserId, settings);
-  const pendingOwnerIds = new Set(requests.map(record => record.ownerId));
+  const pendingWeightPlans = listOkrWeightPlans().filter(plan => plan.status === 'submitted' && people.some(person => person.id === plan.userId && person.supervisorId === currentUserId && person.id !== currentUserId));
+  const pendingOwnerIds = new Set([...requests.map(record => record.ownerId), ...pendingWeightPlans.map(plan => plan.userId)]);
   const currentUser = people.find(person => person.id === currentUserId);
   const companyEditor = !!currentUser && hasOkrPermission(currentUser.id,'companyGoalEdit',settings,people);
   const primaryActionLabel = !currentUser ? '组织信息加载中' : currentUser.rootFlag === 1 ? '添加目标' : '拆解目标';
@@ -107,7 +112,7 @@ export function OkrScopeSidebar({ people, records = [], settings, currentUserId,
             return next;
           }); }}>
             <button type="button" className="okr-scope-main" aria-label={group.label} aria-pressed={isSelected} onClick={event => { event.stopPropagation(); onSelect({ scope: group.key }); if (group.members.length > 0) setExpanded(current => { const next = new Set(current); next.has(group.key) ? next.delete(group.key) : next.add(group.key); return next; }); }}>
-              {group.icon}<span>{group.label}</span>{group.key === 'confirmation' && requests.length > 0 && <Badge className="okr-confirmation-badge" count={requests.length} overflowCount={999} aria-label={`待确认目标 ${requests.length} 项`}/>}
+              {group.icon}<span>{group.label}</span>{group.key === 'confirmation' && requests.length + pendingWeightPlans.length > 0 && <Badge className="okr-confirmation-badge" count={requests.length + pendingWeightPlans.length} overflowCount={999} aria-label={`待确认目标 ${requests.length + pendingWeightPlans.length} 项`}/>}
             </button>
             {group.members.length > 0 && <button
               type="button"
@@ -122,8 +127,9 @@ export function OkrScopeSidebar({ people, records = [], settings, currentUserId,
             >{isExpanded ? <ChevronDown /> : <ChevronRight />}</button>}
           </div>
           {isExpanded && group.key === 'otherDepartments' && <div className="okr-scope-departments">
-            {(group.departmentGroups || []).filter(({ department, members }) => !normalizedQuery || department.toLowerCase().includes(normalizedQuery) || members.some(person => person.name.toLowerCase().includes(normalizedQuery))).map(({ department }) => <section key={department} className="okr-scope-department">
-              <button type="button" className="okr-scope-main" aria-label={department} aria-pressed={selection.scope === group.key && selection.department === department} onClick={() => onSelect({ scope: group.key, department })}><Building/><span>{department}</span></button>
+            {(group.departmentGroups || []).filter(({ department, members }) => !normalizedQuery || department.toLowerCase().includes(normalizedQuery) || members.some(person => person.name.toLowerCase().includes(normalizedQuery))).map(({ department, members }) => <section key={department} className="okr-scope-department">
+              <button type="button" className="okr-scope-main" aria-label={department} aria-pressed={selection.scope === group.key && selection.department === department && !selection.personId} onClick={() => onSelect({ scope: group.key, department })}><Building/><span>{department}</span></button>
+              {selection.scope === group.key && selection.department === department && <div className="okr-scope-members">{members.filter(person => !normalizedQuery || person.name.toLowerCase().includes(normalizedQuery) || department.toLowerCase().includes(normalizedQuery)).map(person => <button key={person.id} type="button" aria-label={person.name} aria-pressed={selection.personId === person.id} className={selection.personId === person.id ? 'is-selected' : ''} onClick={() => onSelect({ scope: group.key, department, personId: person.id })}><span className="okr-scope-member-icon" aria-hidden="true"><User/></span><span>{person.name}</span></button>)}</div>}
             </section>)}
             {normalizedQuery && filteredMembers.length === 0 && <p>未找到匹配人员</p>}
           </div>}
@@ -131,7 +137,7 @@ export function OkrScopeSidebar({ people, records = [], settings, currentUserId,
             {filteredMembers.length > 0 ? [...filteredMembers].sort((left, right) => Number(pendingOwnerIds.has(right.id)) - Number(pendingOwnerIds.has(left.id))).map(person => {
               const selected = selection.scope === group.key && selection.personId === person.id;
               return <button key={person.id} type="button" className={selected ? 'is-selected' : ''} aria-label={person.name} aria-pressed={selected} onClick={() => onSelect({ scope: group.key, personId: person.id })}>
-                <span className="okr-scope-member-icon" aria-hidden="true"><User /></span><span title={`${person.name} · ${person.department}`}>{person.name}{group.key === 'confirmation' && requests.some(record => record.ownerId === person.id) ? `（${requests.filter(record => record.ownerId === person.id).length}）` : ''}</span></button>;
+                <span className="okr-scope-member-icon" aria-hidden="true"><User /></span><span title={`${person.name} · ${person.department}`}>{person.name}{group.key === 'confirmation' && pendingOwnerIds.has(person.id) ? `（${requests.filter(record => record.ownerId === person.id).length + pendingWeightPlans.filter(plan => plan.userId === person.id).length}）` : ''}</span></button>;
             }) : <p>未找到匹配人员</p>}
           </div>}
         </section>;

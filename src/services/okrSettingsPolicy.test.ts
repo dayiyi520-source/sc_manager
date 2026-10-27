@@ -97,6 +97,7 @@ describe('supervisor personal goal confirmation', () => {
   config.confirmation!.selfSupervisor = 'upper';
   expect(confirmationReviewer(people[1], 'create', personal, config, people)).toBe('admin');
   expect(confirmationReviewer(people[2], 'create', personal, config, people)).toBe('manager');
+  expect(() => confirmationReviewer({ ...people[2], supervisorId: null }, 'create', personal, config, people)).toThrow('未配置直属主管');
  });
  it('respects configured supervisor roles rather than treating every personal goal as self-supervised', () => {
   const config = settings();

@@ -1,5 +1,5 @@
 import { creationPeriodError, isDepartmentTemplateAvailable } from './goalCreationPolicy';
-import { normalizeGoalAssignments, assignedDetailRows } from './okrAssignments';
+import { normalizeGoalAssignments, assignedDetailRows, isAssigneeOnlyDepartmentChange } from './okrAssignments';
 import { normalizeObjectiveTitleTemplates } from './okrObjectiveTitleTemplates';
 import { restoreReturnedInitialDraft } from './okrSubmissionState';
 import { applyProgress, canUpdateProgress, progressSubject } from './okrProgress';
@@ -132,7 +132,7 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
   if (record && record.payload.goalModelVersion === 2 && records.some(child => child.status !== 'deleted' && child.payload.sourceObjectiveId === record.id && !payload.keyResults?.some(kr => kr.id === child.payload.sourceKrId))) throw new Error('已有下级承接的 KR 不能移除，请先处理承接关系');
   if (payload.sourceKrId && !(payload.goalLevel === 'department' && payload.objectiveType === 'challenge' && !payload.objectiveTitleTemplateId) && records.some(item => item.id !== record?.id && item.status !== 'deleted' && item.kind === 'objective' && item.ownerId === person.id && item.periodKey === (record?.periodKey || body.periodKey) && (payload.goalLevel !== 'department' || !payload.objectiveTitleTemplateId || (item.payload.objectiveTitleTemplateId === payload.objectiveTitleTemplateId && item.payload.sourceObjectiveId === payload.sourceObjectiveId)) && (item.payload.sourceObjectiveId === payload.sourceObjectiveId && item.payload.sourceKrId === payload.sourceKrId || item.changeRequest?.status === 'pending' && item.changeRequest.payload.sourceObjectiveId === payload.sourceObjectiveId && item.changeRequest.payload.sourceKrId === payload.sourceKrId))) throw new Error('该指派已承接或正在关联确认，请继续编辑已有目标');
   const reviewerId = submission ? confirmationReviewer(owner,record && !['draft','submitted'].includes(record.status) ? 'update' : 'create',payload,settings,people) : undefined;
-  if (record && !['draft','submitted'].includes(record.status) && reviewerId) {
+  if (record && !['draft','submitted'].includes(record.status) && reviewerId && !isAssigneeOnlyDepartmentChange(record.payload, payload)) {
     if (!payload.changeReason?.trim()) throw new Error('请填写修改原因');
 
     const change: OkrGoalChange = { previousPayload: record.payload, id: crypto.randomUUID(), status: 'pending', purpose: record.payload.sourceKrId !== payload.sourceKrId || record.payload.sourceObjectiveId !== payload.sourceObjectiveId ? 'alignment' : 'update', reason: payload.changeReason.trim(), reviewerId, payload: { ...payload, inherited: false }, baseVersion: record.version, requestedAt: timestamp() };
@@ -140,7 +140,7 @@ export function mutateOkrLifecycle(recordId: string | undefined, body: Mutation,
   }
   const next: OkrRecord = { ...record, id: record?.id || crypto.randomUUID(), kind: 'objective', ownerId: owner.id, periodKey: record?.periodKey || body.periodKey || '', status: submission ? 'active' : 'draft', createdAt: record?.createdAt || timestamp(), version: (record?.version ?? -1) + 1, payload: submission ? lockGoalPlan(payload) : { ...payload, inherited: false } };
   if (record && !['draft','submitted'].includes(record.status)) next.payload = { ...payload, plannedDeadline: record.payload.plannedDeadline || record.payload.deadline, inherited: false };
-  if (record && !['draft','submitted'].includes(record.status)) { next.changeHistory = [...(record.changeHistory || []), { id: crypto.randomUUID(), status: 'approved', previousPayload: record.payload, purpose: 'update', reviewerId: person.id, reason: payload.changeReason || '目标内容调整', payload: next.payload, baseVersion: record.version, requestedAt: timestamp(), reviewedAt: timestamp() }]; }
+  if (record && !['draft','submitted'].includes(record.status)) { next.changeHistory = [...(record.changeHistory || []), { id: crypto.randomUUID(), status: 'approved', previousPayload: record.payload, purpose: 'update', reviewerId: person.id, reason: isAssigneeOnlyDepartmentChange(record.payload, payload) ? '调整承接人员' : payload.changeReason || '目标内容调整', payload: next.payload, baseVersion: record.version, requestedAt: timestamp(), reviewedAt: timestamp() }]; }
   if (submission && reviewerId && (!record || ['draft','submitted'].includes(record.status))) {
 
     next.status = 'submitted'; next.payload = { ...payload, inherited: false };

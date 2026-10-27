@@ -760,14 +760,21 @@
 
 .okr-target-month { display:grid; min-width:0; gap:12px; }
 .okr-target-month + .okr-target-month { margin-top:24px; }
-.okr-target-month-head { display:grid; width:100%; min-height:48px; grid-template-columns:20px auto auto 1fr; align-items:center; gap:8px; padding:8px 16px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface-soft); color:var(--text-primary); text-align:left; cursor:pointer; transition:border-color 150ms ease,background-color 150ms ease; }
+.okr-target-month-head { display:grid; width:100%; min-height:48px; grid-template-columns:20px auto auto minmax(0,1fr); align-items:center; gap:8px; padding:8px 16px; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface-soft); color:var(--text-primary); text-align:left; transition:border-color 150ms ease,background-color 150ms ease; }
 .okr-target-month-head:hover { border-color:var(--border-strong); background:var(--bg-elevated); }
 .okr-target-month-head:active { background:var(--bg-card); }
-.okr-target-month-head:focus-visible { outline:2px solid color-mix(in srgb,var(--primary) 32%,transparent); outline-offset:2px; }
+.okr-target-month-toggle { display:grid; width:20px; height:24px; place-items:center; padding:0; border:0; background:transparent; color:var(--text-muted); cursor:pointer; }
+.okr-target-month-toggle:focus-visible { outline:2px solid color-mix(in srgb,var(--primary) 32%,transparent); outline-offset:2px; border-radius:4px; }
 .okr-target-month-head svg { color:var(--text-muted); }
-.okr-target-month-head strong { font-size:14px; line-height:20px; }
-.okr-target-month-head span { color:var(--text-muted); font-size:12px; }
-.okr-target-month-head em { justify-self:end; color:var(--text-muted); font-size:12px; font-style:normal; }
+.okr-target-month-head > strong { font-size:14px; line-height:20px; }
+.okr-target-month-head > span { color:var(--text-muted); font-size:12px; }
+.okr-month-head-right { display:flex; width:100%; min-width:0; align-items:center; justify-content:flex-end; gap:16px; }
+.okr-month-head-right .okr-month-weight-button { width:32px; height:32px; margin-right:8px; padding:0; color:var(--primary); }
+.okr-target-month-head .okr-month-weight-button:hover { color:var(--primary-hover); background:color-mix(in srgb,var(--primary) 10%,transparent); }
+.okr-target-month-head .okr-month-weight-button:focus-visible { outline:2px solid color-mix(in srgb,var(--primary) 32%,transparent); outline-offset:2px; }
+.okr-month-target-count { display:inline-flex; align-items:center; gap:4px; color:var(--text-muted); font-size:12px; white-space:nowrap; }
+.okr-month-head-right .okr-period-progress { margin-left:0; }
+.okr-target-month-head em { color:var(--text-muted); font-size:12px; font-style:normal; }
 
 .okr-target-list { display:grid; overflow:hidden; border:1px solid var(--border-main); border-radius:8px; background:var(--bg-surface); }
 .okr-target-list-item { min-width:0; cursor:pointer; background:var(--bg-card); transition:background-color 150ms ease; }
@@ -843,8 +850,10 @@
 @media (max-width:720px) {
   .okr-page-actions { flex-wrap:wrap; }
   .okr-target-view-switch { order:2; }
-  .okr-target-month-head { grid-template-columns:20px auto 1fr; padding:8px 12px; }
-  .okr-target-month-head em { grid-column:2 / 4; justify-self:start; padding-left:0; }
+  .okr-target-month-head { grid-template-columns:20px auto minmax(0,1fr); padding:8px 12px; }
+  .okr-month-head-right { grid-column:2 / 4; justify-content:flex-start; flex-wrap:wrap; }
+  .okr-target-month-head .okr-month-weight-button { margin-right:0; }
+  .okr-target-month-head em { padding-left:0; }
   .okr-target-list-item > header { align-items:flex-start; gap:12px; padding:16px; }
   .okr-target-list-status > span { display:none; }
   .okr-target-grid { grid-template-columns:minmax(0,1fr); }
@@ -1033,7 +1042,7 @@
   .okr-target-list-item { --okr-content-left: 48px; }
 }
 
-.okr-target-month-head { grid-template-columns: 20px auto auto 1fr auto; }
+.okr-target-month-head { grid-template-columns: 20px auto auto minmax(0,1fr); }
 .okr-target-list-item .okr-target-actions { padding-right: 20px; }
 
 .okr-target-list-item .okr-target-title-line .okr-summary-index { width: 32px; flex: none; }

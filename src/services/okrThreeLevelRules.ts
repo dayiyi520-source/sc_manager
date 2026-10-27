@@ -57,11 +57,10 @@ export function validateThreeLevelGoal(payload: OkrPayload, ownerId: string): st
   if (!payload.keyResults?.length) return '请至少填写一条关键结果';
   if (payload.goalLevel !== 'company' && payload.origin !== 'autonomous' && (!payload.sourceObjectiveId || !payload.sourceKrId)) return '请先承接指派给本人的关键结果';
   if (payload.keyResults.reduce((sum, kr) => sum + kr.weight, 0) !== 100) return 'KR 权重合计须为 100%';
-  if (!payload.keyResults.some(kr => kr.weight > 20)) return '至少一条 KR 权重须大于 20%';
   for (const kr of payload.keyResults) {
     if (!Number.isInteger(kr.progress) || kr.progress < 0 || kr.progress > 100) return 'KR 进度须为 0–100 的整数';
     if (!kr.title?.trim()) return '请填写每条关键结果名称';
-    if (!Number.isInteger(kr.weight) || kr.weight < 5 || kr.weight > 100 || kr.weight % 5 !== 0) return 'KR 权重须为 5% 的倍数';
+    if (!Number.isInteger(kr.weight) || kr.weight < 1 || kr.weight > 100) return 'KR 权重须为 1–100 的整数';
     if (payload.deadline && kr.deadline && kr.deadline > payload.deadline) return 'KR 计划截止日期不能超过目标原计划';
     if (!kr.deadline) return '请设置每条 KR 的计划截止日期';
     if (payload.goalLevel === 'department') {

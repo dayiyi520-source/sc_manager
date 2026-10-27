@@ -73,7 +73,7 @@ export function createWorkbenchFeed(input: FeedInput, catalog: FeedCatalog, auth
   if (source && (!source.module.trim() || !source.recordId.trim())) throw new Error('共享来源信息不完整');
   const sharedId = source ? `shared:${encodeURIComponent(source.module)}:${encodeURIComponent(source.recordId)}` : undefined;
   const existing = editingId ? rows.find(row => row.id === editingId) : undefined;
-  if (editingId && (!existing || existing.source || existing.authorId !== author.id)) throw new Error('该信息不可在工作台编辑');
+  if (editingId && (!existing || feedCategory(existing) != 'square')) throw new Error('该信息不可在工作台编辑');
   if (!Array.isArray(input.tags) || !input.tags.length || input.tags.some(tag => !informationTags.includes(tag as typeof informationTags[number]))) throw new Error('请选择有效的信息标签');
   const audienceScopes = validateAudience(input.audienceScopes, catalog.people || []);
   const project = catalog.projects.find(row => row.id === input.projectId);
@@ -83,10 +83,10 @@ export function createWorkbenchFeed(input: FeedInput, catalog: FeedCatalog, auth
   if (input.productId && !product) throw new Error('请选择有效的关联产品');
   if (input.customerId && !customer) throw new Error('请选择有效的关联客户');
   const feed: WorkbenchFeed = {
-    id: sharedId || existing?.id || globalThis.crypto?.randomUUID?.() || `feed-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+    id: existing?.id || sharedId || globalThis.crypto?.randomUUID?.() || `feed-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
     type: 'square', title, content, time: existing?.time || new Date().toISOString(),
     contentHtml: sanitizeHtml(input.contentHtml || '', { richText: true }), tags: [...new Set(input.tags)], audienceScopes,
-    source, authorId: author.id, author: author.name, productId: product?.id, productName: product?.name,
+    source: existing?.source || source, authorId: existing ? existing.authorId : author.id, author: existing ? existing.author : author.name, productId: product?.id, productName: product?.name,
     projectId: project?.id, projectName: project?.name, customerId: customer?.id, customer: customer?.name,
   };
   saveFeeds([feed, ...rows.filter(row => row.id !== feed.id)], '保存失败，浏览器存储不可用或空间不足，请重试');
@@ -100,7 +100,7 @@ function saveFeeds(rows: WorkbenchFeed[], error: string) {
 export function deleteWorkbenchFeed(id: string, authorId: string): void {
   const rows = listWorkbenchFeeds();
   const existing = rows.find(row => row.id === id);
-  if (!existing || existing.source || existing.authorId !== authorId) throw new Error('该信息不可在工作台删除');
+  if (!existing || feedCategory(existing) != 'square') throw new Error('该信息不可在工作台删除');
   try { localStorage.setItem(FEEDS_KEY, JSON.stringify(rows.filter(row => row.id !== id))); }
   catch { throw new Error('删除失败，浏览器存储不可用，请重试'); }
   window.dispatchEvent(new Event(FEEDS_CHANGED));

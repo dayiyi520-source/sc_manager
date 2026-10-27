@@ -30,3 +30,9 @@ it('does not report inherited O/KR text when only the personal action changes', 
  const rows=goalDifferences(base,changed);
  expect(rows.map(row=>row.label)).toEqual(['动作内容']);
 });
+
+it('lists sub KR assignee changes in a mixed department update', () => {
+ const before={goalLevel:'department' as const,title:'部门目标',keyResults:[{id:'kr',title:'成果',weight:100,progress:0,details:[{id:'detail',name:'版本',assigneeIds:['staff']}]}]};
+ const after={...before,title:'新目标',keyResults:[{...before.keyResults[0],details:[{...before.keyResults[0].details[0],assigneeIds:['manager']}]}]};
+ expect(goalDifferences(before,after,people)).toEqual(expect.arrayContaining([expect.objectContaining({label:'KR1 · 版本 承接人员',before:'员工甲',after:'主管甲'})]));
+});

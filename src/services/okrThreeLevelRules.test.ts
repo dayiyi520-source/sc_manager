@@ -49,6 +49,23 @@ describe('三级目标承接与本人执行', () => {
   });
 });
 describe('目标修改审核和原计划锁定', () => {
+  it('applies a department sub KR reassignment directly and keeps mixed changes for review', () => {
+    const original = createDepartment().records;
+    const record = original.at(-1)!;
+    const withDetails = { ...record, payload: { ...record.payload, keyResults: record.payload.keyResults?.map(kr => ({ ...kr, details: [{ id: 'detail', name: 'APP', version: 'V1', stage: 'UI设计', plannedStartDate: '2026-10-01', plannedEndDate: '2026-10-20', assigneeIds: ['employee'] }] })) } };
+    const records = original.map(item => item.id === record.id ? withDetails : item);
+    const reassigned = { ...withDetails.payload, keyResults: withDetails.payload.keyResults?.map(kr => ({ ...kr, details: kr.details?.map(row => ({ ...row, assigneeIds: ['manager'] })) })) };
+    const result = mutateOkrLifecycle(record.id, { action: 'save', viewerId: 'manager', version: record.version, payload: reassigned }, records, people)!;
+    const saved = result.records.at(-1)!;
+    expect(saved.changeRequest?.status).not.toBe('pending');
+    expect(saved.payload.keyResults?.[0].details?.[0].assigneeIds).toEqual(['manager']);
+    expect(saved.changeHistory?.at(-1)?.reason).toBe('调整承接人员');
+    expect(saved.version).toBe(record.version + 1);
+    const mixed = mutateOkrLifecycle(record.id, { action: 'save', viewerId: 'manager', version: saved.version, payload: { ...saved.payload, title: '调整目标', keyResults: saved.payload.keyResults?.map(kr => ({ ...kr, details: kr.details?.map(row => ({ ...row, assigneeIds: ['manager', 'employee'] })) })), changeReason: '重新规划' } }, result.records, people)!;
+    expect(mixed.records.at(-1)?.changeRequest?.status).toBe('pending');
+    expect(mixed.records.at(-1)?.payload.title).toBe(saved.payload.title);
+    expect(() => mutateOkrLifecycle(record.id, { action: 'save', viewerId: 'manager', version: saved.version, payload: { ...saved.payload, keyResults: saved.payload.keyResults?.map(kr => ({ ...kr, details: kr.details?.map(row => ({ ...row, assigneeIds: ['outside'] })) })) } }, result.records, people)).toThrow('承接人不在当前部门');
+  });
   it('keeps the active payload until company approval and rejects unauthorized review', () => {
     const original = createDepartment().records;
     const record = original.at(-1)!;
@@ -92,11 +109,11 @@ describe('目标修改审核和原计划锁定', () => {
 });
 
 describe('KR 权重与上级日期约束', () => {
-  it('requires five-percent increments and at least one KR above twenty percent', () => {
+  it('accepts any integer KR weights from 1 to 100 when the group totals 100', () => {
     const goal: OkrPayload = { goalLevel: 'company', title: '测试权重', deadline: '2026-10-31', keyResults: [33, 67].map((weight, i) => ({ id: String(i), title: '结果', weight, progress: 0, deadline: '2026-10-31' })) };
-    expect(validateThreeLevelGoal(goal, 'user-admin')).toContain('5%');
+    expect(validateThreeLevelGoal(goal, 'user-admin')).toBeUndefined();
     goal.keyResults = [20, 20, 20, 20, 20].map((weight, i) => ({ id: String(i), title: '结果', weight, progress: 0, deadline: '2026-10-31' }));
-    expect(validateThreeLevelGoal(goal, 'user-admin')).toContain('大于 20%');
+    expect(validateThreeLevelGoal(goal, 'user-admin')).toBeUndefined();
     goal.keyResults = [35, 35, 30].map((weight, i) => ({ id: String(i), title: '结果', weight, progress: 0, deadline: '2026-10-31' }));
     expect(validateThreeLevelGoal(goal, 'user-admin')).toBeUndefined();
   });

@@ -34,5 +34,15 @@ it('hides the source navigation for product releases and names manually posted s
  const view=render(<FeedDetail feed={{...feed,source:{module:'产品发布',recordId:'release',detailUrl:'/app/prod_versions'},versionId:'v'}} onClose={vi.fn()}/>);
  await screen.findByRole('heading',{name:feed.title});expect(screen.queryByRole('link',{name:'前往来源板块'})).not.toBeInTheDocument();
  view.unmount();render(<FeedDetail feed={{...feed,type:'square'}} onClose={vi.fn()}/>);
- expect(await screen.findByText('工作台',{exact:true})).toBeInTheDocument();expect(screen.queryByText('手动发布',{exact:true})).not.toBeInTheDocument();
+ expect(await screen.findByText('工作台发布',{exact:true})).toBeInTheDocument();expect(screen.queryByText('手动发布',{exact:true})).not.toBeInTheDocument();
 });
+
+ it('permits any viewer to edit and delete square information while keeping product releases read-only', async () => {
+ const view = render(<FeedDetail feed={{...feed,type:'square',authorId:'another-user'}} onClose={vi.fn()}/>);
+ expect(await screen.findByRole('button',{name:'编辑'})).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'删除'})).toBeInTheDocument();
+ view.unmount();
+ render(<FeedDetail feed={{...feed,authorId:'viewer',versionId:'v',source:{module:'产品发布',recordId:'v'}}} onClose={vi.fn()}/>);
+ expect(screen.queryByRole('button',{name:'编辑'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'删除'})).not.toBeInTheDocument();
+ });

@@ -6,6 +6,8 @@ import { ChevronDownIcon, ChevronRightIcon } from '@primer/octicons-react';
 import { PersonAvatar } from '../../common/PersonIdentity';
 import { periodLabel } from '../../../services/okrPeriods';
 import { okrRepository, type OkrPerson, type OkrRecord, type OkrWork } from '../../../services/okrRepository';
+import { applyOkrWeightPlan, listOkrWeightPlans, previewOkrWeightPlan, reviewOkrWeightPlan, type OkrWeightPlan } from '../../../services/okrWeightPlans';
+import { personalAssignedObjectives } from '../../../services/okrAssignments';
 import { confirmationMembers, confirmationRequests, goalDifferences } from './goalConfirmation';
 import { buildMyTargetViewItems, MyTargetMonthSection } from './MyTargetMonthSection';
 import { CompanyObjectiveDetail } from './CompanyObjectiveDetail';
@@ -14,7 +16,8 @@ export function GoalConfirmationWorkspace({ records, people, settings, viewerId,
   records: OkrRecord[]; people: OkrPerson[]; settings?: import('../../../services/okrRepository').OkrSettings; viewerId: string; selectedMemberId?: string; selectedCycles?: string[]; onSelectCycles?: (cycles: string[]) => void; onSelectMember: (id: string) => void;
   onRefresh: () => Promise<unknown>; loading: boolean; loadError?: Error | null; work: OkrWork[]; workLoading: boolean; workError: Error | null; onRetryWork: () => void;
 }) {
-  const members = confirmationMembers(people, viewerId, records, settings);
+  const pendingWeightPlans = listOkrWeightPlans().filter(plan => plan.status === 'submitted' && people.some(person => person.id === plan.userId && person.supervisorId === viewerId && person.id !== viewerId));
+  const members = people.filter(person => confirmationMembers(people, viewerId, records, settings).some(member => member.id === person.id) || pendingWeightPlans.some(plan => plan.userId === person.id));
   const requests = confirmationRequests(records, people, viewerId, settings);
   const [defaultMemberId] = useState(() => (members.find(person => requests.some(record => record.ownerId === person.id)) || members[0])?.id);
   const member = members.find(person => person.id === (selectedMemberId || defaultMemberId)) || members[0];
@@ -26,14 +29,28 @@ export function GoalConfirmationWorkspace({ records, people, settings, viewerId,
   const [busyId, setBusyId] = useState<string>();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [detail, setDetail] = useState<OkrRecord>();
+  const [weightPlanVersion, setWeightPlanVersion] = useState(0);
+  const [weightPlanNotes, setWeightPlanNotes] = useState<Record<string, string>>({});
+  const [weightPlanErrors, setWeightPlanErrors] = useState<Record<string, string>>({});
+  const [weightPlanBusy, setWeightPlanBusy] = useState<string>();
   useEffect(() => { setFilter('pending'); setDetail(undefined); setExpandedChanges({}); }, [viewerId, selectedMemberId]);
   const memberRecords = requests.filter(record => record.ownerId === member?.id);
-  const availableCycles = [...new Set(records.filter(record => record.kind === 'objective' && record.ownerId === member?.id && record.changeRequest?.status === 'pending').map(record => record.periodKey))].sort().reverse();
+  const availableCycles = [...new Set([...records.filter(record => record.kind === 'objective' && record.ownerId === member?.id && record.changeRequest?.status === 'pending').map(record => record.periodKey), ...pendingWeightPlans.filter(plan => plan.userId === member?.id).map(plan => plan.periodKey)])].sort().reverse();
   const [localCycles, setLocalCycles] = useState<string[]>([dayjs().format('YYYY-MM')]);
   const effectiveCycles = selectedCycles ?? localCycles;
   const chosen = effectiveCycles.filter(cycle => availableCycles.includes(cycle));
   const pendingIds = new Set(requests.map(record => record.id));
   const visible = memberRecords.filter(record => chosen.includes(record.periodKey) && (filter === 'all' || pendingIds.has(record.id)));
+  const reviewerPlans = pendingWeightPlans.filter(plan => plan.userId === member?.id && effectiveCycles.includes(plan.periodKey));
+  const reviewWeightPlan = async (plan: OkrWeightPlan, decision: 'approve' | 'return') => {
+    const key = plan.id;
+    const feedback = (weightPlanNotes[key] || '').trim();
+    if (decision === 'return' && !feedback) { setWeightPlanErrors(current => ({ ...current, [key]: '请填写修改建议' })); return; }
+    setWeightPlanBusy(key); setWeightPlanErrors(current => ({ ...current, [key]: '' }));
+    try { reviewOkrWeightPlan(plan.userId, plan.periodKey, viewerId, decision, people, feedback); setWeightPlanVersion(version => version + 1); }
+    catch (reason) { setWeightPlanErrors(current => ({ ...current, [key]: reason instanceof Error ? reason.message : '提交失败，请重试' })); }
+    finally { setWeightPlanBusy(undefined); }
+  };
   const submit = async (record: OkrRecord) => {
     if (busyId || !pendingIds.has(record.id)) return;
     const decision = decisions[record.id] || 'approve'; const feedback = (notes[record.id] || '').trim();
@@ -51,11 +68,17 @@ export function GoalConfirmationWorkspace({ records, people, settings, viewerId,
     <header className="okr-confirmation-heading"><div className="okr-confirmation-member">{member && <PersonAvatar name={member.name}/>}<Select aria-label="确认成员" value={member?.id} disabled={!!busyId || loading || !members.length} options={members.map(person => ({value:person.id,label:person.name}))} onChange={id => { onSelectMember(id); }}/></div>
       <div className="okr-confirmation-tools">{comparison && <div className="okr-confirmation-legend"><span className="is-before">删除的内容</span><span className="is-after">新增的内容</span></div>}<label><span>修改对比</span><Switch aria-label="修改对比" checked={comparison} onChange={setComparison}/></label><OkrCycleFilter records={records} viewerId={viewerId} settings={settings} value={effectiveCycles} onChange={onSelectCycles ?? setLocalCycles} disabled={!!busyId || loading}/></div>
     </header>
-    {loading ? <Skeleton active/> : loadError ? <Alert type="error" title="目标确认加载失败" description={loadError.message} action={<Button onClick={() => void onRefresh()}>重试</Button>}/> : (!member || !chosen.length) ? <div className="okr-confirmation-empty"><Empty description={!member ? '暂无可确认成员' : !effectiveCycles.length ? '请选择周期' : filter === 'pending' ? '暂无待确认目标' : '暂无目标'}/></div> : chosen.map(cycle => {
-      const cycleRecords=memberRecords.filter(record=>record.periodKey===cycle); const pending=cycleRecords.filter(record=>pendingIds.has(record.id));
+    {loading ? <Skeleton active/> : loadError ? <Alert type="error" title="目标确认加载失败" description={loadError.message} action={<Button onClick={() => void onRefresh()}>重试</Button>}/> : <>
+      {(!member || !chosen.length) ? <div className="okr-confirmation-empty"><Empty description={!member ? '暂无可确认成员' : !effectiveCycles.length ? '请选择周期' : filter === 'pending' ? '暂无待确认目标' : '暂无目标'}/></div> : chosen.map(cycle => {
+      const cycleRecords=memberRecords.filter(record=>record.periodKey===cycle); const pending=cycleRecords.filter(record=>pendingIds.has(record.id)); const cyclePlans=reviewerPlans.filter(plan=>plan.periodKey===cycle);
       return <section key={cycle} className="okr-confirmation-cycle" aria-label={periodLabel(cycle)+'目标确认'}>
-        <header><h3>{periodLabel(cycle)}</h3><div className="okr-confirmation-cycle-filter"><Radio.Group aria-label="确认项筛选" value={filter} onChange={event=>setFilter(event.target.value)} optionType="button" options={[{value:'pending',label:'待确认项（'+pending.length+'）'},{value:'all',label:'全部（'+cycleRecords.length+'）'}]}/>{filter === 'pending' && pending.length > 0 && <Button type="link" onClick={() => void approveAll(pending)}>全部通过</Button>}</div></header>
-        {!visible.some(record=>record.periodKey===cycle) && <div className="okr-confirmation-empty"><Empty description={filter==='pending'?'暂无待确认目标':'暂无目标'}/></div>}
+        <header><h3>{periodLabel(cycle)}</h3><div className="okr-confirmation-cycle-filter"><Radio.Group aria-label="确认项筛选" value={filter} onChange={event=>setFilter(event.target.value)} optionType="button" options={[{value:'pending',label:'待确认项（'+(pending.length+cyclePlans.length)+'）'},{value:'all',label:'全部（'+(cycleRecords.length+cyclePlans.length)+'）'}]}/>{filter === 'pending' && pending.length > 0 && <Button type="link" onClick={() => void approveAll(pending)}>全部通过</Button>}</div></header>
+        {!visible.some(record=>record.periodKey===cycle) && !cyclePlans.length && <div className="okr-confirmation-empty"><Empty description={filter==='pending'?'暂无待确认目标':'暂无目标'}/></div>}
+        {cyclePlans.map(plan => { const owner = people.find(person => person.id === plan.userId); const assigned = [...personalAssignedObjectives(records, owner, people), ...records.filter(record => record.kind === 'objective' && record.ownerId === plan.userId && record.payload.goalLevel === 'personal')].filter((record, index, rows) => record.periodKey === cycle && rows.findIndex(item => item.id === record.id) === index); const active = applyOkrWeightPlan(assigned, plan.userId); const proposed = previewOkrWeightPlan(assigned, plan); const changes = assigned.flatMap(record => { const rows: Array<{ id: string; label: string; before: number; after: number }> = []; const activeRecord = active.find(item => item.id === record.id) || record; const nextO = plan.objectiveWeights[record.id]; if (nextO !== undefined && nextO !== (activeRecord.payload.weight ?? 100)) rows.push({ id: record.id, label: 'O：' + record.payload.title, before: activeRecord.payload.weight ?? 100, after: nextO }); record.payload.keyResults?.forEach(kr => (kr.details?.length ? kr.details : [undefined]).forEach(detail => { const key = detail?.id || kr.id; const next = plan.keyResultWeights[record.id]?.[key]; const activeKr = activeRecord.payload.keyResults?.find(item => item.id === kr.id); const before = detail ? activeKr?.details?.find(item => item.id === key)?.weight ?? detail.weight ?? kr.weight : activeKr?.weight ?? kr.weight; if (next !== undefined && next !== before) rows.push({ id: record.id + ':' + key, label: 'KR：' + (detail?.name || kr.title), before, after: next }); })); return rows; }); return <article className="okr-confirmation-card" key={plan.id} aria-label={'确认目标：'+(owner?.name || '员工')+'月度权重'}>
+          <section className="okr-confirmation-change-card"><div className="okr-confirmation-change-header"><strong>修改信息 · 月度权重</strong><Button type="text" className="okr-confirmation-change-toggle" aria-expanded={expandedChanges[plan.id] || false} onClick={() => setExpandedChanges(value => ({ ...value, [plan.id]: !value[plan.id] }))}>查看明细 {expandedChanges[plan.id] ? <ChevronDownIcon/> : <ChevronRightIcon/>}</Button></div>{expandedChanges[plan.id] && <section className="okr-confirmation-differences" aria-label="权重修改对比">{changes.length ? changes.map(row => <div key={row.id}><strong>{row.label}</strong><span className={comparison ? 'is-before' : ''}>{row.before}%</span><span aria-hidden="true">→</span><span className={comparison ? 'is-after' : ''}>{row.after}%</span></div>) : <p>本次权重与已生效版本相同</p>}</section>}</section>
+          <section className="okr-confirmation-objective-card"><Tag className="okr-confirmation-status" color="processing">待确认</Tag><MyTargetMonthSection periodKey={cycle} targets={buildMyTargetViewItems(proposed, [], records, people, plan.userId)} viewMode="list" collapsed={false} onToggle={() => {}} onOpenTarget={id => setDetail(proposed.find(record => record.id === id))}/></section>
+          <footer><Radio.Group aria-label="月度权重确认操作" value={decisions[plan.id] || 'approve'} disabled={!!weightPlanBusy} onChange={event => { setDecisions(current => ({ ...current, [plan.id]: event.target.value })); setWeightPlanErrors(current => ({ ...current, [plan.id]: '' })); }}><Radio value="approve">确认目标</Radio><Radio value="return">建议修改</Radio></Radio.Group><Button type="primary" loading={weightPlanBusy === plan.id} disabled={!!weightPlanBusy} onClick={() => void reviewWeightPlan(plan, decisions[plan.id] || 'approve')}>提交</Button>{decisions[plan.id] === 'return' && <Input.TextArea aria-label="权重修改建议" aria-required rows={3} maxLength={1000} placeholder="填写需要调整的内容" value={weightPlanNotes[plan.id] || ''} disabled={!!weightPlanBusy} onChange={event => setWeightPlanNotes(current => ({ ...current, [plan.id]: event.target.value }))}/ >}{weightPlanErrors[plan.id] && <Alert type="error" title={weightPlanErrors[plan.id]} showIcon/>}</footer>
+        </article>; })}
         {visible.filter(record=>record.periodKey===cycle).map(record=>{
           const change=record.changeRequest; const pending=pendingIds.has(record.id); const proposed=pending && change ? {...record,payload:change.payload} : record;
           const differences=change && change.purpose!=='initial' ? goalDifferences(record.payload,change.payload,people) : [];
@@ -72,7 +95,7 @@ export function GoalConfirmationWorkspace({ records, people, settings, viewerId,
           </article>;
         })}
       </section>;
-    })}
+      })}</>}
     {detail && <CompanyObjectiveDetail record={detail} records={records} people={people} work={work} workLoading={workLoading} workError={workError} onRetryWork={onRetryWork} onClose={()=>setDetail(undefined)}/>}
   </section>;
 }

@@ -6,6 +6,7 @@ import type { OkrKrDetail } from '../../../services/okrRepository';
 
 interface Props {
   assigneeOptions?: Array<{ value: string; label: string }>;
+  personalMetrics?: boolean;
   key?: React.Key;
   rows: OkrKrDetail[];
   label: string;
@@ -24,7 +25,7 @@ interface Props {
   placeholder?: boolean;
   productOptions?: Record<string, string[]>;
 }
-export function KrDetailTable({ assigneeOptions, rows, label, stages = [], deliveryStageOptions = {}, disabled = false, deadlineLimit, lockedRows = [], onChange, mode = 'product', productOptions = {}, onAddVersion, onRemove, identityEditable = true, onSelectChildren, placeholder = false, removableIds }: Props) {
+export function KrDetailTable({ assigneeOptions, personalMetrics = false, rows, label, stages = [], deliveryStageOptions = {}, disabled = false, deadlineLimit, lockedRows = [], onChange, mode = 'product', productOptions = {}, onAddVersion, onRemove, identityEditable = true, onSelectChildren, placeholder = false, removableIds }: Props) {
   if (!rows.length && !placeholder) return null;
   const displayRows: OkrKrDetail[] = rows.length ? rows : [{ id: 'placeholder', name: '', version: '' }];
   const stageLabel = mode === 'delivery' ? '目标里程碑' : '阶段';
@@ -40,7 +41,7 @@ export function KrDetailTable({ assigneeOptions, rows, label, stages = [], deliv
       mode === 'delivery' ? { title: '当前里程碑', key: 'currentStage', render: (_: unknown, row: OkrKrDetail) => row.currentStage || '未设置' } : { title: <span>{stageLabel} <span className="okr-required-marker">*</span></span>, key: 'stage', render: (_: unknown, row: OkrKrDetail) => onChange ? <Select aria-required="true" aria-label={`${row.name || '暂未选择'} ${stageLabel}`} placeholder={`选择${stageLabel}`} disabled={disabled || row.id === 'placeholder'} value={row.stage} options={[...new Set([...stages, ...(row.stage ? [row.stage] : [])])].map(value => ({ value, label: value }))} onChange={stage => patch(row.id, { stage })}/> : row.stage || '未设置' },
       ...(mode === 'delivery' ? [{ title: '目标里程碑', key: 'targetStage', render: (_: unknown, row: OkrKrDetail) => onChange ? <Select aria-label={`${row.name || '暂未选择'} 目标里程碑`} placeholder="选择后续里程碑" disabled={disabled || row.id === 'placeholder'} value={row.targetStage} options={(() => { const options=deliveryStageOptions[`${row.name}\u0000${row.version}`] || stages; const index=options.indexOf(row.currentStage || ''); return options.slice(index < 0 ? 0 : index + 1).map(value => ({ value, label: value })); })()} onChange={targetStage => patch(row.id, { targetStage })}/> : row.targetStage || '未设置' }] : []),
       ...(mode === 'product' ? [dateColumn('plannedStartDate', '开始时间'), dateColumn('plannedEndDate', '结束时间')] : []),
-      ...(assigneeOptions ? [{ title: '承接人', key: 'assignees', render: (_: unknown, row: OkrKrDetail) => onChange ? <Select aria-label={`${row.name} ${row.version || ''} 承接人`} mode="multiple" allowClear showSearch optionFilterProp="label" disabled={disabled || row.id === 'placeholder'} value={row.assigneeIds || []} options={assigneeOptions} onChange={assigneeIds => patch(row.id, { assigneeIds })}/> : (row.assigneeIds || []).map(id => assigneeOptions.find(option => option.value === id)?.label || id).join('、') || '——' }] : []),
+      ...(personalMetrics ? [{ title: '进度', key: 'progress', render: (_: unknown, row: OkrKrDetail) => `${row.progress ?? 0}%` }, { title: '权重', key: 'weight', render: (_: unknown, row: OkrKrDetail) => `${row.weight ?? 100}%` }] : assigneeOptions ? [{ title: '承接人', key: 'assignees', render: (_: unknown, row: OkrKrDetail) => onChange ? <Select aria-label={`${row.name} ${row.version || ''} 承接人`} mode="multiple" allowClear showSearch optionFilterProp="label" disabled={disabled || row.id === 'placeholder'} value={row.assigneeIds || []} options={assigneeOptions} onChange={assigneeIds => patch(row.id, { assigneeIds })}/> : (row.assigneeIds || []).map(id => assigneeOptions.find(option => option.value === id)?.label || id).join('、') || '——' }] : []),
       ...(onRemove || onAddVersion || onSelectChildren ? [{ title: '操作', key: 'operations', render: (_: unknown, row: OkrKrDetail) => <Space>{onSelectChildren && <Tooltip title="修改"><Button type="text" icon={<PencilIcon/>} disabled={disabled} aria-label={`修改${row.name}明细`} onClick={() => onSelectChildren(row.name)}/></Tooltip>}{onAddVersion && <Button type="text" icon={<PlusIcon/>} disabled={disabled || !(productOptions[row.name] || []).some(version => !rows.some(item => item.name === row.name && item.version === version)) || rows.some(item => item.name === row.name && !item.version)} aria-label={`${row.name} 添加版本`} onClick={() => onAddVersion(row.name)}>添加版本</Button>}{onRemove && row.id !== 'placeholder' && (!removableIds || removableIds.has(row.id)) && <Button type="text" icon={<TrashIcon/>} disabled={disabled} aria-label={`移除${row.name}${row.version ? ` ${row.version}` : ''}明细`} onClick={() => onRemove(row.id)}/>}</Space> }] : []),
     ]}/>
   </div>;

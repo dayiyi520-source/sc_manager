@@ -2,7 +2,8 @@ import { WorkbenchFeedCard } from './WorkbenchFeedCard';
 import { WorkbenchLearningCard } from './WorkbenchLearningCard';
 import { MyGoalProgressMetric } from './MyGoalProgressMetric';
 import { useFeedReading } from './useFeedReading';
-import { TodoDetail, type TodoRecord } from './TodoDetail';
+import { type TodoRecord } from './TodoDetail';
+import { openWorkItemDetailLink } from '../../utils/workItemDetailLink';
 import { FeedDetail } from './FeedDetail';
 import { type WorkbenchFeed } from '../../services/workbenchFeeds';
 import { FEED_TAB_KEY, TODO_TAB_KEY, rememberWorkbenchTab } from '../../services/workbenchPreferences';
@@ -45,7 +46,6 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
   } = useApp();
 
   const { feeds: WORKBENCH_FEEDS, error: feedError, reload: reloadFeeds } = useWorkbenchFeeds();
-  const [selectedTask, setSelectedTask] = useState<TodoRecord>();
   const [selectedFeed, setSelectedFeed] = useState<WorkbenchFeed>();
   const [innerView, setInnerView] = useState<'home' | 'todos' | 'feeds'>('home');
   const [taskRevision, setTaskRevision] = useState(0);
@@ -104,14 +104,13 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
     </button>
   );
 
-  if (innerView !== 'home') return <React.Suspense fallback={<Skeleton active/>}>{innerView === 'todos' ? <TodoCenterView onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/> : <WorkbenchFeedsView onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/>}</React.Suspense>;
+  if (innerView !== 'home') return <React.Suspense fallback={<Skeleton active/>}>{innerView === 'todos' ? <TodoCenterView hideWorkOrderTab={variant === 'agent'} onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/> : <WorkbenchFeedsView onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/>}</React.Suspense>;
 
   return (
     <div className="space-y-6">
-      {selectedTask && <TodoDetail task={selectedTask} onClose={() => { setSelectedTask(undefined); setTaskRevision(value => value + 1); }}/>}
       <FeedDetail key={selectedFeed?.id || 'closed'} feed={selectedFeed ? WORKBENCH_FEEDS.find(feed => feed.id === selectedFeed.id) : undefined} onClose={() => setSelectedFeed(undefined)}/>
       {/* 顶部核心指标 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="待办任务"
           value={dashboardMetrics.todoTaskCount}
@@ -120,8 +119,8 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
           iconBgColor="bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
         />
         <StatCard
-          title="协同事项/工单"
-          value={dashboardMetrics.collaborationAndWorkOrderCount}
+          title={variant === 'agent' ? '协同事项' : '协同事项/工单'}
+          value={variant === 'agent' ? dashboardMetrics.collaborationCount : dashboardMetrics.collaborationAndWorkOrderCount}
           unit="项"
           icon={<MessageSquare className="w-5 h-5" />}
           iconBgColor="bg-cyan-50 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-400"
@@ -140,11 +139,11 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
           icon={<Briefcase className="w-5 h-5" />}
           iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
         />
-        <MyGoalProgressMetric />
       </div>
 
       {/* 主要内容区域 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {variant === 'agent' && <><WorkbenchFeedCard category="square" feeds={WORKBENCH_FEEDS} error={feedError} onRetry={reloadFeeds} onMore={() => openFeeds('square')} onOpen={setSelectedFeed} isNew={reading.isNew} hasUpdates={reading.hasUpdates('square')}/><WorkbenchLearningCard /><WorkbenchFeedCard category="dynamic" feeds={WORKBENCH_FEEDS} error={feedError} onRetry={reloadFeeds} onMore={() => openFeeds('dynamic')} onOpen={setSelectedFeed} isNew={reading.isNew} hasUpdates={reading.hasUpdates('dynamic')}/></>}
         {/* 待办中心 */}
         <div className="lg:col-span-6 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
@@ -157,7 +156,7 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
                 <TabButton active={todoTab === 'all'} onClick={() => setTodoTab('all')}>全部 ({pendingTodos.length})</TabButton>
                 <TabButton active={todoTab === 'mine'} onClick={() => setTodoTab('mine')}>任务 ({realTasks.filter((task) => task.taskGroup === 'mine').length})</TabButton>
                 <TabButton active={todoTab === 'assist'} onClick={() => setTodoTab('assist')}>协同事项 ({dashboardMetrics.collaborationCount})</TabButton>
-                <TabButton active={todoTab === 'work_order'} onClick={() => setTodoTab('work_order')}>工单 ({dashboardMetrics.workOrderCount})</TabButton>
+                {variant === 'staff' && <TabButton active={todoTab === 'work_order'} onClick={() => setTodoTab('work_order')}>工单 ({dashboardMetrics.workOrderCount})</TabButton>}
               </div>
             </div>
             <button className="shrink-0 text-xs text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => { rememberWorkbenchTab(TODO_TAB_KEY, todoTab); setInnerView('todos'); }}>查看更多</button>
@@ -183,7 +182,7 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
                   >
                     <div className="flex items-center gap-2 mb-2">
                       {task.type === 'assistance' ? <Users className="w-4 h-4 shrink-0 text-[var(--primary)]" /> : <CheckSquare className="w-4 h-4 shrink-0 text-[var(--primary)]" />}
-                      <button type="button" className="min-w-0 truncate text-left font-medium text-sm text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => setSelectedTask(task)}>{task.title}</button>
+                      <button type="button" className="min-w-0 truncate text-left font-medium text-sm text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => openWorkItemDetailLink(task.sourceId, task.taskGroup === 'assist' ? 'WORK_ORDER' : task.type, task.productLineId)}>{task.title}</button>
                     </div>
                     <div className="flex items-center justify-between gap-3 mb-2 text-xs text-[var(--text-muted)]">
                       <span>负责人：{task.assigneeName || '未分配'}</span>
@@ -200,7 +199,7 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
           </div>
         </div>
 
-        {variant === 'agent' ? <WorkbenchLearningCard /> :
+        {variant === 'staff' &&
         <div className="lg:col-span-6 bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--border-main)] flex flex-wrap gap-3 items-center justify-between">
             <div className="flex flex-wrap items-center gap-3">
@@ -264,8 +263,12 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
           </div>
         </div>}
 
+        {variant === 'staff' && <>
         <WorkbenchFeedCard category="square" feeds={WORKBENCH_FEEDS} error={feedError} onRetry={reloadFeeds} onMore={() => openFeeds('square')} onOpen={setSelectedFeed} isNew={reading.isNew} hasUpdates={reading.hasUpdates('square')}/>
         <WorkbenchFeedCard category="dynamic" feeds={WORKBENCH_FEEDS} error={feedError} onRetry={reloadFeeds} onMore={() => openFeeds('dynamic')} onOpen={setSelectedFeed} isNew={reading.isNew} hasUpdates={reading.hasUpdates('dynamic')}/>
+        <MyGoalProgressMetric />
+        <WorkbenchLearningCard />
+        </>}
       </div>
     </div>
   );

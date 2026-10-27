@@ -1,4 +1,5 @@
-import { personalAssignedObjectives } from '../../services/okrAssignments';
+import { personalGoalDisplayRecords } from '../../services/okrAssignments';
+import { isAssigneeOnlyDepartmentChange } from '../../services/okrAssignments';
 import { OkrCycleFilter } from './okr/OkrCycleFilter';
 import { creationSources, creationPeriodError, departmentCreationPayloads, sourceAlignment, departmentChallengeTypes, challengeReferences } from '../../services/goalCreationPolicy';
 import { DepartmentReviewSettings } from './okr/DepartmentReviewSettings';
@@ -46,9 +47,10 @@ import { currentReviewPeriod, reviewPeriodFor, reviewSubmissionAccess, type Revi
 import { ActionBreakdownForm, type ActionGroupValues } from './okr/ActionBreakdownForm';
 import { GoalHierarchyView } from './okr/GoalHierarchyView';
 import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewMode } from './okr/MyTargetMonthSection';
-import { okrRepository, type OkrPayload, type OkrRecord } from '../../services/okrRepository';
+import { okrRepository, type OkrKr, type OkrKrDetail, type OkrPayload, type OkrRecord } from '../../services/okrRepository';
 import { goalLevel } from '../../services/okrGoalRules';
 import { PlusIcon } from '@primer/octicons-react';
+import { getOkrWeightPlan, saveOkrWeightPlan } from '../../services/okrWeightPlans';
 
 export const OKRPerformanceView: React.FC = () => <OkrProvider><OriginalWorkspace mainTab="okrs"/></OkrProvider>;
 export const ReviewSummaryView: React.FC = () => <OkrProvider><OriginalWorkspace mainTab="reviews"/></OkrProvider>;
@@ -146,7 +148,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
   const expandScopeMembers = false;
   const [scopeSidebarCollapsed, setScopeSidebarCollapsed] = useState(false);
   const [objectiveBatchAction, setObjectiveBatchAction] = useState<'draft' | 'submit' | null>(null);
-  const [weightConfirmation, setWeightConfirmation] = useState<{ entries: GoalWeightEntry[]; label: 'O' | 'KR'; finish: (completedIds: string[], submitted: boolean) => void } | null>(null);
+  const [weightConfirmation, setWeightConfirmation] = useState<{ entries?: GoalWeightEntry[]; groups?: import('./okr/GoalWeightConfirmation').GoalWeightGroup[]; label: 'O' | 'KR'; title?: string; finish: (completedIds: string[], submitted: boolean) => void } | null>(null);
+  const [weightPlanVersion, setWeightPlanVersion] = useState(0);
   const [targetFormCycle, setTargetFormCycle] = useState(dayjs().format('YYYY-MM'));
   const objectiveRefs = useRef<Record<string, ObjectiveFormHandle | null>>({});
   const editingObjectiveRef = useRef<ObjectiveFormHandle | null>(null);
@@ -209,15 +212,16 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     return false;
   });
   const scopeOwnerIds = new Set(scopePeople.map(person => person.id));
-  const isMyOkrCategory = selectedScopeGroup === 'my' && !scopeSelection.personId && !scopeSelection.department;
+  const isMyOkrCategory = selectedScopeGroup === 'my' && (!scopeSelection.personId || scopeSelection.personId === currentUser.id) && !scopeSelection.department;
   const visibleLevel = (id: string) => records.find(record=>record.id===id)?.payload.goalLevel;
   const isDepartmentRecord = (id: string) => { const record = records.find(item => item.id === id); return !!record && (record.payload.goalLevel ? record.payload.goalLevel === 'department' : goalLevel(people.find(person => person.id === record.ownerId)) === '部门级'); };
   const filteredOkrs = okrs.filter((o) => selectedCycles.includes(o.cycle) && scopeOwnerIds.has(o.ownerId) && (selectedScopeGroup !== 'otherDepartments' || isDepartmentRecord(o.id)) && !(selectedScopeGroup === 'department' && visibleLevel(o.id) === 'personal') && !(isMyOkrCategory && level === '部门级' && visibleLevel(o.id) === 'department') && (
     isMyOkrCategory || (selectedScopeGroup === 'department' && o.ownerId === currentUser.id && o.status === 'draft') || (['active', 'submitted', 'reviewed'].includes(o.status) && Boolean(records.find(record => record.id === o.id && canViewPending(record, currentUser.id, settings, people))))
   ));
   const assignedPersonalScope = isMyOkrCategory && level !== '公司级';
+  const personalWeightScope = isMyOkrCategory && assignedPersonalScope;
   const personalObjectiveRecords = isMyOkrCategory
-    ? (assignedPersonalScope ? personalAssignedObjectives(records, me, people) : records.filter(record => record.kind === 'objective' && record.ownerId === currentUser.id)).filter(record => selectedCycles.includes(record.periodKey))
+    ? (assignedPersonalScope ? personalGoalDisplayRecords(records, me, people) : records.filter(record => record.kind === 'objective' && record.ownerId === currentUser.id)).filter(record => selectedCycles.includes(record.periodKey))
     : [];
   const visiblePerformances = performances.filter(performance => (
     reviewSubTab === 'my'
@@ -273,10 +277,11 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     ? buildMyTargetViewItems(
       selectedMonthRecords,
       [],
-      visibleActionParents,
+      [...records, ...visibleActionParents],
       people,
       currentUser.id,
       settings,
+      assignedPersonalScope,
     )
     : [];
 
@@ -461,6 +466,44 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
     }
   };
 
+  const openMonthlyWeightConfirmation = (periodKey: string, monthRecords: OkrRecord[]) => {
+    if (!personalWeightScope || !monthRecords.length) return;
+    const pendingPlan = getOkrWeightPlan(currentUser.id, periodKey);
+    const personalRecords = monthRecords;
+    if (!personalRecords.length) return;
+    const objectiveEntries: GoalWeightEntry[] = personalRecords.map(record => ({
+      id: `objective:${record.id}`,
+      title: record.payload.title,
+      weight: pendingPlan?.objectiveWeights[record.id] ?? record.payload.weight ?? 100,
+      submit: async weight => { saveOkrWeightPlan(currentUser.id, periodKey, { objectiveWeights: { [record.id]: weight }, keyResultWeights: {}, baseVersions: { [record.id]: record.version }, autoApprove: level === '部门级' }); return true; },
+    }));
+    const childKrTitle = (kr: OkrKr, detail?: OkrKrDetail) => {
+      if (!detail) return kr.structureType === 'support' && kr.result ? `${kr.title}${kr.result}` : kr.title;
+      if (kr.structureType === 'product') return `完成${[kr.businessObject, detail.name, detail.version, detail.stage || detail.targetStage].filter(Boolean).join('')}`;
+      if (kr.structureType === 'delivery') return `达成${[detail.name, detail.version, detail.targetStage].filter(Boolean).join('')}`;
+      return [detail.name || kr.title, kr.result].filter(Boolean).join('');
+    };
+    const krGroups = personalRecords.map(record => ({
+      id: `objective:${record.id}:kr`,
+      title: `O：${record.payload.title}`,
+      kind: 'keyResult' as const,
+      parentEntryId: `objective:${record.id}`,
+      entries: (record.payload.keyResults || []).flatMap(kr => {
+        const details = kr.details?.length ? kr.details : [undefined];
+        return details.map(detail => {
+          const weightKey = detail?.id || kr.id;
+          return {
+            id: `kr:${record.id}:${kr.id}:${weightKey}`,
+            title: childKrTitle(kr, detail),
+            weight: pendingPlan?.keyResultWeights[record.id]?.[weightKey] ?? detail?.weight ?? kr.weight,
+            submit: async (weight: number) => { saveOkrWeightPlan(currentUser.id, periodKey, { objectiveWeights: {}, keyResultWeights: { [record.id]: { [weightKey]: weight } }, baseVersions: { [record.id]: record.version }, autoApprove: level === '部门级' }); return true; },
+          };
+        });
+      }),
+    })).filter(group => group.entries.length);
+    setWeightConfirmation({ title: `${periodLabel(periodKey)}设置权重`, label: 'O', groups: [{ id: `objectives:${periodKey}`, title: '本月 O', kind: 'objective', totalLabel: 'O 权重合计', entries: objectiveEntries }, ...krGroups], finish: () => setWeightPlanVersion(version => version + 1) });
+  };
+
   const handleScopeChange = (selection: OkrScopeSelection) => {
     setScopeSelection(selection);
     setSelectedOkrRecordId(null);
@@ -563,7 +606,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
         allowAddAnotherInDetail={!isOkrAdmin(currentUser.id, settings, people)}
         onAddAnother={() => openGoalCreation(record.periodKey, record.payload.goalLevel === 'department' ? 'department' : 'personal')}
         onCancel={closeEditor}
-        onSave={payload => { if (!['draft','submitted'].includes(record.status)) { setApplicationReason(''); setChangeApplication({ record, payload }); return Promise.resolve(false); }          return updateOkr(record.id, payload, true).then(ok => { if (ok) { setEditingObjectiveId(null); setSelectedOkrRecordId(null); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); } return ok; }); }}
+        onSave={payload => { if (!['draft','submitted'].includes(record.status) && !isAssigneeOnlyDepartmentChange(record.payload, payload)) { setApplicationReason(''); setChangeApplication({ record, payload }); return Promise.resolve(false); } return updateOkr(record.id, payload, true).then(ok => { if (ok) { setEditingObjectiveId(null); setSelectedOkrRecordId(null); setSelectedMonthDetail(null); setSelectedMonthTargetId(undefined); } return ok; }); }}
         onSaveDraft={['draft','submitted'].includes(record.status) ? payload => updateOkr(record.id, payload, false).then(ok => { if (ok) { setEditingObjectiveId(null); setSelectedOkrRecordId(null); } return ok; }) : undefined}
       />;
       return <CompanyEditorShell blocked={busy} title="编辑目标" onClose={closeEditor} period={<div className="okr-objective-period"><span>目标归属周期</span><Tooltip title="编辑原目标时保留所属周期"><span><Select aria-label="目标归属周期" className="company-objective-cycle-select" value={record.periodKey} disabled options={[{ value: record.periodKey, label: periodLabel(record.periodKey) }]}/></span></Tooltip></div>}>
@@ -578,7 +621,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
             {hasReference && <div className="goal-creation-source-label">来源：{creationSourceLabel(editPayload)}</div>}
             {form}
           </div>
-          <div className="okr-objective-footer">{editLevel !== 'personal' && <Tooltip title="编辑当前目标时不追加其他目标，请返回列表后添加"><div className="company-objective-toolbar"><Button type="text" icon={<PlusIcon/>} disabled>添加目标</Button></div></Tooltip>}<span className="okr-objective-footer-spacer"/><Button onClick={closeEditor} disabled={busy}>取消</Button>{record.status === 'draft' && <Button onClick={() => void editingObjectiveRef.current?.saveDraft()} disabled={busy || loading || !!error}>存草稿</Button>}<Button type="primary" onClick={() => void editingObjectiveRef.current?.submit()} loading={busy} disabled={loading || !!error}>{['draft','submitted'].includes(record.status) ? '提交目标' : record.payload.goalModelVersion !== 2 ? '保存修改' : companyLevel ? '保存修改并同步下级' : '提交修改审核'}</Button></div>
+          <div className="okr-objective-footer">{editLevel !== 'personal' && <Tooltip title="编辑当前目标时不追加其他目标，请返回列表后添加"><div className="company-objective-toolbar"><Button type="text" icon={<PlusIcon/>} disabled>添加目标</Button></div></Tooltip>}<span className="okr-objective-footer-spacer"/><Button onClick={closeEditor} disabled={busy}>取消</Button>{record.status === 'draft' && <Button onClick={() => void editingObjectiveRef.current?.saveDraft()} disabled={busy || loading || !!error}>存草稿</Button>}<Button type="primary" onClick={() => void editingObjectiveRef.current?.submit()} loading={busy} disabled={loading || !!error}>{['draft','submitted'].includes(record.status) ? '提交目标' : record.payload.goalModelVersion !== 2 || editLevel === 'department' ? '保存修改' : companyLevel ? '保存修改并同步下级' : '提交修改审核'}</Button></div>
         </div>
       </CompanyEditorShell>;
     }
@@ -724,7 +767,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
           </Modal>
           {isMyOkrCategory && !assignedPersonalScope && <GoalChangePanel showRequests={false} records={records} people={people} viewerId={currentUser.id} onRefresh={refresh} work={work} workLoading={workLoading} workError={workError} onRetryWork={() => void refreshWork()}/>}
             {deleteObjectiveId && <Modal title={<span className="okr-delete-confirm-title"><ExclamationCircleFilled/>确认删除此目标吗？</span>} open zIndex={2000} cancelText="取消" okText="确定" confirmLoading={busy} cancelButtonProps={{disabled: busy}} closable={!busy} maskClosable={false} keyboard={!busy} onCancel={() => setDeleteObjectiveId(null)} onOk={async () => { if (!deleteObjectiveId || busy) return; if (await deleteOkr(deleteObjectiveId)) { setDeleteObjectiveId(null); setEditingObjectiveId(null); setSelectedOkrRecordId(null); } }}><p>删除后本条目标内容将全部丢失。</p></Modal>}
-          {weightConfirmation && <GoalWeightConfirmation entries={weightConfirmation.entries} label={weightConfirmation.label} onFinish={(ids, submitted) => { weightConfirmation.finish(ids, submitted); setWeightConfirmation(null); }}/>}
+          {weightConfirmation && <GoalWeightConfirmation entries={weightConfirmation.entries} groups={weightConfirmation.groups} title={weightConfirmation.title} label={weightConfirmation.label} onFinish={(ids, submitted) => { weightConfirmation.finish(ids, submitted); setWeightConfirmation(null); }}/>}
           <Modal open={!!withdrawRecord} title="撤回确认" okText="确定" cancelText="取消" confirmLoading={withdrawing} cancelButtonProps={{disabled:withdrawing}} closable={!withdrawing} maskClosable={false} onCancel={() => setWithdrawRecord(null)} onOk={async () => { if (!withdrawRecord || withdrawing) return; setWithdrawing(true); setWithdrawError(''); try { await okrRepository.update(withdrawRecord, 'withdraw-change', {}, currentUser.id); await refresh(); setWithdrawRecord(null); } catch (reason) { setWithdrawError(reason instanceof Error ? reason.message : '撤回失败，请重试'); } finally { setWithdrawing(false); } }}><p>是否撤回该目标的确认流程？</p>{withdrawError && <Alert type="error" title={withdrawError}/>}</Modal>
           {/* OKR Cards List */}
           {selectedMonthDetail ? <div className="okr-detail-page">
@@ -745,7 +788,7 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               onSubmitDraft={record => setOkrDraftToSubmit(record.id)}
             />
           </div> : selectedOkrRecord ? <div className="okr-detail-page">
-            {editingObjectiveId === selectedOkrRecord.id ? renderDraftEditor(selectedOkrRecord) : (selectedOkrRecord.kind === 'objective' || selectedOkrRecord.kind === 'action') ? <CompanyObjectiveDetail onProgress={(recordId, itemId) => setProgressSelection({ recordId: records.find(item => item.id === itemId && item.kind === 'action')?.id || recordId, itemId })} record={selectedOkrRecord} records={objectiveDetailRecords} people={people} work={work} workLoading={workLoading} workError={workError} onRetryWork={() => void refreshWork()} busy={busy} onEdit={!assignedPersonalScope && canEditOkr(selectedOkrRecord,currentUser.id,settings,people) && selectedOkrRecord.changeRequest?.status !== 'pending' ? () => { setDeleteObjectiveId(null); setEditingObjectiveId(selectedOkrRecord.id); } : undefined} onDelete={!assignedPersonalScope && canEditOkr(selectedOkrRecord,currentUser.id,settings,people) && selectedOkrRecord.changeRequest?.status !== 'pending' ? () => setDeleteObjectiveId(selectedOkrRecord.id) : undefined} onClose={() => setSelectedOkrRecordId(null)}/> : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.ownerId} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedOkrRecordId(null)} />}
+            {editingObjectiveId === selectedOkrRecord.id ? renderDraftEditor(selectedOkrRecord) : (selectedOkrRecord.kind === 'objective' || selectedOkrRecord.kind === 'action') ? <CompanyObjectiveDetail onProgress={(recordId, itemId) => setProgressSelection({ recordId: records.find(item => item.id === itemId && item.kind === 'action')?.id || recordId, itemId })} record={selectedOkrRecord} records={objectiveDetailRecords} people={people} personalViewerId={assignedPersonalScope ? currentUser.id : undefined} work={work} workLoading={workLoading} workError={workError} onRetryWork={() => void refreshWork()} busy={busy} onEdit={!assignedPersonalScope && canEditOkr(selectedOkrRecord,currentUser.id,settings,people) && selectedOkrRecord.changeRequest?.status !== 'pending' ? () => { setDeleteObjectiveId(null); setEditingObjectiveId(selectedOkrRecord.id); } : undefined} onDelete={!assignedPersonalScope && canEditOkr(selectedOkrRecord,currentUser.id,settings,people) && selectedOkrRecord.changeRequest?.status !== 'pending' ? () => setDeleteObjectiveId(selectedOkrRecord.id) : undefined} onClose={() => setSelectedOkrRecordId(null)}/> : <GoalHierarchyView records={records} people={people} periodKey={selectedOkrRecord.periodKey} ownerId={selectedOkrRecord.ownerId} initialSelectedId={selectedOkrRecord.id} loading={loading} error={error} showDemoHierarchy={Boolean(me?.rootFlag)} onBack={() => setSelectedOkrRecordId(null)} />}
 
           </div> : ((!me?.rootFlag && objectiveForms.length > 0) || actionFormOpen ? null : <div className="okr-summary-month-list">
              {selectedCycles.length === 0 ? (
@@ -753,10 +796,14 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
           ) : <div className="okr-summary-month-body is-target-view">{summaryMonths.map(month => {
             const monthOkrs = filteredOkrs.filter(item => item.cycle === month);
             const monthOkrIds = new Set(monthOkrs.map(item => item.id));
-            const monthRecords = isMyOkrCategory
+            const selectedDepartmentMember = selectedScopeGroup === 'department' && scopeSelection.personId ? people.find(person => person.id === scopeSelection.personId) : undefined;
+            const assignedMemberRecords = selectedDepartmentMember && goalLevel(selectedDepartmentMember) !== '部门级'
+              ? personalGoalDisplayRecords(records, selectedDepartmentMember, people).filter(record => record.periodKey === month)
+              : undefined;
+            const monthRecords = assignedMemberRecords || (isMyOkrCategory
               ? personalObjectiveRecords.filter(record => record.periodKey === month)
-              : records.filter(record => record.kind === 'objective' && record.periodKey === month && monthOkrIds.has(record.id) && !(selectedScopeGroup === 'department' && record.payload.goalLevel === 'personal'));
-            const targetItems = buildMyTargetViewItems(monthRecords, [], [...records, ...visibleActionParents], people, currentUser.id, settings).map(target => assignedPersonalScope ? { ...target, readOnly: true, editable: false, deletable: false } : target);
+              : records.filter(record => record.kind === 'objective' && record.periodKey === month && monthOkrIds.has(record.id) && !(selectedScopeGroup === 'department' && record.payload.goalLevel === 'personal')));
+            const targetItems = buildMyTargetViewItems(monthRecords, [], [...records, ...visibleActionParents], people, selectedDepartmentMember?.id || currentUser.id, settings, assignedPersonalScope || !!assignedMemberRecords).map(target => assignedPersonalScope || assignedMemberRecords ? { ...target, readOnly: true, editable: false, deletable: false } : target);
             return <MyTargetMonthSection
               onProgress={(recordId, itemId) => setProgressSelection({ recordId: records.find(item => item.id === itemId && item.kind === 'action')?.id || recordId, itemId })}
               onOpenAlignment={targetId => { const aligned = records.find(record => record.id === targetId); if (aligned && (aligned.kind === 'objective' || aligned.kind === 'action')) { setSelectedOkrRecordId(aligned.id); setEditingObjectiveId(null); setSelectedMonthDetail(null); } }}
@@ -773,6 +820,8 @@ const OriginalWorkspace: React.FC<{ mainTab: 'okrs' | 'reviews' }> = ({ mainTab 
               busy={busy || loading || !!error}
               draftCount={!assignedPersonalScope && (isMyOkrCategory || selectedScopeGroup === 'department') ? monthRecords.filter(record => record.status === 'draft' && !record.payload.inherited).length : 0}
               onSubmitDrafts={() => submitSavedGoalDrafts(monthRecords.filter(record => record.status === 'draft' && !record.payload.inherited))}
+              onSetWeights={personalWeightScope && monthRecords.length > 0 ? () => openMonthlyWeightConfirmation(month, monthRecords) : undefined}
+              weightPlanStatus={personalWeightScope && monthRecords.length > 0 ? getOkrWeightPlan(currentUser.id, month)?.status : undefined}
               onAddGoal={selectedScopeGroup === 'department' && level === '部门级' && !scopeSelection.personId ? () => openGoalCreation(month, 'department') : undefined}
               onEditTarget={targetId => {
                 setDeleteObjectiveId(null);

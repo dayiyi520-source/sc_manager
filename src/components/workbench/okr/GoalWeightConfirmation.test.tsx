@@ -11,7 +11,7 @@ describe('submission weight confirmation',()=>{
     expect(goalWeightRemainder([60,30,10])).toBe(10);
     expect(goalWeightRemainder([80,30,0])).toBe(-10);
   });
-  it('keeps the final weight read-only, computes its remainder and submits exact weights',async()=>{
+  it('allows every weight to be edited and submits exact weights',async()=>{
     const first=vi.fn().mockResolvedValue(true),last=vi.fn().mockResolvedValue(true),finish=vi.fn();
     render(<GoalWeightConfirmation label="KR" entries={[{id:'one',title:'主结果一',weight:100,submit:first},{id:'two',title:'主结果二',weight:100,submit:last}]} onFinish={finish}/>);
     expect(screen.getByLabelText('KR2权重')).toBeDisabled();
@@ -41,5 +41,19 @@ describe('submission weight confirmation',()=>{
     fireEvent.click(screen.getByRole('button',{name:/确认并提交/}));
     await waitFor(()=>expect(finish).toHaveBeenCalledWith(['one','two'],true));
     expect(first).toHaveBeenCalledTimes(1);expect(last).toHaveBeenCalledTimes(2);
+  });
+  it('locks single objective and KR weights at 100 percent and shows one footer total', () => {
+    const submit = vi.fn().mockResolvedValue(true);
+    render(<GoalWeightConfirmation title="2026年10月设置权重" groups={[
+      { id: 'objectives', title: '本月 O', kind: 'objective', entries: [{ id: 'o1', title: '目标一', weight: 100, submit }] },
+      { id: 'o1-krs', title: '目标一', kind: 'keyResult', parentEntryId: 'o1', entries: [{ id: 'kr1', title: '关键结果一', weight: 100, submit }] },
+    ]} onFinish={vi.fn()} />);
+    expect(screen.getByLabelText('O1权重')).toHaveValue('100');
+    expect(screen.getByLabelText('O1权重')).toBeDisabled();
+    expect(screen.getByLabelText('KR1权重')).toHaveValue('100');
+    expect(screen.getByLabelText('KR1权重')).toBeDisabled();
+    expect(screen.getByText('权重和：100%')).toBeInTheDocument();
+    expect(screen.queryByText(/本组 KR 权重合计/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/O 权重合计/)).not.toBeInTheDocument();
   });
 });

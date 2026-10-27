@@ -6,14 +6,30 @@ import {describe,it,expect,vi,afterEach} from 'vitest';
 import {GoalConfirmationWorkspace} from './GoalConfirmationWorkspace';
 import {OkrScopeSidebar} from './OkrScopeSidebar';
 import {okrRepository,type OkrRecord,type OkrPerson} from '../../../services/okrRepository';
+import {saveOkrWeightPlan} from '../../../services/okrWeightPlans';
 const people:OkrPerson[]=[{id:'boss',name:'管理员',rootFlag:1,department:'管理部',supervisorId:null,version:1},{id:'manager',name:'主管甲',jobTitle:'产品主管',rootFlag:0,department:'产品部',supervisorId:'boss',version:1},{id:'staff',name:'员工甲',rootFlag:0,department:'产品部',supervisorId:'manager',version:1}];
 const record:OkrRecord={id:'o',kind:'objective',ownerId:'staff',periodKey:'2026-10',status:'active',version:2,payload:{title:'原目标',weight:100,keyResults:[{id:'k',title:'原结果',weight:100,progress:0}]},changeRequest:{id:'c',status:'pending',purpose:'update',reason:'指标变化',reviewerId:'manager',baseVersion:1,requestedAt:'2026-10-13',payload:{title:'调整目标',weight:100,keyResults:[{id:'k',title:'调整结果',weight:100,progress:0}]}}};
 const props={records:[record],people,viewerId:'manager',selectedMemberId:'staff',selectedCycles:['2026-10'],onSelectMember:vi.fn(),onRefresh:vi.fn().mockResolvedValue(undefined),loading:false,work:[],workLoading:false,workError:null,onRetryWork:vi.fn()};
-afterEach(()=>{vi.restoreAllMocks();vi.clearAllMocks();});
+afterEach(()=>{vi.restoreAllMocks();vi.clearAllMocks();localStorage.clear();});
 describe('goal confirmation workspace',()=>{
  it('shows total and member badges and only appropriate confirmation members',()=>{
  render(<OkrScopeSidebar people={people} records={[record]} currentUserId="manager" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={vi.fn()}/>);
- expect(screen.queryByRole('button',{name:'目标确认'})).not.toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'目标确认'})).toBeInTheDocument();
+ expect(screen.getByLabelText('待确认目标 1 项')).toBeInTheDocument();
+ });
+ it('shows an employee weight plan only to the direct supervisor in the existing confirmation layout',()=>{
+  saveOkrWeightPlan('staff','2026-10',{objectiveWeights:{o:100},keyResultWeights:{},baseVersions:{o:2}});
+  const sidebar=render(<OkrScopeSidebar people={people} records={[]} currentUserId="manager" selection={{scope:'my'}} onSelect={vi.fn()} onAddTarget={vi.fn()}/>);
+  expect(screen.getByLabelText('待确认目标 1 项')).toBeInTheDocument();
+  sidebar.unmount();
+  const manager=render(<GoalConfirmationWorkspace {...props} records={[]}/>);
+  expect(screen.getByLabelText('2026年10月目标确认')).toBeInTheDocument();
+  expect(screen.getByText('待确认项（1）')).toBeInTheDocument();
+  expect(document.querySelector('.okr-confirmation-objective-card')).toBeInTheDocument();
+  expect(screen.getByRole('radiogroup',{name:'月度权重确认操作'})).toBeInTheDocument();
+  manager.unmount();
+  render(<GoalConfirmationWorkspace {...props} viewerId="boss" selectedMemberId="staff" records={[]}/>);
+  expect(screen.queryByRole('radiogroup',{name:'月度权重确认操作'})).not.toBeInTheDocument();
  });
  it('submits approval and renders an empty pending workspace after refreshed data',async()=>{
  const update=vi.spyOn(okrRepository,'update').mockResolvedValue(undefined);

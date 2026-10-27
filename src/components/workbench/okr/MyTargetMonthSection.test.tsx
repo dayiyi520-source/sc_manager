@@ -3,6 +3,8 @@ import { fireEvent, render, screen, within, waitFor } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest';
 import { buildMyTargetViewItems, MyTargetMonthSection, type MyTargetViewItem } from './MyTargetMonthSection';
 import type { OkrPerson, OkrRecord } from '../../../services/okrRepository';
+import { personalGoalDisplayRecords } from '../../../services/okrAssignments';
+import { reviewOkrWeightPlan, saveOkrWeightPlan } from '../../../services/okrWeightPlans';
 
 const targets: MyTargetViewItem[] = [
   {
@@ -346,6 +348,71 @@ it('shows assigned personal execution content in card view',()=>{
  const goal:OkrRecord={id:'assigned',kind:'objective',ownerId:'staff',periodKey:'2026-10',status:'active',version:1,payload:{goalLevel:'personal',origin:'assigned',title:'上级KR',keyResults:[{id:'kr',title:'上级KR',weight:100,progress:0,executionActions:[{id:'a',ownerId:'staff',title:'本人计划动作',weight:100,progress:25}]}]}};
  render(<MyTargetMonthSection periodKey="2026-10" targets={buildMyTargetViewItems([goal],[],[goal],[],'staff')} viewMode="card" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()}/>);
  expect(screen.getByText('本人计划动作')).toBeInTheDocument();expect(screen.queryByText('暂无拆解行动')).not.toBeInTheDocument();
+});
+
+it('shows department O/KR weights and employee-only sub KR progress with approved personal weights', () => {
+  localStorage.clear();
+  const people: OkrPerson[] = [
+    { id: 'manager', name: '主管', department: '产品部', supervisorId: null, rootFlag: 0, goalRole: 'supervisor', version: 1 },
+    { id: 'staff', name: '员工甲', department: '产品部', supervisorId: 'manager', rootFlag: 0, version: 1 },
+    { id: 'other', name: '员工乙', department: '产品部', supervisorId: 'manager', rootFlag: 0, version: 1 },
+  ];
+  const first: OkrRecord = { id: 'o1', kind: 'objective', ownerId: 'manager', periodKey: '2026-10', status: 'active', version: 1, payload: { goalLevel: 'department', title: '部门目标一', weight: 80, keyResults: [
+    { id: 'kr1', title: '部门结果一', weight: 70, progress: 60, details: [{ id: 'd1', name: '版本一', assigneeIds: ['staff', 'other'], progress: 60 }, { id: 'd2', name: '版本二', assigneeIds: ['staff'], progress: 0 }] },
+    { id: 'kr2', title: '部门结果二', weight: 30, progress: 20, details: [{ id: 'd3', name: '版本三', assigneeIds: ['staff'], progress: 20 }] },
+  ] } };
+  const second: OkrRecord = { ...first, id: 'o2', payload: { ...first.payload, title: '部门目标二', weight: 20, keyResults: [{ id: 'kr3', title: '部门结果三', weight: 100, progress: 0, details: [{ id: 'd4', name: '版本四', assigneeIds: ['staff'] }] }] } };
+  const review = (id: string, ownerId: string, progress: number): OkrRecord => ({ id, kind: 'review', ownerId, periodKey: '2026-10', status: 'submitted', version: 1, submittedAt: '2026-10-20', payload: { title: '周报', reviewType: 'week', startDate: '2026-10-14', endDate: '2026-10-20', krReviews: [{ objectiveId: 'o1', objectiveTitle: '部门目标一', keyResultId: 'kr1', keyResultTitle: '部门结果一', previousProgress: 0, currentProgress: progress, health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: [], detailProgress: [{ id: 'd1', previousProgress: 0, currentProgress: progress }] }] } });
+  const records = [first, second, review('other-report', 'other', 90), review('staff-report', 'staff', 35)];
+  const display = () => personalGoalDisplayRecords(records, people[1], people);
+  const initial = display();
+  expect(initial[0].payload.keyResults?.flatMap(kr => kr.details?.map(detail => detail.weight))).toEqual([34, 33, 33]);
+  expect(initial[0].payload.keyResults?.[0].details?.[0].progress).toBe(35);
+  expect(initial[0].payload.keyResults?.[0].details?.[1].progress).toBe(0);
+  expect(initial[0].payload.weight).toBe(50);
+  saveOkrWeightPlan('staff', '2026-10', { objectiveWeights: { o1: 60, o2: 40 }, keyResultWeights: { o1: { d1: 20, d2: 30, d3: 50 } }, baseVersions: { o1: 1, o2: 1 } });
+  expect(display()[0].payload.keyResults?.flatMap(kr => kr.details?.map(detail => detail.weight))).toEqual([34, 33, 33]);
+  reviewOkrWeightPlan('staff', '2026-10', 'manager', 'approve', people);
+  const approved = display();
+  expect(approved[0].payload.keyResults?.flatMap(kr => kr.details?.map(detail => detail.weight))).toEqual([20, 30, 50]);
+  expect(approved[1].payload.keyResults?.[0].details?.[0].weight).toBe(100);
+  const expanded = personalGoalDisplayRecords([...records, { ...second, id: 'o3', payload: { ...second.payload, title: '新增部门目标' } }], people[1], people);
+  expect(expanded.map(item => item.payload.weight)).toEqual([34, 33, 33]);
+  const extraDetail = { ...first, payload: { ...first.payload, keyResults: first.payload.keyResults!.map((kr, index) => index ? { ...kr, details: [...kr.details!, { id: 'd5', name: '新增版本', assigneeIds: ['staff'] }] } : kr) } };
+  const expandedDetails = personalGoalDisplayRecords([extraDetail, ...records.slice(1)], people[1], people);
+  expect(expandedDetails[0].payload.keyResults?.flatMap(kr => kr.details?.map(detail => detail.weight))).toEqual([25, 25, 25, 25]);
+  const targets = buildMyTargetViewItems(approved, [], records, people, 'staff');
+  expect(targets[0]).toMatchObject({ totalWeight: 80, personalWeight: 60, actions: [{ weight: 70 }, { weight: 30 }] });
+  render(<MyTargetMonthSection periodKey="2026-10" targets={[targets[0]]} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()}/>);
+  const target = screen.getByLabelText('目标：部门目标一');
+  expect(within(target).getByText('80%', { selector: '.okr-target-weight' })).toBeInTheDocument();
+  expect(within(target).getByText('60%', { selector: '.okr-target-list-status strong' })).toBeInTheDocument();
+  const tables = within(target).getAllByRole('table');
+  expect(tables).toHaveLength(2);
+  for (const table of tables) {
+    expect(within(table).queryByText('承接人')).not.toBeInTheDocument();
+    expect(within(table).getAllByText('进度').length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('权重').length).toBeGreaterThan(0);
+  }
+  expect(within(tables[0]).getByText('35%')).toBeInTheDocument();
+  localStorage.clear();
+});
+
+it('shows the supervisor own assignment as personal sub KR metrics after weight submission', () => {
+  localStorage.clear();
+  const people: OkrPerson[] = [{ id: 'manager', name: '主管', department: '产品部', supervisorId: 'boss', rootFlag: 0, goalRole: 'supervisor', version: 1 }];
+  const record: OkrRecord = { id: 'department-own', kind: 'objective', ownerId: 'manager', periodKey: '2026-10', status: 'active', version: 1, payload: { goalLevel: 'department', title: '主管部门目标', weight: 80, keyResults: [{ id: 'kr', title: '部门结果', weight: 100, progress: 80, details: [{ id: 'one', name: '本人版本一', assigneeIds: ['manager'] }, { id: 'two', name: '本人版本二', assigneeIds: ['manager'] }] }] } };
+  const review: OkrRecord = { id: 'manager-review', kind: 'review', ownerId: 'manager', periodKey: '2026-10', status: 'submitted', version: 1, payload: { title: '周报', reviewType: 'week', startDate: '2026-10-14', endDate: '2026-10-20', krReviews: [{ objectiveId: record.id, objectiveTitle: record.payload.title, keyResultId: 'kr', keyResultTitle: '部门结果', previousProgress: 0, currentProgress: 30, health: 'normal', achievement: '', blocker: '', nextPlan: '', workIds: [], detailProgress: [{ id: 'one', previousProgress: 0, currentProgress: 30 }] }] } };
+  saveOkrWeightPlan('manager', '2026-10', { objectiveWeights: { [record.id]: 100 }, keyResultWeights: { [record.id]: { one: 70, two: 30 } }, baseVersions: { [record.id]: 1 }, autoApprove: true });
+  const display = personalGoalDisplayRecords([record, review], people[0], people);
+  const target = buildMyTargetViewItems(display, [], [record, review], people, 'manager', undefined, true)[0];
+  expect(target).toMatchObject({ totalWeight: 80, personalWeight: 100, personalMetrics: true });
+  render(<MyTargetMonthSection periodKey="2026-10" targets={[target]} viewMode="list" collapsed={false} onToggle={vi.fn()} onOpenTarget={vi.fn()}/>);
+  const table = screen.getByRole('table');
+  expect(within(table).queryByText('承接人')).not.toBeInTheDocument();
+  expect(within(table).getAllByText('30%').length).toBeGreaterThan(0);
+  expect(within(table).getByText('70%')).toBeInTheDocument();
+  localStorage.clear();
 });
 
 it('shows all source KR assignees and each latest sub KR assignment in the employee list', () => {

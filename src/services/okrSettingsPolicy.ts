@@ -58,12 +58,19 @@ export const canUpdateOkrSettings = (viewer: string, next: OkrSettings, previous
 };
 export function confirmationReviewer(owner: OkrPerson, action: 'create'|'update'|'delete', payload: OkrRecord['payload'], settings: OkrSettings | undefined, people: OkrPerson[]): string | undefined {
   // Preserve pre-configuration behavior for previously saved projects.
-  if (!settings?.confirmation) return owner.rootFlag || action === 'delete' || action === 'create' && payload.origin !== 'autonomous' ? undefined : owner.supervisorId || undefined;
+  if (!settings?.confirmation) {
+    if (owner.rootFlag || action === 'delete' || action === 'create' && payload.origin !== 'autonomous') return undefined;
+    if (payload.goalLevel === 'personal' && goalLevel(owner) === '个人级' && !people.some(person => person.id === owner.supervisorId && person.id !== owner.id)) throw new Error('未配置直属主管，无法提交个人目标确认');
+    return owner.supervisorId || undefined;
+  }
   const policy = settings.confirmation;
   if (!policy.enabled || !policy.actions.includes(action) || !policy.types.includes(payload.objectiveType || 'target') || policy.exemptIds.includes(owner.id) || isOkrAdmin(owner.id,settings,people)) return undefined;
   const configuredRole = settings.supervisorIds ? settings.supervisorIds.includes(owner.id) ? 'supervisor' as const : 'employee' as const : owner.goalRole;
+  const employeePersonalGoal = payload.goalLevel === 'personal' && goalLevel({ ...owner, goalRole: configuredRole }) === '个人级';
+  if (employeePersonalGoal && !people.some(person => person.id === owner.supervisorId && person.id !== owner.id)) throw new Error('未配置直属主管，无法提交个人目标确认');
   const ownDepartmentSupervisor = payload.goalLevel === 'personal' && goalLevel({ ...owner, goalRole: configuredRole }) === '部门级';
   let supervisor = ownDepartmentSupervisor ? owner : people.find(p=>p.id===owner.supervisorId);
+  if (employeePersonalGoal) return supervisor?.id;
   if (!supervisor && policy.missingSupervisor === 'upper') { const candidates = people.filter(person => person.id !== owner.id && person.goalRole === 'supervisor' && person.department.trim() === owner.department.trim()); if (candidates.length === 1) supervisor = candidates[0]; }
   if (supervisor && supervisor.id !== owner.id) return supervisor.id;
   const fallback = supervisor?.id === owner.id ? policy.selfSupervisor : policy.missingSupervisor;
