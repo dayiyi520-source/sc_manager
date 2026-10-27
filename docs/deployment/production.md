@@ -30,7 +30,7 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-最近成功发布：2026-10-26 14:38:16（北京时间）；发布编号 `20261026T063816Z`；源码提交 `bbc92039146ccfda0834a265bd2a34dff57d21bf`；发布目录 `/opt/sc-manager-frontend/releases/20261026T063816Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261026T063816Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
+最近成功发布：2026-10-28 00:04:10（北京时间）；发布编号 `20261027T160410Z`；源码提交 `2d42fb386d83d9d55e69b2f1b601ea4840d36349`；发布目录 `/opt/sc-manager-frontend/releases/20261027T160410Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261027T160410Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
@@ -40,6 +40,11 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 上次已核实的发布：20261026T063816Z，源码 bbc9203。
 
 ## 最近成功发布
+
+- 发布时间：2026-10-28 00:04:10（北京时间）；发布编号 `20261027T160410Z`；发布源码 `2d42fb386d83d9d55e69b2f1b601ea4840d36349`。
+- 调整个人目标确认、权重和进度展示、部门承接人修改，以及待办中心全部标签筛选。使用已推送提交的独立源码快照，并在构建前读取线上两份共享 Mock 数据。
+- 类型检查和生产构建通过；相关 169 项测试中 164 项通过、5 项失败，失败集中在仍按旧规则自行新增个人目标及旧审核文案编写的用例。公网首页、入口资源、业务直达路由、发布清单与 Mock 健康检查通过；发布前后目标记录均为 65 条，修订号从 236 升至 237。
+- 发布目录 `/opt/sc-manager-frontend/releases/20261027T160410Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261027T160410Z`。回滚从备份 `previous-target.txt` 读取旧目录并切回 `dist`，再调用本次发布目录 `mock-service/setup.py --rollback` 恢复服务、路由及共享文件。
 
 - 发布时间：2026-10-26 14:38:16（北京时间）；发布编号 `20261026T063816Z`；发布源码 `bbc92039146ccfda0834a265bd2a34dff57d21bf`。
 - 目标总结设置隐藏角色设置与目标确认配置入口，保留已有角色权限和确认规则；浏览器此前停留在隐藏页面时回到 OKR 模板页。周期列表删除规则不变。
