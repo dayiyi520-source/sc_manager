@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FeedDetail } from './FeedDetail';
 import type { WorkbenchFeed } from '../../services/workbenchFeeds';
+import { readingKey } from '../../services/workbenchFeedReading';
 vi.mock('../../context/AppContext', () => ({ useApp: () => ({ currentUser: { id: 'viewer' } }) }));
 vi.mock('../../services/teamRepository', () => ({teamRepository:{options:vi.fn().mockResolvedValue([{id:'viewer',name:'本人',department:'产品部'}])}}));
 vi.mock('./WorkbenchFeedEditor', () => ({ WorkbenchFeedEditor: () => null }));
@@ -10,6 +12,13 @@ beforeEach(() => localStorage.clear());
 afterEach(cleanup);
 const feed: WorkbenchFeed = { id: 'detail', type: 'dynamic', title: '详情顺序验收', content: '正文', time: '2026-10-21T10:00:00', author: '发布人甲', projectName: '项目甲', productName: '产品甲', versionName: 'V1', customer: '客户甲', newsType: '专家报告', activityName: '历史活动' };
 const labels = () => [...document.querySelectorAll('aside .ant-descriptions-item-label')].map(item => item.textContent?.trim());
+it('records one visit under StrictMode and another after reopening the detail', async () => {
+  const first = render(<StrictMode><FeedDetail feed={feed} onClose={vi.fn()}/></StrictMode>);
+  await waitFor(() => expect(JSON.parse(localStorage.getItem(readingKey('viewer')) || '{}').openedCount?.[feed.id]).toBe(1));
+  first.unmount();
+  render(<StrictMode><FeedDetail feed={feed} onClose={vi.fn()}/></StrictMode>);
+  await waitFor(() => expect(JSON.parse(localStorage.getItem(readingKey('viewer')) || '{}').openedCount?.[feed.id]).toBe(2));
+});
 describe('feed detail metadata order and applicable fields', () => {
   it.each([
     ['dynamic', ['类型', '关联产品', '迭代版本', '可见范围', '来源', '发布人', '发布时间', '已读', '未读']],

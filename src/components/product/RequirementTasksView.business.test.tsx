@@ -114,6 +114,33 @@ it('renders the presales empty state without a field configuration service', asy
   await screen.findByText('没有符合当前搜索、过滤或分组条件的售前任务');
 });
 
+it('defaults presales creation to promotion and switches source field and required state by type', async () => {
+  mount('presales');
+  await screen.findByText('没有符合当前搜索、过滤或分组条件的售前任务');
+  fireEvent.click(screen.getByRole('button', { name: '新建' }));
+  await screen.findByText('新建售前任务');
+
+  const type = screen.getByRole('combobox', { name: '任务类型' });
+  expect(type.closest('.ant-select')).toHaveTextContent('售前宣发');
+  expect(screen.getByRole('combobox', { name: '关联商机' }).closest('.ant-form-item')?.querySelector('.ant-form-item-required')).toBeNull();
+  expect(screen.getByRole('combobox', { name: '关联客户' }).closest('.ant-form-item')?.querySelector('.ant-form-item-required')).toBeNull();
+
+  fireEvent.mouseDown(type);
+  fireEvent.click(await screen.findByText('招投标工作', { selector: '.ant-select-item-option-content' }));
+  expect(screen.getByRole('combobox', { name: '关联招投标' }).closest('.ant-form-item')?.querySelector('.ant-form-item-required')).not.toBeNull();
+  expect(screen.getByRole('combobox', { name: '关联客户' }).closest('.ant-form-item')?.querySelector('.ant-form-item-required')).not.toBeNull();
+
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '任务类型' }));
+  fireEvent.click(await screen.findByText('标前工作', { selector: '.ant-select-item-option-content' }));
+  expect(screen.getByRole('combobox', { name: '关联商机' }).closest('.ant-form-item')?.querySelector('.ant-form-item-required')).not.toBeNull();
+  expect(screen.getByRole('combobox', { name: '关联客户' }).closest('.ant-form-item')?.querySelector('.ant-form-item-required')).not.toBeNull();
+
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '任务类型' }));
+  fireEvent.click(await screen.findByText('其他', { selector: '.ant-select-item-option-content' }));
+  expect(screen.getByRole('combobox', { name: '关联商机' }).closest('.ant-form-item')?.querySelector('.ant-form-item-required')).toBeNull();
+  expect(screen.getByRole('combobox', { name: '关联客户' }).closest('.ant-form-item')?.querySelector('.ant-form-item-required')).toBeNull();
+});
+
 
 it.each(['approve', 'reject'] as const)('locks pending status and replaces the menu with %s review controls', async action => {
   const sample = task('review', { status: '处理中', completionApproval: 'pending', creatorId: 'u1', creatorName: '当前用户', assigneeId: 'u2', ownerName: '部门同事' });

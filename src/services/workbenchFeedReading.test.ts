@@ -40,14 +40,20 @@ describe('per-user category browsing and message reading', () => {
   });
 });
 
-it('records the first actual open time and preserves it after another open and category browsing',()=>{
+it('retains first read time while each successful open increments count and updates latest time',()=>{
  vi.useFakeTimers();
  try {
   vi.setSystemTime(new Date('2026-10-22T08:00:00Z'));openFeedMessage('me',first);
   const initial=JSON.parse(localStorage.getItem(readingKey('me'))!);
   expect(initial.openedAt.one).toBe('2026-10-22T08:00:00.000Z');
+  expect(initial.openedCount.one).toBe(1);
+  expect(initial.lastOpenedAt.one).toBe(initial.openedAt.one);
   vi.setSystemTime(new Date('2026-10-22T09:00:00Z'));openFeedMessage('me',first);browseFeedCategory('me',[first,second],'square');
-  expect(JSON.parse(localStorage.getItem(readingKey('me'))!).openedAt.one).toBe(initial.openedAt.one);
+  const saved=JSON.parse(localStorage.getItem(readingKey('me'))!);
+  expect(saved.openedAt.one).toBe(initial.openedAt.one);
+  expect(saved.openedCount.one).toBe(2);
+  expect(saved.lastOpenedAt.one).toBe('2026-10-22T09:00:00.000Z');
+  expect(feedEmployeeReceipts(first,[{id:'me',name:'本人',department:'产品部'}])[0]).toMatchObject({read:true,readCount:2,lastReadAt:saved.lastOpenedAt.one});
  } finally {vi.useRealTimers();}
 });
 it('counts unique eligible employees only and keeps unread records separate from legacy reads without timestamps',()=>{
@@ -56,9 +62,21 @@ it('counts unique eligible employees only and keeps unread records separate from
  openFeedMessage('me',feed);localStorage.setItem(readingKey('legacy'),JSON.stringify({browsed:[],opened:[feed.id]}));
  const rows=feedEmployeeReceipts(feed,[...employees,employees[0]]);
  expect(rows).toHaveLength(3);expect(rows.filter(row=>row.read)).toHaveLength(2);expect(rows.find(row=>row.id==='me')?.readAt).toBeTruthy();
- expect(rows.find(row=>row.id==='legacy')).toMatchObject({read:true,readAt:undefined});
- expect(rows.find(row=>row.id==='other')).toMatchObject({read:false,readAt:undefined});
- openFeedMessage('legacy',feed);expect(JSON.parse(localStorage.getItem(readingKey('legacy'))!).openedAt).toBeUndefined();
+ expect(rows.find(row=>row.id==='legacy')).toMatchObject({read:true,readAt:undefined,readCount:1,lastReadAt:undefined});
+ expect(rows.find(row=>row.id==='other')).toMatchObject({read:false,readAt:undefined,readCount:undefined,lastReadAt:undefined});
+ openFeedMessage('legacy',feed);const legacy=JSON.parse(localStorage.getItem(readingKey('legacy'))!);
+ expect(legacy.openedAt).toBeUndefined();expect(legacy.openedCount[feed.id]).toBe(2);
+ expect(feedEmployeeReceipts(feed,employees).find(row=>row.id==='legacy')?.lastReadAt).toBe(legacy.lastOpenedAt[feed.id]);
+});
+it('uses a legacy first timestamp as latest until a new open and does not count a failed repeat',()=>{
+ localStorage.setItem(readingKey('me'),JSON.stringify({opened:[first.id],openedAt:{[first.id]:'2026-10-21T08:00:00Z'}}));
+ const employee={id:'me',name:'本人',department:'产品部'};
+ expect(feedEmployeeReceipts(first,[employee])[0]).toMatchObject({readCount:1,lastReadAt:'2026-10-21T08:00:00Z'});
+ vi.spyOn(Storage.prototype,'setItem').mockImplementationOnce(()=>{throw new Error('quota')});
+ expect(()=>openFeedMessage('me',first)).toThrow('quota');
+ expect(feedEmployeeReceipts(first,[employee])[0]).toMatchObject({readCount:1,lastReadAt:'2026-10-21T08:00:00Z'});
+ openFeedMessage('me',first);
+ expect(feedEmployeeReceipts(first,[employee])[0].readCount).toBe(2);
 });
 it('fails explicitly on damaged receipt storage and leaves failed writes unread',()=>{
  localStorage.setItem(readingKey('bad'),'broken');

@@ -4,6 +4,13 @@ export function isCollaborationCreator(task: RequirementTask, user: { id?: strin
   if (task.creatorId && user.id) return task.creatorId === user.id;
   return Boolean(task.creatorName?.trim()) && task.creatorName?.trim() === user.name?.trim();
 }
+export function isRecordOnlyCollaboration(task: RequirementTask) {
+  try {
+    const fields = typeof task.specialFields === 'string' ? JSON.parse(task.specialFields) : task.specialFields;
+    return task.workOrderType === '客户诉求' && fields?.transferToProduct === '不需要';
+  } catch { return false; }
+}
+
 function metadata(value: unknown): Record<string, unknown> {
   try {
     const parsed = typeof value === 'string' ? JSON.parse(value) : value;

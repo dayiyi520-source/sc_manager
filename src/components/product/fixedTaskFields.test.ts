@@ -52,13 +52,21 @@ describe('fixed task field contracts', () => {
 
   it.each([
     ['ops', ['assignee', 'priority', 'project', 'productLine', 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', 'attachments']],
-    ['presales', ['assignee', 'priority', 'source', 'customer', 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', 'attachments']],
+    ['presales', ['presalesType', 'assignee', 'priority', 'source', 'customer', 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', 'attachments']],
     ['delivery', ['assignee', 'priority', 'project', 'customer', 'plannedStartDate', 'plannedEndDate', 'expectedCompleteDate', 'estimatedHours', 'attachments']],
   ] as const)('fixes %s business task fields', (kind, expected) => {
     const fields = fixedTaskFields(kind, 'CREATE');
     expect(fields.fields.filter((field) => field.sort >= 0).map((field) => field.fieldCode)).toEqual(expected);
     expect(fields.visible('relatedTasks')).toBe(true);
     expect(fields.visible('workItemType')).toBe(false);
+  });
+
+  it('requires the presales type while leaving its conditional associations optional in the shared field config', () => {
+    const fields = fixedTaskFields('presales', 'CREATE');
+    expect(fields.required('presalesType')).toBe(true);
+    expect(fields.required('source')).toBe(false);
+    expect(fields.required('customer')).toBe(false);
+    expect(fixedTaskFields('presales', 'DETAIL').visible('presalesType')).toBe(true);
   });
 
   it.each(['requirement', 'design', 'dev', 'test'])('does not add legacy fields to %s forms or change existing list columns', (kind) => {

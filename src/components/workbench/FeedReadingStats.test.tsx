@@ -11,13 +11,30 @@ const feed:WorkbenchFeed={id:'receipt-test',type:'square',title:'阅读测试',c
 const employees=[{id:'me',name:'本人',department:'产品部'},{id:'other',name:'同事',department:'产品部'},{id:'outside',name:'不可见员工',department:'市场部'}];
 beforeEach(()=>{localStorage.clear();vi.clearAllMocks();vi.mocked(teamRepository.options).mockResolvedValue(employees);});
 afterEach(cleanup);
-it('shows scoped read/unread counts and the employee, read status, timestamp on hover or keyboard focus',async()=>{
- openFeedMessage('me',feed);render(<FeedReadingStats feed={feed}/>);
+it('shows scoped counts, read frequency and latest time on hover or keyboard focus',async()=>{
+ openFeedMessage('me',feed);openFeedMessage('me',feed);render(<FeedReadingStats feed={feed}/>);
  const read=await screen.findByRole('button',{name:'已读（1）'});expect(screen.getByRole('button',{name:'未读（1）'})).toBeInTheDocument();
  fireEvent.focus(read);
- const popup=await screen.findByRole('tooltip');expect(within(popup).getByText('本人')).toBeInTheDocument();expect(within(popup).getByText('已读',{exact:true})).toBeInTheDocument();
+ const popup=await screen.findByRole('tooltip');expect(within(popup).getByText('本人')).toBeInTheDocument();
+ expect(within(popup).getAllByRole('columnheader').map(header=>header.textContent)).toEqual(['员工','状态（次数）','最近已读时间']);
+ expect(within(popup).getByText('已读（2次）')).toBeInTheDocument();
  expect(within(popup).getByText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)).toBeInTheDocument();
  expect(screen.queryByText('不可见员工')).not.toBeInTheDocument();
+});
+it('shows only employee and status for unread people',async()=>{
+ render(<FeedReadingStats feed={feed}/>);
+ fireEvent.focus(await screen.findByRole('button',{name:'未读（2）'}));
+ const popup=await screen.findByRole('tooltip');
+ expect(within(popup).getAllByRole('columnheader').map(header=>header.textContent)).toEqual(['员工','状态']);
+ expect(within(popup).getAllByText('未读')).toHaveLength(2);
+});
+it('renders legacy reads as one visit and keeps missing timestamps explicit',async()=>{
+ localStorage.setItem(readingKey('me'),JSON.stringify({opened:[feed.id]}));
+ render(<FeedReadingStats feed={feed}/>);
+ fireEvent.focus(await screen.findByRole('button',{name:'已读（1）'}));
+ const popup=await screen.findByRole('tooltip');
+ expect(within(popup).getByText('已读（1次）')).toBeInTheDocument();
+ expect(within(popup).getByText('时间未记录')).toBeInTheDocument();
 });
 it('refreshes counts after another tab records a read',async()=>{
  render(<FeedReadingStats feed={feed}/>);await screen.findByRole('button',{name:'未读（2）'});

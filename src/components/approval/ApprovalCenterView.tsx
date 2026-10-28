@@ -23,6 +23,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag, Drawer, Modal } from '../common/UIComponents';
 import { ApprovalFlow } from '../../types';
+import { pendingFor, reviewedBy } from '../workbench/workbenchListRules';
 
 export const ApprovalCenterView: React.FC = () => {
   const {
@@ -37,7 +38,7 @@ export const ApprovalCenterView: React.FC = () => {
     productLines,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'pending' | 'my_applied' | 'cc_me' | 'history'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'reviewed' | 'my_applied' | 'cc_me' | 'history'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
@@ -62,7 +63,8 @@ export const ApprovalCenterView: React.FC = () => {
   // Filtered list based on active tab
   const filteredApprovals = approvals.filter((a) => {
     // Tab filtering
-    if (activeTab === 'pending' && a.status !== '待审批') return false;
+    if (activeTab === 'pending' && !pendingFor(a, currentUser.name)) return false;
+    if (activeTab === 'reviewed' && !reviewedBy(a, currentUser.name)) return false;
     if (activeTab === 'my_applied' && a.applicantName !== currentUser.name) return false;
     if (activeTab === 'history' && a.status === '待审批') return false;
 
@@ -79,7 +81,7 @@ export const ApprovalCenterView: React.FC = () => {
     return matchQ && matchType;
   });
 
-  const pendingCount = approvals.filter((a) => a.status === '待审批').length;
+  const pendingCount = approvals.filter((a) => pendingFor(a, currentUser.name)).length;
   const myAppliedCount = approvals.filter((a) => a.applicantName === currentUser.name).length;
   const passedCount = approvals.filter((a) => a.status === '已通过').length;
 
@@ -212,6 +214,7 @@ export const ApprovalCenterView: React.FC = () => {
                 </span>
               )}
             </button>
+            <button onClick={() => setActiveTab('reviewed')} className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'reviewed' ? 'bg-[var(--primary)] text-white font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}`}><CheckCircle2 className="w-3.5 h-3.5" />我已审批</button>
             <button
               onClick={() => setActiveTab('my_applied')}
               className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
@@ -338,7 +341,7 @@ export const ApprovalCenterView: React.FC = () => {
                     </td>
                     <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
-                        {item.status === '待审批' ? (
+                        {pendingFor(item, currentUser.name) ? (
                           <>
                             <button
                               onClick={() => handleOpenAction(item, 'approve')}
@@ -452,7 +455,7 @@ export const ApprovalCenterView: React.FC = () => {
             </div>
 
             {/* Actions button footer */}
-            {detailFlow.status === '待审批' && (
+            {pendingFor(detailFlow, currentUser.name) && (
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-main)]">
                 <button
                   onClick={() => handleOpenAction(detailFlow, 'reject')}

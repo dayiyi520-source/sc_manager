@@ -1,3 +1,4 @@
+import { isRecordOnlyCollaboration } from '../utils/collaborationWorkflow';
 import { reviewTemplateAggregations } from './reviewTemplateAggregation';
 import { myTaskProgress, canUpdateMyTaskProgress, validateMyTaskProgress } from './myTaskProgress';
 import { mutateCollaboration } from './mockCollaborationMutations';
@@ -848,8 +849,13 @@ async function handleMockApiRequest(path: string, init: RequestInit = {}): Promi
     const ratedAcceptance = parts[3] === 'acceptance-passed';
     if (ratedAcceptance && (!Number.isInteger(body.rating) || Number(body.rating) < 1 || Number(body.rating) > 5)) throw new Error('请选择1至5星的验收评价');
     if (ratedAcceptance && text(body.comment).length > 500) throw new Error('评价内容不能超过500字');
-    const nextStatus = parts[3] === 'complete' ? '待验收' : parts[3] === 'acceptance-passed' ? '已完成' : '处理中';
-    if ((parts[3] === 'complete' && current.status !== '处理中') || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
+    const recordOnly = isRecordOnlyCollaboration(current);
+    if (parts[3] === 'complete' && recordOnly) {
+      const viewer = taskOperator();
+      if (current.pendingReassignment || (current.assigneeId ? current.assigneeId !== viewer.id : current.ownerName !== viewer.name)) throw new Error('仅当前负责人可完成记录事项');
+    }
+    const nextStatus = parts[3] === 'complete' ? recordOnly ? '已完成' : '待验收' : parts[3] === 'acceptance-passed' ? '已完成' : '处理中';
+    if ((parts[3] === 'complete' && current.status !== '处理中' && !(recordOnly && current.status === '待处理')) || (parts[3] === 'acceptance-passed' && current.status !== '待验收') || (parts[3] === 'acceptance-failed' && current.status !== '待验收')) throw new Error('当前事项状态不允许此操作');
     if (parts[3] === 'complete' && (current.workItems || []).some((item: RequirementWorkItem) => item.blocksClosure !== false && item.status !== '已完成' && item.assistanceTaskStatus !== 'COMPLETED')) throw new Error('存在未完成的关联任务');
     const stagedAttachments = read<any[]>(KEYS.attachments, []);
     const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.map(String) : [];

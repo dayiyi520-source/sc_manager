@@ -17,6 +17,25 @@ const asOwner = async (id: string, action: () => Promise<unknown>) => {
 };
 const create = async (kind: 'presales' | 'delivery' | 'ops', title: string) => await mockApiRequest('/api/' + kind + '-tasks', { method: 'POST', body: JSON.stringify({ title }) }) as { id: string };
 describe('local commercial task routes', () => {
+  it('saves presales types with distinct associations, optional empty links and conditional validation', async () => {
+    const path = '/api/presales-tasks';
+    const save = (payload: Record<string, unknown>) => mockApiRequest(path, { method: 'POST', body: JSON.stringify({ title: '售前分类测试', ...payload }) }) as Promise<{ id: string }>;
+    const promotion = await save({ specialFields: { presalesType: '售前宣发' }, customerId: '', customerName: '' });
+    expect(await mockApiRequest(`${path}/${promotion.id}`)).toMatchObject({ customerId: '', specialFields: { presalesType: '售前宣发' } });
+    await expect(save({ specialFields: { presalesType: '标前工作' } })).rejects.toThrow('请选择关联商机');
+    await expect(save({ specialFields: { presalesType: '招投标工作' } })).rejects.toThrow('请选择关联招投标');
+    await expect(save({ specialFields: { presalesType: '标前工作', opportunityId: 'o1' } })).rejects.toThrow('请选择关联客户');
+    await expect(save({ specialFields: { presalesType: '招投标工作', biddingId: 'b1' } })).rejects.toThrow('请选择关联客户');
+    const opportunity = await save({ customerId: 'c1', specialFields: { presalesType: '标前工作', opportunityId: 'o1', opportunityName: '商机一' } });
+    expect(await mockApiRequest(`${path}/${opportunity.id}`)).toMatchObject({ specialFields: { presalesType: '标前工作', opportunityId: 'o1', opportunityName: '商机一' } });
+    const bidding = await save({ customerId: 'c1', specialFields: { presalesType: '招投标工作', biddingId: 'b1', biddingName: '投标一' } });
+    expect(await mockApiRequest(`${path}/${bidding.id}`)).toMatchObject({ specialFields: { presalesType: '招投标工作', biddingId: 'b1', biddingName: '投标一' } });
+    await expect(mockApiRequest(`${path}/${bidding.id}`, { method: 'PUT', body: JSON.stringify({ customerId: '' }) })).rejects.toThrow('请选择关联客户');
+    await expect(mockApiRequest(`${path}/${bidding.id}`, { method: 'PUT', body: JSON.stringify({ specialFields: { presalesType: '标前工作' } }) })).rejects.toThrow('请选择关联商机');
+    expect(await mockApiRequest(`${path}/${bidding.id}`)).toMatchObject({ specialFields: { presalesType: '招投标工作', biddingId: 'b1' } });
+    await mockApiRequest(`${path}/${bidding.id}`, { method: 'PUT', body: JSON.stringify({ specialFields: { presalesType: '其他' }, customerId: '', customerName: '' }) });
+    expect(await mockApiRequest(`${path}/${bidding.id}`)).toMatchObject({ customerId: '', specialFields: { presalesType: '其他' } });
+  });
   it('seeds eight tasks per kind and paginates independent stores', async () => {
     expect((await mockApiRequest('/api/presales-tasks') as PageResult<RequirementTask>).total).toBe(8);
     const first = await create('presales', '售前一');

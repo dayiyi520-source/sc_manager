@@ -38,18 +38,19 @@ vi.mock('../common/UIComponents', () => ({
 
 describe('我的工作指标卡片', () => {
   beforeEach(() => { openPageTab.mockClear(); sessionStorage.clear(); });
-  it('合并协同事项与工单，且四张卡片不响应点击', async () => {
+  it('分别统计任务、协同、工单和待审批，且四张卡片不响应点击', async () => {
     vi.mocked(requirementRepository.myTasks).mockResolvedValue([
       { id: 'matter-1', taskGroup: 'assist', type: 'assistance', status: '处理中' },
       { id: 'order-1', taskGroup: 'assist', type: 'work_order', status: '待处理' },
     ] as never);
 
     render(<MyTasksView />);
-    await waitFor(() => expect(within(screen.getAllByTestId('metric-card')[1]).getByText('2 项')).toBeInTheDocument());
+    await waitFor(() => expect(within(screen.getAllByTestId('metric-card')[1]).getByText('1 项')).toBeInTheDocument());
 
     const cards = screen.getAllByTestId('metric-card');
     expect(cards).toHaveLength(4);
-    expect(within(cards[1]).queryByText(/工单 \d+ 项/)).not.toBeInTheDocument();
+    expect(cards.map(card => card.querySelector('span')?.textContent)).toEqual(['待办任务','协同事项','工单','待审批']);
+    expect(within(cards[2]).getByText('1 项')).toBeInTheDocument();
     for (const card of cards) {
       expect(card).toHaveAttribute('data-clickable', 'false');
       fireEvent.click(card);
@@ -92,6 +93,17 @@ it('首页动态仅点击标题打开详情', async () => {
   expect(await screen.findByRole('dialog')).toBeInTheDocument();
 });
 
+it('每个待办分类只展示按记录时间排序的最近十条', async () => {
+  const items = Array.from({ length: 12 }, (_, index) => ({ id: `t-${index}`, sourceId: `t-${index}`, title: `待办-${index}`, status: '待处理', taskGroup: 'mine', type: 'dev', time: `2026-10-${String(index + 1).padStart(2, '0')}` }));
+  vi.mocked(requirementRepository.myTasks).mockResolvedValue(items as never);
+  render(<MyTasksView/>);
+  fireEvent.click(await screen.findByRole('button', { name: '任务 (12)' }));
+  expect(await screen.findByRole('button', { name: '待办-11' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '待办-0' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '待办-1' })).not.toBeInTheDocument();
+  expect(screen.getAllByRole('button', { name: /^待办-\d+$/ })).toHaveLength(10);
+});
+
 it('replaces approvals with learning only in the agent dashboard while retaining both information cards',async()=>{
  vi.mocked(requirementRepository.myTasks).mockResolvedValue([]);
  const view=render(<MyTasksView/>);
@@ -105,4 +117,22 @@ it('replaces approvals with learning only in the agent dashboard while retaining
  expect(screen.queryByRole('button',{name:/^工单/})).not.toBeInTheDocument();
  expect(within(screen.getAllByTestId('metric-card')[1]).getByText('协同事项')).toBeInTheDocument();
  expect([...document.querySelectorAll('section[aria-label]')].map(node=>node.getAttribute('aria-label'))).toEqual(['信息广场','我的学习','产品动态']);
+});
+
+it('agent collaboration center shows only the latest ten matters without category tabs', async () => {
+  vi.mocked(requirementRepository.myTasks).mockResolvedValue([
+    { id: 'task', sourceId: 'task', title: '普通任务', status: '待处理', taskGroup: 'mine', type: 'dev', time: '2026-10-28' },
+    { id: 'order', sourceId: 'order', title: '工单记录', status: '待处理', taskGroup: 'assist', type: 'work_order', time: '2026-10-28' },
+    ...Array.from({ length: 12 }, (_, index) => ({ id: `matter-${index}`, sourceId: `matter-${index}`, title: `协同-${index}`, status: '处理中', taskGroup: 'assist', type: 'assistance', time: `2026-10-${String(index + 1).padStart(2, '0')}` })),
+  ] as never);
+  render(<MyTasksView variant="agent"/>);
+  expect(await screen.findByText('协同中心')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '全部 (14)' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '任务 (1)' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '协同事项 (12)' })).not.toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: '协同-11' })).toBeInTheDocument();
+  expect(screen.getAllByRole('button', { name: /^协同-\d+$/ })).toHaveLength(10);
+  expect(screen.queryByRole('button', { name: '协同-0' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '普通任务' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '工单记录' })).not.toBeInTheDocument();
 });

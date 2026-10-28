@@ -6,6 +6,7 @@ import { type TodoRecord } from './TodoDetail';
 import { openWorkItemDetailLink } from '../../utils/workItemDetailLink';
 import { FeedDetail } from './FeedDetail';
 import { type WorkbenchFeed } from '../../services/workbenchFeeds';
+import type { ApprovalFlow } from '../../types';
 import { FEED_TAB_KEY, TODO_TAB_KEY, rememberWorkbenchTab } from '../../services/workbenchPreferences';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -27,6 +28,7 @@ import { requirementRepository } from '../../services/requirementRepository';
 import { useWorkbenchFeeds } from './useWorkbenchFeeds';
 import { projectDeliveryMap } from '../../services/projectDeliveryMap';
 import { getMyTaskMetrics } from './myTasksMetrics';
+import { latestItems, pendingFor, reviewedBy } from './workbenchListRules';
 
 const TodoCenterView = React.lazy(() => import('./TodoCenterView').then(module => ({ default: module.TodoCenterView })));
 const WorkbenchFeedsView = React.lazy(() => import('./WorkbenchFeedsView').then(module => ({ default: module.WorkbenchFeedsView })));
@@ -34,7 +36,7 @@ const WorkbenchFeedsView = React.lazy(() => import('./WorkbenchFeedsView').then(
 type MyTaskRecord = TodoRecord;
 
 type TabType = 'all' | 'mine' | 'assist' | 'work_order';
-type ApprovalTabType = 'pending' | 'my_apply' | 'cc_me';
+type ApprovalTabType = 'pending' | 'reviewed' | 'my_apply' | 'cc_me';
 type FeedTabType = 'dynamic' | 'square';
 
 export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant = 'staff' }) => {
@@ -73,18 +75,22 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
 
   const dashboardMetrics = useMemo(() => getMyTaskMetrics(realTasks, opportunities, projectDeliveryMap()), [realTasks, opportunities]);
   const displayTodos = useMemo(() => {
+    if (variant === 'agent') return realTasks.filter((task) => task.taskGroup === 'assist' && task.type !== 'work_order');
     if (todoTab === 'mine') return realTasks.filter((task) => task.taskGroup === 'mine');
     if (todoTab === 'assist') return realTasks.filter((task) => task.taskGroup === 'assist' && task.type !== 'work_order');
     if (todoTab === 'work_order') return realTasks.filter((task) => task.type === 'work_order');
     return realTasks;
-  }, [realTasks, todoTab]);
+  }, [realTasks, todoTab, variant]);
+  const visibleTodos = latestItems<MyTaskRecord>(displayTodos, task => task.time, 10);
 
   // 审批筛选
   const filteredApprovals = approvals.filter((a) => {
-    if (approvalTab === 'pending') return a.status === '待审批' && a.nodes.some((node) => node.approver === currentUser.name && node.status === 'current');
+    if (approvalTab === 'pending') return pendingFor(a, currentUser.name);
+    if (approvalTab === 'reviewed') return reviewedBy(a, currentUser.name);
     if (approvalTab === 'my_apply') return a.applicantName === currentUser.name && ['审批中', '待审批', '已驳回'].includes(a.status);
     return (a.ccNames || []).includes(currentUser.name) && ['审批中', '待审批'].includes(a.status);
   });
+  const visibleApprovals = latestItems<ApprovalFlow>(filteredApprovals, approval => approval.submittedAt, 10);
 
   // Tab组件
   const TabButton: React.FC<{
@@ -104,7 +110,7 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
     </button>
   );
 
-  if (innerView !== 'home') return <React.Suspense fallback={<Skeleton active/>}>{innerView === 'todos' ? <TodoCenterView hideWorkOrderTab={variant === 'agent'} onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/> : <WorkbenchFeedsView onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/>}</React.Suspense>;
+  if (innerView !== 'home') return <React.Suspense fallback={<Skeleton active/>}>{innerView === 'todos' ? <TodoCenterView agentOnly={variant === 'agent'} onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/> : <WorkbenchFeedsView onBack={returnToMyTasks} backLabel={variant === 'agent' ? '返回代理商待办' : '返回我的待办'}/>}</React.Suspense>;
 
   return (
     <div className="space-y-6">
@@ -119,24 +125,24 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
           iconBgColor="bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
         />
         <StatCard
-          title={variant === 'agent' ? '协同事项' : '协同事项/工单'}
-          value={variant === 'agent' ? dashboardMetrics.collaborationCount : dashboardMetrics.collaborationAndWorkOrderCount}
+          title="协同事项"
+          value={dashboardMetrics.collaborationCount}
           unit="项"
           icon={<MessageSquare className="w-5 h-5" />}
           iconBgColor="bg-cyan-50 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-400"
         />
         <StatCard
-          title="跟进商机数"
-          value={dashboardMetrics.opportunityCount}
-          unit="家"
-          icon={<Users className="w-5 h-5" />}
+          title={variant === 'agent' ? '跟进商机数' : '工单'}
+          value={variant === 'agent' ? dashboardMetrics.opportunityCount : dashboardMetrics.workOrderCount}
+          unit={variant === 'agent' ? '家' : '项'}
+          icon={variant === 'agent' ? <Users className="w-5 h-5" /> : <FileCheck className="w-5 h-5" />}
           iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400"
         />
         <StatCard
-          title="项目交付数"
-          value={dashboardMetrics.projectDeliveryCount}
+          title={variant === 'agent' ? '项目交付数' : '待审批'}
+          value={variant === 'agent' ? dashboardMetrics.projectDeliveryCount : approvals.filter(a => pendingFor(a, currentUser.name)).length}
           unit="项"
-          icon={<Briefcase className="w-5 h-5" />}
+          icon={variant === 'agent' ? <Briefcase className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
           iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
         />
       </div>
@@ -150,16 +156,16 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
             <div className="flex flex-wrap items-center gap-3">
               <div className="font-semibold text-sm text-[var(--text-primary)] flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-[var(--primary)]" />
-                待办中心
+                {variant === 'agent' ? '协同中心' : '待办中心'}
               </div>
-              <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5">
+              {variant === 'staff' && <div className="flex bg-[var(--bg-surface-soft)] rounded-lg p-0.5">
                 <TabButton active={todoTab === 'all'} onClick={() => setTodoTab('all')}>全部 ({pendingTodos.length})</TabButton>
                 <TabButton active={todoTab === 'mine'} onClick={() => setTodoTab('mine')}>任务 ({realTasks.filter((task) => task.taskGroup === 'mine').length})</TabButton>
                 <TabButton active={todoTab === 'assist'} onClick={() => setTodoTab('assist')}>协同事项 ({dashboardMetrics.collaborationCount})</TabButton>
                 {variant === 'staff' && <TabButton active={todoTab === 'work_order'} onClick={() => setTodoTab('work_order')}>工单 ({dashboardMetrics.workOrderCount})</TabButton>}
-              </div>
+              </div>}
             </div>
-            <button className="shrink-0 text-xs text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => { rememberWorkbenchTab(TODO_TAB_KEY, todoTab); setInnerView('todos'); }}>查看更多</button>
+            <button className="shrink-0 text-xs text-[var(--primary)] hover:underline focus-visible:outline focus-visible:outline-[var(--primary)] active:opacity-70" onClick={() => { if (variant === 'staff') rememberWorkbenchTab(TODO_TAB_KEY, todoTab); setInnerView('todos'); }}>查看更多</button>
           </div>
 
           <div className="p-5 max-h-80 overflow-y-auto">
@@ -175,7 +181,7 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
                   </div>
                 )
               ) : (
-                displayTodos.map((task) => (
+                visibleTodos.map((task) => (
                   <div
                     key={task.id}
                     className="p-4 bg-[var(--bg-surface-soft)] border border-[var(--border-main)] rounded-lg"
@@ -212,8 +218,9 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
                   active={approvalTab === 'pending'}
                   onClick={() => setApprovalTab('pending')}
                 >
-                  待审批
+                  待我审批
                 </TabButton>
+                <TabButton active={approvalTab === 'reviewed'} onClick={() => setApprovalTab('reviewed')}>我已审批</TabButton>
                 <TabButton
                   active={approvalTab === 'my_apply'}
                   onClick={() => setApprovalTab('my_apply')}
@@ -238,7 +245,7 @@ export const MyTasksView: React.FC<{ variant?: 'staff' | 'agent' }> = ({ variant
                   暂无审批单据
                 </div>
               ) : (
-                filteredApprovals.map((approval) => (
+                visibleApprovals.map((approval) => (
                   <div
                     key={approval.id}
                     onClick={() => openPageTab('approval_center')}

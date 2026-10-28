@@ -5,6 +5,7 @@ import { directoryProjects } from './customerDirectoryData';
 import { SESSION_KEY } from './sessionStorage';
 import { canReviewCompletion, isCompletionPending, isTaskOwner, needsCompletionApproval, normalizeDeliveryTask } from '../utils/businessTaskWorkflow';
 import type { RequirementTask } from '../types';
+import { readPresalesTaskFields, validatePresalesAssociations } from '../components/product/presalesTaskRules';
 
 type Kind = 'presales' | 'delivery' | 'ops';
 type AuditContext = {
@@ -124,6 +125,13 @@ export function handleMockBusinessTasks(path: string, method: string, body: Reco
   if (method === 'POST' && !taskId) {
     if (!text(body.title).trim()) throw new Error('任务标题不能为空');
     if (kind === 'ops' && !text(body.projectId).trim()) throw new Error('请选择关联项目');
+    if (kind === 'presales') {
+      const fields = readPresalesTaskFields(body.specialFields);
+      if (fields.presalesType !== undefined) {
+        const error = validatePresalesAssociations(text(fields.presalesType), text(fields.presalesType === '招投标工作' ? fields.biddingId : fields.opportunityId), text(body.customerId));
+        if (error) throw new Error(error);
+      }
+    }
     let user = MOCK_USERS[0];
     try { user = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')?.user || user; } catch { /* 失效本地会话使用演示账号。 */ }
     const created: RequirementTask = {
@@ -152,6 +160,13 @@ export function handleMockBusinessTasks(path: string, method: string, body: Reco
     const normalizedBody = waitingApproval
       ? { ...body, status: '处理中', completionApproval: 'pending' as const, completionRequestedAt: new Date().toISOString(), reviewedAt: undefined, reviewedBy: undefined, reviewComment: undefined }
       : body;
+    if (kind === 'presales' && (body.specialFields !== undefined || body.customerId !== undefined)) {
+      const fields = readPresalesTaskFields(body.specialFields === undefined ? task.specialFields : body.specialFields);
+      if (fields.presalesType !== undefined) {
+        const error = validatePresalesAssociations(text(fields.presalesType), text(fields.presalesType === '招投标工作' ? fields.biddingId : fields.opportunityId), text(body.customerId === undefined ? task.customerId : body.customerId));
+        if (error) throw new Error(error);
+      }
+    }
     const updated: RequirementTask = { ...task, ...normalizedBody, id: task.id, code: task.code, creatorId: task.creatorId, creatorName: task.creatorName, createdAt: task.createdAt };
     if (body.ownerName !== undefined && body.assigneeId === undefined && body.ownerName !== task.ownerName) updated.assigneeId = undefined;
     write(kind, tasks.map(item => item.id === taskId ? updated : item));

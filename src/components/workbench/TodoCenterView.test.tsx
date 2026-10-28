@@ -12,7 +12,7 @@ vi.mock('./TodoDetail', () => ({ TodoDetail: ({ task, onClose }: { task: { sourc
 vi.mock('../../utils/workItemDetailLink', () => ({ openWorkItemDetailLink: vi.fn() }));
 afterEach(cleanup);
 describe('完整待办中心', () => {
-  it('全部仅按标题搜索，其他分类保留类型与状态筛选，并可打开来源详情', async () => {
+  it('完整列表移除全部标签，分类保留类型与状态筛选，并可打开来源详情', async () => {
     sessionStorage.clear();
     vi.mocked(requirementRepository.myTasks).mockResolvedValue([
       { id: 't', sourceId: 'task-1', title: '已完成研发', status: '已完成', type: 'dev', taskGroup: 'mine', targetPage: 'prod_rd_tasks', assigneeId: 'me', assigneeName: '本人' },
@@ -31,11 +31,7 @@ describe('完整待办中心', () => {
     fireEvent.change(screen.getByLabelText('搜索待办'), { target: { value: '没有匹配' } });
     expect(screen.getByText('暂无工作事项')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('搜索待办'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('tab', { name: '全部 (2)' }));
-    expect(screen.queryByLabelText('待办类型')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('待办状态')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '已完成研发' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '处理中协同' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /全部/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '任务 (1)' }));
     fireEvent.mouseDown(screen.getByLabelText('待办类型'));
     fireEvent.click(await screen.findByText('研发任务', { selector: '.ant-select-item-option-content' }));
@@ -44,8 +40,21 @@ describe('完整待办中心', () => {
     expect(screen.getByLabelText('待办状态')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '已完成研发' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '处理中协同' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: '全部 (2)' }));
+    fireEvent.click(screen.getByRole('tab', { name: '协同事项 (1)' }));
     expect(screen.getByRole('button', { name: '处理中协同' })).toBeInTheDocument();
+  });
+  it('代理商完整列表只显示协同事项且忽略历史分类记忆', async () => {
+    sessionStorage.setItem('shichuang.workbench.todoTab', 'work_order');
+    vi.mocked(requirementRepository.myTasks).mockResolvedValue([
+      { id: 't', sourceId: 'task', title: '任务', type: 'dev', taskGroup: 'mine', status: '待处理' },
+      { id: 'a', sourceId: 'matter', title: '协同', type: 'assistance', taskGroup: 'assist', status: '待处理' },
+      { id: 'w', sourceId: 'order', title: '工单', type: 'work_order', taskGroup: 'assist', status: '待处理' },
+    ] as never);
+    render(<TodoCenterView onBack={vi.fn()} agentOnly/>);
+    expect(await screen.findByRole('button', { name: '协同' })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '任务' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '工单' })).not.toBeInTheDocument();
   });
   it('失败可重试', async () => {
     vi.mocked(requirementRepository.myTasks).mockRejectedValueOnce(new Error('读取失败')).mockResolvedValueOnce([]);
@@ -58,6 +67,7 @@ describe('完整待办中心', () => {
     sessionStorage.clear();
     vi.mocked(requirementRepository.myTasks).mockResolvedValue([{ id:'a',sourceId:'matter',title:'协同验收',type:'assistance',taskGroup:'assist',status:'处理中',progress:20 }] as never);
     render(<TodoCenterView onBack={vi.fn()}/>);
+    fireEvent.click(await screen.findByRole('tab',{name:'协同事项 (1)'}));
     fireEvent.click(await screen.findByRole('button',{name:'协同验收'}));
     expect(openWorkItemDetailLink).toHaveBeenCalledWith('matter','WORK_ORDER',undefined);
     expect(screen.queryByRole('columnheader',{name:'进度'})).not.toBeInTheDocument();

@@ -1,7 +1,8 @@
+import { QuestionIcon } from '@primer/octicons-react';
 import { newestCreatedFirst } from '../../utils/creationOrder';
-import { collaborationDesignVariant, isCollaborationCreator, lastCollaborationProcessor } from '../../utils/collaborationWorkflow';
+import { collaborationDesignVariant, isRecordOnlyCollaboration, isCollaborationCreator, lastCollaborationProcessor } from '../../utils/collaborationWorkflow';
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Drawer as AntDrawer, Dropdown, Input, Modal as AntModal, Rate, Select } from "antd";
+import { Button, Drawer as AntDrawer, Dropdown, Input, Modal as AntModal, Rate, Select, Popover } from "antd";
 import { openWorkItemDetailLink, workItemDetailLink } from '../../utils/workItemDetailLink';
 import { loadCollaborationRelatedTasks } from '../../services/collaborationRelatedTasks';
 import { workOrderDisplayName } from '../../utils/workOrderDisplay';
@@ -347,6 +348,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const [workflowSubmitting, setWorkflowSubmitting] = useState(false);
   const productDescriptionEditor = useRef<HTMLDivElement>(null);
   const [specialFields, setSpecialFields] = useState<Record<string, string>>({});
+  const requiresExpectedDate = workOrderType !== "客户诉求" || specialFields.transferToProduct !== "不需要";
   const [workOpen, setWorkOpen] = useState(false);
   const [workflowAction, setWorkflowAction] = useState<"" | "convert" | "reassign">("");
   const [subTasks, setSubTasks] = useState<AssistanceSubTask[]>([{ taskType: "", assignee: "", expectedDueDate: "", note: "", media: [] }]);
@@ -382,7 +384,6 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   }, [selected?.id, displayedWorkItems]);
   const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false);
   const [acceptanceReason, setAcceptanceReason] = useState("");
-  const [acceptanceWorkItemId, setAcceptanceWorkItemId] = useState("");
   const [acceptanceTaskOwnerId, setAcceptanceTaskOwnerId] = useState("");
   const [acceptanceSubmitting, setAcceptanceSubmitting] = useState(false);
   const [rejectCategory, setRejectCategory] = useState("");
@@ -410,22 +411,27 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const savedProduct = editingMatter && productLineId === (editingMatter.productLineId || productLines.find(line => line.name === editingMatter.productLineName)?.id) ? productLines.find(line => line.id === productLineId) : undefined;
   const availableProductLines = savedProduct && !availableSourceProductLines.some(line => line.id === savedProduct.id) ? [...availableSourceProductLines, savedProduct] : availableSourceProductLines;
   const creationProduct = availableProductLines.find((line) => line.id === productLineId);
+  const isDataSupport = workOrderType === "其他问题" && specialFields.problemType === "数据支持";
+  const dataSupportOwners = employees.filter(employee => employee.name.trim() === "鲍研");
+  const dataSupportOwner = dataSupportOwners.length === 1 ? dataSupportOwners[0] : undefined;
   const primaryOwnerId = creationProduct?.requirementOwnerUserId;
   const primaryOwnerName = creationProduct?.requirementOwner;
   const changeCreationProduct = (id: string) => {
+    if (isDataSupport) { setProductLineId(id); return; }
     ownerManuallyChanged.current = false;
     setOwnerName(workOrderType === "客户诉求" && specialFields.transferToProduct === "不需要" ? currentUser.name : "");
     setProductLineId(id);
   };
   useEffect(() => {
     if (ownerManuallyChanged.current) return;
+    if (isDataSupport) { setOwnerName(dataSupportOwner?.name || ""); return; }
     if (workOrderType === "客户诉求" && specialFields.transferToProduct === "不需要") { setOwnerName(currentUser.name); return; }
     if (!productLineId) return;
     const primaryOwner = employees.find((employee) => primaryOwnerId
       ? employee.id === primaryOwnerId
       : Boolean(primaryOwnerName) && employee.name === primaryOwnerName);
     setOwnerName(primaryOwner?.name || "");
-  }, [productLineId, primaryOwnerId, primaryOwnerName, employees, workOrderType, specialFields.transferToProduct, currentUser.name]);
+  }, [productLineId, primaryOwnerId, primaryOwnerName, employees, workOrderType, specialFields.transferToProduct, currentUser.name, isDataSupport, dataSupportOwner?.name]);
   const availableRejectReasons = useMemo(() => getRejectReasonsForType(currentWorkOrderType), [currentWorkOrderType]);
 
   useEffect(() => {
@@ -565,14 +571,15 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     if (
       !title.trim() ||
       !selectedEmployee ||
-      !dueDate.trim() ||
+      (requiresExpectedDate && !dueDate.trim()) ||
       (requiresProduct && !selectedProductLine) ||
       !descriptionText.trim() ||
       missingParameter
     ) {
-      addToast("warning", missingParameter ? "请完成所有必填业务参数" : `请补充标题、负责人、${requiresProduct ? "所属产品、" : ""}期望完成时间和事项描述`);
+      addToast("warning", missingParameter ? "请完成所有必填业务参数" : `请补充标题、负责人、${requiresProduct ? "所属产品、" : ""}${requiresExpectedDate ? "期望完成时间、" : ""}事项描述`);
       return;
     }
+    if (workOrderType === "客户诉求" && specialFields.transferToProduct !== "不需要" && !String(specialFields.productDescription || "").trim()) { addToast("warning", "请填写产品需求描述"); return; }
     const customer = customerOptions.find((item) => item.id === customerId)
       || customerOptions.find((item) => item.name.trim().toLocaleLowerCase() === customerQuery.trim().toLocaleLowerCase());
     saveInFlight.current = true;
@@ -593,7 +600,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
         priority: (requirementPriority || "中") as RequirementTask["priority"],
         workOrderType: workOrderType || "其他问题",
         specialFields: workOrderType === "客户诉求" ? { ...specialFields, transferToProduct: specialFields.transferToProduct || "需要" } : specialFields,
-        expectedCompleteDate: dueDate || undefined,
+        expectedCompleteDate: !requiresExpectedDate && !editingMatter ? undefined : dueDate || undefined,
       };
       if (editingMatter) {
         const result = await requirementRepository.reopen(editingMatter.id, { assigneeId: selectedEmployee.id, revision: editingMatter.revision ?? editingMatter.version ?? 0, ...(editingMode === 'reopen' ? { reason: reopenReason.trim() } : {}), changes: input });
@@ -817,7 +824,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     try {
       await requirementRepository.complete(selected.id, { revision: selected.revision ?? selected.version ?? 0, note: completeNote.trim(), noteHtml: completeNoteHtml, attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
       const detail = await requirementRepository.detail(selected.id);
-      if (detail.id !== selected.id || detail.status !== "待验收") throw new Error("事项状态未更新，请刷新后重试");
+      if (detail.id !== selected.id || detail.status !== (isRecordOnlyCollaboration(selected) ? "已完成" : "待验收")) throw new Error("事项状态未更新，请刷新后重试");
       const next = { ...selected, ...detail };
       setSelected(next);
       setEvents(Array.isArray(detail.events) ? detail.events : []);
@@ -828,7 +835,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       setCompleteNote("");
       setCompleteNoteHtml("");
       setFlowMedia([]);
-      addToast("success", "事项已提交验收", "事项状态已变更为待验收");
+      addToast("success", isRecordOnlyCollaboration(selected) ? "事项已完成" : "事项已提交验收", isRecordOnlyCollaboration(selected) ? "记录事项已手动完成" : "事项状态已变更为待验收");
     } catch (error) {
       addToast("error", "事项完成失败", error instanceof Error ? error.message : "请刷新后重试");
     } finally { setCompleteSubmitting(false); }
@@ -852,7 +859,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   }, [acceptanceModalOpen, originalProcessor.id, originalProcessor.resolved]);
   const openAcceptanceFailed = () => {
     if (!selected || !isInitiator(selected, currentUser) || selected.status !== '待验收') return;
-    setAcceptanceWorkItemId(''); setAcceptanceTaskOwnerId(originalProcessor.id); setAcceptanceReason(''); setFlowMedia([]); setAcceptanceModalOpen(true);
+    setAcceptanceTaskOwnerId(originalProcessor.id); setAcceptanceReason(''); setFlowMedia([]); setAcceptanceModalOpen(true);
   };
   const submitAcceptanceFailed = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -863,7 +870,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
     }
     setAcceptanceSubmitting(true);
     try {
-      await requirementRepository.acceptanceFailed(selected.id, { reason: acceptanceReason.trim(), ...(acceptanceWorkItemId ? { workItemId: acceptanceWorkItemId } : {}), taskOwnerId: acceptanceTaskOwnerId, revision: selected.revision ?? selected.version ?? 0, attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
+      await requirementRepository.acceptanceFailed(selected.id, { reason: acceptanceReason.trim(), taskOwnerId: acceptanceTaskOwnerId, revision: selected.revision ?? selected.version ?? 0, attachmentIds: flowMedia.map((item) => item.id).filter((id) => !id.startsWith("unstaged-")) });
       const detail = await requirementRepository.detail(selected.id);
       if (detail.id !== selected.id || detail.status !== "处理中") throw new Error("事项状态未更新，请刷新后重试");
       const next = { ...selected, ...detail };
@@ -873,7 +880,6 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
       setRequirementTasks((list) => list.map((item) => item.id === next.id ? next : item));
       setAcceptanceModalOpen(false);
       setAcceptanceReason("");
-      setAcceptanceWorkItemId("");
       setAcceptanceTaskOwnerId("");
       setFlowMedia([]);
       setScopeReload(value => value + 1);
@@ -1059,19 +1065,27 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
   const fields = <div className="work-order-form grid grid-cols-1 gap-4">
     <WorkOrderInput label="事项标题 *" value={title} onChange={setTitle} placeholder="请输入事项标题，简明描述问题或诉求" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      {workOrderType === "其他问题" && <WorkOrderSelect label="协助类型 *" value={specialFields.problemType || ""} options={["方向研讨", "费用缴纳", "开票/邮寄", "资料获取", "物料支持", "意见反馈", "其他"]} placeholder="请选择协助类型" onChange={(value) => setSpecialFields((current) => ({ ...current, problemType: value }))} />}
+      {workOrderType === "其他问题" && <WorkOrderSelect label="协助类型 *" value={specialFields.problemType || ""} options={["方向研讨", "费用缴纳", "开票/邮寄", "资料获取", "物料支持", "意见反馈", "数据支持", "其他"]} placeholder="请选择协助类型" onChange={(value) => {
+        if (value === "数据支持" || isDataSupport) { ownerManuallyChanged.current = false; setOwnerName(""); }
+        setSpecialFields((current) => ({ ...current, problemType: value }));
+      }} />}
       {workOrderType === "其他问题" && creationOwnerField}
+      {isDataSupport && !dataSupportOwner && !ownerName && <p role="alert" className="text-xs text-[var(--warning)]">无法唯一匹配有效员工“鲍研”，请手动选择负责人</p>}
       {(workOrderType === "客户诉求" || workOrderType === "线上问题" || workOrderType === "交付支持" || workOrderType === "其他问题") && <SearchSelect label={`所属项目${workOrderType === "其他问题" ? "" : " *"}`} value={specialFields.projectName || ""} options={projectOptions.map((item) => item.name)} placeholder="输入项目名称搜索并选择" onChange={(value) => { const project = projectOptions.find((item) => item.name === value); const customer = customerOptions.find((item) => item.id === project?.customerId || item.name === project?.customerName); setSpecialFields((current) => ({ ...current, projectName: value, projectId: project?.id || "", ...(customer ? { customerId: customer.id, customerName: customer.name } : {}) })); setCustomerId(customer?.id || ""); setCustomerQuery(customer?.name || ""); changeCreationProduct(""); }} />}
       {workOrderType === "售前支持" && <label className="work-order-field text-xs text-[var(--text-muted)]">
         所属商机 *
         <Select aria-label="所属商机 *" allowClear showSearch optionFilterProp="label" className="w-full" placeholder="输入商机名称" value={specialFields.opportunityId || undefined} options={opportunityOptions.map((item) => ({ label: item.name, value: item.id }))} onChange={(id) => { const opportunity = opportunityOptions.find((item) => item.id === id); const customer = customerOptions.find((item) => item.id === opportunity?.customerId || item.name === opportunity?.customerName); setSpecialFields((current) => ({ ...current, opportunityName: opportunity?.name || "", opportunityId: opportunity?.id || "", relatedType: opportunity ? "opportunity" : "", ...(customer ? { customerId: customer.id, customerName: customer.name } : {}) })); setCustomerId(customer?.id || ""); setCustomerQuery(customer?.name || ""); changeCreationProduct(""); }} />
       </label>}
       <WorkOrderSelect label={`所属产品${workOrderType === "其他问题" ? "" : " *"}`} value={creationProduct?.name || ""} options={availableProductLines.map((item) => item.name)} disabled={!hasProductSource || availableProductLines.length === 0} placeholder={!hasProductSource ? workOrderType === "售前支持" ? "请先选择所属商机" : "请先选择所属项目" : availableProductLines.length ? "请选择所属产品" : "所选项目或关联对象暂无产品"} onChange={(value) => changeCreationProduct(availableProductLines.find((item) => item.name === value)?.id || "")} />
+      {workOrderType === "客户诉求" && <WorkOrderInput label="诉求来源 *" value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(value) => setSpecialFields((current) => ({ ...current, requestSource: value }))} />}
+      {workOrderType === "客户诉求" && <div className="work-order-field text-xs text-[var(--text-muted)]">
+        <div className="flex items-center gap-2"><span>是否转产品</span><Popover trigger="click" content={<p className="max-w-80 text-xs">选择“是”时，需要填写客户原始诉求和需要产品实现的产品需求描述；选择“否”代表该需求仅作记录，创建后直接完成事项即可。</p>}><button type="button" aria-label="是否转产品说明" className="inline-flex items-center text-[var(--text-muted)] transition-colors hover:text-[var(--primary)] focus-visible:outline focus-visible:outline-[var(--primary)]"><QuestionIcon size={16}/></button></Popover></div>
+        <Select aria-label="是否转产品" className="w-full" value={specialFields.transferToProduct === "不需要" ? "不需要" : "需要"} options={[{label:"是",value:"需要"},{label:"否",value:"不需要"}]} onChange={(value) => { ownerManuallyChanged.current = false; setSpecialFields((current) => ({ ...current, transferToProduct: value })); setOwnerName(value === "不需要" ? currentUser.name : employees.find((employee) => primaryOwnerId ? employee.id === primaryOwnerId : Boolean(primaryOwnerName) && employee.name === primaryOwnerName)?.name || ""); }}/>
+      </div>}
       {workOrderType !== "其他问题" && creationOwnerField}
       <WorkOrderSelect label="优先级" value={requirementPriority} options={["紧急", "高", "中", "低"]} placeholder="请选择优先级" onChange={(value) => setRequirementPriority(value as RequirementTask["priority"])} />
-      <DateField label="期望完成时间 *" value={dueDate} onChange={setDueDate} />
-      {workOrderType === "客户诉求" && <WorkOrderInput label="诉求来源 *" value={specialFields.requestSource || ""} placeholder="请输入诉求来源" onChange={(value) => setSpecialFields((current) => ({ ...current, requestSource: value }))} />}
-      {workOrderType === "客户诉求" && <WorkOrderSelect label="是否转产品" value={specialFields.transferToProduct || "需要"} options={["需要", "不需要"]} onChange={(value) => { ownerManuallyChanged.current = false; setSpecialFields((current) => ({ ...current, transferToProduct: value })); setOwnerName(value === "不需要" ? currentUser.name : employees.find((employee) => primaryOwnerId ? employee.id === primaryOwnerId : Boolean(primaryOwnerName) && employee.name === primaryOwnerName)?.name || ""); }} />}
+      {requiresExpectedDate && <DateField label="期望完成时间 *" value={dueDate} onChange={setDueDate} />}
+
       {workOrderType === "线上问题" && <>
         <WorkOrderSelect label="严重程度" value={specialFields.severity || ""} options={Object.keys(severityPriorities)} placeholder="请选择严重程度（选填）" onChange={(value) => { const priority = severityPriorities[value]; setSpecialFields((current) => ({ ...current, severity: value, ...(priority ? { priority } : {}) })); if (priority) setRequirementPriority(priority); }} />
         <WorkOrderSelect label="发生频率" value={specialFields.frequency || ""} options={["必现（100%）", "高频发生", "偶现（特点条件）", "环境相关偶发"]} placeholder="请选择发生频率" onChange={(value) => setSpecialFields((current) => ({ ...current, frequency: value }))} />
@@ -1260,7 +1274,7 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
             <div className="flex w-full justify-between">
               <div className="flex items-center gap-2">
                 {canReceive && <><Button aria-label="事项接收" type="primary" loading={receiving} disabled={receiving} onClick={() => void receiveMatter()}>事项接收</Button><Button disabled={receiving} onClick={() => openWorkflow("reassign")}>事项转交</Button><Button danger disabled={receiving} onClick={() => setReasonType("reject")}>事项退回</Button></>}
-                {selected.status === "处理中" && ownsSelected && <Button type="primary" disabled={completeSubmitting || workItems.some((item) => !(item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"))} onClick={() => setCompleteModalOpen(true)}>事项完成</Button>}
+                {(selected.status === "处理中" || selected.status === "待处理" && isRecordOnlyCollaboration(selected) && !selected.pendingReassignment) && ownsSelected && <Button type="primary" disabled={completeSubmitting || workItems.some((item) => !(item.status === "已完成" || item.assistanceTaskStatus === "COMPLETED"))} onClick={() => setCompleteModalOpen(true)}>事项完成</Button>}
                 {selected.status === "已退回" && isInitiator(selected, currentUser) && <><Button danger disabled={closeSubmitting} onClick={() => setCloseModalOpen(true)}>事项关闭</Button><Button type="primary" onClick={() => startEditing('returned')}>重新编辑</Button></>}
                 {selected.status === "待验收" && isInitiator(selected, currentUser) && <><Button type="primary" loading={acceptanceSubmitting} disabled={acceptanceSubmitting} onClick={() => { setAcceptanceRating(0); setAcceptanceComment(""); setRatingModalOpen(true); }}>验收通过</Button><button type="button" onClick={openAcceptanceFailed} className="h-9 px-3 rounded-lg border border-[var(--danger)] text-xs font-semibold text-[var(--danger)] hover:bg-[var(--bg-hover)]">验收未通过</button></>}
                 {["已完成", "已关闭"].includes(selected.status) && isInitiator(selected, currentUser) && <button type="button" onClick={() => startEditing('reopen')} className="h-9 px-3 rounded-lg border border-[var(--primary)] text-xs font-semibold text-[var(--active-text)] hover:bg-[var(--bg-hover)]">重新开启</button>}
@@ -1571,15 +1585,12 @@ export const RequirementPoolView: React.FC<RequirementPoolViewProps> = ({ creati
         title="验收未通过"
       >
         <form onSubmit={submitAcceptanceFailed} className="work-order-dialog space-y-4">
-          <p className="text-xs text-[var(--text-muted)]">请说明验收未通过的原因，可选关联任务作为反馈依据。仅协同事项恢复为“处理中”，不修改任务状态或负责人。</p>
+          <p className="text-xs text-[var(--text-muted)]">请说明验收未通过的原因。仅协同事项恢复为“处理中”，不修改任务状态或负责人。</p>
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
             事项负责人 *
             <Select className="w-full" showSearch optionFilterProp="label" value={acceptanceTaskOwnerId || undefined} options={employeeSelectOptions(employees, 'id')} onChange={setAcceptanceTaskOwnerId} aria-label="验收反馈负责人" placeholder="请选择有效事项负责人" disabled={acceptanceSubmitting || originalProcessor.resolved} />
           </label>
-          <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">
-            未通过任务（选填）
-            <Select className="w-full" showSearch optionFilterProp="label" value={acceptanceWorkItemId || undefined} allowClear options={displayedWorkItems.map((item) => ({ label: `${item.title} · ${item.assigneeName || "未分配"}`, value: item.id }))} onChange={(value) => setAcceptanceWorkItemId(value || "")} placeholder="请选择验收未通过的任务" disabled={acceptanceSubmitting} />
-          </label>
+
 
           {!originalProcessor.resolved && <p role="alert" className="text-xs text-[var(--danger)]">原处理负责人失效或无法识别，请补选有效负责人。</p>}
           <label className="work-order-dialog-field text-xs text-[var(--text-muted)]">

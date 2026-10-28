@@ -1,5 +1,5 @@
 import type { RequirementTask, EmployeeOption } from '../types';
-import { isCollaborationCreator } from '../utils/collaborationWorkflow';
+import { isRecordOnlyCollaboration, isCollaborationCreator } from '../utils/collaborationWorkflow';
 
 type Item = RequirementTask & { workItems?: unknown[]; deleted?: boolean; deleteFlag?: number; pendingReassignment?: { id: string; assigneeId: string; assigneeName: string; reason: string; attachmentIds: string[] } };
 type Context = { items: Item[]; people: EmployeeOption[]; viewer: { id: string; name: string }; save: (items: Item[]) => void; id: () => string; now: string };
@@ -31,8 +31,10 @@ export function mutateCollaboration(parts: string[], method: string, body: Recor
     const assignee = people.find(person => person.id === body.assigneeId || !body.assigneeId && person.name === body.ownerName);
     if (isCreate && !assignee) throw new Error('请选择有效负责人');
     const candidate = { ...current, ...changes } as Item;
-    if (!candidate.title?.trim() || !candidate.description?.trim() || !(candidate.expectedCompleteDate || candidate.dueDate)) throw new Error('请补充标题、事项描述和期望完成时间');
+    if (!candidate.title?.trim() || !candidate.description?.trim() || (!isRecordOnlyCollaboration(candidate) && !(candidate.expectedCompleteDate || candidate.dueDate))) throw new Error('请补充标题、事项描述和期望完成时间');
     if (candidate.workOrderType !== '其他问题' && !candidate.productLineId) throw new Error('请选择所属产品');
+    const demand = typeof candidate.specialFields === 'string' ? JSON.parse(candidate.specialFields) : candidate.specialFields || {};
+    if (candidate.workOrderType === '客户诉求' && demand.transferToProduct !== '不需要' && !String(demand.productDescription || '').trim()) throw new Error('请填写产品需求描述');
     if (isCreate) return persist({ ...candidate, id: context.id(), code: `WO-${context.id()}`, category: 'requirement', title: candidate.title.trim(), status: '待处理', assigneeId: assignee!.id, ownerName: assignee!.name, department: assignee!.department, creatorId: viewer.id, creatorName: viewer.name, revision: 0, createdAt: now, workItems: [], events: [event('提需求', { assigneeName: assignee!.name })] });
     if (body.assigneeId !== undefined && body.assigneeId !== current!.assigneeId || body.ownerName !== undefined && body.ownerName !== current!.ownerName) throw new Error('请通过转派修改事项负责人');
     return persist({ ...candidate, revision: revision + 1, events: [...(current!.events || []), event('修改事项')] });

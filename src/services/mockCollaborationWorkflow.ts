@@ -1,4 +1,4 @@
-import { isCollaborationCreator, lastCollaborationProcessor } from '../utils/collaborationWorkflow';
+import { isRecordOnlyCollaboration, isCollaborationCreator, lastCollaborationProcessor } from '../utils/collaborationWorkflow';
 import type { EmployeeOption, RequirementTask, RequirementWorkItem } from '../types';
 
 type Item = RequirementTask & { workItems?: RequirementWorkItem[]; assigneeName?: string; deleted?: boolean; deleteFlag?: boolean };
@@ -25,8 +25,10 @@ export function applyCollaborationWorkflow(action: 'close' | 'reopen' | 'accepta
     const input = body.changes || {};
     changes = Object.fromEntries(editable.filter(field => Object.prototype.hasOwnProperty.call(input, field)).map(field => [field, input[field]]));
     const candidate = { ...current, ...changes };
-    if (!candidate.title?.trim() || !candidate.description?.trim() || !(candidate.expectedCompleteDate || candidate.dueDate)) throw new Error('请补充标题、事项描述和期望完成时间');
+    if (!candidate.title?.trim() || !candidate.description?.trim() || (!isRecordOnlyCollaboration(candidate) && !(candidate.expectedCompleteDate || candidate.dueDate))) throw new Error('请补充标题、事项描述和期望完成时间');
     if (candidate.workOrderType !== '其他问题' && !candidate.productLineId) throw new Error('请选择所属产品');
+    const demand = typeof candidate.specialFields === 'string' ? JSON.parse(candidate.specialFields) : candidate.specialFields || {};
+    if (candidate.workOrderType === '客户诉求' && demand.transferToProduct !== '不需要' && !String(demand.productDescription || '').trim()) throw new Error('请填写产品需求描述');
     const special = candidate.specialFields && typeof candidate.specialFields === 'object' ? candidate.specialFields : {};
     if (candidate.workOrderType === '售前支持' && (!special.opportunityId || !special.supportType)) throw new Error('请完成商机及支持类型');
     if (['客户诉求', '线上问题', '交付支持'].includes(candidate.workOrderType || '') && !special.projectName) throw new Error('请选择所属项目');
