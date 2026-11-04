@@ -22,6 +22,7 @@ import {
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
 import { StatCard, StatusTag, Drawer, Modal } from '../common/UIComponents';
+import { ComprehensivePage } from '../comprehensive/ComprehensivePage';
 import { ApprovalFlow } from '../../types';
 import { pendingFor, reviewedBy } from '../workbench/workbenchListRules';
 
@@ -161,6 +162,7 @@ export const ApprovalCenterView: React.FC = () => {
   };
 
   return (
+    <ComprehensivePage title="审批管理" description="集中处理待办审批，并跟踪申请与历史记录" icon={<FileCheck className="w-5 h-5" />}>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -613,5 +615,6 @@ export const ApprovalCenterView: React.FC = () => {
         </form>
       </Modal>
     </div>
+    </ComprehensivePage>
   );
 };

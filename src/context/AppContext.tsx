@@ -111,6 +111,20 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     ]
   },
   {
+    id: 'approval',
+    title: '综合中心',
+    icon: 'Boxes',
+    subMenus: [
+      { id: 'comp_approval', title: '审批管理', mainMenuId: 'approval', icon: 'FileCheck' },
+      { id: 'comp_attendance', title: '考勤管理', mainMenuId: 'approval', icon: 'UserCheck' },
+      { id: 'comp_procurement', title: '采购管理', mainMenuId: 'approval', icon: 'ShoppingCart' },
+      { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval', icon: 'Package' },
+      { id: 'comp_invoice', title: '发票管理', mainMenuId: 'approval', icon: 'Receipt' },
+      { id: 'comp_payment', title: '回款管理', mainMenuId: 'approval', icon: 'Wallet' },
+      { id: 'comp_kpi', title: 'KPI 考核', mainMenuId: 'approval', icon: 'Award' }
+    ]
+  },
+  {
     id: 'project',
     title: '项目管理',
     icon: 'FolderKanban',

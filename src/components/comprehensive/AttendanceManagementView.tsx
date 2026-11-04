@@ -18,6 +18,7 @@ import {
   Send
 } from '@/components/common/octicons-compat';
 import { StatCard, StatusTag, Modal, Drawer } from '../common/UIComponents';
+import { ComprehensivePage } from './ComprehensivePage';
 import { useApp } from '../../context/AppContext';
 import { AttendanceRecord, LeaveApplication, OvertimeRecord, AttendanceException, ShiftSchedule } from '../../types';
 
@@ -92,6 +93,7 @@ export const AttendanceManagementView: React.FC = () => {
   };
 
   return (
+    <ComprehensivePage title="考勤管理" description="查看考勤记录、请假加班申请与异常处理" icon={<CalendarCheck className="w-5 h-5" />}>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -582,5 +584,6 @@ export const AttendanceManagementView: React.FC = () => {
         )}
       </Drawer>
     </div>
+    </ComprehensivePage>
   );
 };

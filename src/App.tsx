@@ -47,6 +47,7 @@ const ProcurementManagementView = lazyNamed(() => import('./components/comprehen
 const AssetManagementView = lazyNamed(() => import('./components/comprehensive/AssetManagementView'), 'AssetManagementView');
 const InvoiceManagementView = lazyNamed(() => import('./components/comprehensive/InvoiceManagementView'), 'InvoiceManagementView');
 const PaymentCollectionManagementView = lazyNamed(() => import('./components/comprehensive/PaymentCollectionManagementView'), 'PaymentCollectionManagementView');
+const KpiPerformanceDemoView = lazyNamed(() => import('./components/comprehensive/KpiPerformanceDemoView'), 'KpiPerformanceDemoView');
 
 // Operation & Project Views
 const ProjectDeliveryMapView = lazyNamed(() => import('./components/project/ProjectDeliveryMapView'), 'ProjectDeliveryMapView');
@@ -162,6 +163,8 @@ const MainContent: React.FC = () => {
         return <InvoiceManagementView />;
       case 'comp_payment':
         return <PaymentCollectionManagementView />;
+      case 'comp_kpi':
+        return <KpiPerformanceDemoView />;
       // Project
       case 'proj_delivery_map':
         return <ProjectDeliveryMapView />;

@@ -12,6 +12,7 @@ import {
   Building
 } from '@/components/common/octicons-compat';
 import { StatCard, StatusTag, Modal, Drawer } from '../common/UIComponents';
+import { ComprehensivePage } from './ComprehensivePage';
 import { useApp } from '../../context/AppContext';
 import { InvoiceRecord, TaxProfile } from '../../types';
 
@@ -87,6 +88,7 @@ export const InvoiceManagementView: React.FC = () => {
   };
 
   return (
+    <ComprehensivePage title="发票管理" description="处理销项开票、进项登记与企业开票资质" icon={<Receipt className="w-5 h-5" />}>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -403,5 +405,6 @@ export const InvoiceManagementView: React.FC = () => {
         </form>
       </Modal>
     </div>
+    </ComprehensivePage>
   );
 };

@@ -1,0 +1,129 @@
+.comprehensive-page {
+  color: var(--text-body);
+}
+
+.comprehensive-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+}
+
+.comprehensive-page-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 36%, var(--border-main));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg-surface));
+  color: var(--primary);
+  font-size: 22px;
+}
+
+.comprehensive-page-heading {
+  min-width: 0;
+}
+
+.comprehensive-page-eyebrow {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.comprehensive-page-heading h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
+}
+
+.comprehensive-page-heading p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.comprehensive-page .stat-card.ant-card {
+  min-height: 112px;
+  border: 1px solid var(--border-main);
+  border-radius: 8px;
+  background: var(--bg-card);
+  box-shadow: none;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.comprehensive-page .stat-card.ant-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-surface-soft);
+}
+
+.comprehensive-page .stat-card .ant-card-body {
+  padding: 16px;
+}
+
+.comprehensive-page .stat-card .ant-card-body > div > div:first-child > div:last-child {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border-main));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface));
+  color: var(--primary);
+}
+
+.comprehensive-page button[class*="bg-blue-600"] {
+  background-color: var(--primary);
+}
+
+.comprehensive-page button[class*="bg-blue-600"]:hover {
+  background-color: var(--primary-hover);
+}
+
+.comprehensive-page button[class*="bg-[var(--warning)]"] {
+  border-color: var(--primary);
+  background-color: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.comprehensive-page button[class*="bg-[var(--warning)]"]:hover {
+  border-color: var(--primary-hover);
+  background-color: var(--primary-hover);
+  color: var(--text-on-primary);
+}
+
+.comprehensive-page :is(input, select, textarea):focus-visible,
+.comprehensive-page button:focus-visible {
+  outline-color: var(--primary);
+}
+
+.comprehensive-page table thead tr {
+  background: var(--bg-surface-soft);
+}
+
+.comprehensive-page table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+@media (max-width: 640px) {
+  .comprehensive-page-header {
+    align-items: flex-start;
+  }
+
+  .comprehensive-page-icon {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+    font-size: 18px;
+  }
+
+  .comprehensive-page-heading h1 {
+    font-size: 18px;
+    line-height: 26px;
+  }
+}

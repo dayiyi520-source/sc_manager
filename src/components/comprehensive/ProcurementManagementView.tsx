@@ -17,6 +17,7 @@ import {
   FileText
 } from '@/components/common/octicons-compat';
 import { StatCard, StatusTag, Modal, Drawer } from '../common/UIComponents';
+import { ComprehensivePage } from './ComprehensivePage';
 import { useApp } from '../../context/AppContext';
 import { ProcurementItem, ProcurementApply, InboundRecord } from '../../types';
 
@@ -102,6 +103,7 @@ export const ProcurementManagementView: React.FC = () => {
   };
 
   return (
+    <ComprehensivePage title="采购管理" description="管理采购申请、采购单及入库登记" icon={<ShoppingBag className="w-5 h-5" />}>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -466,5 +468,6 @@ export const ProcurementManagementView: React.FC = () => {
         )}
       </Drawer>
     </div>
+    </ComprehensivePage>
   );
 };

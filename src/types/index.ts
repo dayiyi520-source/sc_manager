@@ -75,6 +75,7 @@ export type SubMenuId =
   | 'comp_asset'
   | 'comp_invoice'
   | 'comp_payment'
+  | 'comp_kpi'
   // 项目管理兼容别名
   | 'ops_projects'
   | 'ops_milestones'
