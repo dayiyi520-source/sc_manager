@@ -5,6 +5,7 @@ import {
   createKpiPeriod, gradeForScore, KPI_DIMENSIONS, KPI_MONTHS, loadKpiDemo, saveKpiDemo,
   reviewManagerSubmission, scoreForEmployee, submitManagerReview, type KpiDemoState, type KpiEmployee, type KpiPeriod,
 } from '../../services/kpiPerformanceDemo';
+import { filterPublishedEmployees, listKpiAppeals, submitKpiAppeal, summarizeDepartmentPerformance, type KpiAppeal } from '../../services/kpiPerformancePublication';
 import './kpi-performance-demo.css';
 
 type ViewKey = 'public' | 'sources' | 'calculation' | 'hr';
@@ -33,12 +34,21 @@ export const KpiPerformanceDemoView: React.FC = () => {
   const [query, setQuery] = useState('');
   const [returnTarget, setReturnTarget] = useState<KpiEmployee | null>(null);
   const [returnReason, setReturnReason] = useState('');
+  const [appealOpen, setAppealOpen] = useState(false);
+  const [appealReason, setAppealReason] = useState('');
+  const [appeals, setAppeals] = useState<KpiAppeal[]>(listKpiAppeals);
+  const [detailTarget, setDetailTarget] = useState<KpiEmployee | null>(null);
 
   useEffect(() => { saveKpiDemo(state); }, [state]);
 
   const period = state.periods[month];
   const employees = period?.employees || [];
-  const accessibleEmployees = role === '员工' ? employees.filter(employee => employee.id === 'e-01') : role === '主管' ? employees.filter(employee => employee.manager === supervisor) : employees;
+  const accessibleEmployees = filterPublishedEmployees(employees, role, supervisor, 'e-01');
+  const employeeDepartment = employees.find(employee => employee.id === 'e-01')?.department || '';
+  const departmentEmployees = employees.filter(employee => employee.department === employeeDepartment);
+  const publicationEmployees = role === '员工' ? departmentEmployees : accessibleEmployees;
+  const departmentSummaries = summarizeDepartmentPerformance(publicationEmployees, period?.departmentCoefficients || {});
+  const employeeDepartmentSummary = departmentSummaries.find(item => item.department === employeeDepartment);
   const selectedEmployee = accessibleEmployees.find(employee => employee.id === selectedId) || accessibleEmployees[0];
   const filteredEmployees = useMemo(() => accessibleEmployees.filter(employee =>
     (department === '全部部门' || employee.department === department)
@@ -152,9 +162,10 @@ export const KpiPerformanceDemoView: React.FC = () => {
   const scoreSummary = accessibleEmployees.map(employee => ({ employee, score: scoreForEmployee(employee), grade: gradeForScore(scoreForEmployee(employee)) }));
   const pendingManagerCount = employees.filter(employee => role === '主管' && employee.manager === supervisor && ['待主管复核', 'HR 已退回'].includes(employee.reviewStatus)).length;
   const pendingHrEmployees = employees.filter(employee => employee.reviewStatus === '待 HR 审核');
-  const averageScore = scoreSummary.length ? scoreSummary.reduce((sum, item) => sum + item.score, 0) / scoreSummary.length : 0;
-  const averageCoefficient = scoreSummary.length ? scoreSummary.reduce((sum, item) => sum + item.grade.coefficient, 0) / scoreSummary.length : 0;
-  const gradeCounts = ['S', 'A', 'B', 'C', 'D', 'E'].map(grade => ({ grade, count: scoreSummary.filter(item => item.grade.grade === grade).length }));
+  const publicScoreSummary = publicationEmployees.map(employee => ({ employee, score: scoreForEmployee(employee), grade: gradeForScore(scoreForEmployee(employee)) }));
+  const averageScore = publicScoreSummary.length ? publicScoreSummary.reduce((sum, item) => sum + item.score, 0) / publicScoreSummary.length : 0;
+  const averageCoefficient = publicScoreSummary.length ? publicScoreSummary.reduce((sum, item) => sum + item.grade.coefficient, 0) / publicScoreSummary.length : 0;
+  const gradeCounts = ['S', 'A', 'B', 'C', 'D', 'E'].map(grade => ({ grade, count: publicScoreSummary.filter(item => item.grade.grade === grade).length }));
 
   const finalCoefficient = (employee: KpiEmployee) => {
     const base = gradeForScore(scoreForEmployee(employee)).coefficient;
@@ -170,22 +181,38 @@ export const KpiPerformanceDemoView: React.FC = () => {
     return draft ? scoreForEmployee({ ...employee, scores: { ...employee.scores, attitude: draft.attitude, managerAdjustment: draft.adjustment } }) : scoreForEmployee(employee);
   };
 
+  const handleAppealSubmit = () => {
+    const ownEmployee = employees.find(employee => employee.id === 'e-01');
+    if (!ownEmployee || !period?.published) return;
+    try {
+      const appeal = submitKpiAppeal({ month, employeeId: ownEmployee.id, employeeName: ownEmployee.name, reason: appealReason });
+      setAppeals(current => [...current, appeal]);
+      setAppealReason('');
+      setAppealOpen(false);
+      message.success('申诉已提交');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '申诉提交失败');
+    }
+  };
+
+  const scoreBreakdown = (employee: KpiEmployee) => <div className="kpi-detail-content">
+    <div className="kpi-detail-identity"><div className="kpi-avatar">{employee.name.slice(0, 1)}</div><div><b>{employee.name}</b><span>{employee.department} · {employee.position}</span></div><strong>{scoreForEmployee(employee).toFixed(1)} 分</strong></div>
+    <div className="kpi-detail-dimensions">{KPI_DIMENSIONS.map(dimension => <div key={dimension.key}><span>{dimension.label.replace('（演示）', '')}</span><b>{employee.scores[dimension.key]}<small> / {dimension.max} 分</small></b><div className="kpi-detail-bar"><i style={{ width: `${Math.max(0, Math.min(100, employee.scores[dimension.key] / dimension.max * 100))}%` }} /></div></div>)}</div>
+    <div className="kpi-detail-sources">
+      <div><span>目标完成率（演示）</span><b>{employee.source.okrCompletion}%</b><small>月度目标 {employee.scores.objective} / 60 分</small></div>
+      <div><span>出勤天数</span><b>{employee.source.attendanceDays} 天</b><small>迟到 {employee.source.lateCount} 次 · 缺卡 {employee.source.missingPunches} 次</small></div>
+      <div><span>审批加班</span><b>{employee.source.approvedOvertimeHours} 小时</b><small>额外工作 {employee.scores.extraWork} / 5 分</small></div>
+      <div><span>报告异常</span><b>{employee.source.reportLate + employee.source.reportMissing} 次</b><small>迟交 {employee.source.reportLate} · 未交 {employee.source.reportMissing} · 逾期任务 {employee.source.tasksOverdue}</small></div>
+    </div>
+    <div className="kpi-detail-total"><span>等级 {gradeForScore(scoreForEmployee(employee)).grade}</span><b>绩效系数 {coefficientText(finalCoefficient(employee))}</b></div>
+  </div>;
+
   const showScoreDetail = (employee: KpiEmployee) => {
-    const score = scoreForEmployee(employee);
-    const grade = gradeForScore(score);
-    Modal.info({
-      title: `${employee.name} · ${monthLabel(month)}绩效结果`,
-      content: <div className="kpi-result-modal"><b>{score.toFixed(1)} 分</b><span>{grade.grade} 级</span><span>绩效系数 {coefficientText(finalCoefficient(employee))}</span></div>,
-      okText: '关闭',
-    });
+    setDetailTarget(employee);
   };
 
   return <section className="kpi-workspace">
     <header className="kpi-header">
-      <div className="kpi-heading">
-        <div className="kpi-heading-icon"><TrophyOutlined /></div>
-        <div><div className="kpi-eyebrow">PEOPLE · PERFORMANCE</div><h1>KPI 考核</h1><p>月度绩效结果、公示与审核工作区</p></div>
-      </div>
       <div className="kpi-header-actions">
         <Tag color="gold">演示数据</Tag>
         <Select aria-label="体验角色" value={role} options={['HR', '主管', '员工'].map(value => ({ value, label: `${value}视角` }))} onChange={handleRoleChange} />
@@ -194,7 +221,7 @@ export const KpiPerformanceDemoView: React.FC = () => {
       </div>
     </header>
 
-    <div className="kpi-tabs" role="tablist" aria-label="KPI 考核页面">
+    <div className="kpi-tabs" role="tablist" aria-label="绩效考核页面">
       {views.map(item => { const disabled = role === '员工' && item.key !== 'public' || role === '主管' && item.key === 'hr'; return <button key={item.key} role="tab" aria-selected={view === item.key} aria-disabled={disabled} className={`${view === item.key ? 'is-active' : ''}${disabled ? ' is-disabled' : ''}`} onClick={() => { if (!disabled) setView(item.key); }}>{item.icon}<span>{item.label}</span>{item.key === 'hr' && employees.some(employee => employee.reviewStatus === '待 HR 审核') && <i />}</button>; })}
       <div className="kpi-tab-spacer" />
       <span className={`kpi-period-state ${period?.published ? 'is-published' : period?.generated ? 'is-review' : ''}`}>
@@ -205,23 +232,47 @@ export const KpiPerformanceDemoView: React.FC = () => {
     {!period?.generated && view !== 'public' && <div className="kpi-inline-notice"><ClockCircleOutlined /> 本月考核尚未生成，原始数据可预览；生成后将进入评分和审核流程。{role === 'HR' && <Button type="primary" size="small" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>}</div>}
 
     {view === 'public' && <section className="kpi-panel kpi-public-view">
-      <div className="kpi-view-title"><div><span className="kpi-eyebrow">FINAL RESULTS</span><h2>{monthLabel(month)}绩效公示</h2><p>{period?.published ? `公示时间 ${period.generatedAt || '2026-11-01'} · 仅展示最终考核结果` : '本月结果尚未公示'}</p></div>
+      <div className="kpi-view-title"><div><span className="kpi-eyebrow">FINAL RESULTS</span><h2>{monthLabel(month)}绩效公示</h2><p>{period?.published ? `公示时间 ${period.generatedAt || '2026-11-01'} · ${role === '员工' ? '仅展示本人结果与部门汇总' : role === '主管' ? '展示当前团队最终结果' : '展示全员最终结果'}` : '本月结果尚未公示'}</p></div>
         {role === 'HR' && (period?.generated ? <Button type="primary" icon={<SendOutlined />} disabled={employees.some(employee => employee.reviewStatus !== '已通过')} onClick={publishPeriod}>公示绩效结果</Button> : <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>)}
       </div>
       {role === '主管' && period?.generated && !period.published && <div className="kpi-inline-notice"><ClockCircleOutlined />当前团队有 {pendingManagerCount} 位员工待复核。请先在汇总复核中调整评分并提交，HR 通过后才会计入汇总。<Button type="primary" onClick={() => setView('calculation')}>进入主管复核</Button></div>}
       {role === 'HR' && period?.generated && pendingHrEmployees.length > 0 && <div className="kpi-inline-notice"><AuditOutlined />有 {pendingHrEmployees.length} 项主管评分待审核。<Button type="primary" onClick={() => setView('hr')}>进入 HR 审核</Button></div>}
-      {period?.published ? <>
+      {period?.published && role !== '员工' ? <>
         <div className="kpi-public-overview">
-          <div className="kpi-overview-score"><span>本月平均绩效</span><strong>{averageScore.toFixed(1)}</strong><small>分 <em>·</em> {employees.length} 位员工</small></div>
+          <div className="kpi-overview-score"><span>本月平均绩效</span><strong>{averageScore.toFixed(1)}</strong><small>分 <em>·</em> {publicationEmployees.length} 位员工</small></div>
           <div className="kpi-overview-metric"><span>平均绩效系数</span><b>{averageCoefficient.toFixed(2)}</b><small>部门调节前</small></div>
           <div className="kpi-grade-distribution"><span>等级分布</span><div>{gradeCounts.map(item => <div key={item.grade} className={`kpi-grade-count grade-${item.grade.toLowerCase()}`}><b>{item.grade}</b><small>{item.count}</small></div>)}</div></div>
         </div>
         <div className="kpi-scoreboard-head"><span>员工考核席位</span><span>点击查看最终结果</span></div>
-        <div className="kpi-scoreboard-grid">{scoreSummary.filter(item => role !== '员工' || item.employee.id === 'e-01').map(({ employee, score, grade }) => <button type="button" key={employee.id} className="kpi-scoreboard-tile" onClick={() => showScoreDetail(employee)}>
+        {role === 'HR' ? departmentSummaries.map(summary => <section className="kpi-department-public-group" key={summary.department} aria-label={`${summary.department}绩效公示`}>
+          <header><div><h3>{summary.department}</h3><span>{summary.employeeCount} 位员工 · 部门系数 {coefficientText(summary.departmentCoefficient)}</span></div><strong>平均 {summary.averageScore.toFixed(1)} 分</strong></header>
+          <div className="kpi-scoreboard-grid">{publicScoreSummary.filter(item => item.employee.department === summary.department).map(({ employee, score, grade }) => <button type="button" key={employee.id} className="kpi-scoreboard-tile" onClick={() => showScoreDetail(employee)}>
+            <div className="kpi-avatar">{employee.name.slice(0, 1)}</div><div className="kpi-tile-person"><b>{employee.name}</b><span>{employee.department} · {employee.position}</span></div><div className={`kpi-tile-score tone-${scoreTone(score)}`}><strong>{score.toFixed(1)}</strong><small>{grade.grade} 级</small></div><div className="kpi-tile-coeff"><span>绩效系数</span><b>{coefficientText(finalCoefficient(employee))}</b></div>
+          </button>)}</div>
+        </section>) : <div className="kpi-scoreboard-grid">{publicScoreSummary.map(({ employee, score, grade }) => <button type="button" key={employee.id} className="kpi-scoreboard-tile" onClick={() => showScoreDetail(employee)}>
           <div className="kpi-avatar">{employee.name.slice(0, 1)}</div><div className="kpi-tile-person"><b>{employee.name}</b><span>{employee.department} · {employee.position}</span></div><div className={`kpi-tile-score tone-${scoreTone(score)}`}><strong>{score.toFixed(1)}</strong><small>{grade.grade} 级</small></div><div className="kpi-tile-coeff"><span>绩效系数</span><b>{coefficientText(finalCoefficient(employee))}</b></div>
-        </button>)}</div>
-      </> : <div className="kpi-empty-state"><div className="kpi-empty-mark"><LockOutlined /></div><h3>{period?.generated ? 'HR 审核完成后即可公示' : '本月最终绩效尚未生成'}</h3><p>{period?.generated ? '公示页面只会展示每位员工最终确认的得分、等级和绩效系数。' : '由 HR 控制考核生成时间。生成后进入汇总复核与审核。'}</p>{role === 'HR' && !period?.generated && <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>}</div>}
-      <div className="kpi-demo-footnote"><LockOutlined /> 公示界面仅包含最终结果。明细数据仅在原始数据、汇总复核和 HR 处理页查看。</div>
+        </button>)}</div>}
+      </> : period?.published && role === '员工' ? <>
+        {employeeDepartmentSummary && <>
+          <div className="kpi-public-overview kpi-employee-department-overview">
+            <div className="kpi-overview-score"><span>{employeeDepartment}平均绩效</span><strong>{employeeDepartmentSummary.averageScore.toFixed(1)}</strong><small>分 · {employeeDepartmentSummary.employeeCount} 位员工</small></div>
+            <div className="kpi-overview-metric"><span>部门考核系数</span><b>{coefficientText(employeeDepartmentSummary.departmentCoefficient)}</b><small>{employeeDepartment}公示结果</small></div>
+            <div className="kpi-grade-distribution"><span>部门等级分布</span><div>{['S', 'A', 'B', 'C', 'D', 'E'].map(grade => <div key={grade} className={`kpi-grade-count grade-${grade.toLowerCase()}`}><b>{grade}</b><small>{employeeDepartmentSummary.gradeCounts[grade as keyof typeof employeeDepartmentSummary.gradeCounts]}</small></div>)}</div></div>
+          </div>
+          {employees.find(employee => employee.id === 'e-01') ? <article className="kpi-employee-result-card">
+            {scoreBreakdown(employees.find(employee => employee.id === 'e-01')!)}
+            <div className="kpi-appeal-actions"><span>{appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').length ? `已提交 ${appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').length} 条申诉` : '如对评分有异议，可提交申诉'}</span><Button onClick={() => setAppealOpen(true)}>绩效申诉</Button></div>
+          </article> : <Empty description="暂无本人本月绩效记录" />}
+        </>}
+      </> : <div className="kpi-empty-state"><div className="kpi-empty-mark"><LockOutlined /></div><h3>{period?.generated ? 'HR 审核完成后即可公示' : '本月最终绩效尚未生成'}</h3><p>{period?.generated ? 'HR 完成审核并公示后，员工可查看本人绩效及部门汇总。' : '由 HR 控制考核生成时间。生成后进入汇总复核与审核。'}</p>{role === 'HR' && !period?.generated && <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>}</div>}
+      <div className="kpi-demo-footnote"><LockOutlined /> 员工仅查看本人明细与部门汇总；主管仅查看当前团队，HR 查看分部门全员结果。</div>
+      <Modal open={appealOpen} title={`${monthLabel(month)}绩效申诉`} okText="提交申诉" cancelText="取消" okButtonProps={{ disabled: !appealReason.trim() }} onOk={handleAppealSubmit} onCancel={() => { setAppealOpen(false); setAppealReason(''); }}>
+        <p>请说明对哪些评分项目有异议及原因，申诉记录将保存在本地演示数据中。</p>
+        <Input.TextArea aria-label="申诉原因" rows={4} maxLength={500} showCount value={appealReason} placeholder="填写申诉原因" onChange={event => setAppealReason(event.target.value)} />
+      </Modal>
+      <Modal open={!!detailTarget} title={detailTarget ? `${detailTarget.name} · ${monthLabel(month)}绩效结果` : ''} width={680} footer={<Button onClick={() => setDetailTarget(null)}>关闭</Button>} onCancel={() => setDetailTarget(null)}>
+        {detailTarget && scoreBreakdown(detailTarget)}
+      </Modal>
     </section>}
 
     {view === 'sources' && <section className="kpi-panel">
