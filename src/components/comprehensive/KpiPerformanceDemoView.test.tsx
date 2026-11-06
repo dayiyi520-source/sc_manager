@@ -85,4 +85,16 @@ describe('绩效考核公示', () => {
     document.querySelectorAll('.ant-modal-root').forEach(node => node.remove());
   });
 
+  it('原始数据按来源分类展示列表并包含部门字段', async () => {
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
+
+    expect(await screen.findByRole('tab', { name: '月度目标原始数据' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '部门' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '目标完成率' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '考勤与请假数据' }));
+    expect(screen.getByRole('columnheader', { name: '出勤天数' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '请假天数' })).toBeInTheDocument();
+  });
+
 });
