@@ -45,7 +45,35 @@ export interface KpiPeriod {
   reviewEnabled: boolean;
   generatedAt?: string;
   departmentCoefficients: Record<string, number>;
+  departmentMetrics?: Record<string, { teamCompletion: number; confirmed: boolean }>;
 }
+
+export const departmentCoefficientPreview = (period: KpiPeriod, department: string) => {
+  const members = period.employees.filter(employee => employee.department === department);
+  if (!members.length) return { objectiveCompletion: 0, teamCompletion: 0, majorRedline: false, adjustment: 1, coefficient: 1 };
+  const objectiveCompletion = members.reduce((sum, employee) => sum + employee.source.okrCompletion, 0) / members.length;
+  const teamCompletion = period.departmentMetrics?.[department]?.teamCompletion ?? 100;
+  const majorRedline = members.some(employee => employee.redline?.active && employee.redline.type === '重大失职');
+  const adjustment = objectiveCompletion >= 100 && teamCompletion >= 100 ? 1.1 : 1;
+  return { objectiveCompletion, teamCompletion, majorRedline, adjustment, coefficient: majorRedline ? 0.9 : adjustment };
+};
+
+export const submitDepartmentReview = (period: KpiPeriod, manager: string, department: string): KpiPeriod => {
+  if (!period.generated || period.published || !period.reviewEnabled) throw new Error('当前月份不可提交复核');
+  const targets = period.employees.filter(employee => employee.manager === manager && employee.department === department);
+  if (!targets.length || targets.some(employee => !['待主管复核', 'HR 已退回'].includes(employee.reviewStatus))) throw new Error('该部门存在不可提交的员工');
+  return { ...period, employees: period.employees.map(employee => targets.some(target => target.id === employee.id)
+    ? submitManagerReview({ ...employee, managerDraft: employee.managerDraft || { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, reason: '主管确认当前评分' } }) : employee) };
+};
+
+export const reviewDepartmentSubmission = (period: KpiPeriod, manager: string, department: string, decision: KpiReviewDecision, reason = ''): KpiPeriod => {
+  if (period.published) throw new Error('已公示月份不可审核');
+  const targets = period.employees.filter(employee => employee.manager === manager && employee.department === department);
+  if (!targets.length || targets.some(employee => employee.reviewStatus !== '待 HR 审核')) throw new Error('该部门尚未全部提交 HR 审核');
+  if (decision === 'return' && !reason.trim()) throw new Error('请填写退回原因');
+  return { ...period, employees: period.employees.map(employee => targets.some(target => target.id === employee.id)
+    ? reviewManagerSubmission(employee, decision, reason) : employee) };
+};
 
 export interface KpiDemoState {
   periods: Record<string, KpiPeriod>;
@@ -57,14 +85,12 @@ const buildEmployees = (month: string): KpiEmployee[] => {
   { id: 'e-02', name: '周予安', department: '产品部', position: '产品经理', manager: '陈宇璋', scores: { objective: 53, attendance: 9, extraWork: 3, attitude: 13, review: 9, managerAdjustment: 1 }, source: { okrCompletion: 88, attendanceDays: 22, lateCount: 1, missingPunches: 0, approvedOvertimeHours: 8, reportLate: 0, reportMissing: 0, tasksOverdue: 1, leaveRecords: { '年假': 0, '事假': 0, '病假': 0 } }, reviewStatus: '待 HR 审核', managerDraft: { attitude: 13, adjustment: 1, reason: '按期完成重点版本方案，并主动协调研发风险。' } },
   { id: 'e-03', name: '顾清和', department: '研发部', position: '前端工程师', manager: '陈宇璋', scores: { objective: 50, attendance: 10, extraWork: 5, attitude: 12, review: 8, managerAdjustment: 0 }, source: { okrCompletion: 84, attendanceDays: 22, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 18, reportLate: 1, reportMissing: 0, tasksOverdue: 1, leaveRecords: { '年假': 1, '事假': 0, '病假': 0 } }, reviewStatus: '待主管复核' },
   { id: 'e-04', name: '许明川', department: '研发部', position: '后端工程师', manager: '赵书琳', scores: { objective: 47, attendance: 8, extraWork: 4, attitude: 11, review: 7, managerAdjustment: -1 }, source: { okrCompletion: 78, attendanceDays: 21, lateCount: 2, missingPunches: 1, approvedOvertimeHours: 14, reportLate: 2, reportMissing: 0, tasksOverdue: 2, leaveRecords: { '年假': 0, '事假': 1, '病假': 0 } }, reviewStatus: '待 HR 审核', managerDraft: { attitude: 11, adjustment: -1, reason: '迭代交付存在延迟，复盘材料两次迟交。' } },
-  { id: 'e-05', name: '沈嘉禾', department: '交付部', position: '交付顾问', manager: '王佳乐', scores: { objective: 50, attendance: 10, extraWork: 3, attitude: 13, review: 8, managerAdjustment: 0 }, source: { okrCompletion: 84, attendanceDays: 22, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 5, reportLate: 1, reportMissing: 0, tasksOverdue: 2, leaveRecords: { '年假': 0, '事假': 0, '病假': 1 } }, reviewStatus: '已通过', redline: { type: '一般违规', impact: '最高系数限制为 0.8', active: true }, hrNote: '演示规则：一般违规限制最高绩效系数。' },
-  { id: 'e-06', name: '唐以宁', department: '运营部', position: '运营专员', manager: '毛景强', scores: { objective: 39, attendance: 7, extraWork: 1, attitude: 10, review: 6, managerAdjustment: -2 }, source: { okrCompletion: 65, attendanceDays: 20, lateCount: 3, missingPunches: 1, approvedOvertimeHours: 2, reportLate: 2, reportMissing: 1, tasksOverdue: 3, leaveRecords: { '年假': 0, '事假': 0, '病假': 2 } }, reviewStatus: '待 HR 审核', redline: { type: '重大失职', impact: '绩效系数清零', active: false }, hrNote: '待 HR 核实事件事实与证据。' },
+  { id: 'e-05', name: '沈嘉禾', department: '交付部', position: '交付顾问', manager: '王佳乐', scores: { objective: 50, attendance: 10, extraWork: 3, attitude: 13, review: 8, managerAdjustment: 0 }, source: { okrCompletion: 84, attendanceDays: 22, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 5, reportLate: 1, reportMissing: 0, tasksOverdue: 2, leaveRecords: { '年假': 0, '事假': 0, '病假': 1 } }, reviewStatus: '已通过' },
+  { id: 'e-06', name: '唐以宁', department: '运营部', position: '运营专员', manager: '毛景强', scores: { objective: 39, attendance: 7, extraWork: 1, attitude: 10, review: 6, managerAdjustment: -2 }, source: { okrCompletion: 65, attendanceDays: 20, lateCount: 3, missingPunches: 1, approvedOvertimeHours: 2, reportLate: 2, reportMissing: 1, tasksOverdue: 3, leaveRecords: { '年假': 0, '事假': 0, '病假': 2 } }, reviewStatus: '待 HR 审核' },
   ];
   return month === '2026-10' ? rows.map(employee => ({
     ...employee,
     reviewStatus: '已通过',
-    redline: employee.redline ? { ...employee.redline, active: true } : undefined,
-    hrNote: employee.redline ? `演示红线已处理：${employee.redline.impact}。` : employee.hrNote,
   })) : rows;
 };
 
@@ -115,12 +141,13 @@ export const reviewManagerSubmission = (employee: KpiEmployee, decision: KpiRevi
 
 const initialState = (): KpiDemoState => ({
   periods: Object.fromEntries(KPI_MONTHS.map((month, index) => [month, {
-    employees: month === '2026-11' ? buildEmployees(month).map(employee => ({ ...employee, reviewStatus: '待主管复核', managerDraft: undefined, hrNote: undefined })) : buildEmployees(month),
+    employees: month === '2026-11' ? buildEmployees(month).map(employee => ({ ...employee, redline: undefined, reviewStatus: '待主管复核', managerDraft: undefined, hrNote: undefined })) : buildEmployees(month),
     generated: month !== '2026-09',
     published: month === '2026-10',
     reviewEnabled: month !== '2026-09',
     generatedAt: month === '2026-11' ? '2026-11-01 09:30' : month === '2026-10' ? '2026-11-01 09:30' : undefined,
     departmentCoefficients: { 产品部: 1, 研发部: 1, 交付部: 1, 运营部: 1 },
+    departmentMetrics: Object.fromEntries(['产品部', '研发部', '交付部', '运营部'].map(name => [name, { teamCompletion: 100, confirmed: month === '2026-10' }])),
   }])) as KpiDemoState['periods'],
 });
 
@@ -130,6 +157,10 @@ export const loadKpiDemo = (): KpiDemoState => {
     if (!raw) return initialState();
     const parsed = JSON.parse(raw) as KpiDemoState;
     if (!parsed.periods || !parsed.periods['2026-10']) return initialState();
+    Object.values(parsed.periods).forEach(period => {
+      period.departmentMetrics ||= Object.fromEntries([...new Set(period.employees.map(employee => employee.department))]
+        .map(name => [name, { teamCompletion: 100, confirmed: period.published }]));
+    });
     const reviewDemoPeriod = parsed.periods['2026-11'];
     if (reviewDemoPeriod && !reviewDemoPeriod.generated && !reviewDemoPeriod.published) {
       parsed.periods['2026-11'] = {
@@ -153,6 +184,8 @@ export const saveKpiDemo = (state: KpiDemoState) => {
 export const createKpiPeriod = (period: KpiPeriod): KpiPeriod => ({
   ...period,
   generated: true,
+  published: false,
+  departmentMetrics: Object.fromEntries(Object.entries(period.departmentMetrics || {}).map(([name, metric]) => [name, { ...metric, confirmed: false }])),
   generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   employees: period.employees.map(employee => ({
     ...employee,

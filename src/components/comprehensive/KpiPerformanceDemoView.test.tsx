@@ -40,7 +40,7 @@ describe('绩效考核公示', () => {
     expect(screen.getByRole('tab', { name: /月度公示/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /原始数据/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /汇总复核/ })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /HR 处理/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /部门系数与红线/ })).toBeInTheDocument();
   });
 
   it('员工只看到部门汇总和本人明细，可提交本地申诉且没有公示操作', async () => {

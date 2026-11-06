@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { gradeForScore, loadKpiDemo, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, submitManagerReview, KPI_DEMO_STORAGE_KEY } from './kpiPerformanceDemo';
+import { departmentCoefficientPreview, gradeForScore, loadKpiDemo, reviewDepartmentSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, submitDepartmentReview, submitManagerReview, KPI_DEMO_STORAGE_KEY } from './kpiPerformanceDemo';
 
 describe('KPI performance demo rules', () => {
   beforeEach(() => localStorage.clear());
@@ -58,5 +58,39 @@ describe('KPI performance demo rules', () => {
     expect(returned.hrNote).toContain('请补充具体项目证据');
     expect(returned.scores).toEqual(employee.scores);
     expect(returned.managerDraft).toEqual(submitted.managerDraft);
+  });
+
+  it('submits and reviews a manager department as one group', () => {
+    const period = loadKpiDemo().periods['2026-11'];
+    const submitted = submitDepartmentReview(period, '陈宇璋', '产品部');
+    expect(submitted.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '待 HR 审核')).toBe(true);
+    expect(submitted.employees.find(employee => employee.id === 'e-03')?.reviewStatus).toBe('待主管复核');
+    expect(() => submitDepartmentReview(submitted, '陈宇璋', '产品部')).toThrow();
+    const returned = reviewDepartmentSubmission(submitted, '陈宇璋', '产品部', 'return', '补充依据');
+    expect(returned.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === 'HR 已退回')).toBe(true);
+    const approved = reviewDepartmentSubmission(submitDepartmentReview(returned, '陈宇璋', '产品部'), '陈宇璋', '产品部', 'approve');
+    expect(approved.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '已通过')).toBe(true);
+  });
+
+  it('previews a department coefficient from completion and confirmed major redlines', () => {
+    const period = loadKpiDemo().periods['2026-11'];
+    period.employees.filter(employee => employee.department === '产品部').forEach(employee => { employee.source.okrCompletion = 100; });
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(1.1);
+    period.departmentMetrics!.产品部.teamCompletion = 90;
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(1);
+    period.employees[0].redline = { type: '重大失职', impact: '绩效系数清零', active: true };
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(0.9);
+    expect(period.employees.every(employee => !employee.redline || employee.id === 'e-01')).toBe(true);
+  });
+
+  it('migrates saved months without department metrics without losing their results', () => {
+    const state = loadKpiDemo();
+    delete state.periods['2026-10'].departmentMetrics;
+    delete state.periods['2026-11'].departmentMetrics;
+    saveKpiDemo(state);
+    const restored = loadKpiDemo();
+    expect(restored.periods['2026-10'].departmentMetrics?.产品部.confirmed).toBe(true);
+    expect(restored.periods['2026-11'].departmentMetrics?.产品部.confirmed).toBe(false);
+    expect(restored.periods['2026-10'].employees).toHaveLength(state.periods['2026-10'].employees.length);
   });
 });
