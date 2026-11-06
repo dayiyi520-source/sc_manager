@@ -89,12 +89,18 @@ describe('绩效考核公示', () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
 
-    expect(await screen.findByRole('tab', { name: '月度目标原始数据' })).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: '月度目标' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '部门' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '目标完成率' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: '考勤与请假数据' }));
+    fireEvent.click(screen.getByRole('tab', { name: '考勤与请假' }));
     expect(screen.getByRole('columnheader', { name: '出勤天数' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '请假天数' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '请假记录' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '额外工作投入' }));
+    expect(screen.getByRole('columnheader', { name: '加班总时长' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '折算得分' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '月度上限' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '额外工作得分' })).toBeInTheDocument();
   });
 
 });
