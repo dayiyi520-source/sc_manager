@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Empty, Input, InputNumber, message, Modal, Select, Switch, Tag } from 'antd';
+import { Button, DatePicker, Empty, Input, InputNumber, message, Modal, Select, Switch, Tag } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
 import { AuditOutlined, CheckOutlined, ClockCircleOutlined, DatabaseOutlined, DownOutlined, FileSearchOutlined, FlagOutlined, LineChartOutlined, LockOutlined, PlusOutlined, RightOutlined, SendOutlined, TrophyOutlined } from '@ant-design/icons';
 import {
-  confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, gradeForScore, KPI_DIMENSIONS, KPI_MONTHS, loadKpiDemo, publishKpiPeriod, saveKpiDemo,
-  reviewDepartmentSubmission, scoreForEmployee, submitDepartmentReview, type KpiDemoState, type KpiDepartmentMetrics, type KpiEmployee, type KpiPeriod,
+  confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, gradeForScore, isWithinKpiWindow, KPI_DIMENSIONS, KPI_MONTHS, loadKpiDemo, publishKpiPeriod, saveKpiDemo, validateKpiCycleSettings,
+  reviewDepartmentSubmission, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, syncKpiSources, type KpiCycleSettings, type KpiDemoState, type KpiDepartmentMetrics, type KpiEmployee, type KpiPeriod,
 } from '../../services/kpiPerformanceDemo';
-import { filterPublishedEmployees, listKpiAppeals, submitKpiAppeal, summarizeDepartmentPerformance, type KpiAppeal } from '../../services/kpiPerformancePublication';
+import { correctionForEmployee, filterPublishedEmployees, listKpiAppeals, resolveKpiAppeal, submitKpiAppeal, summarizeDepartmentPerformance, type KpiAppeal, type KpiAppealCorrection } from '../../services/kpiPerformancePublication';
 import './kpi-performance-demo.css';
 
 type ViewKey = 'public' | 'sources' | 'calculation' | 'hr';
@@ -29,12 +30,17 @@ const sourceDataTabs: Array<{ key: SourceDataKey; label: string }> = [
 const monthLabel = (month: string) => `${month.slice(0, 4)}年${Number(month.slice(5))}月`;
 const coefficientText = (value: number) => Number.isInteger(value) ? value.toFixed(1) : value.toFixed(2);
 const scoreTone = (score: number) => score > 90 ? 'high' : score > 80 ? 'good' : score > 70 ? 'mid' : 'low';
-const sourceAdjustmentFor = (employee: KpiEmployee) => employee.source.objectiveAdjustment ?? employee.reviewHistory?.[0]?.before.adjustment ?? employee.scores.managerAdjustment;
+const appealCorrectionFields: Array<{ key: keyof KpiAppealCorrection; label: string }> = [
+  { key: 'okrCompletion', label: '目标完成率' }, { key: 'objectiveScore', label: '目标得分' },
+  { key: 'reportLate', label: '周报迟交' }, { key: 'reportMissing', label: '月报未交' },
+  { key: 'tasksOverdue', label: '任务逾期' }, { key: 'reviewScore', label: '复盘得分' },
+];
 
 export const KpiPerformanceDemoView: React.FC = () => {
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modal, modalContextHolder] = Modal.useModal();
   const [state, setState] = useState<KpiDemoState>(loadKpiDemo);
+  const [clock, setClock] = useState(() => Date.now());
   const [month, setMonth] = useState('2026-11');
   const [view, setView] = useState<ViewKey>('public');
   const [role, setRole] = useState<DemoRole>('HR');
@@ -48,6 +54,12 @@ export const KpiPerformanceDemoView: React.FC = () => {
   const [appealOpen, setAppealOpen] = useState(false);
   const [appealReason, setAppealReason] = useState('');
   const [appeals, setAppeals] = useState<KpiAppeal[]>(listKpiAppeals);
+  const [reviewAppealId, setReviewAppealId] = useState<string | null>(null);
+  const [appealCorrection, setAppealCorrection] = useState<KpiAppealCorrection | null>(null);
+  const [appealResolution, setAppealResolution] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [cycleDraft, setCycleDraft] = useState<KpiCycleSettings | null>(null);
+  const [cycleSettingsOpen, setCycleSettingsOpen] = useState(false);
   const [detailTarget, setDetailTarget] = useState<KpiEmployee | null>(null);
   const [redlineEmployeeId, setRedlineEmployeeId] = useState<string | null>(null);
   const [factorDepartment, setFactorDepartment] = useState('');
@@ -56,6 +68,20 @@ export const KpiPerformanceDemoView: React.FC = () => {
   const [collapsedReviewDepartments, setCollapsedReviewDepartments] = useState<Set<string>>(() => new Set());
 
   useEffect(() => { saveKpiDemo(state); }, [state]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 10000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleAutoPublication = (event: Event) => {
+      const months = (event as CustomEvent<{ months: string[] }>).detail?.months || [];
+      setState(loadKpiDemo());
+      if (months.includes(month)) messageApi.success('已到最终公示时间，绩效结果已自动公示');
+    };
+    window.addEventListener('shichuang:kpi-auto-published', handleAutoPublication);
+    return () => window.removeEventListener('shichuang:kpi-auto-published', handleAutoPublication);
+  }, [messageApi, month]);
 
   const period = state.periods[month];
   const employees = period?.employees || [];
@@ -68,14 +94,15 @@ export const KpiPerformanceDemoView: React.FC = () => {
   const selectedEmployee = accessibleEmployees.find(employee => employee.id === selectedId) || accessibleEmployees[0];
   const filteredEmployees = useMemo(() => accessibleEmployees.filter(employee =>
     (department === '全部部门' || employee.department === department)
-    && (!query.trim() || `${employee.name}${employee.department}${employee.position}`.includes(query.trim()))), [accessibleEmployees, department, query]);
-  const selectedSourceEmployee = filteredEmployees.find(employee => employee.id === selectedId) || filteredEmployees[0];
+    && (!query.trim() || employee.name.includes(query.trim()))), [accessibleEmployees, department, query]);
+  const sourceDepartments = [...new Set(accessibleEmployees.map(employee => employee.department))];
   const employeeGroups = useMemo(() => [...accessibleEmployees.reduce((groups, employee) => {
     const current = groups.get(employee.department) || [];
     groups.set(employee.department, [...current, employee]);
     return groups;
   }, new Map<string, KpiEmployee[]>())], [accessibleEmployees]);
   const departments: string[] = [...new Set<string>(employees.map(employee => employee.department))];
+  const managerReviewOpen = !!period?.cycleSettings && isWithinKpiWindow(period.cycleSettings.managerReview, clock);
   const confirmedDepartmentCount = departments.filter(name => period.departmentMetrics?.[name]?.confirmed).length;
   const matchingFactorDepartments = departments.filter(name => name.includes(factorQuery.trim()));
   const activeFactorDepartment = matchingFactorDepartments.includes(factorDepartment) ? factorDepartment : matchingFactorDepartments[0];
@@ -85,6 +112,26 @@ export const KpiPerformanceDemoView: React.FC = () => {
 
   const updatePeriod = (updater: (previous: KpiPeriod) => KpiPeriod) => {
     setState(current => ({ ...current, periods: { ...current.periods, [month]: updater(current.periods[month]) } }));
+  };
+  const openCycleSettings = () => {
+    if (!requireHr()) return;
+    setCycleDraft(period?.cycleSettings ? structuredClone(period.cycleSettings) : null);
+    setCycleSettingsOpen(true);
+  };
+  const saveCycleSettings = () => {
+    if (!requireHr() || !cycleDraft || period?.published) return;
+    const error = validateKpiCycleSettings(cycleDraft);
+    if (error) { messageApi.error(error); return; }
+    updatePeriod(current => ({
+      ...current,
+      reviewEnabled: true,
+      cycleSettings: cycleDraft,
+      employees: current.employees.map(employee => !current.reviewEnabled && employee.reviewStatus === '待 HR 审核' && !employee.managerDraft
+        ? { ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 }, reviewStatus: '待主管复核', hrNote: undefined }
+        : employee),
+    }));
+    setCycleSettingsOpen(false);
+    messageApi.success('本月周期已保存，最终公示将按设置自动执行');
   };
   const updateEmployee = (id: string, updater: (employee: KpiEmployee) => KpiEmployee) => updatePeriod(current => ({ ...current, employees: current.employees.map(employee => employee.id === id ? updater(employee) : employee) }));
   const requireHr = () => {
@@ -126,7 +173,7 @@ export const KpiPerformanceDemoView: React.FC = () => {
   };
 
   const applyManagerReview = () => {
-    if (!selectedEmployee || role !== '主管' || !period?.reviewEnabled || !period.generated || period.published) return;
+    if (!selectedEmployee || role !== '主管' || !managerReviewOpen || !period?.generated || period.published) return;
     try {
       const submitted = submitDepartmentReview(period, supervisor, selectedEmployee.department);
       updatePeriod(() => submitted);
@@ -169,28 +216,6 @@ export const KpiPerformanceDemoView: React.FC = () => {
     else if (nextRole === '主管') setView(period?.generated ? 'calculation' : 'public');
     else if (view === 'hr' && !period?.generated) setView('public');
     setSelectedId(nextRole === '主管' ? employees.find(employee => employee.manager === supervisor)?.id || '' : 'e-01');
-  };
-
-  const setReviewMode = (enabled: boolean) => {
-    if (!requireHr() || period?.published) return;
-    updatePeriod(current => ({
-      ...current,
-      reviewEnabled: enabled,
-      employees: current.employees.map(employee => {
-        if (enabled && employee.reviewStatus === '待 HR 审核' && !employee.managerDraft) {
-          return { ...employee,
-            scores: employee.reviewHistory?.length ? employee.scores : { ...employee.scores, attitude: 0, managerAdjustment: 0 },
-            source: employee.reviewHistory?.length ? employee.source : { ...employee.source, objectiveAdjustment: 0 },
-            reviewStatus: '待主管复核', hrNote: undefined,
-          };
-        }
-        if (!enabled && employee.reviewStatus === '待主管复核') {
-          return { ...employee, reviewStatus: '待 HR 审核', managerDraft: undefined, hrNote: '主管复核已关闭，等待 HR 确认系统计算结果。' };
-        }
-        return employee;
-      }),
-    }));
-    messageApi.success(`已${enabled ? '开启' : '关闭'}主管复核`);
   };
 
   const confirmAllFactors = () => {
@@ -259,6 +284,50 @@ export const KpiPerformanceDemoView: React.FC = () => {
     }
   };
 
+  const syncSources = async () => {
+    if (!period || syncing) return;
+    setSyncing(true);
+    try {
+      await Promise.resolve();
+      const synced = syncKpiSources(period, month);
+      updatePeriod(() => synced);
+      messageApi.success('四类原始数据已同步');
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : '数据同步失败');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const openAppealReview = (appeal: KpiAppeal) => {
+    const employee = employees.find(item => item.id === appeal.employeeId);
+    if (role !== 'HR' || !employee || appeal.status !== '待处理') return;
+    setReviewAppealId(appeal.id);
+    setAppealCorrection(correctionForEmployee(employee));
+    setAppealResolution('');
+  };
+
+  const closeAppealReview = () => {
+    setReviewAppealId(null);
+    setAppealCorrection(null);
+    setAppealResolution('');
+  };
+
+  const handleAppealDecision = (decision: 'correct' | 'reject') => {
+    if (role !== 'HR' || !reviewAppealId || !period) return;
+    try {
+      const result = resolveKpiAppeal(period, month, reviewAppealId, role, decision, appealResolution, appealCorrection || undefined);
+      updatePeriod(() => result.period);
+      setAppeals(current => current.map(item => item.id === result.appeal.id ? result.appeal : item));
+      closeAppealReview();
+      messageApi.success(decision === 'correct' ? '申诉修正已保存' : '申诉已驳回');
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : '申诉处理失败');
+    }
+  };
+  const activeAppeal = appeals.find(appeal => appeal.id === reviewAppealId);
+  const ownPendingAppeal = appeals.some(appeal => appeal.month === month && appeal.employeeId === 'e-01' && appeal.status === '待处理');
+
   const scoreBreakdown = (employee: KpiEmployee) => <div className="kpi-detail-content">
     <div className="kpi-detail-identity"><div className="kpi-avatar">{employee.name.slice(0, 1)}</div><div><b>{employee.name}</b><span>{employee.department} · {employee.position}</span></div><strong>{scoreForEmployee(employee).toFixed(1)} 分</strong></div>
     <div className="kpi-detail-dimensions">{KPI_DIMENSIONS.map(dimension => <div key={dimension.key}><span>{dimension.label.replace('（演示）', '')}</span><b>{employee.scores[dimension.key]}<small> / {dimension.max} 分</small></b><div className="kpi-detail-bar"><i style={{ width: `${Math.max(0, Math.min(100, employee.scores[dimension.key] / dimension.max * 100))}%` }} /></div></div>)}</div>
@@ -286,7 +355,7 @@ export const KpiPerformanceDemoView: React.FC = () => {
         <Tag color="gold">演示数据</Tag>
         <Select aria-label="体验角色" value={role} options={['HR', '主管', '员工'].map(value => ({ value, label: `${value}视角` }))} onChange={handleRoleChange} />
         {role === '主管' && <Select aria-label="当前主管" value={supervisor} options={[...new Set(employees.map(employee => employee.manager))].map(value => ({ value, label: `${value}的团队` }))} onChange={value => { setSupervisor(value); setSelectedId(employees.find(employee => employee.manager === value)?.id || 'e-01'); }} />}
-        <Select aria-label="考核月份" value={month} options={KPI_MONTHS.map(value => ({ value, label: monthLabel(value) }))} onChange={value => { setMonth(value); setSelectedId('e-01'); setDepartment('全部部门'); setFactorDepartment(''); setFactorQuery(''); setRedlineEmployeeId(null); }} />
+        <Select aria-label="考核月份" disabled={cycleSettingsOpen} value={month} options={KPI_MONTHS.map(value => ({ value, label: monthLabel(value) }))} onChange={value => { setMonth(value); setSelectedId('e-01'); setDepartment('全部部门'); setFactorDepartment(''); setFactorQuery(''); setRedlineEmployeeId(null); }} />
       </div>
     </header>
 
@@ -294,7 +363,7 @@ export const KpiPerformanceDemoView: React.FC = () => {
 
     {view === 'public' && <section className="kpi-panel kpi-public-view">
       <div className="kpi-view-title"><div><span className="kpi-eyebrow">FINAL RESULTS</span><h2>{monthLabel(month)}绩效公示</h2>{(period?.published || role === 'HR') && <p>{period?.published ? `公示时间 ${period.publishedAt || period.generatedAt || '未记录'} · ${role === '员工' ? '仅展示本人结果与部门汇总' : role === '主管' ? '展示当前团队最终结果' : '展示全员最终结果'}` : '本月结果尚未公示'}</p>}</div>
-        {role === 'HR' && (period?.generated ? <Button type="primary" icon={<SendOutlined />} disabled={employees.some(employee => employee.reviewStatus !== '已通过') || departments.some(name => !period.departmentMetrics?.[name]?.confirmed)} onClick={publishPeriod}>公示绩效结果</Button> : <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>)}
+        {role === 'HR' && (period?.generated ? period.cycleSettings ? <Tag color="processing">按周期自动公示</Tag> : <Button type="primary" icon={<SendOutlined />} disabled={employees.some(employee => employee.reviewStatus !== '已通过') || departments.some(name => !period.departmentMetrics?.[name]?.confirmed)} onClick={publishPeriod}>公示绩效结果</Button> : <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>)}
       </div>
       {role === '主管' && period?.generated && !period.published && <div className="kpi-inline-notice"><ClockCircleOutlined />当前团队有 {pendingManagerCount} 位员工待复核。请先在汇总复核中调整评分并提交，HR 通过后才会计入汇总。<Button type="primary" onClick={() => setView('calculation')}>进入主管复核</Button></div>}
       {role === 'HR' && period?.generated && pendingHrEmployees.length > 0 && <div className="kpi-inline-notice"><AuditOutlined />有 {pendingHrEmployees.length} 项主管评分待审核。<Button type="primary" onClick={() => setView('hr')}>进入 HR 审核</Button></div>}
@@ -325,14 +394,21 @@ export const KpiPerformanceDemoView: React.FC = () => {
           </div>
           {employees.find(employee => employee.id === 'e-01') ? <article className="kpi-employee-result-card">
             {scoreBreakdown(employees.find(employee => employee.id === 'e-01')!)}
-            <div className="kpi-appeal-actions"><span>{appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').length ? `已提交 ${appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').length} 条申诉` : '如对评分有异议，可提交申诉'}</span><Button onClick={() => setAppealOpen(true)}>绩效申诉</Button></div>
+            <div className="kpi-appeal-actions"><span>{ownPendingAppeal ? '申诉待 HR 处理' : appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').length ? `已处理 ${appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').length} 条申诉` : '如对评分有异议，可提交申诉'}</span><Button disabled={ownPendingAppeal} onClick={() => setAppealOpen(true)}>绩效申诉</Button></div>
+            {appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').map(appeal => <div className="kpi-own-appeal" key={appeal.id}><Tag>{appeal.status}</Tag><span>{appeal.resolution || appeal.reason}</span></div>)}
           </article> : <Empty description="暂无本人本月绩效记录" />}
         </>}
       </> : <div className="kpi-empty-state"><div className="kpi-empty-mark"><LockOutlined /></div><h3>{period?.generated && role !== 'HR' ? '本月绩效结果尚未公示' : period?.generated ? 'HR 审核完成后即可公示' : '本月最终绩效尚未生成'}</h3>{(role === 'HR' || !period?.generated) && <p>{period?.generated ? 'HR 完成审核并公示后，员工可查看本人绩效及部门汇总。' : '由 HR 控制考核生成时间。生成后进入汇总复核与审核。'}</p>}{role === 'HR' && !period?.generated && <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>}</div>}
+      {role === 'HR' && period?.published && <section className="kpi-appeal-queue" aria-label="绩效申诉审核"><div className="kpi-section-heading"><h3>绩效申诉审核</h3><Tag>{appeals.filter(appeal => appeal.month === month && appeal.status === '待处理').length} 项待处理</Tag></div>{period.cycleSettings && <div className="kpi-inline-notice"><ClockCircleOutlined />员工申诉确认窗口：{dayjs(period.cycleSettings.appealConfirmation.startAt).format('YYYY-MM-DD HH:mm')} 至 {dayjs(period.cycleSettings.appealConfirmation.endAt).format('YYYY-MM-DD HH:mm')}</div>}{appeals.filter(appeal => appeal.month === month).length ? appeals.filter(appeal => appeal.month === month).map(appeal => <div className="kpi-appeal-row" key={appeal.id}><div><b>{appeal.employeeName}</b><span>{appeal.reason}</span>{appeal.resolution && <small>处理说明：{appeal.resolution}</small>}{appeal.correction && <small>修正记录：{appealCorrectionFields.filter(field => appeal.correction!.before[field.key] !== appeal.correction!.after[field.key]).map(field => `${field.label} ${appeal.correction!.before[field.key]} → ${appeal.correction!.after[field.key]}`).join(' · ')}</small>}</div><Tag>{appeal.status}</Tag>{appeal.status === '待处理' && <Button disabled={!!period.cycleSettings && !isWithinKpiWindow(period.cycleSettings.appealConfirmation)} onClick={() => openAppealReview(appeal)}>审核申诉</Button>}</div>) : <Empty description="暂无绩效申诉" />}</section>}
       <div className="kpi-demo-footnote"><LockOutlined /> 员工仅查看本人明细与部门汇总；主管仅查看当前团队，HR 查看分部门全员结果。</div>
       <Modal open={appealOpen} title={`${monthLabel(month)}绩效申诉`} okText="提交申诉" cancelText="取消" okButtonProps={{ disabled: !appealReason.trim() }} onOk={handleAppealSubmit} onCancel={() => { setAppealOpen(false); setAppealReason(''); }}>
         <p>请说明对哪些评分项目有异议及原因，申诉记录将保存在本地演示数据中。</p>
         <Input.TextArea aria-label="申诉原因" rows={4} maxLength={500} showCount value={appealReason} placeholder="填写申诉原因" onChange={event => setAppealReason(event.target.value)} />
+      </Modal>
+      <Modal open={!!activeAppeal && role === 'HR'} title={activeAppeal ? `${activeAppeal.employeeName} · 绩效申诉审核` : '绩效申诉审核'} width={640} onCancel={closeAppealReview} footer={<><Button onClick={closeAppealReview}>取消</Button><Button danger disabled={!appealResolution.trim()} onClick={() => handleAppealDecision('reject')}>驳回申诉</Button><Button type="primary" disabled={!appealResolution.trim() || !appealCorrection} onClick={() => handleAppealDecision('correct')}>确认修正</Button></>}>
+        <p>{activeAppeal?.reason}</p>
+        {appealCorrection && <div className="kpi-appeal-fields"><label>目标完成率 (%)<InputNumber aria-label="申诉目标完成率" min={0} max={200} value={appealCorrection.okrCompletion} onChange={value => setAppealCorrection(current => current && { ...current, okrCompletion: Number(value ?? 0) })} /></label><label>月度目标得分<InputNumber aria-label="申诉月度目标得分" min={0} max={60} value={appealCorrection.objectiveScore} onChange={value => setAppealCorrection(current => current && { ...current, objectiveScore: Number(value ?? 0) })} /></label><label>周报迟交<InputNumber aria-label="申诉周报迟交" min={0} max={31} precision={0} value={appealCorrection.reportLate} onChange={value => setAppealCorrection(current => current && { ...current, reportLate: Number(value ?? 0) })} /></label><label>月报未交<InputNumber aria-label="申诉月报未交" min={0} max={31} precision={0} value={appealCorrection.reportMissing} onChange={value => setAppealCorrection(current => current && { ...current, reportMissing: Number(value ?? 0) })} /></label><label>任务逾期<InputNumber aria-label="申诉任务逾期" min={0} max={31} precision={0} value={appealCorrection.tasksOverdue} onChange={value => setAppealCorrection(current => current && { ...current, tasksOverdue: Number(value ?? 0) })} /></label><label>复盘得分<InputNumber aria-label="申诉复盘得分" min={0} max={10} value={appealCorrection.reviewScore} onChange={value => setAppealCorrection(current => current && { ...current, reviewScore: Number(value ?? 0) })} /></label></div>}
+        <label className="kpi-appeal-resolution">处理说明<Input.TextArea aria-label="申诉处理说明" rows={3} maxLength={500} showCount value={appealResolution} onChange={event => setAppealResolution(event.target.value)} /></label>
       </Modal>
       <Modal open={!!detailTarget} title={detailTarget ? `${detailTarget.name} · ${monthLabel(month)}绩效结果` : ''} width={680} footer={<Button onClick={() => setDetailTarget(null)}>关闭</Button>} onCancel={() => setDetailTarget(null)}>
         {detailTarget && scoreBreakdown(detailTarget)}
@@ -340,24 +416,17 @@ export const KpiPerformanceDemoView: React.FC = () => {
     </section>}
 
     {view === 'sources' && <section className="kpi-panel">
-      <div className="kpi-view-title"><div><span className="kpi-eyebrow">SOURCE RECORDS</span><h2>考核原始数据</h2><p>按来源查看考核数据，演示数据用于说明字段与校对方式</p></div><div className="kpi-filter-row"><Input allowClear placeholder="搜索员工姓名" value={query} onChange={event => setQuery(event.target.value)} prefix={<FileSearchOutlined />} /><Button icon={<DatabaseOutlined />}>重新同步</Button></div></div>
+      <div className="kpi-view-title"><div><span className="kpi-eyebrow">SOURCE RECORDS</span><h2>考核原始数据</h2><p>按来源查看考核数据，演示数据用于说明字段与校对方式</p></div><div className="kpi-filter-row"><Input allowClear placeholder="搜索员工姓名" value={query} onChange={event => setQuery(event.target.value)} prefix={<FileSearchOutlined />} /><Select aria-label="筛选部门" value={sourceDepartments.includes(department) ? department : '全部部门'} options={['全部部门', ...sourceDepartments].map(value => ({ value, label: value }))} onChange={setDepartment} /><Button icon={<DatabaseOutlined />} loading={syncing} disabled={!period} onClick={syncSources}>同步数据</Button></div></div>
       <div className="kpi-source-tabs" role="tablist" aria-label="原始数据分类">{sourceDataTabs.map(item => <button key={item.key} role="tab" aria-selected={sourceDataTab === item.key} className={sourceDataTab === item.key ? 'is-active' : ''} onClick={() => setSourceDataTab(item.key)}>{item.label}</button>)}</div>
-      <div className="kpi-inline-notice"><DatabaseOutlined /> 数据范围：{monthLabel(month)} · 最后同步 2026-11-01 08:45 · {filteredEmployees.length} 项待校对</div>
+      <div className="kpi-inline-notice"><DatabaseOutlined /> 数据范围：{monthLabel(month)} · 最后同步 {period?.sourceSyncedAt || '尚未同步'} · {filteredEmployees.length} 位员工</div>
       <div className="kpi-source-table-wrap"><table className="kpi-source-table"><thead><tr><th>员工</th><th>部门</th>{sourceDataTab === 'objective' && <><th>目标完成率</th><th>基础得分</th><th>目标加分</th><th>目标扣分</th><th>数据状态</th></>}{sourceDataTab === 'attendance' && <><th>出勤天数</th><th>迟到次数</th><th>缺卡次数</th><th>请假天数</th><th>请假记录</th><th>数据状态</th></>}{sourceDataTab === 'extraWork' && <><th>加班总时长</th><th>折算得分</th><th>月度上限</th><th>额外工作得分</th></>}{sourceDataTab === 'reports' && <><th>周报迟交</th><th>月报未交</th><th>任务逾期</th><th>复盘得分</th><th>数据状态</th></>}</tr></thead><tbody>{filteredEmployees.map(employee => <tr key={employee.id} className={selectedId === employee.id ? 'is-selected' : ''} onClick={() => setSelectedId(employee.id)}>{<td><b>{employee.name}</b></td>}<td>{employee.department}</td>{sourceDataTab === 'objective' && <><td>{employee.source.okrCompletion}%</td><td>{employee.scores.objective.toFixed(1)}</td><td>{sourceAdjustmentFor(employee) > 0 ? sourceAdjustmentFor(employee).toFixed(1) : '0'}</td><td>{sourceAdjustmentFor(employee) < 0 ? Math.abs(sourceAdjustmentFor(employee)).toFixed(1) : '0'}</td><td><Tag color={employee.source.okrCompletion >= 80 ? 'success' : 'warning'}>{employee.source.okrCompletion >= 80 ? '已核对' : '待核对'}</Tag></td></>}{sourceDataTab === 'attendance' && <><td>{employee.source.attendanceDays} 天</td><td>{employee.source.lateCount}</td><td>{employee.source.missingPunches}</td><td>{Object.values(employee.source.leaveRecords || {}).reduce<number>((sum, days) => sum + Number(days), 0)} 天</td><td>{Object.entries(employee.source.leaveRecords || {}).filter(([, days]) => Number(days) > 0).map(([type, days]) => `${type} ${days} 天`).join("、") || "无"}</td><td><Tag color="success">已核对</Tag></td></>}{sourceDataTab === 'extraWork' && <><td>{employee.source.approvedOvertimeHours} 小时</td><td>{(employee.source.approvedOvertimeHours / 4).toFixed(1)} 分</td><td>5.0 分</td><td>{employee.scores.extraWork.toFixed(1)} 分</td></>}{sourceDataTab === 'reports' && <><td>{employee.source.reportLate}</td><td>{employee.source.reportMissing}</td><td>{employee.source.tasksOverdue}</td><td>{employee.scores.review.toFixed(1)}</td><td><Tag color={employee.source.reportLate + employee.source.reportMissing === 0 ? 'success' : 'warning'}>{employee.source.reportLate + employee.source.reportMissing === 0 ? '已核对' : '待核对'}</Tag></td></>}</tr>)}</tbody></table></div>
       {filteredEmployees.length === 0 && <Empty description="没有匹配的员工原始数据" />}
-      {selectedSourceEmployee && <section className="kpi-source-review-history" aria-label={`${selectedSourceEmployee.name}复核修改记录`}>
-        <div className="kpi-section-heading"><div><h3>复核修改记录</h3><p>{selectedSourceEmployee.name} · {selectedSourceEmployee.department} · 原始来源值不因主管复核而覆盖</p></div><Tag>{selectedSourceEmployee.reviewHistory?.length ?? 0} 条</Tag></div>
-        {selectedSourceEmployee.reviewHistory?.length ? <div className="kpi-source-review-list">{[...selectedSourceEmployee.reviewHistory].reverse().map(record => <article key={record.id}>
-          <div><b>{record.action}</b><span>{record.actor} · {new Date(record.at).toLocaleString('zh-CN', { hour12: false })}</span></div>
-          <p>工作态度 {record.before.attitude} → {record.proposed.attitude} 分 · 目标加减分 {record.before.adjustment} → {record.proposed.adjustment} 分 · 汇总 {record.before.total.toFixed(1)} → {record.proposed.total.toFixed(1)} 分</p>
-          <small>{record.reason}</small>
-        </article>)}</div> : <Empty description="暂无复核修改记录" />}
-      </section>}
     </section>}
 
     {view === 'calculation' && <section className="kpi-panel">
-      <div className="kpi-view-title"><div><span className="kpi-eyebrow">CALCULATION & REVIEW</span><h2>汇总计算与主管复核</h2><p>系统自动计算基础分；主管修改只有 HR 审核通过后才计入汇总</p></div>{role === 'HR' && <div className="kpi-review-switch"><div><b>允许主管复核修改</b><span>{period?.reviewEnabled ? '主管提交后进入 HR 待审队列' : '关闭后所有未提交修改转由 HR 确认系统分'}</span></div><Switch checked={period?.reviewEnabled} disabled={period?.published} onChange={setReviewMode} /></div>}</div>
-      {role === '主管' && <div className="kpi-inline-notice"><AuditOutlined />{period?.published ? <>本月结果已公示，评分已锁定。<Button type="primary" size="small" onClick={() => { setMonth('2026-11'); setSelectedId(state.periods['2026-11']?.employees.find(employee => employee.manager === supervisor)?.id || ''); }}>进入 11 月复核演示</Button></> : period?.reviewEnabled ? <>当前为主管复核工作区。选择左侧待复核员工，在下方修改工作态度分和目标加减分，填写复核说明后点击“提交给 HR 审核”。</> : 'HR 尚未开启主管复核，当前评分为只读。'}</div>}
+      <div className="kpi-view-title"><div><span className="kpi-eyebrow">CALCULATION & REVIEW</span><h2>汇总计算与主管复核</h2><p>主管仅能在周期设置的复核时间范围内提交，HR 审核通过后计入正式汇总</p></div>{role === 'HR' && <Button disabled={!period?.generated || period.published} onClick={openCycleSettings}>周期设置</Button>}</div>
+      {role === 'HR' && period?.cycleSettings && <div className="kpi-inline-notice"><ClockCircleOutlined />{Date.now() < new Date(period.cycleSettings.finalPublicationAt).getTime() ? `计划于 ${dayjs(period.cycleSettings.finalPublicationAt).format('YYYY-MM-DD HH:mm')} 自动公示` : !period.generated ? '已到最终公示时间，考核尚未生成，暂缓公示' : employees.some(employee => employee.reviewStatus !== '已通过') ? `已到自动公示时间，仍有 ${employees.filter(employee => employee.reviewStatus !== '已通过').length} 位员工待 HR 审核` : !departments.length ? '已到自动公示时间，本月暂无部门数据，暂缓公示' : departments.some(name => !period.departmentMetrics?.[name]?.confirmed) ? '已到自动公示时间，仍有部门系数待确认' : period.published ? '本月绩效已自动公示' : '已到自动公示时间，等待自动处理'}</div>}
+      {role === '主管' && <div className="kpi-inline-notice"><AuditOutlined />{period?.published ? <>本月结果已公示，评分已锁定。<Button type="primary" size="small" onClick={() => { setMonth('2026-11'); setSelectedId(state.periods['2026-11']?.employees.find(employee => employee.manager === supervisor)?.id || ''); }}>进入 11 月复核演示</Button></> : period?.cycleSettings && !managerReviewOpen ? '当前不在主管复核时间范围内，评分只读且暂不可提交。' : !managerReviewOpen ? '本月尚未配置主管复核时间范围，评分只读。' : <>当前为主管复核时间范围内。选择左侧待复核员工，填写复核说明后提交给 HR 审核。</>}</div>}
       {!period?.generated && <div className="kpi-inline-notice"><ClockCircleOutlined />生成考核后可提交主管复核。以下演示数据可供预览。</div>}
       {role === '主管' && selectedEmployee && <div className="kpi-manager-department-overview"><strong>{selectedEmployee.department}</strong><span>{currentReviewGroup.length} 位员工</span><span>当前平均 {((currentReviewGroup.reduce((sum, employee) => sum + scoreForEmployee(employee), 0)) / currentReviewGroup.length).toFixed(1)} 分</span><span>复核后预览 {((currentReviewGroup.reduce((sum, employee) => sum + previewManagerScore(employee), 0)) / currentReviewGroup.length).toFixed(1)} 分</span></div>}
       <div className={`kpi-calculation-layout${role === 'HR' ? ' is-hr-review' : ''}`}><div className="kpi-employee-rail">
@@ -376,7 +445,7 @@ export const KpiPerformanceDemoView: React.FC = () => {
           <div className="kpi-calc-scoreboard">{KPI_DIMENSIONS.map(dimension => <div key={dimension.key}><span>{dimension.label}<small>{dimension.weight}</small></span><b>{selectedEmployee.scores[dimension.key]}<small> / {dimension.max}</small></b></div>)}<div className="is-adjustment"><span>人工加减分<small>需填写原因</small></span><b className={selectedEmployee.scores.managerAdjustment > 0 ? 'is-positive' : selectedEmployee.scores.managerAdjustment < 0 ? 'is-negative' : ''}>{selectedEmployee.scores.managerAdjustment > 0 ? '+' : ''}{selectedEmployee.scores.managerAdjustment.toFixed(1)}</b></div></div>
           <div className="kpi-total-score"><div><span>基础绩效分</span><small>按五个评分维度与主管调整合计</small></div><strong>{scoreForEmployee(selectedEmployee).toFixed(1)}<small>分</small></strong><div className={`kpi-grade-stamp grade-${gradeForScore(scoreForEmployee(selectedEmployee)).grade.toLowerCase()}`}><b>{gradeForScore(scoreForEmployee(selectedEmployee)).grade}</b><span>基础系数 {coefficientText(gradeForScore(scoreForEmployee(selectedEmployee)).coefficient)}</span></div></div>
           <div className="kpi-rule-line"><span>数据范围</span><b>全部为演示数据，月度目标暂未关联</b><span>计算版本</span><b>演示规则 V1</b></div>
-          {period?.reviewEnabled && !period.published && ['待主管复核', 'HR 已退回'].includes(selectedEmployee.reviewStatus) && role === '主管' && <div className="kpi-manager-form"><div className="kpi-section-heading"><div><span className="kpi-eyebrow">MANAGER REVIEW</span><h3>{selectedEmployee.department}复核 · {selectedEmployee.reviewStatus === 'HR 已退回' ? '修改并重新提交' : '复核评分'}</h3></div><Tag color={selectedEmployee.reviewStatus === 'HR 已退回' ? 'error' : 'gold'}>{selectedEmployee.reviewStatus === 'HR 已退回' ? 'HR 已退回' : '待提交'}</Tag></div>{selectedEmployee.reviewStatus === 'HR 已退回' && selectedEmployee.hrNote && <div className="kpi-return-note">{selectedEmployee.hrNote}</div>}<div className="kpi-manager-fields"><label>工作态度分<InputNumber min={0} max={15} value={selectedEmployee.managerDraft?.attitude ?? selectedEmployee.scores.attitude} onChange={value => updateEmployee(selectedEmployee.id, employee => ({ ...employee, managerDraft: { attitude: Number(value ?? 0), adjustment: employee.managerDraft?.adjustment ?? employee.scores.managerAdjustment, reason: employee.managerDraft?.reason ?? '' } }))} /></label><label>目标加减分<InputNumber min={-5} max={5} value={selectedEmployee.managerDraft?.adjustment ?? selectedEmployee.scores.managerAdjustment} onChange={value => updateEmployee(selectedEmployee.id, employee => ({ ...employee, managerDraft: { attitude: employee.managerDraft?.attitude ?? employee.scores.attitude, adjustment: Number(value ?? 0), reason: employee.managerDraft?.reason ?? '' } }))} /></label></div><label className="kpi-reason-label">复核说明<Input.TextArea rows={3} maxLength={200} value={selectedEmployee.managerDraft?.reason || ''} placeholder="填写事实依据，提交后由 HR 审核" onChange={event => updateEmployee(selectedEmployee.id, employee => ({ ...employee, managerDraft: { attitude: employee.managerDraft?.attitude ?? employee.scores.attitude, adjustment: employee.managerDraft?.adjustment ?? employee.scores.managerAdjustment, reason: event.target.value } }))} /></label><div className="kpi-manager-preview"><span>提交后的评分预览</span><b>{previewManagerScore(selectedEmployee).toFixed(1)} 分 · {gradeForScore(previewManagerScore(selectedEmployee)).grade} 级</b><small>同部门员工复核完成后统一提交；HR 通过后才更新正式汇总</small></div><Button type="primary" icon={<SendOutlined />} disabled={currentReviewGroup.some(employee => !['待主管复核', 'HR 已退回'].includes(employee.reviewStatus))} onClick={applyManagerReview}>提交{selectedEmployee.department}给 HR 审核</Button></div>}
+          {managerReviewOpen && !period.published && ['待主管复核', 'HR 已退回'].includes(selectedEmployee.reviewStatus) && role === '主管' && <div className="kpi-manager-form"><div className="kpi-section-heading"><div><span className="kpi-eyebrow">MANAGER REVIEW</span><h3>{selectedEmployee.department}复核 · {selectedEmployee.reviewStatus === 'HR 已退回' ? '修改并重新提交' : '复核评分'}</h3></div><Tag color={selectedEmployee.reviewStatus === 'HR 已退回' ? 'error' : 'gold'}>{selectedEmployee.reviewStatus === 'HR 已退回' ? 'HR 已退回' : '待提交'}</Tag></div>{selectedEmployee.reviewStatus === 'HR 已退回' && selectedEmployee.hrNote && <div className="kpi-return-note">{selectedEmployee.hrNote}</div>}<div className="kpi-manager-fields"><label>工作态度分<InputNumber min={0} max={15} value={selectedEmployee.managerDraft?.attitude ?? selectedEmployee.scores.attitude} onChange={value => updateEmployee(selectedEmployee.id, employee => ({ ...employee, managerDraft: { attitude: Number(value ?? 0), adjustment: employee.managerDraft?.adjustment ?? employee.scores.managerAdjustment, reason: employee.managerDraft?.reason ?? '' } }))} /></label><label>目标加减分<InputNumber min={-5} max={5} value={selectedEmployee.managerDraft?.adjustment ?? selectedEmployee.scores.managerAdjustment} onChange={value => updateEmployee(selectedEmployee.id, employee => ({ ...employee, managerDraft: { attitude: employee.managerDraft?.attitude ?? employee.scores.attitude, adjustment: Number(value ?? 0), reason: employee.managerDraft?.reason ?? '' } }))} /></label></div><label className="kpi-reason-label">复核说明<Input.TextArea rows={3} maxLength={200} value={selectedEmployee.managerDraft?.reason || ''} placeholder="填写事实依据，提交后由 HR 审核" onChange={event => updateEmployee(selectedEmployee.id, employee => ({ ...employee, managerDraft: { attitude: employee.managerDraft?.attitude ?? employee.scores.attitude, adjustment: employee.managerDraft?.adjustment ?? employee.scores.managerAdjustment, reason: event.target.value } }))} /></label><div className="kpi-manager-preview"><span>提交后的评分预览</span><b>{previewManagerScore(selectedEmployee).toFixed(1)} 分 · {gradeForScore(previewManagerScore(selectedEmployee)).grade} 级</b><small>同部门员工复核完成后统一提交；HR 通过后才更新正式汇总</small></div><Button type="primary" icon={<SendOutlined />} disabled={currentReviewGroup.some(employee => !['待主管复核', 'HR 已退回'].includes(employee.reviewStatus))} onClick={applyManagerReview}>提交{selectedEmployee.department}给 HR 审核</Button></div>}
           {role === 'HR' && !period?.published && currentReviewGroup.every(employee => employee.reviewStatus === '待 HR 审核') && <div className="kpi-department-review"><div className="kpi-section-heading"><div><h3>{selectedEmployee.department} · 主管 {selectedEmployee.manager}</h3><p>提交的评分在通过前不会计入正式汇总</p></div><Tag color="processing">{currentReviewGroup.length} 位待审核</Tag></div>{currentReviewGroup.map(employee => <div className="kpi-department-review-row" key={employee.id}><b>{employee.name}</b><span>工作态度 {employee.scores.attitude} → {employee.managerDraft?.attitude ?? employee.scores.attitude} 分</span><span>目标加减分 {employee.scores.managerAdjustment} → {employee.managerDraft?.adjustment ?? employee.scores.managerAdjustment} 分</span><span>汇总 {scoreForEmployee(employee).toFixed(1)} → {previewManagerScore(employee).toFixed(1)} 分</span><small>{employee.managerDraft?.reason || '主管确认当前评分'}</small></div>)}<div className="kpi-review-actions"><Button type="primary" icon={<CheckOutlined />} onClick={() => approveEmployee(selectedEmployee)}>审核通过</Button><Button onClick={() => { setReturnTarget(selectedEmployee); setReturnReason(''); }}>退回主管修改</Button></div></div>}
           {role === '主管' && selectedEmployee.reviewStatus === '待 HR 审核' && <div className="kpi-hr-review-strip"><span><ClockCircleOutlined />已提交 HR 审核，评分暂未计入汇总；HR 通过后才会更新。</span></div>}
           {role === '主管' && selectedEmployee.reviewStatus === '已通过' && <div className="kpi-hr-review-strip"><span><CheckOutlined />HR 已审核通过，本员工评分已锁定并计入汇总。</span></div>}
@@ -386,6 +455,22 @@ export const KpiPerformanceDemoView: React.FC = () => {
       </div>
       <Modal open={!!returnTarget} title={`退回${returnTarget?.department || ''}复核`} footer={<><Button onClick={() => { setReturnTarget(null); setReturnReason(''); }}>取消</Button><Button type="primary" disabled={!returnReason.trim()} onClick={returnEmployee}>确认退回</Button></>} onCancel={() => { setReturnTarget(null); setReturnReason(''); }}><Input.TextArea aria-label="退回原因" rows={4} maxLength={200} value={returnReason} placeholder="填写退回原因" onChange={event => setReturnReason(event.target.value)} /></Modal>
     </section>}
+
+    <Modal open={cycleSettingsOpen && role === 'HR'} title={`${monthLabel(month)}周期设置`} width={720} footer={null} onCancel={() => { setCycleSettingsOpen(false); setCycleDraft(null); }}>
+      <div className="kpi-cycle-modal-content">
+        <p className="kpi-cycle-description">设置主管复核、员工申诉确认及最终自动公示时间。</p>
+        {!period?.generated && <div className="kpi-inline-notice"><ClockCircleOutlined />请先生成本月考核，再设置业务周期。</div>}
+        {period?.published && <div className="kpi-inline-notice"><LockOutlined />本月已公示，周期设置已锁定。</div>}
+        {cycleDraft && <div className="kpi-cycle-form">
+          <label>主管复核时间范围<DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm" value={[dayjs(cycleDraft.managerReview.startAt), dayjs(cycleDraft.managerReview.endAt)]} disabled={period?.published} onChange={values => { if (values?.[0] && values[1]) setCycleDraft(current => current && ({ ...current, managerReview: { startAt: values[0]!.toISOString(), endAt: values[1]!.toISOString() } })); }} /></label>
+          <label>最终公示时间<DatePicker showTime format="YYYY-MM-DD HH:mm" value={dayjs(cycleDraft.finalPublicationAt)} disabled={period?.published} onChange={value => { if (value) setCycleDraft(current => current && ({ ...current, finalPublicationAt: value.toISOString() })); }} /></label>
+          <label>员工申诉确认时间范围<DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm" value={[dayjs(cycleDraft.appealConfirmation.startAt), dayjs(cycleDraft.appealConfirmation.endAt)]} disabled={period?.published} onChange={values => { if (values?.[0] && values[1]) setCycleDraft(current => current && ({ ...current, appealConfirmation: { startAt: values[0]!.toISOString(), endAt: values[1]!.toISOString() } })); }} /></label>
+          <div className="kpi-cycle-hint">主管复核结束后进入申诉确认阶段。最终公示时间到达后自动检查审核及部门系数；条件未满足时暂缓，条件满足后自动公示。</div>
+          <div className="kpi-cycle-actions"><Button onClick={() => { setCycleSettingsOpen(false); setCycleDraft(null); }}>取消</Button><Button type="primary" disabled={!period?.generated || period.published} onClick={saveCycleSettings}>保存周期设置</Button></div>
+        </div>}
+        {!cycleDraft && period?.generated && !period.published && <div className="kpi-cycle-empty"><p>尚未配置本月周期</p><Button type="primary" onClick={() => { const base = dayjs().add(1, 'day').startOf('day'); setCycleDraft({ managerReview: { startAt: base.toISOString(), endAt: base.add(3, 'day').toISOString() }, finalPublicationAt: base.add(4, 'day').toISOString(), appealConfirmation: { startAt: base.add(4, 'day').add(1, 'minute').toISOString(), endAt: base.add(8, 'day').toISOString() } }); }}>设置周期</Button></div>}
+      </div>
+    </Modal>
 
     {view === 'hr' && <section className="kpi-panel">
       <div className="kpi-view-title"><div><span className="kpi-eyebrow">DEPARTMENT FACTORS</span><h2>部门系数与红线</h2><p>按月度目标、团队批量完成率和重大红线预览部门系数，确认后用于公示</p></div></div>

@@ -10,6 +10,7 @@ import { ToastContainer } from './components/common/UIComponents';
 import { Navigate, Route, Routes, useParams, useLocation } from 'react-router-dom';
 import { DevLoginPage } from './components/auth/DevLoginPage';
 import { readSession } from './services/session';
+import { autoPublishKpiPeriod, loadKpiDemo, saveKpiDemo } from './services/kpiPerformanceDemo';
 
 import { SESSION_CHANGED, SESSION_KEY, SESSION_TOKEN_KEY, SHARED_SESSION_KEY, invalidateSession } from './services/sessionStorage';
 import { useQueryClient } from '@tanstack/react-query';
@@ -229,6 +230,26 @@ const AppShell: React.FC = () => {
   const location = useLocation();
   const viewId = location.pathname.startsWith('/app/') ? location.pathname.slice('/app/'.length) : '';
   const fullPage = isFullPageDetail(viewId, location.search);
+  useEffect(() => {
+    const checkScheduledPublications = () => {
+      const state = loadKpiDemo();
+      const publishedMonths: string[] = [];
+      Object.entries(state.periods).forEach(([month, period]) => {
+        const updated = autoPublishKpiPeriod(period);
+        if (updated !== period) {
+          state.periods[month] = updated;
+          publishedMonths.push(month);
+        }
+      });
+      if (publishedMonths.length) {
+        saveKpiDemo(state);
+        window.dispatchEvent(new CustomEvent('shichuang:kpi-auto-published', { detail: { months: publishedMonths } }));
+      }
+    };
+    checkScheduledPublications();
+    const timer = window.setInterval(checkScheduledPublications, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   return (
     <AppProvider>
         <div className="tech-shell flex flex-col h-screen w-screen overflow-hidden font-sans antialiased selection:bg-cyan-400 selection:text-slate-950">

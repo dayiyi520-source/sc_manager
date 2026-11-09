@@ -18,7 +18,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); localStorage.clear(); });
 
 describe('HR 绩效公示', () => {
-  it('HR 开启主管复核后，待审系统分回到主管待复核状态', () => {
+  it('HR 设置主管复核周期后，待审系统分转为待主管复核', async () => {
     const state = loadKpiDemo();
     const period = state.periods['2026-11'];
     period.published = false;
@@ -27,7 +27,9 @@ describe('HR 绩效公示', () => {
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
-    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('button', { name: '周期设置' }));
+    fireEvent.click(await screen.findByRole('button', { name: '设置周期' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存周期设置' }));
     expect(loadKpiDemo().periods['2026-11'].reviewEnabled).toBe(true);
     expect(loadKpiDemo().periods['2026-11'].employees.every(employee => employee.reviewStatus === '待主管复核')).toBe(true);
     expect(loadKpiDemo().periods['2026-11'].employees.every(employee => employee.scores.attitude === 0 && employee.scores.managerAdjustment === 0)).toBe(true);
@@ -129,22 +131,20 @@ describe('HR 绩效公示', () => {
     expect(within(screen.getByRole('group', { name: '产品部系数指标' })).getAllByText('0.80')).toHaveLength(2);
   });
 
-  it('原始数据呈现主管提交和 HR 通过的分数修改记录', () => {
+  it('原始数据只展示 HR 已审核的目标扣分，不重复展示复核记录', () => {
     const state = loadKpiDemo();
     const period = state.periods['2026-11'];
     period.published = false;
+    const now = Date.now();
+    period.cycleSettings = { managerReview: { startAt: new Date(now - 60_000).toISOString(), endAt: new Date(now + 86_400_000).toISOString() }, finalPublicationAt: new Date(now + 172_800_000).toISOString(), appealConfirmation: { startAt: new Date(now + 172_860_000).toISOString(), endAt: new Date(now + 259_200_000).toISOString() } };
     period.employees.filter(employee => employee.department === '产品部').forEach(employee => { employee.reviewStatus = '待主管复核'; });
     period.employees[0].managerDraft = { attitude: 10, adjustment: -2, reason: '交付延期' };
     state.periods['2026-11'] = reviewDepartmentSubmission(submitDepartmentReview(period, '陈宇璋', '产品部'), '陈宇璋', '产品部', 'approve');
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
-    const history = screen.getByRole('region', { name: '林知夏复核修改记录' });
-    expect(within(screen.getByRole('row', { name: /林知夏/ })).getAllByRole('cell')[5]).toHaveTextContent('0');
-    expect(within(history).getByText('提交主管复核')).toBeInTheDocument();
-    expect(within(history).getByText('HR 审核通过')).toBeInTheDocument();
-    expect(within(history).getAllByText(/汇总 79.0 → 87.0 分/)).toHaveLength(2);
-    expect(within(history).getAllByText('交付延期')).toHaveLength(2);
+    expect(within(screen.getByRole('row', { name: /林知夏/ })).getAllByRole('cell')[5]).toHaveTextContent('2.0');
+    expect(screen.queryByRole('region', { name: /复核修改记录/ })).not.toBeInTheDocument();
   });
 
   it('在汇总复核同页审核主管提交的部门员工', () => {

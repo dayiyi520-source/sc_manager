@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { KpiEmployee } from './kpiPerformanceDemo';
-import { filterPublishedEmployees, listKpiAppeals, submitKpiAppeal, summarizeDepartmentPerformance } from './kpiPerformancePublication';
+import { loadKpiDemo, saveKpiDemo, syncKpiSources } from './kpiPerformanceDemo';
+import { correctionForEmployee, filterPublishedEmployees, listKpiAppeals, resolveKpiAppeal, submitKpiAppeal, summarizeDepartmentPerformance } from './kpiPerformancePublication';
 
 const employee = (id: string, department: string, manager: string, score: number): KpiEmployee => ({
   id, name: id, department, position: '专员', manager,
@@ -47,5 +48,36 @@ describe('绩效申诉 Mock 持久化', () => {
     expect(() => submitKpiAppeal({ month: '2026-10', employeeId: 'a', employeeName: '员工甲', reason: '  ' })).toThrow('请填写申诉原因');
     expect(() => submitKpiAppeal({ month: '2026-10', employeeId: 'a', employeeName: '员工甲', reason: 'x'.repeat(501) })).toThrow('不能超过 500 字');
     expect(listKpiAppeals()).toEqual([]);
+  });
+
+  it('HR 修正已公示目标与周月报后保留审计、结果和同步幂等性', () => {
+    const state = loadKpiDemo();
+    const period = state.periods['2026-10'];
+    const original = period.employees[0];
+    const appeal = submitKpiAppeal({ month: '2026-10', employeeId: original.id, employeeName: original.name, reason: '目标和周报分数有误' });
+    expect(() => submitKpiAppeal({ month: '2026-10', employeeId: original.id, employeeName: original.name, reason: '重复申诉' })).toThrow('已有待处理申诉');
+    const correction = { ...correctionForEmployee(original), okrCompletion: 105, objectiveScore: 60, reportLate: 1, reviewScore: 8 };
+    expect(() => resolveKpiAppeal(period, '2026-10', appeal.id, '员工', 'correct', '核实', correction)).toThrow('仅 HR');
+    expect(() => resolveKpiAppeal(period, '2026-11', appeal.id, 'HR', 'correct', '核实', correction)).toThrow('月份不匹配');
+    expect(() => resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'correct', '核实', { ...correction, objectiveScore: 61 })).toThrow('超出允许范围');
+    const resolved = resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'correct', '已核对来源', correction);
+    expect(resolved.appeal).toMatchObject({ status: '已修正', correction: { before: { okrCompletion: original.source.okrCompletion }, after: { okrCompletion: 105 } } });
+    expect(resolved.period.employees[0]).toMatchObject({ source: { okrCompletion: 105, reportLate: 1 }, scores: { objective: 60, review: 8 } });
+    expect(resolved.period.departmentCoefficients.产品部).toBeDefined();
+    expect(syncKpiSources(resolved.period, '2026-10').employees[0].source.okrCompletion).toBe(105);
+    state.periods['2026-10'] = resolved.period;
+    saveKpiDemo(state);
+    expect(loadKpiDemo().periods['2026-10'].employees[0].scores.objective).toBe(60);
+    expect(listKpiAppeals()[0].status).toBe('已修正');
+    expect(() => resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'reject', '重复处理')).toThrow('已处理');
+  });
+
+  it('驳回不修改成绩，并校验处理说明与员工存在性', () => {
+    const period = loadKpiDemo().periods['2026-10'];
+    const appeal = submitKpiAppeal({ month: '2026-10', employeeId: period.employees[0].id, employeeName: period.employees[0].name, reason: '请复核' });
+    expect(() => resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'reject', ' ')).toThrow('处理说明');
+    const resolved = resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'reject', '数据无误');
+    expect(resolved.period).toBe(period);
+    expect(resolved.appeal).toMatchObject({ status: '已驳回', resolution: '数据无误' });
   });
 });
