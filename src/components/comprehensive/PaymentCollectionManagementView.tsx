@@ -99,7 +99,7 @@ export const PaymentCollectionManagementView: React.FC = () => {
   };
 
   return (
-    <ComprehensivePage title="回款管理" description="跟踪合同回款计划、到账记录与逾期款项" icon={<CreditCard className="w-5 h-5" />}>
+    <ComprehensivePage title="回款管理" description="跟踪合同回款计划、到账记录与逾期款项" icon={<CreditCard className="w-5 h-5" />} hideHeader>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

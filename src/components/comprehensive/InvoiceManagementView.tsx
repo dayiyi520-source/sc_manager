@@ -88,7 +88,7 @@ export const InvoiceManagementView: React.FC = () => {
   };
 
   return (
-    <ComprehensivePage title="发票管理" description="处理销项开票、进项登记与企业开票资质" icon={<Receipt className="w-5 h-5" />}>
+    <ComprehensivePage title="发票管理" description="处理销项开票、进项登记与企业开票资质" icon={<Receipt className="w-5 h-5" />} hideHeader>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

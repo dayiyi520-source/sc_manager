@@ -4,7 +4,6 @@ import {
   CalendarCheck, 
   Clock, 
   AlertTriangle, 
-  Plus, 
   Search, 
   Filter, 
   CheckCircle2, 
@@ -17,7 +16,7 @@ import {
   Briefcase,
   Send
 } from '@/components/common/octicons-compat';
-import { StatCard, StatusTag, Modal, Drawer } from '../common/UIComponents';
+import { StatCard, StatusTag, Drawer } from '../common/UIComponents';
 import { ComprehensivePage } from './ComprehensivePage';
 import { useApp } from '../../context/AppContext';
 import { AttendanceRecord, LeaveApplication, OvertimeRecord, AttendanceException, ShiftSchedule } from '../../types';
@@ -29,61 +28,17 @@ export const AttendanceManagementView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Modal controls
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [showOvertimeModal, setShowOvertimeModal] = useState(false);
   const [selectedException, setSelectedException] = useState<AttendanceException | null>(null);
 
   // 当前数据库快照没有考勤相关表，演示初始状态保持为空。
   const [attendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [leaveApps, setLeaveApps] = useState<LeaveApplication[]>([]);
-  const [overtimeRecords, setOvertimeRecords] = useState<OvertimeRecord[]>([]);
+  const [leaveApps] = useState<LeaveApplication[]>([]);
+  const [overtimeRecords] = useState<OvertimeRecord[]>([]);
   const [exceptions, setExceptions] = useState<AttendanceException[]>([]);
   const [shiftSchedules] = useState<ShiftSchedule[]>([]);
   const presentCount = attendanceRecords.filter((record) => record.status === '正常').length;
   const lateOrEarlyCount = attendanceRecords.filter((record) => ['迟到', '早退'].includes(record.status)).length;
   const absentOrLeaveCount = attendanceRecords.filter((record) => ['请假', '缺勤'].includes(record.status)).length;
-
-  // Handle Leave Create
-  const [leaveForm, setLeaveForm] = useState({ applicant: '当前用户', type: '年假', startTime: '', endTime: '', days: 1, reason: '' });
-  const handleCreateLeave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newLeave: LeaveApplication = {
-      id: Date.now().toString(),
-      code: `LV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(Math.random()*90+10)}`,
-      applicant: leaveForm.applicant,
-      type: leaveForm.type as any,
-      startTime: leaveForm.startTime || '2026-09-03 09:00',
-      endTime: leaveForm.endTime || '2026-09-03 18:00',
-      days: Number(leaveForm.days) || 1,
-      reason: leaveForm.reason || '个人休假',
-      approvalStatus: '待审批'
-    };
-    setLeaveApps([newLeave, ...leaveApps]);
-    setShowLeaveModal(false);
-    addToast('success', '请假申请已提交', `单号：${newLeave.code}`);
-  };
-
-  // Handle Overtime Create
-  const [otForm, setOtForm] = useState({ empName: '当前用户', department: '软件研发部', date: '', hours: 2, type: '工作日加班', reason: '' });
-  const handleCreateOt = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newOt: OvertimeRecord = {
-      id: Date.now().toString(),
-      code: `OT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(Math.random()*90+10)}`,
-      empName: otForm.empName,
-      department: otForm.department,
-      date: otForm.date || '2026-09-03',
-      timeSlot: '18:30 - 20:30',
-      hours: Number(otForm.hours) || 2,
-      type: otForm.type as any,
-      reason: otForm.reason || '项目紧急需求处理',
-      status: '待审批'
-    };
-    setOvertimeRecords([newOt, ...overtimeRecords]);
-    setShowOvertimeModal(false);
-    addToast('success', '加班申请已提交', `单号：${newOt.code}`);
-  };
 
   const handleFixException = (status: '已修正' | '驳回') => {
     if (!selectedException) return;
@@ -93,7 +48,7 @@ export const AttendanceManagementView: React.FC = () => {
   };
 
   return (
-    <ComprehensivePage title="考勤管理" description="查看考勤记录、请假加班申请与异常处理" icon={<CalendarCheck className="w-5 h-5" />}>
+    <ComprehensivePage title="考勤管理" description="查看考勤记录、请假加班申请与异常处理" icon={<CalendarCheck className="w-5 h-5" />} hideHeader>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -193,23 +148,6 @@ export const AttendanceManagementView: React.FC = () => {
             >
               <Briefcase className="w-3.5 h-3.5" />
               排班管理
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => setShowLeaveModal(true)}
-              className="px-3.5 py-1.5 bg-[var(--warning)] text-black hover:bg-[var(--accent-gold-hover)] font-semibold rounded-md text-xs flex items-center gap-1.5 transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              新增请假申请
-            </button>
-            <button
-              onClick={() => setShowOvertimeModal(true)}
-              className="px-3.5 py-1.5 bg-[var(--bg-elevated)] text-[var(--text-primary)] hover:bg-[var(--border-main)] font-medium rounded-md text-xs flex items-center gap-1.5 transition-colors border border-[var(--border-main)] shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              申请加班
             </button>
           </div>
         </div>
@@ -421,126 +359,6 @@ export const AttendanceManagementView: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Modal: 新增请假申请 */}
-      <Modal
-        isOpen={showLeaveModal}
-        onClose={() => setShowLeaveModal(false)}
-        title="新建请假申请"
-        maxWidth="md"
-      >
-        <form onSubmit={handleCreateLeave} className="space-y-4 text-xs">
-          <div>
-            <label className="block font-medium text-[var(--text-muted)] mb-1">请假类型</label>
-            <select 
-              value={leaveForm.type} 
-              onChange={(e) => setLeaveForm({ ...leaveForm, type: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
-            >
-              <option value="年假">年假</option>
-              <option value="事假">事假</option>
-              <option value="病假">病假</option>
-              <option value="调休">调休</option>
-              <option value="婚假">婚假</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-medium text-[var(--text-muted)] mb-1">开始时间</label>
-              <input 
-                type="datetime-local" 
-                onChange={(e) => setLeaveForm({ ...leaveForm, startTime: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]" 
-              />
-            </div>
-            <div>
-              <label className="block font-medium text-[var(--text-muted)] mb-1">结束时间</label>
-              <input 
-                type="datetime-local" 
-                onChange={(e) => setLeaveForm({ ...leaveForm, endTime: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]" 
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block font-medium text-[var(--text-muted)] mb-1">请假天数</label>
-            <input 
-              type="number" step="0.5"
-              value={leaveForm.days}
-              onChange={(e) => setLeaveForm({ ...leaveForm, days: Number(e.target.value) })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]" 
-            />
-          </div>
-          <div>
-            <label className="block font-medium text-[var(--text-muted)] mb-1">事由说明</label>
-            <textarea 
-              rows={3} 
-              value={leaveForm.reason}
-              onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]" 
-              placeholder="请输入具体请假原因..."
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setShowLeaveModal(false)} className="px-3.5 py-1.5 border border-[var(--border-main)] rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]">取消</button>
-            <button type="submit" className="px-3.5 py-1.5 bg-[var(--warning)] text-black font-semibold rounded-md hover:bg-[var(--accent-gold-hover)]">提交审批</button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal: 申请加班 */}
-      <Modal
-        isOpen={showOvertimeModal}
-        onClose={() => setShowOvertimeModal(false)}
-        title="申请加班"
-        maxWidth="md"
-      >
-        <form onSubmit={handleCreateOt} className="space-y-4 text-xs">
-          <div>
-            <label className="block font-medium text-[var(--text-muted)] mb-1">加班日期</label>
-            <input 
-              type="date" 
-              onChange={(e) => setOtForm({ ...otForm, date: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]" 
-            />
-          </div>
-          <div>
-            <label className="block font-medium text-[var(--text-muted)] mb-1">加班类型</label>
-            <select 
-              value={otForm.type} 
-              onChange={(e) => setOtForm({ ...otForm, type: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
-            >
-              <option value="工作日加班">工作日加班</option>
-              <option value="双休日加班">双休日加班</option>
-              <option value="法定节假日加班">法定节假日加班</option>
-            </select>
-          </div>
-          <div>
-            <label className="block font-medium text-[var(--text-muted)] mb-1">预估时长 (小时)</label>
-            <input 
-              type="number" step="0.5" 
-              value={otForm.hours}
-              onChange={(e) => setOtForm({ ...otForm, hours: Number(e.target.value) })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]" 
-            />
-          </div>
-          <div>
-            <label className="block font-medium text-[var(--text-muted)] mb-1">加班事由与工作目标</label>
-            <textarea 
-              rows={3} 
-              value={otForm.reason}
-              onChange={(e) => setOtForm({ ...otForm, reason: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]" 
-              placeholder="说明加班任务与必要性..."
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setShowOvertimeModal(false)} className="px-3.5 py-1.5 border border-[var(--border-main)] rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]">取消</button>
-            <button type="submit" className="px-3.5 py-1.5 bg-[var(--warning)] text-black font-semibold rounded-md hover:bg-[var(--accent-gold-hover)]">提交申请</button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Drawer: 申诉处理 */}
       <Drawer

@@ -103,7 +103,7 @@ export const ProcurementManagementView: React.FC = () => {
   };
 
   return (
-    <ComprehensivePage title="采购管理" description="管理采购申请、采购单及入库登记" icon={<ShoppingBag className="w-5 h-5" />}>
+    <ComprehensivePage title="采购管理" description="管理采购申请、采购单及入库登记" icon={<ShoppingBag className="w-5 h-5" />} hideHeader>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

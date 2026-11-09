@@ -1,0 +1,50 @@
+/* Approval surfaces inherit the active AIEDIT theme, including portal dialogs. */
+.approval-center button,
+.approval-center input,
+.approval-center select,
+.approval-center textarea,
+.approval-center [role="button"] {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+.approval-center :is(button, input, select, textarea, [role="button"]):focus-visible,
+.approval-detail-content button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.approval-center :is(button, input, select, textarea):disabled,
+.approval-detail-content button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.approval-detail-content {
+  background: var(--bg-surface);
+  color: var(--text-body);
+}
+.approval-detail-content > div {
+  min-width: 0;
+}
+.approval-detail-content h4 {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+.approval-detail-content [class*="grid"] > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .approval-center button,
+  .approval-center input,
+  .approval-center select,
+  .approval-center textarea,
+  .approval-center [role="button"] { transition: none; }
+}
+
+/* Modal portals live outside .approval-center. Scope their interaction states by title. */
+.fixed:has(.approval-modal-title) :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.fixed:has(.approval-modal-title) :is(button, input, select, textarea):disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}

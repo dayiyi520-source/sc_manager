@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { Empty } from 'antd';
+import './approval-center.css';
 import {
   FileCheck,
   Search,
   Filter,
-  Plus,
   Clock,
   CheckCircle2,
   XCircle,
@@ -29,14 +30,11 @@ import { pendingFor, reviewedBy } from '../workbench/workbenchListRules';
 export const ApprovalCenterView: React.FC = () => {
   const {
     approvals,
-    setApprovals,
     currentUser,
     approveFlow,
     rejectFlow,
     selectedApprovalIdForDetail,
     setSelectedApprovalIdForDetail,
-    addToast,
-    productLines,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'pending' | 'reviewed' | 'my_applied' | 'cc_me' | 'history'>('pending');
@@ -48,15 +46,6 @@ export const ApprovalCenterView: React.FC = () => {
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [actionTargetFlow, setActionTargetFlow] = useState<ApprovalFlow | null>(null);
   const [actionComment, setActionComment] = useState('');
-
-  // New Approval modal
-  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
-  const [formTitle, setFormTitle] = useState('');
-  const [formType, setFormType] = useState<ApprovalFlow['type']>('合同用印审批');
-  const [formCustomer, setFormCustomer] = useState('国家电网华东分部数智调度中心');
-  const [formProduct, setFormProduct] = useState(productLines[0]?.name || '');
-  const [formAmount, setFormAmount] = useState(1200000);
-  const [formReason, setFormReason] = useState('');
 
   // Active detail flow
   const detailFlow = approvals.find((a) => a.id === selectedApprovalIdForDetail) || null;
@@ -104,124 +93,65 @@ export const ApprovalCenterView: React.FC = () => {
     setActionTargetFlow(null);
   };
 
-  const handleCreateApproval = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formTitle.trim()) {
-      addToast('warning', '请填写审批流程主题');
-      return;
-    }
-
-    const newApproval: ApprovalFlow = {
-      id: `appr-${Date.now()}`,
-      code: `APPR-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      title: formTitle,
-      type: formType,
-      applicantName: currentUser.name,
-      applicantDept: currentUser.department,
-      status: '待审批',
-      relatedCustomer: formCustomer,
-      relatedProduct: formProduct,
-      amount: formAmount,
-      submittedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      nodes: [
-        {
-          title: '发起申请',
-          approver: currentUser.name,
-          role: currentUser.roleTitle,
-          status: 'passed',
-          time: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          comment: formReason || '请领导审批'
-        },
-        {
-          title: '部门主管审核',
-          approver: '林志豪',
-          role: '平台技术委员会',
-          status: 'current'
-        },
-        {
-          title: '总经理终审',
-          approver: '总经办',
-          role: '总经理',
-          status: 'waiting'
-        }
-      ],
-      contentDetails: {
-        '审批主题': formTitle,
-        '关联合同/客户': formCustomer,
-        '关联产品': formProduct,
-        '涉及金额': `¥ ${formAmount.toLocaleString()} 元`,
-        '申请说明': formReason || '无补充说明'
-      }
-    };
-
-    setApprovals((prev) => [newApproval, ...prev]);
-    setIsNewModalOpen(false);
-    setFormTitle('');
-    setFormReason('');
-    addToast('success', '审批申请已成功提交', `单号：${newApproval.code}`);
-  };
-
   return (
-    <ComprehensivePage title="审批管理" description="集中处理待办审批，并跟踪申请与历史记录" icon={<FileCheck className="w-5 h-5" />}>
-    <div className="space-y-6">
+    <ComprehensivePage title="审批管理" description="集中处理待办审批，并跟踪申请与历史记录" icon={<FileCheck className="w-5 h-5" />} hideHeader>
+    <div className="approval-center space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="待我审批"
           value={`${pendingCount} 笔`}
           icon={<Clock className="w-5 h-5" />}
-          iconBgColor="bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_20%,var(--border-main))]"
           onClick={() => setActiveTab('pending')}
         />
         <StatCard
           title="我发起的"
           value={`${myAppliedCount} 笔`}
           icon={<Send className="w-5 h-5" />}
-          iconBgColor="bg-sky-500/10 text-sky-400 border border-sky-500/20"
           onClick={() => setActiveTab('my_applied')}
         />
         <StatCard
           title="已通过审批"
           value={`${passedCount} 笔`}
           icon={<CheckCircle2 className="w-5 h-5" />}
-          iconBgColor="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
           onClick={() => setActiveTab('history')}
         />
         <StatCard
           title="审批平均耗时"
           value="4.2 小时"
           icon={<Stamp className="w-5 h-5" />}
-          iconBgColor="bg-purple-500/10 text-purple-400 border border-purple-500/20"
         />
       </div>
 
       {/* Main Table Card */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-lg p-5 shadow-sm space-y-4">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
         {/* Navigation Tabs & Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-main)] pb-4">
-          <div className="flex items-center gap-2 overflow-x-auto">
+          <div className="flex items-center gap-2 overflow-x-auto" role="group" aria-label="审批分类">
             <button
+              aria-pressed={activeTab === 'pending'}
               onClick={() => setActiveTab('pending')}
               className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
                 activeTab === 'pending'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
               待我审批
               {pendingCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-black/20 text-black text-[10px] rounded-full font-mono">
+                <span className="ml-1 px-1.5 py-0.2 bg-[var(--bg-overlay)] text-[var(--text-on-primary)] text-[11px] rounded-full font-mono">
                   {pendingCount}
                 </span>
               )}
             </button>
-            <button onClick={() => setActiveTab('reviewed')} className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'reviewed' ? 'bg-[var(--primary)] text-white font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}`}><CheckCircle2 className="w-3.5 h-3.5" />我已审批</button>
+            <button aria-pressed={activeTab === 'reviewed'} onClick={() => setActiveTab('reviewed')} className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'reviewed' ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}`}><CheckCircle2 className="w-3.5 h-3.5" />我已审批</button>
             <button
+              aria-pressed={activeTab === 'my_applied'}
               onClick={() => setActiveTab('my_applied')}
               className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
                 activeTab === 'my_applied'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
               }`}
             >
@@ -229,25 +159,16 @@ export const ApprovalCenterView: React.FC = () => {
               我发起的
             </button>
             <button
+              aria-pressed={activeTab === 'history'}
               onClick={() => setActiveTab('history')}
               className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
                 activeTab === 'history'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               已办历史
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => setIsNewModalOpen(true)}
-              className="px-3.5 py-1.5 bg-[var(--warning)] text-black hover:bg-[var(--accent-gold-hover)] font-semibold rounded-md text-xs flex items-center gap-1.5 transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              发起新审批
             </button>
           </div>
         </div>
@@ -261,7 +182,7 @@ export const ApprovalCenterView: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="按审批单号、主题、申请人、关联合同或客户搜索..."
-              className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)]"
             />
           </div>
 
@@ -269,7 +190,7 @@ export const ApprovalCenterView: React.FC = () => {
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-body)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="px-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-body)] focus:outline-hidden focus:border-[var(--primary)]"
             >
               <option value="all">所有审批类型</option>
               <option value="合同用印审批">合同用印审批</option>
@@ -283,7 +204,7 @@ export const ApprovalCenterView: React.FC = () => {
 
         {/* List Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[var(--border-main)] bg-[var(--bg-main)] text-[var(--text-muted)]">
                 <th className="py-3 px-3">审批单号</th>
@@ -299,8 +220,7 @@ export const ApprovalCenterView: React.FC = () => {
             <tbody className="divide-y divide-[var(--border-main)]">
               {filteredApprovals.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-[var(--text-muted)]">
-                    暂无符合条件的审批流转记录
+                  <td colSpan={8} className="py-8 text-center"><Empty description="暂无符合条件的审批流转记录" />
                   </td>
                 </tr>
               ) : (
@@ -308,13 +228,16 @@ export const ApprovalCenterView: React.FC = () => {
                   <tr
                     key={item.id}
                     className="hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer group"
+                    tabIndex={0}
+                    role="button"
+                    onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedApprovalIdForDetail(item.id); } }}
                     onClick={() => setSelectedApprovalIdForDetail(item.id)}
                   >
-                    <td className="py-3 px-3 font-mono font-medium text-[var(--warning)]">
+                    <td className="py-3 px-3 font-mono font-medium text-[var(--active-text)]">
                       {item.code}
                     </td>
                     <td className="py-3 px-3 max-w-xs">
-                      <div className="font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--warning)] transition-colors">
+                      <div className="font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--active-text)] transition-colors">
                         {item.title}
                       </div>
                       {item.relatedCustomer && (
@@ -329,10 +252,10 @@ export const ApprovalCenterView: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3 px-3">
-                      <div className="text-white font-medium">{item.applicantName}</div>
+                      <div className="text-[var(--text-primary)] font-medium">{item.applicantName}</div>
                     <div className="text-[11px] text-[var(--text-muted)]">{item.applicantDept}</div>
                     </td>
-                    <td className="py-3 px-3 font-mono font-medium text-white">
+                    <td className="py-3 px-3 font-mono font-medium text-[var(--text-primary)]">
                       {item.amount ? `¥${(item.amount / 10000).toFixed(0)}万` : '-'}
                     </td>
                     <td className="py-3 px-3 text-[var(--text-muted)] font-mono">
@@ -347,13 +270,13 @@ export const ApprovalCenterView: React.FC = () => {
                           <>
                             <button
                               onClick={() => handleOpenAction(item, 'approve')}
-                              className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded text-[11px] font-medium transition-colors"
+                              className="px-2 py-1 bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--success)_20%,var(--bg-surface))] text-[var(--success)] border border-[var(--success)] rounded text-[11px] font-medium transition-colors"
                             >
                               同意
                             </button>
                             <button
                               onClick={() => handleOpenAction(item, 'reject')}
-                              className="px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 rounded text-[11px] font-medium transition-colors"
+                              className="px-2 py-1 bg-[color-mix(in_srgb,var(--danger)_12%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--danger)_20%,var(--bg-surface))] text-[var(--danger)] border border-[var(--danger)] rounded text-[11px] font-medium transition-colors"
                             >
                               驳回
                             </button>
@@ -381,16 +304,17 @@ export const ApprovalCenterView: React.FC = () => {
         <Drawer
           isOpen={!!detailFlow}
           onClose={() => setSelectedApprovalIdForDetail(null)}
-          title={`审批详情：${detailFlow.code}`}
+          title={<span className="font-sans tracking-normal">审批详情：{detailFlow.code}</span>}
           subtitle={detailFlow.title}
-          size="lg"
+          width="max-w-2xl"
+          contentClassName="approval-detail-content overflow-y-auto"
         >
-          <div className="space-y-6 text-xs">
+          <div className="space-y-6 text-sm">
             {/* Header info bar */}
-            <div className="p-4 rounded-lg bg-[var(--bg-main)] border border-[var(--border-main)] flex items-center justify-between">
+            <div className="p-4 rounded-lg bg-[var(--bg-main)] border border-[var(--border-main)] flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-[var(--text-muted)] text-[11px]">申请人与发起时间</div>
-                <div className="font-semibold text-white mt-1 flex items-center gap-2 text-sm">
+                <div className="text-[var(--text-body)] text-xs">申请人与发起时间</div>
+                <div className="font-semibold text-[var(--text-primary)] mt-1 flex flex-wrap items-center gap-2 text-sm break-words">
                   {detailFlow.applicantName} ({detailFlow.applicantDept})
                   <span className="text-xs text-[var(--text-muted)] font-mono font-normal">
                     {detailFlow.submittedAt}
@@ -402,15 +326,15 @@ export const ApprovalCenterView: React.FC = () => {
 
             {/* Structured details key-value */}
             <div className="space-y-3">
-              <h4 className="font-serif font-semibold text-sm text-white tracking-wide flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[var(--warning)]" />
+              <h4 className="font-semibold text-base text-[var(--text-primary)] flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[var(--active-text)]" />
                 审批表单内容
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Object.entries(detailFlow.contentDetails || {}).map(([k, v]) => (
-                  <div key={k} className="p-3 rounded bg-[var(--bg-main)] border border-[var(--border-main)]">
-                    <div className="text-[11px] text-[var(--text-muted)]">{k}</div>
-                    <div className="text-white font-medium mt-1 font-mono">{String(v)}</div>
+                  <div key={k} className="p-4 rounded-lg bg-[var(--bg-main)] border border-[var(--border-main)]">
+                    <div className="text-xs text-[var(--text-body)]">{k}</div>
+                    <div className="text-[var(--text-primary)] font-medium mt-1 break-all">{String(v)}</div>
                   </div>
                 ))}
               </div>
@@ -418,16 +342,16 @@ export const ApprovalCenterView: React.FC = () => {
 
             {/* Workflow Timeline */}
             <div className="space-y-3">
-              <h4 className="font-serif font-semibold text-sm text-white tracking-wide flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[var(--warning)]" />
+              <h4 className="font-semibold text-base text-[var(--text-primary)] flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-[var(--active-text)]" />
                 审批流转节点与审批意见
               </h4>
               <div className="space-y-3 pl-2 border-l-2 border-[var(--border-main)] ml-2">
                 {detailFlow.nodes.map((node, idx) => {
-                  let statusColor = 'bg-[var(--text-muted)] text-black';
-                  if (node.status === 'passed') statusColor = 'bg-emerald-500 text-black';
-                  if (node.status === 'current') statusColor = 'bg-[var(--warning)] text-black animate-pulse';
-                  if (node.status === 'rejected') statusColor = 'bg-rose-500 text-white';
+                  let statusColor = 'bg-[var(--text-muted)] text-[var(--text-on-primary)]';
+                  if (node.status === 'passed') statusColor = 'bg-[var(--success)] text-[var(--text-on-primary)]';
+                  if (node.status === 'current') statusColor = 'bg-[var(--primary)] text-[var(--text-on-primary)]';
+                  if (node.status === 'rejected') statusColor = 'bg-[var(--danger)] text-[var(--text-on-primary)]';
 
                   return (
                     <div key={idx} className="relative pl-5 pb-2 space-y-1">
@@ -436,17 +360,17 @@ export const ApprovalCenterView: React.FC = () => {
                       >
                         {idx + 1}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-white">{node.title}</span>
-                        <span className="text-[11px] text-[var(--text-muted)] font-mono">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-[var(--text-primary)]">{node.title}</span>
+                        <span className="text-xs text-[var(--text-muted)] font-mono">
                           {node.time || (node.status === 'current' ? '处理中...' : '等待中')}
                         </span>
                       </div>
-                      <div className="text-[var(--text-muted)] text-[11px]">
-                        审核人：<span className="text-white">{node.approver}</span> ({node.role})
+                      <div className="text-[var(--text-body)] text-xs">
+                        审核人：<span className="text-[var(--text-primary)]">{node.approver}</span> ({node.role})
                       </div>
                       {node.comment && (
-                        <div className="p-2 rounded bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-body)] text-[11px] mt-1">
+                        <div className="p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-body)] text-xs mt-2 break-words">
                           “{node.comment}”
                         </div>
                       )}
@@ -461,13 +385,13 @@ export const ApprovalCenterView: React.FC = () => {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-main)]">
                 <button
                   onClick={() => handleOpenAction(detailFlow, 'reject')}
-                  className="px-4 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 rounded-md font-medium text-xs transition-colors"
+                  className="px-4 py-2 bg-[color-mix(in_srgb,var(--danger)_12%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--danger)_20%,var(--bg-surface))] text-[var(--danger)] border border-[var(--danger)] rounded-md font-medium text-xs transition-colors"
                 >
                   驳回申请
                 </button>
                 <button
                   onClick={() => handleOpenAction(detailFlow, 'approve')}
-                  className="px-5 py-2 bg-[var(--warning)] hover:bg-[var(--accent-gold-hover)] text-black font-semibold rounded-md text-xs transition-colors shadow-sm"
+                  className="px-5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-on-primary)] font-semibold rounded-md text-xs transition-colors shadow-sm"
                 >
                   同意审批
                 </button>
@@ -481,17 +405,17 @@ export const ApprovalCenterView: React.FC = () => {
       <Modal
         isOpen={actionModalOpen}
         onClose={() => setActionModalOpen(false)}
-        title={actionType === 'approve' ? '确认通过审批' : '确认驳回审批'}
+        title={<span className="approval-modal-title">{actionType === 'approve' ? '确认通过审批' : '确认驳回审批'}</span>}
         subtitle={actionTargetFlow?.title}
       >
-        <div className="space-y-4 text-xs">
+        <div className="space-y-4 text-sm">
           <div className="space-y-1.5">
-            <label className="text-[var(--text-muted)]">审批意见 / 批复说明</label>
+            <label className="text-[var(--text-body)]">审批意见 / 批复说明</label>
             <textarea
               rows={3}
               value={actionComment}
               onChange={(e) => setActionComment(e.target.value)}
-              className="w-full p-2.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="w-full p-2.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)]"
             />
           </div>
 
@@ -499,17 +423,17 @@ export const ApprovalCenterView: React.FC = () => {
             <button
               type="button"
               onClick={() => setActionModalOpen(false)}
-              className="px-3.5 py-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-body)] rounded-md text-xs"
+              className="px-4 py-2 bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface-soft)] text-[var(--text-primary)] border border-[var(--border-main)] rounded-md text-sm transition-colors"
             >
               取消
             </button>
             <button
               type="button"
               onClick={handleConfirmAction}
-              className={`px-4 py-1.5 font-semibold rounded-md text-xs ${
+              className={`px-4 py-2 font-semibold rounded-md text-sm transition-colors ${
                 actionType === 'approve'
-                  ? 'bg-[var(--warning)] hover:bg-[var(--accent-gold-hover)] text-black'
-                  : 'bg-rose-600 hover:bg-rose-700 text-white'
+                  ? 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-on-primary)]'
+                  : 'bg-[var(--danger)] hover:opacity-90 text-[var(--text-on-primary)]'
               }`}
             >
               确认{actionType === 'approve' ? '通过' : '驳回'}
@@ -518,102 +442,6 @@ export const ApprovalCenterView: React.FC = () => {
         </div>
       </Modal>
 
-      {/* New Approval Modal */}
-      <Modal
-        isOpen={isNewModalOpen}
-        onClose={() => setIsNewModalOpen(false)}
-        title="发起新审批流程"
-        subtitle="提交合同用印、商机特批、招投标立项或需求重大变更"
-      >
-        <form onSubmit={handleCreateApproval} className="space-y-4 text-xs">
-          <div className="space-y-1.5">
-            <label className="text-[var(--text-muted)]">审批事项主题 *</label>
-            <input
-              type="text"
-              required
-              value={formTitle}
-              onChange={(e) => setFormTitle(e.target.value)}
-              placeholder="例如：【合同用印】国家电网华东二期扩容合同签署审批"
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--warning)]"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-[var(--text-muted)]">审批类型</label>
-              <select
-                value={formType}
-                onChange={(e) => setFormType(e.target.value as any)}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
-              >
-                <option value="合同用印审批">合同用印审批</option>
-                <option value="商机特批报价">商机特批报价</option>
-                <option value="招投标立项">招投标立项</option>
-                <option value="需求重大变更">需求重大变更</option>
-                <option value="采购与报销">采购与报销</option>
-                <option value="合作伙伴准入">合作伙伴准入</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[var(--text-muted)]">涉及标的金额 (元)</label>
-              <input
-                type="number"
-                value={formAmount}
-                onChange={(e) => setFormAmount(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] font-mono focus:outline-hidden focus:border-[var(--warning)]"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-[var(--text-muted)]">关联客户 / 机构</label>
-              <input
-                type="text"
-                value={formCustomer}
-                onChange={(e) => setFormCustomer(e.target.value)}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[var(--text-muted)]">关联产品</label>
-              <input
-                type="text"
-                value={formProduct}
-                onChange={(e) => setFormProduct(e.target.value)}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[var(--text-muted)]">申请说明 / 交付背景</label>
-            <textarea
-              rows={3}
-              value={formReason}
-              onChange={(e) => setFormReason(e.target.value)}
-              placeholder="说明业务背景、用印类型或特殊折扣依据..."
-              className="w-full p-2.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--warning)]"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => setIsNewModalOpen(false)}
-              className="px-3.5 py-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-body)] rounded-md text-xs"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-1.5 bg-[var(--warning)] hover:bg-[var(--accent-gold-hover)] text-black font-semibold rounded-md text-xs shadow-sm"
-            >
-              提交审批
-            </button>
-          </div>
-        </form>
-      </Modal>
     </div>
     </ComprehensivePage>
   );

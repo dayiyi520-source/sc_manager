@@ -73,7 +73,7 @@ export const AssetManagementView: React.FC = () => {
   };
 
   return (
-    <ComprehensivePage title="资产管理" description="维护资产台账，并跟踪领用归还与维修状态" icon={<Box className="w-5 h-5" />}>
+    <ComprehensivePage title="资产管理" description="维护资产台账，并跟踪领用归还与维修状态" icon={<Box className="w-5 h-5" />} hideHeader>
     <div className="space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
