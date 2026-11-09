@@ -1,3 +1,7 @@
+import { attendanceKpiAdjustments } from './attendanceDemo';
+import { KPI_DEMO_STORAGE_KEY } from './performanceMonthLock';
+export { KPI_DEMO_STORAGE_KEY } from './performanceMonthLock';
+
 export type KpiGrade = 'S' | 'A' | 'B' | 'C' | 'D' | 'E';
 export type KpiStatus = '待主管复核' | '待 HR 审核' | 'HR 已退回' | '已通过' | '待生成';
 
@@ -22,6 +26,7 @@ export interface KpiSourceData {
   reportMissing: number;
   tasksOverdue: number;
   leaveRecords?: Record<string, number>;
+  attendanceApprovalSummary?: string[];
 }
 
 export interface KpiReviewRecord {
@@ -32,6 +37,17 @@ export interface KpiReviewRecord {
   before: { attitude: number; adjustment: number; total: number };
   proposed: { attitude: number; adjustment: number; total: number };
   reason: string;
+}
+
+export interface KpiSourceCorrectionRecord {
+  id: string;
+  appealId: string;
+  source: 'objective' | 'reports';
+  before: Record<string, number>;
+  after: Record<string, number>;
+  reason: string;
+  actor: string;
+  at: string;
 }
 
 export interface KpiEmployee {
@@ -45,6 +61,7 @@ export interface KpiEmployee {
   reviewStatus: KpiStatus;
   managerDraft?: { attitude: number; adjustment: number; reason: string };
   reviewHistory?: KpiReviewRecord[];
+  approvedSourceCorrections?: KpiSourceCorrectionRecord[];
   hrNote?: string;
   redline?: { type: string; impact: string; active: boolean };
   sourceCorrection?: { objective?: boolean; reports?: boolean };
@@ -87,6 +104,8 @@ export function validateKpiCycleSettings(settings: KpiCycleSettings): string | n
 export const isWithinKpiWindow = (window: { startAt: string; endAt: string } | undefined, now = Date.now()) =>
   !!window && now >= new Date(window.startAt).getTime() && now <= new Date(window.endAt).getTime();
 
+export const effectiveKpiSourceData = (employee: KpiEmployee): KpiSourceData => employee.approvedSourceCorrections?.reduce((source, record) => ({ ...source, ...record.after }), employee.source) || employee.source;
+
 export const autoPublishKpiPeriod = (period: KpiPeriod, now = Date.now()): KpiPeriod => {
   if (!period.cycleSettings || period.published || now < new Date(period.cycleSettings.finalPublicationAt).getTime()) return period;
   if (!period.generated || period.employees.some(employee => employee.reviewStatus !== '已通过')) return period;
@@ -109,7 +128,7 @@ const roundFactor = (value: number) => Math.round(value * 100) / 100;
 export const departmentCoefficientPreview = (period: KpiPeriod, department: string) => {
   const members = period.employees.filter(employee => employee.department === department);
   const totalWeight = members.reduce((sum, employee) => sum + (employee.source.okrWeight ?? 1), 0);
-  const objectiveCompletion = totalWeight ? members.reduce((sum, employee) => sum + employee.source.okrCompletion * (employee.source.okrWeight ?? 1), 0) / totalWeight : 0;
+  const objectiveCompletion = totalWeight ? members.reduce((sum, employee) => sum + effectiveKpiSourceData(employee).okrCompletion * (employee.source.okrWeight ?? 1), 0) / totalWeight : 0;
   const metrics = period.departmentMetrics?.[department];
   const teamCompletion = metrics?.teamCompletion ?? 100;
   const touchedRedline = members.some(employee => employee.redline?.active);
@@ -188,7 +207,7 @@ export interface KpiDemoState {
 const buildEmployees = (month: string): KpiEmployee[] => {
   const rows: KpiEmployee[] = [
   { id: 'e-01', name: '林知夏', department: '产品部', position: '高级产品经理', manager: '陈宇璋', scores: { objective: 56, attendance: 10, extraWork: 4, attitude: 14, review: 9, managerAdjustment: 0 }, source: { okrCompletion: 93, attendanceDays: 22, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 12, reportLate: 0, reportMissing: 0, tasksOverdue: 0, leaveRecords: { '年假': 0, '事假': 0, '病假': 0 } }, reviewStatus: '已通过' },
-  { id: 'e-02', name: '周予安', department: '产品部', position: '产品经理', manager: '陈宇璋', scores: { objective: 53, attendance: 9, extraWork: 3, attitude: 13, review: 9, managerAdjustment: 1 }, source: { okrCompletion: 88, attendanceDays: 22, lateCount: 1, missingPunches: 0, approvedOvertimeHours: 8, reportLate: 0, reportMissing: 0, tasksOverdue: 1, leaveRecords: { '年假': 0, '事假': 0, '病假': 0 } }, reviewStatus: '待 HR 审核', managerDraft: { attitude: 13, adjustment: 1, reason: '按期完成重点版本方案，并主动协调研发风险。' } },
+  { id: 'e-02', name: '周予安', department: '产品部', position: '产品经理', manager: '陈宇璋', scores: { objective: 53, attendance: 9, extraWork: 3, attitude: 13, review: 9, managerAdjustment: 1 }, source: { okrCompletion: 88, attendanceDays: 22, lateCount: 1, missingPunches: 1, approvedOvertimeHours: 8, reportLate: 0, reportMissing: 0, tasksOverdue: 1, leaveRecords: { '年假': 0, '事假': 0, '病假': 0 } }, reviewStatus: '待 HR 审核', managerDraft: { attitude: 13, adjustment: 1, reason: '按期完成重点版本方案，并主动协调研发风险。' } },
   { id: 'e-03', name: '顾清和', department: '研发部', position: '前端工程师', manager: '陈宇璋', scores: { objective: 50, attendance: 10, extraWork: 5, attitude: 12, review: 8, managerAdjustment: 0 }, source: { okrCompletion: 84, attendanceDays: 22, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 18, reportLate: 1, reportMissing: 0, tasksOverdue: 1, leaveRecords: { '年假': 1, '事假': 0, '病假': 0 } }, reviewStatus: '待主管复核' },
   { id: 'e-04', name: '许明川', department: '研发部', position: '后端工程师', manager: '赵书琳', scores: { objective: 47, attendance: 8, extraWork: 4, attitude: 11, review: 7, managerAdjustment: -1 }, source: { okrCompletion: 78, attendanceDays: 21, lateCount: 2, missingPunches: 1, approvedOvertimeHours: 14, reportLate: 2, reportMissing: 0, tasksOverdue: 2, leaveRecords: { '年假': 0, '事假': 1, '病假': 0 } }, reviewStatus: '待 HR 审核', managerDraft: { attitude: 11, adjustment: -1, reason: '迭代交付存在延迟，复盘材料两次迟交。' } },
   { id: 'e-05', name: '沈嘉禾', department: '交付部', position: '交付顾问', manager: '王佳乐', scores: { objective: 50, attendance: 10, extraWork: 3, attitude: 13, review: 8, managerAdjustment: 0 }, source: { okrCompletion: 84, attendanceDays: 22, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 5, reportLate: 1, reportMissing: 0, tasksOverdue: 2, leaveRecords: { '年假': 0, '事假': 0, '病假': 1 } }, reviewStatus: '已通过' },
@@ -201,7 +220,6 @@ const buildEmployees = (month: string): KpiEmployee[] => {
   })) : seeded;
 };
 
-export const KPI_DEMO_STORAGE_KEY = 'shichuang.frontend.demo.kpiPerformance.v1';
 export const KPI_MONTHS = ['2026-11', '2026-10', '2026-09'];
 export const KPI_DIMENSIONS = [
   { key: 'objective', label: '月度目标（演示）', max: 60, weight: '60%' },
@@ -221,13 +239,18 @@ export const gradeForScore = (score: number): { grade: KpiGrade; coefficient: nu
 };
 
 export const scoreForEmployee = (employee: KpiEmployee) => Math.max(0, Math.min(100,
-  employee.scores.objective + employee.scores.attendance + employee.scores.extraWork + employee.scores.attitude + employee.scores.review + employee.scores.managerAdjustment,
+  (employee.approvedSourceCorrections?.filter(record => record.source === 'objective').at(-1)?.after.objectiveScore ?? employee.scores.objective)
+  + employee.scores.attendance + employee.scores.extraWork + employee.scores.attitude
+  + (employee.approvedSourceCorrections?.filter(record => record.source === 'reports').at(-1)?.after.reviewScore ?? employee.scores.review)
+  + employee.scores.managerAdjustment,
 ));
 
 export const sourceAdjustmentFor = (employee: KpiEmployee) => employee.scores.managerAdjustment;
 
 export const syncKpiSources = (period: KpiPeriod, month: string): KpiPeriod => {
+  if (period.published) return period;
   const baseline = new Map(buildEmployees(month).map(employee => [employee.id, employee]));
+  const attendanceAdjustments = attendanceKpiAdjustments(month);
   const changedDepartments = new Set<string>();
   const synced: KpiPeriod = {
     ...period,
@@ -235,6 +258,7 @@ export const syncKpiSources = (period: KpiPeriod, month: string): KpiPeriod => {
     employees: period.employees.map(employee => {
       const source = baseline.get(employee.id);
       if (!source) return employee;
+      const attendanceAdjustment = attendanceAdjustments[employee.name];
       if (!employee.sourceCorrection?.objective && employee.source.okrCompletion !== source.source.okrCompletion) changedDepartments.add(employee.department);
       return {
         ...employee,
@@ -242,9 +266,10 @@ export const syncKpiSources = (period: KpiPeriod, month: string): KpiPeriod => {
           ...employee.source,
           ...(!employee.sourceCorrection?.objective && { okrCompletion: source.source.okrCompletion }),
           attendanceDays: source.source.attendanceDays,
-          lateCount: source.source.lateCount,
-          missingPunches: source.source.missingPunches,
-          leaveRecords: source.source.leaveRecords,
+          lateCount: Math.max(0, source.source.lateCount + (attendanceAdjustment?.lateCountDelta || 0)),
+          missingPunches: Math.max(0, source.source.missingPunches + (attendanceAdjustment?.missingPunchDelta || 0)),
+          ...(attendanceAdjustment?.hasLeaveApplications ? { leaveRecords: attendanceAdjustment.leaveRecords } : { leaveRecords: source.source.leaveRecords }),
+          attendanceApprovalSummary: attendanceAdjustment?.approvalSummary || [],
           approvedOvertimeHours: source.source.approvedOvertimeHours,
           ...(!employee.sourceCorrection?.reports && {
             reportLate: source.source.reportLate,
@@ -262,9 +287,7 @@ export const syncKpiSources = (period: KpiPeriod, month: string): KpiPeriod => {
       };
     }),
   };
-  if (changedDepartments.size && period.published) {
-    synced.departmentCoefficients = { ...period.departmentCoefficients, ...Object.fromEntries([...changedDepartments].map(name => [name, departmentCoefficientPreview(synced, name).coefficient])) };
-  } else if (changedDepartments.size) {
+  if (changedDepartments.size) {
     synced.departmentMetrics = { ...period.departmentMetrics, ...Object.fromEntries([...changedDepartments].map(name => [name, { teamCompletion: 100, ...period.departmentMetrics?.[name], confirmed: false }])) };
   }
   return synced;
@@ -306,7 +329,6 @@ const initialState = (): KpiDemoState => ({
     departmentMetrics: Object.fromEntries(['产品部', '研发部', '交付部', '运营部'].map(name => [name, { teamCompletion: 100, confirmed: month === '2026-10' }])),
   }])) as KpiDemoState['periods'],
 });
-
 export const loadKpiDemo = (): KpiDemoState => {
   try {
     const raw = localStorage.getItem(KPI_DEMO_STORAGE_KEY);

@@ -881,10 +881,10 @@ export interface ApprovalFlow {
   id: string;
   code: string;
   title: string;
-  type: '合同用印审批' | '商机特批报价' | '招投标立项' | '需求重大变更' | '采购与报销' | '合作伙伴准入';
+  type: '合同用印审批' | '商机特批报价' | '招投标立项' | '需求重大变更' | '采购与报销' | '合作伙伴准入' | '补卡审批' | '请假审批' | '考勤异常申诉审批';
   applicantName: string;
   applicantDept: string;
-  status: '审批中' | '待审批' | '已通过' | '已驳回' | '已撤销';
+  status: '待审批' | '审批中' | '已驳回' | '已完成';
   ccNames?: string[];
   relatedCustomer?: string;
   relatedProduct?: string;
@@ -1160,11 +1160,11 @@ export interface WinningEngagement {
   isTransferredToDelivery?: boolean; isTransferredToReqPool?: boolean; createdAt: string;
 }
 
-export interface AttendanceRecord { id: string; employeeName: string; date: string; checkIn?: string; checkOut?: string; status: string; }
-export interface LeaveApplication { id: string; code?: string; applicant: string; type: string; startDate?: string; endDate?: string; startTime?: string; endTime?: string; days: number; status?: string; approvalStatus?: string; reason?: string; }
+export interface AttendanceRecord { id: string; empCode: string; empName: string; department: string; date: string; clockInTime: string; clockOutTime: string; workHours: number; status: string; originalStatus?: string; sourceApprovalCode?: string; sourceApprovalType?: string; correctionNote?: string; }
+export interface LeaveApplication { id: string; code?: string; applicant: string; department: string; type: string; startDate?: string; endDate?: string; startTime?: string; endTime?: string; days: number; status?: string; approvalStatus?: string; reason?: string; linkedAttendanceIds?: string[]; }
 export interface OvertimeRecord { id: string; code?: string; employeeName?: string; empName?: string; department?: string; date: string; timeSlot?: string; hours: number; type?: string; reason: string; status: string; }
-export interface AttendanceException { id: string; employeeName: string; date: string; type: string; status: string; }
-export interface ShiftSchedule { id: string; name: string; startTime: string; endTime: string; status: string; }
+export interface AttendanceException { id: string; empName: string; department: string; date: string; exceptionType: string; reason: string; status: string; source?: '审批中心' | 'HR人工修改' | '员工申诉'; approvalCode?: string; approvalType?: string; approvalStatus?: string; linkedAttendanceId?: string; originalStatus?: string; effectiveStatus?: string; correctionStatus?: '待审批' | '审批中' | '已生效' | '待HR更正' | '未生效'; processedBy?: string; processedAt?: string; }
+export interface ShiftSchedule { id: string; deptName: string; shiftName: string; workTime: string; empCount: number; status: string; }
 export interface ProcurementItem { id: string; code?: string; name?: string; category?: string; type?: string; supplier?: string; description?: string; quantity?: number; unitPrice?: number; amount: number; status: string; relatedCustomer?: string; relatedProject?: string; orderTime?: string; }
 export interface ProcurementApply { id: string; code?: string; title?: string; type?: string; applicant: string; department?: string; amount?: number; totalAmount?: number; relatedCustomer?: string; relatedProject?: string; status: string; createdAt?: string; items?: ProcurementItem[]; }
 export interface InboundRecord { id: string; inboundCode?: string; procurementId?: string; purchaseCode?: string; itemName?: string; quantity?: number; receivedAt?: string; inboundTime?: string; receiver?: string; registrar?: string; status?: string; transferredToAsset?: boolean; }

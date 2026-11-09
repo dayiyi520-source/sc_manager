@@ -198,6 +198,7 @@
 .kpi-calculation-layout { display: grid; grid-template-columns: 205px minmax(0, 1fr); gap: 16px; }
 .kpi-calculation-layout.is-hr-review { grid-template-columns: 252px minmax(0, 1fr); }
 .kpi-employee-rail { align-self: start; padding: 8px; border: 1px solid var(--border-main); border-radius: 7px; background: var(--bg-card); }
+.kpi-employee-rail > .ant-select { width: 100%; margin: 0 0 10px; }
 .kpi-rail-heading { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 10px; color: var(--text-primary); font-size: 12px; font-weight: 600; }
 .kpi-rail-heading .ant-tag { margin: 0; }
 .kpi-employee-rail > button { display: grid; grid-template-columns: 32px minmax(0, 1fr) 7px; align-items: center; gap: 8px; width: 100%; min-height: 50px; padding: 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text-body); text-align: left; cursor: pointer; }
@@ -211,10 +212,11 @@
 .kpi-review-department-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .kpi-review-department-count { color: var(--text-muted); font-size: 12px; font-weight: 400; }
 .kpi-team-members { display: grid; gap: 4px; }
-.kpi-team-member { display: grid; grid-template-columns: 32px minmax(0, 1fr) 7px; align-items: center; gap: 10px; width: 100%; min-height: 72px; padding: 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
+.kpi-team-member { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 7px; align-items: center; gap: 8px; width: 100%; min-height: 72px; padding: 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
 .kpi-team-member:hover { background: var(--bg-surface-soft); }
 .kpi-team-member.is-active { border-color: color-mix(in srgb, var(--primary) 35%, var(--border-main)); background: color-mix(in srgb, var(--primary) 9%, var(--bg-surface)); }
 .kpi-team-member-info { display: grid; gap: 4px; min-width: 0; }
+.kpi-review-badges { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }.kpi-review-badges .ant-tag { margin: 0; }
 .kpi-team-member-info small { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 15px; overflow-wrap: anywhere; }
 .kpi-team-member-status { white-space: nowrap; }
 

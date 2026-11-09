@@ -1,28 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Empty } from 'antd';
 import './approval-center.css';
 import {
   FileCheck,
   Search,
-  Filter,
   Clock,
   CheckCircle2,
-  XCircle,
-  AlertCircle,
   Stamp,
-  Building,
-  DollarSign,
-  ChevronRight,
-  User,
-  MessageSquare,
   ShieldCheck,
-  Send,
-  RefreshCw,
   FileText,
-  ArrowRight
+  Send
 } from '@/components/common/octicons-compat';
 import { useApp } from '../../context/AppContext';
-import { StatCard, StatusTag, Drawer, Modal } from '../common/UIComponents';
+import { StatCard, StatusTag, Drawer } from '../common/UIComponents';
 import { ComprehensivePage } from '../comprehensive/ComprehensivePage';
 import { ApprovalFlow } from '../../types';
 import { pendingFor, reviewedBy } from '../workbench/workbenchListRules';
@@ -31,32 +21,41 @@ export const ApprovalCenterView: React.FC = () => {
   const {
     approvals,
     currentUser,
-    approveFlow,
-    rejectFlow,
     selectedApprovalIdForDetail,
     setSelectedApprovalIdForDetail,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'pending' | 'reviewed' | 'my_applied' | 'cc_me' | 'history'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'my_applied' | 'cc_me' | 'reviewed' | 'all'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-
-  // Fast action states
-  const [actionModalOpen, setActionModalOpen] = useState(false);
-  const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
-  const [actionTargetFlow, setActionTargetFlow] = useState<ApprovalFlow | null>(null);
-  const [actionComment, setActionComment] = useState('');
+  const [applicantFilter, setApplicantFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Active detail flow
   const detailFlow = approvals.find((a) => a.id === selectedApprovalIdForDetail) || null;
 
-  // Filtered list based on active tab
+  const displayStatus = (status: string) => status === '已通过' ? '已完成' : status === '已撤销' ? '已驳回' : status;
+  const currentDate = new Date();
+  const today = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+  const todayCount = approvals.filter(approval => approval.submittedAt.slice(0, 10) === today).length;
+  const inProgressCount = approvals.filter(approval => displayStatus(approval.status) === '审批中').length;
+  const completedCount = approvals.filter(approval => ['已完成', '已驳回'].includes(displayStatus(approval.status))).length;
+  const averageHours = useMemo(() => {
+    const durations = approvals.flatMap(approval => {
+      if (displayStatus(approval.status) !== '已完成' || !approval.completedAt) return [];
+      const start = Date.parse(approval.submittedAt.replace(' ', 'T'));
+      const end = Date.parse(approval.completedAt.replace(' ', 'T'));
+      return Number.isFinite(start) && Number.isFinite(end) && end >= start ? [(end - start) / 3600000] : [];
+    });
+    return durations.length ? durations.reduce((sum, duration) => sum + duration, 0) / durations.length : 0;
+  }, [approvals]);
+
   const filteredApprovals = approvals.filter((a) => {
     // Tab filtering
     if (activeTab === 'pending' && !pendingFor(a, currentUser.name)) return false;
-    if (activeTab === 'reviewed' && !reviewedBy(a, currentUser.name)) return false;
     if (activeTab === 'my_applied' && a.applicantName !== currentUser.name) return false;
-    if (activeTab === 'history' && a.status === '待审批') return false;
+    if (activeTab === 'cc_me' && !a.ccNames?.includes(currentUser.name)) return false;
+    if (activeTab === 'reviewed' && !reviewedBy(a, currentUser.name)) return false;
 
     // Search query
     const matchQ =
@@ -67,31 +66,13 @@ export const ApprovalCenterView: React.FC = () => {
 
     // Type
     const matchType = typeFilter === 'all' || a.type === typeFilter;
+    const matchApplicant = applicantFilter === 'all' || a.applicantName === applicantFilter;
+    const matchStatus = statusFilter === 'all' || displayStatus(a.status) === statusFilter;
 
-    return matchQ && matchType;
+    return matchQ && matchType && matchApplicant && matchStatus;
   });
 
   const pendingCount = approvals.filter((a) => pendingFor(a, currentUser.name)).length;
-  const myAppliedCount = approvals.filter((a) => a.applicantName === currentUser.name).length;
-  const passedCount = approvals.filter((a) => a.status === '已通过').length;
-
-  const handleOpenAction = (flow: ApprovalFlow, type: 'approve' | 'reject') => {
-    setActionTargetFlow(flow);
-    setActionType(type);
-    setActionComment(type === 'approve' ? '同意，符合公司业务规范。' : '驳回，请补充更详细的技术方案说明。');
-    setActionModalOpen(true);
-  };
-
-  const handleConfirmAction = () => {
-    if (!actionTargetFlow) return;
-    if (actionType === 'approve') {
-      approveFlow(actionTargetFlow.id, actionComment);
-    } else {
-      rejectFlow(actionTargetFlow.id, actionComment);
-    }
-    setActionModalOpen(false);
-    setActionTargetFlow(null);
-  };
 
   return (
     <ComprehensivePage title="审批管理" description="集中处理待办审批，并跟踪申请与历史记录" icon={<FileCheck className="w-5 h-5" />} hideHeader>
@@ -99,33 +80,30 @@ export const ApprovalCenterView: React.FC = () => {
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="待我审批"
-          value={`${pendingCount} 笔`}
+          title="今日发起"
+          value={`${todayCount} 笔`}
           icon={<Clock className="w-5 h-5" />}
-          onClick={() => setActiveTab('pending')}
         />
         <StatCard
-          title="我发起的"
-          value={`${myAppliedCount} 笔`}
+          title="审批中"
+          value={`${inProgressCount} 笔`}
           icon={<Send className="w-5 h-5" />}
-          onClick={() => setActiveTab('my_applied')}
         />
         <StatCard
-          title="已通过审批"
-          value={`${passedCount} 笔`}
+          title="已审批"
+          value={`${completedCount} 笔`}
           icon={<CheckCircle2 className="w-5 h-5" />}
-          onClick={() => setActiveTab('history')}
         />
         <StatCard
           title="审批平均耗时"
-          value="4.2 小时"
+          value={`${averageHours.toFixed(1)} 小时`}
           icon={<Stamp className="w-5 h-5" />}
         />
       </div>
 
       {/* Main Table Card */}
       <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
-        {/* Navigation Tabs & Actions */}
+        {/* Navigation Tabs */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-main)] pb-4">
           <div className="flex items-center gap-2 overflow-x-auto" role="group" aria-label="审批分类">
             <button
@@ -145,7 +123,6 @@ export const ApprovalCenterView: React.FC = () => {
                 </span>
               )}
             </button>
-            <button aria-pressed={activeTab === 'reviewed'} onClick={() => setActiveTab('reviewed')} className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'reviewed' ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}`}><CheckCircle2 className="w-3.5 h-3.5" />我已审批</button>
             <button
               aria-pressed={activeTab === 'my_applied'}
               onClick={() => setActiveTab('my_applied')}
@@ -158,35 +135,45 @@ export const ApprovalCenterView: React.FC = () => {
               <Send className="w-3.5 h-3.5" />
               我发起的
             </button>
+            <button aria-pressed={activeTab === 'cc_me'} onClick={() => setActiveTab('cc_me')} className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'cc_me' ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}`}><ShieldCheck className="w-3.5 h-3.5" />抄送我的</button>
+            <button aria-pressed={activeTab === 'reviewed'} onClick={() => setActiveTab('reviewed')} className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'reviewed' ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}`}><CheckCircle2 className="w-3.5 h-3.5" />我已审批</button>
             <button
-              aria-pressed={activeTab === 'history'}
-              onClick={() => setActiveTab('history')}
+              aria-pressed={activeTab === 'all'}
+              onClick={() => setActiveTab('all')}
               className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'history'
+                activeTab === 'all'
                   ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              已办历史
+              全部
             </button>
           </div>
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
+        <div className="approval-filter-bar">
+          <div className="approval-search-field">
             <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="按审批单号、主题、申请人、关联合同或客户搜索..."
+              placeholder="搜索审批单号、主题或关联内容"
               className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)]"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="approval-filter-selects">
+            <select aria-label="申请人筛选" value={applicantFilter} onChange={event => setApplicantFilter(event.target.value)} className="px-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-body)] focus:outline-hidden focus:border-[var(--primary)]">
+              <option value="all">所有申请人</option>
+              {[...new Set(approvals.map(approval => approval.applicantName))].map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+            <select aria-label="审批状态筛选" value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="px-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-body)] focus:outline-hidden focus:border-[var(--primary)]">
+              <option value="all">所有审批状态</option>
+              {['待审批', '审批中', '已驳回', '已完成'].map(status => <option key={status} value={status}>{status}</option>)}
+            </select>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
@@ -198,6 +185,9 @@ export const ApprovalCenterView: React.FC = () => {
               <option value="招投标立项">招投标立项</option>
               <option value="需求重大变更">需求重大变更</option>
               <option value="采购与报销">采购与报销</option>
+              <option value="补卡审批">补卡审批</option>
+              <option value="请假审批">请假审批</option>
+              <option value="考勤异常申诉审批">考勤异常申诉审批</option>
             </select>
           </div>
         </div>
@@ -214,13 +204,12 @@ export const ApprovalCenterView: React.FC = () => {
                 <th className="py-3 px-3">关联标的 / 金额</th>
                 <th className="py-3 px-3">申请时间</th>
                 <th className="py-3 px-3">当前状态</th>
-                <th className="py-3 px-3 text-right">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-main)]">
               {filteredApprovals.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center"><Empty description="暂无符合条件的审批流转记录" />
+                  <td colSpan={7} className="py-8 text-center"><Empty description="暂无符合条件的审批流转记录" />
                   </td>
                 </tr>
               ) : (
@@ -262,34 +251,7 @@ export const ApprovalCenterView: React.FC = () => {
                       {item.submittedAt}
                     </td>
                     <td className="py-3 px-3">
-                      <StatusTag status={item.status} />
-                    </td>
-                    <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
-                        {pendingFor(item, currentUser.name) ? (
-                          <>
-                            <button
-                              onClick={() => handleOpenAction(item, 'approve')}
-                              className="px-2 py-1 bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--success)_20%,var(--bg-surface))] text-[var(--success)] border border-[var(--success)] rounded text-[11px] font-medium transition-colors"
-                            >
-                              同意
-                            </button>
-                            <button
-                              onClick={() => handleOpenAction(item, 'reject')}
-                              className="px-2 py-1 bg-[color-mix(in_srgb,var(--danger)_12%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--danger)_20%,var(--bg-surface))] text-[var(--danger)] border border-[var(--danger)] rounded text-[11px] font-medium transition-colors"
-                            >
-                              驳回
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setSelectedApprovalIdForDetail(item.id)}
-                            className="inline-flex items-center gap-1 text-[var(--active-text)] hover:text-[var(--primary-hover)] text-xs"
-                          >
-                            详情 <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
+                      <StatusTag status={displayStatus(item.status)} />
                     </td>
                   </tr>
                 ))
@@ -321,7 +283,7 @@ export const ApprovalCenterView: React.FC = () => {
                   </span>
                 </div>
               </div>
-              <StatusTag status={detailFlow.status} />
+              <StatusTag status={displayStatus(detailFlow.status)} />
             </div>
 
             {/* Structured details key-value */}
@@ -380,67 +342,9 @@ export const ApprovalCenterView: React.FC = () => {
               </div>
             </div>
 
-            {/* Actions button footer */}
-            {pendingFor(detailFlow, currentUser.name) && (
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-main)]">
-                <button
-                  onClick={() => handleOpenAction(detailFlow, 'reject')}
-                  className="px-4 py-2 bg-[color-mix(in_srgb,var(--danger)_12%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--danger)_20%,var(--bg-surface))] text-[var(--danger)] border border-[var(--danger)] rounded-md font-medium text-xs transition-colors"
-                >
-                  驳回申请
-                </button>
-                <button
-                  onClick={() => handleOpenAction(detailFlow, 'approve')}
-                  className="px-5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-on-primary)] font-semibold rounded-md text-xs transition-colors shadow-sm"
-                >
-                  同意审批
-                </button>
-              </div>
-            )}
           </div>
         </Drawer>
       )}
-
-      {/* Fast Action Modal (Approve / Reject) */}
-      <Modal
-        isOpen={actionModalOpen}
-        onClose={() => setActionModalOpen(false)}
-        title={<span className="approval-modal-title">{actionType === 'approve' ? '确认通过审批' : '确认驳回审批'}</span>}
-        subtitle={actionTargetFlow?.title}
-      >
-        <div className="space-y-4 text-sm">
-          <div className="space-y-1.5">
-            <label className="text-[var(--text-body)]">审批意见 / 批复说明</label>
-            <textarea
-              rows={3}
-              value={actionComment}
-              onChange={(e) => setActionComment(e.target.value)}
-              className="w-full p-2.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)]"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => setActionModalOpen(false)}
-              className="px-4 py-2 bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface-soft)] text-[var(--text-primary)] border border-[var(--border-main)] rounded-md text-sm transition-colors"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmAction}
-              className={`px-4 py-2 font-semibold rounded-md text-sm transition-colors ${
-                actionType === 'approve'
-                  ? 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-on-primary)]'
-                  : 'bg-[var(--danger)] hover:opacity-90 text-[var(--text-on-primary)]'
-              }`}
-            >
-              确认{actionType === 'approve' ? '通过' : '驳回'}
-            </button>
-          </div>
-        </div>
-      </Modal>
 
     </div>
     </ComprehensivePage>

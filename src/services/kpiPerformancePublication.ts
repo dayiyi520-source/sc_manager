@@ -1,4 +1,4 @@
-import { departmentCoefficientPreview, gradeForScore, isWithinKpiWindow, scoreForEmployee, type KpiEmployee, type KpiPeriod } from './kpiPerformanceDemo';
+import { departmentCoefficientPreview, effectiveKpiSourceData, gradeForScore, isWithinKpiWindow, scoreForEmployee, type KpiDemoState, type KpiEmployee, type KpiPeriod } from './kpiPerformanceDemo';
 
 export type KpiPublicationRole = 'HR' | '主管' | '员工';
 
@@ -43,7 +43,10 @@ export function filterPublishedEmployees(
   employeeId: string,
 ): KpiEmployee[] {
   if (role === '员工') return employees.filter(employee => employee.id === employeeId);
-  if (role === '主管') return employees.filter(employee => employee.manager === supervisor);
+  if (role === '主管') {
+    const managedDepartments = new Set(employees.filter(employee => employee.manager === supervisor).map(employee => employee.department));
+    return employees.filter(employee => managedDepartments.has(employee.department));
+  }
   return employees;
 }
 
@@ -96,14 +99,50 @@ export function submitKpiAppeal(input: Pick<KpiAppeal, 'month' | 'employeeId' | 
   return appeal;
 }
 
-export const correctionForEmployee = (employee: KpiEmployee): KpiAppealCorrection => ({
-  okrCompletion: employee.source.okrCompletion,
-  objectiveScore: employee.scores.objective,
-  reportLate: employee.source.reportLate,
-  reportMissing: employee.source.reportMissing,
-  tasksOverdue: employee.source.tasksOverdue,
-  reviewScore: employee.scores.review,
-});
+export const correctionForEmployee = (employee: KpiEmployee): KpiAppealCorrection => {
+  const source = effectiveKpiSourceData(employee);
+  return {
+    okrCompletion: source.okrCompletion,
+    objectiveScore: employee.approvedSourceCorrections?.filter(record => record.source === 'objective').at(-1)?.after.objectiveScore ?? employee.scores.objective,
+    reportLate: source.reportLate,
+    reportMissing: source.reportMissing,
+    tasksOverdue: source.tasksOverdue,
+    reviewScore: employee.approvedSourceCorrections?.filter(record => record.source === 'reports').at(-1)?.after.reviewScore ?? employee.scores.review,
+  };
+};
+
+export function restoreLegacyAppealCorrections(state: KpiDemoState, appeals = listKpiAppeals()): KpiDemoState {
+  return {
+    ...state,
+    periods: Object.fromEntries(Object.entries(state.periods).map(([month, period]) => [month, {
+      ...period,
+      employees: period.employees.map(employee => {
+        if (employee.approvedSourceCorrections?.length) return employee;
+        const history = appeals.filter(appeal => appeal.month === month && appeal.employeeId === employee.id && appeal.status === '已修正' && appeal.correction)
+          .sort((left, right) => (left.resolvedAt || left.createdAt).localeCompare(right.resolvedAt || right.createdAt));
+        if (!history.length) return employee;
+        const corrections = history.flatMap(appeal => {
+          const { before, after } = appeal.correction!;
+          const changedObjective = before.okrCompletion !== after.okrCompletion || before.objectiveScore !== after.objectiveScore;
+          const changedReports = before.reportLate !== after.reportLate || before.reportMissing !== after.reportMissing || before.tasksOverdue !== after.tasksOverdue || before.reviewScore !== after.reviewScore;
+          const at = appeal.resolvedAt || appeal.createdAt;
+          return [
+            ...(changedObjective ? [{ id: `${appeal.id}-objective`, appealId: appeal.id, source: 'objective' as const, before: { okrCompletion: before.okrCompletion, objectiveScore: before.objectiveScore }, after: { okrCompletion: after.okrCompletion, objectiveScore: after.objectiveScore }, reason: appeal.resolution || '', actor: 'HR', at }] : []),
+            ...(changedReports ? [{ id: `${appeal.id}-reports`, appealId: appeal.id, source: 'reports' as const, before: { reportLate: before.reportLate, reportMissing: before.reportMissing, tasksOverdue: before.tasksOverdue, reviewScore: before.reviewScore }, after: { reportLate: after.reportLate, reportMissing: after.reportMissing, tasksOverdue: after.tasksOverdue, reviewScore: after.reviewScore }, reason: appeal.resolution || '', actor: 'HR', at }] : []),
+          ];
+        });
+        const firstCorrection = history[0].correction!;
+        return {
+          ...employee,
+          source: { ...employee.source, okrCompletion: firstCorrection.before.okrCompletion, reportLate: firstCorrection.before.reportLate, reportMissing: firstCorrection.before.reportMissing, tasksOverdue: firstCorrection.before.tasksOverdue },
+          scores: { ...employee.scores, objective: firstCorrection.before.objectiveScore, review: firstCorrection.before.reviewScore },
+          approvedSourceCorrections: corrections,
+          sourceCorrection: undefined,
+        };
+      }),
+    }])) as KpiDemoState['periods'],
+  };
+}
 
 export function resolveKpiAppeal(
   period: KpiPeriod,
@@ -146,13 +185,26 @@ export function resolveKpiAppeal(
   if (decision === 'correct' && correction) {
     const objectiveChanged = before.okrCompletion !== correction.okrCompletion || before.objectiveScore !== correction.objectiveScore;
     const reportsChanged = before.reportLate !== correction.reportLate || before.reportMissing !== correction.reportMissing || before.tasksOverdue !== correction.tasksOverdue || before.reviewScore !== correction.reviewScore;
+    const at = new Date().toISOString();
+    const sourceCorrections = [
+      ...(objectiveChanged ? [{
+        id: `${appeal.id}-objective`, appealId: appeal.id, source: 'objective' as const,
+        before: { okrCompletion: before.okrCompletion, objectiveScore: before.objectiveScore },
+        after: { okrCompletion: correction.okrCompletion, objectiveScore: correction.objectiveScore },
+        reason: note, actor: 'HR', at,
+      }] : []),
+      ...(reportsChanged ? [{
+        id: `${appeal.id}-reports`, appealId: appeal.id, source: 'reports' as const,
+        before: { reportLate: before.reportLate, reportMissing: before.reportMissing, tasksOverdue: before.tasksOverdue, reviewScore: before.reviewScore },
+        after: { reportLate: correction.reportLate, reportMissing: correction.reportMissing, tasksOverdue: correction.tasksOverdue, reviewScore: correction.reviewScore },
+        reason: note, actor: 'HR', at,
+      }] : []),
+    ];
     updatedPeriod = {
       ...period,
       employees: period.employees.map(item => item.id === employee.id ? {
         ...item,
-        source: { ...item.source, okrCompletion: correction.okrCompletion, reportLate: correction.reportLate, reportMissing: correction.reportMissing, tasksOverdue: correction.tasksOverdue },
-        scores: { ...item.scores, objective: correction.objectiveScore, review: correction.reviewScore },
-        sourceCorrection: { ...item.sourceCorrection, objective: item.sourceCorrection?.objective || objectiveChanged, reports: item.sourceCorrection?.reports || reportsChanged },
+        approvedSourceCorrections: [...(item.approvedSourceCorrections || []), ...sourceCorrections],
       } : item),
     };
     if (before.okrCompletion !== correction.okrCompletion) {

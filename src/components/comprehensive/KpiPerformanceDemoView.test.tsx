@@ -4,7 +4,7 @@ import { App as AntApp, Modal } from 'antd';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { KpiPerformanceDemoView } from './KpiPerformanceDemoView';
-import { departmentCoefficientPreview, KPI_DEMO_STORAGE_KEY, loadKpiDemo, publishKpiPeriod, reviewDepartmentSubmission, submitDepartmentReview } from '../../services/kpiPerformanceDemo';
+import { departmentCoefficientPreview, KPI_DEMO_STORAGE_KEY, loadKpiDemo, publishKpiPeriod, reviewDepartmentSubmission, saveKpiDemo, scoreForEmployee, submitDepartmentReview } from '../../services/kpiPerformanceDemo';
 import { listKpiAppeals, submitKpiAppeal } from '../../services/kpiPerformancePublication';
 
 beforeEach(() => { localStorage.clear(); });
@@ -129,6 +129,22 @@ describe('绩效考核公示', () => {
     document.querySelectorAll('.ant-modal-root').forEach(node => node.remove());
   });
 
+  it('主管复核时间范围外，月度公示不显示待复核入口', async () => {
+    const state = loadKpiDemo();
+    const period = state.periods['2026-11'];
+    period.generated = true;
+    period.cycleSettings = {
+      managerReview: { startAt: '2026-10-01T00:00:00.000Z', endAt: '2026-10-02T00:00:00.000Z' },
+      appealConfirmation: { startAt: '2026-10-03T00:00:00.000Z', endAt: '2026-11-30T00:00:00.000Z' },
+      finalPublicationAt: '2026-11-01T00:00:00.000Z',
+    };
+    saveKpiDemo(state);
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    await chooseRole('主管');
+    expect(screen.queryByText(/当前团队有 .* 位员工待复核/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '进入主管复核' })).not.toBeInTheDocument();
+  });
+
   it('原始数据按来源分类展示列表并包含部门字段', async () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
@@ -165,10 +181,16 @@ describe('绩效考核公示', () => {
     }
   });
 
-  it('HR 仅对已公示员工申诉修正目标和周月报，刷新后保留结果', async () => {
+  it('HR 在汇总复核中处理申诉，原始来源不变且修正记录关联可追溯', async () => {
     await seedPublishedPeriod();
     const appeal = submitKpiAppeal({ month: '2026-11', employeeId: 'e-01', employeeName: '林知夏', reason: '目标得分有误' });
     const view = render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    expect(screen.queryByRole('button', { name: '审核申诉' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
+    fireEvent.mouseDown(screen.getByLabelText('筛选汇总复核事项'));
+    fireEvent.click(await screen.findByText('员工申诉 · 1', { selector: '.ant-select-item-option-content' }));
+    expect(screen.getAllByText('员工申诉').length).toBeGreaterThan(1);
+    expect(screen.getByText('目标得分有误')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '审核申诉' }));
     expect(await screen.findByLabelText('申诉月度目标得分')).toBeInTheDocument();
     expect(screen.queryByLabelText('申诉出勤天数')).not.toBeInTheDocument();
@@ -176,12 +198,23 @@ describe('绩效考核公示', () => {
     fireEvent.change(screen.getByLabelText('申诉处理说明'), { target: { value: '核实目标完成情况' } });
     fireEvent.click(screen.getByRole('button', { name: '确认修正' }));
     await waitFor(() => expect(listKpiAppeals().find(item => item.id === appeal.id)?.status).toBe('已修正'));
-    expect(loadKpiDemo().periods['2026-11'].employees[0].scores.objective).toBe(58);
+    const correctedState = loadKpiDemo().periods['2026-11'];
+    expect(correctedState.employees[0].source.okrCompletion).toBe(93);
+    expect(correctedState.employees[0].scores.objective).toBe(56);
+    expect(scoreForEmployee(correctedState.employees[0])).toBe(81);
+    expect(correctedState.employees[0].approvedSourceCorrections).toHaveLength(1);
     view.unmount();
-    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    const refreshedView = render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
     expect(screen.getByText('已修正')).toBeInTheDocument();
-    expect(screen.getByText('处理说明：核实目标完成情况')).toBeInTheDocument();
-    expect(screen.getByText(/修正记录：目标得分 56 → 58/)).toBeInTheDocument();
+    expect(screen.getByText(/处理说明：核实目标完成情况/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
+    expect(screen.getByRole('columnheader', { name: '绩效修正记录' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看 1 条' }));
+    expect(await screen.findByText('目标得分：56 → 58')).toBeInTheDocument();
+    refreshedView.unmount();
+    document.querySelectorAll('.ant-modal-root').forEach(node => node.remove());
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
     expect(screen.getByText('核实目标完成情况')).toBeInTheDocument();
     expect(screen.getByText('月度目标 58 / 60 分')).toBeInTheDocument();

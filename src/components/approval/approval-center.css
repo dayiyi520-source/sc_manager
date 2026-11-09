@@ -31,6 +31,29 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.approval-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.approval-search-field {
+  position: relative;
+  flex: 0 0 250px;
+  width: 250px;
+}
+.approval-filter-selects {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.approval-filter-selects select { min-width: 150px; }
+@media (max-width: 760px) {
+  .approval-filter-bar,
+  .approval-filter-selects { align-items: stretch; flex-direction: column; width: 100%; }
+  .approval-search-field { flex-basis: auto; width: 100%; }
+  .approval-filter-selects select { width: 100%; }
+}
 @media (prefers-reduced-motion: reduce) {
   .approval-center button,
   .approval-center input,

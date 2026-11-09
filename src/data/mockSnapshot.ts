@@ -92,7 +92,7 @@ export const MOCK_APPROVALS: ApprovalFlow[] = [
   },
   {
     id: 'demo-approval-change', code: 'APPR-2026-1002', title: 'V4.2 版本需求重大变更评审', type: '需求重大变更',
-    applicantName: '林志豪', applicantDept: '人力行政部', status: '待审批', ccNames: ['陈佳'], relatedProduct: '数字化协同管理中枢 V4.2', submittedAt: '2026-10-02 15:40',
+    applicantName: '林志豪', applicantDept: '人力行政部', status: '审批中', ccNames: ['陈佳'], relatedProduct: '数字化协同管理中枢 V4.2', submittedAt: '2026-10-02 15:40',
     nodes: [
       { title: '发起申请', approver: '林志豪', role: '超级系统管理员', status: 'passed', time: '2026-10-02 15:40', comment: '补充跨部门影响评估。' },
       { title: '产品负责人审核', approver: '王芳', role: '产品经理', status: 'current' },
@@ -112,13 +112,37 @@ export const MOCK_APPROVALS: ApprovalFlow[] = [
   },
   {
     id: 'demo-approval-passed', code: 'APPR-2026-0998', title: '合作伙伴准入申请', type: '合作伙伴准入',
-    applicantName: '林志豪', applicantDept: '人力行政部', status: '已通过', relatedCustomer: '智行新能源汽车工业互联股份有限公司', submittedAt: '2026-09-28 10:05', completedAt: '2026-09-29 16:30',
+    applicantName: '林志豪', applicantDept: '人力行政部', status: '已完成', relatedCustomer: '智行新能源汽车工业互联股份有限公司', submittedAt: '2026-09-28 10:05', completedAt: '2026-09-29 16:30',
     nodes: [
       { title: '发起申请', approver: '林志豪', role: '超级系统管理员', status: 'passed', time: '2026-09-28 10:05' },
       { title: '部门主管审核', approver: '王芳', role: '产品经理', status: 'passed', time: '2026-09-29 09:10', comment: '资料完整。' },
       { title: '总经理终审', approver: '总经办', role: '总经理', status: 'passed', time: '2026-09-29 16:30', comment: '同意准入。' },
     ],
     contentDetails: { '审批主题': '合作伙伴准入申请', '关联合作方': '智行新能源汽车工业互联股份有限公司', '申请说明': '完成资质审核并纳入合作伙伴目录。' },
+  },
+  {
+    id: 'demo-attendance-makeup-approved', code: 'AP-ATT-2026-1104', title: '周予安 11月4日补卡申请', type: '补卡审批',
+    applicantName: '周予安', applicantDept: '产品部', status: '已完成', submittedAt: '2026-11-04 18:12', completedAt: '2026-11-05 10:24',
+    nodes: [{ title: '发起申请', approver: '周予安', role: '产品经理', status: 'passed', time: '2026-11-04 18:12' }, { title: '部门主管审核', approver: '陈宇璋', role: '部门主管', status: 'passed', time: '2026-11-05 10:24', comment: '外出客户现场属实，同意补录下班卡。' }],
+    contentDetails: { '审批主题': '11月4日补录下班卡', '异常日期': '2026-11-04', '原考勤状态': '缺卡', '审批结果': '补录下班卡 18:06', '申请说明': '外出客户现场，忘记补录下班卡。' },
+  },
+  {
+    id: 'demo-attendance-exception-review', code: 'AP-ATT-2026-1103', title: '许明川 11月3日早退考勤复核', type: '考勤异常申诉审批',
+    applicantName: '许明川', applicantDept: '研发部', status: '审批中', submittedAt: '2026-11-03 18:05',
+    nodes: [{ title: '发起申诉', approver: '许明川', role: '后端工程师', status: 'passed', time: '2026-11-03 18:05' }, { title: '部门主管审核', approver: '赵书琳', role: '部门主管', status: 'passed', time: '2026-11-04 09:10' }, { title: 'HR 复核', approver: '林志豪', role: 'HR', status: 'current' }],
+    contentDetails: { '审批主题': '11月3日早退考勤复核', '异常日期': '2026-11-03', '原考勤状态': '早退', '申请说明': '已提交外出审批，申请核对考勤。' },
+  },
+  {
+    id: 'demo-attendance-leave-approved', code: 'LEAVE-2026-1106', title: '唐以宁 11月6日病假申请', type: '请假审批',
+    applicantName: '唐以宁', applicantDept: '运营部', status: '已完成', submittedAt: '2026-11-05 16:30', completedAt: '2026-11-05 17:05',
+    nodes: [{ title: '发起申请', approver: '唐以宁', role: '运营专员', status: 'passed', time: '2026-11-05 16:30' }, { title: 'HR 审核', approver: '林志豪', role: 'HR', status: 'passed', time: '2026-11-05 17:05', comment: '材料已核实，同意病假。' }],
+    contentDetails: { '审批主题': '11月6日病假申请', '请假类型': '病假', '请假时间': '2026-11-06 09:00 至 18:00', '审批结果': '病假 1 天', '申请说明': '身体不适就诊。' },
+  },
+  {
+    id: 'demo-attendance-locked-correction', code: 'AP-ATT-2026-1028', title: '唐以宁 10月28日补卡申请', type: '补卡审批',
+    applicantName: '唐以宁', applicantDept: '运营部', status: '已完成', submittedAt: '2026-10-28 18:15', completedAt: '2026-10-29 09:16',
+    nodes: [{ title: '发起申请', approver: '唐以宁', role: '运营专员', status: 'passed', time: '2026-10-28 18:15' }, { title: '部门主管审核', approver: '毛景强', role: '部门主管', status: 'passed', time: '2026-10-29 09:16' }],
+    contentDetails: { '审批主题': '10月28日补录下班卡', '异常日期': '2026-10-28', '原考勤状态': '缺卡', '审批结果': '补录下班卡 18:00', '申请说明': '审批完成时 10 月绩效已公示，等待 HR 更正确认。' },
   },
 ];
 

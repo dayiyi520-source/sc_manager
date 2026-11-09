@@ -14,7 +14,8 @@ describe('workbench list rules', () => {
     expect(pendingFor(waiting, '同事')).toBe(true);
     expect(reviewedBy(waiting, '同事')).toBe(false);
     expect(reviewedBy(flow('已驳回', [{ title: '一审', approver: '本人', role: '主管', status: 'rejected' }]), '本人')).toBe(true);
-    expect(reviewedBy(flow('已通过', [{ title: '一审', approver: '他人', role: '主管', status: 'passed' }]), '本人')).toBe(false);
+    expect(reviewedBy(flow('已完成', [{ title: '一审', approver: '他人', role: '主管', status: 'passed' }]), '本人')).toBe(false);
+    expect(pendingFor(flow('审批中', [{ title: '一审', approver: '本人', role: '主管', status: 'current' }]), '本人')).toBe(true);
   });
 
   it('shows the newest ten by record time without mutating input and puts missing dates last', () => {

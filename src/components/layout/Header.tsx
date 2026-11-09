@@ -96,7 +96,7 @@ export const Header: React.FC = () => {
     }
   };
 
-  const pendingApprovalsCount = approvals.filter((a) => a.status === '待审批').length;
+  const pendingApprovalsCount = approvals.filter((a) => a.status === '待审批' || a.status === '审批中').length;
   const pendingTasksCount = requirementTasks.filter((t) => t.status === '待处理' || t.status === '研发中').length;
 
   return (

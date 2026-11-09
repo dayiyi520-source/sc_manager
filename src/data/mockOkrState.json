@@ -1,5 +1,5 @@
 {
-  "revision": 84,
+  "revision": 108,
   "okrRecords": [
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
@@ -6726,6 +6726,1140 @@
           "feedback": ""
         }
       ]
+    },
+    {
+      "id": "a8c147d2-f93b-4fb9-b83e-782c5f2a3095",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "active",
+      "createdAt": "2026-10-22T13:37:59.202Z",
+      "version": 12,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+        "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+        "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+        "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+        "sourceVersion": 3,
+        "alignments": [
+          {
+            "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+            "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "product",
+            "deadline": "2026-10-31",
+            "details": [
+              {
+                "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                "name": "教师教学档案袋",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedStartDate": "2026-10-22",
+                "plannedEndDate": "2026-10-31",
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+              },
+              {
+                "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                "name": "教师教学档案袋",
+                "version": "V1.2.0",
+                "stage": "产品设计",
+                "plannedStartDate": "2026-10-22",
+                "plannedEndDate": "2026-11-03",
+                "assigneeIds": [
+                  "user-product",
+                  "user-product-member"
+                ],
+                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+              }
+            ],
+            "assigneeIds": [
+              "user-product-member",
+              "user-product"
+            ],
+            "businessObject": "教师教学档案袋",
+            "version": "V1.1.0",
+            "stage": "产品设计",
+            "plannedDeadline": "2026-10-31"
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+        "objectiveTemplateKrTypes": [
+          "product",
+          "support"
+        ],
+        "changeReason": "测试",
+        "note": "",
+        "plannedDeadline": "2026-10-31",
+        "sourceWithdrawalAcknowledged": false,
+        "sourceKrData": {
+          "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+          "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+          "weight": 25,
+          "progress": 0,
+          "assigneeIds": [
+            "user-product"
+          ],
+          "deadline": "2026-10-31",
+          "plannedDeadline": "2026-10-31"
+        }
+      },
+      "changeRequest": {
+        "previousPayload": {
+          "goalModelVersion": 2,
+          "goalLevel": "department",
+          "origin": "assigned",
+          "inherited": false,
+          "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+          "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+          "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+          "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+          "sourceVersion": 3,
+          "alignments": [
+            {
+              "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+              "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+            }
+          ],
+          "weight": 100,
+          "deadline": "2026-10-31",
+          "keyResults": [
+            {
+              "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+              "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+              "weight": 100,
+              "progress": 0,
+              "structureType": "product",
+              "deadline": "2026-10-31",
+              "details": [
+                {
+                  "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                  "name": "教师教学档案袋",
+                  "version": "V1.1.0",
+                  "stage": "产品设计",
+                  "plannedStartDate": "2026-10-22",
+                  "plannedEndDate": "2026-10-31",
+                  "assigneeIds": [
+                    "user-product-member"
+                  ],
+                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                },
+                {
+                  "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                  "name": "教师教学档案袋",
+                  "version": "V1.2.0",
+                  "stage": "产品设计",
+                  "plannedStartDate": "2026-10-22",
+                  "plannedEndDate": "2026-11-03",
+                  "assigneeIds": [
+                    "user-product",
+                    "user-product-member"
+                  ],
+                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                }
+              ],
+              "assigneeIds": [
+                "user-product-member",
+                "user-product"
+              ],
+              "businessObject": "教师教学档案袋",
+              "version": "V1.1.0",
+              "stage": "产品设计",
+              "plannedDeadline": "2026-10-31"
+            }
+          ],
+          "objectiveType": "target",
+          "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+          "objectiveTemplateKrTypes": [
+            "product",
+            "support"
+          ],
+          "changeReason": "测试",
+          "note": "",
+          "plannedDeadline": "2026-10-31",
+          "sourceWithdrawalAcknowledged": false,
+          "sourceKrData": {
+            "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "weight": 25,
+            "progress": 0,
+            "assigneeIds": [
+              "user-product"
+            ],
+            "deadline": "2026-10-31",
+            "plannedDeadline": "2026-10-31"
+          }
+        },
+        "id": "37b96330-702b-419b-9449-9b7ea9390732",
+        "status": "approved",
+        "purpose": "update",
+        "reason": "测试",
+        "reviewerId": "user-admin",
+        "payload": {
+          "goalModelVersion": 2,
+          "goalLevel": "department",
+          "origin": "assigned",
+          "inherited": false,
+          "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+          "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+          "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+          "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+          "sourceVersion": 3,
+          "alignments": [
+            {
+              "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+              "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+            }
+          ],
+          "weight": 100,
+          "deadline": "2026-10-31",
+          "keyResults": [
+            {
+              "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+              "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+              "weight": 100,
+              "progress": 0,
+              "structureType": "product",
+              "deadline": "2026-10-31",
+              "details": [
+                {
+                  "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                  "name": "教师教学档案袋",
+                  "version": "V1.1.0",
+                  "stage": "产品设计",
+                  "plannedStartDate": "2026-10-22",
+                  "plannedEndDate": "2026-10-31",
+                  "assigneeIds": [
+                    "user-product-member",
+                    "user-product"
+                  ],
+                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                },
+                {
+                  "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                  "name": "教师教学档案袋",
+                  "version": "V1.2.0",
+                  "stage": "产品设计",
+                  "plannedStartDate": "2026-10-22",
+                  "plannedEndDate": "2026-11-03",
+                  "assigneeIds": [
+                    "user-product",
+                    "user-product-member"
+                  ],
+                  "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                }
+              ],
+              "assigneeIds": [
+                "user-product-member",
+                "user-product"
+              ],
+              "businessObject": "教师教学档案袋",
+              "version": "V1.1.0",
+              "stage": "产品设计",
+              "plannedDeadline": "2026-10-31"
+            }
+          ],
+          "objectiveType": "target",
+          "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+          "objectiveTemplateKrTypes": [
+            "product",
+            "support"
+          ],
+          "changeReason": "测试",
+          "note": "",
+          "plannedDeadline": "2026-10-31",
+          "sourceWithdrawalAcknowledged": false,
+          "sourceKrData": {
+            "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "weight": 25,
+            "progress": 0,
+            "assigneeIds": [
+              "user-product"
+            ],
+            "deadline": "2026-10-31",
+            "plannedDeadline": "2026-10-31"
+          }
+        },
+        "baseVersion": 10,
+        "requestedAt": "2026-10-27T15:32:37.325Z",
+        "reviewedAt": "2026-10-27T15:32:48.609Z",
+        "feedback": ""
+      },
+      "changeHistory": [
+        {
+          "id": "f590dfb5-4182-431f-8dc2-45dbf4f366ec",
+          "status": "approved",
+          "purpose": "initial",
+          "reviewerId": "user-admin",
+          "reason": "自主目标首次提交",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+                "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  }
+                ],
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "businessObject": "教师教学档案袋",
+                "version": "V1.1.0",
+                "stage": "产品设计"
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "",
+            "note": ""
+          },
+          "baseVersion": 1,
+          "requestedAt": "2026-10-22T13:40:04.895Z",
+          "reviewedAt": "2026-10-22T13:41:12.208Z",
+          "feedback": ""
+        },
+        {
+          "previousPayload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+                "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  }
+                ],
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "businessObject": "教师教学档案袋",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "",
+            "note": "",
+            "plannedDeadline": "2026-10-31",
+            "sourceWithdrawalAcknowledged": false,
+            "sourceKrData": {
+              "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+              "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+              "weight": 25,
+              "progress": 0,
+              "assigneeIds": [
+                "user-product"
+              ],
+              "deadline": "2026-10-31",
+              "plannedDeadline": "2026-10-31"
+            }
+          },
+          "id": "b0712a42-bde5-4d8e-ab98-3f8a05e35527",
+          "status": "approved",
+          "purpose": "update",
+          "reason": "测试",
+          "reviewerId": "user-admin",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+                "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product",
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  }
+                ],
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "businessObject": "教师教学档案袋",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "测试",
+            "note": "",
+            "plannedDeadline": "2026-10-31",
+            "sourceWithdrawalAcknowledged": false,
+            "sourceKrData": {
+              "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+              "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+              "weight": 25,
+              "progress": 0,
+              "assigneeIds": [
+                "user-product"
+              ],
+              "deadline": "2026-10-31",
+              "plannedDeadline": "2026-10-31"
+            }
+          },
+          "baseVersion": 6,
+          "requestedAt": "2026-10-27T13:21:49.947Z",
+          "reviewedAt": "2026-10-27T13:22:03.464Z",
+          "feedback": ""
+        },
+        {
+          "previousPayload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+                "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product",
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  }
+                ],
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "businessObject": "教师教学档案袋",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "测试",
+            "note": "",
+            "plannedDeadline": "2026-10-31",
+            "sourceWithdrawalAcknowledged": false,
+            "sourceKrData": {
+              "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+              "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+              "weight": 25,
+              "progress": 0,
+              "assigneeIds": [
+                "user-product"
+              ],
+              "deadline": "2026-10-31",
+              "plannedDeadline": "2026-10-31"
+            }
+          },
+          "id": "77311a75-877c-4316-ac2b-efff0de28ba8",
+          "status": "approved",
+          "purpose": "update",
+          "reason": "测试",
+          "reviewerId": "user-admin",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+                "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-11-03",
+                    "assigneeIds": [
+                      "user-product",
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  }
+                ],
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "businessObject": "教师教学档案袋",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "测试",
+            "note": "",
+            "plannedDeadline": "2026-10-31",
+            "sourceWithdrawalAcknowledged": false,
+            "sourceKrData": {
+              "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+              "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+              "weight": 25,
+              "progress": 0,
+              "assigneeIds": [
+                "user-product"
+              ],
+              "deadline": "2026-10-31",
+              "plannedDeadline": "2026-10-31"
+            }
+          },
+          "baseVersion": 8,
+          "requestedAt": "2026-10-27T14:52:31.282Z",
+          "reviewedAt": "2026-10-27T15:07:50.635Z",
+          "feedback": ""
+        },
+        {
+          "previousPayload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+                "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-11-03",
+                    "assigneeIds": [
+                      "user-product",
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  }
+                ],
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "businessObject": "教师教学档案袋",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "测试",
+            "note": "",
+            "plannedDeadline": "2026-10-31",
+            "sourceWithdrawalAcknowledged": false,
+            "sourceKrData": {
+              "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+              "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+              "weight": 25,
+              "progress": 0,
+              "assigneeIds": [
+                "user-product"
+              ],
+              "deadline": "2026-10-31",
+              "plannedDeadline": "2026-10-31"
+            }
+          },
+          "id": "37b96330-702b-419b-9449-9b7ea9390732",
+          "status": "approved",
+          "purpose": "update",
+          "reason": "测试",
+          "reviewerId": "user-admin",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+            "sourceVersion": 3,
+            "alignments": [
+              {
+                "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+                "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "32728220-e7a6-41c5-b806-e7d558fc9772",
+                "title": "按期完成2个产品版本迭代计划 · 达到对应的阶段",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "product",
+                "deadline": "2026-10-31",
+                "details": [
+                  {
+                    "id": "13e3852c-8fc8-41e1-8e01-60452934d4e4",
+                    "name": "教师教学档案袋",
+                    "version": "V1.1.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-10-31",
+                    "assigneeIds": [
+                      "user-product-member",
+                      "user-product"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  },
+                  {
+                    "id": "54710072-6a3b-419a-98f9-f6dd992e7927",
+                    "name": "教师教学档案袋",
+                    "version": "V1.2.0",
+                    "stage": "产品设计",
+                    "plannedStartDate": "2026-10-22",
+                    "plannedEndDate": "2026-11-03",
+                    "assigneeIds": [
+                      "user-product",
+                      "user-product-member"
+                    ],
+                    "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
+                  }
+                ],
+                "assigneeIds": [
+                  "user-product-member",
+                  "user-product"
+                ],
+                "businessObject": "教师教学档案袋",
+                "version": "V1.1.0",
+                "stage": "产品设计",
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "测试",
+            "note": "",
+            "plannedDeadline": "2026-10-31",
+            "sourceWithdrawalAcknowledged": false,
+            "sourceKrData": {
+              "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+              "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+              "weight": 25,
+              "progress": 0,
+              "assigneeIds": [
+                "user-product"
+              ],
+              "deadline": "2026-10-31",
+              "plannedDeadline": "2026-10-31"
+            }
+          },
+          "baseVersion": 10,
+          "requestedAt": "2026-10-27T15:32:37.325Z",
+          "reviewedAt": "2026-10-27T15:32:48.609Z",
+          "feedback": ""
+        }
+      ]
+    },
+    {
+      "id": "c2067d54-01c4-4082-87fb-6a7b3d514c37",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-22T13:37:59.670Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "依托标准流程，在约定时限内闭环上下游协同事项；按时输出培训资料、组织产品赋能培训，建立协同规则、流程和边界，保障上下游业务平稳推进。",
+        "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+        "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+        "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+        "sourceVersion": 3,
+        "alignments": [
+          {
+            "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "5c4014a6-f9e1-4889-a496-fbef3520b3e1",
+            "title": "",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "delivery",
+            "deadline": "2026-10-31",
+            "details": []
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "2475a064-2465-4b05-a38e-85be7c1188fa",
+        "objectiveTemplateKrTypes": [
+          "delivery",
+          "support"
+        ],
+        "changeReason": "",
+        "note": ""
+      }
+    },
+    {
+      "id": "52e9a87a-e4a1-4636-9722-6a0e28f541dd",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-22T13:37:59.903Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "按时制定月度/季度版本计划，管控版本范围与里程碑；保障迭代节奏稳定，重点需求按期推进、风险及时暴露，持续推动产品迭代升级",
+        "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+        "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+        "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+        "sourceVersion": 3,
+        "alignments": [
+          {
+            "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "cce19dc5-b0a8-4fb8-861d-6073a7331a4d",
+            "title": "",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "support",
+            "deadline": "2026-10-31"
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "204c7623-fc37-4af9-9779-b2790f7c6636",
+        "objectiveTemplateKrTypes": [
+          "support"
+        ],
+        "changeReason": "",
+        "note": ""
+      }
+    },
+    {
+      "id": "07092546-aab6-473a-8792-521e5835d710",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-22T13:38:00.117Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+        "sourceTitle": "明确跨部门交付里程碑",
+        "sourceObjectiveId": "demo-month-2026-10-user-admin",
+        "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+        "sourceVersion": 0,
+        "alignments": [
+          {
+            "parentObjectiveId": "demo-month-2026-10-user-admin",
+            "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "e0176fc5-aca3-4868-beda-c0f4bd369d41",
+            "title": "",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "product",
+            "deadline": "2026-10-31",
+            "details": []
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+        "objectiveTemplateKrTypes": [
+          "product",
+          "support"
+        ],
+        "changeReason": "",
+        "note": ""
+      }
+    },
+    {
+      "id": "2884ec93-76e0-425b-a0ca-73a313fdde58",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-22T13:38:00.329Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "依托标准流程，在约定时限内闭环上下游协同事项；按时输出培训资料、组织产品赋能培训，建立协同规则、流程和边界，保障上下游业务平稳推进。",
+        "sourceTitle": "明确跨部门交付里程碑",
+        "sourceObjectiveId": "demo-month-2026-10-user-admin",
+        "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+        "sourceVersion": 0,
+        "alignments": [
+          {
+            "parentObjectiveId": "demo-month-2026-10-user-admin",
+            "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "fecdc797-fa48-4f46-a470-e59c3d701d03",
+            "title": "",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "delivery",
+            "deadline": "2026-10-31",
+            "details": []
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "2475a064-2465-4b05-a38e-85be7c1188fa",
+        "objectiveTemplateKrTypes": [
+          "delivery",
+          "support"
+        ],
+        "changeReason": "",
+        "note": ""
+      }
+    },
+    {
+      "id": "a3b0f325-d5cb-4b1a-a5f4-314303ae3e32",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-22T13:38:00.630Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "按时制定月度/季度版本计划，管控版本范围与里程碑；保障迭代节奏稳定，重点需求按期推进、风险及时暴露，持续推动产品迭代升级",
+        "sourceTitle": "明确跨部门交付里程碑",
+        "sourceObjectiveId": "demo-month-2026-10-user-admin",
+        "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+        "sourceVersion": 0,
+        "alignments": [
+          {
+            "parentObjectiveId": "demo-month-2026-10-user-admin",
+            "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "38782cfe-d023-435c-9366-a33f717a4fdd",
+            "title": "",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "support",
+            "deadline": "2026-10-31"
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "204c7623-fc37-4af9-9779-b2790f7c6636",
+        "objectiveTemplateKrTypes": [
+          "support"
+        ],
+        "changeReason": "",
+        "note": ""
+      }
     }
   ],
   "okrPeople": [
@@ -7362,7 +8496,7 @@
                 "type": "textarea",
                 "required": false,
                 "maxLength": 10000,
-                "placeholder": "补充部门本月整体成果、问题与经验"
+                "placeholder": "补充部门本月整体成果、��题与经验"
               }
             ]
           },

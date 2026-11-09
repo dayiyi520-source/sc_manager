@@ -95,6 +95,22 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(syncKpiSources(synced, '2026-11').employees[0]).toEqual(synced.employees[0]);
   });
 
+  it('merges effective attendance approvals into KPI source data and excludes pending or locked changes', () => {
+    const period = loadKpiDemo().periods['2026-11'];
+    const synced = syncKpiSources(period, '2026-11');
+    const zhou = synced.employees.find(employee => employee.name === '周予安')!;
+    const gu = synced.employees.find(employee => employee.name === '顾清和')!;
+    const tang = synced.employees.find(employee => employee.name === '唐以宁')!;
+
+    expect(zhou.source.missingPunches).toBe(0);
+    expect(zhou.source.leaveRecords).toMatchObject({ 年假: 1 });
+    expect(zhou.source.attendanceApprovalSummary?.some(item => item.includes('AP-ATT-2026-1104'))).toBe(true);
+    expect(gu.source.leaveRecords).toMatchObject({ 年假: 2 });
+    expect(tang.source.leaveRecords).toMatchObject({ 病假: 1 });
+    expect(tang.source.lateCount).toBe(2);
+    expect(tang.source.attendanceApprovalSummary?.some(item => item.includes('AP-ATT-2026-1028'))).toBe(false);
+  });
+
   it('invalidates unpublished factor confirmation when source objectives change', () => {
     const period = withOpenManagerWindow(loadKpiDemo().periods['2026-11']);
     period.departmentMetrics!.产品部.confirmed = true;

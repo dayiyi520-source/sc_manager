@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { customerDirectoryRepository } from '../services/customerDirectoryRepository';
 import { requirementRepository } from '../services/requirementRepository';
 import { productRepository } from '../services/productRepository';
+import { loadApprovalFlows, saveApprovalFlows, syncAttendanceApprovals } from '../services/approvalDemo';
 import { useSessionState } from './modules/useSessionState';
 import { useCrmQueries } from './modules/useCrmQueries';
 import { useProductQueries } from './modules/useProductQueries';
@@ -414,11 +415,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [bugs, setBugs] = useState<DefectBug[]>(MOCK_BUGS);
   const [requirementPool, setRequirementPool] = useState<RequirementPoolItem[]>([]);
   const [requirementTaskDraft, setRequirementTaskDraft] = useState<RequirementTaskDraft | null>(null);
-  const [approvals, setApprovals] = useState<ApprovalFlow[]>(MOCK_APPROVALS);
+  const [approvals, setApprovals] = useState<ApprovalFlow[]>(() => loadApprovalFlows(MOCK_APPROVALS));
   const [projects, setProjects] = useState<ProjectItem[]>(directoryProjects());
   const [servers, setServers] = useState<ServerNode[]>([]);
   const { okrs, setOkrs, performances, setPerformances } = useOkrState(currentUser, dataMode === 'remote' || import.meta.env.VITE_MOCK_MODE !== 'false');
   const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>(loadKnowledgeDocs);
+  useEffect(() => {
+    saveApprovalFlows(approvals);
+    syncAttendanceApprovals(approvals);
+  }, [approvals]);
 
   // Operations & Delivery Extensions
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -695,7 +700,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const isAllDone = newNodes.every((n) => n.status === 'passed');
         return {
           ...flow,
-          status: isAllDone ? ('已通过' as const) : ('待审批' as const),
+          status: isAllDone ? ('已完成' as const) : ('审批中' as const),
           nodes: newNodes,
           completedAt: isAllDone ? '刚刚' : undefined
         };
