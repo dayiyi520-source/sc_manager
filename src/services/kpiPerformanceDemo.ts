@@ -12,6 +12,8 @@ export interface KpiScores {
 
 export interface KpiSourceData {
   okrCompletion: number;
+  okrWeight?: number;
+  objectiveAdjustment?: number;
   attendanceDays: number;
   lateCount: number;
   missingPunches: number;
@@ -20,6 +22,16 @@ export interface KpiSourceData {
   reportMissing: number;
   tasksOverdue: number;
   leaveRecords?: Record<string, number>;
+}
+
+export interface KpiReviewRecord {
+  id: string;
+  action: '提交主管复核' | 'HR 退回' | 'HR 审核通过';
+  actor: string;
+  at: string;
+  before: { attitude: number; adjustment: number; total: number };
+  proposed: { attitude: number; adjustment: number; total: number };
+  reason: string;
 }
 
 export interface KpiEmployee {
@@ -32,6 +44,7 @@ export interface KpiEmployee {
   source: KpiSourceData;
   reviewStatus: KpiStatus;
   managerDraft?: { attitude: number; adjustment: number; reason: string };
+  reviewHistory?: KpiReviewRecord[];
   hrNote?: string;
   redline?: { type: string; impact: string; active: boolean };
 }
@@ -43,19 +56,55 @@ export interface KpiPeriod {
   generated: boolean;
   published: boolean;
   reviewEnabled: boolean;
+  reviewScoresInitialized?: boolean;
   generatedAt?: string;
+  publishedAt?: string;
   departmentCoefficients: Record<string, number>;
-  departmentMetrics?: Record<string, { teamCompletion: number; confirmed: boolean }>;
+  departmentMetrics?: Record<string, KpiDepartmentMetrics>;
 }
+
+export interface KpiDepartmentMetrics {
+  teamCompletion: number;
+  businessRequirement?: boolean;
+  managementContribution?: boolean;
+  riskResponse?: boolean;
+  teamDeliveryMiss?: boolean;
+  confirmed: boolean;
+}
+
+const roundFactor = (value: number) => Math.round(value * 100) / 100;
 
 export const departmentCoefficientPreview = (period: KpiPeriod, department: string) => {
   const members = period.employees.filter(employee => employee.department === department);
-  if (!members.length) return { objectiveCompletion: 0, teamCompletion: 0, majorRedline: false, adjustment: 1, coefficient: 1 };
-  const objectiveCompletion = members.reduce((sum, employee) => sum + employee.source.okrCompletion, 0) / members.length;
-  const teamCompletion = period.departmentMetrics?.[department]?.teamCompletion ?? 100;
+  const totalWeight = members.reduce((sum, employee) => sum + (employee.source.okrWeight ?? 1), 0);
+  const objectiveCompletion = totalWeight ? members.reduce((sum, employee) => sum + employee.source.okrCompletion * (employee.source.okrWeight ?? 1), 0) / totalWeight : 0;
+  const metrics = period.departmentMetrics?.[department];
+  const teamCompletion = metrics?.teamCompletion ?? 100;
+  const touchedRedline = members.some(employee => employee.redline?.active);
   const majorRedline = members.some(employee => employee.redline?.active && employee.redline.type === '重大失职');
-  const adjustment = objectiveCompletion >= 100 && teamCompletion >= 100 ? 1.1 : 1;
-  return { objectiveCompletion, teamCompletion, majorRedline, adjustment, coefficient: majorRedline ? 0.9 : adjustment };
+  const responsibilityCap = metrics?.teamDeliveryMiss || touchedRedline ? 0.8 : null;
+  const adjustment = roundFactor(Math.max(0.8, Math.min(1.2, 1
+    + (objectiveCompletion >= 100 ? 0.1 : 0)
+    + (metrics?.businessRequirement ? 0.05 : 0)
+    + (metrics?.managementContribution ? 0.05 : 0)
+    + (metrics?.riskResponse ? 0.05 : 0)
+    - (teamCompletion < 100 ? 0.1 : 0)
+    - (metrics?.teamDeliveryMiss ? 0.1 : 0))));
+  const coefficient = majorRedline ? 0 : Math.min(adjustment, responsibilityCap ?? adjustment);
+  const scenario = coefficient > 1 ? '场景1（调节系数 > 1.0）' : coefficient < 1 ? '场景3（调节系数 < 1.0）' : '场景2（调节系数 = 1.0）';
+  return { objectiveCompletion, teamCompletion, touchedRedline, majorRedline, responsibilityCap, adjustment, coefficient, scenario };
+};
+
+const recordReview = (employee: KpiEmployee, action: KpiReviewRecord['action'], actor: string, reason: string): KpiEmployee => {
+  const draft = employee.managerDraft;
+  const proposedScores = draft ? { ...employee.scores, attitude: draft.attitude, managerAdjustment: draft.adjustment } : employee.scores;
+  const record: KpiReviewRecord = {
+    id: `${employee.id}-${Date.now()}-${employee.reviewHistory?.length ?? 0}`, action, actor, at: new Date().toISOString(),
+    before: { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, total: scoreForEmployee(employee) },
+    proposed: { attitude: proposedScores.attitude, adjustment: proposedScores.managerAdjustment, total: scoreForEmployee({ ...employee, scores: proposedScores }) },
+    reason,
+  };
+  return { ...employee, reviewHistory: [...(employee.reviewHistory ?? []), record] };
 };
 
 export const submitDepartmentReview = (period: KpiPeriod, manager: string, department: string): KpiPeriod => {
@@ -63,7 +112,7 @@ export const submitDepartmentReview = (period: KpiPeriod, manager: string, depar
   const targets = period.employees.filter(employee => employee.manager === manager && employee.department === department);
   if (!targets.length || targets.some(employee => !['待主管复核', 'HR 已退回'].includes(employee.reviewStatus))) throw new Error('该部门存在不可提交的员工');
   return { ...period, employees: period.employees.map(employee => targets.some(target => target.id === employee.id)
-    ? submitManagerReview({ ...employee, managerDraft: employee.managerDraft || { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, reason: '主管确认当前评分' } }) : employee) };
+    ? submitManagerReview(recordReview({ ...employee, managerDraft: employee.managerDraft || { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, reason: '主管确认当前评分' } }, '提交主管复核', manager, employee.managerDraft?.reason || '主管确认当前评分')) : employee) };
 };
 
 export const reviewDepartmentSubmission = (period: KpiPeriod, manager: string, department: string, decision: KpiReviewDecision, reason = ''): KpiPeriod => {
@@ -72,7 +121,29 @@ export const reviewDepartmentSubmission = (period: KpiPeriod, manager: string, d
   if (!targets.length || targets.some(employee => employee.reviewStatus !== '待 HR 审核')) throw new Error('该部门尚未全部提交 HR 审核');
   if (decision === 'return' && !reason.trim()) throw new Error('请填写退回原因');
   return { ...period, employees: period.employees.map(employee => targets.some(target => target.id === employee.id)
-    ? reviewManagerSubmission(employee, decision, reason) : employee) };
+    ? reviewManagerSubmission(recordReview(employee, decision === 'approve' ? 'HR 审核通过' : 'HR 退回', 'HR', decision === 'approve' ? employee.managerDraft?.reason || '确认当前评分' : reason.trim()), decision, reason) : employee) };
+};
+
+export const publishKpiPeriod = (period: KpiPeriod): KpiPeriod => {
+  if (!period.generated || period.published) throw new Error('当前月份不可公示');
+  if (period.employees.some(employee => employee.reviewStatus !== '已通过')) throw new Error('仍有员工未完成 HR 审核');
+  if ([...new Set(period.employees.map(employee => employee.department))].some(name => !period.departmentMetrics?.[name]?.confirmed)) throw new Error('请先确认全部部门系数');
+  return { ...period, published: true, publishedAt: new Date().toLocaleString('zh-CN', { hour12: false }) };
+};
+
+export const confirmAllDepartmentCoefficients = (period: KpiPeriod): KpiPeriod => {
+  if (!period.generated || period.published) throw new Error('当前月份不可确认部门系数');
+  const departments = [...new Set(period.employees.map(employee => employee.department))];
+  if (!departments.length) throw new Error('本月没有可确认的部门');
+  return {
+    ...period,
+    departmentCoefficients: Object.fromEntries(departments.map(name => [name, departmentCoefficientPreview(period, name).coefficient])),
+    departmentMetrics: Object.fromEntries(departments.map(name => [name, {
+      teamCompletion: 100,
+      ...period.departmentMetrics?.[name],
+      confirmed: true,
+    }])),
+  };
 };
 
 export interface KpiDemoState {
@@ -88,10 +159,11 @@ const buildEmployees = (month: string): KpiEmployee[] => {
   { id: 'e-05', name: '沈嘉禾', department: '交付部', position: '交付顾问', manager: '王佳乐', scores: { objective: 50, attendance: 10, extraWork: 3, attitude: 13, review: 8, managerAdjustment: 0 }, source: { okrCompletion: 84, attendanceDays: 22, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 5, reportLate: 1, reportMissing: 0, tasksOverdue: 2, leaveRecords: { '年假': 0, '事假': 0, '病假': 1 } }, reviewStatus: '已通过' },
   { id: 'e-06', name: '唐以宁', department: '运营部', position: '运营专员', manager: '毛景强', scores: { objective: 39, attendance: 7, extraWork: 1, attitude: 10, review: 6, managerAdjustment: -2 }, source: { okrCompletion: 65, attendanceDays: 20, lateCount: 3, missingPunches: 1, approvedOvertimeHours: 2, reportLate: 2, reportMissing: 1, tasksOverdue: 3, leaveRecords: { '年假': 0, '事假': 0, '病假': 2 } }, reviewStatus: '待 HR 审核' },
   ];
-  return month === '2026-10' ? rows.map(employee => ({
+  const seeded = rows.map(employee => ({ ...employee, source: { ...employee.source, objectiveAdjustment: employee.scores.managerAdjustment } }));
+  return month === '2026-10' ? seeded.map(employee => ({
     ...employee,
     reviewStatus: '已通过',
-  })) : rows;
+  })) : seeded;
 };
 
 export const KPI_DEMO_STORAGE_KEY = 'shichuang.frontend.demo.kpiPerformance.v1';
@@ -141,11 +213,13 @@ export const reviewManagerSubmission = (employee: KpiEmployee, decision: KpiRevi
 
 const initialState = (): KpiDemoState => ({
   periods: Object.fromEntries(KPI_MONTHS.map((month, index) => [month, {
-    employees: month === '2026-11' ? buildEmployees(month).map(employee => ({ ...employee, redline: undefined, reviewStatus: '待主管复核', managerDraft: undefined, hrNote: undefined })) : buildEmployees(month),
+    employees: month === '2026-11' ? buildEmployees(month).map(employee => ({ ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 }, redline: undefined, reviewStatus: '待主管复核', managerDraft: undefined, hrNote: undefined })) : buildEmployees(month),
     generated: month !== '2026-09',
     published: month === '2026-10',
     reviewEnabled: month !== '2026-09',
+    reviewScoresInitialized: true,
     generatedAt: month === '2026-11' ? '2026-11-01 09:30' : month === '2026-10' ? '2026-11-01 09:30' : undefined,
+    publishedAt: month === '2026-10' ? '2026-11-01 09:30' : undefined,
     departmentCoefficients: { 产品部: 1, 研发部: 1, 交付部: 1, 运营部: 1 },
     departmentMetrics: Object.fromEntries(['产品部', '研发部', '交付部', '运营部'].map(name => [name, { teamCompletion: 100, confirmed: month === '2026-10' }])),
   }])) as KpiDemoState['periods'],
@@ -160,6 +234,14 @@ export const loadKpiDemo = (): KpiDemoState => {
     Object.values(parsed.periods).forEach(period => {
       period.departmentMetrics ||= Object.fromEntries([...new Set(period.employees.map(employee => employee.department))]
         .map(name => [name, { teamCompletion: 100, confirmed: period.published }]));
+      period.employees.forEach(employee => {
+        employee.source.objectiveAdjustment ??= employee.reviewHistory?.[0]?.before.adjustment ?? employee.scores.managerAdjustment;
+      });
+      if (!period.reviewScoresInitialized && !period.published && period.reviewEnabled) {
+        period.employees = period.employees.map(employee => employee.reviewStatus === '待主管复核' && !employee.reviewHistory?.length
+          ? { ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 } } : employee);
+      }
+      period.reviewScoresInitialized = true;
     });
     const reviewDemoPeriod = parsed.periods['2026-11'];
     if (reviewDemoPeriod && !reviewDemoPeriod.generated && !reviewDemoPeriod.published) {
@@ -168,7 +250,7 @@ export const loadKpiDemo = (): KpiDemoState => {
         generated: true,
         generatedAt: '2026-11-01 09:30',
         reviewEnabled: true,
-        employees: reviewDemoPeriod.employees.map(employee => ({ ...employee, reviewStatus: '待主管复核', managerDraft: undefined, hrNote: undefined })),
+        employees: reviewDemoPeriod.employees.map(employee => ({ ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 }, reviewStatus: '待主管复核', managerDraft: undefined, hrNote: undefined })),
       };
     }
     return parsed;
@@ -185,12 +267,17 @@ export const createKpiPeriod = (period: KpiPeriod): KpiPeriod => ({
   ...period,
   generated: true,
   published: false,
+  publishedAt: undefined,
+  reviewScoresInitialized: true,
   departmentMetrics: Object.fromEntries(Object.entries(period.departmentMetrics || {}).map(([name, metric]) => [name, { ...metric, confirmed: false }])),
   generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   employees: period.employees.map(employee => ({
     ...employee,
+    scores: period.reviewEnabled ? { ...employee.scores, attitude: 0, managerAdjustment: 0 } : employee.scores,
+    source: period.reviewEnabled ? { ...employee.source, objectiveAdjustment: 0 } : employee.source,
     reviewStatus: period.reviewEnabled ? '待主管复核' : '待 HR 审核',
     managerDraft: undefined,
+    reviewHistory: [],
     hrNote: undefined,
   })),
 });
