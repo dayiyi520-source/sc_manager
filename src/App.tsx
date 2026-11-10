@@ -23,11 +23,13 @@ const lazyNamed = (loader: () => Promise<Record<string, unknown>>, exportName: s
   return { default: module[exportName] as React.ComponentType };
 });
 const MyTasksView = lazyNamed(() => import('./components/workbench/MyTasksView'), 'MyTasksView');
+const WorkCenterView = lazyNamed(() => import('./components/workbench/WorkCenterView'), 'WorkCenterView');
 const TrainingCenterView = lazyNamed(() => import('./components/training/TrainingCenterView'), 'TrainingCenterView');
 const KnowledgeBaseView = lazyNamed(() => import('./components/workbench/KnowledgeBaseView'), 'KnowledgeBaseView');
 const RequirementTasksView = lazyNamed(() => import('./components/product/RequirementTasksView'), 'RequirementTasksView');
 const DesignTasksView = lazyNamed(() => import('./components/product/DesignTasksView'), 'DesignTasksView');
 const TestAndDefectView = lazyNamed(() => import('./components/product/TestAndDefectView'), 'TestAndDefectView');
+const TestTaskWorkspace = lazyNamed(() => import('./components/product/TestTaskWorkspace'), 'TestTaskWorkspace');
 const RequirementPoolView = lazyNamed(() => import('./components/workbench/RequirementPoolView'), 'RequirementPoolView');
 const OKRPerformanceView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'OKRPerformanceView');
 const ReviewSummaryView = lazyNamed(() => import('./components/workbench/OKRPerformanceView'), 'ReviewSummaryView');
@@ -98,6 +100,16 @@ const MainContent: React.FC = () => {
         return <MyTasksView key="agent" variant="agent" />;
       case 'wb_my_tasks':
         return <MyTasksView />;
+      case 'wb_work_center':
+        return <WorkCenterView taskPanels={{
+          product: <RequirementTasksView productLineFilter="all" itemLabel="产品任务" taskKind="requirement" hideCreateAction hideScopeTabs />,
+          design: <DesignTasksView showGrouping={false} />,
+          development: <RequirementTasksView productLineFilter="all" itemLabel="研发任务" taskKind="dev" hideCreateAction hideScopeTabs />,
+          testing: <TestTaskWorkspace productLineFilter="all" hideCreateAction hideScopeTabs />,
+          operations: <RequirementTasksView itemLabel="运维任务" taskKind="ops" businessGroupFilter="all" hideCreateAction hideScopeTabs />,
+          delivery: <RequirementTasksView itemLabel="交付任务" taskKind="delivery" businessGroupFilter="all" hideCreateAction hideScopeTabs />,
+          presales: <RequirementTasksView itemLabel="售前任务" taskKind="presales" businessGroupFilter="all" hideCreateAction hideScopeTabs />,
+        }} />;
       case 'wb_feeds':
       case 'wb_todo_center':
         return <Navigate to="/app/wb_my_tasks" replace/>;

@@ -8,7 +8,7 @@ import type { RequirementTask } from '../../types';
 import { RequirementTasksView } from './RequirementTasksView';
 import type { DesignAllocationExtra } from './ProductTaskAllocationView';
 
-type DesignTasksViewProps = { productLineFilter?: string; productLines?: Array<{ id: string; name: string; code?: string }>; onProductLineChange?: (value: string) => void };
+type DesignTasksViewProps = { productLineFilter?: string; productLines?: Array<{ id: string; name: string; code?: string }>; onProductLineChange?: (value: string) => void; showGrouping?: boolean };
 export type DesignTaskVariant = 'product' | 'project' | 'other';
 type PoolVariant = DesignTaskVariant | 'all';
 type TodoStatus = '待设计' | '设计中' | '已设计' | '已取消';
@@ -61,7 +61,7 @@ const DesignPoolList: React.FC<{ variant: PoolVariant }> = ({ variant }) => {
   </section>;
 };
 
-export const DesignTasksView: React.FC<DesignTasksViewProps> = () => {
+export const DesignTasksView: React.FC<DesignTasksViewProps> = ({ showGrouping = true }) => {
   const [designVariant, setDesignVariant] = useState<DesignTaskVariant>('product');
   const [designVariantFilter, setDesignVariantFilter] = useState<DesignTaskVariant | 'all'>('all');
   const { designTasks: storedDesignTasks = [], productLines = [] } = useApp();
@@ -97,6 +97,9 @@ export const DesignTasksView: React.FC<DesignTasksViewProps> = () => {
     sourceTitle: item.sourceTitle,
     status: { name: item.status, successful: item.status === '已设计' },
   } as DesignAllocationExtra)), []);
+  const taskList = <RequirementTasksView key={designVariantFilter} productLineFilter="all" itemLabel="设计任务" taskKind="design" designVariant={designVariant} designVariantFilter={showGrouping ? designVariantFilter : 'all'} designOwnershipFilter={showGrouping ? ownershipFilter : ''} onDesignVariantChange={setDesignVariant} designExtras={showGrouping ? designExtras : []} hideCreateAction={!showGrouping} hideScopeTabs={!showGrouping} />;
+  if (!showGrouping) return <div className="design-tasks-view min-w-0">{taskList}</div>;
+
   return <div className="design-tasks-view"><div className="grid min-h-[520px] grid-cols-[auto_minmax(0,1fr)] gap-3"><aside aria-label="设计类型" className="w-60 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface)] p-2">
     <div className="px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">设计类型</div>
     <button type="button" aria-pressed={designVariantFilter === 'all'} onClick={() => selectVariant('all')} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${designVariantFilter === 'all' ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'hover:bg-[var(--bg-surface-soft)]'}`}><span>全部</span><span>{designCounts.all}</span></button>
@@ -107,6 +110,6 @@ export const DesignTasksView: React.FC<DesignTasksViewProps> = () => {
       </div>
       {expanded.has(key) && <div className="pl-6">{designGroups[key].map(group => <button type="button" key={group.key} aria-label={`${label}：${group.name}`} aria-pressed={designVariantFilter === key && ownershipFilter === group.key} onClick={() => { selectVariant(key); setOwnershipFilter(group.key); }} className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm ${designVariantFilter === key && ownershipFilter === group.key ? 'bg-[var(--primary)]/10 text-[var(--active-text)]' : 'hover:bg-[var(--bg-surface-soft)]'}`}><span className="truncate" title={group.name}>{group.name}</span><span className="text-xs text-[var(--text-muted)]">{group.count}</span></button>)}{!designGroups[key].length && <p className="px-3 py-2 text-xs text-[var(--text-muted)]">暂无设计任务</p>}</div>}
     </section>)}
-  </aside><div className="min-w-0"><RequirementTasksView key={designVariantFilter} productLineFilter="all" itemLabel="设计任务" taskKind="design" designVariant={designVariant} designVariantFilter={designVariantFilter} designOwnershipFilter={ownershipFilter} onDesignVariantChange={setDesignVariant} designExtras={designExtras} /></div></div></div>;
+  </aside><div className="min-w-0">{taskList}</div></div></div>;
 };
 export default DesignTasksView;

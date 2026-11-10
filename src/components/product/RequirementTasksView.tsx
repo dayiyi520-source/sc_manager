@@ -185,13 +185,15 @@ type RequirementTasksViewProps = {
   designOwnershipFilter?: string;
   onDesignVariantChange?: (variant: DesignTaskVariant) => void;
   designExtras?: DesignAllocationExtra[];
+  hideCreateAction?: boolean;
+  hideScopeTabs?: boolean;
 };
 
 const EMPTY_REQUIREMENT_TASKS: RequirementTask[] = [];
 const EMPTY_BUGS: DefectBug[] = [];
 const EMPTY_DEV_TASKS: DevTask[] = [];
 
-export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', businessGroupFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, detailPresentation = 'drawer', onDetailClose, renderDetail, creationContext, designVariant = 'product', designVariantFilter = designVariant, designOwnershipFilter = '', onDesignVariantChange, designExtras = [] }) => {
+export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ productLineFilter = 'all', businessGroupFilter = 'all', itemLabel = '产品任务', taskKind = 'requirement', initialScope = 'all', initialDetail, detailPresentation = 'drawer', onDetailClose, renderDetail, creationContext, designVariant = 'product', designVariantFilter = designVariant, designOwnershipFilter = '', onDesignVariantChange, designExtras = [], hideCreateAction = false, hideScopeTabs = false }) => {
   const queryClient = useQueryClient();
   const [detailSearch] = useState(() => creationContext ? '' : window.location.search);
   const {
@@ -261,8 +263,8 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
   const productTaskScope = isCommercialTask || taskKind === 'requirement' || taskKind === 'design' || taskKind === 'dev' || taskKind === 'test' || taskKind === 'bug' || taskKind === 'ops';
   const reviewInFlight = useRef(new Set<string>());
   const [reviewBusyId, setReviewBusyId] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created' | 'my_participated' | 'my_department' | 'my_pending_review' | 'my_verification' | 'my_archived'>(productTaskScope ? 'my_owned' : initialScope);
-  useEffect(() => { if (productTaskScope) setActiveTab('my_owned'); }, [productTaskScope, taskKind]);
+  const [activeTab, setActiveTab] = useState<'all' | 'my_owned' | 'my_created' | 'my_participated' | 'my_department' | 'my_pending_review' | 'my_verification' | 'my_archived'>(hideScopeTabs ? 'all' : productTaskScope && !hideCreateAction ? 'my_owned' : initialScope);
+  useEffect(() => { if (productTaskScope || hideScopeTabs) setActiveTab(hideScopeTabs ? 'all' : hideCreateAction ? initialScope : 'my_owned'); }, [productTaskScope, taskKind, hideCreateAction, hideScopeTabs, initialScope]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState('');
@@ -1854,12 +1856,12 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
       {!creationContext && !initialDetail && <div>
       {/* Tabs + Search + Filter + Group */}
       <div ref={controlsRef} className="task-page-toolbar bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3 text-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div className={`flex flex-col gap-3 border-b border-slate-100 pb-3 dark:border-slate-800 sm:flex-row sm:items-center ${hideScopeTabs ? 'sm:justify-end' : 'justify-between'}`}>
           {/* 分类 */}
-          <div role="tablist" aria-label={`${itemLabel}范围`} className="requirement-scope-tabs inline-flex h-10 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">
+          {!hideScopeTabs && <div role="tablist" aria-label={`${itemLabel}范围`} className="requirement-scope-tabs inline-flex h-10 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-surface-soft)] p-1">
             {(productTaskScope ? [...(taskKind === 'bug' ? [['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_verification', '待我验证的'], ['my_department', '我部门的'], ['all', '全公司的'], ['my_archived', '我归档的']] as const : BUSINESS_TASK_SCOPES), ...(isDeliveryReview ? [['my_pending_review', '待审核']] as const : [])] : [['all', '全部'], ['my_owned', '我负责的'], ['my_created', '我创建的'], ['my_participated', '我参与的']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={!showProductTasks && activeTab === value} onClick={() => { setShowProductTasks(false); setActiveTab(value); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">{label}·{value === 'my_archived' ? archivedTasksQuery.data ? tabCounts[value] : '—' : isCommercialTask && !commercialTasksQuery.data ? '—' : tabCounts[value]}</button>)}
             {(taskKind === 'dev' || taskKind === 'test' || taskKind === 'design') && <button type="button" role="tab" aria-selected={showProductTasks} onClick={() => { setShowProductTasks(true); setFilterOpen(false); setGroupOpen(false); setSearchOpen(false); }} className="requirement-scope-tab h-8 rounded-md px-4 text-xs font-semibold whitespace-nowrap">待分配任务·{productTasksQuery.data?.length || 0}</button>}
-          </div>
+          </div>}
 
           {!showProductTasks && <div className="flex items-center gap-2">
             <div className="relative flex items-center gap-1">
@@ -1883,7 +1885,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
               </Popover>
               {searchOpen && searchOwnerPickerOpen && <div className="absolute left-0 top-11 z-40 w-[min(88vw,300px)]"><Select aria-label="搜索负责人" mode="multiple" autoFocus open={searchOwnerPickerOpen} onDropdownVisibleChange={setSearchOwnerPickerOpen} showSearch allowClear optionFilterProp="label" value={searchOwnerNames} onChange={setSearchOwnerNames} options={employeeNameOptions} placeholder="搜索负责人或职位" className="w-full" /></div>}
             </div>
-            {taskKind === 'design' ? <Dropdown
+            {!hideCreateAction && (taskKind === 'design' ? <Dropdown
               trigger={['click']}
               menu={{
                 items: [
@@ -1897,7 +1899,7 @@ export const RequirementTasksView: React.FC<RequirementTasksViewProps> = ({ prod
                   window.setTimeout(() => openAddModal(variant), 0);
                 }
               }}
-            ><Button type="primary" id="btn-add-req-task" icon={<Plus className="h-3.5 w-3.5" />}>新建设计任务</Button></Dropdown> : <Button type="primary" id="btn-add-req-task" onClick={openAddModal} icon={<Plus className="h-3.5 w-3.5" />}>新建</Button>}
+            ><Button type="primary" id="btn-add-req-task" icon={<Plus className="h-3.5 w-3.5" />}>新建设计任务</Button></Dropdown> : <Button type="primary" id="btn-add-req-task" onClick={openAddModal} icon={<Plus className="h-3.5 w-3.5" />}>新建</Button>)}
           </div>}
         </div>
         {filterOpen && <div className="border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)] px-4 py-4">

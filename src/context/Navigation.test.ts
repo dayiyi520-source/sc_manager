@@ -55,8 +55,9 @@ describe('design task navigation', () => {
   });
 });
 
-it('places the agent dashboard directly below My Tasks',()=>{
+it('places Work Center below My Tasks and the agent dashboard after it',()=>{
  const workbench=MENU_GROUPS.find(group=>group.id==='workbench')!.subMenus;
  const index=workbench.findIndex(menu=>menu.id==='wb_my_tasks');
- expect(workbench[index+1]).toMatchObject({id:'wb_agent_tasks',title:'代理商待办'});
+ expect(workbench[index+1]).toMatchObject({id:'wb_work_center',title:'工作中心'});
+ expect(workbench[index+2]).toMatchObject({id:'wb_agent_tasks',title:'代理商待办'});
 });
