@@ -80,6 +80,18 @@ describe('绩效申诉 Mock 持久化', () => {
     expect(() => resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'reject', '重复处理')).toThrow('已处理');
   });
 
+  it('HR 修正周报未交次数后按清零规则保存复盘分', () => {
+    const period = loadKpiDemo().periods['2026-10'];
+    const original = period.employees[0];
+    const appeal = submitKpiAppeal({ month: '2026-10', employeeId: original.id, employeeName: original.name, reason: '周报未交次数有误' });
+    const correction = { ...correctionForEmployee(original), weeklyReportMissing: 3, reviewScore: 0 };
+    expect(() => resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'correct', '错误得分', { ...correction, reviewScore: 8 })).toThrow('须按迟交和未交次数自动计算');
+    const resolved = resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'correct', '核实周报记录', correction);
+    expect(correctionForEmployee(resolved.period.employees[0])).toMatchObject({ weeklyReportMissing: 3, reviewScore: 0 });
+    expect(resolved.period.employees[0].source.weeklyReportMissing ?? 0).toBe(0);
+    expect(resolved.period.employees[0].approvedSourceCorrections?.[0]).toMatchObject({ source: 'reports', after: { weeklyReportMissing: 3, reviewScore: 0 } });
+  });
+
   it('驳回不修改成绩，并校验处理说明与员工存在性', () => {
     const period = loadKpiDemo().periods['2026-10'];
     const appeal = submitKpiAppeal({ month: '2026-10', employeeId: period.employees[0].id, employeeName: period.employees[0].name, reason: '请复核' });

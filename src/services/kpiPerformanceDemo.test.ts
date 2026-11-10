@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, gradeForScore, loadKpiDemo, publishKpiPeriod, reviewDepartmentSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
+import { attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, gradeForScore, isMonthlyGoalLate, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
+import mockOkrState from '../data/mockOkrState.json';
+import type { OkrPerson, OkrRecord } from './okrRepository';
 
 describe('KPI performance demo rules', () => {
   beforeEach(() => localStorage.clear());
@@ -15,9 +17,82 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
 };
 
   it('maps score boundaries to the configured demo grades and coefficients', () => {
+    expect(gradeForScore(96)).toEqual({ grade: 'S', coefficient: 1.5 });
     expect(gradeForScore(95)).toEqual({ grade: 'A', coefficient: 1.2 });
     expect(gradeForScore(90)).toEqual({ grade: 'B', coefficient: 1.0 });
+    expect(gradeForScore(80)).toEqual({ grade: 'C', coefficient: 0.8 });
+    expect(gradeForScore(70)).toEqual({ grade: 'D', coefficient: 0.5 });
     expect(gradeForScore(60)).toEqual({ grade: 'E', coefficient: 0 });
+  });
+
+  it('scores weekly and monthly reports with late deductions and missing-report zero rules', () => {
+    const source = loadKpiDemo().periods['2026-11'].employees[0].source;
+    expect(reportScoreFor(source)).toBe(10);
+    expect(reportScoreFor({ ...source, reportLate: 1, monthlyReportLate: 1 })).toBe(6);
+    expect(reportScoreFor({ ...source, reportLate: 6 })).toBe(0);
+    expect(reportScoreFor({ ...source, weeklyReportMissing: 2 })).toBe(10);
+    expect(reportScoreFor({ ...source, weeklyReportMissing: 3 })).toBe(0);
+    expect(reportScoreFor({ ...source, reportMissing: 1 })).toBe(0);
+    const state = loadKpiDemo();
+    saveKpiDemo(state);
+    expect(loadKpiDemo().periods['2026-11'].employees[0].scores.review).toBe(10);
+    expect(loadKpiDemo().periods['2026-10'].employees[0].scores.review).toBe(9);
+  });
+
+  it('scores verified attendance by the lowest applicable tier and paid-leave cap', () => {
+    const source = loadKpiDemo().periods['2026-11'].employees[0].source;
+    expect(attendanceScoreFor(source)).toBe(10);
+    expect(attendanceScoreFor({ ...source, lateMinutes: 15, leaveRecords: { 事假: 1 } })).toBe(8);
+    expect(attendanceScoreFor({ ...source, lateMinutes: 30 })).toBe(8);
+    expect(attendanceScoreFor({ ...source, lateMinutes: 16, leaveRecords: { 事假: 2 } })).toBe(6);
+    expect(attendanceScoreFor({ ...source, leaveRecords: { 事假: 3 } })).toBe(3);
+    expect(attendanceScoreFor({ ...source, leaveRecords: { 年假: 2, 调休: 1.5 } })).toBe(8);
+    expect(attendanceScoreFor({ ...source, lateMinutes: 31 })).toBe(0);
+    expect(attendanceScoreFor({ ...source, missingPunches: 4 })).toBe(0);
+    expect(attendanceScoreFor({ ...source, earlyLeaveCount: 1 })).toBe(0);
+    expect(attendanceScoreFor({ ...source, absenceCount: 1 })).toBe(0);
+    expect(attendanceScoreFor({ ...source, leaveRecords: { 事假: 3.5 } })).toBe(0);
+  });
+
+  it('uses the actual objective submission time and counts only submitted goals after the deadline', () => {
+    const records = mockOkrState.okrRecords as OkrRecord[];
+    const deadline = '2026-11-05T18:00:00+08:00';
+    expect(isMonthlyGoalLate(records, 'e-01', '2026-11', deadline)).toBe(false);
+    expect(isMonthlyGoalLate(records, 'e-02', '2026-11', deadline)).toBe(true);
+    expect(isMonthlyGoalLate(records, 'e-04', '2026-11', deadline)).toBe(true);
+    expect(isMonthlyGoalLate(records, 'e-02', '2026-11')).toBe(false);
+    expect(isMonthlyGoalLate([{ ...records.find(row => row.id === 'kpi-demo-goal-e-02-2026-11')!, submittedAt: deadline }], 'e-02', '2026-11', deadline)).toBe(false);
+  });
+
+  it('converts approved overtime at 18 hours per five points and applies both caps', () => {
+    expect(extraWorkScoreFor(18, 10)).toBe(5);
+    expect(extraWorkScoreFor(36, 10)).toBe(10);
+    expect(extraWorkScoreFor(36, 0)).toBe(5);
+    expect(extraWorkScoreFor(12, 10)).toBe(3.33);
+    const employee = loadKpiDemo().periods['2026-11'].employees[0];
+    expect(scoreForEmployee({ ...employee, scores: { ...employee.scores, objective: 50, attendance: 10, extraWork: 10, attitude: 15, review: 10 } })).toBe(90);
+    expect(scoreForEmployee({ ...employee, scores: { ...employee.scores, objective: 50.01, attendance: 10, extraWork: 10, attitude: 15, review: 10 } })).toBe(95.01);
+  });
+
+  it('recalculates attendance on source sync and keeps published results unchanged', () => {
+    const period = loadKpiDemo().periods['2026-11'];
+    expect(period.employees[1].source).toMatchObject({ missingPunches: 0, leaveRecords: { 年假: 1 } });
+    period.employees[1].scores.attendance = 10;
+    const synced = syncKpiSources(period, '2026-11');
+    expect(synced.employees[1].scores.attendance).toBe(8);
+    expect(scoreForEmployee(synced.employees[1])).toBe(scoreForEmployee(period.employees[1]) - 2);
+    const published = loadKpiDemo().periods['2026-10'];
+    const before = published.employees[1].scores.attendance;
+    expect(before).toBe(9);
+    expect(syncKpiSources(published, '2026-10').employees[1].scores.attendance).toBe(before);
+  });
+
+  it('calculates department goals with the same OKR base and redline rules', () => {
+    const records = mockOkrState.okrRecords as OkrRecord[];
+    const people = mockOkrState.okrPeople as OkrPerson[];
+    expect(departmentGoalSummary(records, people, '2026-11', '产品部')).toEqual({ completion: 91, base: 45.5, deduction: 0, total: 45.5 });
+    expect(departmentGoalSummary(records, people, '2026-11', '运营部')).toEqual({ completion: 76, base: 38, deduction: 0, total: 30 });
+    expect(loadKpiDemo().periods['2026-11'].departmentMetrics?.产品部.goalScore).toBe(45.5);
   });
 
   it('saves calculation and review state so the demo resumes after reload', () => {
@@ -177,14 +252,19 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(approved.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '已通过')).toBe(true);
   });
 
-  it('previews a department coefficient from completion and confirmed major redlines', () => {
+  it('calculates responsibility separately from the final department coefficient', () => {
     const period = loadKpiDemo().periods['2026-11'];
-    period.employees.filter(employee => employee.department === '产品部').forEach(employee => { employee.source.okrCompletion = 100; });
-    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(1.1);
-    period.departmentMetrics!.产品部.teamCompletion = 90;
-    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(1);
+    period.employees.filter(employee => employee.department === '产品部').forEach(employee => { employee.source.okrCompletion = 80; });
+    period.departmentMetrics!.产品部.goalCompletion = 95;
+    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ responsibilityCoefficient: 1, adjustment: 0.9, coefficient: 0.9 });
+    period.employees[0].source.okrCompletion = 79;
+    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ responsibilityCoefficient: 0.8, coefficient: 0.9 });
+    period.employees[0].source.okrCompletion = 80;
+    period.employees[0].source.goalLate = true;
+    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ delayedSubmissionCount: 1, responsibilityCoefficient: 0.8 });
+    period.employees[0].source.goalLate = false;
     period.employees[0].redline = { type: '重大失职', impact: '绩效系数清零', active: true };
-    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(0);
+    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ responsibilityCoefficient: 0.8, coefficient: 0.9 });
     expect(period.employees.every(employee => !employee.redline || employee.id === 'e-01')).toBe(true);
   });
 
@@ -194,7 +274,7 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     const changed = { ...original, managerDraft: { attitude: 10, adjustment: -2, reason: '目标延期并补充复盘' } };
     const submitted = submitDepartmentReview({ ...period, employees: [changed, ...period.employees.slice(1)] }, '陈宇璋', '产品部');
     expect(submitted.employees[0].scores).toEqual(original.scores);
-    expect(submitted.employees[0].reviewHistory?.[0]).toMatchObject({ action: '提交主管复核', actor: '陈宇璋', before: { attitude: 0, adjustment: 0, total: 79 }, proposed: { attitude: 10, adjustment: -2, total: 87 } });
+    expect(submitted.employees[0].reviewHistory?.[0]).toMatchObject({ action: '提交主管复核', actor: '陈宇璋', before: { attitude: 0, adjustment: 0, total: 79.33 }, proposed: { attitude: 10, adjustment: -2, total: 87.33 } });
     const returned = reviewDepartmentSubmission(submitted, '陈宇璋', '产品部', 'return', '请补充依据');
     expect(returned.employees[0].scores).toEqual(original.scores);
     expect(returned.employees[0].reviewHistory?.[1]).toMatchObject({ action: 'HR 退回', reason: '请补充依据' });
@@ -214,18 +294,33 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(loadKpiDemo().periods['2026-11'].employees[0].reviewHistory).toHaveLength(4);
   });
 
-  it('applies documented demo criteria, caps and major redlines to the department', () => {
+  it('applies completion thresholds, enabled criteria and department redline formulas', () => {
     const period = loadKpiDemo().periods['2026-11'];
-    period.employees.filter(employee => employee.department === '产品部').forEach(employee => { employee.source.okrCompletion = 100; });
-    period.departmentMetrics!.产品部 = { teamCompletion: 100, confirmed: false, businessRequirement: true, managementContribution: true, riskResponse: true };
+    period.departmentMetrics!.产品部 = { ...period.departmentMetrics!.产品部, goalCompletion: 0, confirmed: false };
+    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ adjustment: 0, coefficient: 0 });
+    period.departmentMetrics!.产品部.goalCompletion = 95;
+    expect(departmentCoefficientPreview(period, '产品部').adjustment).toBe(0.9);
+    period.departmentMetrics!.产品部.goalCompletion = 95.01;
+    expect(departmentCoefficientPreview(period, '产品部').adjustment).toBe(1);
+    period.departmentMetrics!.产品部.businessRequirement = true;
+    expect(departmentCoefficientPreview(period, '产品部').adjustment).toBe(1.1);
+    period.departmentMetrics!.产品部.managementContribution = true;
     expect(departmentCoefficientPreview(period, '产品部').adjustment).toBe(1.2);
-    period.departmentMetrics!.产品部.teamDeliveryMiss = true;
-    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ responsibilityCap: 0.8, coefficient: 0.8 });
-    period.departmentMetrics!.产品部.teamDeliveryMiss = false;
-    period.employees[0].redline = { type: '一般违规', impact: '最高系数限制为 0.8', active: true };
-    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ touchedRedline: true, coefficient: 0.8 });
-    period.employees[0].redline.type = '重大失职';
-    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ majorRedline: true, coefficient: 0 });
+    period.departmentMetrics!.产品部.riskResponse = true;
+    expect(departmentCoefficientPreview(period, '产品部').adjustment).toBe(1.2);
+    period.departmentMetrics!.产品部.redlineChoice = '质量返工管理问题系数下调一档';
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(1.1);
+    period.departmentMetrics!.产品部.redlineChoice = '质量返工管理问题系数下调二档';
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(1);
+    period.departmentMetrics!.产品部.redlineChoice = '承诺型目标完成率碰触红线';
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(0.9);
+    period.departmentMetrics!.产品部.redlineChoice = '输出成果造假';
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(0);
+    period.departmentMetrics!.产品部.redlineChoice = '无';
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(1.2);
+    period.departmentMetrics!.产品部.goalCompletion = 91;
+    period.departmentMetrics!.产品部.redlineChoice = '质量返工管理问题系数下调二档';
+    expect(departmentCoefficientPreview(period, '产品部').coefficient).toBe(0.8);
   });
 
   it('confirms all departments atomically and rejects published or empty periods', () => {
@@ -234,7 +329,7 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     period.employees[0].redline = { type: '重大失职', impact: '绩效系数清零', active: true };
     const confirmed = confirmAllDepartmentCoefficients(period);
     expect(Object.values(confirmed.departmentMetrics || {}).every(metric => metric.confirmed)).toBe(true);
-    expect(confirmed.departmentCoefficients.产品部).toBe(0);
+    expect(confirmed.departmentCoefficients.产品部).toBe(0.9);
     expect(period.departmentMetrics!.产品部.confirmed).toBe(false);
     expect(() => confirmAllDepartmentCoefficients({ ...confirmed, published: true })).toThrow('不可确认');
     expect(() => confirmAllDepartmentCoefficients({ ...period, employees: [] })).toThrow('没有可确认的部门');
@@ -260,7 +355,7 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     saveKpiDemo(state);
     const restored = loadKpiDemo().periods['2026-11'];
     expect(restored.published).toBe(true);
-    expect(scoreForEmployee(restored.employees[0])).toBe(87);
+    expect(scoreForEmployee(restored.employees[0])).toBe(87.33);
     expect(restored.employees[0].reviewHistory).toHaveLength(2);
     expect(() => reviewDepartmentSubmission(restored, '陈宇璋', '产品部', 'approve')).toThrow('已公示');
   });

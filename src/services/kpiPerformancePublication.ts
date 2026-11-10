@@ -1,4 +1,4 @@
-import { departmentCoefficientPreview, effectiveKpiSourceData, gradeForScore, isWithinKpiWindow, scoreForEmployee, type KpiDemoState, type KpiEmployee, type KpiPeriod } from './kpiPerformanceDemo';
+import { departmentCoefficientPreview, effectiveKpiSourceData, gradeForScore, isWithinKpiWindow, reportScoreFor, scoreForEmployee, type KpiDemoState, type KpiEmployee, type KpiPeriod } from './kpiPerformanceDemo';
 
 export type KpiPublicationRole = 'HR' | '主管' | '员工';
 
@@ -28,6 +28,8 @@ export interface KpiAppealCorrection {
   okrCompletion: number;
   objectiveScore: number;
   reportLate: number;
+  monthlyReportLate: number;
+  weeklyReportMissing: number;
   reportMissing: number;
   tasksOverdue: number;
   reviewScore: number;
@@ -105,6 +107,8 @@ export const correctionForEmployee = (employee: KpiEmployee): KpiAppealCorrectio
     okrCompletion: source.okrCompletion,
     objectiveScore: employee.approvedSourceCorrections?.filter(record => record.source === 'objective').at(-1)?.after.objectiveScore ?? employee.scores.objective,
     reportLate: source.reportLate,
+    monthlyReportLate: source.monthlyReportLate ?? 0,
+    weeklyReportMissing: source.weeklyReportMissing ?? 0,
     reportMissing: source.reportMissing,
     tasksOverdue: source.tasksOverdue,
     reviewScore: employee.approvedSourceCorrections?.filter(record => record.source === 'reports').at(-1)?.after.reviewScore ?? employee.scores.review,
@@ -124,11 +128,11 @@ export function restoreLegacyAppealCorrections(state: KpiDemoState, appeals = li
         const corrections = history.flatMap(appeal => {
           const { before, after } = appeal.correction!;
           const changedObjective = before.okrCompletion !== after.okrCompletion || before.objectiveScore !== after.objectiveScore;
-          const changedReports = before.reportLate !== after.reportLate || before.reportMissing !== after.reportMissing || before.tasksOverdue !== after.tasksOverdue || before.reviewScore !== after.reviewScore;
+          const changedReports = before.reportLate !== after.reportLate || before.monthlyReportLate !== after.monthlyReportLate || before.weeklyReportMissing !== after.weeklyReportMissing || before.reportMissing !== after.reportMissing || before.tasksOverdue !== after.tasksOverdue || before.reviewScore !== after.reviewScore;
           const at = appeal.resolvedAt || appeal.createdAt;
           return [
             ...(changedObjective ? [{ id: `${appeal.id}-objective`, appealId: appeal.id, source: 'objective' as const, before: { okrCompletion: before.okrCompletion, objectiveScore: before.objectiveScore }, after: { okrCompletion: after.okrCompletion, objectiveScore: after.objectiveScore }, reason: appeal.resolution || '', actor: 'HR', at }] : []),
-            ...(changedReports ? [{ id: `${appeal.id}-reports`, appealId: appeal.id, source: 'reports' as const, before: { reportLate: before.reportLate, reportMissing: before.reportMissing, tasksOverdue: before.tasksOverdue, reviewScore: before.reviewScore }, after: { reportLate: after.reportLate, reportMissing: after.reportMissing, tasksOverdue: after.tasksOverdue, reviewScore: after.reviewScore }, reason: appeal.resolution || '', actor: 'HR', at }] : []),
+            ...(changedReports ? [{ id: `${appeal.id}-reports`, appealId: appeal.id, source: 'reports' as const, before: { reportLate: before.reportLate, monthlyReportLate: before.monthlyReportLate ?? 0, weeklyReportMissing: before.weeklyReportMissing ?? 0, reportMissing: before.reportMissing, tasksOverdue: before.tasksOverdue, reviewScore: before.reviewScore }, after: { reportLate: after.reportLate, monthlyReportLate: after.monthlyReportLate ?? 0, weeklyReportMissing: after.weeklyReportMissing ?? 0, reportMissing: after.reportMissing, tasksOverdue: after.tasksOverdue, reviewScore: after.reviewScore }, reason: appeal.resolution || '', actor: 'HR', at }] : []),
           ];
         });
         const firstCorrection = history[0].correction!;
@@ -168,10 +172,12 @@ export function resolveKpiAppeal(
   const before = correctionForEmployee(employee);
   if (decision === 'correct') {
     if (!correction) throw new Error('请填写修正数据');
-    for (const [key, max] of Object.entries({ okrCompletion: 200, objectiveScore: 60, reportLate: 31, reportMissing: 31, tasksOverdue: 31, reviewScore: 10 })) {
+    for (const [key, max] of Object.entries({ okrCompletion: 200, objectiveScore: 60, reportLate: 31, monthlyReportLate: 31, weeklyReportMissing: 31, reportMissing: 31, tasksOverdue: 31, reviewScore: 10 })) {
       const value = correction[key as keyof KpiAppealCorrection];
       if (!Number.isFinite(value) || value < 0 || value > max || (key !== 'okrCompletion' && key !== 'objectiveScore' && key !== 'reviewScore' && !Number.isInteger(value))) throw new Error('修正数据超出允许范围');
     }
+    if ((before.reportLate !== correction.reportLate || before.monthlyReportLate !== correction.monthlyReportLate || before.weeklyReportMissing !== correction.weeklyReportMissing || before.reportMissing !== correction.reportMissing)
+      && correction.reviewScore !== reportScoreFor(correction)) throw new Error('周月报得分须按迟交和未交次数自动计算');
     if (Object.keys(before).every(key => before[key as keyof KpiAppealCorrection] === correction[key as keyof KpiAppealCorrection])) throw new Error('请至少修改一项数据');
   }
   const resolvedAppeal: KpiAppeal = {
@@ -184,7 +190,7 @@ export function resolveKpiAppeal(
   let updatedPeriod = period;
   if (decision === 'correct' && correction) {
     const objectiveChanged = before.okrCompletion !== correction.okrCompletion || before.objectiveScore !== correction.objectiveScore;
-    const reportsChanged = before.reportLate !== correction.reportLate || before.reportMissing !== correction.reportMissing || before.tasksOverdue !== correction.tasksOverdue || before.reviewScore !== correction.reviewScore;
+    const reportsChanged = before.reportLate !== correction.reportLate || before.monthlyReportLate !== correction.monthlyReportLate || before.weeklyReportMissing !== correction.weeklyReportMissing || before.reportMissing !== correction.reportMissing || before.tasksOverdue !== correction.tasksOverdue || before.reviewScore !== correction.reviewScore;
     const at = new Date().toISOString();
     const sourceCorrections = [
       ...(objectiveChanged ? [{
@@ -195,8 +201,8 @@ export function resolveKpiAppeal(
       }] : []),
       ...(reportsChanged ? [{
         id: `${appeal.id}-reports`, appealId: appeal.id, source: 'reports' as const,
-        before: { reportLate: before.reportLate, reportMissing: before.reportMissing, tasksOverdue: before.tasksOverdue, reviewScore: before.reviewScore },
-        after: { reportLate: correction.reportLate, reportMissing: correction.reportMissing, tasksOverdue: correction.tasksOverdue, reviewScore: correction.reviewScore },
+        before: { reportLate: before.reportLate, monthlyReportLate: before.monthlyReportLate, weeklyReportMissing: before.weeklyReportMissing, reportMissing: before.reportMissing, tasksOverdue: before.tasksOverdue, reviewScore: before.reviewScore },
+        after: { reportLate: correction.reportLate, monthlyReportLate: correction.monthlyReportLate, weeklyReportMissing: correction.weeklyReportMissing, reportMissing: correction.reportMissing, tasksOverdue: correction.tasksOverdue, reviewScore: correction.reviewScore },
         reason: note, actor: 'HR', at,
       }] : []),
     ];

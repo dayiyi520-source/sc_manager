@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { App as AntApp, Modal } from 'antd';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { KpiPerformanceDemoView } from './KpiPerformanceDemoView';
 import { departmentCoefficientPreview, KPI_DEMO_STORAGE_KEY, loadKpiDemo, publishKpiPeriod, reviewDepartmentSubmission, saveKpiDemo, scoreForEmployee, submitDepartmentReview } from '../../services/kpiPerformanceDemo';
 import { listKpiAppeals, submitKpiAppeal } from '../../services/kpiPerformancePublication';
+
+vi.mock('../../services/okrRepository', async () => {
+  const seed = await import('../../data/mockOkrState.json');
+  return { okrRepository: { people: async () => seed.default.okrPeople, records: async () => seed.default.okrRecords } };
+});
 
 beforeEach(() => { localStorage.clear(); });
 afterEach(() => {
@@ -68,7 +73,7 @@ describe('绩效考核公示', () => {
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
-    expect(screen.getByText('87.0 分')).toBeInTheDocument();
+    expect(screen.getByText('87.3 分')).toBeInTheDocument();
     expect(screen.getByText('工作态度')).toBeInTheDocument();
     expect(screen.queryByText('周予安')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /公示绩效结果/ })).not.toBeInTheDocument();
@@ -151,11 +156,19 @@ describe('绩效考核公示', () => {
 
     expect(await screen.findByRole('tab', { name: '月度目标' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '部门' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '目标完成率' })).toBeInTheDocument();
+    expect(await screen.findByRole('columnheader', { name: '月度目标完成率' })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '考勤与请假' }));
     expect(screen.getByRole('columnheader', { name: '出勤天数' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '请假天数' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '请假记录' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '累计迟到' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '早退次数' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '旷工次数' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '考勤得分' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '数据状态' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/审批\/人工更正：/)).not.toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /周予安/ })).toHaveTextContent('年假 1 天');
     fireEvent.click(screen.getByRole('tab', { name: '额外工作投入' }));
     expect(screen.getByRole('columnheader', { name: '加班总时长' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '折算得分' })).toBeInTheDocument();
@@ -167,17 +180,19 @@ describe('绩效考核公示', () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
     expect(screen.queryByText('复核修改记录')).not.toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByLabelText('筛选部门'));
+    fireEvent.mouseDown(await screen.findByLabelText('筛选部门'));
     fireEvent.click(await screen.findByText('产品部', { selector: '.ant-select-item-option-content' }));
     fireEvent.change(screen.getByPlaceholderText('搜索员工姓名'), { target: { value: '林知夏' } });
     expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /周予安/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /顾清和/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '考勤与请假' }));
     fireEvent.click(screen.getByRole('button', { name: /同步数据/ }));
     await waitFor(() => expect(loadKpiDemo().periods['2026-11'].sourceSyncedAt).toBeTruthy());
     for (const name of ['月度目标', '考勤与请假', '额外工作投入', '周月报']) {
       fireEvent.click(screen.getByRole('tab', { name }));
-      expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
+      if (name === '月度目标') expect(await screen.findByRole('row', { name: /林知夏/ })).toBeInTheDocument();
+      else expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
     }
   });
 
@@ -201,7 +216,7 @@ describe('绩效考核公示', () => {
     const correctedState = loadKpiDemo().periods['2026-11'];
     expect(correctedState.employees[0].source.okrCompletion).toBe(93);
     expect(correctedState.employees[0].scores.objective).toBe(56);
-    expect(scoreForEmployee(correctedState.employees[0])).toBe(81);
+    expect(scoreForEmployee(correctedState.employees[0])).toBe(81.33);
     expect(correctedState.employees[0].approvedSourceCorrections).toHaveLength(1);
     view.unmount();
     const refreshedView = render(<AntApp><KpiPerformanceDemoView /></AntApp>);
@@ -209,9 +224,8 @@ describe('绩效考核公示', () => {
     expect(screen.getByText('已修正')).toBeInTheDocument();
     expect(screen.getByText(/处理说明：核实目标完成情况/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
-    expect(screen.getByRole('columnheader', { name: '绩效修正记录' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '查看 1 条' }));
-    expect(await screen.findByText('目标得分：56 → 58')).toBeInTheDocument();
+    expect(await screen.findByRole('columnheader', { name: '综合基础分' })).toBeInTheDocument();
+    expect(correctedState.employees[0].approvedSourceCorrections?.[0].after.objectiveScore).toBe(58);
     refreshedView.unmount();
     document.querySelectorAll('.ant-modal-root').forEach(node => node.remove());
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);

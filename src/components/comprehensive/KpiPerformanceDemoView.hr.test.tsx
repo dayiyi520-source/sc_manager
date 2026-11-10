@@ -2,7 +2,7 @@
 import React from 'react';
 import { App as AntApp } from 'antd';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { KpiPerformanceDemoView } from './KpiPerformanceDemoView';
 import { KPI_DEMO_STORAGE_KEY, loadKpiDemo, reviewDepartmentSubmission, submitDepartmentReview } from '../../services/kpiPerformanceDemo';
 
@@ -34,6 +34,25 @@ describe('HR 绩效公示', () => {
     expect(loadKpiDemo().periods['2026-11'].employees.every(employee => employee.reviewStatus === '待主管复核')).toBe(true);
     expect(loadKpiDemo().periods['2026-11'].employees.every(employee => employee.scores.attitude === 0 && employee.scores.managerAdjustment === 0)).toBe(true);
   });
+  it('按月度目标截止时间统计部门迟交员工', async () => {
+    const state = loadKpiDemo();
+    const period = state.periods['2026-11'];
+    period.published = false;
+    period.cycleSettings = {
+      monthlyGoalDeadline: '2026-11-05T18:00:00+08:00',
+      managerReview: { startAt: '2026-11-06T00:00:00+08:00', endAt: '2026-11-10T00:00:00+08:00' },
+      appealConfirmation: { startAt: '2026-11-11T00:00:00+08:00', endAt: '2026-11-15T00:00:00+08:00' },
+      finalPublicationAt: '2026-11-12T00:00:00+08:00',
+    };
+    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
+    fireEvent.click(screen.getByRole('button', { name: '周期设置' }));
+    expect(screen.getByLabelText('月度目标最迟提交时间')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /部门系数与红线/ }));
+    await waitFor(() => expect(within(screen.getByRole('group', { name: '产品部系数指标' })).getByText('1 人')).toBeInTheDocument());
+    expect(loadKpiDemo().periods['2026-11'].employees.find(employee => employee.id === 'e-02')?.source.goalLate).toBe(true);
+  });
   it('在部门系数页默认无红线并显示待确认计算预览', async () => {
     const state = loadKpiDemo();
     state.periods['2026-11'].published = false;
@@ -45,9 +64,13 @@ describe('HR 绩效公示', () => {
     expect(screen.getByRole('button', { name: /新增红线员工/ })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: '确认本月部门系数' })).toHaveLength(1);
     expect(screen.getByRole('region', { name: '本月部门系数统一确认' })).toBeInTheDocument();
-    expect(screen.getAllByText('部门OKR加权完成率')).toHaveLength(1);
+    expect(screen.getAllByText('部门目标完成率')).toHaveLength(1);
     expect(screen.getByRole('region', { name: '产品部系数详情' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: '产品部系数指标' }).children).toHaveLength(6);
+    expect(screen.getByRole('group', { name: '产品部系数指标' }).children).toHaveLength(9);
+    expect(screen.getByText('综合基础分')).toBeInTheDocument();
+    expect(screen.getByText('部门员工绩效等级名额分布')).toBeInTheDocument();
+    expect(screen.queryByText('适用场景')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: '产品部团队交付未达标' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '确认本月部门系数' }));
     expect(loadKpiDemo().periods['2026-11'].departmentMetrics?.产品部.confirmed).toBe(true);
     expect(Object.values(loadKpiDemo().periods['2026-11'].departmentMetrics || {}).every(metric => metric.confirmed)).toBe(true);
@@ -117,7 +140,7 @@ describe('HR 绩效公示', () => {
     expect(screen.queryByText('周予安 · 产品部', { selector: '.ant-select-item-option-content' })).not.toBeInTheDocument();
   });
 
-  it('判断项更新预览并使已确认部门重新待确认', () => {
+  it('判断项与部门红线更新预览并使已确认部门重新待确认', async () => {
     const state = loadKpiDemo();
     state.periods['2026-11'].published = false;
     state.periods['2026-11'].departmentMetrics!.产品部.confirmed = true;
@@ -126,12 +149,14 @@ describe('HR 绩效公示', () => {
     fireEvent.click(screen.getByRole('tab', { name: /部门系数与红线/ }));
     fireEvent.click(screen.getByRole('switch', { name: '产品部业务经营要求' }));
     expect(loadKpiDemo().periods['2026-11'].departmentMetrics?.产品部).toMatchObject({ businessRequirement: true, confirmed: false });
-    expect(within(screen.getByRole('group', { name: '产品部系数指标' })).getAllByText('1.05')).toHaveLength(2);
-    fireEvent.click(screen.getByRole('switch', { name: '产品部团队交付未达标' }));
-    expect(within(screen.getByRole('group', { name: '产品部系数指标' })).getAllByText('0.80')).toHaveLength(2);
+    expect(within(screen.getByRole('group', { name: '产品部系数指标' })).getAllByText('0.90')).toHaveLength(2);
+    fireEvent.mouseDown(screen.getByLabelText('产品部是否触碰红线'));
+    fireEvent.click(await screen.findByText('质量返工管理问题系数下调二档', { selector: '.ant-select-item-option-content' }));
+    expect(within(screen.getByRole('group', { name: '产品部系数指标' })).getAllByText('0.80')).toHaveLength(1);
+    expect(loadKpiDemo().periods['2026-11'].departmentMetrics?.产品部).toMatchObject({ redlineChoice: '质量返工管理问题系数下调二档', confirmed: false });
   });
 
-  it('原始数据只展示 HR 已审核的目标扣分，不重复展示复核记录', () => {
+  it('月度目标使用 OKR 原始数据，不混入主管复核调整', async () => {
     const state = loadKpiDemo();
     const period = state.periods['2026-11'];
     period.published = false;
@@ -143,7 +168,9 @@ describe('HR 绩效公示', () => {
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
-    expect(within(screen.getByRole('row', { name: /林知夏/ })).getAllByRole('cell')[5]).toHaveTextContent('2.0');
+    expect(await screen.findByRole('row', { name: /林知夏/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '综合基础分' })).toBeInTheDocument();
+    expect(screen.queryByText('交付延期')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /复核修改记录/ })).not.toBeInTheDocument();
   });
 
