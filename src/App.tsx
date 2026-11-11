@@ -26,6 +26,8 @@ const MyTasksView = lazyNamed(() => import('./components/workbench/MyTasksView')
 const WorkCenterView = lazyNamed(() => import('./components/workbench/WorkCenterView'), 'WorkCenterView');
 const TrainingCenterView = lazyNamed(() => import('./components/training/TrainingCenterView'), 'TrainingCenterView');
 const KnowledgeBaseView = lazyNamed(() => import('./components/workbench/KnowledgeBaseView'), 'KnowledgeBaseView');
+const PresalesCenterView = lazyNamed(() => import('./components/presales/PresalesCenterView'), 'PresalesCenterView');
+const CompetitorManagementView = lazyNamed(() => import('./components/customer/CompetitorManagementView'), 'CompetitorManagementView');
 const RequirementTasksView = lazyNamed(() => import('./components/product/RequirementTasksView'), 'RequirementTasksView');
 const DesignTasksView = lazyNamed(() => import('./components/product/DesignTasksView'), 'DesignTasksView');
 const TestAndDefectView = lazyNamed(() => import('./components/product/TestAndDefectView'), 'TestAndDefectView');
@@ -128,6 +130,10 @@ const MainContent: React.FC = () => {
         return <CustomerDirectoryView kind="leads" />;
       case 'crm_opportunities':
         return <CustomerDirectoryView kind="opportunities" />;
+      case 'crm_presales_center':
+        return <PresalesCenterView />;
+      case 'crm_competitors':
+        return <CompetitorManagementView />;
       case 'crm_presales_tasks':
       case 'crm_presales_tickets':
         return <RequirementTasksView itemLabel="售前任务" taskKind="presales" businessGroupFilter={productLineFilter} />;

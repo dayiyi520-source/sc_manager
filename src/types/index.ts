@@ -50,6 +50,8 @@ export type SubMenuId =
   | 'crm_bid_review'
   | 'crm_contracts'
   | 'crm_presales_tasks'
+  | 'crm_presales_center'
+  | 'crm_competitors'
   | 'crm_presales_tickets'
   // 产研管理
   | 'prod_planning'

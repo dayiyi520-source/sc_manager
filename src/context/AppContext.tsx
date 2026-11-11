@@ -109,7 +109,9 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'crm_customers', title: '客户档案', mainMenuId: 'crm', icon: 'Users' },
       { id: 'crm_leads', title: '线索管理', mainMenuId: 'crm', icon: 'FileSpreadsheet' },
       { id: 'crm_opportunities', title: '商机管理', mainMenuId: 'crm', icon: 'Target' },
-      { id: 'crm_presales_tasks', title: '售前任务', mainMenuId: 'crm', icon: 'ListTodo' }
+      { id: 'crm_presales_tasks', title: '售前任务', mainMenuId: 'crm', icon: 'ListTodo' },
+      { id: 'crm_presales_center', title: '售前中心', mainMenuId: 'crm', icon: 'BookOpen' },
+      { id: 'crm_competitors', title: '友商管理', mainMenuId: 'crm', icon: 'Organization' }
     ]
   },
   {
@@ -117,7 +119,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     title: '综合中心',
     icon: 'Boxes',
     subMenus: [
-      { id: 'comp_approval', title: '审批管理', mainMenuId: 'approval', icon: 'FileCheck' },
+      { id: 'comp_approval', title: '审批管理', mainMenuId: 'approval', icon: 'ShieldCheck' },
       { id: 'comp_attendance', title: '考勤管理', mainMenuId: 'approval', icon: 'UserCheck' },
       { id: 'comp_procurement', title: '采购管理', mainMenuId: 'approval', icon: 'ShoppingCart' },
       { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval', icon: 'Package' },

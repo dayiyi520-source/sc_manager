@@ -32,8 +32,19 @@ describe('design task navigation', () => {
   });
 
   it('exposes the requested business task menus and keeps retired entries hidden', () => {
-    expect(MENU_GROUPS.find((group) => group.id === 'crm')).toMatchObject({ title: '客户与商机', subMenus: [expect.objectContaining({ id: 'crm_customers', title: '客户档案' }), expect.objectContaining({ id: 'crm_leads', title: '线索管理' }), expect.objectContaining({ id: 'crm_opportunities', title: '商机管理' }), expect.objectContaining({ id: 'crm_presales_tasks', title: '售前任务' })] });
-    expect(MENU_GROUPS.find((group) => group.id === 'approval')).toBeUndefined();
+    expect(MENU_GROUPS.find((group) => group.id === 'crm')).toMatchObject({ title: '客户与商机', subMenus: [expect.objectContaining({ id: 'crm_customers', title: '客户档案' }), expect.objectContaining({ id: 'crm_leads', title: '线索管理' }), expect.objectContaining({ id: 'crm_opportunities', title: '商机管理' }), expect.objectContaining({ id: 'crm_presales_tasks', title: '售前任务' }), expect.objectContaining({ id: 'crm_presales_center', title: '售前中心' }), expect.objectContaining({ id: 'crm_competitors', title: '友商管理' })] });
+    expect(MENU_GROUPS.find((group) => group.id === 'approval')).toMatchObject({
+      title: '综合中心',
+      subMenus: [
+        { id: 'comp_approval', title: '审批管理', mainMenuId: 'approval' },
+        { id: 'comp_attendance', title: '考勤管理', mainMenuId: 'approval' },
+        { id: 'comp_procurement', title: '采购管理', mainMenuId: 'approval' },
+        { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval' },
+        { id: 'comp_invoice', title: '发票管理', mainMenuId: 'approval' },
+        { id: 'comp_payment', title: '回款管理', mainMenuId: 'approval' },
+        { id: 'comp_kpi', title: '绩效考核', mainMenuId: 'approval' }
+      ]
+    });
     expect(MENU_GROUPS.find((group) => group.id === 'project')).toMatchObject({ title: '项目管理', subMenus: expect.arrayContaining([expect.objectContaining({ id: 'proj_delivery_map', title: '项目交付地图' }), expect.objectContaining({ id: 'proj_delivery_tasks', title: '交付任务' })]) });
     expect(MENU_GROUPS.find((group) => group.id === 'workbench')?.subMenus.some((menu) => menu.id === 'wb_knowledge')).toBe(false);
     const product = MENU_GROUPS.find((group) => group.id === 'product')!.subMenus;
