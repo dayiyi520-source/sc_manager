@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProductLine } from '../../types';
 import { CompetitorManagementView, type CompetitorRecord } from './CompetitorManagementView';
+import { createCompetitorDemoRecords } from './competitorDemoData';
 
 const state = vi.hoisted(() => ({ products: [] as ProductLine[] }));
 vi.mock('../../context/AppContext', () => ({ useApp: () => ({ productLines: state.products }) }));
@@ -24,7 +25,7 @@ const record: CompetitorRecord = {
 
 describe('友商管理界面', () => {
   it('shows eight requested columns and an honest empty state', () => {
-    render(<CompetitorManagementView />);
+    render(<CompetitorManagementView records={[]} />);
     for (const heading of ['友商名称', '注册资金', '法人', '关联竞品', '交锋项目', '创建人', '创建时间', '编辑操作']) {
       expect(screen.getByRole('columnheader', { name: heading })).toBeInTheDocument();
     }
@@ -49,7 +50,7 @@ describe('友商管理界面', () => {
   });
 
   it('edits a draft, filters saleable products and never claims a saved record', async () => {
-    render(<CompetitorManagementView />);
+    render(<CompetitorManagementView records={[]} />);
     fireEvent.click(screen.getByRole('button', { name: '新建友商' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('combobox', { name: '友商名称' })).toBeInTheDocument();
@@ -73,10 +74,34 @@ describe('友商管理界面', () => {
 
   it('keeps the product chooser empty when no product is saleable', () => {
     state.products = [{ id: 'hidden', name: '不可销售产品', commercialAvailability: '不可销售' }] as ProductLine[];
-    render(<CompetitorManagementView />);
+    render(<CompetitorManagementView records={[]} />);
     fireEvent.click(screen.getByRole('button', { name: '新建友商' }));
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '师创产品' }));
     expect(screen.getByText('暂无可销售产品')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /保\s*存/ })).toBeDisabled();
   });
+});
+
+it('shows four clearly labeled demo companies with working search and detail counts by default', async () => {
+  render(<CompetitorManagementView />);
+  const rows = screen.getAllByRole('row').slice(1);
+  expect(rows).toHaveLength(4);
+  expect(rows.every(row => row.textContent?.includes('演示'))).toBe(true);
+  fireEvent.change(screen.getByRole('textbox', { name: '搜索友商名称' }), { target: { value: '演示·云图' } });
+  fireEvent.click(screen.getByRole('button', { name: /查\s*询/ }));
+  await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2));
+  fireEvent.click(screen.getByRole('button', { name: /重\s*置/ }));
+  const first = screen.getAllByRole('row')[1];
+  fireEvent.click(within(first).getByRole('button', { name: /关联竞品/ }));
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getByText('可销售产品')).toBeInTheDocument();
+  expect(within(dialog).queryByText('不可销售产品')).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button', { name: /关\s*闭/ }));
+});
+
+it('does not generate invalid product references when no product is saleable', () => {
+  const rows = createCompetitorDemoRecords([{ id: 'hidden', name: '未销售产品', commercialAvailability: '不可销售' }] as ProductLine[]);
+  expect(rows).toHaveLength(4);
+  expect(rows.every(row => row.products.length === 0)).toBe(true);
+  expect(rows.every(row => row.companyName.startsWith('演示·'))).toBe(true);
 });

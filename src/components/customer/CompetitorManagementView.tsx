@@ -4,6 +4,7 @@ import type { UploadFile } from 'antd';
 import { LinkIcon, PaperclipIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '@primer/octicons-react';
 import { useApp } from '../../context/AppContext';
 import { isSaleableProduct } from '../../services/presalesCenterRepository';
+import { createCompetitorDemoRecords } from './competitorDemoData';
 import './competitorManagement.css';
 
 export type CompetitorMaterial = { id: string; name: string };
@@ -36,7 +37,7 @@ type EditorDraft = Pick<CompetitorRecord, 'companyName' | 'registeredCapital' | 
 const newProduct = (id: string): ProductDraft => ({ id, productId: '', competitorProduct: '', files: [], link: '' });
 const initialDraft = (): EditorDraft => ({ companyName: '', registeredCapital: '', legalRepresentative: '', products: [newProduct('new-1')] });
 
-export function CompetitorManagementView({ records = [] }: { records?: CompetitorRecord[] }) {
+export function CompetitorManagementView({ records }: { records?: CompetitorRecord[] }) {
   const { productLines } = useApp();
   const [search, setSearch] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -47,7 +48,7 @@ export function CompetitorManagementView({ records = [] }: { records?: Competito
   const saleableProducts = productLines.filter(isSaleableProduct);
   const productOptions = saleableProducts.map(product => ({ value: product.id, label: product.name }));
   const productName = (id: string) => productLines.find(product => product.id === id)?.name || '—';
-  const filtered = records.filter(record => !keyword || record.companyName.toLocaleLowerCase().includes(keyword.toLocaleLowerCase()));
+  const filtered = (records ?? createCompetitorDemoRecords(productLines)).filter(record => !keyword || record.companyName.toLocaleLowerCase().includes(keyword.toLocaleLowerCase()));
 
   const openEditor = (record?: CompetitorRecord) => {
     setDraft(record ? {
@@ -70,6 +71,7 @@ export function CompetitorManagementView({ records = [] }: { records?: Competito
       <h1>友商管理</h1>
       <Button type="primary" icon={<PlusIcon />} onClick={() => openEditor()}>新建友商</Button>
     </header>
+    {records === undefined && <Alert type="info" showIcon title="演示数据，仅用于界面预览；企业信息与交锋结果不代表真实记录。" className="competitor-demo-notice" />}
     <div className="competitor-toolbar">
       <Input aria-label="搜索友商名称" placeholder="搜索友商名称" prefix={<SearchIcon />} allowClear value={search} onChange={event => setSearch(event.target.value)} onPressEnter={() => setKeyword(search.trim())} />
       <Button onClick={() => setKeyword(search.trim())}>查询</Button>
