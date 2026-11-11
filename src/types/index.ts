@@ -78,6 +78,7 @@ export type SubMenuId =
   | 'comp_asset'
   | 'comp_invoice'
   | 'comp_payment'
+  | 'comp_payable'
   | 'comp_kpi'
   // 项目管理兼容别名
   | 'ops_projects'
@@ -1085,6 +1086,9 @@ export interface InvoiceRecord {
   taxAmount?: number;
   applicant?: string;
   relatedContractCode?: string;
+  purchaseOrderCode?: string;
+  relatedProjectName?: string;
+  note?: string;
   status: '已开具' | '已认证' | '待开具' | '待审批' | '开票中' | '已发送' | '已作废' | '已红冲' | '已校验归档' | '作废' | string;
   issueStatus?: '待申请' | '待审批' | '开票中' | '已开具' | '已发送' | '已作废' | '已红冲' | string;
   certificationStatus?: '待认证' | '已认证' | '已抵扣' | string;
@@ -1132,9 +1136,11 @@ export interface ServerNode {
 export interface AssetRecord { id: string; assetCode: string; name: string; category: string; brand: string; model: string; status: string; holder: string; department: string; location: string; buyDate: string; price: number; }
 export interface AssetBorrowLog { id: string; assetCode: string; assetName: string; borrower: string; department: string; borrowDate: string; returnDate: string; status: string; remark?: string; }
 export interface AssetMaintenanceRecord { id: string; assetCode: string; assetName: string; issueDescription: string; repairCompany: string; cost: number; startDate: string; expectedEndDate: string; status: string; }
-export interface TaxProfile { id: string; companyName: string; taxId: string; bankName: string; bankAccount: string; addressPhone: string; }
+export interface TaxProfile { id: string; companyName: string; taxId: string; bankName: string; bankAccount: string; addressPhone: string; isDemo?: boolean; }
 export interface PaymentPlan { id: string; planCode: string; contractCode: string; customerName: string; stageName: string; planAmount: number; receivedAmount: number; uncollectedAmount: number; dueDate: string; status: string; manager: string; }
 export interface ActualPaymentRecord { id: string; recordCode: string; planCode: string; customerName: string; amount: number; payDate: string; payMethod: string; bankSerialNo: string; operator: string; }
+export interface AccountsPayableRecord { id: string; payableCode: string; supplierName: string; purchaseOrderCode?: string; projectName?: string; amount: number; paidAmount: number; unpaidAmount: number; dueDate: string; status: string; applicant: string; note?: string; }
+export interface AccountsPayablePaymentRecord { id: string; paymentCode: string; payableCode: string; supplierName: string; amount: number; payDate: string; payMethod: string; bankSerialNo: string; operator: string; }
 
 export interface VisitPlan {
   id: string; title: string; schoolName: string; customerId?: string; leadId?: string; opportunityId?: string;

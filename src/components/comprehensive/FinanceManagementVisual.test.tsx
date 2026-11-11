@@ -3,18 +3,48 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, expect, it, vi } from 'vitest';
 import { InvoiceManagementView } from './InvoiceManagementView';
 import { PaymentCollectionManagementView } from './PaymentCollectionManagementView';
+import { loadInvoiceLedger } from '../../services/invoiceLedgerRepository';
 
-vi.mock('../../context/AppContext', () => ({ useApp: () => ({ addToast: vi.fn() }) }));
-afterEach(cleanup);
+const { addToast } = vi.hoisted(() => ({ addToast: vi.fn() }));
+vi.mock('../../context/AppContext', async () => {
+  const React = await import('react');
+  return {
+    useApp: () => {
+      const [invoices, setInvoices] = React.useState(() => loadInvoiceLedger().invoices);
+      const [paymentSchedules, setPaymentSchedules] = React.useState(() => loadInvoiceLedger().paymentSchedules);
+      const [invoiceApprovals, setInvoiceApprovals] = React.useState(() => loadInvoiceLedger().invoiceApprovals);
+      return {
+        addToast, invoices, setInvoices, paymentSchedules, setPaymentSchedules, invoiceApprovals, setInvoiceApprovals,
+        currentUser: { id: 'user-1', name: '测试申请人', department: '财务' },
+        customers: [{ id: 'customer-1', name: '测试客户' }],
+        contracts: [{ id: 'contract-1', code: 'CT-001', name: '测试合同', customerId: 'customer-1', customerName: '测试客户', relatedProduct: '', type: '主合同', amount: 2000, signDate: '', status: '履行中' }],
+        projects: [{ id: 'project-1', code: 'P-001', name: '测试项目', customerId: 'customer-1', customerName: '测试客户', stage: '项目立项', progress: 20, pmName: '项目经理', startDate: '' }],
+        partners: [{ id: 'partner-1', name: '测试供应商', type: '集成服务商', level: '一级', contactName: '联系人', contactPhone: '', status: '合作中' }]
+      };
+    }
+  };
+});
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  vi.clearAllMocks();
+});
 
-it('shows all invoice views with official empty states and keeps tax profile entry readable', () => {
+it('loads mock ledger data and switches invoice actions by tab', () => {
   render(<InvoiceManagementView />);
   expect(screen.getByRole('tablist', { name: '发票视图' })).toBeInTheDocument();
-  expect(screen.getByText('暂无销项开票申请')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('tab', { name: '进项抵扣登记' }));
-  expect(screen.getByText('暂无进项抵扣登记')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '开具发票' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '录入抬头资料' })).not.toBeInTheDocument();
+  expect(screen.getByText('FP-DEMO-2026-001')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: '进项发票' }));
+  expect(screen.getByRole('button', { name: '录入发票' })).toBeInTheDocument();
+  expect(screen.getByText('FP-DEMO-2026-101')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('tab', { name: '开票抬头信息库' }));
-  expect(screen.getByText('暂无开票抬头资料')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '开具发票' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '录入发票' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '录入抬头资料' })).toBeInTheDocument();
+  expect(screen.getByText('演示抬头·国家电网华东分部')).toBeInTheDocument();
+  expect(screen.getAllByText('演示资料')).toHaveLength(2);
   fireEvent.click(screen.getByRole('button', { name: '录入抬头资料' }));
   const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByRole('heading', { name: '录入企业开票抬头资质' })).toBeInTheDocument();
@@ -26,15 +56,61 @@ it('shows all invoice views with official empty states and keeps tax profile ent
   expect(card).toHaveTextContent('开户银行');
 });
 
-it('keeps invoice application entry and list switching', () => {
+it('requires an overage reason and records a sales invoice with linked contract data', () => {
   render(<InvoiceManagementView />);
-  fireEvent.click(screen.getByRole('button', { name: '新建开票申请' }));
+  expect(screen.queryByRole('button', { name: '录入抬头资料' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: '开票抬头信息库' }));
+  fireEvent.click(screen.getByRole('button', { name: '录入抬头资料' }));
+  const profileDialog = screen.getByRole('dialog');
+  fireEvent.change(within(profileDialog).getByLabelText('企业全称'), { target: { value: '客户甲开票抬头' } });
+  fireEvent.change(within(profileDialog).getByLabelText('统一社会信用代码 / 税号'), { target: { value: '123456789012345678' } });
+  fireEvent.click(within(profileDialog).getByRole('button', { name: '保存资质档案' }));
+  fireEvent.click(screen.getByRole('tab', { name: '销项开票' }));
+  fireEvent.click(screen.getByRole('button', { name: '开具发票' }));
   const dialog = screen.getByRole('dialog');
-  fireEvent.change(within(dialog).getByPlaceholderText('如：国家电网华东分部'), { target: { value: '测试客户' } });
-  fireEvent.change(within(dialog).getByPlaceholderText('例如：500000'), { target: { value: '500000' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: '提交财务开票' }));
-  expect(screen.getByText('测试客户')).toBeInTheDocument();
-  expect(screen.getByText('¥ 500,000')).toBeInTheDocument();
+  expect(within(dialog).getByRole('heading', { name: '开具/登记增值税全电发票' })).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText('发票代码/号码'), { target: { value: 'FP-001' } });
+  const profileOption = within(dialog).getByRole('option', { name: '客户甲开票抬头' });
+  fireEvent.change(within(dialog).getByLabelText('购方抬头/客户名称'), { target: { value: profileOption.getAttribute('value') } });
+  fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
+  fireEvent.change(within(dialog).getByLabelText('关联付款阶段'), { target: { value: 'demo-stage-contract-1-stage-2' } });
+  expect(within(dialog).getByLabelText('关联项目')).toHaveValue('project-1');
+  expect(within(dialog).getByLabelText('关联客户')).toHaveValue('测试客户');
+  fireEvent.change(within(dialog).getByLabelText('含税开票金额 (元)'), { target: { value: '1200000' } });
+  fireEvent.change(within(dialog).getByLabelText('适用税率'), { target: { value: '6%' } });
+  const reason = within(dialog).getByLabelText('超开票审批原因');
+  expect(reason).toBeRequired();
+  fireEvent.click(within(dialog).getByRole('button', { name: '确认开具入账' }));
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  fireEvent.change(reason, { target: { value: '项目实施计划调整，申请提前开票' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '确认开具入账' }));
+  const savedLedger = JSON.parse(localStorage.getItem('shichuang.frontend.mock.invoiceLedger') || '{}');
+  expect(savedLedger.invoiceApprovals[0]).toMatchObject({
+    contractId: 'contract-1', paymentScheduleId: 'demo-stage-contract-1-stage-2', requestedAmount: 1200000, availableAmount: 1152000,
+    overAmount: 48000, reason: '项目实施计划调整，申请提前开票'
+  });
+  expect(screen.getByText('FP-001')).toBeInTheDocument();
+  expect(screen.getByText('待审批')).toBeInTheDocument();
+});
+
+it('records a purchase invoice with project-derived customer and updated ledger columns', () => {
+  render(<InvoiceManagementView />);
+  fireEvent.click(screen.getByRole('tab', { name: '进项发票' }));
+  fireEvent.click(screen.getByRole('button', { name: '录入发票' }));
+  const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('发票代码/号码'), { target: { value: 'FP-P-001' } });
+  fireEvent.change(within(dialog).getByLabelText('销方抬头/供应商名称'), { target: { value: '测试供应商' } });
+  fireEvent.change(within(dialog).getByLabelText('关联采购单'), { target: { value: 'PO-001' } });
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
+  expect(within(dialog).getByLabelText('关联客户')).toHaveValue('测试客户');
+  fireEvent.change(within(dialog).getByLabelText('含税开票金额 (元)'), { target: { value: '500' } });
+  fireEvent.change(within(dialog).getByLabelText('适用税率'), { target: { value: '13%' } });
+  fireEvent.change(within(dialog).getByLabelText('备注'), { target: { value: '办公设备采购' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '确认录入发票' }));
+  expect(screen.getByText('FP-P-001')).toBeInTheDocument();
+  expect(screen.getByText('PO-001')).toBeInTheDocument();
+  expect(screen.getByText('办公设备采购')).toBeInTheDocument();
+  expect(screen.getByText('¥ 500')).toBeInTheDocument();
 });
 
 it('shows all payment views and preserves the plan and receipt entry flows', () => {

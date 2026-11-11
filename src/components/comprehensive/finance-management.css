@@ -52,7 +52,7 @@ html:not(.dark) .tech-main .finance-workspace .finance-tabs > .finance-tab[aria-
 .finance-overdue-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 6px; background: color-mix(in srgb, var(--danger) 12%, var(--bg-surface)); color: var(--danger); }
 .finance-overdue-title { color: var(--text-primary); font-size: 14px; font-weight: 600; }
 .finance-dialog > div:first-child { background: var(--bg-overlay); backdrop-filter: none; }
-.finance-dialog [role="dialog"] { border-radius: 8px; }
+.finance-dialog [role="dialog"] { width: min(1120px, calc(100vw - 32px)); max-width: none; border-radius: 8px; }
 .finance-dialog [role="dialog"] > div:first-child { background: var(--bg-surface); }
 .finance-dialog .finance-form { display: grid; gap: 16px; font-size: 12px; }
 .finance-form label { display: block; margin-bottom: 8px; color: var(--text-body); font-size: 12px; font-weight: 500; }

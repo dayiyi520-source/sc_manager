@@ -3,6 +3,7 @@ import { loadKnowledgeDocs, saveKnowledgeDocs } from '../services/knowledgeRepos
 import { directoryCustomers, directoryLeads, directoryOpportunities, directoryProjects } from '../services/customerDirectoryData';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { customerDirectoryRepository } from '../services/customerDirectoryRepository';
+import { loadInvoiceLedger } from '../services/invoiceLedgerRepository';
 import { requirementRepository } from '../services/requirementRepository';
 import { productRepository } from '../services/productRepository';
 import { loadApprovalFlows, saveApprovalFlows, syncAttendanceApprovals } from '../services/approvalDemo';
@@ -125,6 +126,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval', icon: 'Package' },
       { id: 'comp_invoice', title: '发票管理', mainMenuId: 'approval', icon: 'Receipt' },
       { id: 'comp_payment', title: '回款管理', mainMenuId: 'approval', icon: 'Wallet' },
+      { id: 'comp_payable', title: '应付账款', mainMenuId: 'approval', icon: 'Wallet' },
       { id: 'comp_kpi', title: '绩效考核', mainMenuId: 'approval', icon: 'Award' }
     ]
   },
@@ -389,6 +391,7 @@ const normalizeRequirementStatus = (status: RequirementTask['status']): Requirem
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [storedInvoiceLedger] = useState(loadInvoiceLedger);
   const { activeTabId, setActiveTabId, openTabs, sidebarCollapsed, mobileSidebarOpen, openPageTab, closePageTab, toggleSidebar, toggleMobileSidebar } = useNavigationState(MENU_GROUPS, ALIAS_MAP);
   const { currentUser, setCurrentUser, sessionToken: crmSessionToken, dataMode } = useSessionState(MOCK_USERS[0]);
   const { theme, globalSearchOpen, setGlobalSearchOpen, toasts, addToast, removeToast, toggleTheme } = useWorkspaceUiState();
@@ -434,9 +437,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [risks, setRisks] = useState<RiskItem[]>([]);
   const [devTasks, setDevTasks] = useState<DevTask[]>(MOCK_DEV_TASKS.map((task) => ({ id: task.id, title: task.title, description: task.description, developer: task.ownerName, status: task.status, priority: task.priority as DevTask['priority'], versionName: task.versionName || '', productLineName: task.productLineName || '', estimatedHours: task.estimatedHours || 0, spentHours: task.actualHours || 0, dueDate: task.dueDate || '' })));
-  const [paymentSchedules, setPaymentSchedules] = useState<PaymentSchedule[]>([]);
-  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
-  const [invoiceApprovals, setInvoiceApprovals] = useState<InvoiceApprovalRecord[]>([]);
+  const [paymentSchedules, setPaymentSchedules] = useState<PaymentSchedule[]>(storedInvoiceLedger.paymentSchedules);
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>(storedInvoiceLedger.invoices);
+  const [invoiceApprovals, setInvoiceApprovals] = useState<InvoiceApprovalRecord[]>(storedInvoiceLedger.invoiceApprovals);
 
   // 所有领域共用同一数据模式，避免本地回退会话误请求后端。
   const crmEnabled = dataMode === 'remote' || import.meta.env.VITE_MOCK_MODE !== 'false';

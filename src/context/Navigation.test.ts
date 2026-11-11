@@ -42,6 +42,7 @@ describe('design task navigation', () => {
         { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval' },
         { id: 'comp_invoice', title: '发票管理', mainMenuId: 'approval' },
         { id: 'comp_payment', title: '回款管理', mainMenuId: 'approval' },
+        { id: 'comp_payable', title: '应付账款', mainMenuId: 'approval' },
         { id: 'comp_kpi', title: '绩效考核', mainMenuId: 'approval' }
       ]
     });
