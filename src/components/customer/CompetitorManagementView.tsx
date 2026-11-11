@@ -24,6 +24,7 @@ export type CompetitorEncounter = {
 export type CompetitorRecord = {
   id: string;
   companyName: string;
+  creditCode?: string;
   registeredCapital: string;
   legalRepresentative: string;
   products: CompetitorProduct[];
@@ -33,9 +34,9 @@ export type CompetitorRecord = {
 };
 
 type ProductDraft = Omit<CompetitorProduct, 'attachments'> & { files: UploadFile[] };
-type EditorDraft = Pick<CompetitorRecord, 'companyName' | 'registeredCapital' | 'legalRepresentative'> & { products: ProductDraft[] };
+type EditorDraft = Pick<CompetitorRecord, 'companyName' | 'creditCode' | 'registeredCapital' | 'legalRepresentative'> & { products: ProductDraft[] };
 const newProduct = (id: string): ProductDraft => ({ id, productId: '', competitorProduct: '', files: [], link: '' });
-const initialDraft = (): EditorDraft => ({ companyName: '', registeredCapital: '', legalRepresentative: '', products: [newProduct('new-1')] });
+const initialDraft = (): EditorDraft => ({ companyName: '', creditCode: '', registeredCapital: '', legalRepresentative: '', products: [newProduct('new-1')] });
 
 export function CompetitorManagementView({ records }: { records?: CompetitorRecord[] }) {
   const { productLines } = useApp();
@@ -53,6 +54,7 @@ export function CompetitorManagementView({ records }: { records?: CompetitorReco
   const openEditor = (record?: CompetitorRecord) => {
     setDraft(record ? {
       companyName: record.companyName,
+      creditCode: record.creditCode || '',
       registeredCapital: record.registeredCapital,
       legalRepresentative: record.legalRepresentative,
       products: record.products.map(item => ({
@@ -77,8 +79,9 @@ export function CompetitorManagementView({ records }: { records?: CompetitorReco
       <Button onClick={() => setKeyword(search.trim())}>查询</Button>
       <Button onClick={() => { setSearch(''); setKeyword(''); }}>重置</Button>
     </div>
-    <Table<CompetitorRecord> className="competitor-table" rowKey="id" size="middle" dataSource={filtered} scroll={{ x: 1120 }} locale={{ emptyText: <Empty description={keyword ? '没有符合条件的友商' : '暂无友商记录'} /> }} pagination={{ pageSize: 10, showSizeChanger: false, showTotal: total => `共 ${total} 条` }} columns={[
+    <Table<CompetitorRecord> className="competitor-table" rowKey="id" size="middle" dataSource={filtered} scroll={{ x: 1320 }} locale={{ emptyText: <Empty description={keyword ? '没有符合条件的友商' : '暂无友商记录'} /> }} pagination={{ pageSize: 10, showSizeChanger: false, showTotal: total => `共 ${total} 条` }} columns={[
       { title: '友商名称', dataIndex: 'companyName', width: 210, render: (value: string) => <span className="competitor-ellipsis" title={value}>{value || '—'}</span> },
+      { title: '企业信用代码', dataIndex: 'creditCode', width: 190, render: (value?: string) => <span className="competitor-credit-code" title={value || undefined}>{value || '—'}</span> },
       { title: '注册资金', dataIndex: 'registeredCapital', width: 130, render: (value: string) => value || '—' },
       { title: '法人', dataIndex: 'legalRepresentative', width: 120, render: (value: string) => value || '—' },
       { title: '关联竞品', width: 110, render: (_, record) => <Button type="link" className="competitor-count" onClick={() => setDetail({ kind: 'products', record })} aria-label={`查看${record.companyName}的关联竞品`}>{record.products.length}</Button> },
@@ -96,6 +99,7 @@ export function CompetitorManagementView({ records }: { records?: CompetitorReco
           <label className="competitor-company-search"><span>友商名称</span><Select aria-label="友商名称" showSearch allowClear placeholder="搜索并选择启信宝企业" value={draft.companyName || undefined} onClear={() => setDraft(current => ({ ...current, companyName: '', registeredCapital: '', legalRepresentative: '' }))} options={[]} notFoundContent={<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无企业候选" />} /></label>
           <label><span>注册资金</span><Input aria-label="注册资金" value={draft.registeredCapital} placeholder="选择友商后自动带入" readOnly /></label>
           <label><span>法人</span><Input aria-label="法人" value={draft.legalRepresentative} placeholder="选择友商后自动带入" readOnly /></label>
+          <label><span>企业信用代码</span><Input aria-label="企业信用代码" placeholder="请输入企业信用代码" value={draft.creditCode || ''} onChange={event => setDraft(current => ({ ...current, creditCode: event.target.value }))} /></label>
         </div>
         <div className="competitor-section-title"><h2>关联竞品</h2><Button icon={<PlusIcon />} onClick={() => setDraft(current => ({ ...current, products: [...current.products, newProduct(`new-${nextRow.current++}`)] }))}>添加竞品</Button></div>
         <div className="competitor-draft-scroll"><div className="competitor-draft-head"><span>师创产品</span><span>友商产品</span><span>友商资料</span><span>操作</span></div>

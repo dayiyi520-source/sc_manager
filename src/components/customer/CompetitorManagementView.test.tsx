@@ -17,19 +17,29 @@ beforeEach(() => {
 });
 
 const record: CompetitorRecord = {
-  id: 'company-1', companyName: '测试企业', registeredCapital: '1000万元', legalRepresentative: '测试法人',
+  id: 'company-1', companyName: '测试企业', creditCode: '91310000TESTCODE88', registeredCapital: '1000万元', legalRepresentative: '测试法人',
   creatorName: '创建人', createdAt: '2026-11-11 10:00',
   products: [{ id: 'r1', productId: 'sale', competitorProduct: '竞品A', attachments: [{ id: 'a1', name: '资料.pdf' }], link: 'https://example.com/material' }],
   encounters: [{ id: 'bid1', biddingName: '招投标项目', coreProduct: '可销售产品', result: '未中标' }],
 };
 
 describe('友商管理界面', () => {
-  it('shows eight requested columns and an honest empty state', () => {
+  it('shows the requested columns and an honest empty state', () => {
     render(<CompetitorManagementView records={[]} />);
-    for (const heading of ['友商名称', '注册资金', '法人', '关联竞品', '交锋项目', '创建人', '创建时间', '编辑操作']) {
+    for (const heading of ['友商名称', '企业信用代码', '注册资金', '法人', '关联竞品', '交锋项目', '创建人', '创建时间', '编辑操作']) {
       expect(screen.getByRole('columnheader', { name: heading })).toBeInTheDocument();
     }
     expect(screen.getByText('暂无友商记录')).toBeInTheDocument();
+  });
+
+  it('shows the enterprise credit code in the list and uses a dash when absent', () => {
+    render(<CompetitorManagementView records={[record, { ...record, id: 'company-2', companyName: '无代码企业', creditCode: undefined }]} />);
+    const codedRow = screen.getByRole('row', { name: /测试企业/ });
+    expect(within(codedRow).getByText('91310000TESTCODE88')).toBeInTheDocument();
+    fireEvent.click(within(codedRow).getByRole('button', { name: '编辑' }));
+    expect(within(screen.getByRole('dialog')).getByRole('textbox', { name: '企业信用代码' })).toHaveValue('91310000TESTCODE88');
+    const emptyCodeRow = screen.getByRole('row', { name: /无代码企业/ });
+    expect(within(emptyCodeRow).getAllByRole('cell')[1]).toHaveTextContent('—');
   });
 
   it('opens both numeric detail views with the required fields', () => {
@@ -54,6 +64,11 @@ describe('友商管理界面', () => {
     fireEvent.click(screen.getByRole('button', { name: '新建友商' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('combobox', { name: '友商名称' })).toBeInTheDocument();
+    const creditCode = within(dialog).getByRole('textbox', { name: '企业信用代码' });
+    expect(creditCode).toHaveValue('');
+    expect(creditCode).not.toBeDisabled();
+    fireEvent.change(creditCode, { target: { value: '91310000DRAFTCODE1' } });
+    expect(creditCode).toHaveValue('91310000DRAFTCODE1');
     expect(within(dialog).getByRole('textbox', { name: '注册资金' })).toHaveAttribute('readonly');
     expect(within(dialog).getByRole('textbox', { name: '法人' })).toHaveAttribute('readonly');
     expect(within(dialog).getByRole('button', { name: /保\s*存/ })).toBeDisabled();
