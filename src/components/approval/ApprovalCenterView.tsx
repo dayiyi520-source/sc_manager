@@ -201,7 +201,6 @@ export const ApprovalCenterView: React.FC = () => {
                 <th className="py-3 px-3">审批事项与主题</th>
                 <th className="py-3 px-3">审批类型</th>
                 <th className="py-3 px-3">申请人 / 部门</th>
-                <th className="py-3 px-3">关联标的 / 金额</th>
                 <th className="py-3 px-3">申请时间</th>
                 <th className="py-3 px-3">当前状态</th>
               </tr>
@@ -209,7 +208,7 @@ export const ApprovalCenterView: React.FC = () => {
             <tbody className="divide-y divide-[var(--border-main)]">
               {filteredApprovals.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center"><Empty description="暂无符合条件的审批流转记录" />
+                  <td colSpan={6} className="py-8 text-center"><Empty description="暂无符合条件的审批流转记录" />
                   </td>
                 </tr>
               ) : (
@@ -243,9 +242,6 @@ export const ApprovalCenterView: React.FC = () => {
                     <td className="py-3 px-3">
                       <div className="text-[var(--text-primary)] font-medium">{item.applicantName}</div>
                     <div className="text-[11px] text-[var(--text-muted)]">{item.applicantDept}</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono font-medium text-[var(--text-primary)]">
-                      {item.amount ? `¥${(item.amount / 10000).toFixed(0)}万` : '-'}
                     </td>
                     <td className="py-3 px-3 text-[var(--text-muted)] font-mono">
                       {item.submittedAt}

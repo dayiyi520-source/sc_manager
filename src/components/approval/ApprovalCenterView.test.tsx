@@ -48,6 +48,19 @@ describe('ApprovalCenterView', () => {
     expect(screen.queryByRole('button', { name: '驳回' })).not.toBeInTheDocument();
   });
 
+  it('keeps type-specific details out of the common list and spans all six columns when empty', () => {
+    render(<ApprovalCenterView />);
+    expect(screen.getAllByRole('columnheader').map(header => header.textContent)).toEqual([
+      '审批单号', '审批事项与主题', '审批类型', '申请人 / 部门', '申请时间', '当前状态',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    expect(screen.getByText('AP-1').closest('tr')?.querySelectorAll('td')).toHaveLength(6);
+    fireEvent.click(screen.getByText('AP-1').closest('tr')!);
+    expect(within(screen.getByRole('dialog')).getByText('演示内容')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('搜索审批单号、主题或关联内容'), { target: { value: '不存在的审批单' } });
+    expect(screen.getByText('暂无符合条件的审批流转记录').closest('td')).toHaveAttribute('colspan', '6');
+  });
+
   it('filters by applicant and the four display statuses, and keeps details read-only', () => {
     render(<ApprovalCenterView />);
     fireEvent.click(screen.getByRole('button', { name: '全部' }));
