@@ -157,12 +157,13 @@ export const Modal: React.FC<{
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  className?: string;
   footer?: React.ReactNode;
   headerIcon?: React.ReactNode;
   subtitle?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
   zIndex?: number;
-}> = ({ isOpen, onClose, title, children, footer, headerIcon, subtitle, maxWidth = 'xl', zIndex }) => {
+}> = ({ isOpen, onClose, title, children, className = '', footer, headerIcon, subtitle, maxWidth = 'xl', zIndex }) => {
   if (!isOpen) return null;
 
   const maxWidthClasses = {
@@ -176,9 +177,12 @@ export const Modal: React.FC<{
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4" style={zIndex === undefined ? undefined : { zIndex }}>
+    <div className={`fixed inset-0 z-[60] overflow-y-auto flex items-center justify-center p-4 ${className}`} style={zIndex === undefined ? undefined : { zIndex }}>
       <div className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity" onClick={onClose} />
       <div
+        role="dialog"
+        aria-label={title}
+        aria-modal="true"
         className={`relative bg-[var(--bg-surface)] text-[var(--text-body)] rounded-xl shadow-2xl border border-[var(--border-main)] w-full ${maxWidthClasses[maxWidth]} my-8 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-main)] bg-[var(--bg-surface-soft)]">
@@ -191,6 +195,7 @@ export const Modal: React.FC<{
           </h3>
           <button
             id="btn-modal-close"
+            aria-label="关闭"
             onClick={onClose}
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded hover:bg-[var(--bg-elevated)] transition-colors"
           >

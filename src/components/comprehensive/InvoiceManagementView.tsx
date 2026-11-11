@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
+import { Empty } from 'antd';
+import './finance-management.css';
 import { 
   Receipt, 
   Plus, 
   Search, 
-  Filter, 
-  CheckCircle2, 
   FileText, 
   Building2, 
   DollarSign, 
-  CreditCard,
   Building
 } from '@/components/common/octicons-compat';
-import { StatCard, StatusTag, Modal, Drawer } from '../common/UIComponents';
+import { StatCard, StatusTag, Modal } from '../common/UIComponents';
 import { ComprehensivePage } from './ComprehensivePage';
 import { useApp } from '../../context/AppContext';
 import { InvoiceRecord, TaxProfile } from '../../types';
@@ -89,7 +88,7 @@ export const InvoiceManagementView: React.FC = () => {
 
   return (
     <ComprehensivePage title="发票管理" description="处理销项开票、进项登记与企业开票资质" icon={<Receipt className="w-5 h-5" />} hideHeader>
-    <div className="space-y-6">
+    <div className="finance-workspace space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
@@ -97,7 +96,6 @@ export const InvoiceManagementView: React.FC = () => {
           value="¥ 1,680,000"
           subText="税率 6% 开票状态良好"
           icon={<Receipt className="w-5 h-5" />}
-          iconBgColor="bg-blue-500/10 text-blue-400 border border-blue-500/20"
           onClick={() => setActiveTab('sales')}
         />
         <StatCard
@@ -105,7 +103,6 @@ export const InvoiceManagementView: React.FC = () => {
           value="¥ 42,500"
           subText="可抵扣税额 ¥ 5,525"
           icon={<DollarSign className="w-5 h-5" />}
-          iconBgColor="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
           onClick={() => setActiveTab('purchase')}
         />
         <StatCard
@@ -113,62 +110,52 @@ export const InvoiceManagementView: React.FC = () => {
           value={`${taxProfiles.length} 企`}
           subText="资质纳税识别号已核验"
           icon={<Building2 className="w-5 h-5" />}
-          iconBgColor="bg-purple-500/10 text-purple-400 border border-purple-500/20"
           onClick={() => setActiveTab('tax_profile')}
         />
       </div>
 
       {/* Main Table Card */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-lg p-5 shadow-sm space-y-4">
+      <div className="finance-panel space-y-4">
         {/* Navigation Tabs & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-main)] pb-4">
-          <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="finance-header">
+          <div className="finance-tabs" role="tablist" aria-label="发票视图">
             <button
+              type="button" role="tab" aria-selected={activeTab === 'sales'}
               onClick={() => setActiveTab('sales')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'sales'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`finance-tab ${activeTab === 'sales' ? 'is-active' : ''}`}
             >
               <Receipt className="w-3.5 h-3.5" />
               销项开票申请
             </button>
             <button
+              type="button" role="tab" aria-selected={activeTab === 'purchase'}
               onClick={() => setActiveTab('purchase')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'purchase'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`finance-tab ${activeTab === 'purchase' ? 'is-active' : ''}`}
             >
               <FileText className="w-3.5 h-3.5" />
               进项抵扣登记
             </button>
             <button
+              type="button" role="tab" aria-selected={activeTab === 'tax_profile'}
               onClick={() => setActiveTab('tax_profile')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'tax_profile'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`finance-tab ${activeTab === 'tax_profile' ? 'is-active' : ''}`}
             >
               <Building className="w-3.5 h-3.5" />
               开票抬头信息库
             </button>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="finance-actions">
             <button
               onClick={() => setShowInvoiceModal(true)}
-              className="px-3.5 py-1.5 bg-[var(--warning)] text-black hover:bg-[var(--accent-gold-hover)] font-semibold rounded-md text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+              className="finance-action finance-action-primary"
             >
               <Plus className="w-4 h-4" />
               新建开票申请
             </button>
             <button
               onClick={() => setShowProfileModal(true)}
-              className="px-3.5 py-1.5 bg-[var(--bg-elevated)] text-[var(--text-primary)] hover:bg-[var(--border-main)] font-medium rounded-md text-xs flex items-center gap-1.5 transition-colors border border-[var(--border-main)] shadow-sm"
+              className="finance-action"
             >
               <Plus className="w-4 h-4" />
               录入抬头资料
@@ -177,23 +164,23 @@ export const InvoiceManagementView: React.FC = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
+        <div>
+          <div className="finance-search">
+            <Search className="w-4 h-4" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索发票单号、抬头名称、关联合同号、申请人..."
-              className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
         </div>
 
         {/* Tab 1: 销项开票 */}
         {activeTab === 'sales' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="finance-table-scroll">
+            <table className="finance-table finance-table-wide">
               <thead>
                 <tr className="border-b border-[var(--border-main)] bg-[var(--bg-main)] text-[var(--text-muted)]">
                   <th className="py-3 px-3">发票申请单号</th>
@@ -215,7 +202,7 @@ export const InvoiceManagementView: React.FC = () => {
                       <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{inv.invoiceNo}</td>
                       <td className="py-3 px-3"><StatusTag status={inv.category} type="info" /></td>
                       <td className="py-3 px-3 font-medium text-[var(--text-primary)]">{inv.customerName}</td>
-                      <td className="py-3 px-3 font-bold text-white">¥ {inv.amount.toLocaleString()}</td>
+                      <td className="finance-amount">¥ {inv.amount.toLocaleString()}</td>
                       <td className="py-3 px-3 text-[var(--text-body)]">{inv.taxRate} (¥{inv.taxAmount})</td>
                       <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{inv.relatedContractCode}</td>
                       <td className="py-3 px-3 text-[var(--text-body)]">{inv.applicant}</td>
@@ -223,6 +210,7 @@ export const InvoiceManagementView: React.FC = () => {
                       <td className="py-3 px-3"><StatusTag status={inv.status} /></td>
                     </tr>
                   ))}
+                {!invoices.some(i => i.type === '销项' && (i.customerName.includes(searchQuery) || i.invoiceNo.includes(searchQuery))) && <tr><td colSpan={9} className="finance-empty-cell"><Empty description={searchQuery ? '暂无匹配的销项开票申请' : '暂无销项开票申请'} /></td></tr>}
               </tbody>
             </table>
           </div>
@@ -230,8 +218,8 @@ export const InvoiceManagementView: React.FC = () => {
 
         {/* Tab 2: 进项抵扣登记 */}
         {activeTab === 'purchase' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="finance-table-scroll">
+            <table className="finance-table">
               <thead>
                 <tr className="border-b border-[var(--border-main)] bg-[var(--bg-main)] text-[var(--text-muted)]">
                   <th className="py-3 px-3">发票代码/单号</th>
@@ -252,13 +240,14 @@ export const InvoiceManagementView: React.FC = () => {
                       <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{inv.invoiceNo}</td>
                       <td className="py-3 px-3"><StatusTag status={inv.category} type="info" /></td>
                       <td className="py-3 px-3 font-medium text-[var(--text-primary)]">{inv.customerName}</td>
-                      <td className="py-3 px-3 font-bold text-white">¥ {inv.amount.toLocaleString()}</td>
-                      <td className="py-3 px-3 font-bold text-emerald-400">¥ {inv.taxAmount.toLocaleString()}</td>
+                      <td className="finance-amount">¥ {inv.amount.toLocaleString()}</td>
+                      <td className="finance-amount finance-amount-success">¥ {inv.taxAmount.toLocaleString()}</td>
                       <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{inv.relatedContractCode}</td>
                       <td className="py-3 px-3 text-[var(--text-body)]">{inv.applicant}</td>
                       <td className="py-3 px-3"><StatusTag status={inv.status} type="success" /></td>
                     </tr>
                   ))}
+                {!invoices.some(i => i.type === '进项') && <tr><td colSpan={8} className="finance-empty-cell"><Empty description="暂无进项抵扣登记" /></td></tr>}
               </tbody>
             </table>
           </div>
@@ -266,22 +255,25 @@ export const InvoiceManagementView: React.FC = () => {
 
         {/* Tab 3: 开票抬头信息库 */}
         {activeTab === 'tax_profile' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="finance-profile-grid">
             {taxProfiles.map((prof) => (
-              <div
+              <article
                 key={prof.id}
-                className="p-4 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg space-y-2 text-xs"
+                className="finance-profile"
               >
-                <div className="flex justify-between items-center pb-2 border-b border-[var(--border-main)]">
-                  <h4 className="font-semibold text-white text-sm">{prof.companyName}</h4>
+                <div className="finance-profile-header">
+                  <h4>{prof.companyName}</h4>
                   <StatusTag status="已验真" type="success" />
                 </div>
-                <p><span className="text-[var(--text-muted)]">纳税人识别号:</span> <span className="font-mono text-[var(--warning)] font-bold">{prof.taxId}</span></p>
-                <p><span className="text-[var(--text-muted)]">开户银行:</span> {prof.bankName}</p>
-                <p><span className="text-[var(--text-muted)]">银行账号:</span> <span className="font-mono text-[var(--text-primary)]">{prof.bankAccount}</span></p>
-                <p><span className="text-[var(--text-muted)]">地址及电话:</span> {prof.addressPhone}</p>
-              </div>
+                <dl>
+                  <dt>纳税人识别号</dt><dd className="finance-tax-id font-mono">{prof.taxId}</dd>
+                  <dt>开户银行</dt><dd>{prof.bankName || '—'}</dd>
+                  <dt>银行账号</dt><dd className="font-mono">{prof.bankAccount || '—'}</dd>
+                  <dt>地址及电话</dt><dd>{prof.addressPhone || '—'}</dd>
+                </dl>
+              </article>
             ))}
+            {!taxProfiles.length && <div className="col-span-full py-8"><Empty description="暂无开票抬头资料" /></div>}
           </div>
         )}
       </div>
@@ -289,17 +281,19 @@ export const InvoiceManagementView: React.FC = () => {
       {/* Modal: 新建开票申请 */}
       <Modal
         isOpen={showInvoiceModal}
+        className="finance-dialog"
         onClose={() => setShowInvoiceModal(false)}
         title="发起开票申请"
         maxWidth="md"
       >
-        <form onSubmit={handleCreateInvoice} className="space-y-4 text-xs">
+        <form onSubmit={handleCreateInvoice} className="finance-form">
           <div>
             <label className="block font-medium text-[var(--text-muted)] mb-1">开票类别</label>
             <select
+              aria-label="开票类别"
               value={newInvoiceForm.category}
               onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, category: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             >
               <option value="增值税专用发票">增值税专用发票 (13% / 6%)</option>
               <option value="增值税普通发票">增值税普通发票</option>
@@ -309,34 +303,37 @@ export const InvoiceManagementView: React.FC = () => {
             <label className="block font-medium text-[var(--text-muted)] mb-1">购方开票抬头 / 客户全称</label>
             <input
               type="text"
+              aria-label="购方开票抬头 / 客户全称"
               required
               placeholder="如：国家电网华东分部"
               onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, customerName: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
           <div>
             <label className="block font-medium text-[var(--text-muted)] mb-1">开票含税总金额 (元)</label>
             <input
               type="number"
+              aria-label="开票含税总金额 (元)"
               required
               placeholder="例如：500000"
               onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, amount: Number(e.target.value) })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
           <div>
             <label className="block font-medium text-[var(--text-muted)] mb-1">关联合同编号</label>
             <input
               type="text"
+              aria-label="关联合同编号"
               placeholder="如：SC-CT-2026-089"
               onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, relatedContractCode: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setShowInvoiceModal(false)} className="px-3.5 py-1.5 border border-[var(--border-main)] rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]">取消</button>
-            <button type="submit" className="px-3.5 py-1.5 bg-[var(--warning)] text-black font-semibold rounded-md hover:bg-[var(--accent-gold-hover)]">提交财务开票</button>
+          <div className="finance-form-footer">
+            <button type="button" onClick={() => setShowInvoiceModal(false)} className="finance-action">取消</button>
+            <button type="submit" className="finance-action finance-action-primary">提交财务开票</button>
           </div>
         </form>
       </Modal>
@@ -344,48 +341,53 @@ export const InvoiceManagementView: React.FC = () => {
       {/* Modal: 录入开票抬头信息 */}
       <Modal
         isOpen={showProfileModal}
+        className="finance-dialog"
         onClose={() => setShowProfileModal(false)}
         title="录入企业开票抬头资质"
         maxWidth="md"
       >
-        <form onSubmit={handleCreateProfile} className="space-y-4 text-xs">
+        <form onSubmit={handleCreateProfile} className="finance-form">
           <div>
             <label className="block font-medium text-[var(--text-muted)] mb-1">企业全称</label>
             <input
               type="text"
+              aria-label="企业全称"
               required
               placeholder="如：南京师创智联科技有限公司"
               onChange={(e) => setNewProfileForm({ ...newProfileForm, companyName: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
           <div>
             <label className="block font-medium text-[var(--text-muted)] mb-1">统一社会信用代码 / 税号</label>
             <input
               type="text"
+              aria-label="统一社会信用代码 / 税号"
               required
               placeholder="18位纳税人识别号"
               onChange={(e) => setNewProfileForm({ ...newProfileForm, taxId: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="finance-form-grid">
             <div>
               <label className="block font-medium text-[var(--text-muted)] mb-1">开户银行</label>
               <input
                 type="text"
+                aria-label="开户银行"
                 placeholder="如：招商银行南京分行"
                 onChange={(e) => setNewProfileForm({ ...newProfileForm, bankName: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+                className="finance-input"
               />
             </div>
             <div>
               <label className="block font-medium text-[var(--text-muted)] mb-1">银行卡账号</label>
               <input
                 type="text"
+                aria-label="银行卡账号"
                 placeholder="例如：6222 0210 1022..."
                 onChange={(e) => setNewProfileForm({ ...newProfileForm, bankAccount: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+                className="finance-input"
               />
             </div>
           </div>
@@ -393,14 +395,15 @@ export const InvoiceManagementView: React.FC = () => {
             <label className="block font-medium text-[var(--text-muted)] mb-1">公司注册地址及电话</label>
             <input
               type="text"
+              aria-label="公司注册地址及电话"
               placeholder="南京市江宁区紫金研创中心 A座 (025-88886666)"
               onChange={(e) => setNewProfileForm({ ...newProfileForm, addressPhone: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setShowProfileModal(false)} className="px-3.5 py-1.5 border border-[var(--border-main)] rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]">取消</button>
-            <button type="submit" className="px-3.5 py-1.5 bg-[var(--warning)] text-black font-semibold rounded-md hover:bg-[var(--accent-gold-hover)]">保存资质档案</button>
+          <div className="finance-form-footer">
+            <button type="button" onClick={() => setShowProfileModal(false)} className="finance-action">取消</button>
+            <button type="submit" className="finance-action finance-action-primary">保存资质档案</button>
           </div>
         </form>
       </Modal>

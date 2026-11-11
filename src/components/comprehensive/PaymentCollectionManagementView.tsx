@@ -1,19 +1,15 @@
 import React, { useState } from 'react';
+import { Empty } from 'antd';
+import './finance-management.css';
 import { 
   CreditCard, 
   Plus, 
   Search, 
-  Filter, 
   DollarSign, 
-  Calendar, 
   AlertTriangle, 
   CheckCircle2, 
-  Clock, 
-  Building2,
-  Send,
-  FileCheck2
 } from '@/components/common/octicons-compat';
-import { StatCard, StatusTag, Modal, Drawer } from '../common/UIComponents';
+import { StatCard, StatusTag, Modal } from '../common/UIComponents';
 import { ComprehensivePage } from './ComprehensivePage';
 import { useApp } from '../../context/AppContext';
 import { PaymentPlan, ActualPaymentRecord } from '../../types';
@@ -100,7 +96,7 @@ export const PaymentCollectionManagementView: React.FC = () => {
 
   return (
     <ComprehensivePage title="回款管理" description="跟踪合同回款计划、到账记录与逾期款项" icon={<CreditCard className="w-5 h-5" />} hideHeader>
-    <div className="space-y-6">
+    <div className="finance-workspace space-y-6">
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
@@ -108,7 +104,6 @@ export const PaymentCollectionManagementView: React.FC = () => {
           value="¥ 2,829,000"
           subText="已回款比例 68.4%"
           icon={<DollarSign className="w-5 h-5" />}
-          iconBgColor="bg-blue-500/10 text-blue-400 border border-blue-500/20"
           onClick={() => setActiveTab('plan')}
         />
         <StatCard
@@ -116,7 +111,6 @@ export const PaymentCollectionManagementView: React.FC = () => {
           value="¥ 1,935,000"
           subText="银行对账单匹配率 100%"
           icon={<CheckCircle2 className="w-5 h-5" />}
-          iconBgColor="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
           onClick={() => setActiveTab('received')}
         />
         <StatCard
@@ -124,55 +118,45 @@ export const PaymentCollectionManagementView: React.FC = () => {
           value="¥ 85,000"
           subText="1 笔款项超过约定节点 24 天"
           icon={<AlertTriangle className="w-5 h-5" />}
-          iconBgColor="bg-rose-500/10 text-rose-400 border border-rose-500/20"
           onClick={() => setActiveTab('overdue')}
         />
       </div>
 
       {/* Main Table Card */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-lg p-5 shadow-sm space-y-4">
+      <div className="finance-panel space-y-4">
         {/* Navigation Tabs & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-main)] pb-4">
-          <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="finance-header">
+          <div className="finance-tabs" role="tablist" aria-label="回款视图">
             <button
+              type="button" role="tab" aria-selected={activeTab === 'plan'}
               onClick={() => setActiveTab('plan')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'plan'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`finance-tab ${activeTab === 'plan' ? 'is-active' : ''}`}
             >
               <CreditCard className="w-3.5 h-3.5" />
               回款计划台账
             </button>
             <button
+              type="button" role="tab" aria-selected={activeTab === 'received'}
               onClick={() => setActiveTab('received')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'received'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`finance-tab ${activeTab === 'received' ? 'is-active' : ''}`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               实际到账记录
             </button>
             <button
+              type="button" role="tab" aria-selected={activeTab === 'overdue'}
               onClick={() => setActiveTab('overdue')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'overdue'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`finance-tab ${activeTab === 'overdue' ? 'is-active' : ''}`}
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               逾期与催款预警
             </button>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="finance-actions">
             <button
               onClick={() => setShowPlanModal(true)}
-              className="px-3.5 py-1.5 bg-[var(--warning)] text-black hover:bg-[var(--accent-gold-hover)] font-semibold rounded-md text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+              className="finance-action finance-action-primary"
             >
               <Plus className="w-4 h-4" />
               新建回款计划
@@ -181,23 +165,23 @@ export const PaymentCollectionManagementView: React.FC = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
+        <div>
+          <div className="finance-search">
+            <Search className="w-4 h-4" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索计划编号、关联合同号、客户名称或负责人..."
-              className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
         </div>
 
         {/* Tab 1: 回款计划 */}
         {activeTab === 'plan' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="finance-table-scroll">
+            <table className="finance-table finance-table-wide">
               <thead>
                 <tr className="border-b border-[var(--border-main)] bg-[var(--bg-main)] text-[var(--text-muted)]">
                   <th className="py-3 px-3">计划编号</th>
@@ -221,9 +205,9 @@ export const PaymentCollectionManagementView: React.FC = () => {
                       <td className="py-3 px-3 font-mono text-[var(--text-primary)]">{plan.contractCode}</td>
                       <td className="py-3 px-3 font-semibold text-[var(--text-primary)]">{plan.customerName}</td>
                       <td className="py-3 px-3 text-[var(--text-body)]">{plan.stageName}</td>
-                      <td className="py-3 px-3 font-bold text-white">¥ {plan.planAmount.toLocaleString()}</td>
-                      <td className="py-3 px-3 font-bold text-emerald-400">¥ {plan.receivedAmount.toLocaleString()}</td>
-                      <td className="py-3 px-3 font-bold text-[var(--warning)]">¥ {plan.uncollectedAmount.toLocaleString()}</td>
+                      <td className="finance-amount">¥ {plan.planAmount.toLocaleString()}</td>
+                      <td className="finance-amount finance-amount-success">¥ {plan.receivedAmount.toLocaleString()}</td>
+                      <td className="finance-amount finance-amount-warning">¥ {plan.uncollectedAmount.toLocaleString()}</td>
                       <td className="py-3 px-3 text-[var(--text-muted)]">{plan.dueDate}</td>
                       <td className="py-3 px-3"><StatusTag status={plan.status} /></td>
                       <td className="py-3 px-3 text-right">
@@ -234,17 +218,18 @@ export const PaymentCollectionManagementView: React.FC = () => {
                               setRecordAmount(plan.uncollectedAmount);
                               setShowRecordModal(true);
                             }}
-                            className="px-2.5 py-1 bg-emerald-600 text-white rounded text-xs font-semibold hover:bg-emerald-700 transition"
+                            className="finance-action"
                           >
                             录入到账
                           </button>
                         )}
                         {plan.uncollectedAmount === 0 && (
-                          <span className="text-[10px] text-emerald-400 font-mono">结清</span>
+                          <span className="text-[var(--success)] font-mono">结清</span>
                         )}
                       </td>
                     </tr>
                   ))}
+                {!plans.some(p => p.customerName.includes(searchQuery) || p.contractCode.includes(searchQuery)) && <tr><td colSpan={10} className="finance-empty-cell"><Empty description={searchQuery ? '暂无匹配的回款计划' : '暂无回款计划'} /></td></tr>}
               </tbody>
             </table>
           </div>
@@ -252,8 +237,8 @@ export const PaymentCollectionManagementView: React.FC = () => {
 
         {/* Tab 2: 实际到账记录 */}
         {activeTab === 'received' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="finance-table-scroll">
+            <table className="finance-table">
               <thead>
                 <tr className="border-b border-[var(--border-main)] bg-[var(--bg-main)] text-[var(--text-muted)]">
                   <th className="py-3 px-3">到账单号</th>
@@ -272,13 +257,14 @@ export const PaymentCollectionManagementView: React.FC = () => {
                     <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{r.recordCode}</td>
                     <td className="py-3 px-3 font-mono text-[var(--text-body)]">{r.planCode}</td>
                     <td className="py-3 px-3 font-semibold text-[var(--text-primary)]">{r.customerName}</td>
-                    <td className="py-3 px-3 font-bold text-emerald-400">¥ {r.amount.toLocaleString()}</td>
+                    <td className="finance-amount finance-amount-success">¥ {r.amount.toLocaleString()}</td>
                     <td className="py-3 px-3"><StatusTag status={r.payMethod} type="info" /></td>
                     <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{r.bankSerialNo}</td>
                     <td className="py-3 px-3 text-[var(--text-muted)]">{r.payDate}</td>
                     <td className="py-3 px-3 text-[var(--text-body)]">{r.operator}</td>
                   </tr>
                 ))}
+                {!records.length && <tr><td colSpan={8} className="finance-empty-cell"><Empty description="暂无到账记录" /></td></tr>}
               </tbody>
             </table>
           </div>
@@ -292,31 +278,32 @@ export const PaymentCollectionManagementView: React.FC = () => {
               .map((ovd) => (
                 <div
                   key={ovd.id}
-                  className="p-4 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg flex items-center justify-between text-xs"
+                  className="finance-overdue"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="p-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-md">
+                    <div className="finance-overdue-icon">
                       <AlertTriangle className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-sm">{ovd.customerName}</span>
+                        <span className="finance-overdue-title">{ovd.customerName}</span>
                         <span className="font-mono text-[var(--text-muted)]">({ovd.contractCode})</span>
                         <StatusTag status="严重逾期" type="danger" />
                       </div>
                       <p className="text-[var(--text-muted)] mt-1">
-                        阶段: {ovd.stageName} | 约定日期: {ovd.dueDate} | 欠款: <span className="font-bold text-rose-400">¥ {ovd.uncollectedAmount.toLocaleString()}</span>
+                        阶段: {ovd.stageName} | 约定日期: {ovd.dueDate} | 欠款: <span className="font-bold text-[var(--danger)]">¥ {ovd.uncollectedAmount.toLocaleString()}</span>
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => addToast('info', `已生成催款函PDF并推送至负责人 [${ovd.manager}]`)}
-                    className="px-3.5 py-1.5 bg-rose-600 text-white font-semibold rounded-md hover:bg-rose-700 transition"
+                    className="finance-action finance-action-danger"
                   >
                     生成催款函与警示通知
                   </button>
                 </div>
               ))}
+            {!plans.some(p => p.status === '逾期未还') && <div className="py-8"><Empty description="暂无逾期款项" /></div>}
           </div>
         )}
       </div>
@@ -324,49 +311,54 @@ export const PaymentCollectionManagementView: React.FC = () => {
       {/* Modal: 新建回款计划 */}
       <Modal
         isOpen={showPlanModal}
+        className="finance-dialog"
         onClose={() => setShowPlanModal(false)}
         title="新建合同回款计划"
         maxWidth="md"
       >
-        <form onSubmit={handleCreatePlan} className="space-y-4 text-xs">
+        <form onSubmit={handleCreatePlan} className="finance-form">
           <div>
             <label className="block font-medium text-[var(--text-muted)] mb-1">关联合同编号</label>
             <input
               type="text"
+              aria-label="关联合同编号"
               required
               placeholder="如：SC-CT-2026-089"
               onChange={(e) => setNewPlanForm({ ...newPlanForm, contractCode: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
           <div>
             <label className="block font-medium text-[var(--text-muted)] mb-1">付款客户全称</label>
             <input
               type="text"
+              aria-label="付款客户全称"
               required
               placeholder="如：国家电网"
               onChange={(e) => setNewPlanForm({ ...newPlanForm, customerName: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="finance-form-grid">
             <div>
               <label className="block font-medium text-[var(--text-muted)] mb-1">回款阶段说明</label>
               <input
                 type="text"
+                aria-label="回款阶段说明"
                 placeholder="例：初验款(30%)"
                 onChange={(e) => setNewPlanForm({ ...newPlanForm, stageName: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+                className="finance-input"
               />
             </div>
             <div>
               <label className="block font-medium text-[var(--text-muted)] mb-1">应收计划金额 (元)</label>
               <input
                 type="number"
+                aria-label="应收计划金额 (元)"
                 required
                 placeholder="100000"
                 onChange={(e) => setNewPlanForm({ ...newPlanForm, planAmount: Number(e.target.value) })}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+                className="finance-input"
               />
             </div>
           </div>
@@ -374,14 +366,15 @@ export const PaymentCollectionManagementView: React.FC = () => {
             <label className="block font-medium text-[var(--text-muted)] mb-1">约定截止回款日期</label>
             <input
               type="date"
+              aria-label="约定截止回款日期"
               required
               onChange={(e) => setNewPlanForm({ ...newPlanForm, dueDate: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+              className="finance-input"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setShowPlanModal(false)} className="px-3.5 py-1.5 border border-[var(--border-main)] rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]">取消</button>
-            <button type="submit" className="px-3.5 py-1.5 bg-[var(--warning)] text-black font-semibold rounded-md hover:bg-[var(--accent-gold-hover)]">创建回款计划</button>
+          <div className="finance-form-footer">
+            <button type="button" onClick={() => setShowPlanModal(false)} className="finance-action">取消</button>
+            <button type="submit" className="finance-action finance-action-primary">创建回款计划</button>
           </div>
         </form>
       </Modal>
@@ -389,14 +382,15 @@ export const PaymentCollectionManagementView: React.FC = () => {
       {/* Modal: 快捷录入到账 */}
       <Modal
         isOpen={showRecordModal}
+        className="finance-dialog"
         onClose={() => setShowRecordModal(false)}
         title="快捷录入到账明细"
         maxWidth="md"
       >
         {selectedPlanForRecord && (
-          <form onSubmit={handleRecordPayment} className="space-y-4 text-xs">
-            <div className="p-3 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg space-y-1">
-              <p><span className="text-[var(--text-muted)]">客户名称:</span> <span className="font-semibold text-white">{selectedPlanForRecord.customerName}</span></p>
+          <form onSubmit={handleRecordPayment} className="finance-form">
+            <div className="finance-form-summary space-y-1">
+              <p><span className="text-[var(--text-muted)]">客户名称:</span> <strong>{selectedPlanForRecord.customerName}</strong></p>
               <p><span className="text-[var(--text-muted)]">回款节点:</span> {selectedPlanForRecord.stageName}</p>
               <p><span className="text-[var(--text-muted)]">待回款未清余额:</span> <span className="font-bold text-[var(--warning)]">¥ {selectedPlanForRecord.uncollectedAmount.toLocaleString()}</span></p>
             </div>
@@ -404,27 +398,29 @@ export const PaymentCollectionManagementView: React.FC = () => {
               <label className="block font-medium text-[var(--text-muted)] mb-1">本次到账金额 (元)</label>
               <input
                 type="number"
+                aria-label="本次到账金额 (元)"
                 required
                 value={recordAmount}
                 onChange={(e) => setRecordAmount(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+                className="finance-input"
               />
             </div>
             <div>
               <label className="block font-medium text-[var(--text-muted)] mb-1">支付/到账方式</label>
               <select
+                aria-label="支付/到账方式"
                 value={recordPayMethod}
                 onChange={(e) => setRecordPayMethod(e.target.value)}
-                className="w-full px-3 py-2 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-md text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--warning)]"
+                className="finance-input"
               >
                 <option value="电汇">银行电汇</option>
                 <option value="承兑汇票">商业/银行承兑汇票</option>
                 <option value="网银转账">网银即时转账</option>
               </select>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowRecordModal(false)} className="px-3.5 py-1.5 border border-[var(--border-main)] rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]">取消</button>
-              <button type="submit" className="px-3.5 py-1.5 bg-emerald-600 text-white font-semibold rounded-md hover:bg-emerald-700">确认销账并录入</button>
+            <div className="finance-form-footer">
+              <button type="button" onClick={() => setShowRecordModal(false)} className="finance-action">取消</button>
+              <button type="submit" className="finance-action finance-action-primary">确认销账并录入</button>
             </div>
           </form>
         )}
