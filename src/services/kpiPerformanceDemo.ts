@@ -15,6 +15,7 @@ export interface KpiScores {
   attitude: number;
   review: number;
   managerAdjustment: number;
+  temporaryTaskDeduction?: number;
 }
 
 export interface KpiSourceData {
@@ -44,8 +45,8 @@ export interface KpiReviewRecord {
   action: '提交主管复核' | 'HR 退回' | 'HR 审核通过';
   actor: string;
   at: string;
-  before: { attitude: number; adjustment: number; total: number };
-  proposed: { attitude: number; adjustment: number; total: number };
+  before: { attitude: number; adjustment: number; total: number; temporaryTaskDeduction?: number; objectiveScore?: number; reviewScore?: number };
+  proposed: { attitude: number; adjustment: number; total: number; temporaryTaskDeduction?: number; objectiveScore?: number; reviewScore?: number };
   reason: string;
 }
 
@@ -69,7 +70,8 @@ export interface KpiEmployee {
   scores: KpiScores;
   source: KpiSourceData;
   reviewStatus: KpiStatus;
-  managerDraft?: { attitude: number; adjustment: number; reason: string };
+  managerDraft?: { attitude: number; adjustment: number; temporaryTaskDeduction?: number; reason: string };
+  scoreAllocationVersion?: 2;
   reviewHistory?: KpiReviewRecord[];
   approvedSourceCorrections?: KpiSourceCorrectionRecord[];
   hrNote?: string;
@@ -204,11 +206,14 @@ export const departmentCoefficientPreview = (period: KpiPeriod, department: stri
 
 const recordReview = (employee: KpiEmployee, action: KpiReviewRecord['action'], actor: string, reason: string): KpiEmployee => {
   const draft = employee.managerDraft;
-  const proposedScores = draft ? { ...employee.scores, attitude: draft.attitude, managerAdjustment: draft.adjustment } : employee.scores;
+  const proposedScores = draft ? { ...employee.scores, attitude: draft.attitude, managerAdjustment: draft.adjustment, temporaryTaskDeduction: draft.temporaryTaskDeduction ?? 0 } : employee.scores;
+  const proposed = draft ? { ...employee, scores: proposedScores, scoreAllocationVersion: 2 as const } : employee;
+  const beforeDimensions = kpiDimensionScores(employee);
+  const proposedDimensions = kpiDimensionScores(proposed);
   const record: KpiReviewRecord = {
     id: `${employee.id}-${Date.now()}-${employee.reviewHistory?.length ?? 0}`, action, actor, at: new Date().toISOString(),
-    before: { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, total: scoreForEmployee(employee) },
-    proposed: { attitude: proposedScores.attitude, adjustment: proposedScores.managerAdjustment, total: scoreForEmployee({ ...employee, scores: proposedScores }) },
+    before: { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, temporaryTaskDeduction: employee.scores.temporaryTaskDeduction ?? 0, objectiveScore: beforeDimensions.objective, reviewScore: beforeDimensions.review, total: scoreForEmployee(employee) },
+    proposed: { attitude: proposedScores.attitude, adjustment: proposedScores.managerAdjustment, temporaryTaskDeduction: proposedScores.temporaryTaskDeduction ?? 0, objectiveScore: proposedDimensions.objective, reviewScore: proposedDimensions.review, total: scoreForEmployee(proposed) },
     reason,
   };
   return { ...employee, reviewHistory: [...(employee.reviewHistory ?? []), record] };
@@ -221,7 +226,7 @@ export const submitDepartmentReview = (period: KpiPeriod, manager: string, depar
   const targets = period.employees.filter(employee => employee.manager === manager && employee.department === department);
   if (!targets.length || targets.some(employee => !['待主管复核', 'HR 已退回'].includes(employee.reviewStatus))) throw new Error('该部门存在不可提交的员工');
   return { ...period, employees: period.employees.map(employee => targets.some(target => target.id === employee.id)
-    ? submitManagerReview(recordReview({ ...employee, managerDraft: employee.managerDraft || { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, reason: '主管确认当前评分' } }, '提交主管复核', manager, employee.managerDraft?.reason || '主管确认当前评分')) : employee) };
+    ? submitManagerReview(recordReview({ ...employee, managerDraft: employee.managerDraft || { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, temporaryTaskDeduction: employee.scores.temporaryTaskDeduction ?? 0, reason: '主管确认当前评分' } }, '提交主管复核', manager, employee.managerDraft?.reason || '主管确认当前评分')) : employee) };
 };
 
 export const reviewDepartmentSubmission = (period: KpiPeriod, manager: string, department: string, decision: KpiReviewDecision, reason = ''): KpiPeriod => {
@@ -316,12 +321,19 @@ export const reportScoreFor = (source: Pick<KpiSourceData, 'reportLate' | 'month
     : Math.max(0, 10 - 2 * (source.reportLate + (source.monthlyReportLate ?? 0)));
 
 export const scoreForEmployee = (employee: KpiEmployee) => {
-  const objectiveScore = employee.approvedSourceCorrections?.filter(record => record.source === 'objective').at(-1)?.after.objectiveScore ?? employee.scores.objective;
-  return Math.round(Math.max(0, Math.min(objectiveScore <= 50 ? 90 : 100,
-  objectiveScore + employee.scores.attendance + employee.scores.extraWork + employee.scores.attitude
-  + (employee.approvedSourceCorrections?.filter(record => record.source === 'reports').at(-1)?.after.reviewScore ?? employee.scores.review)
-  + employee.scores.managerAdjustment,
+  const { objective, review } = kpiDimensionScores(employee);
+  return Math.round(Math.max(0, Math.min(objective <= 50 ? 90 : 100,
+  objective + employee.scores.attendance + employee.scores.extraWork + employee.scores.attitude
+  + review + (employee.scoreAllocationVersion === 2 ? 0 : employee.scores.managerAdjustment),
   )) * 100) / 100;
+};
+
+export const kpiDimensionScores = (employee: KpiEmployee) => {
+  const objectiveBase = employee.approvedSourceCorrections?.filter(record => record.source === 'objective').at(-1)?.after.objectiveScore ?? employee.scores.objective;
+  const reviewBase = employee.approvedSourceCorrections?.filter(record => record.source === 'reports').at(-1)?.after.reviewScore ?? employee.scores.review;
+  return employee.scoreAllocationVersion === 2
+    ? { objective: Math.min(60, Math.max(0, objectiveBase + employee.scores.managerAdjustment)), review: Math.min(10, Math.max(0, reviewBase + (employee.scores.temporaryTaskDeduction ?? 0))) }
+    : { objective: objectiveBase, review: reviewBase };
 };
 
 export const sourceAdjustmentFor = (employee: KpiEmployee) => employee.scores.managerAdjustment;
@@ -388,6 +400,7 @@ export const syncKpiSources = (period: KpiPeriod, month: string): KpiPeriod => {
 export const submitManagerReview = (employee: KpiEmployee): KpiEmployee => {
   const draft = employee.managerDraft;
   if (!draft?.reason.trim()) throw new Error('请填写复核说明');
+  if (!Number.isFinite(draft.attitude) || !Number.isFinite(draft.adjustment) || !Number.isFinite(draft.temporaryTaskDeduction ?? 0) || (draft.temporaryTaskDeduction ?? 0) > 0) throw new Error('临时任务只允许扣分，请核对评分');
   if (!['待主管复核', 'HR 已退回'].includes(employee.reviewStatus)) throw new Error('当前状态不可提交主管复核');
   return { ...employee, reviewStatus: '待 HR 审核', hrNote: `主管已提交：${draft.reason.trim()}` };
 };
@@ -399,9 +412,11 @@ export const reviewManagerSubmission = (employee: KpiEmployee, decision: KpiRevi
     return { ...employee, reviewStatus: 'HR 已退回', hrNote: `HR 退回：${reason.trim()}` };
   }
   const draft = employee.managerDraft;
+  if (draft && (!Number.isFinite(draft.attitude) || !Number.isFinite(draft.adjustment) || !Number.isFinite(draft.temporaryTaskDeduction ?? 0) || (draft.temporaryTaskDeduction ?? 0) > 0)) throw new Error('临时任务只允许扣分，请核对评分');
   return {
     ...employee,
-    scores: draft ? { ...employee.scores, attitude: draft.attitude, managerAdjustment: draft.adjustment } : employee.scores,
+    scores: draft ? { ...employee.scores, attitude: draft.attitude, managerAdjustment: draft.adjustment, temporaryTaskDeduction: draft.temporaryTaskDeduction ?? 0 } : employee.scores,
+    scoreAllocationVersion: draft ? 2 : employee.scoreAllocationVersion,
     source: draft ? { ...employee.source, objectiveAdjustment: draft.adjustment } : employee.source,
     reviewStatus: '已通过',
     hrNote: draft ? `HR 审核通过：${draft.reason.trim()}` : 'HR 已确认系统计算结果。',
@@ -497,7 +512,8 @@ export const createKpiPeriod = (period: KpiPeriod): KpiPeriod => ({
   generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   employees: period.employees.map(employee => ({
     ...employee,
-    scores: period.reviewEnabled ? { ...employee.scores, attitude: 0, managerAdjustment: 0 } : employee.scores,
+    scores: period.reviewEnabled ? { ...employee.scores, attitude: 0, managerAdjustment: 0, temporaryTaskDeduction: 0 } : employee.scores,
+    scoreAllocationVersion: period.reviewEnabled ? undefined : employee.scoreAllocationVersion,
     source: period.reviewEnabled ? { ...employee.source, objectiveAdjustment: 0 } : employee.source,
     reviewStatus: period.reviewEnabled ? '待主管复核' : '待 HR 审核',
     managerDraft: undefined,

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, gradeForScore, isMonthlyGoalLate, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
+import { attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, gradeForScore, isMonthlyGoalLate, kpiDimensionScores, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
 import mockOkrState from '../data/mockOkrState.json';
 import type { OkrPerson, OkrRecord } from './okrRepository';
 
@@ -227,6 +227,33 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(approved.scores.attitude).toBe(10);
     expect(approved.scores.managerAdjustment).toBe(-2);
     expect(scoreForEmployee(approved)).toBe(scoreForEmployee(employee) + 8);
+  });
+
+  it('allocates unlimited signed goal adjustment and temporary-task deductions into capped dimensions after HR approval', () => {
+    const employee = { ...loadKpiDemo().periods['2026-11'].employees[0], reviewStatus: '待主管复核' as const, scores: { ...loadKpiDemo().periods['2026-11'].employees[0].scores, objective: 50, review: 10 } };
+    const submitted = submitManagerReview({ ...employee, managerDraft: { attitude: 10, adjustment: 12, temporaryTaskDeduction: -4, reason: '挑战目标与临时任务复核' } });
+    expect(scoreForEmployee(submitted)).toBe(scoreForEmployee(employee));
+    const approved = reviewManagerSubmission(submitted, 'approve');
+    expect(approved.scoreAllocationVersion).toBe(2);
+    expect(kpiDimensionScores(approved)).toEqual({ objective: 60, review: 6 });
+    expect(scoreForEmployee(approved)).toBe(89.33);
+    const state = loadKpiDemo();
+    state.periods['2026-11'].employees[0] = approved;
+    saveKpiDemo(state);
+    const restored = loadKpiDemo().periods['2026-11'].employees[0];
+    expect(kpiDimensionScores(restored)).toEqual({ objective: 60, review: 6 });
+    expect(scoreForEmployee(restored)).toBe(89.33);
+    expect(kpiDimensionScores({ ...approved, scores: { ...approved.scores, managerAdjustment: -100, temporaryTaskDeduction: -100 } })).toEqual({ objective: 0, review: 0 });
+    expect(kpiDimensionScores({ ...approved, scores: { ...approved.scores, managerAdjustment: 100, temporaryTaskDeduction: 0 } })).toEqual({ objective: 60, review: 10 });
+    expect(() => submitManagerReview({ ...employee, managerDraft: { attitude: 10, adjustment: 0, temporaryTaskDeduction: 1, reason: '不可加分' } })).toThrow('临时任务只允许扣分');
+  });
+
+  it('preserves previously published legacy totals without reallocating their adjustment', () => {
+    const employee = loadKpiDemo().periods['2026-10'].employees[1];
+    const total = scoreForEmployee(employee);
+    expect(employee.scoreAllocationVersion).toBeUndefined();
+    expect(kpiDimensionScores(employee)).toEqual({ objective: employee.scores.objective, review: employee.scores.review });
+    expect(scoreForEmployee(employee)).toBe(total);
   });
 
   it('returns a submission to the manager without applying the proposed score', () => {

@@ -102,6 +102,28 @@ describe('HR 绩效公示', () => {
     expect(screen.getByRole('button', { name: '确认本月部门系数' })).toBeEnabled();
   });
 
+  it('主管复核可填写无幅度限制的目标加减分和仅扣分的临时任务', async () => {
+    const state = loadKpiDemo();
+    const period = state.periods['2026-11'];
+    const now = Date.now();
+    period.published = false;
+    period.cycleSettings = { managerReview: { startAt: new Date(now - 60_000).toISOString(), endAt: new Date(now + 86_400_000).toISOString() }, finalPublicationAt: new Date(now + 172_800_000).toISOString(), appealConfirmation: { startAt: new Date(now + 172_860_000).toISOString(), endAt: new Date(now + 259_200_000).toISOString() } };
+    period.employees.forEach(employee => { employee.reviewStatus = '待主管复核'; });
+    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.mouseDown(screen.getByLabelText('体验角色'));
+    fireEvent.click(await screen.findByText('主管视角', { selector: '.ant-select-item-option-content' }));
+    expect(screen.getByText('目标加减分')).toBeInTheDocument();
+    expect(screen.getByText('临时任务扣分')).toBeInTheDocument();
+    const goal = screen.getByText('目标加减分').closest('label')!.querySelector('input')!;
+    const temporary = screen.getByText('临时任务扣分').closest('label')!.querySelector('input')!;
+    expect(goal).not.toHaveAttribute('max');
+    fireEvent.change(goal, { target: { value: '12' } });
+    fireEvent.change(temporary, { target: { value: '-4' } });
+    expect(goal).toHaveValue('12');
+    expect(temporary).toHaveValue('-4');
+  });
+
   it('HR 逐员工查看提交的两个分数，审核后加减分带正负语义', () => {
     const state = loadKpiDemo();
     const period = state.periods['2026-11'];

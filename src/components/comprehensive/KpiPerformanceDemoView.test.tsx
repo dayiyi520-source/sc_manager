@@ -2,7 +2,7 @@
 import React from 'react';
 import { App as AntApp, Modal } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { KpiPerformanceDemoView } from './KpiPerformanceDemoView';
 import { departmentCoefficientPreview, KPI_DEMO_STORAGE_KEY, loadKpiDemo, publishKpiPeriod, reviewDepartmentSubmission, saveKpiDemo, scoreForEmployee, submitDepartmentReview } from '../../services/kpiPerformanceDemo';
 import { listKpiAppeals, submitKpiAppeal } from '../../services/kpiPerformancePublication';
@@ -74,7 +74,7 @@ describe('绩效考核公示', () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
     expect(screen.getByText('87.3 分')).toBeInTheDocument();
-    expect(screen.getByText('工作态度')).toBeInTheDocument();
+    expect(screen.getAllByText('工作态度').length).toBeGreaterThan(0);
     expect(screen.queryByText('周予安')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /公示绩效结果/ })).not.toBeInTheDocument();
   });
@@ -103,8 +103,11 @@ describe('绩效考核公示', () => {
     expect(screen.queryByText('周予安')).not.toBeInTheDocument();
     expect(screen.getByText('月度目标 56 / 60 分')).toBeInTheDocument();
     expect(screen.getByText('出勤天数')).toBeInTheDocument();
-    expect(screen.getByText('工作态度')).toBeInTheDocument();
-    expect(screen.getByText('复盘总结')).toBeInTheDocument();
+    expect(screen.getAllByText('工作态度').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('周月报提交')).toHaveLength(2);
+    expect(screen.getByText('考勤')).toBeInTheDocument();
+    expect(screen.queryByText('全勤')).not.toBeInTheDocument();
+    expect(screen.queryByText('报告异常')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '绩效申诉' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '公示绩效结果' })).not.toBeInTheDocument();
 
@@ -129,9 +132,41 @@ describe('绩效考核公示', () => {
     expect(screen.getByText('月度目标')).toBeInTheDocument();
     expect(screen.getByText('工作态度')).toBeInTheDocument();
     expect(screen.getByText('审批加班')).toBeInTheDocument();
-    expect(screen.getByText('报告异常')).toBeInTheDocument();
+    expect(screen.getAllByText('周月报提交')).toHaveLength(2);
+    expect(screen.getByText('考勤')).toBeInTheDocument();
+    expect(screen.queryByText('全勤')).not.toBeInTheDocument();
+    expect(screen.queryByText('报告异常')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '人工调分说明' })).toHaveTextContent('无');
     view.unmount();
     document.querySelectorAll('.ant-modal-root').forEach(node => node.remove());
+  });
+
+  it('主管已公示详情展示分项封顶和经 HR 通过的目标及临时任务调整', async () => {
+    await seedPublishedPeriod();
+    const state = loadKpiDemo();
+    const employee = state.periods['2026-11'].employees[0];
+    employee.scoreAllocationVersion = 2;
+    employee.scores = { ...employee.scores, objective: 50, review: 10, managerAdjustment: 12, temporaryTaskDeduction: -4 };
+    employee.reviewHistory = [
+      { id: 'manager', action: '提交主管复核', actor: '陈宇璋', at: '2026-11-01T08:00:00Z', before: { attitude: 14, adjustment: 0, temporaryTaskDeduction: 0, objectiveScore: 50, reviewScore: 10, total: 88 }, proposed: { attitude: 14, adjustment: 12, temporaryTaskDeduction: -4, objectiveScore: 60, reviewScore: 6, total: 94 }, reason: '挑战目标完成，临时任务超期' },
+      { id: 'hr', action: 'HR 审核通过', actor: 'HR', at: '2026-11-02T08:00:00Z', before: { attitude: 14, adjustment: 0, temporaryTaskDeduction: 0, objectiveScore: 50, reviewScore: 10, total: 88 }, proposed: { attitude: 14, adjustment: 12, temporaryTaskDeduction: -4, objectiveScore: 60, reviewScore: 6, total: 94 }, reason: '已核实' },
+    ];
+    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    await chooseRole('主管');
+    fireEvent.click(screen.getByRole('tab', { name: /月度公示/ }));
+    fireEvent.click(screen.getByRole('button', { name: /林知夏/ }));
+    const dialog = await screen.findByRole('dialog');
+    const adjustment = within(dialog).getByRole('region', { name: '人工调分说明' });
+    expect(within(dialog).getByText('考勤')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('周月报提交')).toHaveLength(2);
+    expect(adjustment).toHaveTextContent('月度目标加减分');
+    expect(adjustment).toHaveTextContent('0.0 → 12.0 分');
+    expect(adjustment).toHaveTextContent('临时任务扣分');
+    expect(adjustment).toHaveTextContent('0.0 → -4.0 分');
+    expect(adjustment).toHaveTextContent('50.0 → 60.0 分');
+    expect(adjustment).toHaveTextContent('10.0 → 6.0 分');
+    expect(adjustment).toHaveTextContent('挑战目标完成，临时任务超期');
   });
 
   it('主管复核时间范围外，月度公示不显示待复核入口', async () => {
@@ -194,6 +229,54 @@ describe('绩效考核公示', () => {
       if (name === '月度目标') expect(await screen.findByRole('row', { name: /林知夏/ })).toBeInTheDocument();
       else expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
     }
+  });
+
+  it('员工原始数据四类均仅展示本人且不可同步，周月报不显示状态和修正入口', async () => {
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    await chooseRole('员工');
+    fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
+
+    expect(screen.queryByPlaceholderText('搜索员工姓名')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('筛选部门')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /同步数据/ })).not.toBeInTheDocument();
+    for (const name of ['月度目标', '考勤与请假', '额外工作投入', '周月报']) {
+      fireEvent.click(screen.getByRole('tab', { name }));
+      expect(await screen.findByRole('row', { name: /林知夏/ })).toBeInTheDocument();
+      expect(screen.queryByRole('row', { name: /周予安/ })).not.toBeInTheDocument();
+      if (name === '周月报') {
+        expect(screen.queryByRole('columnheader', { name: '数据状态' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('columnheader', { name: '绩效修正记录' })).not.toBeInTheDocument();
+      }
+    }
+  });
+
+  it('员工公示仅解释 HR 已通过的主管调分，历史缺失说明不伪造原因', async () => {
+    await seedPublishedPeriod();
+    const state = loadKpiDemo();
+    const employee = state.periods['2026-11'].employees[0];
+    employee.scores.managerAdjustment = -2;
+    employee.reviewHistory = [
+      { id: 'submitted', action: '提交主管复核', actor: '陈宇璋', at: '2026-11-01T08:00:00Z', before: { attitude: 0, adjustment: 0, total: 80 }, proposed: { attitude: 10, adjustment: -2, total: 88 }, reason: '目标延期' },
+      { id: 'approved', action: 'HR 审核通过', actor: 'HR', at: '2026-11-02T08:00:00Z', before: { attitude: 0, adjustment: 0, total: 80 }, proposed: { attitude: 10, adjustment: -2, total: 88 }, reason: '目标延期' },
+      { id: 'draft', action: '提交主管复核', actor: '陈宇璋', at: '2026-11-03T08:00:00Z', before: { attitude: 10, adjustment: -2, total: 88 }, proposed: { attitude: 10, adjustment: -5, total: 85 }, reason: '不应显示的草稿' },
+    ];
+    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
+    const view = render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    await chooseRole('员工');
+    const adjustment = screen.getByRole('region', { name: '人工调分说明' });
+    expect(adjustment).toHaveTextContent('有调整');
+    expect(adjustment).toHaveTextContent('0.0 → -2.0 分');
+    expect(adjustment).toHaveTextContent('目标延期');
+    expect(adjustment).toHaveTextContent('陈宇璋');
+    expect(adjustment).toHaveTextContent('HR 审核通过');
+    expect(adjustment).not.toHaveTextContent('不应显示的草稿');
+
+    view.unmount();
+    employee.reviewHistory = [];
+    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    await chooseRole('员工');
+    expect(screen.getByRole('region', { name: '人工调分说明' })).toHaveTextContent('历史评分未记录调整依据');
   });
 
   it('HR 在汇总复核中处理申诉，原始来源不变且修正记录关联可追溯', async () => {

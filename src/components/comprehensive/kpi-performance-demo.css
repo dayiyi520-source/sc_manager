@@ -82,6 +82,17 @@
 .kpi-detail-dimensions b small { color: var(--text-muted); font-size: 9px; font-weight: 400; }
 .kpi-detail-bar { height: 3px; overflow: hidden; border-radius: 2px; background: var(--border-main); }
 .kpi-detail-bar i { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.kpi-employee-adjustment { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-main); border-radius: 6px; background: var(--bg-surface); }
+.kpi-employee-adjustment-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.kpi-employee-adjustment-head h3 { margin: 0; color: var(--text-primary); font-size: 14px; font-weight: 600; }
+.kpi-employee-adjustment-head strong { color: var(--text-primary); font-size: 14px; font-variant-numeric: tabular-nums; }
+.kpi-employee-adjustment-head .is-negative { color: var(--danger); }
+.kpi-employee-adjustment-head .is-positive { color: var(--success); }
+.kpi-employee-adjustment-record { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border-main); font-size: 12px; overflow-wrap: anywhere; }
+.kpi-employee-adjustment-record > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.kpi-employee-adjustment-record b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.kpi-employee-adjustment-record p, .kpi-employee-adjustment-empty { margin: 0; color: var(--text-body); line-height: 20px; }
+.kpi-employee-adjustment-record small { color: var(--text-muted); line-height: 18px; }
 .kpi-detail-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--border-main); border-radius: 6px; background: var(--border-main); }
 .kpi-detail-sources > div { display: grid; gap: 4px; min-width: 0; padding: 9px; background: var(--bg-surface); }
 .kpi-detail-sources b { color: var(--text-primary); font-size: 12px; }
@@ -250,7 +261,7 @@
 .kpi-rule-line { display: flex; align-items: center; gap: 9px; margin-top: 10px; color: var(--text-muted); font-size: 10px; }
 .kpi-rule-line b { margin-right: 14px; color: var(--text-body); font-weight: 500; }
 .kpi-manager-form { display: grid; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-main); }
-.kpi-manager-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kpi-manager-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .kpi-manager-fields label, .kpi-reason-label { display: grid; gap: 6px; color: var(--text-muted); font-size: 11px; }
 .kpi-manager-form > .ant-btn { justify-self: end; }
 .kpi-hr-review-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border-main)); border-radius: 6px; background: color-mix(in srgb, var(--primary) 7%, var(--bg-surface)); }
@@ -298,3 +309,4 @@
 .kpi-okr-adjustments span{flex:1;min-width:160px;overflow-wrap:anywhere}
 .kpi-okr-entry .ant-select{min-width:160px;max-width:100%}
 .kpi-okr-entry .ant-input{flex:1;min-width:220px}
+@media (max-width: 760px) { .kpi-manager-fields { grid-template-columns: 1fr; } }
