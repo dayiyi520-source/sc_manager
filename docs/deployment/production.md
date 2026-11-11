@@ -30,7 +30,7 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-最近成功发布：2026-10-28 16:39:20（北京时间）；发布编号 `20261028T083920Z`；源码提交 `a150096973d3457d98be88ffd786db254c5f75d3`；发布目录 `/opt/sc-manager-frontend/releases/20261028T083920Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261028T083920Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
+最近成功发布：2026-11-11 14:58:03（北京时间）；发布编号 `20261111T065803Z`；源码提交 `054466f5bc3db3d12129a772e7fcd68e0fc8e96d`；发布目录 `/opt/sc-manager-frontend/releases/20261111T065803Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261111T065803Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
@@ -40,6 +40,12 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 上次已核实的发布：20261026T063816Z，源码 bbc9203。
 
 ## 最近成功发布
+
+- 发布时间：2026-11-11 14:58:03（北京时间）；发布编号 `20261111T065803Z`；发布源码 `054466f5bc3db3d12129a772e7fcd68e0fc8e96d`，分支 `project-frontend`。
+- 发布内容：售前中心、友商管理界面与绩效逐员工复核；重部署保留线上共享 Mock 数据。使用已推送源码的隔离快照构建，快照中的目标状态和产研模板取自发布前线上读取结果，仓库本地样例未覆盖服务器。
+- 发布前定向回归 75 项中 74 项通过，1 项产品拖拽测试在并行负载下超时，单独复跑 5 项全通过；类型检查、专用发布构建和新增共享数据保护测试均通过。PRD 校验仍受既有禁词及登记数量问题阻断。
+- 公网发布清单、专属 Mock 健康接口、友商、售前和绩效直达路由均通过；两份共享数据发布前后 SHA-256 完全一致：目标状态 `ca49fe26611733b64c1eb14aef5cf415318adc7023e62a6a841e67eff4b94a92`，产研模板 `a7197372e78d437e63a045753d784e6e7116e0542b5cce9ff4611c0e8d1aa9ad`。
+- 浏览器使用 1920×1080 页面视口验收友商和售前入口，无脚本错误或横向溢出。回滚使用本次备份目录的 `previous-target.txt` 切回旧版 `dist`，并调用本次发布目录 `mock-service/setup.py --rollback` 恢复服务、路由与备份数据；不要删除其他应用或数据库。
 
 - 发布时间：2026-10-28 16:39:20（北京时间）；发布编号 `20261028T083920Z`；发布源码 `a150096973d3457d98be88ffd786db254c5f75d3`，分支 `project-frontend`。
 - 发布内容：售前任务五类类型及关联必填规则；我的待办四指标、十条列表、审批标签、代理商协同中心；已读次数及最近时间；协同事项整体验收反馈、产品需求转产品字段与日期联动、仅记录手动完成；其他协同新增数据支持并默认匹配鲍研，允许手动改选。
