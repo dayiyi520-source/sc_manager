@@ -1,5 +1,5 @@
 {
-  "revision": 108,
+  "revision": 119,
   "okrRecords": [
     { "id": "kpi-demo-department-product-2026-10", "kind": "objective", "ownerId": "kpi-manager-product", "periodKey": "2026-10", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "产品部重点方案交付", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-department-kr-product-10", "title": "重点方案评审通过", "weight": 100, "progress": 91 }] } },
     { "id": "kpi-demo-department-research-2026-10", "kind": "objective", "ownerId": "kpi-manager-research", "periodKey": "2026-10", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "研发部版本稳定交付", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-department-kr-research-10", "title": "版本迭代与缺陷修复", "weight": 100, "progress": 86 }] } },
@@ -2519,7 +2519,7 @@
                     "plannedEndDate": "2026-10-31"
                   }
                 ],
-                "businessObject": "师创云���台",
+                "businessObject": "������������������������创云���台",
                 "version": "V1.1.0",
                 "stage": "产品设计",
                 "assigneeIds": [
@@ -5126,8 +5126,8 @@
           },
           {
             "workId": "task:4e6a513a-58a6-487a-a890-16aa53d3781e",
-            "title": "测试用例编写：研修课程目录与学习路径",
-            "status": "待测试",
+            "title": "测试用例编写：研修课程目录与����习路径",
+            "status": "待测��",
             "workType": "task",
             "sourceLabel": "师创砺知堂 / 师创砺知堂 V1.0.0",
             "result": "",
@@ -5153,7 +5153,7 @@
           },
           {
             "workId": "task:bde05e56-800e-425d-a68f-467d70d6eba7",
-            "title": "版本兼容性验��� 1",
+            "title": "������容性验��� 1",
             "status": "待测试",
             "workType": "task",
             "sourceLabel": "省级项目管理平台 / 省级项目管理平台 V1.1.0",
@@ -5172,10 +5172,12 @@
       "kind": "review",
       "ownerId": "user-product",
       "periodKey": "2026-10-12/2026-10-18",
-      "status": "draft",
-      "version": 2,
+      "status": "submitted",
+      "version": 4,
       "createdAt": "2026-10-15T02:20:39.228Z",
       "payload": {
+        "reviewTemplateSnapshot": null,
+        "reviewTemplateValues": {},
         "title": "2026年第 41 周 (10.12 - 10.18)—产品规划部",
         "startDate": "2026-10-12",
         "endDate": "2026-10-18",
@@ -5184,319 +5186,31 @@
         "selfScore": 90,
         "summary": "",
         "nextWeekPlan": "",
-        "syncKrProgress": true,
-        "krReviews": [
+        "departmentReviewExclusions": [
           {
-            "objectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
-            "objectiveTitle": "产研目标测试",
-            "keyResultId": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
-            "keyResultTitle": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
-            "previousProgress": 0,
-            "currentProgress": 10,
-            "health": "normal",
-            "achievement": "",
-            "blocker": "",
-            "nextPlan": "",
-            "workIds": [],
-            "detailRows": [
-              {
-                "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                "name": "教师教学档案袋",
-                "version": "V1.1.0",
-                "stage": "产品设计",
-                "plannedStartDate": "2026-10-14",
-                "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
-              },
-              {
-                "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                "name": "教师教学档案袋",
-                "version": "V1.2.0",
-                "stage": "产品设计",
-                "plannedStartDate": "2026-10-22",
-                "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
-              },
-              {
-                "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                "name": "教师教学档案袋",
-                "version": "V1.0.0",
-                "stage": "产品设计",
-                "plannedStartDate": "2026-10-24",
-                "plannedEndDate": "2026-10-31",
-                "productLineId": "72685385-263d-40f5-b90e-55f815f71a83"
-              },
-              {
-                "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
-                "name": "产教融合平台",
-                "version": "V1.1.0",
-                "stage": "产品设计",
-                "plannedStartDate": "2026-10-21",
-                "plannedEndDate": "2026-10-22",
-                "productLineId": "9567cbd9-56f8-4e61-ac49-422664c5c08e"
-              }
-            ],
-            "contributors": [
-              {
-                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
-                "authorName": "毛景强",
-                "detailId": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                "previousProgress": 0,
-                "currentProgress": 50,
-                "submitted": true
-              },
-              {
-                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
-                "authorName": "毛景强",
-                "detailId": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                "previousProgress": 0,
-                "currentProgress": 50,
-                "submitted": true
-              },
-              {
-                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
-                "authorName": "毛景强",
-                "detailId": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                "previousProgress": 0,
-                "currentProgress": 20,
-                "submitted": true
-              },
-              {
-                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
-                "authorName": "毛景强",
-                "detailId": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                "previousProgress": 0,
-                "currentProgress": 0,
-                "submitted": false
-              },
-              {
-                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
-                "authorName": "毛景强",
-                "detailId": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                "previousProgress": 0,
-                "currentProgress": 0,
-                "submitted": false
-              },
-              {
-                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
-                "authorName": "毛景强",
-                "detailId": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                "previousProgress": 0,
-                "currentProgress": 0,
-                "submitted": false
-              },
-              {
-                "authorId": "user-product",
-                "authorName": "陈宇璋",
-                "detailId": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                "previousProgress": 0,
-                "currentProgress": 0,
-                "submitted": true
-              },
-              {
-                "authorId": "user-product",
-                "authorName": "陈宇璋",
-                "detailId": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                "previousProgress": 0,
-                "currentProgress": 0,
-                "submitted": true
-              },
-              {
-                "authorId": "user-product",
-                "authorName": "陈宇璋",
-                "detailId": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                "previousProgress": 0,
-                "currentProgress": 0,
-                "submitted": true
-              },
-              {
-                "authorId": "user-product",
-                "authorName": "陈宇璋",
-                "detailId": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
-                "previousProgress": 0,
-                "currentProgress": 0,
-                "submitted": true
-              }
-            ],
-            "detailProgress": [
-              {
-                "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                "previousProgress": 0,
-                "currentProgress": 16.7
-              },
-              {
-                "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                "previousProgress": 0,
-                "currentProgress": 16.7
-              },
-              {
-                "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                "previousProgress": 0,
-                "currentProgress": 6.7
-              },
-              {
-                "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
-                "previousProgress": 0,
-                "currentProgress": 0
-              }
-            ],
-            "supervisorJudgment": "",
-            "employeeReviewSnapshots": [
-              {
-                "id": "okr-1792029544420-jpzre",
-                "authorId": "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4",
-                "authorName": "毛景强",
-                "title": "[周报] 2026年第 41 周 (10.12 - 10.18)",
-                "startDate": "2026-10-12",
-                "endDate": "2026-10-18",
-                "status": "submitted",
-                "krReviews": [
-                  {
-                    "objectiveId": "9f2ca790-c91b-45d6-b240-b8aae2a4e6cd",
-                    "objectiveTitle": "按期完成3个产品版本迭代计划 · 达到对应的验收阶段",
-                    "keyResultId": "4204baf4-dd9c-45a5-b1d4-a30d550569a1",
-                    "keyResultTitle": "测试一下审核",
-                    "previousProgress": 0,
-                    "currentProgress": 40,
-                    "health": "risk",
-                    "achievement": "",
-                    "blocker": "测试测试测试",
-                    "nextPlan": "",
-                    "workIds": [
-                      "task:2b65d061-2484-4cd7-b841-4005524b0422",
-                      "task:06d9d899-56fc-4d2c-959c-4e033f75685a"
-                    ],
-                    "detailProgress": [
-                      {
-                        "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                        "previousProgress": 0,
-                        "currentProgress": 50
-                      },
-                      {
-                        "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                        "previousProgress": 0,
-                        "currentProgress": 50
-                      },
-                      {
-                        "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                        "previousProgress": 0,
-                        "currentProgress": 20
-                      }
-                    ],
-                    "executionHealth": "风险",
-                    "detailRows": [
-                      {
-                        "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                        "name": "师创云平台",
-                        "version": "V1.1.0",
-                        "stage": "产品设计",
-                        "plannedStartDate": "2026-10-14",
-                        "plannedEndDate": "2026-10-31"
-                      },
-                      {
-                        "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                        "name": "师创云平台",
-                        "version": "V1.2.0",
-                        "stage": "产品设计",
-                        "plannedStartDate": "2026-10-22",
-                        "plannedEndDate": "2026-10-31"
-                      },
-                      {
-                        "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                        "name": "师创云平台",
-                        "version": "V1.0.0",
-                        "stage": "产品设计",
-                        "plannedStartDate": "2026-10-24",
-                        "plannedEndDate": "2026-10-31"
-                      }
-                    ]
-                  }
-                ],
-                "assistance": [],
-                "items": [
-                  {
-                    "workId": "task:2b65d061-2484-4cd7-b841-4005524b0422",
-                    "title": "���试用例编写：统一身份认证与组织同步",
-                    "status": "待测试",
-                    "workType": "task",
-                    "sourceLabel": "师创云平台 / 师创云平台 V1.0.0",
-                    "result": "",
-                    "impact": ""
-                  },
-                  {
-                    "workId": "task:06d9d899-56fc-4d2c-959c-4e033f75685a",
-                    "title": "设计：应用中心与单点登录",
-                    "status": "设计中",
-                    "workType": "task",
-                    "sourceLabel": "师创云平台 / 师创云平台 V1.1.0",
-                    "result": "",
-                    "impact": ""
-                  }
-                ]
-              }
-            ],
-            "supervisorProgress": [
-              {
-                "id": "c0b2059d-ce89-4e76-8dec-af12487eae9a",
-                "currentProgress": 0
-              },
-              {
-                "id": "486d7503-f3bf-47b9-80c8-a2966ece8a06",
-                "currentProgress": 0
-              },
-              {
-                "id": "ba86cab3-59a7-4f56-8b8b-6094d52c38c3",
-                "currentProgress": 0
-              },
-              {
-                "id": "81cd58df-bf8f-4211-82cb-e7cf0c23835c",
-                "currentProgress": 0
-              }
-            ]
+            "employeeId": "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
+            "employeeName": "王佳乐",
+            "reason": "测试"
           },
           {
-            "objectiveId": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
-            "objectiveTitle": "产研目标测试",
-            "keyResultId": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
-            "keyResultTitle": "其他工作支持 · 100%响应",
-            "previousProgress": 0,
-            "currentProgress": 0,
-            "health": "normal",
-            "achievement": "",
-            "blocker": "",
-            "nextPlan": "",
-            "workIds": [],
-            "detailRows": [],
-            "contributors": [
-              {
-                "authorId": "user-product",
-                "authorName": "陈宇璋",
-                "detailId": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
-                "previousProgress": 0,
-                "currentProgress": 0,
-                "submitted": true
-              }
-            ],
-            "detailProgress": [
-              {
-                "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
-                "previousProgress": 0,
-                "currentProgress": 0
-              }
-            ],
-            "supervisorJudgment": "",
-            "employeeReviewSnapshots": [],
-            "supervisorProgress": [
-              {
-                "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
-                "currentProgress": 0
-              }
-            ]
+            "employeeId": "558f155c-51ed-4802-8a85-e3c64a31a422",
+            "employeeName": "朱金星",
+            "reason": "测试"
+          },
+          {
+            "employeeId": "b63dcfc1-12cf-44c6-9939-c230de30e2c8",
+            "employeeName": "王建",
+            "reason": "测试"
+          },
+          {
+            "employeeId": "user-product-member",
+            "employeeName": "毛景强",
+            "reason": "测试"
           }
         ],
-        "departmentObjectiveVersions": {
-          "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc": 14
-        },
+        "syncKrProgress": false,
+        "krReviews": [],
+        "departmentObjectiveVersions": {},
         "departmentContentSnapshots": [
           {
             "id": "okr-1792029544420-jpzre",
@@ -5673,7 +5387,7 @@
               },
               {
                 "workId": "task:bde05e56-800e-425d-a68f-467d70d6eba7",
-                "title": "版本兼容性验证 1",
+                "title": "������容性验��� 1",
                 "status": "待测试",
                 "workType": "task",
                 "sourceLabel": "省级项目管理平台 / 省级项目管理平台 V1.1.0",
@@ -5716,30 +5430,7 @@
             ]
           }
         ],
-        "objectiveSnapshots": [
-          {
-            "id": "ff6c94fc-2ea1-4170-86d3-6e5995bc0ebc",
-            "period": "2026-10",
-            "payload": {
-              "title": "产研目标测试",
-              "weight": 100,
-              "keyResults": [
-                {
-                  "id": "0cb6a557-0413-41e7-b892-42706ee4e0ad",
-                  "title": "按期完成4个产品版本迭代计划 · 达到对应的验收阶段",
-                  "weight": 80,
-                  "progress": 10
-                },
-                {
-                  "id": "2fab56e5-8edc-47fb-be6a-a2c80dc6f196",
-                  "title": "其他工作支持 · 100%响应",
-                  "weight": 20,
-                  "progress": 0
-                }
-              ]
-            }
-          }
-        ],
+        "objectiveSnapshots": [],
         "knowledgeEntries": [],
         "helpNeeded": "",
         "assistance": [],
@@ -5750,15 +5441,19 @@
           "notes": {}
         },
         "items": []
-      }
+      },
+      "submittedAt": "2026-10-17T09:49:20.091Z",
+      "viewedBy": [
+        "user-admin"
+      ]
     },
     {
       "id": "okr-1792031398424-aaay8",
       "kind": "review",
       "ownerId": "user-product",
       "periodKey": "2026-10-01/2026-10-31",
-      "status": "draft",
-      "version": 1,
+      "status": "deleted",
+      "version": 2,
       "createdAt": "2026-10-15T02:29:58.424Z",
       "payload": {
         "title": "2026年第10月 部门月报-产品规划部",
@@ -6229,7 +5924,9 @@
           "collaborationCount": 0,
           "totalHours": 0
         }
-      }
+      },
+      "deletedAt": "2026-10-17T06:18:27.494Z",
+      "deletedBy": "user-product"
     },
     {
       "id": "demo-month-2026-10-user-admin",
@@ -6237,7 +5934,7 @@
       "ownerId": "user-admin",
       "periodKey": "2026-10",
       "status": "active",
-      "version": 0,
+      "version": 2,
       "createdAt": "2026-10-08T09:11:30.775Z",
       "payload": {
         "title": "推动季度重点项目按计划交付",
@@ -6267,7 +5964,10 @@
               "user-admin"
             ]
           }
-        ]
+        ],
+        "alignments": [],
+        "note": "",
+        "changeReason": "测试"
       }
     },
     {
@@ -6593,7 +6293,8 @@
                 "targetStage": "试运行",
                 "assigneeIds": [
                   "48bfbac2-3a1c-4d2a-9c6e-15a5f531aca4"
-                ]
+                ],
+                "productLineId": "32860365-6bf3-4c59-b193-9a49f0b73930"
               }
             ],
             "assigneeIds": [
@@ -7880,6 +7581,342 @@
         "changeReason": "",
         "note": ""
       }
+    },
+    {
+      "id": "77082b84-b192-4eb9-a9af-6df3ae3764a6",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-17T02:42:48.343Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+        "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全��积压迭代需求。",
+        "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+        "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+        "sourceVersion": 3,
+        "alignments": [
+          {
+            "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "b6625e23-33ed-40cc-aca4-8ddea0d5cf67",
+            "title": "",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "product",
+            "deadline": "2026-10-31",
+            "details": []
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+        "objectiveTemplateKrTypes": [
+          "product",
+          "support"
+        ],
+        "changeReason": "",
+        "note": ""
+      }
+    },
+    {
+      "id": "3e70f6b8-1746-4e83-9804-fdc070ba019c",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-17T02:42:50.760Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "依托标准流程，在约定时限内闭环上下游协同事项；按时输出培训资料、组织产品赋能培训，建立协同规则、流程和边界，保障上下游业务平稳推进。",
+        "sourceTitle": "明确跨部门交付里程碑",
+        "sourceObjectiveId": "demo-month-2026-10-user-admin",
+        "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+        "sourceVersion": 0,
+        "alignments": [
+          {
+            "parentObjectiveId": "demo-month-2026-10-user-admin",
+            "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "a72474cb-c716-44e7-ae01-d155f1fd5c0a",
+            "title": "",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "delivery",
+            "deadline": "2026-10-31",
+            "details": []
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "2475a064-2465-4b05-a38e-85be7c1188fa",
+        "objectiveTemplateKrTypes": [
+          "delivery",
+          "support"
+        ],
+        "changeReason": "",
+        "note": ""
+      }
+    },
+    {
+      "id": "dc6dad21-3429-4cfc-919f-8a5c419e7a7f",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "deleted",
+      "createdAt": "2026-10-17T02:42:51.182Z",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "按时制定月度/季度版本计划，管控版本范围与里程碑；保障迭代节奏稳定，重点需求按期推进、风险及时暴露，持续推动产品迭代升级",
+        "sourceTitle": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+        "sourceObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+        "sourceKrId": "289581a0-399a-41ff-acf6-4f4557efa36d",
+        "sourceVersion": 3,
+        "alignments": [
+          {
+            "parentObjectiveId": "e9b7e604-6eaa-401a-acb1-47e77704fd21",
+            "parentKeyResultId": "289581a0-399a-41ff-acf6-4f4557efa36d"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "202dd8e9-ee14-482d-9271-a54982f98f3b",
+            "title": "",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "support",
+            "deadline": "2026-10-31"
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "204c7623-fc37-4af9-9779-b2790f7c6636",
+        "objectiveTemplateKrTypes": [
+          "support"
+        ],
+        "changeReason": "",
+        "note": ""
+      }
+    },
+    {
+      "id": "0bca40b3-507e-4795-8c1a-faa41b58ed15",
+      "kind": "objective",
+      "ownerId": "user-product",
+      "periodKey": "2026-10",
+      "status": "active",
+      "createdAt": "2026-10-20T06:37:05.797Z",
+      "version": 2,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "assigned",
+        "inherited": false,
+        "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+        "sourceTitle": "明确跨部门交付里程碑",
+        "sourceObjectiveId": "demo-month-2026-10-user-admin",
+        "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+        "sourceVersion": 2,
+        "alignments": [
+          {
+            "parentObjectiveId": "demo-month-2026-10-user-admin",
+            "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+          }
+        ],
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "1be08a98-0ae8-4361-9e9b-02fbbfc5d5c6",
+            "title": "测试 · 测试",
+            "weight": 100,
+            "progress": 0,
+            "structureType": "support",
+            "deadline": "2026-10-31",
+            "action": "测试",
+            "result": "测试",
+            "assigneeIds": [
+              "user-product"
+            ],
+            "plannedDeadline": "2026-10-31"
+          }
+        ],
+        "objectiveType": "target",
+        "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+        "objectiveTemplateKrTypes": [
+          "product",
+          "support"
+        ],
+        "changeReason": "",
+        "note": "",
+        "plannedDeadline": "2026-10-31",
+        "sourceWithdrawalAcknowledged": false
+      },
+      "changeRequest": {
+        "id": "d24daced-b58f-47fc-b5ec-5a9fa43ec0c1",
+        "status": "approved",
+        "purpose": "initial",
+        "reviewerId": "user-admin",
+        "reason": "自主目标首次提交",
+        "payload": {
+          "goalModelVersion": 2,
+          "goalLevel": "department",
+          "origin": "assigned",
+          "inherited": false,
+          "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+          "sourceTitle": "明确跨部门交付里程碑",
+          "sourceObjectiveId": "demo-month-2026-10-user-admin",
+          "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+          "sourceVersion": 1,
+          "alignments": [
+            {
+              "parentObjectiveId": "demo-month-2026-10-user-admin",
+              "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+            }
+          ],
+          "weight": 100,
+          "deadline": "2026-10-31",
+          "keyResults": [
+            {
+              "id": "1be08a98-0ae8-4361-9e9b-02fbbfc5d5c6",
+              "title": "测试 · 测试",
+              "weight": 100,
+              "progress": 0,
+              "structureType": "support",
+              "deadline": "2026-10-31",
+              "action": "测试",
+              "result": "测试",
+              "assigneeIds": [
+                "user-product"
+              ]
+            }
+          ],
+          "objectiveType": "target",
+          "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+          "objectiveTemplateKrTypes": [
+            "product",
+            "support"
+          ],
+          "changeReason": "",
+          "note": ""
+        },
+        "baseVersion": 0,
+        "requestedAt": "2026-10-20T06:37:05.797Z",
+        "reviewedAt": "2026-10-20T06:37:13.310Z",
+        "feedback": ""
+      },
+      "changeHistory": [
+        {
+          "id": "d24daced-b58f-47fc-b5ec-5a9fa43ec0c1",
+          "status": "approved",
+          "purpose": "initial",
+          "reviewerId": "user-admin",
+          "reason": "自主目标首次提交",
+          "payload": {
+            "goalModelVersion": 2,
+            "goalLevel": "department",
+            "origin": "assigned",
+            "inherited": false,
+            "title": "产品方案、原型设计按期交付率>90%，重大项目无无故延期；PRD二次评审通过率>80%，迭代内非紧急缺陷类需求变更率<10%，产品设计造成下游返工率<8%。",
+            "sourceTitle": "明确跨部门交付里程碑",
+            "sourceObjectiveId": "demo-month-2026-10-user-admin",
+            "sourceKrId": "demo-month-2026-10-user-admin-kr-1",
+            "sourceVersion": 1,
+            "alignments": [
+              {
+                "parentObjectiveId": "demo-month-2026-10-user-admin",
+                "parentKeyResultId": "demo-month-2026-10-user-admin-kr-1"
+              }
+            ],
+            "weight": 100,
+            "deadline": "2026-10-31",
+            "keyResults": [
+              {
+                "id": "1be08a98-0ae8-4361-9e9b-02fbbfc5d5c6",
+                "title": "测试 · 测试",
+                "weight": 100,
+                "progress": 0,
+                "structureType": "support",
+                "deadline": "2026-10-31",
+                "action": "测试",
+                "result": "测试",
+                "assigneeIds": [
+                  "user-product"
+                ]
+              }
+            ],
+            "objectiveType": "target",
+            "objectiveTitleTemplateId": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
+            "objectiveTemplateKrTypes": [
+              "product",
+              "support"
+            ],
+            "changeReason": "",
+            "note": ""
+          },
+          "baseVersion": 0,
+          "requestedAt": "2026-10-20T06:37:05.797Z",
+          "reviewedAt": "2026-10-20T06:37:13.310Z",
+          "feedback": ""
+        }
+      ]
+    },
+    {
+      "id": "ebe4f4f5-9bad-430d-9f14-7d36fecf03ab",
+      "kind": "objective",
+      "ownerId": "user-admin",
+      "periodKey": "2026-11",
+      "status": "active",
+      "createdAt": "2026-11-10T01:09:22.235Z",
+      "version": 0,
+      "payload": {
+        "title": "测试",
+        "goalModelVersion": 2,
+        "goalLevel": "company",
+        "inherited": false,
+        "changeReason": "",
+        "objectiveType": "target",
+        "alignments": [],
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "note": "",
+        "keyResults": [
+          {
+            "id": "071bbf6a-adc7-4073-a956-648a926dfc15",
+            "title": "测试",
+            "weight": 100,
+            "progress": 0,
+            "deadline": "2026-11-30",
+            "assigneeIds": [
+              "user-product"
+            ],
+            "plannedDeadline": "2026-11-30"
+          }
+        ],
+        "plannedDeadline": "2026-11-30"
+      }
     }
   ],
   "okrPeople": [
@@ -8216,81 +8253,6 @@
     },
     "templates": [
       {
-        "department": "产品规划部",
-        "type": "product",
-        "fields": [
-          "目标内容",
-          "关联产品",
-          "关键节点",
-          "动作",
-          "截止日期",
-          "权重"
-        ],
-        "departments": [
-          "产品规划部",
-          "交互设计部",
-          "软件研发部",
-          "研发一组"
-        ],
-        "stages": [
-          "产品设计",
-          "UI设计",
-          "产品开发",
-          "测试验收",
-          "上线运维"
-        ]
-      },
-      {
-        "department": "产品规划部",
-        "departments": [
-          "产品规划部",
-          "交互设计部",
-          "软件研发部",
-          "研发一组"
-        ],
-        "type": "support",
-        "fields": [],
-        "types": []
-      },
-      {
-        "department": "产品规划部",
-        "departments": [
-          "产品规划部",
-          "交互设计部",
-          "软件研发部",
-          "研发一组"
-        ],
-        "type": "delivery",
-        "fields": [],
-        "stages": [
-          "开始",
-          "进行",
-          "结束"
-        ]
-      },
-      {
-        "department": "师生服务交付中心",
-        "type": "delivery",
-        "fields": [
-          "目标内容",
-          "关联项目",
-          "关键节点",
-          "动作",
-          "截止日期",
-          "权重"
-        ],
-        "departments": [
-          "师生服务交付中心",
-          "项目管理交付中心",
-          "数据应用部"
-        ],
-        "stages": [
-          "开始",
-          "进行",
-          "结束"
-        ]
-      },
-      {
         "department": "人力行政部",
         "type": "support",
         "fields": [
@@ -8354,7 +8316,7 @@
       "selfSupervisor": "auto",
       "exemptIds": []
     },
-    "version": 51,
+    "version": 68,
     "objectiveTitleTemplates": [
       {
         "id": "9f8e2c4c-d03e-4876-8f2b-2eeb8d7accd0",
@@ -8644,7 +8606,8 @@
             "guidance": "",
             "fields": []
           }
-        ]
+        ],
+        "enabled": true
       },
       {
         "id": "product-planning-supervisor-week-v1",
@@ -8712,32 +8675,113 @@
           }
         ],
         "enabled": true
+      },
+      {
+        "configurationVersion": 2,
+        "id": "05d343fd-d0f1-46c7-a000-e78e29204d3a",
+        "name": "测试",
+        "department": "*",
+        "audience": "employee",
+        "reportType": "week",
+        "version": 1,
+        "status": "draft",
+        "effectiveFrom": "2026-10-30",
+        "blocks": [
+          {
+            "id": "goals",
+            "title": "目标复盘",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "extra",
+            "title": "插播任务",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "assistance",
+            "title": "需要协同事项",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "knowledge",
+            "title": "知识沉淀",
+            "guidance": "",
+            "fields": []
+          },
+          {
+            "id": "3afcfe8c-e3a3-4dbe-8f37-6c212bac7dd7",
+            "title": "新板块",
+            "guidance": "",
+            "fields": [
+              {
+                "id": "5323f7ab-89c6-46ef-b51e-1b6a03c1c8f0",
+                "label": "新板块",
+                "type": "textarea",
+                "required": false,
+                "maxLength": 10000,
+                "placeholder": ""
+              }
+            ]
+          }
+        ]
       }
     ],
     "weeklyReviewCycles": [
       {
-        "id": "a1d7cbe3-a282-4710-8960-57e999aba801",
-        "title": "2026年10月第四周",
+        "id": "a67e13cf-29fc-4d51-bc91-8a5a27f9dc74",
+        "title": "2026年10月第三周",
         "month": "2026-10",
         "startDate": "2026-10-19",
         "endDate": "2026-10-25",
-        "notifyAt": "2026-10-23T09:00",
-        "deadline": "2026-10-25T00:00",
+        "notifyAt": "2026-10-19T09:00",
+        "deadline": "2026-10-26T00:00",
         "allowBackfill": true
       },
       {
-        "id": "4c664a20-14e8-4dae-8ee1-e7cd3b21c970",
-        "title": "2026年10月第五周",
+        "id": "2646ee9d-31de-451e-8751-7dd0fb65fd28",
+        "title": "2026年9月第五周",
+        "month": "2026-09",
+        "startDate": "2026-09-28",
+        "endDate": "2026-10-04",
+        "notifyAt": "2026-09-28T09:00",
+        "deadline": "2026-10-05T00:00",
+        "allowBackfill": true
+      },
+      {
+        "id": "0c9fa857-bb3c-494b-8fc6-de61728574a7",
+        "title": "2026年10月第一周",
+        "month": "2026-10",
+        "startDate": "2026-10-05",
+        "endDate": "2026-10-11",
+        "notifyAt": "2026-10-05T09:00",
+        "deadline": "2026-10-12T00:00",
+        "allowBackfill": true
+      },
+      {
+        "id": "488cd8c2-2069-43df-a80d-136453122ba4",
+        "title": "2026年10月第二周",
+        "month": "2026-10",
+        "startDate": "2026-10-12",
+        "endDate": "2026-10-18",
+        "notifyAt": "2026-10-12T09:00",
+        "deadline": "2026-10-19T00:00",
+        "allowBackfill": true
+      },
+      {
+        "id": "fe0f0cc3-4ff1-4bff-ba9c-7ed5aae5d63f",
+        "title": "2026年10月第四周",
         "month": "2026-10",
         "startDate": "2026-10-26",
         "endDate": "2026-11-01",
-        "notifyAt": "2026-10-30T09:00",
+        "notifyAt": "2026-10-26T09:00",
         "deadline": "2026-11-02T00:00",
         "allowBackfill": true
       }
     ],
     "subAdministratorIds": [
-      "1389c6c8-e275-4ed3-a981-9f6d2fc77d3a",
       "user-product"
     ],
     "permissionGrants": {
@@ -8757,14 +8801,6 @@
       ]
     },
     "supervisorIds": [
-      "1629cfd2-3d41-4cc2-b415-6aa9b3ee6b31",
-      "55b5604b-e203-49e3-ab90-059eb8fae9c9",
-      "674012ec-1573-47db-9170-12190e23a036",
-      "77387263-6110-4ea7-a6db-f0c3e5c75f7d",
-      "9a35d30f-2952-41ca-9ae0-7a2685556f7f",
-      "user-okr-supervisor",
-      "user-product",
-      "user-sales",
       "user-tech"
     ]
   }

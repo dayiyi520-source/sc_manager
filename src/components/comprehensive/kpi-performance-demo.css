@@ -109,6 +109,13 @@
 .kpi-appeal-row > div { display: grid; flex: 1; gap: 4px; min-width: 0; }
 .kpi-appeal-row b { color: var(--text-primary); font-size: 14px; }
 .kpi-appeal-row span, .kpi-appeal-row small { overflow-wrap: anywhere; color: var(--text-muted); font-size: 12px; }
+.kpi-appeal-review-modal .ant-modal-body { max-height: min(72vh, 760px); overflow-y: auto; overscroll-behavior: contain; }
+.kpi-appeal-current-result { padding-bottom: 16px; border-bottom: 1px solid var(--border-main); }
+.kpi-appeal-review-context, .kpi-appeal-correction { margin-top: 16px; }
+.kpi-appeal-review-context h3, .kpi-appeal-correction h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 14px; font-weight: 600; }
+.kpi-appeal-review-context p { margin: 0; color: var(--text-body); font-size: 13px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.kpi-appeal-correction { padding-top: 16px; border-top: 1px solid var(--border-main); }
+.kpi-appeal-correction .kpi-appeal-fields { margin: 0 0 16px; }
 .kpi-appeal-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
 .kpi-appeal-fields label, .kpi-appeal-resolution { display: grid; gap: 8px; color: var(--text-body); font-size: 12px; }
 .kpi-appeal-fields .ant-input-number { width: 100%; }
@@ -166,6 +173,15 @@
 .kpi-department-review { display: grid; gap: 10px; margin-top: 16px; padding: 14px; border: 1px solid var(--border-main); border-radius: 6px; background: var(--bg-surface-soft); }
 .kpi-department-review .kpi-section-heading h3 { margin: 0; color: var(--text-primary); font-size: 14px; }
 .kpi-department-review .kpi-section-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: 11px; }
+.kpi-review-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--border-main); border-bottom: 1px solid var(--border-main); }
+.kpi-review-values > div { display: grid; align-content: center; gap: 8px; min-width: 0; padding: 12px 16px; }
+.kpi-review-values > div + div { border-left: 1px solid var(--border-main); }
+.kpi-review-values span { color: var(--text-muted); font-size: 12px; }
+.kpi-review-values b { color: var(--text-primary); font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kpi-review-impact { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; color: var(--text-body); font-size: 12px; line-height: 20px; }
+.kpi-review-impact strong { margin-left: auto; color: var(--text-primary); font-size: 14px; }
+.kpi-review-reason { margin: 0; padding-top: 12px; border-top: 1px solid var(--border-main); color: var(--text-body); font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
+.kpi-manager-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .kpi-department-review-row { display: grid; grid-template-columns: 80px repeat(3, minmax(0, 1fr)); gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border-main); font-size: 12px; }
 .kpi-department-review-row b { color: var(--text-primary); }.kpi-department-review-row small { grid-column: 2 / -1; color: var(--text-muted); overflow-wrap: anywhere; }
 .kpi-review-actions { display: flex; gap: 8px; justify-content: flex-end; }
@@ -309,4 +325,5 @@
 .kpi-okr-adjustments span{flex:1;min-width:160px;overflow-wrap:anywhere}
 .kpi-okr-entry .ant-select{min-width:160px;max-width:100%}
 .kpi-okr-entry .ant-input{flex:1;min-width:220px}
+@media (max-width: 760px) { .kpi-review-values { grid-template-columns: 1fr; } .kpi-review-values > div + div { border-left: 0; border-top: 1px solid var(--border-main); } .kpi-review-impact strong { flex-basis: 100%; margin-left: 0; } }
 @media (max-width: 760px) { .kpi-manager-fields { grid-template-columns: 1fr; } }

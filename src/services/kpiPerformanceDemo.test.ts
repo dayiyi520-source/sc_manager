@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, gradeForScore, isMonthlyGoalLate, kpiDimensionScores, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
+import { attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, gradeForScore, isMonthlyGoalLate, kpiDimensionScores, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewEmployeeSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitEmployeeReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
 import mockOkrState from '../data/mockOkrState.json';
 import type { OkrPerson, OkrRecord } from './okrRepository';
 
@@ -277,6 +277,42 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(returned.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === 'HR 已退回')).toBe(true);
     const approved = reviewDepartmentSubmission(submitDepartmentReview(returned, '陈宇璋', '产品部'), '陈宇璋', '产品部', 'approve');
     expect(approved.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '已通过')).toBe(true);
+  });
+
+  it('submits and reviews one employee without changing unsubmitted or approved colleagues', () => {
+    const period = withOpenManagerWindow(loadKpiDemo().periods['2026-11']);
+    const [target, unsubmitted, approved] = period.employees;
+    target.managerDraft = { attitude: 10, adjustment: 12, temporaryTaskDeduction: -4, reason: '挑战任务与临时任务' };
+    approved.reviewStatus = '已通过';
+    const before = period.employees.map(employee => ({ status: employee.reviewStatus, score: scoreForEmployee(employee) }));
+
+    const submitted = submitEmployeeReview(period, target.id, target.manager);
+    expect(submitted.employees[0].reviewStatus).toBe('待 HR 审核');
+    expect(submitted.employees[1].reviewStatus).toBe(before[1].status);
+    expect(submitted.employees[2].reviewStatus).toBe('已通过');
+    expect(scoreForEmployee(submitted.employees[0])).toBe(before[0].score);
+    expect(() => submitEmployeeReview(submitted, unsubmitted.id, '其他主管')).toThrow('本人负责');
+    expect(() => reviewEmployeeSubmission(submitted, unsubmitted.id, 'return', '退回')).toThrow('尚未提交');
+
+    const returned = reviewEmployeeSubmission(submitted, target.id, 'return', '请补充事实依据');
+    expect(returned.employees[0].reviewStatus).toBe('HR 已退回');
+    expect(returned.employees[0].hrNote).toContain('请补充事实依据');
+    expect(returned.employees[1]).toEqual(submitted.employees[1]);
+    expect(returned.employees[2]).toEqual(submitted.employees[2]);
+    expect(scoreForEmployee(returned.employees[0])).toBe(before[0].score);
+
+    const resubmitted = submitEmployeeReview(returned, target.id, target.manager);
+    const accepted = reviewEmployeeSubmission(resubmitted, target.id, 'approve');
+    expect(accepted.employees[0].reviewStatus).toBe('已通过');
+    expect(kpiDimensionScores(accepted.employees[0])).toEqual({ objective: 60, review: 6 });
+    expect(scoreForEmployee(accepted.employees[0])).not.toBe(before[0].score);
+    expect(accepted.employees[0].reviewHistory?.map(record => record.action)).toEqual(['提交主管复核', 'HR 退回', '提交主管复核', 'HR 审核通过']);
+    expect(accepted.employees[1]).toEqual(period.employees[1]);
+    expect(accepted.employees[2]).toEqual(period.employees[2]);
+    const state = loadKpiDemo();
+    state.periods['2026-11'] = accepted;
+    saveKpiDemo(state);
+    expect(loadKpiDemo().periods['2026-11'].employees[0].reviewHistory).toHaveLength(4);
   });
 
   it('calculates responsibility separately from the final department coefficient', () => {

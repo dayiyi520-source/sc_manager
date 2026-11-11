@@ -229,6 +229,15 @@ export const submitDepartmentReview = (period: KpiPeriod, manager: string, depar
     ? submitManagerReview(recordReview({ ...employee, managerDraft: employee.managerDraft || { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, temporaryTaskDeduction: employee.scores.temporaryTaskDeduction ?? 0, reason: '主管确认当前评分' } }, '提交主管复核', manager, employee.managerDraft?.reason || '主管确认当前评分')) : employee) };
 };
 
+export const submitEmployeeReview = (period: KpiPeriod, employeeId: string, manager: string): KpiPeriod => {
+  if (!period.generated || period.published) throw new Error('当前月份不可提交复核');
+  if (!period.cycleSettings || !isWithinKpiWindow(period.cycleSettings.managerReview)) throw new Error('当前不在主管复核时间范围内');
+  const employee = period.employees.find(item => item.id === employeeId && item.manager === manager);
+  if (!employee) throw new Error('只能提交本人负责的员工');
+  const submitted = submitManagerReview(recordReview(employee, '提交主管复核', manager, employee.managerDraft?.reason || ''));
+  return { ...period, employees: period.employees.map(item => item.id === employeeId ? submitted : item) };
+};
+
 export const reviewDepartmentSubmission = (period: KpiPeriod, manager: string, department: string, decision: KpiReviewDecision, reason = ''): KpiPeriod => {
   if (period.published) throw new Error('已公示月份不可审核');
   const targets = period.employees.filter(employee => employee.manager === manager && employee.department === department);
@@ -236,6 +245,15 @@ export const reviewDepartmentSubmission = (period: KpiPeriod, manager: string, d
   if (decision === 'return' && !reason.trim()) throw new Error('请填写退回原因');
   return { ...period, employees: period.employees.map(employee => targets.some(target => target.id === employee.id)
     ? reviewManagerSubmission(recordReview(employee, decision === 'approve' ? 'HR 审核通过' : 'HR 退回', 'HR', decision === 'approve' ? employee.managerDraft?.reason || '确认当前评分' : reason.trim()), decision, reason) : employee) };
+};
+
+export const reviewEmployeeSubmission = (period: KpiPeriod, employeeId: string, decision: KpiReviewDecision, reason = ''): KpiPeriod => {
+  if (period.published) throw new Error('已公示月份不可审核');
+  const employee = period.employees.find(item => item.id === employeeId);
+  if (!employee) throw new Error('未找到待审核员工');
+  if (employee.reviewStatus !== '待 HR 审核') throw new Error('当前员工尚未提交 HR 审核');
+  const reviewed = reviewManagerSubmission(recordReview(employee, decision === 'approve' ? 'HR 审核通过' : 'HR 退回', 'HR', decision === 'approve' ? employee.managerDraft?.reason || '确认当前评分' : reason.trim()), decision, reason);
+  return { ...period, employees: period.employees.map(item => item.id === employeeId ? reviewed : item) };
 };
 
 export const publishKpiPeriod = (period: KpiPeriod): KpiPeriod => {

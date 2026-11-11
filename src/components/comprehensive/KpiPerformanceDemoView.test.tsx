@@ -289,7 +289,20 @@ describe('绩效考核公示', () => {
     fireEvent.click(await screen.findByText('员工申诉 · 1', { selector: '.ant-select-item-option-content' }));
     expect(screen.getAllByText('员工申诉').length).toBeGreaterThan(1);
     expect(screen.getByText('目标得分有误')).toBeInTheDocument();
+    const queue = screen.getByRole('region', { name: '员工申诉复核' });
+    expect(queue).not.toHaveTextContent('仅 HR 可见');
+    expect(queue).not.toHaveTextContent('项待处理');
+    expect(within(queue).queryByText('待处理')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '审核申诉' }));
+    const reviewDialog = await screen.findByRole('dialog');
+    const currentResult = within(reviewDialog).getByRole('region', { name: '当前绩效结果' });
+    expect(currentResult).toHaveTextContent('林知夏');
+    expect(currentResult).toHaveTextContent('考勤');
+    expect(currentResult).toHaveTextContent('周月报提交');
+    expect(currentResult).toHaveTextContent('人工调分说明');
+    expect(currentResult).toHaveTextContent('绩效系数');
+    expect(within(reviewDialog).getByRole('region', { name: '申诉内容' })).toHaveTextContent('目标得分有误');
+    expect(within(reviewDialog).getByRole('region', { name: '修正数据' })).toBeInTheDocument();
     expect(await screen.findByLabelText('申诉月度目标得分')).toBeInTheDocument();
     expect(screen.queryByLabelText('申诉出勤天数')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('申诉月度目标得分'), { target: { value: '58' } });
@@ -306,6 +319,7 @@ describe('绩效考核公示', () => {
     fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
     expect(screen.getByText('已修正')).toBeInTheDocument();
     expect(screen.getByText(/处理说明：核实目标完成情况/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '审核申诉' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
     expect(await screen.findByRole('columnheader', { name: '综合基础分' })).toBeInTheDocument();
     expect(correctedState.employees[0].approvedSourceCorrections?.[0].after.objectiveScore).toBe(58);
@@ -315,6 +329,23 @@ describe('绩效考核公示', () => {
     await chooseRole('员工');
     expect(screen.getByText('核实目标完成情况')).toBeInTheDocument();
     expect(screen.getByText('月度目标 58 / 60 分')).toBeInTheDocument();
+  });
+
+  it('HR 驳回申诉后只显示审核结果和说明，不再显示待处理或审核入口', async () => {
+    await seedPublishedPeriod();
+    submitKpiAppeal({ month: '2026-11', employeeId: 'e-01', employeeName: '林知夏', reason: '请核对周月报' });
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
+    const queue = screen.getByRole('region', { name: '员工申诉复核' });
+    expect(within(queue).getByRole('button', { name: '审核申诉' })).toBeInTheDocument();
+    expect(within(queue).queryByText('待处理')).not.toBeInTheDocument();
+    fireEvent.click(within(queue).getByRole('button', { name: '审核申诉' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('申诉处理说明'), { target: { value: '核实后维持原分' } });
+    fireEvent.click(screen.getByRole('button', { name: '驳回申诉' }));
+    await waitFor(() => expect(within(queue).getByText('已驳回')).toBeInTheDocument());
+    expect(queue).toHaveTextContent('处理说明：核实后维持原分');
+    expect(within(queue).queryByRole('button', { name: '审核申诉' })).not.toBeInTheDocument();
   });
 
   it('HR 可进入周期设置并按月保存自动公示安排', async () => {
