@@ -9,6 +9,15 @@ FILES=('okr-state.json','research-template.json')
 def run(*args,check=True): return subprocess.run(args,check=check,capture_output=True,text=True)
 def atomic(path,text):
     temporary=path.with_suffix(path.suffix+'.next');temporary.write_text(text,encoding='utf-8');os.replace(temporary,path)
+def initialize_shared_data(shared,new,uid,gid):
+    for name in FILES:
+        destination=shared/name
+        if destination.exists():
+            json.loads(destination.read_text(encoding='utf-8'))
+            continue
+        incoming=json.loads((new/'mock-data'/name).read_text(encoding='utf-8'))
+        atomic(destination,json.dumps(incoming,ensure_ascii=False,indent=2)+'\n')
+        os.chown(destination,uid,gid);os.chmod(destination,0o660)
 def rollback(root,backup):
     metadata=json.loads((backup/'mock-rollback.json').read_text())
     run('systemctl','stop',UNIT.name,check=False)
@@ -44,16 +53,7 @@ def prepare(root,new,backup,prefix,release):
         try:pwd.getpwnam('sc-manager-mock')
         except KeyError:run('useradd','--system','--no-create-home','--home-dir',str(shared),'--shell','/usr/sbin/nologin','--gid','www-data','sc-manager-mock')
         uid=pwd.getpwnam('sc-manager-mock').pw_uid;gid=grp.getgrnam('www-data').gr_gid
-        for name in FILES:
-            incoming=json.loads((new/'mock-data'/name).read_text())
-            if name=='okr-state.json' and (shared/name).exists():
-                old=json.loads((shared/name).read_text());rows={row['id']:row for row in incoming['okrRecords']}
-                for row in old['okrRecords']:
-                    source=rows.get(row['id'])
-                    if not source or row.get('version',0)>source.get('version',0):rows[row['id']]=row
-                incoming['okrRecords']=list(rows.values());incoming['revision']=max(old.get('revision',0),incoming.get('revision',0))+1
-                if old.get('okrSettings',{}).get('version',0)>incoming['okrSettings'].get('version',0):incoming['okrSettings']=old['okrSettings']
-            atomic(shared/name,json.dumps(incoming,ensure_ascii=False,indent=2)+'\n');os.chown(shared/name,uid,gid);os.chmod(shared/name,0o660)
+        initialize_shared_data(shared,new,uid,gid)
         os.chown(shared,uid,gid);os.chmod(shared,0o750)
         unit=f"""[Unit]
 Description=sc-manager-frontend file Mock persistence

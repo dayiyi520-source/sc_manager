@@ -22,11 +22,11 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 共享 Mock 数据
 
-数据库初始快照、产研任务样例编译进静态资源；最新 src/data/mockOkrState.json 和 src/data/mockResearchTemplate.json 同时上传并初始化 /opt/sc-manager-frontend/shared/mock/ 下的目标复盘及产研模板文件。目标总结设置包含在目标状态文件中。保存成功会写入共享文件，浏览器仅缓存；失败及并发旧版本提交明确提示，不显示虚假的成功。
+数据库初始快照、产研任务样例编译进静态资源；发布包中的目标复盘与产研模板样例仅在共享文件缺失时初始化 /opt/sc-manager-frontend/shared/mock/。重部署保留线上已有共享文件的原始内容，不以源码样例覆盖。目标总结设置包含在目标状态文件中。保存成功会写入共享文件，浏览器仅缓存；失败及并发旧版本提交明确提示，不显示虚假的成功。
 
 服务单元为 sc-manager-frontend-mock.service，以无登录权限的 sc-manager-mock 用户运行，只能写入本项目共享 Mock 目录及运行时目录。使用 Unix socket /run/sc-manager-frontend-mock/mock.sock，由专属 Nginx 路径 /sc-manager-frontend/api/mock/ 转发。写入仅接受本站 Origin 和 JSON，并校验格式及版本；不接受任意文件路径。该服务属于纯前端 Mock 演示，不替代正式后端的认证、租户和业务权限校验。
 
-每次发布备份原 Nginx 路由、服务单元及共享数据。目标数据更新保留服务器更高版本记录及未包含在新样例中的记录；产研模板以此次上传的最新源码样例更新。后续线上保存独立于发布目录；需把服务器共享数据同步回源码才能将线上编辑带到其他独立环境。
+每次发布备份原 Nginx 路由、服务单元及共享数据。发布前从线上读取两份共享数据，在独立源码快照中用于构建，并核对在线版本；服务器已有共享数据时只校验可读，不覆盖内容或增加修订号。后续线上保存独立于发布目录；需把服务器共享数据同步回源码才能将线上编辑带到其他独立环境。若需要把本地样例变更合并到线上，应单独走有冲突校验的业务变更流程，不借发布覆盖。
 
 ## 发布、核验与回滚
 
