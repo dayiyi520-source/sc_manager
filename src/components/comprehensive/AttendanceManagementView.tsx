@@ -16,6 +16,7 @@ import { useApp } from '../../context/AppContext';
 import { AttendanceException } from '../../types';
 import { confirmLockedAttendanceCorrection, loadAttendanceDemo, saveAttendanceDemo } from '../../services/attendanceDemo';
 import { syncAttendanceApprovals } from '../../services/approvalDemo';
+import './attendance-management.css';
 
 export const AttendanceManagementView: React.FC = () => {
   const { addToast, approvals } = useApp();
@@ -129,48 +130,36 @@ export const AttendanceManagementView: React.FC = () => {
       {/* Main Table Card */}
       <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-lg p-5 shadow-sm space-y-4">
         {/* Navigation Tabs & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-main)] pb-4">
-          <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-main)]">
+          <div className="attendance-category-tabs flex items-center gap-2 overflow-x-auto">
             <button
+              aria-pressed={activeTab === 'record'}
               onClick={() => { setActiveTab('record'); setTabFilter('ALL'); }}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'record'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`attendance-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'record' ? 'is-active' : ''}`}
             >
               <CalendarCheck className="w-3.5 h-3.5" />
               考勤明细
             </button>
             <button
+              aria-pressed={activeTab === 'leave'}
               onClick={() => { setActiveTab('leave'); setTabFilter('ALL'); }}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'leave'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`attendance-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'leave' ? 'is-active' : ''}`}
             >
               <FileText className="w-3.5 h-3.5" />
               请假申请
             </button>
             <button
+              aria-pressed={activeTab === 'overtime'}
               onClick={() => { setActiveTab('overtime'); setTabFilter('ALL'); }}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'overtime'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`attendance-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'overtime' ? 'is-active' : ''}`}
             >
               <Clock className="w-3.5 h-3.5" />
               加班记录
             </button>
             <button
+              aria-pressed={activeTab === 'exception'}
               onClick={() => { setActiveTab('exception'); setTabFilter('ALL'); }}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'exception'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`attendance-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'exception' ? 'is-active' : ''}`}
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               异常申诉
@@ -179,12 +168,9 @@ export const AttendanceManagementView: React.FC = () => {
               </span>
             </button>
             <button
+              aria-pressed={activeTab === 'schedule'}
               onClick={() => { setActiveTab('schedule'); setTabFilter('ALL'); }}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'schedule'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`attendance-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'schedule' ? 'is-active' : ''}`}
             >
               <Briefcase className="w-3.5 h-3.5" />
               排班管理

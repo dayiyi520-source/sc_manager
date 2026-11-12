@@ -21,8 +21,36 @@ beforeEach(() => {
 });
 
 describe('AttendanceManagementView', () => {
+  it('has mock records available in every attendance category tab', () => {
+    render(<AttendanceManagementView />);
+    const categories = ['考勤明细', '请假申请', '加班记录', '异常申诉', '排班管理'];
+
+    for (const label of categories) {
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(label) }));
+      if (label === '异常申诉') {
+        expect(screen.getAllByRole('button', { name: /查看处理详情|确认更正/ }).length, `${label} 应有演示记录`).toBeGreaterThan(0);
+      } else if (label === '排班管理') {
+        expect(screen.getAllByRole('heading').length, `${label} 应有演示记录`).toBeGreaterThan(0);
+      } else {
+        const rows = within(screen.getByRole('table')).getAllByRole('row');
+        expect(rows.length, `${label} 应有演示记录`).toBeGreaterThan(1);
+        expect(rows[1]).not.toHaveTextContent(/暂无匹配/);
+      }
+    }
+  });
+
   it('removes employee number and places leave department after applicant', () => {
     render(<AttendanceManagementView />);
+    const attendanceTab = screen.getByRole('button', { name: '考勤明细' });
+    expect(attendanceTab).toHaveAttribute('aria-pressed', 'true');
+    expect(attendanceTab).toHaveClass('is-active');
+    const leaveTab = screen.getByRole('button', { name: '请假申请' });
+    fireEvent.click(leaveTab);
+    expect(leaveTab).toHaveAttribute('aria-pressed', 'true');
+    expect(leaveTab).toHaveClass('is-active');
+    expect(attendanceTab).toHaveAttribute('aria-pressed', 'false');
+    expect(attendanceTab).not.toHaveClass('is-active');
+    fireEvent.click(attendanceTab);
     const attendanceTable = screen.getByRole('table');
     expect(within(attendanceTable).queryByRole('columnheader', { name: '工号' })).not.toBeInTheDocument();
     expect(within(attendanceTable).getAllByText('林知夏')).toHaveLength(2);

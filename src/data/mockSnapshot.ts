@@ -144,6 +144,30 @@ export const MOCK_APPROVALS: ApprovalFlow[] = [
     nodes: [{ title: '发起申请', approver: '唐以宁', role: '运营专员', status: 'passed', time: '2026-10-28 18:15' }, { title: '部门主管审核', approver: '毛景强', role: '部门主管', status: 'passed', time: '2026-10-29 09:16' }],
     contentDetails: { '审批主题': '10月28日补录下班卡', '异常日期': '2026-10-28', '原考勤状态': '缺卡', '审批结果': '补录下班卡 18:00', '申请说明': '审批完成时 10 月绩效已公示，等待 HR 更正确认。' },
   },
+  {
+    id: 'demo-approval-tab-pending', code: 'AP-DEMO-2026-1101', title: '周星待审批分类演示记录', type: '采购与报销',
+    applicantName: '王佳乐', applicantDept: '产品规划部', status: '待审批', submittedAt: '2026-11-10 09:20',
+    nodes: [{ title: '部门主管审核', approver: '周星', role: '前端开发工程师', status: 'current' }, { title: '财务审核', approver: '财务部', role: '财务负责人', status: 'waiting' }],
+    contentDetails: { '演示标识': '本地演示记录', '审批主题': '采购与报销分类筛选演示', '申请说明': '用于验证待我审批分类的列表展示。' },
+  },
+  {
+    id: 'demo-approval-tab-applied', code: 'AP-DEMO-2026-1102', title: '周星发起分类演示记录', type: '需求重大变更',
+    applicantName: '周星', applicantDept: '软件研发部', status: '审批中', submittedAt: '2026-11-10 10:15',
+    nodes: [{ title: '技术负责人审核', approver: '李爱剑', role: '前端开发组长', status: 'current' }, { title: '产品负责人确认', approver: '王佳乐', role: '产品经理', status: 'waiting' }],
+    contentDetails: { '演示标识': '本地演示记录', '审批主题': '我发起的分类筛选演示', '申请说明': '用于验证本人发起的审批记录展示。' },
+  },
+  {
+    id: 'demo-approval-tab-cc', code: 'AP-DEMO-2026-1103', title: '周星抄送分类演示记录', type: '合同用印审批',
+    applicantName: '赵宁', applicantDept: '研发中心', status: '审批中', ccNames: ['周星'], submittedAt: '2026-11-10 11:30',
+    nodes: [{ title: '部门主管审核', approver: '李爱剑', role: '前端开发组长', status: 'current' }, { title: '财务审核', approver: '财务部', role: '财务负责人', status: 'waiting' }],
+    contentDetails: { '演示标识': '本地演示记录', '审批主题': '抄送我的分类筛选演示', '申请说明': '用于验证抄送审批记录展示。' },
+  },
+  {
+    id: 'demo-approval-tab-reviewed', code: 'AP-DEMO-2026-1104', title: '周星已审批分类演示记录', type: '合作伙伴准入',
+    applicantName: '王佳乐', applicantDept: '产品规划部', status: '已完成', submittedAt: '2026-11-09 14:00', completedAt: '2026-11-10 13:45',
+    nodes: [{ title: '部门主管审核', approver: '周星', role: '前端开发工程师', status: 'passed', time: '2026-11-10 13:45' }],
+    contentDetails: { '演示标识': '本地演示记录', '审批主题': '我已审批分类筛选演示', '申请说明': '用于验证本人已审批记录展示。' },
+  },
 ];
 
 export const LEGACY_WORKBENCH_FEEDS = [

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, gradeForScore, isMonthlyGoalLate, kpiDimensionScores, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewEmployeeSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitEmployeeReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
+import { attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, goalAdjustmentDraft, gradeForScore, isMonthlyGoalLate, kpiDimensionScores, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewEmployeeSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitEmployeeReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
 import mockOkrState from '../data/mockOkrState.json';
 import type { OkrPerson, OkrRecord } from './okrRepository';
 
@@ -246,6 +246,21 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(kpiDimensionScores({ ...approved, scores: { ...approved.scores, managerAdjustment: -100, temporaryTaskDeduction: -100 } })).toEqual({ objective: 0, review: 0 });
     expect(kpiDimensionScores({ ...approved, scores: { ...approved.scores, managerAdjustment: 100, temporaryTaskDeduction: 0 } })).toEqual({ objective: 60, review: 10 });
     expect(() => submitManagerReview({ ...employee, managerDraft: { attitude: 10, adjustment: 0, temporaryTaskDeduction: 1, reason: '不可加分' } })).toThrow('临时任务只允许扣分');
+  });
+
+  it('retains separate goal bonus and deduction while using only their net for scoring', () => {
+    const period = withOpenManagerWindow(loadKpiDemo().periods['2026-11']);
+    const employee = period.employees[0];
+    expect(goalAdjustmentDraft({ ...employee, managerDraft: { attitude: 10, adjustment: -3, reason: '旧草稿' } })).toEqual({ bonus: 0, deduction: 3 });
+    employee.managerDraft = { attitude: 10, adjustment: 0, goalBonus: 5, goalDeduction: 5, reason: '目标有挑战成果和质量问题' };
+    const submitted = submitEmployeeReview(period, employee.id, employee.manager);
+    expect(submitted.employees[0].reviewHistory?.[0].proposed).toMatchObject({ goalBonus: 5, goalDeduction: 5, adjustment: 0 });
+    const approved = reviewEmployeeSubmission(submitted, employee.id, 'approve');
+    expect(approved.employees[0].reviewHistory?.at(-1)?.proposed).toMatchObject({ goalBonus: 5, goalDeduction: 5, adjustment: 0 });
+    expect(approved.employees[0].scores.managerAdjustment).toBe(0);
+    expect(kpiDimensionScores(approved.employees[0]).objective).toBe(employee.scores.objective);
+    expect(() => submitManagerReview({ ...employee, reviewStatus: '待主管复核', managerDraft: { ...employee.managerDraft!, goalBonus: -1 } })).toThrow('目标加分和减分不得为负');
+    expect(() => submitManagerReview({ ...employee, reviewStatus: '待主管复核', managerDraft: { ...employee.managerDraft!, adjustment: 2 } })).toThrow('请核对评分');
   });
 
   it('preserves previously published legacy totals without reallocating their adjustment', () => {

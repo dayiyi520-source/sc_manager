@@ -146,10 +146,10 @@ describe('绩效考核公示', () => {
     const state = loadKpiDemo();
     const employee = state.periods['2026-11'].employees[0];
     employee.scoreAllocationVersion = 2;
-    employee.scores = { ...employee.scores, objective: 50, review: 10, managerAdjustment: 12, temporaryTaskDeduction: -4 };
+    employee.scores = { ...employee.scores, objective: 50, review: 10, managerAdjustment: 8, temporaryTaskDeduction: -4 };
     employee.reviewHistory = [
-      { id: 'manager', action: '提交主管复核', actor: '陈宇璋', at: '2026-11-01T08:00:00Z', before: { attitude: 14, adjustment: 0, temporaryTaskDeduction: 0, objectiveScore: 50, reviewScore: 10, total: 88 }, proposed: { attitude: 14, adjustment: 12, temporaryTaskDeduction: -4, objectiveScore: 60, reviewScore: 6, total: 94 }, reason: '挑战目标完成，临时任务超期' },
-      { id: 'hr', action: 'HR 审核通过', actor: 'HR', at: '2026-11-02T08:00:00Z', before: { attitude: 14, adjustment: 0, temporaryTaskDeduction: 0, objectiveScore: 50, reviewScore: 10, total: 88 }, proposed: { attitude: 14, adjustment: 12, temporaryTaskDeduction: -4, objectiveScore: 60, reviewScore: 6, total: 94 }, reason: '已核实' },
+      { id: 'manager', action: '提交主管复核', actor: '陈宇璋', at: '2026-11-01T08:00:00Z', before: { attitude: 14, adjustment: 0, goalBonus: 0, goalDeduction: 0, temporaryTaskDeduction: 0, objectiveScore: 50, reviewScore: 10, total: 88 }, proposed: { attitude: 14, adjustment: 8, goalBonus: 12, goalDeduction: 4, temporaryTaskDeduction: -4, objectiveScore: 58, reviewScore: 6, total: 92 }, reason: '挑战目标完成，临时任务超期' },
+      { id: 'hr', action: 'HR 审核通过', actor: 'HR', at: '2026-11-02T08:00:00Z', before: { attitude: 14, adjustment: 0, goalBonus: 0, goalDeduction: 0, temporaryTaskDeduction: 0, objectiveScore: 50, reviewScore: 10, total: 88 }, proposed: { attitude: 14, adjustment: 8, goalBonus: 12, goalDeduction: 4, temporaryTaskDeduction: -4, objectiveScore: 58, reviewScore: 6, total: 92 }, reason: '已核实' },
     ];
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
@@ -160,13 +160,42 @@ describe('绩效考核公示', () => {
     const adjustment = within(dialog).getByRole('region', { name: '人工调分说明' });
     expect(within(dialog).getByText('考勤')).toBeInTheDocument();
     expect(within(dialog).getAllByText('周月报提交')).toHaveLength(2);
-    expect(adjustment).toHaveTextContent('月度目标加减分');
-    expect(adjustment).toHaveTextContent('0.0 → 12.0 分');
+    expect(adjustment).toHaveTextContent('目标加分');
+    expect(adjustment).toHaveTextContent('+12.0 分');
+    expect(adjustment).toHaveTextContent('目标减分');
+    expect(adjustment).toHaveTextContent('-4.0 分');
     expect(adjustment).toHaveTextContent('临时任务扣分');
     expect(adjustment).toHaveTextContent('0.0 → -4.0 分');
-    expect(adjustment).toHaveTextContent('50.0 → 60.0 分');
+    expect(adjustment).toHaveTextContent('50.0 → 58.0 分');
     expect(adjustment).toHaveTextContent('10.0 → 6.0 分');
     expect(adjustment).toHaveTextContent('挑战目标完成，临时任务超期');
+  });
+
+  it('HR 月度公示详情使用周月报文案并展示已批准的目标加分和减分', async () => {
+    await seedPublishedPeriod();
+    const state = loadKpiDemo();
+    const employee = state.periods['2026-11'].employees[0];
+    employee.scoreAllocationVersion = 2;
+    employee.scores.managerAdjustment = 0;
+    employee.reviewHistory = [
+      { id: 'submitted', action: '提交主管复核', actor: '陈宇璋', at: '2026-11-01T08:00:00Z', before: { attitude: 10, adjustment: 0, total: 80 }, proposed: { attitude: 10, adjustment: 0, goalBonus: 5, goalDeduction: 5, total: 80 }, reason: '挑战成果与质量扣分分别认定' },
+      { id: 'approved', action: 'HR 审核通过', actor: 'HR', at: '2026-11-02T08:00:00Z', before: { attitude: 10, adjustment: 0, total: 80 }, proposed: { attitude: 10, adjustment: 0, goalBonus: 5, goalDeduction: 5, total: 80 }, reason: '确认' },
+    ];
+    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.click(screen.getByRole('button', { name: /林知夏/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('考勤')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('周月报提交')).toHaveLength(2);
+    expect(within(dialog).queryByText('复盘总结')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('报告异常')).not.toBeInTheDocument();
+    const adjustment = within(dialog).getByRole('region', { name: '人工调分说明' });
+    expect(adjustment).toHaveTextContent('有调整');
+    expect(adjustment).toHaveTextContent('目标加分');
+    expect(adjustment).toHaveTextContent('+5.0 分');
+    expect(adjustment).toHaveTextContent('目标减分');
+    expect(adjustment).toHaveTextContent('-5.0 分');
+    expect(adjustment).toHaveTextContent('挑战成果与质量扣分分别认定');
   });
 
   it('主管复核时间范围外，月度公示不显示待复核入口', async () => {

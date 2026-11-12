@@ -73,6 +73,9 @@ export const ApprovalCenterView: React.FC = () => {
   });
 
   const pendingCount = approvals.filter((a) => pendingFor(a, currentUser.name)).length;
+  const currentNodeLabel = (flow: ApprovalFlow) => flow.status === '已完成'
+    ? '已完成'
+    : flow.nodes.find(node => node.status === 'current')?.title || '—';
 
   return (
     <ComprehensivePage title="审批管理" description="集中处理待办审批，并跟踪申请与历史记录" icon={<FileCheck className="w-5 h-5" />} hideHeader>
@@ -104,16 +107,12 @@ export const ApprovalCenterView: React.FC = () => {
       {/* Main Table Card */}
       <div className="bg-[var(--bg-surface)] border border-[var(--border-main)] rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
         {/* Navigation Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-main)] pb-4">
-          <div className="flex items-center gap-2 overflow-x-auto" role="group" aria-label="审批分类">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-main)]">
+          <div className="approval-category-tabs flex items-center gap-2 overflow-x-auto" role="group" aria-label="审批分类">
             <button
               aria-pressed={activeTab === 'pending'}
               onClick={() => setActiveTab('pending')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'pending'
-                  ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`approval-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'pending' ? 'is-active' : ''}`}
             >
               <Clock className="w-3.5 h-3.5" />
               待我审批
@@ -126,25 +125,17 @@ export const ApprovalCenterView: React.FC = () => {
             <button
               aria-pressed={activeTab === 'my_applied'}
               onClick={() => setActiveTab('my_applied')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'my_applied'
-                  ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`approval-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'my_applied' ? 'is-active' : ''}`}
             >
               <Send className="w-3.5 h-3.5" />
               我发起的
             </button>
-            <button aria-pressed={activeTab === 'cc_me'} onClick={() => setActiveTab('cc_me')} className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'cc_me' ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}`}><ShieldCheck className="w-3.5 h-3.5" />抄送我的</button>
-            <button aria-pressed={activeTab === 'reviewed'} onClick={() => setActiveTab('reviewed')} className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'reviewed' ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'}`}><CheckCircle2 className="w-3.5 h-3.5" />我已审批</button>
+            <button aria-pressed={activeTab === 'cc_me'} onClick={() => setActiveTab('cc_me')} className={`approval-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'cc_me' ? 'is-active' : ''}`}><ShieldCheck className="w-3.5 h-3.5" />抄送我的</button>
+            <button aria-pressed={activeTab === 'reviewed'} onClick={() => setActiveTab('reviewed')} className={`approval-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'reviewed' ? 'is-active' : ''}`}><CheckCircle2 className="w-3.5 h-3.5" />我已审批</button>
             <button
               aria-pressed={activeTab === 'all'}
               onClick={() => setActiveTab('all')}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'all'
-                  ? 'bg-[var(--primary)] text-[var(--text-on-primary)] font-semibold shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
-              }`}
+              className={`approval-category-tab text-xs font-medium transition-colors flex items-center gap-1.5 ${activeTab === 'all' ? 'is-active' : ''}`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               全部
@@ -200,6 +191,7 @@ export const ApprovalCenterView: React.FC = () => {
                 <th className="py-3 px-3">审批单号</th>
                 <th className="py-3 px-3">审批事项与主题</th>
                 <th className="py-3 px-3">审批类型</th>
+                <th className="py-3 px-3">当前节点</th>
                 <th className="py-3 px-3">申请人 / 部门</th>
                 <th className="py-3 px-3">申请时间</th>
                 <th className="py-3 px-3">当前状态</th>
@@ -208,7 +200,7 @@ export const ApprovalCenterView: React.FC = () => {
             <tbody className="divide-y divide-[var(--border-main)]">
               {filteredApprovals.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center"><Empty description="暂无符合条件的审批流转记录" />
+                  <td colSpan={7} className="py-8 text-center"><Empty description="暂无符合条件的审批流转记录" />
                   </td>
                 </tr>
               ) : (
@@ -239,6 +231,7 @@ export const ApprovalCenterView: React.FC = () => {
                         {item.type}
                       </span>
                     </td>
+                    <td className="py-3 px-3 text-[var(--text-body)]">{currentNodeLabel(item)}</td>
                     <td className="py-3 px-3">
                       <div className="text-[var(--text-primary)] font-medium">{item.applicantName}</div>
                     <div className="text-[11px] text-[var(--text-muted)]">{item.applicantDept}</div>

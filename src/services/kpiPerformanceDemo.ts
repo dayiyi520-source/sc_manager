@@ -45,8 +45,8 @@ export interface KpiReviewRecord {
   action: '提交主管复核' | 'HR 退回' | 'HR 审核通过';
   actor: string;
   at: string;
-  before: { attitude: number; adjustment: number; total: number; temporaryTaskDeduction?: number; objectiveScore?: number; reviewScore?: number };
-  proposed: { attitude: number; adjustment: number; total: number; temporaryTaskDeduction?: number; objectiveScore?: number; reviewScore?: number };
+  before: { attitude: number; adjustment: number; total: number; goalBonus?: number; goalDeduction?: number; temporaryTaskDeduction?: number; objectiveScore?: number; reviewScore?: number };
+  proposed: { attitude: number; adjustment: number; total: number; goalBonus?: number; goalDeduction?: number; temporaryTaskDeduction?: number; objectiveScore?: number; reviewScore?: number };
   reason: string;
 }
 
@@ -70,7 +70,7 @@ export interface KpiEmployee {
   scores: KpiScores;
   source: KpiSourceData;
   reviewStatus: KpiStatus;
-  managerDraft?: { attitude: number; adjustment: number; temporaryTaskDeduction?: number; reason: string };
+  managerDraft?: { attitude: number; adjustment: number; goalBonus?: number; goalDeduction?: number; temporaryTaskDeduction?: number; reason: string };
   scoreAllocationVersion?: 2;
   reviewHistory?: KpiReviewRecord[];
   approvedSourceCorrections?: KpiSourceCorrectionRecord[];
@@ -212,8 +212,8 @@ const recordReview = (employee: KpiEmployee, action: KpiReviewRecord['action'], 
   const proposedDimensions = kpiDimensionScores(proposed);
   const record: KpiReviewRecord = {
     id: `${employee.id}-${Date.now()}-${employee.reviewHistory?.length ?? 0}`, action, actor, at: new Date().toISOString(),
-    before: { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, temporaryTaskDeduction: employee.scores.temporaryTaskDeduction ?? 0, objectiveScore: beforeDimensions.objective, reviewScore: beforeDimensions.review, total: scoreForEmployee(employee) },
-    proposed: { attitude: proposedScores.attitude, adjustment: proposedScores.managerAdjustment, temporaryTaskDeduction: proposedScores.temporaryTaskDeduction ?? 0, objectiveScore: proposedDimensions.objective, reviewScore: proposedDimensions.review, total: scoreForEmployee(proposed) },
+    before: { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, goalBonus: Math.max(0, employee.scores.managerAdjustment), goalDeduction: Math.max(0, -employee.scores.managerAdjustment), temporaryTaskDeduction: employee.scores.temporaryTaskDeduction ?? 0, objectiveScore: beforeDimensions.objective, reviewScore: beforeDimensions.review, total: scoreForEmployee(employee) },
+    proposed: { attitude: proposedScores.attitude, adjustment: proposedScores.managerAdjustment, ...(draft && (draft.goalBonus !== undefined || draft.goalDeduction !== undefined) ? { goalBonus: draft.goalBonus ?? Math.max(0, draft.adjustment), goalDeduction: draft.goalDeduction ?? Math.max(0, -draft.adjustment) } : {}), temporaryTaskDeduction: proposedScores.temporaryTaskDeduction ?? 0, objectiveScore: proposedDimensions.objective, reviewScore: proposedDimensions.review, total: scoreForEmployee(proposed) },
     reason,
   };
   return { ...employee, reviewHistory: [...(employee.reviewHistory ?? []), record] };
@@ -356,6 +356,20 @@ export const kpiDimensionScores = (employee: KpiEmployee) => {
 
 export const sourceAdjustmentFor = (employee: KpiEmployee) => employee.scores.managerAdjustment;
 
+export const goalAdjustmentDraft = (employee: KpiEmployee) => ({
+  bonus: employee.managerDraft?.goalBonus ?? Math.max(0, employee.managerDraft?.adjustment ?? employee.scores.managerAdjustment),
+  deduction: employee.managerDraft?.goalDeduction ?? Math.max(0, -(employee.managerDraft?.adjustment ?? employee.scores.managerAdjustment)),
+});
+
+const validManagerDraft = (draft: NonNullable<KpiEmployee['managerDraft']>) =>
+  Number.isFinite(draft.attitude) && draft.attitude >= 0 && draft.attitude <= 15
+  && Number.isFinite(draft.adjustment)
+  && Number.isFinite(draft.temporaryTaskDeduction ?? 0) && (draft.temporaryTaskDeduction ?? 0) <= 0
+  && (draft.goalBonus === undefined || Number.isFinite(draft.goalBonus) && draft.goalBonus >= 0)
+  && (draft.goalDeduction === undefined || Number.isFinite(draft.goalDeduction) && draft.goalDeduction >= 0)
+  && (draft.goalBonus === undefined && draft.goalDeduction === undefined
+    || draft.adjustment === (draft.goalBonus ?? Math.max(0, draft.adjustment)) - (draft.goalDeduction ?? Math.max(0, -draft.adjustment)));
+
 const verifiedAttendance = (employee: KpiEmployee, baseline: KpiEmployee, adjustment?: AttendanceKpiAdjustment) => {
   const source = {
     attendanceDays: baseline.source.attendanceDays,
@@ -418,7 +432,7 @@ export const syncKpiSources = (period: KpiPeriod, month: string): KpiPeriod => {
 export const submitManagerReview = (employee: KpiEmployee): KpiEmployee => {
   const draft = employee.managerDraft;
   if (!draft?.reason.trim()) throw new Error('请填写复核说明');
-  if (!Number.isFinite(draft.attitude) || !Number.isFinite(draft.adjustment) || !Number.isFinite(draft.temporaryTaskDeduction ?? 0) || (draft.temporaryTaskDeduction ?? 0) > 0) throw new Error('临时任务只允许扣分，请核对评分');
+  if (!validManagerDraft(draft)) throw new Error('请核对评分：目标加分和减分不得为负，临时任务只允许扣分');
   if (!['待主管复核', 'HR 已退回'].includes(employee.reviewStatus)) throw new Error('当前状态不可提交主管复核');
   return { ...employee, reviewStatus: '待 HR 审核', hrNote: `主管已提交：${draft.reason.trim()}` };
 };
@@ -430,7 +444,7 @@ export const reviewManagerSubmission = (employee: KpiEmployee, decision: KpiRevi
     return { ...employee, reviewStatus: 'HR 已退回', hrNote: `HR 退回：${reason.trim()}` };
   }
   const draft = employee.managerDraft;
-  if (draft && (!Number.isFinite(draft.attitude) || !Number.isFinite(draft.adjustment) || !Number.isFinite(draft.temporaryTaskDeduction ?? 0) || (draft.temporaryTaskDeduction ?? 0) > 0)) throw new Error('临时任务只允许扣分，请核对评分');
+  if (draft && !validManagerDraft(draft)) throw new Error('请核对评分：目标加分和减分不得为负，临时任务只允许扣分');
   return {
     ...employee,
     scores: draft ? { ...employee.scores, attitude: draft.attitude, managerAdjustment: draft.adjustment, temporaryTaskDeduction: draft.temporaryTaskDeduction ?? 0 } : employee.scores,

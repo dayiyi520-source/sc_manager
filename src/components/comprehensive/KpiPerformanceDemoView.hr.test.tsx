@@ -66,7 +66,14 @@ describe('HR 绩效公示', () => {
     expect(screen.getByRole('region', { name: '本月部门系数统一确认' })).toBeInTheDocument();
     expect(screen.getAllByText('部门目标完成率')).toHaveLength(1);
     expect(screen.getByRole('region', { name: '产品部系数详情' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: '产品部系数指标' }).children).toHaveLength(9);
+    const metrics = screen.getByRole('group', { name: '产品部系数指标' });
+    expect(metrics.children).toHaveLength(9);
+    Array.from(metrics.children).forEach(cell => {
+      expect(cell.querySelectorAll(':scope > span')).toHaveLength(1);
+      expect(cell.querySelectorAll(':scope > b')).toHaveLength(1);
+    });
+    expect(within(metrics).getByText('主管绩效系数')).toBeInTheDocument();
+    expect(within(metrics).queryByText('初始系数')).not.toBeInTheDocument();
     expect(screen.getByText('综合基础分')).toBeInTheDocument();
     expect(screen.getByText('部门员工绩效等级名额分布')).toBeInTheDocument();
     expect(screen.queryByText('适用场景')).not.toBeInTheDocument();
@@ -102,7 +109,7 @@ describe('HR 绩效公示', () => {
     expect(screen.getByRole('button', { name: '确认本月部门系数' })).toBeEnabled();
   });
 
-  it('主管复核可填写无幅度限制的目标加减分和仅扣分的临时任务', async () => {
+  it('主管复核分别填写目标加分和减分，并保留临时任务扣分', async () => {
     const state = loadKpiDemo();
     const period = state.periods['2026-11'];
     const now = Date.now();
@@ -113,17 +120,22 @@ describe('HR 绩效公示', () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.mouseDown(screen.getByLabelText('体验角色'));
     fireEvent.click(await screen.findByText('主管视角', { selector: '.ant-select-item-option-content' }));
-    expect(screen.getByText('目标加减分')).toBeInTheDocument();
+    expect(screen.getByText('目标加分')).toBeInTheDocument();
+    expect(screen.getByText('目标减分')).toBeInTheDocument();
     expect(screen.getByText('临时任务扣分')).toBeInTheDocument();
-    const goal = screen.getByText('目标加减分').closest('label')!.querySelector('input')!;
+    const bonus = screen.getByText('目标加分').closest('label')!.querySelector('input')!;
+    const deduction = screen.getByText('目标减分').closest('label')!.querySelector('input')!;
     const temporary = screen.getByText('临时任务扣分').closest('label')!.querySelector('input')!;
-    expect(goal).not.toHaveAttribute('max');
-    fireEvent.change(goal, { target: { value: '12' } });
+    expect(bonus).not.toHaveAttribute('max');
+    expect(deduction).not.toHaveAttribute('max');
+    fireEvent.change(bonus, { target: { value: '12' } });
+    fireEvent.change(deduction, { target: { value: '3' } });
     fireEvent.change(temporary, { target: { value: '-4' } });
-    expect(goal).toHaveValue('12');
+    expect(bonus).toHaveValue('12');
+    expect(deduction).toHaveValue('3');
     expect(temporary).toHaveValue('-4');
     fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
-    expect(loadKpiDemo().periods['2026-11'].employees[0]).toMatchObject({ reviewStatus: '待主管复核', managerDraft: { adjustment: 12, temporaryTaskDeduction: -4 } });
+    expect(loadKpiDemo().periods['2026-11'].employees[0]).toMatchObject({ reviewStatus: '待主管复核', managerDraft: { goalBonus: 12, goalDeduction: 3, adjustment: 9, temporaryTaskDeduction: -4 } });
     expect(loadKpiDemo().periods['2026-11'].employees[1].managerDraft).toBeUndefined();
   });
 
@@ -131,6 +143,7 @@ describe('HR 绩效公示', () => {
     const state = loadKpiDemo();
     const period = state.periods['2026-11'];
     period.published = false;
+    period.cycleSettings = { managerReview: { startAt: new Date(Date.now() - 60_000).toISOString(), endAt: new Date(Date.now() + 86_400_000).toISOString() }, appealConfirmation: { startAt: new Date(Date.now() + 172_860_000).toISOString(), endAt: new Date(Date.now() + 259_200_000).toISOString() }, finalPublicationAt: new Date(Date.now() + 172_800_000).toISOString() };
     period.employees[0].reviewStatus = '待 HR 审核';
     period.employees[0].managerDraft = { attitude: 10, adjustment: -2, reason: '目标延期' };
     period.employees[1].reviewStatus = '待主管复核';
@@ -151,6 +164,9 @@ describe('HR 绩效公示', () => {
     fireEvent.click(await screen.findByText('主管视角', { selector: '.ant-select-item-option-content' }));
     fireEvent.click(within(screen.getByText('我的团队').closest('.kpi-employee-rail')!).getByRole('button', { name: /周予安/ }));
     expect(screen.queryByText('HR 退回：请补充依据')).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByText('我的团队').closest('.kpi-employee-rail')!).getByRole('button', { name: /林知夏/ }));
+    expect(screen.getByText('HR 退回：请补充依据')).toBeInTheDocument();
+    expect(screen.queryByText('修改并重新提交')).not.toBeInTheDocument();
   });
 
   it('HR 逐员工查看提交的两个分数，审核后加减分带正负语义', () => {
@@ -166,7 +182,8 @@ describe('HR 绩效公示', () => {
     const review = screen.getByRole('region', { name: '林知夏主管复核' });
     expect(review).toHaveTextContent('工作态度分');
     expect(review).toHaveTextContent('0 → 10 分');
-    expect(review).toHaveTextContent('0 → -2 分');
+    expect(review).toHaveTextContent('目标减分');
+    expect(review).toHaveTextContent('0 → 2 分');
     expect(review).not.toHaveTextContent('额外贡献');
     const beforeScore = container.querySelector('.kpi-total-score > strong')?.textContent || '';
     fireEvent.click(screen.getByRole('button', { name: /审核通过/ }));

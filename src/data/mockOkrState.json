@@ -1,26 +1,530 @@
 {
-  "revision": 119,
+  "revision": 120,
   "okrRecords": [
-    { "id": "kpi-demo-department-product-2026-10", "kind": "objective", "ownerId": "kpi-manager-product", "periodKey": "2026-10", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "产品部重点方案交付", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-department-kr-product-10", "title": "重点方案评审通过", "weight": 100, "progress": 91 }] } },
-    { "id": "kpi-demo-department-research-2026-10", "kind": "objective", "ownerId": "kpi-manager-research", "periodKey": "2026-10", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "研发部版本稳定交付", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-department-kr-research-10", "title": "版本迭代与缺陷修复", "weight": 100, "progress": 86 }] } },
-    { "id": "kpi-demo-department-delivery-2026-10", "kind": "objective", "ownerId": "kpi-manager-delivery", "periodKey": "2026-10", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "交付部项目验收", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-department-kr-delivery-10", "title": "项目实施与验收", "weight": 100, "progress": 89 }] } },
-    { "id": "kpi-demo-department-operations-2026-10", "kind": "objective", "ownerId": "kpi-manager-operations", "periodKey": "2026-10", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "运营部活动落地", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-department-kr-operations-10", "title": "活动执行与复盘", "weight": 100, "progress": 76 }] } },
-    { "id": "kpi-demo-department-product-2026-11", "kind": "objective", "ownerId": "kpi-manager-product", "periodKey": "2026-11", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "产品部重点方案交付", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-department-kr-product-11", "title": "重点方案评审通过", "weight": 100, "progress": 91 }] } },
-    { "id": "kpi-demo-department-research-2026-11", "kind": "objective", "ownerId": "kpi-manager-research", "periodKey": "2026-11", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "研发部版本稳定交付", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-department-kr-research-11", "title": "版本迭代与缺陷修复", "weight": 100, "progress": 86 }] } },
-    { "id": "kpi-demo-department-delivery-2026-11", "kind": "objective", "ownerId": "kpi-manager-delivery", "periodKey": "2026-11", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "交付部项目验收", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-department-kr-delivery-11", "title": "项目实施与验收", "weight": 100, "progress": 89 }] } },
-    { "id": "kpi-demo-department-operations-2026-11", "kind": "objective", "ownerId": "kpi-manager-operations", "periodKey": "2026-11", "status": "active", "version": 1, "payload": { "goalModelVersion": 2, "goalLevel": "department", "origin": "autonomous", "objectiveType": "target", "title": "运营部活动落地", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-department-kr-operations-11", "title": "活动执行与复盘", "weight": 100, "progress": 76 }] } },
-    { "id": "kpi-demo-goal-e-01-2026-10", "kind": "objective", "ownerId": "e-01", "periodKey": "2026-10", "status": "active", "version": 1, "submittedAt": "2026-10-04T09:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "重点版本方案按期交付", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-kr-e-01-10", "title": "完成重点版本方案并通过评审", "weight": 100, "progress": 93, "deadline": "2026-10-31" }] } },
-    { "id": "kpi-demo-goal-e-02-2026-10", "kind": "objective", "ownerId": "e-02", "periodKey": "2026-10", "status": "active", "version": 1, "submittedAt": "2026-10-05T16:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "产品需求方案闭环", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-kr-e-02-10", "title": "按期完成需求设计与交付", "weight": 100, "progress": 88, "deadline": "2026-10-31" }] } },
-    { "id": "kpi-demo-goal-e-03-2026-10", "kind": "objective", "ownerId": "e-03", "periodKey": "2026-10", "status": "active", "version": 1, "submittedAt": "2026-10-05T11:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "前端迭代按期交付", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-kr-e-03-10", "title": "完成迭代开发与联调", "weight": 100, "progress": 84, "deadline": "2026-10-31" }] } },
-    { "id": "kpi-demo-goal-e-04-2026-10", "kind": "objective", "ownerId": "e-04", "periodKey": "2026-10", "status": "active", "version": 1, "submittedAt": "2026-10-06T10:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "后端服务稳定交付", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-kr-e-04-10", "title": "完成服务开发与缺陷修复", "weight": 100, "progress": 78, "deadline": "2026-10-31" }] } },
-    { "id": "kpi-demo-goal-e-05-2026-10", "kind": "objective", "ownerId": "e-05", "periodKey": "2026-10", "status": "active", "version": 1, "submittedAt": "2026-10-04T14:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "项目交付验收", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-kr-e-05-10", "title": "完成项目实施与验收材料", "weight": 100, "progress": 84, "deadline": "2026-10-31" }] } },
-    { "id": "kpi-demo-goal-e-06-2026-10", "kind": "objective", "ownerId": "e-06", "periodKey": "2026-10", "status": "active", "version": 1, "submittedAt": "2026-10-07T09:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "运营活动按期落地", "weight": 100, "deadline": "2026-10-31", "keyResults": [{ "id": "kpi-demo-kr-e-06-10", "title": "完成活动执行与结果复盘", "weight": 100, "progress": 65, "deadline": "2026-10-31" }] } },
-    { "id": "kpi-demo-goal-e-01-2026-11", "kind": "objective", "ownerId": "e-01", "periodKey": "2026-11", "status": "active", "version": 1, "submittedAt": "2026-11-04T09:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "重点版本方案按期交付", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-kr-e-01", "title": "完成重点版本方案并通过评审", "weight": 100, "progress": 93, "deadline": "2026-11-30" }] } },
-    { "id": "kpi-demo-goal-e-02-2026-11", "kind": "objective", "ownerId": "e-02", "periodKey": "2026-11", "status": "active", "version": 1, "submittedAt": "2026-11-06T10:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "产品需求方案闭环", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-kr-e-02", "title": "按期完成需求设计与交付", "weight": 100, "progress": 88, "deadline": "2026-11-30" }] } },
-    { "id": "kpi-demo-goal-e-03-2026-11", "kind": "objective", "ownerId": "e-03", "periodKey": "2026-11", "status": "active", "version": 1, "submittedAt": "2026-11-05T15:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "前端迭代按期交付", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-kr-e-03", "title": "完成迭代开发与联调", "weight": 100, "progress": 84, "deadline": "2026-11-30" }] } },
-    { "id": "kpi-demo-goal-e-04-2026-11", "kind": "objective", "ownerId": "e-04", "periodKey": "2026-11", "status": "active", "version": 1, "submittedAt": "2026-11-07T10:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "后端服务稳定交付", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-kr-e-04", "title": "完成服务开发与缺陷修复", "weight": 100, "progress": 78, "deadline": "2026-11-30" }] } },
-    { "id": "kpi-demo-goal-e-05-2026-11", "kind": "objective", "ownerId": "e-05", "periodKey": "2026-11", "status": "active", "version": 1, "submittedAt": "2026-11-05T12:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "项目交付验收", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-kr-e-05", "title": "完成项目实施与验收材料", "weight": 100, "progress": 84, "deadline": "2026-11-30" }] } },
-    { "id": "kpi-demo-goal-e-06-2026-11", "kind": "objective", "ownerId": "e-06", "periodKey": "2026-11", "status": "active", "version": 1, "submittedAt": "2026-11-04T16:00:00+08:00", "payload": { "goalModelVersion": 2, "goalLevel": "personal", "origin": "autonomous", "objectiveType": "target", "title": "运营活动按期落地", "weight": 100, "deadline": "2026-11-30", "keyResults": [{ "id": "kpi-demo-kr-e-06", "title": "完成活动执行与结果复盘", "weight": 100, "progress": 65, "deadline": "2026-11-30" }] } },
+    {
+      "id": "kpi-demo-department-product-2026-10",
+      "kind": "objective",
+      "ownerId": "kpi-manager-product",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "产品部重点方案交付",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-department-kr-product-10",
+            "title": "重点方案评审通过",
+            "weight": 100,
+            "progress": 91
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-department-research-2026-10",
+      "kind": "objective",
+      "ownerId": "kpi-manager-research",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "研发部版本稳定交付",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-department-kr-research-10",
+            "title": "版本迭代与缺陷修复",
+            "weight": 100,
+            "progress": 86
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-department-delivery-2026-10",
+      "kind": "objective",
+      "ownerId": "kpi-manager-delivery",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "交付部项目验收",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-department-kr-delivery-10",
+            "title": "项目实施与验收",
+            "weight": 100,
+            "progress": 89
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-department-operations-2026-10",
+      "kind": "objective",
+      "ownerId": "kpi-manager-operations",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "运营部活动落地",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-department-kr-operations-10",
+            "title": "活动执行与复盘",
+            "weight": 100,
+            "progress": 76
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-department-product-2026-11",
+      "kind": "objective",
+      "ownerId": "kpi-manager-product",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "产品部重点方案交付",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-department-kr-product-11",
+            "title": "重点方案评审通过",
+            "weight": 100,
+            "progress": 91
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-department-research-2026-11",
+      "kind": "objective",
+      "ownerId": "kpi-manager-research",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "研发部版本稳定交付",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-department-kr-research-11",
+            "title": "版本迭代与缺陷修复",
+            "weight": 100,
+            "progress": 86
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-department-delivery-2026-11",
+      "kind": "objective",
+      "ownerId": "kpi-manager-delivery",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "交付部项目验收",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-department-kr-delivery-11",
+            "title": "项目实施与验收",
+            "weight": 100,
+            "progress": 89
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-department-operations-2026-11",
+      "kind": "objective",
+      "ownerId": "kpi-manager-operations",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "department",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "运营部活动落地",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-department-kr-operations-11",
+            "title": "活动执行与复盘",
+            "weight": 100,
+            "progress": 76
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-01-2026-10",
+      "kind": "objective",
+      "ownerId": "e-01",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-10-04T09:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "重点版本方案按期交付",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-01-10",
+            "title": "完成重点版本方案并通过评审",
+            "weight": 100,
+            "progress": 93,
+            "deadline": "2026-10-31"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-02-2026-10",
+      "kind": "objective",
+      "ownerId": "e-02",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-10-05T16:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "产品需求方案闭环",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-02-10",
+            "title": "按期完成需求设计与交付",
+            "weight": 100,
+            "progress": 88,
+            "deadline": "2026-10-31"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-03-2026-10",
+      "kind": "objective",
+      "ownerId": "e-03",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-10-05T11:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "前端迭代按期交付",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-03-10",
+            "title": "完成迭代开发与联调",
+            "weight": 100,
+            "progress": 84,
+            "deadline": "2026-10-31"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-04-2026-10",
+      "kind": "objective",
+      "ownerId": "e-04",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-10-06T10:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "后端服务稳定交付",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-04-10",
+            "title": "完成服务开发与缺陷修复",
+            "weight": 100,
+            "progress": 78,
+            "deadline": "2026-10-31"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-05-2026-10",
+      "kind": "objective",
+      "ownerId": "e-05",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-10-04T14:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "项目交付验收",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-05-10",
+            "title": "完成项目实施与验收材料",
+            "weight": 100,
+            "progress": 84,
+            "deadline": "2026-10-31"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-06-2026-10",
+      "kind": "objective",
+      "ownerId": "e-06",
+      "periodKey": "2026-10",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-10-07T09:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "运营活动按期落地",
+        "weight": 100,
+        "deadline": "2026-10-31",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-06-10",
+            "title": "完成活动执行与结果复盘",
+            "weight": 100,
+            "progress": 65,
+            "deadline": "2026-10-31"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-01-2026-11",
+      "kind": "objective",
+      "ownerId": "e-01",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-11-04T09:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "重点版本方案按期交付",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-01",
+            "title": "完成重点版本方案并通过评审",
+            "weight": 100,
+            "progress": 93,
+            "deadline": "2026-11-30"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-02-2026-11",
+      "kind": "objective",
+      "ownerId": "e-02",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-11-06T10:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "产品需求方案闭环",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-02",
+            "title": "按期完成需求设计与交付",
+            "weight": 100,
+            "progress": 88,
+            "deadline": "2026-11-30"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-03-2026-11",
+      "kind": "objective",
+      "ownerId": "e-03",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-11-05T15:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "前端迭代按期交付",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-03",
+            "title": "完成迭代开发与联调",
+            "weight": 100,
+            "progress": 84,
+            "deadline": "2026-11-30"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-04-2026-11",
+      "kind": "objective",
+      "ownerId": "e-04",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-11-07T10:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "后端服务稳定交付",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-04",
+            "title": "完成服务开发与缺陷修复",
+            "weight": 100,
+            "progress": 78,
+            "deadline": "2026-11-30"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-05-2026-11",
+      "kind": "objective",
+      "ownerId": "e-05",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-11-05T12:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "项目交付验收",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-05",
+            "title": "完成项目实施与验收材料",
+            "weight": 100,
+            "progress": 84,
+            "deadline": "2026-11-30"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kpi-demo-goal-e-06-2026-11",
+      "kind": "objective",
+      "ownerId": "e-06",
+      "periodKey": "2026-11",
+      "status": "active",
+      "version": 1,
+      "submittedAt": "2026-11-04T16:00:00+08:00",
+      "payload": {
+        "goalModelVersion": 2,
+        "goalLevel": "personal",
+        "origin": "autonomous",
+        "objectiveType": "target",
+        "title": "运营活动按期落地",
+        "weight": 100,
+        "deadline": "2026-11-30",
+        "keyResults": [
+          {
+            "id": "kpi-demo-kr-e-06",
+            "title": "完成活动执行与结果复盘",
+            "weight": 100,
+            "progress": 65,
+            "deadline": "2026-11-30"
+          }
+        ]
+      }
+    },
     {
       "id": "047a996c-8d5d-4944-a48a-984f2e0e1eeb",
       "kind": "objective",
@@ -247,13 +751,13 @@
       "periodKey": "2026-10",
       "status": "active",
       "createdAt": "2026-10-13T00:50:40.355Z",
-      "version": 3,
+      "version": 4,
       "payload": {
         "title": "全力保障今年储备项目落地，强化产品竞争力为明年打下基础",
         "goalModelVersion": 2,
         "goalLevel": "company",
         "inherited": false,
-        "changeReason": "的",
+        "changeReason": "测试",
         "objectiveType": "target",
         "alignments": [],
         "weight": 100,
@@ -272,7 +776,7 @@
           },
           {
             "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
-            "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+            "title": "付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
             "weight": 25,
             "progress": 0,
             "assigneeIds": [
@@ -435,6 +939,134 @@
           "baseVersion": 2,
           "requestedAt": "2026-10-14T02:11:15.366Z",
           "reviewedAt": "2026-10-14T02:11:15.366Z"
+        },
+        {
+          "id": "8b89defd-ed2f-4428-8d1f-69522cb8adea",
+          "status": "approved",
+          "previousPayload": {
+            "title": "全力保障今年储备项目落地，强化产品竞争力为明年打下基础",
+            "goalModelVersion": 2,
+            "goalLevel": "company",
+            "inherited": false,
+            "changeReason": "的",
+            "objectiveType": "target",
+            "alignments": [],
+            "weight": 100,
+            "note": "",
+            "keyResults": [
+              {
+                "id": "bf557043-045c-4a0f-bfa7-327c3b846e4a",
+                "title": "做好存量客户挖掘、新增客户拓展、合作伙伴商机赋能落地，三手抓拉动营收；确保公司销售额与营收目标推进",
+                "weight": 25,
+                "progress": 0,
+                "assigneeIds": [
+                  "user-sales"
+                ],
+                "deadline": "2026-10-31",
+                "plannedDeadline": "2026-10-31"
+              },
+              {
+                "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+                "title": "着力谋划公司产品竞争力课题形成规划路径，聚焦解决产品交付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+                "weight": 25,
+                "progress": 0,
+                "assigneeIds": [
+                  "user-product"
+                ],
+                "deadline": "2026-10-31",
+                "plannedDeadline": "2026-10-31"
+              },
+              {
+                "id": "1c24ea2d-d1a2-4f96-99fd-69f9b92addba",
+                "title": "高质量完成产品交互设计落地与样式走查把关工作，持续打磨统一产品交互风格，推进 AI 辅助设计真正落地应用",
+                "weight": 25,
+                "progress": 0,
+                "assigneeIds": [
+                  "9a35d30f-2952-41ca-9ae0-7a2685556f7f"
+                ],
+                "deadline": "2026-10-31",
+                "plannedDeadline": "2026-10-31"
+              },
+              {
+                "id": "b3f876fa-980c-4545-ae6e-54c08a7d82cd",
+                "title": "落地产研共建机制，推动研发深度前置参与产品需求工作；各产品和项目条线按既定时间节点高质量上线，严控线上bug率，提升运维质量。真正走通AI赋能场景的产研一体化模式，真正提升研发人效。",
+                "weight": 25,
+                "progress": 0,
+                "assigneeIds": [
+                  "user-tech"
+                ],
+                "deadline": "2026-10-31",
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "deadline": "2026-10-31",
+            "plannedDeadline": "2026-10-31"
+          },
+          "purpose": "update",
+          "reviewerId": "user-admin",
+          "reason": "测试",
+          "payload": {
+            "title": "全力保障今年储备项目落地，强化产品竞争力为明年打下基础",
+            "goalModelVersion": 2,
+            "goalLevel": "company",
+            "inherited": false,
+            "changeReason": "测试",
+            "objectiveType": "target",
+            "alignments": [],
+            "weight": 100,
+            "note": "",
+            "keyResults": [
+              {
+                "id": "bf557043-045c-4a0f-bfa7-327c3b846e4a",
+                "title": "做好存量客户挖掘、新增客户拓展、合作伙伴商机赋能落地，三手抓拉动营收；确保公司销售额与营收目标推进",
+                "weight": 25,
+                "progress": 0,
+                "assigneeIds": [
+                  "user-sales"
+                ],
+                "deadline": "2026-10-31",
+                "plannedDeadline": "2026-10-31"
+              },
+              {
+                "id": "289581a0-399a-41ff-acf6-4f4557efa36d",
+                "title": "付延期和质量问题，压实产品端责任，按节点推进产品规划与设计，从源头降低交付风险；联动交付中心和研发梳理存量积压项目迭代需求，制定迭代推进计划，按期闭环全部积压迭代需求。",
+                "weight": 25,
+                "progress": 0,
+                "assigneeIds": [
+                  "user-product"
+                ],
+                "deadline": "2026-10-31",
+                "plannedDeadline": "2026-10-31"
+              },
+              {
+                "id": "1c24ea2d-d1a2-4f96-99fd-69f9b92addba",
+                "title": "高质量完成产品交互设计落地与样式走查把关工作，持续打磨统一产品交互风格，推进 AI 辅助设计真正落地应用",
+                "weight": 25,
+                "progress": 0,
+                "assigneeIds": [
+                  "9a35d30f-2952-41ca-9ae0-7a2685556f7f"
+                ],
+                "deadline": "2026-10-31",
+                "plannedDeadline": "2026-10-31"
+              },
+              {
+                "id": "b3f876fa-980c-4545-ae6e-54c08a7d82cd",
+                "title": "落地产研共建机制，推动研发深度前置参与产品需求工作；各产品和项目条线按既定时间节点高质量上线，严控线上bug率，提升运维质量。真正走通AI赋能场景的产研一体化模式，真正提升研发人效。",
+                "weight": 25,
+                "progress": 0,
+                "assigneeIds": [
+                  "user-tech"
+                ],
+                "deadline": "2026-10-31",
+                "plannedDeadline": "2026-10-31"
+              }
+            ],
+            "deadline": "2026-10-31",
+            "plannedDeadline": "2026-10-31"
+          },
+          "baseVersion": 3,
+          "requestedAt": "2026-11-12T02:49:32.330Z",
+          "reviewedAt": "2026-11-12T02:49:32.330Z"
         }
       ]
     },
@@ -7920,16 +8552,92 @@
     }
   ],
   "okrPeople": [
-    { "id": "e-01", "name": "林知夏", "jobTitle": "高级产品经理", "department": "产品部", "supervisorId": "kpi-manager-product", "rootFlag": 0, "version": 0 },
-    { "id": "e-02", "name": "周予安", "jobTitle": "产品经理", "department": "产品部", "supervisorId": "kpi-manager-product", "rootFlag": 0, "version": 0 },
-    { "id": "e-03", "name": "顾清和", "jobTitle": "前端工程师", "department": "研发部", "supervisorId": "kpi-manager-product", "rootFlag": 0, "version": 0 },
-    { "id": "e-04", "name": "许明川", "jobTitle": "后端工程师", "department": "研发部", "supervisorId": "kpi-manager-research", "rootFlag": 0, "version": 0 },
-    { "id": "e-05", "name": "沈嘉禾", "jobTitle": "交付顾问", "department": "交付部", "supervisorId": "kpi-manager-delivery", "rootFlag": 0, "version": 0 },
-    { "id": "e-06", "name": "唐以宁", "jobTitle": "运营专员", "department": "运营部", "supervisorId": "kpi-manager-operations", "rootFlag": 0, "version": 0 },
-    { "id": "kpi-manager-product", "name": "陈宇璋（绩效演示）", "department": "产品部", "supervisorId": "user-admin", "rootFlag": 0, "version": 0 },
-    { "id": "kpi-manager-research", "name": "赵书琳（绩效演示）", "department": "研发部", "supervisorId": "user-admin", "rootFlag": 0, "version": 0 },
-    { "id": "kpi-manager-delivery", "name": "王佳乐（绩效演示）", "department": "交付部", "supervisorId": "user-admin", "rootFlag": 0, "version": 0 },
-    { "id": "kpi-manager-operations", "name": "毛景强（绩效演示）", "department": "运营部", "supervisorId": "user-admin", "rootFlag": 0, "version": 0 },
+    {
+      "id": "e-01",
+      "name": "林知夏",
+      "jobTitle": "高级产品经理",
+      "department": "产品部",
+      "supervisorId": "kpi-manager-product",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "e-02",
+      "name": "周予安",
+      "jobTitle": "产品经理",
+      "department": "产品部",
+      "supervisorId": "kpi-manager-product",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "e-03",
+      "name": "顾清和",
+      "jobTitle": "前端工程师",
+      "department": "研发部",
+      "supervisorId": "kpi-manager-product",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "e-04",
+      "name": "许明川",
+      "jobTitle": "后端工程师",
+      "department": "研发部",
+      "supervisorId": "kpi-manager-research",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "e-05",
+      "name": "沈嘉禾",
+      "jobTitle": "交付顾问",
+      "department": "交付部",
+      "supervisorId": "kpi-manager-delivery",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "e-06",
+      "name": "唐以宁",
+      "jobTitle": "运营专员",
+      "department": "运营部",
+      "supervisorId": "kpi-manager-operations",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "kpi-manager-product",
+      "name": "陈宇璋（绩效演示）",
+      "department": "产品部",
+      "supervisorId": "user-admin",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "kpi-manager-research",
+      "name": "赵书琳（绩效演示）",
+      "department": "研发部",
+      "supervisorId": "user-admin",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "kpi-manager-delivery",
+      "name": "王佳乐（绩效演示）",
+      "department": "交付部",
+      "supervisorId": "user-admin",
+      "rootFlag": 0,
+      "version": 0
+    },
+    {
+      "id": "kpi-manager-operations",
+      "name": "毛景强（绩效演示）",
+      "department": "运营部",
+      "supervisorId": "user-admin",
+      "rootFlag": 0,
+      "version": 0
+    },
     {
       "id": "06a548b0-38fb-434a-9728-6249fb14a77b",
       "name": "周星",
