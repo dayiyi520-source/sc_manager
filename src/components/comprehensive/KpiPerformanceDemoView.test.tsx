@@ -73,7 +73,7 @@ describe('绩效考核公示', () => {
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
-    expect(screen.getByText('87.3 分')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '绩效结果总览' })).toHaveTextContent('87.3');
     expect(screen.getAllByText('工作态度').length).toBeGreaterThan(0);
     expect(screen.queryByText('周予安')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /公示绩效结果/ })).not.toBeInTheDocument();
@@ -97,15 +97,22 @@ describe('绩效考核公示', () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
 
-    expect(await screen.findByText('产品部平均绩效')).toBeInTheDocument();
-    expect(screen.getByText('部门等级分布')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '月度绩效结果' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '2026年11月绩效公示' })).not.toBeInTheDocument();
+    expect(screen.queryByText('产品部平均绩效')).not.toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: '绩效结果总览' })).toBeInTheDocument();
+    expect(screen.getByText('部门员工绩效等级分布')).toBeInTheDocument();
+    const summary = screen.getByRole('region', { name: '绩效结果总览' });
+    expect(summary.textContent!.indexOf('部门绩效系数')).toBeLessThan(summary.textContent!.indexOf('部门员工平均绩效'));
+    expect(screen.getByRole('region', { name: '五项模块得分' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: '本月绩效评分明细' })).toBeInTheDocument();
     expect(screen.getByText('林知夏')).toBeInTheDocument();
     expect(screen.queryByText('周予安')).not.toBeInTheDocument();
-    expect(screen.getByText('月度目标 56 / 60 分')).toBeInTheDocument();
-    expect(screen.getByText('出勤天数')).toBeInTheDocument();
+    expect(screen.getByText('56')).toBeInTheDocument();
+    expect(screen.getByText('出勤情况')).toBeInTheDocument();
     expect(screen.getAllByText('工作态度').length).toBeGreaterThan(0);
     expect(screen.getAllByText('周月报提交')).toHaveLength(2);
-    expect(screen.getByText('考勤')).toBeInTheDocument();
+    expect(screen.getAllByText('考勤')).toHaveLength(2);
     expect(screen.queryByText('全勤')).not.toBeInTheDocument();
     expect(screen.queryByText('报告异常')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '绩效申诉' })).toBeInTheDocument();
@@ -128,15 +135,19 @@ describe('绩效考核公示', () => {
     expect(screen.getByRole('button', { name: /周予安/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '公示绩效结果' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /周予安/ }));
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('月度目标')).toBeInTheDocument();
-    expect(screen.getByText('工作态度')).toBeInTheDocument();
-    expect(screen.getByText('审批加班')).toBeInTheDocument();
-    expect(screen.getAllByText('周月报提交')).toHaveLength(2);
-    expect(screen.getByText('考勤')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('region', { name: '绩效结果' })).toBeInTheDocument();
+    const summary = within(dialog).getByRole('region', { name: '绩效结果总览' });
+    expect(summary.textContent!.indexOf('部门绩效系数')).toBeLessThan(summary.textContent!.indexOf('部门员工平均绩效'));
+    expect(within(dialog).getByRole('table', { name: '本月绩效评分明细' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('columnheader', { name: '主管加分' })).toBeInTheDocument();
+    expect(within(dialog).getByText('主管月度综合评分')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('周月报提交')).toHaveLength(2);
+    expect(within(dialog).getAllByText('考勤')).toHaveLength(2);
     expect(screen.queryByText('全勤')).not.toBeInTheDocument();
     expect(screen.queryByText('报告异常')).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: '人工调分说明' })).toHaveTextContent('无');
+    expect(screen.queryByRole('region', { name: '人工调分说明' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '绩效评语' })).toHaveTextContent('暂无绩效评语');
     view.unmount();
     document.querySelectorAll('.ant-modal-root').forEach(node => node.remove());
   });
@@ -157,8 +168,8 @@ describe('绩效考核公示', () => {
     fireEvent.click(screen.getByRole('tab', { name: /月度公示/ }));
     fireEvent.click(screen.getByRole('button', { name: /林知夏/ }));
     const dialog = await screen.findByRole('dialog');
-    const adjustment = within(dialog).getByRole('region', { name: '人工调分说明' });
-    expect(within(dialog).getByText('考勤')).toBeInTheDocument();
+    const adjustment = within(dialog).getByRole('table', { name: '本月绩效评分明细' });
+    expect(within(dialog).getAllByText('考勤')).toHaveLength(2);
     expect(within(dialog).getAllByText('周月报提交')).toHaveLength(2);
     expect(adjustment).toHaveTextContent('目标加分');
     expect(adjustment).toHaveTextContent('+12.0 分');
@@ -185,12 +196,15 @@ describe('绩效考核公示', () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('button', { name: /林知夏/ }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('考勤')).toBeInTheDocument();
+    expect(within(dialog).getByRole('region', { name: '绩效结果' })).toBeInTheDocument();
+    const summary = within(dialog).getByRole('region', { name: '绩效结果总览' });
+    expect(summary.textContent!.indexOf('部门绩效系数')).toBeLessThan(summary.textContent!.indexOf('部门员工平均绩效'));
+    expect(within(dialog).getByRole('table', { name: '本月绩效评分明细' })).toBeInTheDocument();
+    expect(within(dialog).getAllByText('考勤')).toHaveLength(2);
     expect(within(dialog).getAllByText('周月报提交')).toHaveLength(2);
     expect(within(dialog).queryByText('复盘总结')).not.toBeInTheDocument();
     expect(within(dialog).queryByText('报告异常')).not.toBeInTheDocument();
-    const adjustment = within(dialog).getByRole('region', { name: '人工调分说明' });
-    expect(adjustment).toHaveTextContent('有调整');
+    const adjustment = within(dialog).getByRole('table', { name: '本月绩效评分明细' });
     expect(adjustment).toHaveTextContent('目标加分');
     expect(adjustment).toHaveTextContent('+5.0 分');
     expect(adjustment).toHaveTextContent('目标减分');
@@ -292,12 +306,11 @@ describe('绩效考核公示', () => {
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     const view = render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
-    const adjustment = screen.getByRole('region', { name: '人工调分说明' });
-    expect(adjustment).toHaveTextContent('有调整');
+    const adjustment = screen.getByRole('table', { name: '本月绩效评分明细' });
     expect(adjustment).toHaveTextContent('0.0 → -2.0 分');
     expect(adjustment).toHaveTextContent('目标延期');
     expect(adjustment).toHaveTextContent('陈宇璋');
-    expect(adjustment).toHaveTextContent('HR 审核通过');
+    expect(adjustment).toHaveTextContent('HR审核通过');
     expect(adjustment).not.toHaveTextContent('不应显示的草稿');
 
     view.unmount();
@@ -305,7 +318,7 @@ describe('绩效考核公示', () => {
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
-    expect(screen.getByRole('region', { name: '人工调分说明' })).toHaveTextContent('历史评分未记录调整依据');
+    expect(screen.getByRole('table', { name: '本月绩效评分明细' })).toHaveTextContent('历史评分未记录调整依据');
   });
 
   it('HR 在汇总复核中处理申诉，原始来源不变且修正记录关联可追溯', async () => {
@@ -357,7 +370,7 @@ describe('绩效考核公示', () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
     expect(screen.getByText('核实目标完成情况')).toBeInTheDocument();
-    expect(screen.getByText('月度目标 58 / 60 分')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '五项模块得分' })).toHaveTextContent('58 / 60 分');
   });
 
   it('HR 驳回申诉后只显示审核结果和说明，不再显示待处理或审核入口', async () => {

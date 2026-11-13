@@ -8,6 +8,7 @@ import {
 } from '../../services/kpiPerformanceDemo';
 import { correctionForEmployee, filterPublishedEmployees, listKpiAppeals, resolveKpiAppeal, restoreLegacyAppealCorrections, submitKpiAppeal, summarizeDepartmentPerformance, type KpiAppeal, type KpiAppealCorrection } from '../../services/kpiPerformancePublication';
 import './kpi-performance-demo.css';
+import { KpiPublishedResult } from './KpiPublishedResult';
 import { OkrPerformanceScoreView } from './OkrPerformanceScoreView';
 import { okrRepository } from '../../services/okrRepository';
 import mockOkrState from '../../data/mockOkrState.json';
@@ -470,9 +471,9 @@ export const KpiPerformanceDemoView: React.FC = () => {
     {!period?.generated && view !== 'public' && !(view === 'sources' && sourceDataTab === 'objective') && <div className="kpi-inline-notice"><ClockCircleOutlined /> 本月考核尚未生成，原始数据可预览；生成后将进入评分和审核流程。{role === 'HR' && <Button type="primary" size="small" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>}</div>}
 
     {view === 'public' && <section className="kpi-panel kpi-public-view">
-      <div className="kpi-view-title"><div><span className="kpi-eyebrow">FINAL RESULTS</span><h2>{monthLabel(month)}绩效公示</h2>{(period?.published || role === 'HR') && <p>{period?.published ? `公示时间 ${period.publishedAt || period.generatedAt || '未记录'} · ${role === '员工' ? '仅展示本人结果与部门汇总' : role === '主管' ? '展示当前团队最终结果' : '展示全员最终结果'}` : '本月结果尚未公示'}</p>}</div>
+      {!(period?.published && role === '员工') && <div className="kpi-view-title"><div><span className="kpi-eyebrow">FINAL RESULTS</span><h2>{monthLabel(month)}绩效公示</h2>{(period?.published || role === 'HR') && <p>{period?.published ? `公示时间 ${period.publishedAt || period.generatedAt || '未记录'} · ${role === '员工' ? '仅展示本人结果与部门汇总' : role === '主管' ? '展示当前团队最终结果' : '展示全员最终结果'}` : '本月结果尚未公示'}</p>}</div>
         {role === 'HR' && (period?.generated ? period.cycleSettings ? <Tag color="processing">按周期自动公示</Tag> : <Button type="primary" icon={<SendOutlined />} disabled={employees.some(employee => employee.reviewStatus !== '已通过') || departments.some(name => !period.departmentMetrics?.[name]?.confirmed)} onClick={publishPeriod}>公示绩效结果</Button> : <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>)}
-      </div>
+      </div>}
       {role === '主管' && period?.generated && !period.published && managerReviewOpen && <div className="kpi-inline-notice"><ClockCircleOutlined />当前团队有 {employees.filter(employee => employee.manager === supervisor && ['待主管复核', 'HR 已退回'].includes(employee.reviewStatus)).length} 位员工待复核。请在汇总复核中完成后提交给 HR。<Button type="primary" onClick={() => setView('calculation')}>进入主管复核</Button></div>}
       {period?.published && role !== '员工' ? <>
         <div className="kpi-public-overview">
@@ -493,26 +494,26 @@ export const KpiPerformanceDemoView: React.FC = () => {
           <div className="kpi-avatar">{employee.name.slice(0, 1)}</div><div className="kpi-tile-person"><b>{employee.name}</b><span>{employee.department} · {employee.position}</span></div><div className={`kpi-tile-score tone-${scoreTone(score)}`}><strong>{score.toFixed(1)}</strong><small>{grade.grade} 级</small></div><div className="kpi-tile-coeff"><span>绩效系数</span><b>{coefficientText(finalCoefficient(employee))}</b></div>
         </button>)}</div>}
       </> : period?.published && role === '员工' ? <>
-        {employeeDepartmentSummary && <>
-          <div className="kpi-public-overview kpi-employee-department-overview">
-            <div className="kpi-overview-score"><span>{employeeDepartment}平均绩效</span><strong>{employeeDepartmentSummary.averageScore.toFixed(1)}</strong><small>分 · {employeeDepartmentSummary.employeeCount} 位员工</small></div>
-            <div className="kpi-overview-metric"><span>部门考核系数</span><b>{coefficientText(employeeDepartmentSummary.departmentCoefficient)}</b><small>{employeeDepartment}公示结果</small></div>
-            <div className="kpi-grade-distribution"><span>部门等级分布</span><div>{['S', 'A', 'B', 'C', 'D', 'E'].map(grade => <div key={grade} className={`kpi-grade-count grade-${grade.toLowerCase()}`}><b>{grade}</b><small>{employeeDepartmentSummary.gradeCounts[grade as keyof typeof employeeDepartmentSummary.gradeCounts]}</small></div>)}</div></div>
-          </div>
-          {employees.find(employee => employee.id === 'e-01') ? <article className="kpi-employee-result-card">
-            {scoreBreakdown(employees.find(employee => employee.id === 'e-01')!, true)}
-            <div className="kpi-appeal-actions"><span>{ownPendingAppeal ? '申诉待 HR 处理' : appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').length ? `已处理 ${appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').length} 条申诉` : '如对评分有异议，可提交申诉'}</span><Button disabled={ownPendingAppeal} onClick={() => setAppealOpen(true)}>绩效申诉</Button></div>
-            {appeals.filter(appeal => appeal.month === month && appeal.employeeId === 'e-01').map(appeal => <div className="kpi-own-appeal" key={appeal.id}><Tag>{appeal.status}</Tag><span>{appeal.resolution || appeal.reason}</span></div>)}
-          </article> : <Empty description="暂无本人本月绩效记录" />}
-        </>}
+          {employees.find(employee => employee.id === 'e-01') && employeeDepartmentSummary ? (() => {
+            const employee = employees.find(item => item.id === 'e-01')!;
+            const ownAppeals = appeals.filter(appeal => appeal.month === month && appeal.employeeId === employee.id);
+            return <KpiPublishedResult employee={employee} departmentSummary={employeeDepartmentSummary} finalCoefficient={finalCoefficient(employee)} month={month} actions={<>
+              <div className="kpi-appeal-actions"><span>{ownPendingAppeal ? '申诉待 HR 处理' : ownAppeals.length ? `已处理 ${ownAppeals.length} 条申诉` : '如对评分有异议，可提交申诉'}</span><Button disabled={ownPendingAppeal} onClick={() => setAppealOpen(true)}>绩效申诉</Button></div>
+              {ownAppeals.map(appeal => <div className="kpi-own-appeal" key={appeal.id}><Tag>{appeal.status}</Tag><span>{appeal.resolution || appeal.reason}</span></div>)}
+            </>} />;
+          })() : <Empty description="暂无本人本月绩效记录" />}
       </> : <div className="kpi-empty-state"><div className="kpi-empty-mark"><LockOutlined /></div><h3>{period?.generated && role !== 'HR' ? '本月绩效结果尚未公示' : period?.generated ? 'HR 审核完成后即可公示' : '本月最终绩效尚未生成'}</h3>{(role === 'HR' || !period?.generated) && <p>{period?.generated ? 'HR 完成审核并公示后，员工可查看本人绩效及部门汇总。' : '由 HR 控制考核生成时间。生成后进入汇总复核与审核。'}</p>}{role === 'HR' && !period?.generated && <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>}</div>}
       <div className="kpi-demo-footnote"><LockOutlined /> 员工仅查看本人明细与部门汇总；主管查看本部门全部成员；HR 查看分部门全员结果。</div>
       <Modal open={appealOpen} title={`${monthLabel(month)}绩效申诉`} okText="提交申诉" cancelText="取消" okButtonProps={{ disabled: !appealReason.trim() }} onOk={handleAppealSubmit} onCancel={() => { setAppealOpen(false); setAppealReason(''); }}>
         <p>请说明对哪些评分项目有异议及原因，申诉记录将保存在本地演示数据中。</p>
         <Input.TextArea aria-label="申诉原因" rows={4} maxLength={500} showCount value={appealReason} placeholder="填写申诉原因" onChange={event => setAppealReason(event.target.value)} />
       </Modal>
-      <Modal open={!!detailTarget} title={detailTarget ? `${detailTarget.name} · ${monthLabel(month)}绩效结果` : ''} width={680} footer={<Button onClick={() => setDetailTarget(null)}>关闭</Button>} onCancel={() => setDetailTarget(null)}>
-        {detailTarget && scoreBreakdown(detailTarget, !!period?.published && (role === '主管' || role === 'HR'))}
+      <Modal open={!!detailTarget} title={detailTarget ? `${detailTarget.name} · ${monthLabel(month)}绩效结果` : ''} width={1440} footer={<Button onClick={() => setDetailTarget(null)}>关闭</Button>} onCancel={() => setDetailTarget(null)}>
+        {detailTarget && period?.published && (role === '主管' || role === 'HR')
+          ? departmentSummaries.find(summary => summary.department === detailTarget.department)
+            ? <KpiPublishedResult employee={detailTarget} departmentSummary={departmentSummaries.find(summary => summary.department === detailTarget.department)!} finalCoefficient={finalCoefficient(detailTarget)} month={month} />
+            : <Empty />
+          : detailTarget && scoreBreakdown(detailTarget, false)}
       </Modal>
     </section>}
 
