@@ -17,7 +17,7 @@ vi.mock('../../context/AppContext', async () => {
         addToast, invoices, setInvoices, paymentSchedules, setPaymentSchedules, invoiceApprovals, setInvoiceApprovals,
         currentUser: { id: 'user-1', name: '测试申请人', department: '财务' },
         customers: [{ id: 'customer-1', name: '测试客户' }],
-        contracts: [{ id: 'contract-1', code: 'CT-001', name: '测试合同', customerId: 'customer-1', customerName: '测试客户', relatedProduct: '', type: '主合同', amount: 2000, signDate: '', status: '履行中' }],
+        contracts: [{ id: 'contract-1', code: 'CT-001', name: '测试合同', customerId: 'customer-1', customerName: '测试客户', relatedProduct: '', type: '主合同', amount: 200000, signDate: '', status: '履行中', paymentStages: [{ phase: '初验款', percentage: 50, amount: 100000, status: '待付款', dueDate: '2026-11-30' }] }],
         projects: [{ id: 'project-1', code: 'P-001', name: '测试项目', customerId: 'customer-1', customerName: '测试客户', stage: '项目立项', progress: 20, pmName: '项目经理', startDate: '' }],
         partners: [{ id: 'partner-1', name: '测试供应商', type: '集成服务商', level: '一级', contactName: '联系人', contactPhone: '', status: '合作中' }]
       };
@@ -113,23 +113,45 @@ it('records a purchase invoice with project-derived customer and updated ledger 
   expect(screen.getByText('¥ 500')).toBeInTheDocument();
 });
 
-it('shows all payment views and preserves the plan and receipt entry flows', () => {
+it('creates a project receivable, records a partial receipt, and shows project cash position', () => {
   render(<PaymentCollectionManagementView />);
   expect(screen.getByRole('tablist', { name: '回款视图' })).toBeInTheDocument();
-  expect(screen.getByText('暂无回款计划')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('tab', { name: '实际到账记录' }));
+  expect(screen.getByText('暂无应收计划')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: '实际到账' }));
   expect(screen.getByText('暂无到账记录')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('tab', { name: '逾期与催款预警' }));
-  expect(screen.getByText('暂无逾期款项')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '新建回款计划' }));
+  fireEvent.click(screen.getByRole('tab', { name: '应收计划' }));
+  fireEvent.click(screen.getByRole('button', { name: '新建应收计划' }));
   const dialog = screen.getByRole('dialog');
-  fireEvent.change(within(dialog).getByPlaceholderText('如：SC-CT-2026-089'), { target: { value: 'SC-CT-1' } });
-  fireEvent.change(within(dialog).getByPlaceholderText('如：国家电网'), { target: { value: '测试客户' } });
-  fireEvent.change(within(dialog).getByPlaceholderText('100000'), { target: { value: '100000' } });
-  fireEvent.change(within(dialog).getByLabelText('约定截止回款日期'), { target: { value: '2026-11-30' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: '创建回款计划' }));
-  fireEvent.click(screen.getByRole('tab', { name: '回款计划台账' }));
+  fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
+  fireEvent.change(within(dialog).getByLabelText('合同付款阶段'), { target: { value: '0' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '保存应收计划' }));
   expect(screen.getByText('测试客户')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '录入到账' }));
-  expect(within(screen.getByRole('dialog')).getByRole('button', { name: '确认销账并录入' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '登记到账' }));
+  const receiptDialog = screen.getByRole('dialog');
+  fireEvent.change(within(receiptDialog).getByLabelText('本次到账金额'), { target: { value: '40000' } });
+  fireEvent.click(within(receiptDialog).getByRole('button', { name: '确认登记到账' }));
+  expect(screen.getAllByText('¥ 60,000').length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole('tab', { name: '项目收支' }));
+  expect(screen.getByRole('columnheader', { name: '实际净流入' })).toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: '预计净流入' })).toBeInTheDocument();
+});
+
+it('links a deposit refund plan to the paid project deposit and reserves its return amount', () => {
+  localStorage.setItem('shichuang.frontend.mock.accountsPayable', JSON.stringify({
+    payables: [{ id: 'deposit-1', payableCode: 'AP-DEPOSIT-1', category: '招投标保证金', supplierName: '招标单位', projectId: 'project-1', projectName: '测试项目', amount: 50000, paidAmount: 50000, unpaidAmount: 0, dueDate: '2026-10-01', status: '已结清', applicant: '财务' }],
+    payments: []
+  }));
+  render(<PaymentCollectionManagementView />);
+  fireEvent.click(screen.getByRole('button', { name: '新建应收计划' }));
+  const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('应收类别'), { target: { value: '保证金退回' } });
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
+  fireEvent.change(within(dialog).getByLabelText('原缴保证金记录'), { target: { value: 'deposit-1' } });
+  fireEvent.change(within(dialog).getByLabelText('应收说明'), { target: { value: '投标保证金退回' } });
+  fireEvent.change(within(dialog).getByLabelText('约定收款日期'), { target: { value: '2026-11-30' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '保存应收计划' }));
+  const plan = JSON.parse(localStorage.getItem('shichuang.frontend.mock.paymentCollection') || '{}').plans[0];
+  const deposit = JSON.parse(localStorage.getItem('shichuang.frontend.mock.accountsPayable') || '{}').payables[0];
+  expect(plan).toMatchObject({ sourcePayableId: 'deposit-1', planAmount: 50000, projectId: 'project-1' });
+  expect(deposit.returnPlannedAmount).toBe(50000);
 });

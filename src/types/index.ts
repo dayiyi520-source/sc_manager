@@ -1137,9 +1137,11 @@ export interface AssetRecord { id: string; assetCode: string; name: string; cate
 export interface AssetBorrowLog { id: string; assetCode: string; assetName: string; borrower: string; department: string; borrowDate: string; returnDate: string; status: string; remark?: string; }
 export interface AssetMaintenanceRecord { id: string; assetCode: string; assetName: string; issueDescription: string; repairCompany: string; cost: number; startDate: string; expectedEndDate: string; status: string; }
 export interface TaxProfile { id: string; companyName: string; taxId: string; bankName: string; bankAccount: string; addressPhone: string; isDemo?: boolean; }
-export interface PaymentPlan { id: string; planCode: string; contractCode: string; customerName: string; stageName: string; planAmount: number; receivedAmount: number; uncollectedAmount: number; dueDate: string; status: string; manager: string; }
+export type ReceivableCategory = '合同回款' | '保证金退回' | '维保续费';
+export interface PaymentPlan { id: string; planCode: string; category?: ReceivableCategory; contractId?: string; contractCode?: string; sourcePayableId?: string; projectId?: string; projectName?: string; customerId?: string; customerName: string; stageName: string; planAmount: number; receivedAmount: number; uncollectedAmount: number; dueDate: string; status: string; manager: string; }
 export interface ActualPaymentRecord { id: string; recordCode: string; planCode: string; customerName: string; amount: number; payDate: string; payMethod: string; bankSerialNo: string; operator: string; }
-export interface AccountsPayableRecord { id: string; payableCode: string; supplierName: string; purchaseOrderCode?: string; projectName?: string; amount: number; paidAmount: number; unpaidAmount: number; dueDate: string; status: string; applicant: string; note?: string; }
+export type ProjectPayableCategory = '招投标保证金' | '代理商分成' | '项目采购' | '项目外包' | '其他项目支出';
+export interface AccountsPayableRecord { id: string; payableCode: string; category?: ProjectPayableCategory; supplierName: string; purchaseOrderCode?: string; projectId?: string; projectName?: string; customerId?: string; customerName?: string; contractId?: string; contractCode?: string; amount: number; paidAmount: number; unpaidAmount: number; returnedAmount?: number; returnPlannedAmount?: number; dueDate: string; status: string; applicant: string; note?: string; }
 export interface AccountsPayablePaymentRecord { id: string; paymentCode: string; payableCode: string; supplierName: string; amount: number; payDate: string; payMethod: string; bankSerialNo: string; operator: string; }
 
 export interface VisitPlan {

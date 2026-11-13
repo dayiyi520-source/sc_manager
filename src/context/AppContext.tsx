@@ -126,7 +126,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
       { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval', icon: 'Package' },
       { id: 'comp_invoice', title: '发票管理', mainMenuId: 'approval', icon: 'Receipt' },
       { id: 'comp_payment', title: '回款管理', mainMenuId: 'approval', icon: 'Wallet' },
-      { id: 'comp_payable', title: '应付账款', mainMenuId: 'approval', icon: 'Wallet' },
+      { id: 'comp_payable', title: '项目应付', mainMenuId: 'approval', icon: 'Wallet' },
       { id: 'comp_kpi', title: '绩效考核', mainMenuId: 'approval', icon: 'Award' }
     ]
   },
