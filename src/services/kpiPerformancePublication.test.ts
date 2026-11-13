@@ -6,7 +6,7 @@ import { correctionForEmployee, filterPublishedEmployees, listKpiAppeals, resolv
 
 const employee = (id: string, department: string, manager: string, score: number): KpiEmployee => ({
   id, name: id, department, position: '专员', manager,
-  scores: { objective: score, attendance: 0, extraWork: 0, attitude: 0, review: 0, managerAdjustment: 0 },
+  scores: { objective: 60, attendance: 10, extraWork: 0, attitude: Math.min(15, Math.max(0, score - 70)), review: Math.max(0, score - 85), managerAdjustment: 0 },
   source: { okrCompletion: 0, attendanceDays: 0, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 0, reportLate: 0, reportMissing: 0, tasksOverdue: 0 },
   reviewStatus: '已通过',
 });
@@ -107,9 +107,10 @@ describe('绩效申诉 Mock 持久化', () => {
     const appeal = submitKpiAppeal({ month: '2026-10', employeeId: original.id, employeeName: original.name, reason: '目标和周报分数有误' });
     const correction = { ...correctionForEmployee(original), okrCompletion: 105, objectiveScore: 60, reportLate: 1, reviewScore: 8 };
     const resolved = resolveKpiAppeal(period, '2026-10', appeal.id, 'HR', 'correct', '已核对来源', correction);
-    const legacyEmployee = { ...resolved.period.employees[0], source: { ...original.source, okrCompletion: 105, reportLate: 1 }, scores: { ...original.scores, objective: 60, review: 8 }, sourceCorrection: { objective: true, reports: true }, approvedSourceCorrections: undefined };
+    const legacyEmployee = { ...resolved.period.employees[0], source: { ...original.source, okrCompletion: 105, reportLate: 1 }, scores: { ...original.scores, objective: 60, review: 8 }, sourceCorrection: { objective: true, reports: true, attendance: true, extraWork: true }, approvedSourceCorrections: undefined };
     const migrated = restoreLegacyAppealCorrections({ periods: { ...loadKpiDemo().periods, '2026-10': { ...resolved.period, employees: [legacyEmployee, ...resolved.period.employees.slice(1)] } } });
     expect(migrated.periods['2026-10'].employees[0]).toMatchObject({ source: { okrCompletion: original.source.okrCompletion, reportLate: original.source.reportLate }, scores: { objective: original.scores.objective, review: original.scores.review }, approvedSourceCorrections: expect.any(Array) });
     expect(migrated.periods['2026-10'].employees[0].approvedSourceCorrections).toHaveLength(2);
+    expect(migrated.periods['2026-10'].employees[0].sourceCorrection).toEqual({ attendance: true, extraWork: true });
   });
 });

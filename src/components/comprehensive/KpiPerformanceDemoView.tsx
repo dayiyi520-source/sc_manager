@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, DatePicker, Empty, Input, InputNumber, message, Modal, Select, Switch, Tag } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { AuditOutlined, CheckOutlined, ClockCircleOutlined, DatabaseOutlined, DownOutlined, FileSearchOutlined, FlagOutlined, LineChartOutlined, LockOutlined, PlusOutlined, RightOutlined, SendOutlined, TrophyOutlined } from '@ant-design/icons';
+import { AuditOutlined, CheckOutlined, ClockCircleOutlined, DatabaseOutlined, DownOutlined, EditOutlined, FileSearchOutlined, FlagOutlined, LineChartOutlined, LockOutlined, PlusOutlined, RightOutlined, SendOutlined, TrophyOutlined } from '@ant-design/icons';
 import {
-  confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, departmentRedlineChoices, effectiveKpiSourceData, gradeForScore, isMonthlyGoalLate, isWithinKpiWindow, KPI_DIMENSIONS, KPI_MONTHS, loadKpiDemo, publishKpiPeriod, saveKpiDemo, validateKpiCycleSettings,
-  reviewEmployeeSubmission, reportScoreFor, scoreForEmployee, kpiDimensionScores, goalAdjustmentDraft, sourceAdjustmentFor, submitEmployeeReview, syncKpiSources, type KpiCycleSettings, type KpiDemoState, type KpiDepartmentMetrics, type KpiEmployee, type KpiPeriod,
+  applyKpiSourceEdit, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, departmentRedlineChoices, effectiveKpiSourceData, gradeForScore, isMonthlyGoalLate, isWithinKpiWindow, KPI_DIMENSIONS, KPI_MONTHS, kpiSourceEditValues, loadKpiDemo, publishKpiPeriod, saveKpiDemo, validateKpiCycleSettings,
+  reviewEmployeeSubmission, reportScoreFor, scoreForEmployee, effectiveKpiScores, kpiDimensionScores, goalAdjustmentDraft, sourceAdjustmentFor, submitEmployeeReview, syncKpiSources, type KpiCycleSettings, type KpiDemoState, type KpiDepartmentMetrics, type KpiEmployee, type KpiPeriod, type KpiSourceCategory, type KpiSourceEditValues,
 } from '../../services/kpiPerformanceDemo';
 import { correctionForEmployee, filterPublishedEmployees, listKpiAppeals, resolveKpiAppeal, restoreLegacyAppealCorrections, submitKpiAppeal, summarizeDepartmentPerformance, type KpiAppeal, type KpiAppealCorrection } from '../../services/kpiPerformancePublication';
 import './kpi-performance-demo.css';
@@ -32,6 +32,23 @@ const sourceDataTabs: Array<{ key: SourceDataKey; label: string }> = [
   { key: 'extraWork', label: '额外工作投入' },
   { key: 'reports', label: '周月报' },
 ];
+
+const sourceEditFields: Record<SourceDataKey, Array<{ key: string; label: string; min: number; max: number; step: number }>> = {
+  objective: [{ key: 'okrCompletion', label: '目标完成率（%）', min: 0, max: 200, step: 0.1 }, { key: 'objectiveScore', label: '目标得分', min: 0, max: 60, step: 0.1 }],
+  attendance: [
+    { key: 'attendanceDays', label: '出勤天数', min: 0, max: 31, step: 1 }, { key: 'lateCount', label: '迟到次数', min: 0, max: 31, step: 1 },
+    { key: 'lateMinutes', label: '迟到分钟', min: 0, max: 1440, step: 1 }, { key: 'missingPunches', label: '缺卡次数', min: 0, max: 31, step: 1 },
+    { key: 'earlyLeaveCount', label: '早退次数', min: 0, max: 31, step: 1 }, { key: 'absenceCount', label: '旷工次数', min: 0, max: 31, step: 1 },
+    { key: 'annualLeave', label: '年假天数', min: 0, max: 31, step: 0.5 }, { key: 'compensatoryLeave', label: '调休天数', min: 0, max: 31, step: 0.5 },
+    { key: 'personalLeave', label: '事假天数', min: 0, max: 31, step: 0.5 }, { key: 'sickLeave', label: '病假天数', min: 0, max: 31, step: 0.5 },
+  ],
+  extraWork: [{ key: 'approvedOvertimeHours', label: '审批加班时长（小时）', min: 0, max: 744, step: 0.5 }],
+  reports: [
+    { key: 'reportLate', label: '周报迟交次数', min: 0, max: 31, step: 1 }, { key: 'monthlyReportLate', label: '月报迟交次数', min: 0, max: 31, step: 1 },
+    { key: 'weeklyReportMissing', label: '周报未交次数', min: 0, max: 31, step: 1 }, { key: 'reportMissing', label: '月报未交次数', min: 0, max: 31, step: 1 },
+    { key: 'tasksOverdue', label: '任务逾期数', min: 0, max: 31, step: 1 },
+  ],
+};
 
 const monthLabel = (month: string) => `${month.slice(0, 4)}年${Number(month.slice(5))}月`;
 const coefficientText = (value: number) => Number.isInteger(value) ? value.toFixed(1) : value.toFixed(2);
@@ -75,6 +92,9 @@ export const KpiPerformanceDemoView: React.FC = () => {
   const [collapsedReviewDepartments, setCollapsedReviewDepartments] = useState<Set<string>>(() => new Set());
   const [reviewFilter, setReviewFilter] = useState<ReviewFilterKey>('all');
   const [sourceCorrectionTarget, setSourceCorrectionTarget] = useState<{ employee: KpiEmployee; source: 'objective' | 'reports' } | null>(null);
+  const [sourceEditTarget, setSourceEditTarget] = useState<{ employee: KpiEmployee; category: KpiSourceCategory } | null>(null);
+  const [sourceEditValues, setSourceEditValues] = useState<KpiSourceEditValues>({});
+  const [sourceEditReason, setSourceEditReason] = useState('');
 
   useEffect(() => { saveKpiDemo(state); }, [state]);
   useEffect(() => {
@@ -158,6 +178,10 @@ export const KpiPerformanceDemoView: React.FC = () => {
   }, new Map<string, KpiEmployee[]>())], [workflowEmployees, role, view, reviewFilter, monthAppeals]);
   const departments: string[] = [...new Set<string>(employees.map(employee => employee.department))];
   const managerReviewOpen = !!period?.cycleSettings && isWithinKpiWindow(period.cycleSettings.managerReview, clock);
+  const canEditSource = (employee: KpiEmployee) => !!period?.generated && !period.published && (
+    (role === '主管' && managerReviewOpen && employee.manager === supervisor && ['待主管复核', 'HR 已退回'].includes(employee.reviewStatus))
+    || (role === 'HR' && employee.reviewStatus === '待 HR 审核')
+  );
   const confirmedDepartmentCount = departments.filter(name => period.departmentMetrics?.[name]?.confirmed).length;
   const matchingFactorDepartments = departments.filter(name => name.includes(factorQuery.trim()));
   const activeFactorDepartment = matchingFactorDepartments.includes(factorDepartment) ? factorDepartment : matchingFactorDepartments[0];
@@ -206,6 +230,30 @@ export const KpiPerformanceDemoView: React.FC = () => {
       reason: employee.managerDraft?.reason ?? '',
     } };
   });
+  const openSourceEditor = (employee: KpiEmployee, category: KpiSourceCategory) => {
+    if (!canEditSource(employee)) return;
+    setSourceEditTarget({ employee, category });
+    setSourceEditValues(kpiSourceEditValues(employee, category));
+    setSourceEditReason('');
+  };
+  const saveSourceEdit = () => {
+    if (!sourceEditTarget || !canEditSource(employees.find(employee => employee.id === sourceEditTarget.employee.id) || sourceEditTarget.employee)) return;
+    const currentEmployee = employees.find(employee => employee.id === sourceEditTarget.employee.id);
+    if (!currentEmployee) return;
+    try {
+      const updated = applyKpiSourceEdit(currentEmployee, sourceEditTarget.category, sourceEditValues, sourceEditReason, role);
+      updatePeriod(current => ({
+        ...current,
+        departmentMetrics: { ...current.departmentMetrics, [updated.department]: { teamCompletion: 100, ...current.departmentMetrics?.[updated.department], confirmed: false } },
+        employees: current.employees.map(employee => employee.id === updated.id ? updated : employee),
+      }));
+      setSourceEditTarget(null);
+      setSourceEditReason('');
+      messageApi.success(`${updated.name}的原始考核数据已保存，相关得分已重算`);
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : '原始数据保存失败');
+    }
+  };
   const requireHr = () => {
     if (role === 'HR') return true;
     messageApi.warning('切换到 HR 体验视角后可执行此操作');
@@ -283,6 +331,8 @@ export const KpiPerformanceDemoView: React.FC = () => {
   };
 
   const handleRoleChange = (nextRole: DemoRole) => {
+    setSourceEditTarget(null);
+    setSourceEditReason('');
     setRole(nextRole);
     setQuery('');
     setDepartment('全部部门');
@@ -435,9 +485,9 @@ export const KpiPerformanceDemoView: React.FC = () => {
   };
 
   const scoreBreakdown = (employee: KpiEmployee, showAdjustment = false) => <div className="kpi-detail-content">
-    {(() => { const source = effectiveKpiSourceData(employee); const { objective: objectiveScore, review: reviewScore } = kpiDimensionScores(employee); return <>
+    {(() => { const source = effectiveKpiSourceData(employee); const effectiveScores = effectiveKpiScores(employee); const { objective: objectiveScore } = effectiveScores; return <>
     <div className="kpi-detail-identity"><div className="kpi-avatar">{employee.name.slice(0, 1)}</div><div><b>{employee.name}</b><span>{employee.department} · {employee.position}</span></div><strong>{scoreForEmployee(employee).toFixed(1)} 分</strong></div>
-    <div className="kpi-detail-dimensions">{KPI_DIMENSIONS.map(dimension => { const value = dimension.key === 'objective' ? objectiveScore : dimension.key === 'review' ? reviewScore : employee.scores[dimension.key]; const label = showAdjustment && dimension.key === 'attendance' ? '考勤' : showAdjustment && dimension.key === 'review' ? '周月报提交' : dimension.label.replace('（演示）', ''); return <div key={dimension.key}><span>{label}</span><b>{value}<small> / {dimension.max} 分</small></b><div className="kpi-detail-bar"><i style={{ width: `${Math.max(0, Math.min(100, value / dimension.max * 100))}%` }} /></div></div>; })}</div>
+    <div className="kpi-detail-dimensions">{KPI_DIMENSIONS.map(dimension => { const value = effectiveScores[dimension.key]; const label = showAdjustment && dimension.key === 'attendance' ? '考勤' : showAdjustment && dimension.key === 'review' ? '周月报提交' : dimension.label.replace('（演示）', ''); return <div key={dimension.key}><span>{label}</span><b>{value}<small> / {dimension.max} 分</small></b><div className="kpi-detail-bar"><i style={{ width: `${Math.max(0, Math.min(100, value / dimension.max * 100))}%` }} /></div></div>; })}</div>
     {showAdjustment && scoreAdjustmentDetails(employee)}
     <div className="kpi-detail-sources">
       <div><span>目标完成率（演示）</span><b>{source.okrCompletion}%</b><small>月度目标 {objectiveScore} / 60 分</small></div>
@@ -463,8 +513,8 @@ export const KpiPerformanceDemoView: React.FC = () => {
       <div className="kpi-header-actions">
         <Tag color="gold">演示数据</Tag>
         <Select aria-label="体验角色" value={role} options={['HR', '主管', '员工'].map(value => ({ value, label: `${value}视角` }))} onChange={handleRoleChange} />
-        {role === '主管' && <Select aria-label="当前主管" value={supervisor} options={[...new Set(employees.map(employee => employee.manager))].map(value => ({ value, label: `${value}的团队` }))} onChange={value => { setSupervisor(value); setSelectedId(employees.find(employee => employee.manager === value)?.id || 'e-01'); }} />}
-        <Select aria-label="考核月份" disabled={cycleSettingsOpen} value={month} options={KPI_MONTHS.map(value => ({ value, label: monthLabel(value) }))} onChange={value => { setMonth(value); setSelectedId('e-01'); setDepartment('全部部门'); setFactorDepartment(''); setFactorQuery(''); setRedlineEmployeeId(null); }} />
+        {role === '主管' && <Select aria-label="当前主管" value={supervisor} options={[...new Set(employees.map(employee => employee.manager))].map(value => ({ value, label: `${value}的团队` }))} onChange={value => { setSourceEditTarget(null); setSupervisor(value); setSelectedId(employees.find(employee => employee.manager === value)?.id || 'e-01'); }} />}
+        <Select aria-label="考核月份" disabled={cycleSettingsOpen} value={month} options={KPI_MONTHS.map(value => ({ value, label: monthLabel(value) }))} onChange={value => { setSourceEditTarget(null); setSourceEditReason(''); setMonth(value); setSelectedId('e-01'); setDepartment('全部部门'); setFactorDepartment(''); setFactorQuery(''); setRedlineEmployeeId(null); }} />
       </div>
     </header>
 
@@ -520,14 +570,18 @@ export const KpiPerformanceDemoView: React.FC = () => {
     {view === 'sources' && <section className="kpi-panel">
       <div className="kpi-view-title"><div><span className="kpi-eyebrow">SOURCE RECORDS</span><h2>考核原始数据</h2><p>按来源查看考核数据</p></div>{role !== '员工' && <div className="kpi-filter-row"><Input allowClear placeholder="搜索员工姓名" value={query} onChange={event => setQuery(event.target.value)} prefix={<FileSearchOutlined />} /><Select aria-label="筛选部门" value={sourceDepartments.includes(department) ? department : '全部部门'} options={['全部部门', ...sourceDepartments].map(value => ({ value, label: value }))} onChange={setDepartment} />{sourceDataTab !== 'objective' && <Button icon={<DatabaseOutlined />} loading={syncing} disabled={!period || period.published} onClick={syncSources}>同步数据</Button>}</div>}</div>
       <div className="kpi-source-tabs" role="tablist" aria-label="原始数据分类">{sourceDataTabs.map(item => <button key={item.key} role="tab" aria-selected={sourceDataTab === item.key} className={sourceDataTab === item.key ? 'is-active' : ''} onClick={() => setSourceDataTab(item.key)}>{item.label}</button>)}</div>
-      {sourceDataTab === 'objective' ? <OkrPerformanceScoreView month={month} employees={filteredEmployees} onScoresLoaded={scores => {
+      {role !== '员工' && <div className="kpi-inline-notice"><EditOutlined />{role === 'HR' ? 'HR 可修改待 HR 审核员工的原始数据；其他状态和已公示月份只读。' : managerReviewOpen ? '复核期间可修改本人负责且待主管复核或已退回的员工原始数据；已提交 HR 审核的记录只读。' : '仅主管复核时间范围内可修改本人负责且待复核或已退回的员工原始数据。'}</div>}
+      {sourceDataTab === 'objective' ? <OkrPerformanceScoreView month={month} employees={filteredEmployees} onEditEmployee={employeeId => {
+        const employee = employees.find(item => item.id === employeeId);
+        if (employee) openSourceEditor(employee, 'objective');
+      }} canEditEmployee={employeeId => { const employee = employees.find(item => item.id === employeeId); return !!employee && canEditSource(employee); }} onScoresLoaded={scores => {
         if (month !== '2026-11') return;
-        updatePeriod(current => ({ ...current, employees: current.employees.map(employee => scores[employee.id]
+        updatePeriod(current => ({ ...current, employees: current.employees.map(employee => scores[employee.id] && !employee.sourceCorrection?.objective
           ? { ...employee, scores: { ...employee.scores, objective: scores[employee.id].objective }, source: { ...employee.source, okrCompletion: scores[employee.id].completion, objectiveFromOkr: true } }
           : employee) }));
       }} /> : <>
-      <div className="kpi-inline-notice"><DatabaseOutlined /> 数据范围：{monthLabel(month)} · {sourceDataTab !== 'attendance' && <>最后同步 {period?.sourceSyncedAt || '尚未同步'} · </>}{filteredEmployees.length} 位员工</div>
-      <div className="kpi-source-table-wrap"><table className="kpi-source-table"><thead><tr><th>员工</th><th>部门</th>{sourceDataTab === 'objective' && <><th>目标完成率</th><th>基础得分</th><th>目标加分</th><th>目标扣分</th><th>数据状态</th><th>绩效修正记录</th></>}{sourceDataTab === 'attendance' && <><th>出勤天数</th><th>累计迟到</th><th>缺卡次数</th><th>早退次数</th><th>旷工次数</th><th>请假天数</th><th>请假记录</th><th>考勤得分</th></>}{sourceDataTab === 'extraWork' && <><th>加班总时长</th><th>折算得分</th><th>月度上限</th><th>额外工作得分</th></>}{sourceDataTab === 'reports' && <><th>周报迟交</th><th>月报迟交</th><th>周报未交</th><th>月报未交</th><th>任务逾期</th><th>复盘得分</th></>}</tr></thead><tbody>{filteredEmployees.map(employee => <tr key={employee.id} className={selectedId === employee.id ? 'is-selected' : ''} onClick={() => setSelectedId(employee.id)}>{<td><b>{employee.name}</b></td>}<td>{employee.department}</td>{sourceDataTab === 'objective' && <><td>{employee.source.okrCompletion}%</td><td>{employee.scores.objective.toFixed(1)}</td><td>{sourceAdjustmentFor(employee) > 0 ? sourceAdjustmentFor(employee).toFixed(1) : '0'}</td><td>{sourceAdjustmentFor(employee) < 0 ? Math.abs(sourceAdjustmentFor(employee)).toFixed(1) : '0'}</td><td><Tag color={employee.source.okrCompletion >= 80 ? 'success' : 'warning'}>{employee.source.okrCompletion >= 80 ? '已核对' : '待核对'}</Tag></td><td>{sourceCorrectionButton(employee, 'objective')}</td></>}{sourceDataTab === 'attendance' && <><td>{employee.source.attendanceDays} 天</td><td>{employee.source.lateMinutes ?? 0} 分钟</td><td>{employee.source.missingPunches}</td><td>{employee.source.earlyLeaveCount ?? 0}</td><td>{employee.source.absenceCount ?? 0}</td><td>{Object.values(employee.source.leaveRecords || {}).reduce<number>((sum, days) => sum + Number(days), 0)} 天</td><td>{Object.entries(employee.source.leaveRecords || {}).filter(([, days]) => Number(days) > 0).map(([type, days]) => `${type} ${days} 天`).join('，') || '无'}</td><td>{employee.scores.attendance.toFixed(1)} 分</td></>}{sourceDataTab === 'extraWork' && <><td>{employee.source.approvedOvertimeHours} 小时</td><td>{(employee.source.approvedOvertimeHours / 18 * 5).toFixed(2)} 分</td><td>{employee.scores.attendance === 0 ? 5 : 10} 分</td><td>{employee.scores.extraWork.toFixed(2)} 分</td></>}{sourceDataTab === 'reports' && <><td>{employee.source.reportLate}</td><td>{employee.source.monthlyReportLate ?? 0}</td><td>{employee.source.weeklyReportMissing ?? 0}</td><td>{employee.source.reportMissing}</td><td>{employee.source.tasksOverdue}</td><td>{employee.scores.review.toFixed(1)}</td></>}</tr>)}</tbody></table></div>
+      <div className="kpi-inline-notice"><DatabaseOutlined /> 数据范围：{monthLabel(month)} · {role === 'HR' ? '全部员工' : role === '主管' ? `${supervisor}负责范围` : '本人'} · {sourceDataTab !== 'attendance' && <>最后同步 {period?.sourceSyncedAt || '尚未同步'} · </>}{filteredEmployees.length} 位员工</div>
+      <div className="kpi-source-table-wrap"><table className="kpi-source-table"><thead><tr><th>员工</th><th>部门</th>{sourceDataTab === 'objective' && <><th>目标完成率</th><th>基础得分</th><th>目标加分</th><th>目标扣分</th><th>数据状态</th><th>绩效修正记录</th></>}{sourceDataTab === 'attendance' && <><th>出勤天数</th><th>累计迟到</th><th>缺卡次数</th><th>早退次数</th><th>旷工次数</th><th>请假天数</th><th>请假记录</th><th>考勤得分</th></>}{sourceDataTab === 'extraWork' && <><th>加班总时长</th><th>折算得分</th><th>月度上限</th><th>额外工作得分</th></>}{sourceDataTab === 'reports' && <><th>周报迟交</th><th>月报迟交</th><th>周报未交</th><th>月报未交</th><th>任务逾期</th><th>复盘得分</th></>}<th>数据修正</th></tr></thead><tbody>{filteredEmployees.map(employee => <tr key={employee.id} className={selectedId === employee.id ? 'is-selected' : ''} onClick={() => setSelectedId(employee.id)}>{<td><b>{employee.name}</b></td>}<td>{employee.department}</td>{sourceDataTab === 'objective' && <><td>{employee.source.okrCompletion}%</td><td>{employee.scores.objective.toFixed(1)}</td><td>{sourceAdjustmentFor(employee) > 0 ? sourceAdjustmentFor(employee).toFixed(1) : '0'}</td><td>{sourceAdjustmentFor(employee) < 0 ? Math.abs(sourceAdjustmentFor(employee)).toFixed(1) : '0'}</td><td><Tag color={employee.source.okrCompletion >= 80 ? 'success' : 'warning'}>{employee.source.okrCompletion >= 80 ? '已核对' : '待核对'}</Tag></td><td>{sourceCorrectionButton(employee, 'objective')}</td></>}{sourceDataTab === 'attendance' && <><td>{employee.source.attendanceDays} 天</td><td>{employee.source.lateMinutes ?? 0} 分钟</td><td>{employee.source.missingPunches}</td><td>{employee.source.earlyLeaveCount ?? 0}</td><td>{employee.source.absenceCount ?? 0}</td><td>{Object.values(employee.source.leaveRecords || {}).reduce<number>((sum, days) => sum + Number(days), 0)} 天</td><td>{Object.entries(employee.source.leaveRecords || {}).filter(([, days]) => Number(days) > 0).map(([type, days]) => `${type} ${days} 天`).join('，') || '无'}</td><td>{employee.scores.attendance.toFixed(1)} 分</td></>}{sourceDataTab === 'extraWork' && <><td>{employee.source.approvedOvertimeHours} 小时</td><td>{(employee.source.approvedOvertimeHours / 18 * 5).toFixed(2)} 分</td><td>{employee.scores.attendance === 0 ? 5 : 10} 分</td><td>{employee.scores.extraWork.toFixed(2)} 分</td></>}{sourceDataTab === 'reports' && <><td>{employee.source.reportLate}</td><td>{employee.source.monthlyReportLate ?? 0}</td><td>{employee.source.weeklyReportMissing ?? 0}</td><td>{employee.source.reportMissing}</td><td>{employee.source.tasksOverdue}</td><td>{employee.scores.review.toFixed(1)}</td></>}<td><Button type="link" size="small" icon={<EditOutlined />} disabled={!canEditSource(employee)} onClick={event => { event.stopPropagation(); openSourceEditor(employee, sourceDataTab); }}>{canEditSource(employee) ? '修改' : '只读'}</Button></td></tr>)}</tbody></table></div>
       {filteredEmployees.length === 0 && <Empty description="没有匹配的员工原始数据" />}
       </>}
     </section>}
@@ -551,7 +605,7 @@ export const KpiPerformanceDemoView: React.FC = () => {
         })}{reviewFilter !== 'all' && employeeGroups.length === 0 && <Empty description="暂无待处理事项" />}</> : <><div className="kpi-rail-heading">我的团队 <Tag>{accessibleEmployees.length}</Tag></div>{accessibleEmployees.map(employee => <button type="button" key={employee.id} className={selectedEmployee?.id === employee.id ? 'is-active' : ''} onClick={() => setSelectedId(employee.id)}><span className="kpi-avatar">{employee.name.slice(0, 1)}</span><span><b>{employee.name}</b><small>{employee.department} · {employee.reviewStatus}</small></span><i className={`kpi-status-dot ${employee.reviewStatus === '已通过' ? 'is-done' : employee.reviewStatus === '待 HR 审核' ? 'is-hr' : ''}`} /></button>)}</>}
       </div>
         {selectedEmployee && <div className="kpi-calc-detail"><div className="kpi-calc-person"><div><span className="kpi-eyebrow">EMPLOYEE PERFORMANCE</span><h3>{selectedEmployee.name}<small>{selectedEmployee.department} · {selectedEmployee.position}</small></h3><p>直属主管：{selectedEmployee.manager}</p></div><Tag color={selectedEmployee.reviewStatus === '已通过' ? 'success' : selectedEmployee.reviewStatus === '待 HR 审核' ? 'processing' : selectedEmployee.reviewStatus === 'HR 已退回' ? 'error' : 'warning'}>{selectedEmployee.reviewStatus}</Tag></div>
-          <div className="kpi-calc-scoreboard">{KPI_DIMENSIONS.map(dimension => <div key={dimension.key}><span>{dimension.label}<small>{dimension.weight}</small></span><b>{dimension.key === 'objective' ? kpiDimensionScores(selectedEmployee).objective : dimension.key === 'review' ? kpiDimensionScores(selectedEmployee).review : selectedEmployee.scores[dimension.key]}<small> / {dimension.max}</small></b></div>)}{selectedEmployee.scoreAllocationVersion === 2 ? <><div className="is-adjustment"><span>目标加分<small>已计入月度目标</small></span><b className="is-positive">+{goalAdjustmentDraft(selectedEmployee).bonus.toFixed(1)}</b></div><div className="is-adjustment"><span>目标减分<small>已计入月度目标</small></span><b className="is-negative">-{goalAdjustmentDraft(selectedEmployee).deduction.toFixed(1)}</b></div><div className="is-adjustment"><span>临时任务扣分（已计入周月报）</span><b className={selectedEmployee.scores.temporaryTaskDeduction ? 'is-negative' : ''}>{(selectedEmployee.scores.temporaryTaskDeduction ?? 0).toFixed(1)}</b></div></> : <div className="is-adjustment"><span>人工加减分<small>需填写原因</small></span><b className={selectedEmployee.scores.managerAdjustment > 0 ? 'is-positive' : selectedEmployee.scores.managerAdjustment < 0 ? 'is-negative' : ''}>{selectedEmployee.scores.managerAdjustment > 0 ? '+' : ''}{selectedEmployee.scores.managerAdjustment.toFixed(1)}</b></div>}</div>
+          <div className="kpi-calc-scoreboard">{KPI_DIMENSIONS.map(dimension => <div key={dimension.key}><span>{dimension.label}<small>{dimension.weight}</small></span><b>{effectiveKpiScores(selectedEmployee)[dimension.key]}<small> / {dimension.max}</small></b></div>)}{selectedEmployee.scoreAllocationVersion === 2 ? <><div className="is-adjustment"><span>目标加分<small>已计入月度目标</small></span><b className="is-positive">+{goalAdjustmentDraft(selectedEmployee).bonus.toFixed(1)}</b></div><div className="is-adjustment"><span>目标减分<small>已计入月度目标</small></span><b className="is-negative">-{goalAdjustmentDraft(selectedEmployee).deduction.toFixed(1)}</b></div><div className="is-adjustment"><span>临时任务扣分（已计入周月报）</span><b className={selectedEmployee.scores.temporaryTaskDeduction ? 'is-negative' : ''}>{(selectedEmployee.scores.temporaryTaskDeduction ?? 0).toFixed(1)}</b></div></> : <div className="is-adjustment"><span>人工加减分<small>需填写原因</small></span><b className={selectedEmployee.scores.managerAdjustment > 0 ? 'is-positive' : selectedEmployee.scores.managerAdjustment < 0 ? 'is-negative' : ''}>{selectedEmployee.scores.managerAdjustment > 0 ? '+' : ''}{selectedEmployee.scores.managerAdjustment.toFixed(1)}</b></div>}</div>
           <div className="kpi-total-score"><div><span>基础绩效分</span><small>按五项得分合计</small></div><strong>{scoreForEmployee(selectedEmployee).toFixed(1)}<small>分</small></strong><div className={`kpi-grade-stamp grade-${gradeForScore(scoreForEmployee(selectedEmployee)).grade.toLowerCase()}`}><b>{gradeForScore(scoreForEmployee(selectedEmployee)).grade}</b><span>基础系数 {coefficientText(gradeForScore(scoreForEmployee(selectedEmployee)).coefficient)}</span></div></div>
           {selectedEmployee.reviewStatus === '已通过' && selectedEmployee.scoreAllocationVersion === 2 && scoreAdjustmentDetails(selectedEmployee)}
           <div className="kpi-rule-line"><span>数据范围</span><b>全部为演示数据，月度目标暂未关联</b><span>计算版本</span><b>演示规则 V1</b></div>
@@ -606,6 +660,15 @@ export const KpiPerformanceDemoView: React.FC = () => {
         </div>}
         {!cycleDraft && period?.generated && !period.published && <div className="kpi-cycle-empty"><p>尚未配置本月周期</p><Button type="primary" onClick={() => { const base = dayjs().add(1, 'day').startOf('day'); setCycleDraft({ monthlyGoalDeadline: dayjs(month).date(5).hour(18).minute(0).second(0).toISOString(), managerReview: { startAt: base.toISOString(), endAt: base.add(3, 'day').toISOString() }, finalPublicationAt: base.add(4, 'day').toISOString(), appealConfirmation: { startAt: base.add(4, 'day').add(1, 'minute').toISOString(), endAt: base.add(8, 'day').toISOString() } }); }}>设置周期</Button></div>}
       </div>
+    </Modal>
+
+    <Modal open={!!sourceEditTarget} title={sourceEditTarget ? `${sourceEditTarget.employee.name} · ${sourceDataTabs.find(item => item.key === sourceEditTarget.category)?.label}原始数据修正` : '原始数据修正'} okText="保存修正" cancelText="取消" onCancel={() => { setSourceEditTarget(null); setSourceEditReason(''); }} onOk={saveSourceEdit} okButtonProps={{ disabled: !sourceEditReason.trim() }} width={720}>
+      {sourceEditTarget && <>
+        <div className="kpi-inline-notice"><DatabaseOutlined />修改后立即重算相关绩效分数，记录修改前后数据与原因；本月数据保存在当前演示环境。</div>
+        <div className="kpi-source-edit-grid">{sourceEditFields[sourceEditTarget.category].map(field => <label key={field.key}>{field.label}<InputNumber min={field.min} max={field.max} step={field.step} value={sourceEditValues[field.key]} onChange={value => setSourceEditValues(current => ({ ...current, [field.key]: Number(value ?? 0) }))} /></label>)}</div>
+        <label className="kpi-source-edit-reason">修改原因<Input.TextArea rows={3} maxLength={200} value={sourceEditReason} placeholder="说明数据修正依据" onChange={event => setSourceEditReason(event.target.value)} /></label>
+        {!!sourceEditTarget.employee.sourceEditHistory?.filter(record => record.category === sourceEditTarget.category).length && <section className="kpi-source-edit-history" aria-label="本类数据修改记录"><h3>修改记录</h3>{sourceEditTarget.employee.sourceEditHistory.filter(record => record.category === sourceEditTarget.category).slice().reverse().map(record => <div key={record.id}><b>{dayjs(record.at).format('YYYY-MM-DD HH:mm')} · {record.actor}</b><span>{record.reason}</span><small>变更项：{Object.keys(record.after).filter(key => record.before[key] !== record.after[key]).map(key => `${sourceEditFields[record.category].find(field => field.key === key)?.label || key} ${record.before[key]} → ${record.after[key]}`).join('；') || '数据未变化'}</small></div>)}</section>}
+      </>}
     </Modal>
 
     {view === 'hr' && <section className="kpi-panel">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Empty, Tag } from 'antd';
-import { DatabaseOutlined } from '@ant-design/icons';
+import { Button, Empty, Tag } from 'antd';
+import { DatabaseOutlined, EditOutlined } from '@ant-design/icons';
 import { okrRepository, type OkrPerson, type OkrRecord } from '../../services/okrRepository';
 import { calculateOkrScore, scoreObjectivesFor } from '../../services/okrPerformanceScore';
 import type { KpiEmployee } from '../../services/kpiPerformanceDemo';
@@ -10,12 +10,14 @@ interface Props {
   month: string;
   employees: KpiEmployee[];
   onScoresLoaded?: (scores: Record<string, { completion: number; objective: number }>) => void;
+  onEditEmployee?: (employeeId: string) => void;
+  canEditEmployee?: (employeeId: string) => boolean;
 }
 
 const demoPeople = mockOkrState.okrPeople.filter(person => /^e-0[1-6]$/.test(person.id)) as OkrPerson[];
 const demoRecords = mockOkrState.okrRecords.filter(record => record.id.startsWith('kpi-demo-goal-e-')) as OkrRecord[];
 
-export function OkrPerformanceScoreView({ month, employees, onScoresLoaded }: Props) {
+export function OkrPerformanceScoreView({ month, employees, onScoresLoaded, onEditEmployee, canEditEmployee }: Props) {
   const [people, setPeople] = useState<OkrPerson[]>(demoPeople);
   const [records, setRecords] = useState<OkrRecord[]>(demoRecords);
 
@@ -51,12 +53,13 @@ export function OkrPerformanceScoreView({ month, employees, onScoresLoaded }: Pr
   return <>
     <div className="kpi-inline-notice"><DatabaseOutlined /> 数据范围：{month.slice(0, 4)}年{Number(month.slice(5))}月 · {employees.length} 位员工</div>
     <div className="kpi-source-table-wrap"><table className="kpi-source-table"><thead><tr>
-      <th>员工</th><th>部门</th><th>月度目标完成率</th><th>目标基础分</th><th>KR 完成率扣分</th><th>刚性红线</th><th>综合基础分</th><th>备注</th>
+      <th>员工</th><th>部门</th><th>月度目标完成率</th><th>目标基础分</th><th>KR 完成率扣分</th><th>刚性红线</th><th>综合基础分</th><th>备注</th>{onEditEmployee && <th>数据修正</th>}
     </tr></thead><tbody>{employees.map(employee => {
       const goals = scoreObjectivesFor(records, people, employee.id, month, 'personal');
       const score = calculateOkrScore(goals, []);
       const promised = goals.filter(goal => goal.type === 'target');
-      const completion = promised.reduce((sum, goal) => sum + goal.weight * goal.progress / 100, 0);
+      const sourceEdited = !!employee.sourceCorrection?.objective;
+      const completion = sourceEdited ? employee.source.okrCompletion : promised.reduce((sum, goal) => sum + goal.weight * goal.progress / 100, 0);
       const below90 = promised.filter(goal => goal.progress < 90);
       const below80 = promised.filter(goal => goal.progress < 80);
       const reasons = [
@@ -64,12 +67,13 @@ export function OkrPerformanceScoreView({ month, employees, onScoresLoaded }: Pr
         ...(below80.length ? [`承诺型 O「${below80.map(goal => goal.title).join('、')}」完成率低于 80%`] : []),
       ];
       return <tr key={employee.id}><td><b>{employee.name}</b></td><td>{employee.department}</td>
-        <td>{score.validWeights ? `${completion.toFixed(1)}%` : '—'}</td>
-        <td>{score.validWeights ? score.base.toFixed(2) : '—'}</td>
-        <td>{score.validWeights ? score.automaticDeduction.toFixed(2) : '—'}</td>
+        <td>{sourceEdited || score.validWeights ? `${completion.toFixed(1)}%` : '—'}</td>
+        <td>{sourceEdited ? employee.scores.objective.toFixed(2) : score.validWeights ? score.base.toFixed(2) : '—'}</td>
+        <td>{sourceEdited ? '人工修正' : score.validWeights ? score.automaticDeduction.toFixed(2) : '—'}</td>
         <td><Tag color={score.redline ? 'error' : 'success'}>{score.redline ? '是' : '否'}</Tag></td>
-        <td>{score.total === null ? '待确认' : score.total.toFixed(2)}</td>
-        <td>{reasons.join('；') || (score.validWeights ? '—' : '目标权重待确认')}</td>
+        <td>{sourceEdited ? employee.scores.objective.toFixed(2) : score.total === null ? '待确认' : score.total.toFixed(2)}</td>
+        <td>{sourceEdited ? '已人工修正' : reasons.join('；') || (score.validWeights ? '—' : '目标权重待确认')}</td>
+        {onEditEmployee && <td><Button type="link" size="small" icon={<EditOutlined />} disabled={!canEditEmployee?.(employee.id)} onClick={() => onEditEmployee(employee.id)}>{canEditEmployee?.(employee.id) ? '修改' : '只读'}</Button></td>}
       </tr>;
     })}</tbody></table></div>
     {!employees.length && <Empty description="没有匹配的员工原始数据" />}

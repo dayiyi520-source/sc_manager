@@ -30,6 +30,9 @@ export interface KpiSourceData {
   earlyLeaveCount?: number;
   absenceCount?: number;
   approvedOvertimeHours: number;
+  companyOvertimeHours?: number;
+  homeOvertimeHours?: number;
+  reportSubmittedCount?: number;
   reportLate: number;
   monthlyReportLate?: number;
   weeklyReportMissing?: number;
@@ -61,6 +64,19 @@ export interface KpiSourceCorrectionRecord {
   at: string;
 }
 
+export type KpiSourceCategory = 'objective' | 'attendance' | 'extraWork' | 'reports';
+export type KpiSourceEditValues = Record<string, number>;
+
+export interface KpiSourceEditRecord {
+  id: string;
+  category: KpiSourceCategory;
+  actor: string;
+  at: string;
+  reason: string;
+  before: KpiSourceEditValues;
+  after: KpiSourceEditValues;
+}
+
 export interface KpiEmployee {
   id: string;
   name: string;
@@ -76,7 +92,8 @@ export interface KpiEmployee {
   approvedSourceCorrections?: KpiSourceCorrectionRecord[];
   hrNote?: string;
   redline?: { type: string; impact: string; active: boolean };
-  sourceCorrection?: { objective?: boolean; reports?: boolean };
+  sourceCorrection?: { objective?: boolean; attendance?: boolean; extraWork?: boolean; reports?: boolean };
+  sourceEditHistory?: KpiSourceEditRecord[];
 }
 
 export type KpiReviewDecision = 'approve' | 'return';
@@ -118,7 +135,13 @@ export function validateKpiCycleSettings(settings: KpiCycleSettings): string | n
 export const isWithinKpiWindow = (window: { startAt: string; endAt: string } | undefined, now = Date.now()) =>
   !!window && now >= new Date(window.startAt).getTime() && now <= new Date(window.endAt).getTime();
 
-export const effectiveKpiSourceData = (employee: KpiEmployee): KpiSourceData => employee.approvedSourceCorrections?.reduce((source, record) => ({ ...source, ...record.after }), employee.source) || employee.source;
+export const effectiveKpiSourceData = (employee: KpiEmployee): KpiSourceData => employee.approvedSourceCorrections?.reduce((source, record) => {
+  const reportSubmittedCount = record.source === 'reports' && source.reportSubmittedCount !== undefined
+    ? source.reportSubmittedCount - ((record.after.weeklyReportMissing ?? source.weeklyReportMissing ?? 0) - (record.before.weeklyReportMissing ?? source.weeklyReportMissing ?? 0))
+      - ((record.after.reportMissing ?? source.reportMissing) - (record.before.reportMissing ?? source.reportMissing))
+    : source.reportSubmittedCount;
+  return { ...source, ...record.after, reportSubmittedCount };
+}, employee.source) || employee.source;
 
 export const isMonthlyGoalLate = (records: OkrRecord[], ownerId: string, month: string, deadline?: string): boolean => {
   if (!deadline) return false;
@@ -301,8 +324,12 @@ const buildEmployees = (month: string): KpiEmployee[] => {
     'e-05': { lateMinutes: 0, earlyLeaveCount: 0, absenceCount: 0 },
     'e-06': { lateMinutes: 35, earlyLeaveCount: 0, absenceCount: 0 },
   };
+  const overtimeSplit: Record<string, [number, number]> = { 'e-01': [8, 4], 'e-02': [6, 2], 'e-03': [12, 6], 'e-04': [10, 4], 'e-05': [3, 2], 'e-06': [1, 1] };
   const seeded = rows.map(employee => {
-    const source = { ...employee.source, ...attendanceFacts[employee.id], objectiveAdjustment: employee.scores.managerAdjustment };
+    const [companyOvertimeHours, homeOvertimeHours] = overtimeSplit[employee.id];
+    const source = { ...employee.source, ...attendanceFacts[employee.id], companyOvertimeHours, homeOvertimeHours,
+      reportSubmittedCount: 5 - (employee.source.weeklyReportMissing ?? 0) - employee.source.reportMissing,
+      objectiveAdjustment: employee.scores.managerAdjustment };
     const attendance = attendanceScoreFor(source);
     return { ...employee, source, scores: { ...employee.scores, attendance, extraWork: extraWorkScoreFor(source.approvedOvertimeHours, attendance) } };
   });
@@ -315,11 +342,11 @@ const buildEmployees = (month: string): KpiEmployee[] => {
 
 export const KPI_MONTHS = ['2026-11', '2026-10', '2026-09'];
 export const KPI_DIMENSIONS = [
-  { key: 'objective', label: '月度目标（演示）', max: 60, weight: '60%' },
-  { key: 'attendance', label: '全勤', max: 10, weight: '10%' },
-  { key: 'extraWork', label: '额外投入', max: 10, weight: '最高10分' },
-  { key: 'attitude', label: '工作态度', max: 15, weight: '15%' },
-  { key: 'review', label: '复盘总结', max: 10, weight: '10%' },
+  { key: 'objective', label: '月度目标（演示）', max: 60, weight: '60%', weightPoints: 60 },
+  { key: 'attendance', label: '全勤', max: 10, weight: '10%', weightPoints: 10 },
+  { key: 'extraWork', label: '额外投入', max: 10, weight: '5%', weightPoints: 5 },
+  { key: 'attitude', label: '工作态度', max: 15, weight: '15%', weightPoints: 15 },
+  { key: 'review', label: '复盘总结', max: 10, weight: '10%', weightPoints: 10 },
 ] as const;
 
 export const gradeForScore = (score: number): { grade: KpiGrade; coefficient: number } => {
@@ -338,12 +365,29 @@ export const reportScoreFor = (source: Pick<KpiSourceData, 'reportLate' | 'month
     ? 0
     : Math.max(0, 10 - 2 * (source.reportLate + (source.monthlyReportLate ?? 0)));
 
-export const scoreForEmployee = (employee: KpiEmployee) => {
+export const effectiveKpiScores = (employee: KpiEmployee) => {
   const { objective, review } = kpiDimensionScores(employee);
-  return Math.round(Math.max(0, Math.min(objective <= 50 ? 90 : 100,
-  objective + employee.scores.attendance + employee.scores.extraWork + employee.scores.attitude
-  + review + (employee.scoreAllocationVersion === 2 ? 0 : employee.scores.managerAdjustment),
-  )) * 100) / 100;
+  return {
+    objective,
+    attendance: employee.scores.attendance,
+    extraWork: Math.min(employee.scores.attendance === 0 ? 5 : 10, employee.scores.extraWork),
+    attitude: Math.min(objective < 30 ? 6 : 15, employee.scores.attitude),
+    review,
+  };
+};
+
+export const weightedKpiScores = (employee: KpiEmployee) => {
+  const finalScores = effectiveKpiScores(employee);
+  return KPI_DIMENSIONS.map(dimension => ({
+    key: dimension.key,
+    score: Math.round(finalScores[dimension.key] / dimension.max * dimension.weightPoints * 100) / 100,
+  }));
+};
+
+export const scoreForEmployee = (employee: KpiEmployee) => {
+  const weighted = weightedKpiScores(employee).reduce((total, dimension) => total + dimension.score, 0);
+  const max = effectiveKpiScores(employee).objective <= 50 ? 90 : 100;
+  return Math.round(Math.max(0, Math.min(max, weighted)) * 100) / 100;
 };
 
 export const kpiDimensionScores = (employee: KpiEmployee) => {
@@ -351,7 +395,7 @@ export const kpiDimensionScores = (employee: KpiEmployee) => {
   const reviewBase = employee.approvedSourceCorrections?.filter(record => record.source === 'reports').at(-1)?.after.reviewScore ?? employee.scores.review;
   return employee.scoreAllocationVersion === 2
     ? { objective: Math.min(60, Math.max(0, objectiveBase + employee.scores.managerAdjustment)), review: Math.min(10, Math.max(0, reviewBase + (employee.scores.temporaryTaskDeduction ?? 0))) }
-    : { objective: objectiveBase, review: reviewBase };
+    : { objective: Math.min(60, Math.max(0, objectiveBase + employee.scores.managerAdjustment)), review: reviewBase };
 };
 
 export const sourceAdjustmentFor = (employee: KpiEmployee) => employee.scores.managerAdjustment;
@@ -369,6 +413,101 @@ const validManagerDraft = (draft: NonNullable<KpiEmployee['managerDraft']>) =>
   && (draft.goalDeduction === undefined || Number.isFinite(draft.goalDeduction) && draft.goalDeduction >= 0)
   && (draft.goalBonus === undefined && draft.goalDeduction === undefined
     || draft.adjustment === (draft.goalBonus ?? Math.max(0, draft.adjustment)) - (draft.goalDeduction ?? Math.max(0, -draft.adjustment)));
+
+const sourceEditBounds: Record<KpiSourceCategory, Record<string, { min: number; max: number; integer?: boolean }>> = {
+  objective: { okrCompletion: { min: 0, max: 200 }, objectiveScore: { min: 0, max: 60 } },
+  attendance: {
+    attendanceDays: { min: 0, max: 31, integer: true }, lateCount: { min: 0, max: 31, integer: true }, lateMinutes: { min: 0, max: 1440, integer: true },
+    missingPunches: { min: 0, max: 31, integer: true }, earlyLeaveCount: { min: 0, max: 31, integer: true }, absenceCount: { min: 0, max: 31, integer: true },
+    annualLeave: { min: 0, max: 31 }, compensatoryLeave: { min: 0, max: 31 }, personalLeave: { min: 0, max: 31 }, sickLeave: { min: 0, max: 31 },
+  },
+  extraWork: { approvedOvertimeHours: { min: 0, max: 744 } },
+  reports: {
+    reportLate: { min: 0, max: 31, integer: true }, monthlyReportLate: { min: 0, max: 31, integer: true },
+    weeklyReportMissing: { min: 0, max: 31, integer: true }, reportMissing: { min: 0, max: 31, integer: true }, tasksOverdue: { min: 0, max: 31, integer: true },
+  },
+};
+
+const sourceValue = (employee: KpiEmployee, category: KpiSourceCategory, key: string) => {
+  if (category === 'objective') return key === 'objectiveScore' ? employee.scores.objective : employee.source.okrCompletion;
+  if (category === 'attendance') {
+    const leaveKeys: Record<string, string> = { annualLeave: '年假', compensatoryLeave: '调休', personalLeave: '事假', sickLeave: '病假' };
+    return leaveKeys[key] ? employee.source.leaveRecords?.[leaveKeys[key]] ?? 0 : (employee.source as unknown as Record<string, number>)[key] ?? 0;
+  }
+  if (category === 'extraWork') return employee.source.approvedOvertimeHours;
+  return (employee.source as unknown as Record<string, number>)[key] ?? 0;
+};
+
+export const kpiSourceEditValues = (employee: KpiEmployee, category: KpiSourceCategory): KpiSourceEditValues =>
+  Object.fromEntries(Object.keys(sourceEditBounds[category]).map(key => [key, sourceValue(employee, category, key)]));
+
+export const applyKpiSourceEdit = (
+  employee: KpiEmployee,
+  category: KpiSourceCategory,
+  values: KpiSourceEditValues,
+  reason: string,
+  actor: string,
+  now = new Date(),
+): KpiEmployee => {
+  const normalizedReason = reason.trim();
+  if (!normalizedReason) throw new Error('请填写原始数据修改原因');
+  if (!Object.keys(sourceEditBounds[category]).every(key => Number.isFinite(values[key]))) throw new Error('请完整填写原始数据');
+  Object.entries(sourceEditBounds[category]).forEach(([key, bounds]) => {
+    const value = values[key];
+    if (value < bounds.min || value > bounds.max || (bounds.integer && !Number.isInteger(value))) throw new Error(`${key} 超出允许范围`);
+  });
+
+  const before = Object.fromEntries(Object.keys(sourceEditBounds[category]).map(key => [key, sourceValue(employee, category, key)]));
+  const source = { ...employee.source };
+  const scores = { ...employee.scores };
+  const sourceCorrection = { ...employee.sourceCorrection };
+  if (category === 'objective') {
+    source.okrCompletion = values.okrCompletion;
+    source.objectiveFromOkr = false;
+    scores.objective = values.objectiveScore;
+    sourceCorrection.objective = true;
+  } else if (category === 'attendance') {
+    source.attendanceDays = values.attendanceDays;
+    source.lateCount = values.lateCount;
+    source.lateMinutes = values.lateMinutes;
+    source.missingPunches = values.missingPunches;
+    source.earlyLeaveCount = values.earlyLeaveCount;
+    source.absenceCount = values.absenceCount;
+    source.leaveRecords = {
+      ...source.leaveRecords,
+      年假: values.annualLeave,
+      调休: values.compensatoryLeave,
+      事假: values.personalLeave,
+      病假: values.sickLeave,
+    };
+    scores.attendance = attendanceScoreFor(source);
+    scores.extraWork = extraWorkScoreFor(source.approvedOvertimeHours, scores.attendance);
+    sourceCorrection.attendance = true;
+  } else if (category === 'extraWork') {
+    if (source.approvedOvertimeHours !== values.approvedOvertimeHours) {
+      source.companyOvertimeHours = undefined;
+      source.homeOvertimeHours = undefined;
+    }
+    source.approvedOvertimeHours = values.approvedOvertimeHours;
+    scores.extraWork = extraWorkScoreFor(values.approvedOvertimeHours, scores.attendance);
+    sourceCorrection.extraWork = true;
+  } else {
+    if (source.weeklyReportMissing !== values.weeklyReportMissing || source.reportMissing !== values.reportMissing) source.reportSubmittedCount = undefined;
+    source.reportLate = values.reportLate;
+    source.monthlyReportLate = values.monthlyReportLate;
+    source.weeklyReportMissing = values.weeklyReportMissing;
+    source.reportMissing = values.reportMissing;
+    source.tasksOverdue = values.tasksOverdue;
+    scores.review = reportScoreFor(source);
+    sourceCorrection.reports = true;
+  }
+
+  const record: KpiSourceEditRecord = {
+    id: `source-edit-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    category, actor, at: now.toISOString(), reason: normalizedReason, before, after: { ...values },
+  };
+  return { ...employee, source, scores, sourceCorrection, sourceEditHistory: [...(employee.sourceEditHistory || []), record] };
+};
 
 const verifiedAttendance = (employee: KpiEmployee, baseline: KpiEmployee, adjustment?: AttendanceKpiAdjustment) => {
   const source = {
@@ -397,15 +536,22 @@ export const syncKpiSources = (period: KpiPeriod, month: string): KpiPeriod => {
       if (!source) return employee;
       const attendanceAdjustment = attendanceAdjustments[employee.name];
       if (!employee.sourceCorrection?.objective && !employee.source.objectiveFromOkr && employee.source.okrCompletion !== source.source.okrCompletion) changedDepartments.add(employee.department);
-      const attendance = verifiedAttendance(employee, source, attendanceAdjustment);
+      const attendance = employee.sourceCorrection?.attendance
+        ? { source: Object.fromEntries(['attendanceDays', 'lateCount', 'lateMinutes', 'missingPunches', 'earlyLeaveCount', 'absenceCount', 'leaveRecords'].map(key => [key, employee.source[key as keyof KpiSourceData]])) as Pick<KpiSourceData, 'attendanceDays' | 'lateCount' | 'lateMinutes' | 'missingPunches' | 'earlyLeaveCount' | 'absenceCount' | 'leaveRecords'>,
+          score: attendanceScoreFor(employee.source) }
+        : verifiedAttendance(employee, source, attendanceAdjustment);
+      const overtimeHours = employee.sourceCorrection?.extraWork ? employee.source.approvedOvertimeHours : source.source.approvedOvertimeHours;
       return {
         ...employee,
         source: {
           ...employee.source,
           ...(!employee.sourceCorrection?.objective && !employee.source.objectiveFromOkr && { okrCompletion: source.source.okrCompletion }),
           ...attendance.source,
-          approvedOvertimeHours: source.source.approvedOvertimeHours,
+          approvedOvertimeHours: overtimeHours,
+          companyOvertimeHours: employee.sourceCorrection?.extraWork ? employee.source.companyOvertimeHours : source.source.companyOvertimeHours,
+          homeOvertimeHours: employee.sourceCorrection?.extraWork ? employee.source.homeOvertimeHours : source.source.homeOvertimeHours,
           ...(!employee.sourceCorrection?.reports && {
+            reportSubmittedCount: source.source.reportSubmittedCount,
             reportLate: source.source.reportLate,
             monthlyReportLate: source.source.monthlyReportLate ?? 0,
             weeklyReportMissing: source.source.weeklyReportMissing ?? 0,
@@ -417,7 +563,7 @@ export const syncKpiSources = (period: KpiPeriod, month: string): KpiPeriod => {
           ...employee.scores,
           ...(!employee.sourceCorrection?.objective && !employee.source.objectiveFromOkr && { objective: source.scores.objective }),
           attendance: attendance.score,
-          extraWork: extraWorkScoreFor(source.source.approvedOvertimeHours, attendance.score),
+          extraWork: extraWorkScoreFor(overtimeHours, attendance.score),
           ...(!employee.sourceCorrection?.reports && { review: reportScoreFor(source.source) }),
         },
       };
@@ -480,7 +626,10 @@ const withVerifiedAttendance = (state: KpiDemoState): KpiDemoState => {
     period.employees = period.employees.map(employee => {
       const source = baseline.get(employee.id);
       if (!source) return employee;
-      const attendance = verifiedAttendance(employee, source, adjustments[employee.name]);
+      const attendance = employee.sourceCorrection?.attendance
+        ? { source: Object.fromEntries(['attendanceDays', 'lateCount', 'lateMinutes', 'missingPunches', 'earlyLeaveCount', 'absenceCount', 'leaveRecords'].map(key => [key, employee.source[key as keyof KpiSourceData]])) as Pick<KpiSourceData, 'attendanceDays' | 'lateCount' | 'lateMinutes' | 'missingPunches' | 'earlyLeaveCount' | 'absenceCount' | 'leaveRecords'>,
+          score: attendanceScoreFor(employee.source) }
+        : verifiedAttendance(employee, source, adjustments[employee.name]);
       const goalLate = period.cycleSettings?.monthlyGoalDeadline && employee.source.goalLate === undefined
         ? isMonthlyGoalLate(mockOkrState.okrRecords as OkrRecord[], employee.id, month, period.cycleSettings.monthlyGoalDeadline)
         : employee.source.goalLate;
@@ -498,6 +647,7 @@ export const loadKpiDemo = (): KpiDemoState => {
     const parsed = JSON.parse(raw) as KpiDemoState;
     if (!parsed.periods || !parsed.periods['2026-10']) return withVerifiedAttendance(initialState());
     Object.entries(parsed.periods).forEach(([month, period]) => {
+      const baseline = new Map(buildEmployees(month).map(employee => [employee.id, employee.source]));
       period.departmentMetrics ||= Object.fromEntries([...new Set(period.employees.map(employee => employee.department))]
         .map(name => [name, { teamCompletion: 100, confirmed: period.published }]));
       for (const [name, metric] of Object.entries(period.departmentMetrics)) {
@@ -507,6 +657,16 @@ export const loadKpiDemo = (): KpiDemoState => {
       }
       period.employees.forEach(employee => {
         employee.source.objectiveAdjustment = employee.scores.managerAdjustment;
+        const original = baseline.get(employee.id);
+        if (!original) return;
+        if (!employee.sourceCorrection?.extraWork && employee.source.approvedOvertimeHours === original.approvedOvertimeHours
+          && employee.source.companyOvertimeHours === undefined && employee.source.homeOvertimeHours === undefined) {
+          employee.source.companyOvertimeHours = original.companyOvertimeHours;
+          employee.source.homeOvertimeHours = original.homeOvertimeHours;
+        }
+        if (!employee.sourceCorrection?.reports && employee.source.reportSubmittedCount === undefined
+          && (employee.source.weeklyReportMissing ?? 0) === (original.weeklyReportMissing ?? 0)
+          && employee.source.reportMissing === original.reportMissing) employee.source.reportSubmittedCount = original.reportSubmittedCount;
       });
       if (!period.reviewScoresInitialized && !period.published && period.reviewEnabled) {
         period.employees = period.employees.map(employee => employee.reviewStatus === '待主管复核' && !employee.reviewHistory?.length

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, goalAdjustmentDraft, gradeForScore, isMonthlyGoalLate, kpiDimensionScores, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewEmployeeSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitEmployeeReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
+import { applyKpiSourceEdit, attendanceScoreFor, autoPublishKpiPeriod, confirmAllDepartmentCoefficients, createKpiPeriod, departmentCoefficientPreview, departmentGoalSummary, extraWorkScoreFor, goalAdjustmentDraft, gradeForScore, isMonthlyGoalLate, kpiDimensionScores, kpiSourceEditValues, loadKpiDemo, publishKpiPeriod, reportScoreFor, reviewDepartmentSubmission, reviewEmployeeSubmission, reviewManagerSubmission, saveKpiDemo, scoreForEmployee, sourceAdjustmentFor, submitDepartmentReview, submitEmployeeReview, submitManagerReview, syncKpiSources, validateKpiCycleSettings, weightedKpiScores, KPI_DEMO_STORAGE_KEY, type KpiPeriod } from './kpiPerformanceDemo';
 import mockOkrState from '../data/mockOkrState.json';
 import type { OkrPerson, OkrRecord } from './okrRepository';
 
@@ -39,6 +39,20 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(loadKpiDemo().periods['2026-10'].employees[0].scores.review).toBe(9);
   });
 
+  it('persists demo overtime locations and submitted report totals', () => {
+    const state = loadKpiDemo();
+    const source = state.periods['2026-10'].employees[0].source;
+    expect((source.companyOvertimeHours ?? 0) + (source.homeOvertimeHours ?? 0)).toBe(source.approvedOvertimeHours);
+    expect(source.reportSubmittedCount).toBe(5);
+    saveKpiDemo(state);
+    expect(loadKpiDemo().periods['2026-10'].employees[0].source).toMatchObject({ companyOvertimeHours: 8, homeOvertimeHours: 4, reportSubmittedCount: 5 });
+    delete state.periods['2026-10'].employees[0].source.companyOvertimeHours;
+    delete state.periods['2026-10'].employees[0].source.homeOvertimeHours;
+    delete state.periods['2026-10'].employees[0].source.reportSubmittedCount;
+    saveKpiDemo(state);
+    expect(loadKpiDemo().periods['2026-10'].employees[0].source).toMatchObject({ companyOvertimeHours: 8, homeOvertimeHours: 4, reportSubmittedCount: 5 });
+  });
+
   it('scores verified attendance by the lowest applicable tier and paid-leave cap', () => {
     const source = loadKpiDemo().periods['2026-11'].employees[0].source;
     expect(attendanceScoreFor(source)).toBe(10);
@@ -71,7 +85,19 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(extraWorkScoreFor(12, 10)).toBe(3.33);
     const employee = loadKpiDemo().periods['2026-11'].employees[0];
     expect(scoreForEmployee({ ...employee, scores: { ...employee.scores, objective: 50, attendance: 10, extraWork: 10, attitude: 15, review: 10 } })).toBe(90);
-    expect(scoreForEmployee({ ...employee, scores: { ...employee.scores, objective: 50.01, attendance: 10, extraWork: 10, attitude: 15, review: 10 } })).toBe(95.01);
+    expect(scoreForEmployee({ ...employee, scores: { ...employee.scores, objective: 50.01, attendance: 10, extraWork: 10, attitude: 15, review: 10 } })).toBe(90.01);
+    expect(scoreForEmployee({ ...employee, scores: { ...employee.scores, objective: 60, attendance: 10, extraWork: 10, attitude: 15, review: 10 } })).toBe(100);
+  });
+
+  it('caps attitude at six below 30 objective points and keeps the 90-point total rule', () => {
+    const employee = loadKpiDemo().periods['2026-10'].employees[0];
+    const lowGoal = { ...employee, scores: { ...employee.scores, objective: 29, attitude: 14 } };
+    expect(weightedKpiScores(lowGoal).find(item => item.key === 'attitude')?.score).toBe(6);
+    expect(scoreForEmployee(lowGoal)).toBe(56);
+    const boundary = { ...lowGoal, scores: { ...lowGoal.scores, objective: 30 } };
+    expect(weightedKpiScores(boundary).find(item => item.key === 'attitude')?.score).toBe(14);
+    const noExtraGoalBonus = { ...employee, scores: { ...employee.scores, objective: 50, attendance: 10, extraWork: 10, attitude: 15, review: 10 } };
+    expect(scoreForEmployee(noExtraGoalBonus)).toBe(90);
   });
 
   it('recalculates attendance on source sync and keeps published results unchanged', () => {
@@ -103,7 +129,7 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     saveKpiDemo(state);
 
     const restored = loadKpiDemo().periods['2026-10'].employees[0];
-    expect(scoreForEmployee(restored)).toBe(95);
+    expect(scoreForEmployee(restored)).toBe(93);
     expect(restored.reviewStatus).toBe('已通过');
     expect(localStorage.getItem(KPI_DEMO_STORAGE_KEY)).not.toBeNull();
   });
@@ -168,6 +194,27 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(synced.employees[0]).toMatchObject({ managerDraft: { adjustment: 3 }, source: { okrCompletion: 101, reportLate: 2, attendanceDays: 22, approvedOvertimeHours: 12 }, scores: { objective: 58, review: 7, managerAdjustment: 0 } });
     expect(period.employees[0].source.attendanceDays).toBe(0);
     expect(syncKpiSources(synced, '2026-11').employees[0]).toEqual(synced.employees[0]);
+  });
+
+  it('saves auditable source corrections, recalculates scores, and preserves edited values after sync and reload', () => {
+    const state = loadKpiDemo();
+    const period = state.periods['2026-11'];
+    const original = period.employees[0];
+    const attendance = kpiSourceEditValues(original, 'attendance');
+    const correctedAttendance = applyKpiSourceEdit(original, 'attendance', { ...attendance, lateMinutes: 16 }, '核对考勤记录后更正', 'HR', new Date('2026-11-08T10:00:00.000Z'));
+    expect(correctedAttendance.scores.attendance).toBe(8);
+    expect(correctedAttendance.sourceEditHistory?.[0]).toMatchObject({ category: 'attendance', actor: 'HR', reason: '核对考勤记录后更正' });
+    expect(() => applyKpiSourceEdit(original, 'attendance', { ...attendance, lateMinutes: 2000 }, '越界', 'HR')).toThrow('lateMinutes 超出允许范围');
+    expect(() => applyKpiSourceEdit(original, 'attendance', attendance, ' ', 'HR')).toThrow('请填写原始数据修改原因');
+
+    period.employees[0] = correctedAttendance;
+    saveKpiDemo(state);
+    const reloaded = loadKpiDemo();
+    expect(reloaded.periods['2026-11'].employees[0]).toMatchObject({
+      source: { lateMinutes: 16 }, scores: { attendance: 8 }, sourceCorrection: { attendance: true },
+    });
+    const synced = syncKpiSources(reloaded.periods['2026-11'], '2026-11');
+    expect(synced.employees[0]).toMatchObject({ source: { lateMinutes: 16 }, scores: { attendance: 8 } });
   });
 
   it('merges effective attendance approvals into KPI source data and excludes pending or locked changes', () => {
@@ -236,13 +283,13 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     const approved = reviewManagerSubmission(submitted, 'approve');
     expect(approved.scoreAllocationVersion).toBe(2);
     expect(kpiDimensionScores(approved)).toEqual({ objective: 60, review: 6 });
-    expect(scoreForEmployee(approved)).toBe(89.33);
+    expect(scoreForEmployee(approved)).toBe(87.67);
     const state = loadKpiDemo();
     state.periods['2026-11'].employees[0] = approved;
     saveKpiDemo(state);
     const restored = loadKpiDemo().periods['2026-11'].employees[0];
     expect(kpiDimensionScores(restored)).toEqual({ objective: 60, review: 6 });
-    expect(scoreForEmployee(restored)).toBe(89.33);
+    expect(scoreForEmployee(restored)).toBe(87.67);
     expect(kpiDimensionScores({ ...approved, scores: { ...approved.scores, managerAdjustment: -100, temporaryTaskDeduction: -100 } })).toEqual({ objective: 0, review: 0 });
     expect(kpiDimensionScores({ ...approved, scores: { ...approved.scores, managerAdjustment: 100, temporaryTaskDeduction: 0 } })).toEqual({ objective: 60, review: 10 });
     expect(() => submitManagerReview({ ...employee, managerDraft: { attitude: 10, adjustment: 0, temporaryTaskDeduction: 1, reason: '不可加分' } })).toThrow('临时任务只允许扣分');
@@ -263,11 +310,12 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(() => submitManagerReview({ ...employee, reviewStatus: '待主管复核', managerDraft: { ...employee.managerDraft!, adjustment: 2 } })).toThrow('请核对评分');
   });
 
-  it('preserves previously published legacy totals without reallocating their adjustment', () => {
+  it('includes legacy manager adjustment in the objective module before weighted scoring', () => {
     const employee = loadKpiDemo().periods['2026-10'].employees[1];
     const total = scoreForEmployee(employee);
     expect(employee.scoreAllocationVersion).toBeUndefined();
-    expect(kpiDimensionScores(employee)).toEqual({ objective: employee.scores.objective, review: employee.scores.review });
+    expect(kpiDimensionScores(employee)).toEqual({ objective: employee.scores.objective + employee.scores.managerAdjustment, review: employee.scores.review });
+    expect(weightedKpiScores(employee).reduce((sum, dimension) => sum + dimension.score, 0)).toBe(total);
     expect(scoreForEmployee(employee)).toBe(total);
   });
 
@@ -352,7 +400,7 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     const changed = { ...original, managerDraft: { attitude: 10, adjustment: -2, reason: '目标延期并补充复盘' } };
     const submitted = submitDepartmentReview({ ...period, employees: [changed, ...period.employees.slice(1)] }, '陈宇璋', '产品部');
     expect(submitted.employees[0].scores).toEqual(original.scores);
-    expect(submitted.employees[0].reviewHistory?.[0]).toMatchObject({ action: '提交主管复核', actor: '陈宇璋', before: { attitude: 0, adjustment: 0, total: 79.33 }, proposed: { attitude: 10, adjustment: -2, total: 87.33 } });
+    expect(submitted.employees[0].reviewHistory?.[0]).toMatchObject({ action: '提交主管复核', actor: '陈宇璋', before: { attitude: 0, adjustment: 0, total: 77.67 }, proposed: { attitude: 10, adjustment: -2, total: 85.67 } });
     const returned = reviewDepartmentSubmission(submitted, '陈宇璋', '产品部', 'return', '请补充依据');
     expect(returned.employees[0].scores).toEqual(original.scores);
     expect(returned.employees[0].reviewHistory?.[1]).toMatchObject({ action: 'HR 退回', reason: '请补充依据' });
@@ -433,7 +481,7 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     saveKpiDemo(state);
     const restored = loadKpiDemo().periods['2026-11'];
     expect(restored.published).toBe(true);
-    expect(scoreForEmployee(restored.employees[0])).toBe(87.33);
+    expect(scoreForEmployee(restored.employees[0])).toBe(85.67);
     expect(restored.employees[0].reviewHistory).toHaveLength(2);
     expect(() => reviewDepartmentSubmission(restored, '陈宇璋', '产品部', 'approve')).toThrow('已公示');
   });

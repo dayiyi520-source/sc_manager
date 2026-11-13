@@ -141,7 +141,9 @@ export function restoreLegacyAppealCorrections(state: KpiDemoState, appeals = li
           source: { ...employee.source, okrCompletion: firstCorrection.before.okrCompletion, reportLate: firstCorrection.before.reportLate, reportMissing: firstCorrection.before.reportMissing, tasksOverdue: firstCorrection.before.tasksOverdue },
           scores: { ...employee.scores, objective: firstCorrection.before.objectiveScore, review: firstCorrection.before.reviewScore },
           approvedSourceCorrections: corrections,
-          sourceCorrection: undefined,
+          sourceCorrection: employee.sourceCorrection?.attendance || employee.sourceCorrection?.extraWork
+            ? { attendance: employee.sourceCorrection.attendance, extraWork: employee.sourceCorrection.extraWork }
+            : undefined,
         };
       }),
     }])) as KpiDemoState['periods'],

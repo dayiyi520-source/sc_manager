@@ -73,7 +73,7 @@ describe('绩效考核公示', () => {
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
-    expect(screen.getByRole('region', { name: '绩效结果总览' })).toHaveTextContent('87.3');
+    expect(screen.getByRole('region', { name: '绩效结果总览' })).toHaveTextContent('85.7');
     expect(screen.getAllByText('工作态度').length).toBeGreaterThan(0);
     expect(screen.queryByText('周予安')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /公示绩效结果/ })).not.toBeInTheDocument();
@@ -236,6 +236,7 @@ describe('绩效考核公示', () => {
     expect(screen.getByRole('columnheader', { name: '部门' })).toBeInTheDocument();
     expect(await screen.findByRole('columnheader', { name: '月度目标完成率' })).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(7);
     fireEvent.click(screen.getByRole('tab', { name: '考勤与请假' }));
     expect(screen.getByRole('columnheader', { name: '出勤天数' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '请假天数' })).toBeInTheDocument();
@@ -272,6 +273,50 @@ describe('绩效考核公示', () => {
       if (name === '月度目标') expect(await screen.findByRole('row', { name: /林知夏/ })).toBeInTheDocument();
       else expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
     }
+  });
+
+  it('HR 审核期间可修改待审员工来源数据并保存原因与审计记录', async () => {
+    const state = loadKpiDemo();
+    state.periods['2026-11'].employees[1].reviewStatus = '待 HR 审核';
+    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
+    fireEvent.click(screen.getByRole('tab', { name: '周月报' }));
+
+    const employeeRow = screen.getByRole('row', { name: /周予安/ });
+    fireEvent.click(within(employeeRow).getByRole('button', { name: /修改/ }));
+    fireEvent.change(screen.getByLabelText('周报迟交次数'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('修改原因'), { target: { value: '核对周报提交记录后更正' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存修正' }));
+
+    await waitFor(() => expect(loadKpiDemo().periods['2026-11'].employees[1]).toMatchObject({
+      source: { reportLate: 2 }, scores: { review: 6 }, sourceCorrection: { reports: true },
+    }));
+    expect(loadKpiDemo().periods['2026-11'].employees[1].sourceEditHistory?.[0]).toMatchObject({ actor: 'HR', reason: '核对周报提交记录后更正' });
+  });
+
+  it('主管仅能在复核窗口内修改本人负责员工的来源数据', async () => {
+    const state = loadKpiDemo();
+    const period = state.periods['2026-11'];
+    const now = Date.now();
+    period.cycleSettings = { managerReview: { startAt: new Date(now - 60_000).toISOString(), endAt: new Date(now + 86_400_000).toISOString() }, finalPublicationAt: new Date(now + 172_800_000).toISOString(), appealConfirmation: { startAt: new Date(now + 172_860_000).toISOString(), endAt: new Date(now + 259_200_000).toISOString() } };
+    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    await chooseRole('主管');
+    fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
+
+    const ownEmployeeRow = await screen.findByRole('row', { name: /林知夏/ });
+    expect(within(ownEmployeeRow).getByRole('button', { name: /修改/ })).toBeEnabled();
+    fireEvent.click(within(ownEmployeeRow).getByRole('button', { name: /修改/ }));
+    fireEvent.change(screen.getByLabelText('目标完成率（%）'), { target: { value: '95' } });
+    fireEvent.change(screen.getByLabelText('目标得分'), { target: { value: '58' } });
+    fireEvent.change(screen.getByLabelText('修改原因'), { target: { value: '复核确认目标进度' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存修正' }));
+
+    await waitFor(() => expect(loadKpiDemo().periods['2026-11'].employees[0]).toMatchObject({
+      source: { okrCompletion: 95 }, scores: { objective: 58 }, sourceCorrection: { objective: true },
+    }));
+    expect(loadKpiDemo().periods['2026-11'].employees[0].sourceEditHistory?.[0].actor).toBe('主管');
   });
 
   it('员工原始数据四类均仅展示本人且不可同步，周月报不显示状态和修正入口', async () => {
@@ -354,7 +399,7 @@ describe('绩效考核公示', () => {
     const correctedState = loadKpiDemo().periods['2026-11'];
     expect(correctedState.employees[0].source.okrCompletion).toBe(93);
     expect(correctedState.employees[0].scores.objective).toBe(56);
-    expect(scoreForEmployee(correctedState.employees[0])).toBe(81.33);
+    expect(scoreForEmployee(correctedState.employees[0])).toBe(79.67);
     expect(correctedState.employees[0].approvedSourceCorrections).toHaveLength(1);
     view.unmount();
     const refreshedView = render(<AntApp><KpiPerformanceDemoView /></AntApp>);
