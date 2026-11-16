@@ -1,3 +1,4 @@
+import { reviewRawScores, type ReviewBook } from './kpiReviewModel';
 import { attendanceKpiAdjustments, type AttendanceKpiAdjustment } from './attendanceDemo';
 import { KPI_DEMO_STORAGE_KEY } from './performanceMonthLock';
 import { calculateOkrScore, scoreObjectivesFor } from './okrPerformanceScore';
@@ -6,7 +7,25 @@ import mockOkrState from '../data/mockOkrState.json';
 export { KPI_DEMO_STORAGE_KEY } from './performanceMonthLock';
 
 export type KpiGrade = 'S' | 'A' | 'B' | 'C' | 'D' | 'E';
-export type KpiStatus = '待主管复核' | '待 HR 审核' | 'HR 已退回' | '已通过' | '待生成';
+export type KpiStatus = '草稿' | '待主管确认' | '待HR复审' | '已确认' | '已公示' | '待生成' | '待主管复核' | '待 HR 审核' | 'HR 已退回' | '已通过';
+
+export const currentKpiStatus = (status: KpiStatus, published = false): KpiStatus => {
+  if (published || status === '已公示') return '已公示';
+  if (status === '待主管复核') return '待主管确认';
+  if (status === '待 HR 审核') return '待HR复审';
+  if (status === 'HR 已退回') return '待主管确认';
+  if (status === '已通过') return '已确认';
+  return status;
+};
+
+export const gradeForCoefficient = (coefficient: number): KpiGrade => coefficient >= 1.5 ? 'S' : coefficient >= 1.2 ? 'A' : coefficient >= 1 ? 'B' : coefficient >= 0.8 ? 'C' : coefficient >= 0.5 ? 'D' : 'E';
+
+export function normalizeKpiLifecycle(period: KpiPeriod): KpiPeriod {
+  return { ...period,
+    employees: period.employees.map(employee => ({ ...employee, reviewStatus: currentKpiStatus(employee.reviewStatus, period.published) })),
+    supervisors: period.supervisors?.map(employee => ({ ...employee, reviewStatus: period.published && employee.bossRatedAt ? '已公示' : currentKpiStatus(employee.reviewStatus, false) })),
+  };
+}
 
 export interface KpiScores {
   objective: number;
@@ -78,6 +97,10 @@ export interface KpiSourceEditRecord {
 }
 
 export interface KpiEmployee {
+  performanceKind?: 'employee' | 'supervisor';
+  supervisorDemoRated?: boolean;
+  bossRatedAt?: string;
+  reviewBook?: ReviewBook;
   id: string;
   name: string;
   department: string;
@@ -99,6 +122,7 @@ export interface KpiEmployee {
 export type KpiReviewDecision = 'approve' | 'return';
 
 export interface KpiPeriod {
+  supervisors?: KpiEmployee[];
   employees: KpiEmployee[];
   generated: boolean;
   published: boolean;
@@ -114,13 +138,17 @@ export interface KpiPeriod {
 
 export interface KpiCycleSettings {
   monthlyGoalDeadline?: string;
-  managerReview: { startAt: string; endAt: string };
-  appealConfirmation: { startAt: string; endAt: string };
-  finalPublicationAt: string;
+  mode?: 'switches';
+  appealWorkingDays?: number;
+  managerReview?: { startAt: string; endAt: string };
+  appealConfirmation?: { startAt: string; endAt: string };
+  finalPublicationAt?: string;
 }
 
 export function validateKpiCycleSettings(settings: KpiCycleSettings): string | null {
   if (settings.monthlyGoalDeadline && !Number.isFinite(new Date(settings.monthlyGoalDeadline).getTime())) return '请设置有效的月度目标最迟提交时间';
+  if (settings.mode === 'switches') return Number.isInteger(settings.appealWorkingDays) && settings.appealWorkingDays! >= 1 && settings.appealWorkingDays! <= 60 ? null : '员工申诉期间须为 1–60 个工作日';
+  if (!settings.managerReview || !settings.appealConfirmation || !settings.finalPublicationAt) return '请完整设置周期';
   const dates = [settings.managerReview.startAt, settings.managerReview.endAt, settings.appealConfirmation.startAt, settings.appealConfirmation.endAt, settings.finalPublicationAt].map(value => new Date(value).getTime());
   if (dates.some(value => !Number.isFinite(value))) return '请完整设置三个周期时间';
   const [reviewStart, reviewEnd, appealStart, appealEnd, publicationAt] = dates;
@@ -163,13 +191,57 @@ export const attendanceScoreFor = (source: KpiSourceData): number => {
   return Math.min(lateScore, leaveScore, paidLeave > 3 ? 8 : 10);
 };
 
-export const autoPublishKpiPeriod = (period: KpiPeriod, now = Date.now()): KpiPeriod => {
-  if (!period.cycleSettings || period.published || now < new Date(period.cycleSettings.finalPublicationAt).getTime()) return period;
-  if (!period.generated || period.employees.some(employee => employee.reviewStatus !== '已通过')) return period;
-  const departments = [...new Set(period.employees.map(employee => employee.department))];
-  if (!departments.length || departments.some(name => !period.departmentMetrics?.[name]?.confirmed)) return period;
-  return { ...period, published: true, publishedAt: new Date(now).toLocaleString('zh-CN', { hour12: false }) };
-};
+// Retained for historical callers: publication now requires an explicit HR switch action.
+export const autoPublishKpiPeriod = (period: KpiPeriod, _now = Date.now()): KpiPeriod => period;
+
+export function isManagerReviewOpen(period: KpiPeriod, now = Date.now()) {
+  return period.generated && !period.published && (period.cycleSettings?.mode === 'switches'
+    ? period.reviewEnabled : isWithinKpiWindow(period.cycleSettings?.managerReview, now));
+}
+
+/** Business-day calendar is Monday–Friday, in Asia/Shanghai; publication day is day zero. */
+export function appealWindowFor(period: KpiPeriod) {
+  if (!period.published) return null;
+  if (period.cycleSettings?.mode !== 'switches') return period.cycleSettings?.appealConfirmation || null;
+  if (!period.publishedAt) return null;
+  const value = period.publishedAt.trim();
+  const timestamp = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value) ? Date.parse(value) : Date.parse(value.replace(/\//g, '-').replace(' ', 'T') + '+08:00');
+  if (!Number.isFinite(timestamp)) return null;
+  const days = period.cycleSettings.appealWorkingDays;
+  if (!Number.isInteger(days) || days! < 1 || days! > 60) return null;
+  const localDate = new Date(timestamp + 8 * 3600000);
+  localDate.setUTCHours(0, 0, 0, 0);
+  let counted = 0;
+  while (counted < days!) {
+    localDate.setUTCDate(localDate.getUTCDate() + 1);
+    if (localDate.getUTCDay() !== 0 && localDate.getUTCDay() !== 6) counted++;
+  }
+  localDate.setUTCHours(23, 59, 59, 999);
+  return { startAt: new Date(timestamp).toISOString(), endAt: new Date(localDate.getTime() - 8 * 3600000).toISOString() };
+}
+
+export function isAppealPeriodOpen(period: KpiPeriod, now = Date.now()) {
+  if (!period.published) return false;
+  if (period.cycleSettings?.mode !== 'switches' && !period.cycleSettings) return true;
+  return isWithinKpiWindow(appealWindowFor(period) || undefined, now);
+}
+
+export function switchKpiCycle(period: KpiPeriod, settings: KpiCycleSettings, reviewEnabled: boolean, publicationEnabled: boolean, role: string): KpiPeriod {
+  if (role !== 'HR') throw new Error('仅 HR 可修改周期设置');
+  if (!period.generated) throw new Error('请先生成本月考核');
+  if (period.published) throw new Error('已公示月份设置已锁定');
+  const error = validateKpiCycleSettings(settings);
+  if (error) throw new Error(error);
+  const next: KpiPeriod = { ...period, cycleSettings: { mode: 'switches', monthlyGoalDeadline: settings.monthlyGoalDeadline, appealWorkingDays: settings.appealWorkingDays }, reviewEnabled,
+    employees: period.employees.map(employee => {
+      const status = currentKpiStatus(employee.reviewStatus, period.published);
+      if (reviewEnabled && status === '草稿') return { ...employee, reviewStatus: '待主管确认' as const };
+      if (reviewEnabled && status === '待HR复审') return employee;
+      if (!reviewEnabled && ['待主管确认', '待HR复审'].includes(status)) return { ...employee, reviewStatus: '草稿' as const };
+      return { ...employee, reviewStatus: status };
+    }) };
+  return publicationEnabled ? publishKpiPeriod({ ...next, reviewEnabled: false }) : next;
+}
 
 export interface KpiDepartmentMetrics {
   teamCompletion: number;
@@ -211,13 +283,14 @@ export const departmentCoefficientPreview = (period: KpiPeriod, department: stri
   const metrics = period.departmentMetrics?.[department];
   const objectiveCompletion = metrics?.goalCompletion ?? 0;
   const baseScore = metrics?.goalScore ?? null;
-  const initialCoefficient = 1;
+  const ratedSupervisor = period.supervisors?.find(item => item.department === department && item.bossRatedAt);
+  const initialCoefficient = ratedSupervisor ? gradeForScore(scoreForEmployee(ratedSupervisor)).coefficient : null;
   const memberCompletion = members.length ? members.reduce((sum, employee) => sum + effectiveKpiSourceData(employee).okrCompletion, 0) / members.length : 0;
   const delayedSubmissionCount = members.filter(employee => employee.source.goalLate).length;
   const touchedRedline = members.some(employee => employee.redline?.active);
   const majorRedline = members.some(employee => employee.redline?.active && employee.redline.type === '重大失职');
   const redlineChoice = metrics?.redlineChoice ?? '无';
-  const responsibilityCoefficient = touchedRedline || memberCompletion < 80 || delayedSubmissionCount > members.length * 0.3 ? 0.8 : initialCoefficient;
+  const responsibilityCoefficient = touchedRedline || memberCompletion < 90 || delayedSubmissionCount > members.length * 0.6 ? 0.8 : 1;
   const enabledCriteria = [metrics?.businessRequirement, metrics?.managementContribution, metrics?.riskResponse].filter(Boolean).length;
   const adjustment = objectiveCompletion === 0 ? 0 : objectiveCompletion <= 95 ? 0.9 : enabledCriteria >= 2 ? 1.2 : enabledCriteria === 1 ? 1.1 : 1;
   const coefficient = redlineChoice === '输出成果造假' ? 0
@@ -245,17 +318,20 @@ const recordReview = (employee: KpiEmployee, action: KpiReviewRecord['action'], 
 export const submitDepartmentReview = (period: KpiPeriod, manager: string, department: string): KpiPeriod => {
   if (!period.generated || period.published) throw new Error('当前月份不可提交复核');
   if (!period.cycleSettings) throw new Error('请先设置主管复核时间范围');
-  if (!isWithinKpiWindow(period.cycleSettings.managerReview)) throw new Error('当前不在主管复核时间范围内');
-  const targets = period.employees.filter(employee => employee.manager === manager && employee.department === department);
-  if (!targets.length || targets.some(employee => !['待主管复核', 'HR 已退回'].includes(employee.reviewStatus))) throw new Error('该部门存在不可提交的员工');
+  if (!isManagerReviewOpen(period)) throw new Error('当前不在主管复核时间范围内');
+  const leaderDepartment = period.supervisors?.find(employee => employee.name === manager)?.department;
+  const targets = period.employees.filter(employee => employee.department === department && (leaderDepartment ? leaderDepartment === department : employee.manager === manager));
+  if (!targets.length || targets.some(employee => currentKpiStatus(employee.reviewStatus) !== '待主管确认')) throw new Error('该部门存在不可提交的员工');
   return { ...period, employees: period.employees.map(employee => targets.some(target => target.id === employee.id)
     ? submitManagerReview(recordReview({ ...employee, managerDraft: employee.managerDraft || { attitude: employee.scores.attitude, adjustment: employee.scores.managerAdjustment, temporaryTaskDeduction: employee.scores.temporaryTaskDeduction ?? 0, reason: '主管确认当前评分' } }, '提交主管复核', manager, employee.managerDraft?.reason || '主管确认当前评分')) : employee) };
 };
 
 export const submitEmployeeReview = (period: KpiPeriod, employeeId: string, manager: string): KpiPeriod => {
   if (!period.generated || period.published) throw new Error('当前月份不可提交复核');
-  if (!period.cycleSettings || !isWithinKpiWindow(period.cycleSettings.managerReview)) throw new Error('当前不在主管复核时间范围内');
-  const employee = period.employees.find(item => item.id === employeeId && item.manager === manager);
+  if (!isManagerReviewOpen(period)) throw new Error('当前不在主管复核时间范围内');
+  if (!period.reviewEnabled) throw new Error('请先由 HR 开启主管确认');
+  const leaderDepartment = period.supervisors?.find(item => item.name === manager)?.department;
+  const employee = period.employees.find(item => item.id === employeeId && (leaderDepartment ? item.department === leaderDepartment : item.manager === manager));
   if (!employee) throw new Error('只能提交本人负责的员工');
   const submitted = submitManagerReview(recordReview(employee, '提交主管复核', manager, employee.managerDraft?.reason || ''));
   return { ...period, employees: period.employees.map(item => item.id === employeeId ? submitted : item) };
@@ -263,8 +339,9 @@ export const submitEmployeeReview = (period: KpiPeriod, employeeId: string, mana
 
 export const reviewDepartmentSubmission = (period: KpiPeriod, manager: string, department: string, decision: KpiReviewDecision, reason = ''): KpiPeriod => {
   if (period.published) throw new Error('已公示月份不可审核');
-  const targets = period.employees.filter(employee => employee.manager === manager && employee.department === department);
-  if (!targets.length || targets.some(employee => employee.reviewStatus !== '待 HR 审核')) throw new Error('该部门尚未全部提交 HR 审核');
+  const leaderDepartment = period.supervisors?.find(employee => employee.name === manager)?.department;
+  const targets = period.employees.filter(employee => employee.department === department && (leaderDepartment ? leaderDepartment === department : employee.manager === manager));
+  if (!targets.length || targets.some(employee => currentKpiStatus(employee.reviewStatus) !== '待HR复审')) throw new Error('该部门尚未全部提交 HR 复审');
   if (decision === 'return' && !reason.trim()) throw new Error('请填写退回原因');
   return { ...period, employees: period.employees.map(employee => targets.some(target => target.id === employee.id)
     ? reviewManagerSubmission(recordReview(employee, decision === 'approve' ? 'HR 审核通过' : 'HR 退回', 'HR', decision === 'approve' ? employee.managerDraft?.reason || '确认当前评分' : reason.trim()), decision, reason) : employee) };
@@ -274,17 +351,18 @@ export const reviewEmployeeSubmission = (period: KpiPeriod, employeeId: string, 
   if (period.published) throw new Error('已公示月份不可审核');
   const employee = period.employees.find(item => item.id === employeeId);
   if (!employee) throw new Error('未找到待审核员工');
-  if (employee.reviewStatus !== '待 HR 审核') throw new Error('当前员工尚未提交 HR 审核');
+  if (currentKpiStatus(employee.reviewStatus) !== '待HR复审') throw new Error('当前员工尚未提交 HR 复审');
   const reviewed = reviewManagerSubmission(recordReview(employee, decision === 'approve' ? 'HR 审核通过' : 'HR 退回', 'HR', decision === 'approve' ? employee.managerDraft?.reason || '确认当前评分' : reason.trim()), decision, reason);
   return { ...period, employees: period.employees.map(item => item.id === employeeId ? reviewed : item) };
 };
 
 export const publishKpiPeriod = (period: KpiPeriod): KpiPeriod => {
   if (!period.generated || period.published) throw new Error('当前月份不可公示');
-  if (period.cycleSettings) throw new Error('已设置自动公示周期，请等待最终公示时间');
-  if (period.employees.some(employee => employee.reviewStatus !== '已通过')) throw new Error('仍有员工未完成 HR 审核');
+  if (period.cycleSettings && period.cycleSettings.mode !== 'switches') throw new Error('请在周期设置中切换为手动公示');
+  if (period.employees.some(employee => currentKpiStatus(employee.reviewStatus) !== '已确认')) throw new Error('仍有员工未完成 HR 复审确认');
+  if ([...new Set(period.employees.map(employee => employee.department))].some(department => !period.supervisors?.some(employee => employee.department === department && employee.bossRatedAt))) throw new Error('仍有部门主管待老板评定');
   if ([...new Set(period.employees.map(employee => employee.department))].some(name => !period.departmentMetrics?.[name]?.confirmed)) throw new Error('请先确认全部部门系数');
-  return { ...period, published: true, publishedAt: new Date().toLocaleString('zh-CN', { hour12: false }) };
+  return { ...period, published: true, reviewEnabled: false, publishedAt: new Date().toISOString(), employees: period.employees.map(employee => ({ ...employee, reviewStatus: '已公示' as const })), supervisors: period.supervisors?.map(employee => ({ ...employee, reviewStatus: employee.bossRatedAt ? '已公示' as const : employee.reviewStatus })) };
 };
 
 export const confirmAllDepartmentCoefficients = (period: KpiPeriod): KpiPeriod => {
@@ -292,6 +370,7 @@ export const confirmAllDepartmentCoefficients = (period: KpiPeriod): KpiPeriod =
   const departments = [...new Set(period.employees.map(employee => employee.department))];
   if (!departments.length) throw new Error('本月没有可确认的部门');
   if (departments.some(name => period.departmentMetrics?.[name]?.goalScore == null)) throw new Error('请先确认全部部门目标权重');
+  if (departments.some(name => !period.supervisors?.some(employee => employee.department === name && employee.bossRatedAt))) throw new Error('请先完成各部门主管绩效评定');
   return {
     ...period,
     departmentCoefficients: Object.fromEntries(departments.map(name => [name, departmentCoefficientPreview(period, name).coefficient])),
@@ -336,7 +415,7 @@ const buildEmployees = (month: string): KpiEmployee[] => {
   return month === '2026-10' ? seeded.map(employee => ({
     ...employee,
     scores: { ...employee.scores, attendance: rows.find(row => row.id === employee.id)!.scores.attendance, extraWork: rows.find(row => row.id === employee.id)!.scores.extraWork },
-    reviewStatus: '已通过',
+    reviewStatus: '已确认',
   })) : seeded;
 };
 
@@ -366,6 +445,10 @@ export const reportScoreFor = (source: Pick<KpiSourceData, 'reportLate' | 'month
     : Math.max(0, 10 - 2 * (source.reportLate + (source.monthlyReportLate ?? 0)));
 
 export const effectiveKpiScores = (employee: KpiEmployee) => {
+  if (employee.reviewBook) {
+    const raw = reviewRawScores(employee.reviewBook);
+    return { ...raw, extraWork: Math.min(raw.attendance === 0 ? 5 : 10, raw.extraWork), attitude: Math.min(raw.objective < 30 ? 6 : 15, raw.attitude) };
+  }
   const { objective, review } = kpiDimensionScores(employee);
   return {
     objective,
@@ -391,6 +474,7 @@ export const scoreForEmployee = (employee: KpiEmployee) => {
 };
 
 export const kpiDimensionScores = (employee: KpiEmployee) => {
+  if (employee.reviewBook) { const raw = reviewRawScores(employee.reviewBook); return { objective: raw.objective, review: raw.review }; }
   const objectiveBase = employee.approvedSourceCorrections?.filter(record => record.source === 'objective').at(-1)?.after.objectiveScore ?? employee.scores.objective;
   const reviewBase = employee.approvedSourceCorrections?.filter(record => record.source === 'reports').at(-1)?.after.reviewScore ?? employee.scores.review;
   return employee.scoreAllocationVersion === 2
@@ -506,7 +590,9 @@ export const applyKpiSourceEdit = (
     id: `source-edit-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
     category, actor, at: now.toISOString(), reason: normalizedReason, before, after: { ...values },
   };
-  return { ...employee, source, scores, sourceCorrection, sourceEditHistory: [...(employee.sourceEditHistory || []), record] };
+  return { ...employee, source, scores, sourceCorrection, sourceEditHistory: [...(employee.sourceEditHistory || []), record],
+    ...(employee.reviewBook ? { reviewBook: { ...employee.reviewBook, revision: employee.reviewBook.revision + 1, base: { ...employee.reviewBook.base,
+      ...(category === 'objective' ? { objective: scores.objective } : category === 'attendance' ? { attendance: scores.attendance, extraWork: scores.extraWork } : category === 'extraWork' ? { extraWork: scores.extraWork } : { review: scores.review }) } } } : {}) };
 };
 
 const verifiedAttendance = (employee: KpiEmployee, baseline: KpiEmployee, adjustment?: AttendanceKpiAdjustment) => {
@@ -579,15 +665,15 @@ export const submitManagerReview = (employee: KpiEmployee): KpiEmployee => {
   const draft = employee.managerDraft;
   if (!draft?.reason.trim()) throw new Error('请填写复核说明');
   if (!validManagerDraft(draft)) throw new Error('请核对评分：目标加分和减分不得为负，临时任务只允许扣分');
-  if (!['待主管复核', 'HR 已退回'].includes(employee.reviewStatus)) throw new Error('当前状态不可提交主管复核');
-  return { ...employee, reviewStatus: '待 HR 审核', hrNote: `主管已提交：${draft.reason.trim()}` };
+  if (!['待主管确认', '待主管复核', 'HR 已退回'].includes(employee.reviewStatus)) throw new Error('当前状态不可提交主管复核');
+  return { ...employee, reviewStatus: '待HR复审', hrNote: `主管已提交：${draft.reason.trim()}` };
 };
 
 export const reviewManagerSubmission = (employee: KpiEmployee, decision: KpiReviewDecision, reason = ''): KpiEmployee => {
-  if (employee.reviewStatus !== '待 HR 审核') throw new Error('当前状态没有待审核的绩效');
+  if (!['待HR复审', '待 HR 审核'].includes(employee.reviewStatus)) throw new Error('当前状态没有待审核的绩效');
   if (decision === 'return' && !reason.trim()) throw new Error('请填写退回原因');
   if (decision === 'return') {
-    return { ...employee, reviewStatus: 'HR 已退回', hrNote: `HR 退回：${reason.trim()}` };
+    return { ...employee, reviewStatus: '待主管确认', hrNote: `HR 退回：${reason.trim()}` };
   }
   const draft = employee.managerDraft;
   if (draft && !validManagerDraft(draft)) throw new Error('请核对评分：目标加分和减分不得为负，临时任务只允许扣分');
@@ -596,17 +682,17 @@ export const reviewManagerSubmission = (employee: KpiEmployee, decision: KpiRevi
     scores: draft ? { ...employee.scores, attitude: draft.attitude, managerAdjustment: draft.adjustment, temporaryTaskDeduction: draft.temporaryTaskDeduction ?? 0 } : employee.scores,
     scoreAllocationVersion: draft ? 2 : employee.scoreAllocationVersion,
     source: draft ? { ...employee.source, objectiveAdjustment: draft.adjustment } : employee.source,
-    reviewStatus: '已通过',
+    reviewStatus: '已确认',
     hrNote: draft ? `HR 审核通过：${draft.reason.trim()}` : 'HR 已确认系统计算结果。',
   };
 };
 
 const initialState = (): KpiDemoState => ({
   periods: Object.fromEntries(KPI_MONTHS.map((month, index) => [month, {
-    employees: month === '2026-11' ? buildEmployees(month).map(employee => ({ ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 }, redline: undefined, reviewStatus: '待主管复核', managerDraft: undefined, hrNote: undefined })) : buildEmployees(month),
+    employees: month === '2026-11' ? buildEmployees(month).map(employee => ({ ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 }, redline: undefined, reviewStatus: '草稿', managerDraft: undefined, hrNote: undefined })) : buildEmployees(month),
     generated: month !== '2026-09',
     published: month === '2026-10',
-    reviewEnabled: month !== '2026-09',
+    reviewEnabled: false,
     reviewScoresInitialized: true,
     generatedAt: month === '2026-11' ? '2026-11-01 09:30' : month === '2026-10' ? '2026-11-01 09:30' : undefined,
     publishedAt: month === '2026-10' ? '2026-11-01 09:30' : undefined,
@@ -617,6 +703,32 @@ const initialState = (): KpiDemoState => ({
     })),
   }])) as KpiDemoState['periods'],
 });
+
+function ensureSupervisorPeriods(state: KpiDemoState) {
+  for (const [month, period] of Object.entries(state.periods)) {
+    const existingIds = new Set((period.supervisors || []).map(person => person.id));
+    const managers = mockOkrState.okrPeople.filter(person => person.id.startsWith('kpi-manager-') && !existingIds.has(person.id));
+    period.supervisors = [...(period.supervisors || []), ...managers.map(person => {
+      const goal = demoDepartmentGoal(month, person.department);
+      const legacyPublishedDemo = month === '2026-10';
+      const base = { objective: goal.total ?? 0, attendance: 10, extraWork: 0, attitude: legacyPublishedDemo ? 13 : 0, review: 10 };
+      const adjustments = Object.fromEntries(['objective', 'attendance', 'extraWork', 'attitude', 'review'].map(key => [key, { bonus: 0, deduction: 0, note: '' }])) as import('./kpiReviewModel').ModuleAdjustments;
+      const ratingAt = '2026-11-01T09:30:00+08:00';
+      return { id: person.id, name: person.name.replace('（绩效演示）', ''), department: person.department, position: '部门主管（演示）', manager: '老板', performanceKind: 'supervisor' as const,
+        ...(legacyPublishedDemo ? { supervisorDemoRated: true, bossRatedAt: ratingAt, reviewBook: { base, active: { 老板: adjustments }, drafts: {}, history: [{ id: `october-demo-${person.id}`, actor: '老板' as const, name: '老板（演示）', at: ratingAt, action: '演示评定已确认', after: adjustments }], revision: 1 } } : {}),
+        scores: { ...base, managerAdjustment: 0 }, source: { okrCompletion: goal.completion, attendanceDays: 22, lateCount: 0, missingPunches: 0, approvedOvertimeHours: 0, reportLate: 0, reportMissing: 0, tasksOverdue: 0 }, reviewStatus: (legacyPublishedDemo ? period.published ? '已公示' : '已确认' : '草稿') as KpiStatus };
+    })];
+    if (month === '2026-10') period.supervisors = period.supervisors.map(employee => {
+      if (employee.bossRatedAt) return employee;
+      const goal = demoDepartmentGoal(month, employee.department);
+      const base = { objective: goal.total ?? 0, attendance: 10, extraWork: 0, attitude: 13, review: 10 };
+      const adjustments = Object.fromEntries(['objective', 'attendance', 'extraWork', 'attitude', 'review'].map(key => [key, { bonus: 0, deduction: 0, note: '' }])) as import('./kpiReviewModel').ModuleAdjustments;
+      const ratingAt = '2026-11-01T09:30:00+08:00';
+      return { ...employee, supervisorDemoRated: true, bossRatedAt: ratingAt, scores: { ...base, managerAdjustment: 0 }, reviewBook: { base, active: { 老板: adjustments }, drafts: {}, history: [{ id: `october-demo-${employee.id}`, actor: '老板' as const, name: '老板（演示）', at: ratingAt, action: '演示评定已确认', after: adjustments }], revision: 1 }, reviewStatus: period.published ? '已公示' as const : '已确认' as const };
+    });
+  }
+  return { ...state, periods: Object.fromEntries(Object.entries(state.periods).map(([month, period]) => [month, normalizeKpiLifecycle(period)])) };
+}
 
 const withVerifiedAttendance = (state: KpiDemoState): KpiDemoState => {
   for (const [month, period] of Object.entries(state.periods)) {
@@ -643,9 +755,9 @@ const withVerifiedAttendance = (state: KpiDemoState): KpiDemoState => {
 export const loadKpiDemo = (): KpiDemoState => {
   try {
     const raw = localStorage.getItem(KPI_DEMO_STORAGE_KEY);
-    if (!raw) return withVerifiedAttendance(initialState());
+    if (!raw) return ensureSupervisorPeriods(withVerifiedAttendance(initialState()));
     const parsed = JSON.parse(raw) as KpiDemoState;
-    if (!parsed.periods || !parsed.periods['2026-10']) return withVerifiedAttendance(initialState());
+    if (!parsed.periods || !parsed.periods['2026-10']) return ensureSupervisorPeriods(withVerifiedAttendance(initialState()));
     Object.entries(parsed.periods).forEach(([month, period]) => {
       const baseline = new Map(buildEmployees(month).map(employee => [employee.id, employee.source]));
       period.departmentMetrics ||= Object.fromEntries([...new Set(period.employees.map(employee => employee.department))]
@@ -669,7 +781,7 @@ export const loadKpiDemo = (): KpiDemoState => {
           && employee.source.reportMissing === original.reportMissing) employee.source.reportSubmittedCount = original.reportSubmittedCount;
       });
       if (!period.reviewScoresInitialized && !period.published && period.reviewEnabled) {
-        period.employees = period.employees.map(employee => employee.reviewStatus === '待主管复核' && !employee.reviewHistory?.length
+        period.employees = period.employees.map(employee => currentKpiStatus(employee.reviewStatus) === '待主管确认' && !employee.reviewHistory?.length
           ? { ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 } } : employee);
       }
       period.reviewScoresInitialized = true;
@@ -680,13 +792,14 @@ export const loadKpiDemo = (): KpiDemoState => {
         ...reviewDemoPeriod,
         generated: true,
         generatedAt: '2026-11-01 09:30',
-        reviewEnabled: true,
-        employees: reviewDemoPeriod.employees.map(employee => ({ ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 }, reviewStatus: '待主管复核', managerDraft: undefined, hrNote: undefined })),
+        reviewEnabled: false,
+        employees: reviewDemoPeriod.employees.map(employee => ({ ...employee, scores: { ...employee.scores, attitude: 0, managerAdjustment: 0 }, source: { ...employee.source, objectiveAdjustment: 0 }, reviewStatus: '草稿', managerDraft: undefined, hrNote: undefined })),
       };
     }
-    return withVerifiedAttendance(parsed);
+    Object.entries(parsed.periods).forEach(([month, period]) => { parsed.periods[month] = normalizeKpiLifecycle(period); });
+    return ensureSupervisorPeriods(withVerifiedAttendance(parsed));
   } catch {
-    return withVerifiedAttendance(initialState());
+    return ensureSupervisorPeriods(withVerifiedAttendance(initialState()));
   }
 };
 
@@ -697,6 +810,8 @@ export const saveKpiDemo = (state: KpiDemoState) => {
 export const createKpiPeriod = (period: KpiPeriod): KpiPeriod => ({
   ...period,
   generated: true,
+  reviewEnabled: false,
+  supervisors: period.supervisors?.map(employee => ({ ...employee, bossRatedAt: undefined, reviewBook: undefined, reviewStatus: '待生成' as const })),
   published: false,
   publishedAt: undefined,
   reviewScoresInitialized: true,
@@ -704,10 +819,11 @@ export const createKpiPeriod = (period: KpiPeriod): KpiPeriod => ({
   generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   employees: period.employees.map(employee => ({
     ...employee,
+    reviewBook: undefined,
     scores: period.reviewEnabled ? { ...employee.scores, attitude: 0, managerAdjustment: 0, temporaryTaskDeduction: 0 } : employee.scores,
     scoreAllocationVersion: period.reviewEnabled ? undefined : employee.scoreAllocationVersion,
     source: period.reviewEnabled ? { ...employee.source, objectiveAdjustment: 0 } : employee.source,
-    reviewStatus: period.reviewEnabled ? '待主管复核' : '待 HR 审核',
+    reviewStatus: '草稿',
     managerDraft: undefined,
     reviewHistory: [],
     hrNote: undefined,

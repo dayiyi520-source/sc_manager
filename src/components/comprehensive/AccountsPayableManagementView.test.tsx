@@ -24,7 +24,7 @@ afterEach(() => {
 
 it('loads payable demo data and switches to payment records', () => {
   render(<AccountsPayableManagementView />);
-  expect(screen.getByText('项目应付总额')).toBeInTheDocument();
+  expect(screen.getByText('应付总额')).toBeInTheDocument();
   expect(screen.getByText('AP-DEMO-2026-001')).toBeInTheDocument();
   expect(screen.queryByText('AP-DEMO-2026-003')).not.toBeInTheDocument();
   expect(screen.getByText('逾期应付款')).toBeInTheDocument();
@@ -34,15 +34,21 @@ it('loads payable demo data and switches to payment records', () => {
 
 it('creates a payable and records a partial payment persistently', () => {
   render(<AccountsPayableManagementView />);
-  fireEvent.click(screen.getByRole('button', { name: '新建项目应付' }));
+  fireEvent.click(screen.getByRole('button', { name: '新建付款计划' }));
   const createDialog = screen.getByRole('dialog');
+  const customerField = within(createDialog).getByLabelText('收款客户');
+  expect(customerField).toHaveValue('');
   fireEvent.change(within(createDialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
-  fireEvent.change(within(createDialog).getByLabelText('收款对象'), { target: { value: '测试供应商' } });
+  expect(customerField).toHaveValue('测试客户');
+  expect(customerField).toHaveAttribute('readonly');
+  fireEvent.change(within(createDialog).getByLabelText('关联项目'), { target: { value: 'project-2' } });
+  expect(customerField).toHaveValue('演示学校一');
+  fireEvent.change(within(createDialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
   fireEvent.change(within(createDialog).getByLabelText('含税应付金额 (元)'), { target: { value: '1000' } });
   fireEvent.change(within(createDialog).getByLabelText('计划付款日期'), { target: { value: '2026-12-01' } });
-  fireEvent.click(within(createDialog).getByRole('button', { name: '保存项目应付' }));
-  expect(screen.getByText('测试供应商')).toBeInTheDocument();
-  const row = screen.getByText('测试供应商').closest('tr');
+  fireEvent.click(within(createDialog).getByRole('button', { name: '保存付款计划' }));
+  expect(screen.getAllByText('测试客户').length).toBeGreaterThan(0);
+  const row = screen.getAllByText('测试客户').find((element) => element.closest('tr'))?.closest('tr');
   expect(row).toBeTruthy();
   fireEvent.click(within(row as HTMLElement).getByRole('button', { name: '登记付款' }));
   const paymentDialog = screen.getByRole('dialog');
@@ -50,13 +56,13 @@ it('creates a payable and records a partial payment persistently', () => {
   fireEvent.click(within(paymentDialog).getByRole('button', { name: '确认登记付款' }));
   expect(screen.getByText('¥ 600')).toBeInTheDocument();
   const saved = JSON.parse(localStorage.getItem('shichuang.frontend.mock.accountsPayable') || '{}');
-  expect(saved.payments).toHaveLength(2);
-  expect(saved.payables.find((item: { supplierName: string }) => item.supplierName === '测试供应商')).toMatchObject({ paidAmount: 400, unpaidAmount: 600 });
+  expect(saved.payments).toHaveLength(3);
+  expect(saved.payables.find((item: { supplierName: string }) => item.supplierName === '测试客户')).toMatchObject({ supplierName: '测试客户', customerId: 'customer-1', customerName: '测试客户', paidAmount: 400, unpaidAmount: 600 });
 });
 
 it('requires a project and a contract for agency sharing payables', () => {
   render(<AccountsPayableManagementView />);
-  fireEvent.click(screen.getByRole('button', { name: '新建项目应付' }));
+  fireEvent.click(screen.getByRole('button', { name: '新建付款计划' }));
   const dialog = screen.getByRole('dialog');
   fireEvent.change(within(dialog).getByLabelText('支出类别'), { target: { value: '代理商分成' } });
   expect(within(dialog).getByLabelText('关联项目')).toBeRequired();

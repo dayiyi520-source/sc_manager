@@ -9,7 +9,7 @@ describe('KPI performance demo rules', () => {
 
 const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
   const now = Date.now();
-  return { ...period, cycleSettings: {
+  return { ...period, reviewEnabled: true, employees: period.employees.map(employee => employee.reviewStatus === '草稿' ? { ...employee, reviewStatus: '待主管确认' as const } : employee), cycleSettings: {
     managerReview: { startAt: new Date(now - 60_000).toISOString(), endAt: new Date(now + 86_400_000).toISOString() },
     finalPublicationAt: new Date(now + 172_800_000).toISOString(),
     appealConfirmation: { startAt: new Date(now + 172_860_000).toISOString(), endAt: new Date(now + 259_200_000).toISOString() },
@@ -125,12 +125,12 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     const state = loadKpiDemo();
     const period = state.periods['2026-10'];
     period.employees[0].scores.managerAdjustment = 2;
-    period.employees[0].reviewStatus = '已通过';
+    period.employees[0].reviewStatus = '已确认';
     saveKpiDemo(state);
 
     const restored = loadKpiDemo().periods['2026-10'].employees[0];
     expect(scoreForEmployee(restored)).toBe(93);
-    expect(restored.reviewStatus).toBe('已通过');
+    expect(restored.reviewStatus).toBe('已公示');
     expect(localStorage.getItem(KPI_DEMO_STORAGE_KEY)).not.toBeNull();
   });
 
@@ -140,14 +140,14 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
 
     expect(reviewPeriod.generated).toBe(true);
     expect(reviewPeriod.published).toBe(false);
-    expect(reviewPeriod.reviewEnabled).toBe(true);
-    expect(reviewPeriod.employees.every(employee => employee.reviewStatus === '待主管复核')).toBe(true);
+    expect(reviewPeriod.reviewEnabled).toBe(false);
+    expect(reviewPeriod.employees.every(employee => employee.reviewStatus === '草稿')).toBe(true);
     expect(reviewPeriod.employees.every(employee => employee.scores.attitude === 0 && employee.scores.managerAdjustment === 0)).toBe(true);
     expect(createKpiPeriod(reviewPeriod).employees.every(employee => employee.scores.attitude === 0 && employee.scores.managerAdjustment === 0)).toBe(true);
     expect(state.periods['2026-10'].published).toBe(true);
   });
 
-  it('validates ordered cycle settings and automatically publishes when all prerequisites are met', () => {
+  it('retains legacy settings validation but never auto publishes', () => {
     const cycleSettings = {
       managerReview: { startAt: '2026-11-01T00:00:00.000Z', endAt: '2026-11-03T00:00:00.000Z' },
       finalPublicationAt: '2026-11-04T00:00:00.000Z',
@@ -156,13 +156,13 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(validateKpiCycleSettings(cycleSettings)).toBeNull();
     expect(validateKpiCycleSettings({ ...cycleSettings, appealConfirmation: { ...cycleSettings.appealConfirmation, startAt: '2026-11-02T00:00:00.000Z' } })).toContain('主管复核结束后');
     const period = loadKpiDemo().periods['2026-11'];
-    const ready = { ...period, cycleSettings, employees: period.employees.map(employee => ({ ...employee, reviewStatus: '已通过' as const })), departmentMetrics: Object.fromEntries(Object.entries(period.departmentMetrics || {}).map(([name, metrics]) => [name, { ...metrics, confirmed: true }])) };
-    expect(() => publishKpiPeriod(ready)).toThrow('自动公示');
+    const ready = { ...period, cycleSettings, employees: period.employees.map(employee => ({ ...employee, reviewStatus: '已确认' as const })), departmentMetrics: Object.fromEntries(Object.entries(period.departmentMetrics || {}).map(([name, metrics]) => [name, { ...metrics, confirmed: true }])) };
+    expect(() => publishKpiPeriod(ready)).toThrow('手动公示');
     expect(() => submitDepartmentReview({ ...period, cycleSettings }, '陈宇璋', '产品部')).toThrow('主管复核时间范围');
     expect(autoPublishKpiPeriod(ready, Date.parse('2026-11-03T23:59:59.000Z')).published).toBe(false);
     const published = autoPublishKpiPeriod(ready, Date.parse('2026-11-04T00:00:01.000Z'));
-    expect(published.published).toBe(true);
-    expect(new Date(published.publishedAt!).getTime()).toBe(Date.parse('2026-11-04T00:00:01.000Z'));
+    expect(published).toBe(ready);
+    expect(published.published).toBe(false);
     expect(autoPublishKpiPeriod({ ...ready, employees: period.employees }, Date.parse('2026-11-05T00:00:00.000Z')).published).toBe(false);
     expect(autoPublishKpiPeriod({ ...ready, departmentMetrics: {} }, Date.parse('2026-11-05T00:00:00.000Z')).published).toBe(false);
   });
@@ -248,12 +248,14 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     const state = loadKpiDemo();
     const period = state.periods['2026-11'];
     delete period.reviewScoresInitialized;
+    period.employees[0].reviewStatus = '待主管确认';
     period.employees[0].scores.attitude = 14;
     period.employees[1].scores.attitude = 13;
-    period.employees[1].reviewStatus = '待 HR 审核';
+    period.employees[1].reviewStatus = '待HR复审';
     period.employees[1].managerDraft = { attitude: 13, adjustment: 1, reason: '已提交' };
     period.employees[2].scores.attitude = 12;
-    period.employees[2].reviewStatus = '已通过';
+    period.employees[2].reviewStatus = '已确认';
+    period.reviewEnabled = true;
     saveKpiDemo(state);
     const restored = loadKpiDemo().periods['2026-11'];
     expect(restored.employees[0].scores.attitude).toBe(0);
@@ -263,21 +265,21 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
   });
 
   it('keeps manager changes out of the summary until HR approves', () => {
-    const employee = { ...loadKpiDemo().periods['2026-11'].employees[0], reviewStatus: '待主管复核' as const };
+    const employee = { ...loadKpiDemo().periods['2026-11'].employees[0], reviewStatus: '待主管确认' as const };
     const draft = { ...employee, managerDraft: { attitude: 10, adjustment: -2, reason: '交付延期，复盘材料未按期提交。' } };
     const submitted = submitManagerReview(draft);
-    expect(submitted.reviewStatus).toBe('待 HR 审核');
+    expect(submitted.reviewStatus).toBe('待HR复审');
     expect(scoreForEmployee(submitted)).toBe(scoreForEmployee(employee));
 
     const approved = reviewManagerSubmission(submitted, 'approve');
-    expect(approved.reviewStatus).toBe('已通过');
+    expect(approved.reviewStatus).toBe('已确认');
     expect(approved.scores.attitude).toBe(10);
     expect(approved.scores.managerAdjustment).toBe(-2);
     expect(scoreForEmployee(approved)).toBe(scoreForEmployee(employee) + 8);
   });
 
   it('allocates unlimited signed goal adjustment and temporary-task deductions into capped dimensions after HR approval', () => {
-    const employee = { ...loadKpiDemo().periods['2026-11'].employees[0], reviewStatus: '待主管复核' as const, scores: { ...loadKpiDemo().periods['2026-11'].employees[0].scores, objective: 50, review: 10 } };
+    const employee = { ...loadKpiDemo().periods['2026-11'].employees[0], reviewStatus: '待主管确认' as const, scores: { ...loadKpiDemo().periods['2026-11'].employees[0].scores, objective: 50, review: 10 } };
     const submitted = submitManagerReview({ ...employee, managerDraft: { attitude: 10, adjustment: 12, temporaryTaskDeduction: -4, reason: '挑战目标与临时任务复核' } });
     expect(scoreForEmployee(submitted)).toBe(scoreForEmployee(employee));
     const approved = reviewManagerSubmission(submitted, 'approve');
@@ -306,8 +308,8 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(approved.employees[0].reviewHistory?.at(-1)?.proposed).toMatchObject({ goalBonus: 5, goalDeduction: 5, adjustment: 0 });
     expect(approved.employees[0].scores.managerAdjustment).toBe(0);
     expect(kpiDimensionScores(approved.employees[0]).objective).toBe(employee.scores.objective);
-    expect(() => submitManagerReview({ ...employee, reviewStatus: '待主管复核', managerDraft: { ...employee.managerDraft!, goalBonus: -1 } })).toThrow('目标加分和减分不得为负');
-    expect(() => submitManagerReview({ ...employee, reviewStatus: '待主管复核', managerDraft: { ...employee.managerDraft!, adjustment: 2 } })).toThrow('请核对评分');
+    expect(() => submitManagerReview({ ...employee, reviewStatus: '待主管确认', managerDraft: { ...employee.managerDraft!, goalBonus: -1 } })).toThrow('目标加分和减分不得为负');
+    expect(() => submitManagerReview({ ...employee, reviewStatus: '待主管确认', managerDraft: { ...employee.managerDraft!, adjustment: 2 } })).toThrow('请核对评分');
   });
 
   it('includes legacy manager adjustment in the objective module before weighted scoring', () => {
@@ -320,11 +322,11 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
   });
 
   it('returns a submission to the manager without applying the proposed score', () => {
-    const employee = { ...loadKpiDemo().periods['2026-11'].employees[0], reviewStatus: '待主管复核' as const };
+    const employee = { ...loadKpiDemo().periods['2026-11'].employees[0], reviewStatus: '待主管确认' as const };
     const submitted = submitManagerReview({ ...employee, managerDraft: { attitude: 12, adjustment: 1, reason: '按期交付并主动协助团队。' } });
     const returned = reviewManagerSubmission(submitted, 'return', '请补充具体项目证据。');
 
-    expect(returned.reviewStatus).toBe('HR 已退回');
+    expect(returned.reviewStatus).toBe('待主管确认');
     expect(returned.hrNote).toContain('请补充具体项目证据');
     expect(returned.scores).toEqual(employee.scores);
     expect(returned.managerDraft).toEqual(submitted.managerDraft);
@@ -333,32 +335,32 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
   it('submits and reviews a manager department as one group', () => {
     const period = withOpenManagerWindow(loadKpiDemo().periods['2026-11']);
     const submitted = submitDepartmentReview(period, '陈宇璋', '产品部');
-    expect(submitted.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '待 HR 审核')).toBe(true);
-    expect(submitted.employees.find(employee => employee.id === 'e-03')?.reviewStatus).toBe('待主管复核');
+    expect(submitted.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '待HR复审')).toBe(true);
+    expect(submitted.employees.find(employee => employee.id === 'e-03')?.reviewStatus).toBe('待主管确认');
     expect(() => submitDepartmentReview(submitted, '陈宇璋', '产品部')).toThrow();
     const returned = reviewDepartmentSubmission(submitted, '陈宇璋', '产品部', 'return', '补充依据');
-    expect(returned.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === 'HR 已退回')).toBe(true);
+    expect(returned.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '待主管确认')).toBe(true);
     const approved = reviewDepartmentSubmission(submitDepartmentReview(returned, '陈宇璋', '产品部'), '陈宇璋', '产品部', 'approve');
-    expect(approved.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '已通过')).toBe(true);
+    expect(approved.employees.filter(employee => employee.department === '产品部').every(employee => employee.reviewStatus === '已确认')).toBe(true);
   });
 
   it('submits and reviews one employee without changing unsubmitted or approved colleagues', () => {
     const period = withOpenManagerWindow(loadKpiDemo().periods['2026-11']);
     const [target, unsubmitted, approved] = period.employees;
     target.managerDraft = { attitude: 10, adjustment: 12, temporaryTaskDeduction: -4, reason: '挑战任务与临时任务' };
-    approved.reviewStatus = '已通过';
+    approved.reviewStatus = '已确认';
     const before = period.employees.map(employee => ({ status: employee.reviewStatus, score: scoreForEmployee(employee) }));
 
     const submitted = submitEmployeeReview(period, target.id, target.manager);
-    expect(submitted.employees[0].reviewStatus).toBe('待 HR 审核');
+    expect(submitted.employees[0].reviewStatus).toBe('待HR复审');
     expect(submitted.employees[1].reviewStatus).toBe(before[1].status);
-    expect(submitted.employees[2].reviewStatus).toBe('已通过');
+    expect(submitted.employees[2].reviewStatus).toBe('已确认');
     expect(scoreForEmployee(submitted.employees[0])).toBe(before[0].score);
     expect(() => submitEmployeeReview(submitted, unsubmitted.id, '其他主管')).toThrow('本人负责');
     expect(() => reviewEmployeeSubmission(submitted, unsubmitted.id, 'return', '退回')).toThrow('尚未提交');
 
     const returned = reviewEmployeeSubmission(submitted, target.id, 'return', '请补充事实依据');
-    expect(returned.employees[0].reviewStatus).toBe('HR 已退回');
+    expect(returned.employees[0].reviewStatus).toBe('待主管确认');
     expect(returned.employees[0].hrNote).toContain('请补充事实依据');
     expect(returned.employees[1]).toEqual(submitted.employees[1]);
     expect(returned.employees[2]).toEqual(submitted.employees[2]);
@@ -366,7 +368,7 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
 
     const resubmitted = submitEmployeeReview(returned, target.id, target.manager);
     const accepted = reviewEmployeeSubmission(resubmitted, target.id, 'approve');
-    expect(accepted.employees[0].reviewStatus).toBe('已通过');
+    expect(accepted.employees[0].reviewStatus).toBe('已确认');
     expect(kpiDimensionScores(accepted.employees[0])).toEqual({ objective: 60, review: 6 });
     expect(scoreForEmployee(accepted.employees[0])).not.toBe(before[0].score);
     expect(accepted.employees[0].reviewHistory?.map(record => record.action)).toEqual(['提交主管复核', 'HR 退回', '提交主管复核', 'HR 审核通过']);
@@ -380,18 +382,22 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
 
   it('calculates responsibility separately from the final department coefficient', () => {
     const period = loadKpiDemo().periods['2026-11'];
-    period.employees.filter(employee => employee.department === '产品部').forEach(employee => { employee.source.okrCompletion = 80; });
+    const template = period.employees[0];
+    period.employees = Array.from({ length: 5 }, (_, index) => ({ ...structuredClone(template), id: `responsibility-${index}`, redline: undefined, approvedSourceCorrections: [], source: { ...template.source, okrCompletion: 90, goalLate: false } }));
     period.departmentMetrics!.产品部.goalCompletion = 95;
-    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ responsibilityCoefficient: 1, adjustment: 0.9, coefficient: 0.9 });
-    period.employees[0].source.okrCompletion = 79;
+    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ memberCompletion: 90, responsibilityCoefficient: 1, adjustment: 0.9, coefficient: 0.9 });
+    period.employees[0].source.okrCompletion = 89.99;
     expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ responsibilityCoefficient: 0.8, coefficient: 0.9 });
-    period.employees[0].source.okrCompletion = 80;
-    period.employees[0].source.goalLate = true;
-    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ delayedSubmissionCount: 1, responsibilityCoefficient: 0.8 });
-    period.employees[0].source.goalLate = false;
+    period.employees[0].source.okrCompletion = 90;
+    period.employees.slice(0, 3).forEach(employee => { employee.source.goalLate = true; });
+    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ delayedSubmissionCount: 3, responsibilityCoefficient: 1 });
+    period.employees[3].source.goalLate = true;
+    expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ delayedSubmissionCount: 4, responsibilityCoefficient: 0.8, coefficient: 0.9 });
+    period.employees.forEach(employee => { employee.source.goalLate = false; });
     period.employees[0].redline = { type: '重大失职', impact: '绩效系数清零', active: true };
     expect(departmentCoefficientPreview(period, '产品部')).toMatchObject({ responsibilityCoefficient: 0.8, coefficient: 0.9 });
-    expect(period.employees.every(employee => !employee.redline || employee.id === 'e-01')).toBe(true);
+    period.employees[0].redline.active = false;
+    expect(departmentCoefficientPreview(period, '产品部').responsibilityCoefficient).toBe(1);
   });
 
   it('records submitted, returned and approved changes, writing only approved adjustment to source', () => {
@@ -410,8 +416,8 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     expect(approved.employees[0].scores.managerAdjustment).toBe(-2);
     expect(approved.employees[0].source).toEqual({ ...original.source, objectiveAdjustment: -2 });
     expect(approved.employees[0].reviewHistory?.map(item => item.action)).toEqual(['提交主管复核', 'HR 退回', '提交主管复核', 'HR 审核通过']);
-    expect(() => publishKpiPeriod({ ...approved, cycleSettings: undefined })).toThrow('仍有员工未完成 HR 审核');
-    const ready = { ...approved, cycleSettings: undefined, employees: approved.employees.map(employee => ({ ...employee, reviewStatus: '已通过' as const })), departmentMetrics: Object.fromEntries(Object.entries(approved.departmentMetrics || {}).map(([name, metric]) => [name, { ...metric, confirmed: true }])) };
+    expect(() => publishKpiPeriod({ ...approved, cycleSettings: undefined })).toThrow('仍有员工未完成 HR 复审确认');
+    const ready = { ...approved, cycleSettings: undefined, employees: approved.employees.map(employee => ({ ...employee, reviewStatus: '已确认' as const })), supervisors: approved.supervisors?.map(employee => ({ ...employee, bossRatedAt: '2026-11-01T09:30:00+08:00' })), departmentMetrics: Object.fromEntries(Object.entries(approved.departmentMetrics || {}).map(([name, metric]) => [name, { ...metric, confirmed: true }])) };
     const published = publishKpiPeriod(ready);
     expect(published.published).toBe(true);
     expect(published.publishedAt).toBeTruthy();
@@ -451,6 +457,7 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
 
   it('confirms all departments atomically and rejects published or empty periods', () => {
     const period = loadKpiDemo().periods['2026-11'];
+    period.supervisors = period.supervisors?.map(employee => ({ ...employee, bossRatedAt: '2026-11-01T09:30:00+08:00' }));
     period.departmentMetrics!.产品部.businessRequirement = true;
     period.employees[0].redline = { type: '重大失职', impact: '绩效系数清零', active: true };
     const confirmed = confirmAllDepartmentCoefficients(period);
@@ -465,13 +472,14 @@ const withOpenManagerWindow = (period: KpiPeriod): KpiPeriod => {
     const state = loadKpiDemo();
     let period = withOpenManagerWindow(state.periods['2026-11']);
     period.reviewEnabled = true;
+    period.supervisors = period.supervisors?.map(employee => ({ ...employee, bossRatedAt: '2026-11-01T09:30:00+08:00' }));
     period.employees[0].managerDraft = { attitude: 10, adjustment: -2, reason: '完成情况经主管复核' };
-    const groups = [...new Set(period.employees.map(employee => `${employee.manager}|${employee.department}`))];
-    for (const group of groups) {
-      const [manager, department] = group.split('|');
+    const departments = [...new Set(period.employees.map(employee => employee.department))];
+    for (const department of departments) {
+      const manager = period.supervisors?.find(employee => employee.department === department)?.name || '';
       period = reviewDepartmentSubmission(submitDepartmentReview(period, manager, department), manager, department, 'approve');
     }
-    expect(period.employees.every(employee => employee.reviewStatus === '已通过')).toBe(true);
+    expect(period.employees.every(employee => employee.reviewStatus === '已确认')).toBe(true);
     expect(period.employees[0].reviewHistory?.map(record => record.action)).toEqual(['提交主管复核', 'HR 审核通过']);
     expect(period.employees[0].scores.attitude).toBe(10);
     expect(period.employees[0].source.okrCompletion).toBe(93);

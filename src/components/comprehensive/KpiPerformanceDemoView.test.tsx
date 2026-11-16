@@ -29,7 +29,8 @@ async function seedPublishedPeriod() {
   const period = state.periods['2026-11'];
   period.generated = true;
   period.published = true;
-  period.employees = period.employees.map(employee => ({ ...employee, reviewStatus: '已通过' }));
+  period.employees = period.employees.map(employee => ({ ...employee, reviewStatus: '已公示' }));
+  period.supervisors = period.supervisors?.map(employee => ({ ...employee, bossRatedAt: employee.bossRatedAt || '2026-11-01T09:30:00+08:00', reviewStatus: '已公示' }));
   localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -42,6 +43,7 @@ describe('绩效考核公示', () => {
     expect(screen.getByRole('heading', { name: '2026年11月绩效公示' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '本月绩效结果尚未公示' })).toBeInTheDocument();
     expect(screen.queryByText('本月结果尚未公示')).not.toBeInTheDocument();
+    if (role === '主管') expect(screen.getByText('本月绩效结果尚未确认，可联系管理员进行确认。')).toBeInTheDocument();
     expect(screen.queryByText('HR 审核完成后即可公示')).not.toBeInTheDocument();
     expect(screen.queryByText('HR 完成审核并公示后，员工可查看本人绩效及部门汇总。')).not.toBeInTheDocument();
   });
@@ -63,11 +65,14 @@ describe('绩效考核公示', () => {
     let period = state.periods['2026-11'];
     const now = Date.now();
     period.cycleSettings = { managerReview: { startAt: new Date(now - 60_000).toISOString(), endAt: new Date(now + 86_400_000).toISOString() }, finalPublicationAt: new Date(now + 172_800_000).toISOString(), appealConfirmation: { startAt: new Date(now + 172_860_000).toISOString(), endAt: new Date(now + 259_200_000).toISOString() } };
+    period.reviewEnabled = true;
+    period.employees = period.employees.map(employee => ({ ...employee, reviewStatus: '待主管确认' }));
     period.employees[0].managerDraft = { attitude: 10, adjustment: -2, reason: '主管复核调整' };
-    for (const group of [...new Set(period.employees.map(employee => `${employee.manager}|${employee.department}`))]) {
-      const [manager, department] = group.split('|');
+    for (const department of [...new Set(period.employees.map(employee => employee.department))]) {
+      const manager = period.supervisors?.find(employee => employee.department === department)?.name || '';
       period = reviewDepartmentSubmission(submitDepartmentReview(period, manager, department), manager, department, 'approve');
     }
+    period.supervisors = period.supervisors?.map(employee => ({ ...employee, bossRatedAt: '2026-11-01T09:30:00+08:00' }));
     period = { ...period, departmentMetrics: Object.fromEntries(Object.entries(period.departmentMetrics || {}).map(([name, metric]) => [name, { ...metric, confirmed: true }])), departmentCoefficients: Object.fromEntries([...new Set(period.employees.map(employee => employee.department))].map(name => [name, departmentCoefficientPreview(period, name).coefficient])) };
     state.periods['2026-11'] = publishKpiPeriod({ ...period, cycleSettings: undefined });
     localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
@@ -103,13 +108,16 @@ describe('绩效考核公示', () => {
     expect(await screen.findByRole('region', { name: '绩效结果总览' })).toBeInTheDocument();
     expect(screen.getByText('部门员工绩效等级分布')).toBeInTheDocument();
     const summary = screen.getByRole('region', { name: '绩效结果总览' });
-    expect(summary.textContent!.indexOf('部门绩效系数')).toBeLessThan(summary.textContent!.indexOf('部门员工平均绩效'));
+    expect(summary).not.toHaveTextContent('部门绩效系数');
+    expect(summary).not.toHaveTextContent('部门员工平均绩效');
     expect(screen.getByRole('region', { name: '五项模块得分' })).toBeInTheDocument();
     expect(screen.getByRole('table', { name: '本月绩效评分明细' })).toBeInTheDocument();
     expect(screen.getByText('林知夏')).toBeInTheDocument();
     expect(screen.queryByText('周予安')).not.toBeInTheDocument();
-    expect(screen.getByText('56')).toBeInTheDocument();
-    expect(screen.getByText('出勤情况')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '五项模块得分' })).getByText('56')).toBeInTheDocument();
+    expect(screen.getByText('出勤')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '加分/扣分' })).not.toBeInTheDocument();
+    expect(screen.getByText('出差地加班')).toBeInTheDocument();
     expect(screen.getAllByText('工作态度').length).toBeGreaterThan(0);
     expect(screen.getAllByText('周月报提交')).toHaveLength(2);
     expect(screen.getAllByText('考勤')).toHaveLength(2);
@@ -138,10 +146,11 @@ describe('绩效考核公示', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('region', { name: '绩效结果' })).toBeInTheDocument();
     const summary = within(dialog).getByRole('region', { name: '绩效结果总览' });
-    expect(summary.textContent!.indexOf('部门绩效系数')).toBeLessThan(summary.textContent!.indexOf('部门员工平均绩效'));
+    expect(summary).not.toHaveTextContent('部门绩效系数');
+    expect(summary).not.toHaveTextContent('部门员工平均绩效');
     expect(within(dialog).getByRole('table', { name: '本月绩效评分明细' })).toBeInTheDocument();
     expect(within(dialog).getByRole('columnheader', { name: '主管加分' })).toBeInTheDocument();
-    expect(within(dialog).getByText('主管月度综合评分')).toBeInTheDocument();
+    expect(within(dialog).getByText('主管评分')).toBeInTheDocument();
     expect(within(dialog).getAllByText('周月报提交')).toHaveLength(2);
     expect(within(dialog).getAllByText('考勤')).toHaveLength(2);
     expect(screen.queryByText('全勤')).not.toBeInTheDocument();
@@ -198,7 +207,8 @@ describe('绩效考核公示', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('region', { name: '绩效结果' })).toBeInTheDocument();
     const summary = within(dialog).getByRole('region', { name: '绩效结果总览' });
-    expect(summary.textContent!.indexOf('部门绩效系数')).toBeLessThan(summary.textContent!.indexOf('部门员工平均绩效'));
+    expect(summary).not.toHaveTextContent('部门绩效系数');
+    expect(summary).not.toHaveTextContent('部门员工平均绩效');
     expect(within(dialog).getByRole('table', { name: '本月绩效评分明细' })).toBeInTheDocument();
     expect(within(dialog).getAllByText('考勤')).toHaveLength(2);
     expect(within(dialog).getAllByText('周月报提交')).toHaveLength(2);
@@ -255,70 +265,18 @@ describe('绩效考核公示', () => {
     expect(screen.getByRole('columnheader', { name: '额外工作得分' })).toBeInTheDocument();
   });
 
-  it('原始数据按姓名与部门联合筛选，同步四类来源并保留刷新状态', async () => {
+  it('原始数据对 HR 和主管只读，保留分类与范围筛选', async () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
-    expect(screen.queryByText('复核修改记录')).not.toBeInTheDocument();
-    fireEvent.mouseDown(await screen.findByLabelText('筛选部门'));
-    fireEvent.click(await screen.findByText('产品部', { selector: '.ant-select-item-option-content' }));
-    fireEvent.change(screen.getByPlaceholderText('搜索员工姓名'), { target: { value: '林知夏' } });
-    expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
-    expect(screen.queryByRole('row', { name: /周予安/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('row', { name: /顾清和/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /同步数据/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /修改/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '考勤与请假' }));
-    fireEvent.click(screen.getByRole('button', { name: /同步数据/ }));
-    await waitFor(() => expect(loadKpiDemo().periods['2026-11'].sourceSyncedAt).toBeTruthy());
-    for (const name of ['月度目标', '考勤与请假', '额外工作投入', '周月报']) {
-      fireEvent.click(screen.getByRole('tab', { name }));
-      if (name === '月度目标') expect(await screen.findByRole('row', { name: /林知夏/ })).toBeInTheDocument();
-      else expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
-    }
-  });
-
-  it('HR 审核期间可修改待审员工来源数据并保存原因与审计记录', async () => {
-    const state = loadKpiDemo();
-    state.periods['2026-11'].employees[1].reviewStatus = '待 HR 审核';
-    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
-    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
-    fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
-    fireEvent.click(screen.getByRole('tab', { name: '周月报' }));
-
-    const employeeRow = screen.getByRole('row', { name: /周予安/ });
-    fireEvent.click(within(employeeRow).getByRole('button', { name: /修改/ }));
-    fireEvent.change(screen.getByLabelText('周报迟交次数'), { target: { value: '2' } });
-    fireEvent.change(screen.getByLabelText('修改原因'), { target: { value: '核对周报提交记录后更正' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存修正' }));
-
-    await waitFor(() => expect(loadKpiDemo().periods['2026-11'].employees[1]).toMatchObject({
-      source: { reportLate: 2 }, scores: { review: 6 }, sourceCorrection: { reports: true },
-    }));
-    expect(loadKpiDemo().periods['2026-11'].employees[1].sourceEditHistory?.[0]).toMatchObject({ actor: 'HR', reason: '核对周报提交记录后更正' });
-  });
-
-  it('主管仅能在复核窗口内修改本人负责员工的来源数据', async () => {
-    const state = loadKpiDemo();
-    const period = state.periods['2026-11'];
-    const now = Date.now();
-    period.cycleSettings = { managerReview: { startAt: new Date(now - 60_000).toISOString(), endAt: new Date(now + 86_400_000).toISOString() }, finalPublicationAt: new Date(now + 172_800_000).toISOString(), appealConfirmation: { startAt: new Date(now + 172_860_000).toISOString(), endAt: new Date(now + 259_200_000).toISOString() } };
-    localStorage.setItem(KPI_DEMO_STORAGE_KEY, JSON.stringify(state));
-    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    expect(screen.getByRole('row', { name: /林知夏/ })).toBeInTheDocument();
     await chooseRole('主管');
     fireEvent.click(screen.getByRole('tab', { name: /原始数据/ }));
-
-    const ownEmployeeRow = await screen.findByRole('row', { name: /林知夏/ });
-    expect(within(ownEmployeeRow).getByRole('button', { name: /修改/ })).toBeEnabled();
-    fireEvent.click(within(ownEmployeeRow).getByRole('button', { name: /修改/ }));
-    fireEvent.change(screen.getByLabelText('目标完成率（%）'), { target: { value: '95' } });
-    fireEvent.change(screen.getByLabelText('目标得分'), { target: { value: '58' } });
-    fireEvent.change(screen.getByLabelText('修改原因'), { target: { value: '复核确认目标进度' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存修正' }));
-
-    await waitFor(() => expect(loadKpiDemo().periods['2026-11'].employees[0]).toMatchObject({
-      source: { okrCompletion: 95 }, scores: { objective: 58 }, sourceCorrection: { objective: true },
-    }));
-    expect(loadKpiDemo().periods['2026-11'].employees[0].sourceEditHistory?.[0].actor).toBe('主管');
+    expect(screen.queryByRole('button', { name: /同步数据/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /修改/ })).not.toBeInTheDocument();
   });
-
   it('员工原始数据四类均仅展示本人且不可同步，周月报不显示状态和修正入口', async () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     await chooseRole('员工');
@@ -386,7 +344,7 @@ describe('绩效考核公示', () => {
     expect(currentResult).toHaveTextContent('林知夏');
     expect(currentResult).toHaveTextContent('考勤');
     expect(currentResult).toHaveTextContent('周月报提交');
-    expect(currentResult).toHaveTextContent('人工调分说明');
+    expect(currentResult).toHaveTextContent('加减分说明');
     expect(currentResult).toHaveTextContent('绩效系数');
     expect(within(reviewDialog).getByRole('region', { name: '申诉内容' })).toHaveTextContent('目标得分有误');
     expect(within(reviewDialog).getByRole('region', { name: '修正数据' })).toBeInTheDocument();
@@ -435,19 +393,20 @@ describe('绩效考核公示', () => {
     expect(within(queue).queryByRole('button', { name: '审核申诉' })).not.toBeInTheDocument();
   });
 
-  it('HR 可进入周期设置并按月保存自动公示安排', async () => {
+  it('HR 可进入周期设置并按月保存开关与工作日申诉期', async () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
     fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
     fireEvent.click(screen.getByRole('button', { name: '周期设置' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('2026年11月周期设置')).toBeInTheDocument();
     expect(screen.queryByText('允许主管复核修改')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '设置周期' }));
-    expect(screen.getByText('主管复核时间范围')).toBeInTheDocument();
-    expect(screen.getByText('员工申诉确认时间范围')).toBeInTheDocument();
-    expect(screen.getByText('最终公示时间')).toBeInTheDocument();
+    expect(screen.queryByText('主管复核时间范围')).not.toBeInTheDocument();
+    expect(screen.queryByText('最终公示时间')).not.toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '绩效公示开关' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: '主管复核开关' }));
+    fireEvent.change(screen.getByLabelText('员工申诉期间工作日'), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: '保存周期设置' }));
-    await waitFor(() => expect(loadKpiDemo().periods['2026-11']).toMatchObject({ reviewEnabled: true, cycleSettings: { finalPublicationAt: expect.any(String) } }));
+    await waitFor(() => expect(loadKpiDemo().periods['2026-11']).toMatchObject({ reviewEnabled: true, cycleSettings: { mode: 'switches', appealWorkingDays: 3 } }));
     expect(screen.getByRole('button', { name: '周期设置' })).toBeInTheDocument();
   });
 
@@ -459,6 +418,30 @@ describe('绩效考核公示', () => {
     await chooseRole('HR');
     expect(screen.getByRole('button', { name: '周期设置' })).toBeInTheDocument();
     expect(screen.queryByText('允许主管复核修改')).not.toBeInTheDocument();
+  });
+
+  it('HR通过公示开关保存后实际公示，锁定设置并按工作日开启申诉期', async () => {
+    const state = loadKpiDemo();
+    const period = state.periods['2026-11'];
+    period.employees.forEach(employee => { employee.reviewStatus = '已通过'; });
+    period.supervisors = period.supervisors?.map(employee => ({ ...employee, bossRatedAt: '2026-11-01T09:30:00+08:00' }));
+    Object.values(period.departmentMetrics!).forEach(metric => { metric.confirmed = true; });
+    saveKpiDemo(state);
+    const view = render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
+    fireEvent.click(screen.getByRole('button', { name: '周期设置' }));
+    fireEvent.change(screen.getByLabelText('员工申诉期间工作日'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('switch', { name: '绩效公示开关' }));
+    expect(screen.getByRole('switch', { name: '主管复核开关' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '保存周期设置' }));
+    await waitFor(() => expect(loadKpiDemo().periods['2026-11']).toMatchObject({ published: true, reviewEnabled: false, cycleSettings: { mode: 'switches', appealWorkingDays: 2 } }));
+    expect(loadKpiDemo().periods['2026-11'].publishedAt).toMatch(/Z$/);
+    view.unmount();
+    document.querySelectorAll('.ant-modal-root').forEach(node => node.remove());
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    fireEvent.click(screen.getByRole('button', { name: '周期设置' }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: '绩效公示开关' })).toBeDisabled());
+    expect(screen.getByLabelText('员工申诉期间工作日')).toBeDisabled();
   });
 
 });

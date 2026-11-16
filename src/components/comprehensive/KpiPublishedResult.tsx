@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button, Tooltip } from 'antd';
 import { okrRepository, type OkrPerson, type OkrRecord } from '../../services/okrRepository';
 import { calculateOkrScore, scoreObjectivesFor, type ScoreObjective } from '../../services/okrPerformanceScore';
+import { EmployeePublishedScoreTable, employeeDetailGroups, type ScoreTableEditor } from './EmployeePublishedScoreTable';
 import mockOkrState from '../../data/mockOkrState.json';
 import { KPI_DIMENSIONS, effectiveKpiScores, effectiveKpiSourceData, gradeForScore, kpiDimensionScores, scoreForEmployee, weightedKpiScores, type KpiEmployee } from '../../services/kpiPerformanceDemo';
 import type { KpiDepartmentSummary } from '../../services/kpiPerformancePublication';
@@ -10,8 +11,8 @@ type Cell = number | string | undefined;
 const factorText = (value: number) => Number.isInteger(value) ? value.toFixed(1) : value.toFixed(2);
 const cellText = (value: Cell) => typeof value === 'number' ? value.toFixed(1) : value || '—';
 
-interface DetailRow { detail: string; source: string; rule: string; adjustment?: string }
-interface DetailGroup { name: string; weight: string; score: number; base: number; rule: string; redline: string; hrBonus?: Cell; hrDeduction?: Cell; managerBonus?: Cell; managerDeduction?: Cell; explanation: string; rows: DetailRow[] }
+export interface DetailRow { detail: string; source: string; rule: string; adjustment?: string }
+export interface DetailGroup { name: string; weight: string; score: number; base: number; rule: string; redline: string; hrBonus?: Cell; hrDeduction?: Cell; managerBonus?: Cell; managerDeduction?: Cell; explanation: string; rows: DetailRow[] }
 
 function correctionTotals(employee: KpiEmployee, source: 'objective' | 'reports') {
   const key = source === 'objective' ? 'objectiveScore' : 'reviewScore';
@@ -24,6 +25,13 @@ function correctionTotals(employee: KpiEmployee, source: 'objective' | 'reports'
 }
 
 function approvedComment(employee: KpiEmployee) {
+  if (employee.reviewBook) {
+    const actor = employee.performanceKind === 'supervisor' ? '老板' : '主管';
+    const entry = employee.reviewBook.active[actor];
+    const notes = [...new Set(Object.values(entry || {}).map(item => item.note).filter(Boolean))];
+    const record = employee.reviewBook.history.slice().reverse().find(item => item.actor === actor && ['提交复核', '评定生效'].includes(item.action));
+    return notes.length ? { reason: notes.join('；'), actor: record?.name || actor, at: record?.at || '' } : null;
+  }
   const history = employee.reviewHistory || [];
   const approved = [...history].reverse().find(record => record.action === 'HR 审核通过');
   const index = approved ? history.indexOf(approved) : -1;
@@ -139,9 +147,9 @@ function scoreGroups(employee: KpiEmployee, objectives: ScoreObjective[], goalSt
   return groups.map(group => ({ ...group, explanation: moduleExplanation(employee, group.name) }));
 }
 
-export interface KpiPublishedResultProps { employee: KpiEmployee; departmentSummary: KpiDepartmentSummary; finalCoefficient: number; month: string; actions?: React.ReactNode }
+export interface KpiPublishedResultProps { employee: KpiEmployee; departmentSummary: KpiDepartmentSummary; finalCoefficient: number; month: string; detailLayout?: 'standard' | 'employee-example'; showDepartment?: boolean; editor?: ScoreTableEditor; published?: boolean; actions?: React.ReactNode }
 
-export const KpiPublishedResult: React.FC<KpiPublishedResultProps> = ({ employee, departmentSummary, finalCoefficient, month, actions }) => {
+export const KpiPublishedResult: React.FC<KpiPublishedResultProps> = ({ employee, departmentSummary, finalCoefficient, month, detailLayout = 'employee-example', showDepartment = false, editor, published = true, actions }) => {
   const score = scoreForEmployee(employee);
   const weightedScores = weightedKpiScores(employee);
   const grade = gradeForScore(score);
@@ -156,9 +164,9 @@ export const KpiPublishedResult: React.FC<KpiPublishedResultProps> = ({ employee
     void Promise.all([okrRepository.people(), okrRepository.records()]).then(([people, records]) => {
       const peopleIds = new Set(people.map(person => person.id));
       const recordIds = new Set(records.map(record => record.id));
-      const mergedPeople = [...people, ...(mockOkrState.okrPeople as OkrPerson[]).filter(person => /^e-0[1-6]$/.test(person.id) && !peopleIds.has(person.id))];
-      const mergedRecords = [...records, ...(mockOkrState.okrRecords as OkrRecord[]).filter(record => record.id.startsWith('kpi-demo-goal-e-') && !recordIds.has(record.id))];
-      const goals = scoreObjectivesFor(mergedRecords, mergedPeople, employee.id, month, 'personal').map(goal => {
+      const mergedPeople = [...people, ...(mockOkrState.okrPeople as OkrPerson[]).filter(person => (/^e-0[1-6]$/.test(person.id) || employee.performanceKind === 'supervisor' && person.id.startsWith('kpi-manager-')) && !peopleIds.has(person.id))];
+      const mergedRecords = [...records, ...(mockOkrState.okrRecords as OkrRecord[]).filter(record => (record.id.startsWith('kpi-demo-goal-e-') || employee.performanceKind === 'supervisor' && record.id.startsWith('kpi-demo-department-')) && !recordIds.has(record.id))];
+      const goals = scoreObjectivesFor(mergedRecords, mergedPeople, employee.id, month, employee.performanceKind === 'supervisor' ? 'department' : 'personal').map(goal => {
         const record = mergedRecords.find(item => item.id === goal.id);
         if (!record?.payload.keyResults?.some(kr => kr.details?.length)) return goal;
         // The scoring helper expands personal action rows; group these back under their KR for the result view.
@@ -176,18 +184,19 @@ export const KpiPublishedResult: React.FC<KpiPublishedResultProps> = ({ employee
   }, [goalKey, employee.id, month, attempt]);
   const currentGoals = goalData.key === goalKey ? goalData : { goals: [], status: 'loading' };
   const goalStatus = currentGoals.status === 'loading' ? '正在加载目标明细' : currentGoals.status === 'error' ? '目标明细加载失败' : currentGoals.goals.length ? '' : '暂无本月 O、KR 明细';
-  const groups = scoreGroups(employee, currentGoals.goals, goalStatus);
+  const standardGroups = scoreGroups(employee, currentGoals.goals, goalStatus);
+  const groups = detailLayout === 'employee-example' ? employeeDetailGroups(standardGroups, employee) : standardGroups;
   const comment = approvedComment(employee);
   return <section className="kpi-published-result" aria-label="绩效结果">
-    <header className="kpi-published-heading"><div><h2>月度绩效结果</h2><p>{month.slice(0, 4)}年{Number(month.slice(5))}月 · 查看个人绩效结果、模块得分与评分依据</p></div><span>已公示</span></header>
-    <section className="kpi-published-summary" aria-label="绩效结果总览">
+    <header className="kpi-published-heading"><div><h2>月度绩效结果</h2><p>{month.slice(0, 4)}年{Number(month.slice(5))}月 · 查看个人绩效结果、模块得分与评分依据</p></div><span>{published ? '已公示' : '评分中'}</span></header>
+    <section className={`kpi-published-summary${showDepartment ? '' : ' is-personal-only'}`} aria-label="绩效结果总览">
       <div className="kpi-published-person"><div className="kpi-avatar">{employee.name.slice(0, 1)}</div><div><b>{employee.name}</b><span>{employee.department} · {employee.position}</span></div></div>
       <div className="kpi-published-metric"><span>绩效总分</span><b>{score.toFixed(1)}<small> / 100 分</small></b></div>
       <div className="kpi-published-metric"><span>绩效等级</span><b className={`grade-${grade.grade.toLowerCase()}`}>{grade.grade}<small> 级</small></b></div>
       <div className="kpi-published-metric is-personal-factor"><span>个人绩效系数</span><b className="is-success">{factorText(finalCoefficient)}</b></div>
-      <div className="kpi-published-metric is-department-factor"><span>部门绩效系数</span><b>{factorText(departmentSummary.departmentCoefficient)}</b></div>
+      {showDepartment && <><div className="kpi-published-metric is-department-factor"><span>部门绩效系数</span><b>{factorText(departmentSummary.departmentCoefficient)}</b></div>
       <div className="kpi-published-metric"><span>部门员工平均绩效</span><b>{departmentSummary.averageScore.toFixed(1)}<small> 分</small></b><small>{departmentSummary.employeeCount} 位员工</small></div>
-      <div className="kpi-published-distribution"><span>部门员工绩效等级分布</span><div>{(['S', 'A', 'B', 'C', 'D', 'E'] as const).map(item => <div key={item} className={`grade-${item.toLowerCase()}`}><b>{item}</b><small>{departmentSummary.gradeCounts[item]}</small></div>)}</div></div>
+      <div className="kpi-published-distribution"><span>部门员工绩效等级分布</span><div>{(['S', 'A', 'B', 'C', 'D', 'E'] as const).map(item => <div key={item} className={`grade-${item.toLowerCase()}`}><b>{item}</b><small>{departmentSummary.gradeCounts[item]}</small></div>)}</div></div></>}
     </section>
     <section className="kpi-published-modules" aria-label="五项模块得分">{KPI_DIMENSIONS.map(dimension => {
       const value = scores[dimension.key];
@@ -196,17 +205,17 @@ export const KpiPublishedResult: React.FC<KpiPublishedResultProps> = ({ employee
     })}</section>
     <section className="kpi-published-comment" aria-label="绩效评语"><h3>绩效评语</h3><p>{comment?.reason || '暂无绩效评语'}</p>{comment && <small>{comment.actor} · {comment.at}</small>}</section>
     <section className="kpi-published-breakdown" aria-label="评分明细">
-      <header><div><h3>评分明细</h3><p>按计分项展示数据来源、规则判定与分数影响</p></div><span>本月明细 <b>{groups.reduce((sum, group) => sum + group.rows.length, 0)} 项</b></span></header>
+      <header><div><h3>评分明细</h3><p>按计分项展示数据来源、规则判定与分数影响</p></div><strong className="kpi-heading-total">合计 {score.toFixed(1)} / 100 分</strong></header>
       {employee.redline?.active && <div className="kpi-published-personal-redline"><b>个人红线</b><span>{employee.redline.type}：{employee.redline.impact}</span></div>}
-      <div className="kpi-published-table-wrap"><table aria-label="本月绩效评分明细"><thead><tr><th>模块</th><th>评分明细</th><th>数据来源</th><th>规则判定</th><th>加分/扣分</th><th>刚性红线</th><th>基础分</th><th>主管加分</th><th>主管减分</th><th>HR 加分</th><th>HR 减分</th><th>本项得分</th><th>加减分说明</th></tr></thead><tbody>
+      {detailLayout === 'employee-example' ? <EmployeePublishedScoreTable groups={groups} employee={employee} editor={editor} /> : <div className="kpi-published-table-wrap"><table aria-label="本月绩效评分明细"><thead><tr><th>模块</th><th>评分明细</th><th>数据来源</th><th>规则判定</th><th>加分/扣分</th><th>刚性红线</th><th>基础分</th><th>主管加分</th><th>主管减分</th><th>HR 加分</th><th>HR 减分</th><th>本项得分</th><th>加减分说明</th></tr></thead><tbody>
         {groups.flatMap(group => group.rows.map((row, index) => <tr key={`${group.name}-${row.detail}`}>
           {index === 0 && <th scope="rowgroup" rowSpan={group.rows.length}><b>{group.name}</b><small>权重 {group.weight}</small></th>}
           <td className="kpi-detail-name">{row.detail}</td><td className="kpi-detail-source">{row.source}</td><td className="kpi-detail-rule"><Tooltip title={<span style={{ whiteSpace: 'pre-wrap' }}>{[index === 0 ? group.rule : '', row.rule].filter(Boolean).join('\n')}</span>}><span className="kpi-detail-rule-text">{index === 0 && <>{group.rule}<br /></>}{row.rule}</span></Tooltip></td><td className="kpi-detail-adjustment">{row.adjustment || '—'}</td>
           {index === 0 && <><td className="kpi-detail-redline" rowSpan={group.rows.length}>{group.redline}</td><td className="kpi-detail-number" rowSpan={group.rows.length}>{cellText(group.base)}</td><td className="kpi-detail-number" rowSpan={group.rows.length}>{cellText(group.managerBonus)}</td><td className="kpi-detail-number" rowSpan={group.rows.length}>{cellText(group.managerDeduction)}</td><td className="kpi-detail-number" rowSpan={group.rows.length}>{cellText(group.hrBonus)}</td><td className="kpi-detail-number" rowSpan={group.rows.length}>{cellText(group.hrDeduction)}</td><td className="kpi-detail-number is-score" rowSpan={group.rows.length}>{cellText(group.score)}</td><td className="kpi-module-explanation" rowSpan={group.rows.length}>{group.explanation}</td></>}
         </tr>))}
-      </tbody></table></div>
+      </tbody></table></div>}
       {currentGoals.status === 'error' && <div className="kpi-goal-retry" role="alert">目标明细暂不可用，已公示成绩保持不变。<Button onClick={() => setAttempt(value => value + 1)}>重试加载目标明细</Button></div>}
-      <footer><span>五项模块得分合计（按权重折算）</span><small>{weightedScores.map(dimension => dimension.score.toFixed(1)).join(' + ')}</small><b>{score.toFixed(1)} / 100 分</b>{dimensions.objective <= 50 && <small>月度目标不超过 50 分时总分封顶 90 分</small>}</footer>
+
     </section>
     {actions}
   </section>;

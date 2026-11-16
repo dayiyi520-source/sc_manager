@@ -1,6 +1,6 @@
-import { departmentCoefficientPreview, effectiveKpiSourceData, gradeForScore, isWithinKpiWindow, reportScoreFor, scoreForEmployee, type KpiDemoState, type KpiEmployee, type KpiPeriod } from './kpiPerformanceDemo';
+import { departmentCoefficientPreview, effectiveKpiSourceData, gradeForCoefficient, gradeForScore, isAppealPeriodOpen, loadKpiDemo, reportScoreFor, scoreForEmployee, type KpiDemoState, type KpiEmployee, type KpiPeriod } from './kpiPerformanceDemo';
 
-export type KpiPublicationRole = 'HR' | '主管' | '员工';
+export type KpiPublicationRole = 'HR' | '主管' | '员工' | '老板';
 
 export interface KpiDepartmentSummary {
   department: string;
@@ -8,6 +8,7 @@ export interface KpiDepartmentSummary {
   averageScore: number;
   averageCoefficient: number;
   departmentCoefficient: number;
+  departmentGrade: 'S' | 'A' | 'B' | 'C' | 'D' | 'E';
   gradeCounts: Record<'S' | 'A' | 'B' | 'C' | 'D' | 'E', number>;
 }
 
@@ -43,9 +44,12 @@ export function filterPublishedEmployees(
   role: KpiPublicationRole,
   supervisor: string,
   employeeId: string,
+  supervisorDepartment?: string,
 ): KpiEmployee[] {
+  if (role === '老板') return employees;
   if (role === '员工') return employees.filter(employee => employee.id === employeeId);
   if (role === '主管') {
+    if (supervisorDepartment) return employees.filter(employee => employee.department === supervisorDepartment);
     const managedDepartments = new Set(employees.filter(employee => employee.manager === supervisor).map(employee => employee.department));
     return employees.filter(employee => managedDepartments.has(employee.department));
   }
@@ -70,6 +74,7 @@ export function summarizeDepartmentPerformance(
       averageScore: scores.reduce((sum, score) => sum + score, 0) / members.length,
       averageCoefficient: scores.reduce((sum, score) => sum + gradeForScore(score).coefficient, 0) / members.length,
       departmentCoefficient: typeof departmentCoefficients === 'number' ? departmentCoefficients : departmentCoefficients[department] ?? 1,
+      departmentGrade: gradeForCoefficient(typeof departmentCoefficients === 'number' ? departmentCoefficients : departmentCoefficients[department] ?? 1),
       gradeCounts,
     };
   });
@@ -84,7 +89,9 @@ export function listKpiAppeals(): KpiAppeal[] {
   }
 }
 
-export function submitKpiAppeal(input: Pick<KpiAppeal, 'month' | 'employeeId' | 'employeeName' | 'reason'>): KpiAppeal {
+export function submitKpiAppeal(input: Pick<KpiAppeal, 'month' | 'employeeId' | 'employeeName' | 'reason'>, period?: KpiPeriod): KpiAppeal {
+  const configuredPeriod = period || loadKpiDemo().periods[input.month];
+  if ((period || configuredPeriod?.cycleSettings?.mode === 'switches') && !isAppealPeriodOpen(configuredPeriod)) throw new Error('当前不在员工申诉期间');
   const reason = input.reason.trim();
   if (!reason) throw new Error('请填写申诉原因');
   if (reason.length > 500) throw new Error('申诉原因不能超过 500 字');
@@ -164,7 +171,7 @@ export function resolveKpiAppeal(
   if (role !== 'HR') throw new Error('仅 HR 可处理绩效申诉');
   if (appeal.month !== month) throw new Error('申诉月份不匹配');
   if (!period.published) throw new Error('仅可处理已公示月份的申诉');
-  if (period.cycleSettings && !isWithinKpiWindow(period.cycleSettings.appealConfirmation)) throw new Error('当前不在员工申诉确认时间范围内');
+  if (!isAppealPeriodOpen(period)) throw new Error('当前不在员工申诉期间');
   const employee = period.employees.find(item => item.id === appeal.employeeId);
   if (!employee) throw new Error('申诉员工不存在');
   const note = resolution.trim();
@@ -180,7 +187,7 @@ export function resolveKpiAppeal(
     }
     if ((before.reportLate !== correction.reportLate || before.monthlyReportLate !== correction.monthlyReportLate || before.weeklyReportMissing !== correction.weeklyReportMissing || before.reportMissing !== correction.reportMissing)
       && correction.reviewScore !== reportScoreFor(correction)) throw new Error('周月报得分须按迟交和未交次数自动计算');
-    if (Object.keys(before).every(key => before[key as keyof KpiAppealCorrection] === correction[key as keyof KpiAppealCorrection])) throw new Error('请至少修改一项数据');
+    if (!employee.reviewBook?.history.some(record => record.appealId === appealId && record.action === '评定生效') && Object.keys(before).every(key => before[key as keyof KpiAppealCorrection] === correction[key as keyof KpiAppealCorrection])) throw new Error('请至少修改一项数据');
   }
   const resolvedAppeal: KpiAppeal = {
     ...appeal,
@@ -190,6 +197,16 @@ export function resolveKpiAppeal(
     ...(decision === 'correct' && correction ? { correction: { before, after: correction } } : {}),
   };
   let updatedPeriod = period;
+  if (decision === 'reject' && employee.reviewBook) {
+    const entry = employee.reviewBook.history.find(record => record.appealId === appealId && record.action === '评定生效');
+    if (entry) {
+      const book = structuredClone(employee.reviewBook);
+      if (entry.before) book.active.HR = entry.before; else delete book.active.HR;
+      book.revision += 1;
+      book.history.push({ ...entry, id: crypto.randomUUID(), at: new Date().toISOString(), action: '申诉驳回，恢复调分前记录' });
+      updatedPeriod = { ...period, employees: period.employees.map(item => item.id === employee.id ? { ...item, reviewBook: book } : item) };
+    }
+  }
   if (decision === 'correct' && correction) {
     const objectiveChanged = before.okrCompletion !== correction.okrCompletion || before.objectiveScore !== correction.objectiveScore;
     const reportsChanged = before.reportLate !== correction.reportLate || before.monthlyReportLate !== correction.monthlyReportLate || before.weeklyReportMissing !== correction.weeklyReportMissing || before.reportMissing !== correction.reportMissing || before.tasksOverdue !== correction.tasksOverdue || before.reviewScore !== correction.reviewScore;
@@ -213,6 +230,7 @@ export function resolveKpiAppeal(
       employees: period.employees.map(item => item.id === employee.id ? {
         ...item,
         approvedSourceCorrections: [...(item.approvedSourceCorrections || []), ...sourceCorrections],
+        ...(item.reviewBook ? { reviewBook: { ...item.reviewBook, revision: item.reviewBook.revision + 1, base: { ...item.reviewBook.base, ...(objectiveChanged ? { objective: correction.objectiveScore } : {}), ...(reportsChanged ? { review: correction.reviewScore } : {}) } } } : {}),
       } : item),
     };
     if (before.okrCompletion !== correction.okrCompletion) {

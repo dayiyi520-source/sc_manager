@@ -114,6 +114,7 @@ it('records a purchase invoice with project-derived customer and updated ledger 
 });
 
 it('creates a project receivable, records a partial receipt, and shows project cash position', () => {
+  localStorage.setItem('shichuang.frontend.mock.paymentCollection', JSON.stringify({ plans: [], records: [] }));
   render(<PaymentCollectionManagementView />);
   expect(screen.getByRole('tablist', { name: '回款视图' })).toBeInTheDocument();
   expect(screen.getByText('暂无应收计划')).toBeInTheDocument();

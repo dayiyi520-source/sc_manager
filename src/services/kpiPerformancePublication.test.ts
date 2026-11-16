@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { KpiEmployee } from './kpiPerformanceDemo';
-import { loadKpiDemo, saveKpiDemo, syncKpiSources } from './kpiPerformanceDemo';
+import { gradeForCoefficient, loadKpiDemo, saveKpiDemo, syncKpiSources } from './kpiPerformanceDemo';
 import { correctionForEmployee, filterPublishedEmployees, listKpiAppeals, resolveKpiAppeal, restoreLegacyAppealCorrections, submitKpiAppeal, summarizeDepartmentPerformance } from './kpiPerformancePublication';
 
 const employee = (id: string, department: string, manager: string, score: number): KpiEmployee => ({
@@ -23,7 +23,7 @@ describe('绩效公示数据范围', () => {
 
   it('主管公示取得负责部门的全部成员，而非仅直接汇报员工', () => {
     const sameDepartment = employee('d', '产品部', '主管乙', 80);
-    expect(filterPublishedEmployees([...employees, sameDepartment], '主管', '主管甲', '').map(item => item.id)).toEqual(['a', 'b', 'd']);
+    expect(filterPublishedEmployees([...employees, sameDepartment], '主管', '主管甲', '', '产品部').map(item => item.id)).toEqual(['a', 'b', 'd']);
   });
 
   it('HR 取得全部员工记录', () => {
@@ -34,7 +34,12 @@ describe('绩效公示数据范围', () => {
     const [summary] = summarizeDepartmentPerformance(employees.slice(0, 2), 1.1);
     expect(summary).toMatchObject({ department: '产品部', employeeCount: 2, averageScore: 90, departmentCoefficient: 1.1 });
     expect(summary.gradeCounts).toEqual({ S: 0, A: 1, B: 1, C: 0, D: 0, E: 0 });
+    expect(summary.departmentGrade).toBe('B');
     expect(JSON.stringify(summary)).not.toMatch(/"name"|"id"/);
+  });
+
+  it('部门系数等级按大于等于阈值映射', () => {
+    expect([1.5, 1.2, 1.1, 1, 0.9, 0.8, 0.5, 0.49].map(gradeForCoefficient)).toEqual(['S', 'A', 'B', 'B', 'C', 'C', 'D', 'E']);
   });
 });
 

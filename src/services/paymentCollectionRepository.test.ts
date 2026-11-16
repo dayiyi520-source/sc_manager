@@ -14,3 +14,25 @@ it('persists project receivable plans and partial receipt records across reloads
 
   expect(loadPaymentCollection()).toEqual(snapshot);
 });
+
+it('seeds representative demo plans and receipt records on first load', () => {
+  const snapshot = loadPaymentCollection();
+
+  expect(snapshot.plans.map((plan) => plan.category)).toEqual(expect.arrayContaining(['合同回款', '保证金退回', '维保续费']));
+  expect(snapshot.plans.some((plan) => plan.status === '部分回款')).toBe(true);
+  expect(snapshot.plans.some((plan) => plan.status === '逾期未还')).toBe(true);
+  expect(snapshot.records.length).toBeGreaterThan(0);
+  expect(loadPaymentCollection()).toEqual(snapshot);
+});
+
+it('preserves an intentionally empty saved snapshot', () => {
+  savePaymentCollection({ plans: [], records: [] });
+
+  expect(loadPaymentCollection()).toEqual({ plans: [], records: [] });
+});
+
+it('restores demo data when the saved snapshot is malformed', () => {
+  localStorage.setItem('shichuang.frontend.mock.paymentCollection', '{');
+
+  expect(loadPaymentCollection().plans.length).toBeGreaterThan(0);
+});
