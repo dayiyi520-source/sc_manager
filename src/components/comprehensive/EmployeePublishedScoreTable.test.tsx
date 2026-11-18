@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KpiPublishedResult } from './KpiPublishedResult';
 import { loadKpiDemo } from '../../services/kpiPerformanceDemo';
@@ -32,6 +32,9 @@ describe('员工公示示例表格', () => {
     expect(screen.getByRole('row', { name: /周月报应提交/ })).toHaveTextContent('未记录');
     expect(screen.getByRole('row', { name: /主管评分/ })).toHaveTextContent('基准分 13 分');
     expect(screen.getByRole('row', { name: /临时任务逾期/ })).toHaveTextContent('逾期或质量不达标扣 2–4 分 / 次');
+    expect(table.querySelectorAll('.example-rule-text').length).toBeGreaterThan(0);
+    fireEvent.mouseEnter(screen.getByRole('row', { name: /总加班时长/ }).querySelector('.example-rule-text')!);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('实际加班时长 ÷18×5 分。');
   });
   it('只改变员工版明细，不覆盖公示分数和其他角色详情布局', async () => {
     const input = props();

@@ -423,7 +423,9 @@
 .kpi-employee-example-table thead th { text-align: left; white-space: normal; }
 .kpi-employee-example-table tbody th { vertical-align: middle; text-align: center; color: var(--text-primary); }
 .kpi-employee-example-table tbody th small { font-size: 11px; }
-.kpi-employee-example-table .example-rule, .kpi-employee-example-table .example-explanation { white-space: pre-wrap; }
+.kpi-employee-example-table .example-rule { min-width: 0; max-width: 320px; overflow-wrap: anywhere; }
+.kpi-employee-example-table .example-rule-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: pre-wrap; line-height: 1.5; cursor: help; }
+.kpi-employee-example-table .example-explanation { white-space: pre-wrap; }
 .kpi-employee-example-table .example-number, .kpi-employee-example-table .example-redline { text-align: center; font-variant-numeric: tabular-nums; vertical-align: middle; }
 .kpi-employee-example-table .example-explanation { vertical-align: middle; }
 .kpi-employee-example-table tbody tr:last-child td, .kpi-employee-example-table tbody tr:last-child th { border-bottom: 1px solid var(--border-main); }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Input, InputNumber, Tag } from 'antd';
+import { Input, InputNumber, Tag, Tooltip } from 'antd';
 import { REVIEW_MODULES, reviewBookFor, type ModuleAdjustments, type ReviewActor } from '../../services/kpiReviewModel';
 import { effectiveKpiSourceData, type KpiEmployee } from '../../services/kpiPerformanceDemo';
 import type { DetailGroup, DetailRow } from './KpiPublishedResult';
@@ -69,7 +69,7 @@ export function EmployeePublishedScoreTable({ groups, employee, editor }: { grou
       const fallback = (actor: ReviewActor, kind: 'bonus' | 'deduction') => actor === '主管' ? kind === 'bonus' ? group.managerBonus : group.managerDeduction : actor === 'HR' ? kind === 'bonus' ? group.hrBonus : group.hrDeduction : undefined;
       return <tbody key={group.name}>{group.rows.map((row, index) => <tr key={`${index}-${row.detail}`}>
         {index === 0 && <th scope="rowgroup" rowSpan={group.rows.length}><b>{group.name}</b><small>权重 {group.weight}</small></th>}
-        <td className="example-detail">{row.detail}</td><td className="example-source">{row.source}</td><td className="example-rule">{row.rule}</td>
+        <td className="example-detail">{row.detail}</td><td className="example-source">{row.source}</td><td className="example-rule"><Tooltip title={<span style={{ whiteSpace: 'pre-wrap' }}>{row.rule}</span>}><span className="example-rule-text">{row.rule}</span></Tooltip></td>
         {index === 0 && <>
           <td className="example-number" rowSpan={group.rows.length}>{numberText(employee?.reviewBook ? employee.reviewBook.base[module.key] : group.base)}</td>
           {roles.flatMap(actor => (['bonus', 'deduction'] as const).map(kind => <td key={`${actor}-${kind}`} className="example-number" rowSpan={group.rows.length}>
