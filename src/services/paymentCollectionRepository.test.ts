@@ -18,7 +18,7 @@ it('persists project receivable plans and partial receipt records across reloads
 it('seeds representative demo plans and receipt records on first load', () => {
   const snapshot = loadPaymentCollection();
 
-  expect(snapshot.plans.map((plan) => plan.category)).toEqual(expect.arrayContaining(['合同回款', '保证金退回', '维保续费']));
+  expect(snapshot.plans.map((plan) => plan.category)).toEqual(expect.arrayContaining(['合同款', '投标保证金', '其他']));
   expect(snapshot.plans.some((plan) => plan.status === '部分回款')).toBe(true);
   expect(snapshot.plans.some((plan) => plan.status === '逾期未还')).toBe(true);
   expect(snapshot.records.length).toBeGreaterThan(0);

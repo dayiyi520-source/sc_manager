@@ -137,15 +137,56 @@ it('creates a project receivable, records a partial receipt, and shows project c
   expect(screen.getByRole('columnheader', { name: '预计净流入' })).toBeInTheDocument();
 });
 
+it('offers the new receivable types and requires the matching deposit category and project', () => {
+  localStorage.setItem('shichuang.frontend.mock.accountsPayable', JSON.stringify({
+    payables: [
+      { id: 'bid-deposit', payableCode: 'AP-BID', category: '投标保证金', supplierName: '招标单位', projectId: 'project-1', projectName: '测试项目', amount: 30000, paidAmount: 30000, unpaidAmount: 0, dueDate: '2026-10-01', status: '已结清', applicant: '财务' },
+      { id: 'performance-deposit', payableCode: 'AP-PERFORMANCE', category: '履约保证金', supplierName: '业主单位', projectId: 'project-1', projectName: '测试项目', amount: 20000, paidAmount: 20000, unpaidAmount: 0, dueDate: '2026-10-02', status: '已结清', applicant: '财务' }
+    ], payments: []
+  }));
+  render(<PaymentCollectionManagementView />);
+  fireEvent.click(screen.getByRole('button', { name: '新建应收计划' }));
+  const dialog = screen.getByRole('dialog');
+  const category = within(dialog).getByLabelText('应收类型');
+  expect([...category.querySelectorAll('option')].map(option => option.textContent)).toEqual(['合同款', '运营中心分成', '投标保证金', '履约保证金', '质保金', '其他']);
+  fireEvent.change(category, { target: { value: '投标保证金' } });
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
+  const source = within(dialog).getByLabelText('原缴保证金记录');
+  expect([...source.querySelectorAll('option')].map(option => option.textContent)).toEqual(['请选择已支付的投标保证金', 'AP-BID · 招标单位 · 可退 ¥ 30,000']);
+  fireEvent.change(category, { target: { value: '履约保证金' } });
+  const performanceSource = within(dialog).getByLabelText('原缴保证金记录');
+  expect([...performanceSource.querySelectorAll('option')].map(option => option.textContent)).toEqual(['请选择已支付的履约保证金', 'AP-PERFORMANCE · 业主单位 · 可退 ¥ 20,000']);
+  fireEvent.change(category, { target: { value: '运营中心分成' } });
+  expect(within(dialog).getByLabelText('关联合同')).toBeRequired();
+  expect(within(dialog).getByLabelText('合同付款阶段')).toBeRequired();
+});
+
+it('creates an other-type receivable from manually entered amount and date without a contract', () => {
+  localStorage.setItem('shichuang.frontend.mock.paymentCollection', JSON.stringify({ plans: [], records: [] }));
+  render(<PaymentCollectionManagementView />);
+  fireEvent.click(screen.getByRole('button', { name: '新建应收计划' }));
+  const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('应收类型'), { target: { value: '其他' } });
+  expect(within(dialog).getByLabelText('关联合同')).not.toBeRequired();
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
+  fireEvent.change(within(dialog).getByLabelText('应收说明'), { target: { value: '项目服务补款' } });
+  fireEvent.change(within(dialog).getByLabelText('应收金额'), { target: { value: '2800' } });
+  fireEvent.change(within(dialog).getByLabelText('约定收款日期'), { target: { value: '2026-12-15' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '保存应收计划' }));
+
+  const plan = JSON.parse(localStorage.getItem('shichuang.frontend.mock.paymentCollection') || '{}').plans[0];
+  expect(plan).toMatchObject({ category: '其他', stageName: '项目服务补款', planAmount: 2800, dueDate: '2026-12-15', projectId: 'project-1' });
+});
+
 it('links a deposit refund plan to the paid project deposit and reserves its return amount', () => {
   localStorage.setItem('shichuang.frontend.mock.accountsPayable', JSON.stringify({
-    payables: [{ id: 'deposit-1', payableCode: 'AP-DEPOSIT-1', category: '招投标保证金', supplierName: '招标单位', projectId: 'project-1', projectName: '测试项目', amount: 50000, paidAmount: 50000, unpaidAmount: 0, dueDate: '2026-10-01', status: '已结清', applicant: '财务' }],
+    payables: [{ id: 'deposit-1', payableCode: 'AP-DEPOSIT-1', category: '投标保证金', supplierName: '招标单位', projectId: 'project-1', projectName: '测试项目', amount: 50000, paidAmount: 50000, unpaidAmount: 0, dueDate: '2026-10-01', status: '已结清', applicant: '财务' }],
     payments: []
   }));
   render(<PaymentCollectionManagementView />);
   fireEvent.click(screen.getByRole('button', { name: '新建应收计划' }));
   const dialog = screen.getByRole('dialog');
-  fireEvent.change(within(dialog).getByLabelText('应收类别'), { target: { value: '保证金退回' } });
+  fireEvent.change(within(dialog).getByLabelText('应收类型'), { target: { value: '投标保证金' } });
   fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
   fireEvent.change(within(dialog).getByLabelText('原缴保证金记录'), { target: { value: 'deposit-1' } });
   fireEvent.change(within(dialog).getByLabelText('应收说明'), { target: { value: '投标保证金退回' } });
@@ -153,6 +194,6 @@ it('links a deposit refund plan to the paid project deposit and reserves its ret
   fireEvent.click(within(dialog).getByRole('button', { name: '保存应收计划' }));
   const plan = JSON.parse(localStorage.getItem('shichuang.frontend.mock.paymentCollection') || '{}').plans[0];
   const deposit = JSON.parse(localStorage.getItem('shichuang.frontend.mock.accountsPayable') || '{}').payables[0];
-  expect(plan).toMatchObject({ sourcePayableId: 'deposit-1', planAmount: 50000, projectId: 'project-1' });
+  expect(plan).toMatchObject({ category: '投标保证金', sourcePayableId: 'deposit-1', planAmount: 50000, projectId: 'project-1' });
   expect(deposit.returnPlannedAmount).toBe(50000);
 });

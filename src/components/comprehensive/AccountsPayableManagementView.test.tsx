@@ -25,6 +25,7 @@ afterEach(() => {
 it('loads payable demo data and switches to payment records', () => {
   render(<AccountsPayableManagementView />);
   expect(screen.getByText('应付总额')).toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: '付款类型' })).toBeInTheDocument();
   expect(screen.getByText('AP-DEMO-2026-001')).toBeInTheDocument();
   expect(screen.queryByText('AP-DEMO-2026-003')).not.toBeInTheDocument();
   expect(screen.getByText('逾期应付款')).toBeInTheDocument();
@@ -64,7 +65,11 @@ it('requires a project and a contract for agency sharing payables', () => {
   render(<AccountsPayableManagementView />);
   fireEvent.click(screen.getByRole('button', { name: '新建付款计划' }));
   const dialog = screen.getByRole('dialog');
-  fireEvent.change(within(dialog).getByLabelText('支出类别'), { target: { value: '代理商分成' } });
+  expect(within(dialog).getByLabelText('付款类型')).toHaveValue('第三方采购');
+  expect([...within(dialog).getByLabelText('付款类型').querySelectorAll('option')].slice(1).map(option => option.textContent)).toEqual(['运营中心分成', '投标报名费', '投标保证金', '中标服务费', '专家评审费', '投标平台服务费', '履约保证金', '质保金', '第三方采购']);
+  fireEvent.change(within(dialog).getByLabelText('付款类型'), { target: { value: '运营中心分成' } });
   expect(within(dialog).getByLabelText('关联项目')).toBeRequired();
   expect(within(dialog).getByLabelText('关联合同')).toBeRequired();
+  fireEvent.change(within(dialog).getByLabelText('付款类型'), { target: { value: '投标报名费' } });
+  expect(within(dialog).getByLabelText('关联合同')).not.toBeRequired();
 });
