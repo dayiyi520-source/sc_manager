@@ -13,6 +13,11 @@ html:not(.dark) .tech-main .finance-workspace .finance-tabs > .finance-tab[aria-
 .finance-action:hover:not(:disabled) { border-color: var(--primary); background: var(--bg-surface-soft); }
 .finance-action:active:not(:disabled) { background: var(--bg-elevated); }
 .finance-action:disabled { cursor: not-allowed; opacity: .5; }
+.finance-action-link { min-height: 32px; padding: 4px 0; border: 0; border-radius: 0; background: transparent; color: var(--active-text); font-size: 12px; font-weight: 500; line-height: 18px; cursor: pointer; transition: color 150ms ease, text-decoration-color 150ms ease; }
+.finance-action-link:hover:not(:disabled) { color: var(--primary-hover); text-decoration: underline; text-underline-offset: 3px; }
+.finance-action-link:active:not(:disabled) { color: var(--primary); }
+.finance-action-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+.finance-action-link:disabled { cursor: not-allowed; opacity: .5; }
 .finance-action-primary { border-color: var(--primary); background: var(--primary); color: var(--text-on-primary); }
 .finance-action-primary:hover:not(:disabled) { border-color: var(--primary-hover); background: var(--primary-hover); }
 .finance-action-primary:active:not(:disabled) { background: color-mix(in srgb, var(--primary) 80%, var(--bg-surface)); }

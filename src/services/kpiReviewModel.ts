@@ -7,11 +7,14 @@ export type ReviewModule = typeof REVIEW_MODULES[number]['key'];
 export type ReviewActor = '主管' | 'HR' | '老板';
 export interface ModuleAdjustment { bonus: number; deduction: number; note: string }
 export type ModuleAdjustments = Record<ReviewModule, ModuleAdjustment>;
+export interface ReviewComment { text: string; name: string; at: string }
 export interface ReviewBook {
   base: Record<ReviewModule, number>;
   active: Partial<Record<ReviewActor, ModuleAdjustments>>;
   drafts: Partial<Record<ReviewActor, ModuleAdjustments>>;
-  history: Array<{ id: string; actor: ReviewActor; name: string; at: string; action: string; before?: ModuleAdjustments; after: ModuleAdjustments; appealId?: string }>;
+  comments?: Partial<Record<ReviewActor, ReviewComment>>;
+  commentDrafts?: Partial<Record<ReviewActor, ReviewComment>>;
+  history: Array<{ id: string; actor: ReviewActor; name: string; at: string; action: string; before?: ModuleAdjustments; after: ModuleAdjustments; comment?: string; appealId?: string }>;
   revision: number;
 }
 export const blankAdjustments = (): ModuleAdjustments => Object.fromEntries(REVIEW_MODULES.map(m => [m.key, { bonus: 0, deduction: 0, note: '' }])) as ModuleAdjustments;
@@ -34,7 +37,7 @@ export function reviewBookFor(employee: KpiEmployee): ReviewBook {
     draft.review = { bonus: 0, deduction: Math.max(0, -(employee.managerDraft.temporaryTaskDeduction ?? 0)), note: employee.managerDraft.reason };
     drafts.主管 = draft;
   }
-  return { base, active: employee.performanceKind === 'supervisor' ? {} : { 主管: manager }, drafts, history: [], revision: 0 };
+  return { base, active: employee.performanceKind === 'supervisor' ? {} : { 主管: manager }, drafts, comments: {}, commentDrafts: {}, history: [], revision: 0 };
 }
 export function reviewRawScores(book: ReviewBook) {
   return Object.fromEntries(REVIEW_MODULES.map(m => {

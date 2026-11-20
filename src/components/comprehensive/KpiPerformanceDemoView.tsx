@@ -501,7 +501,7 @@ export const KpiPerformanceDemoView: React.FC = () => {
 
     {view === 'public' && role !== '老板' && <section className="kpi-panel kpi-public-view">
       {!(period?.published && role === '员工') && <div className="kpi-view-title"><div><span className="kpi-eyebrow">FINAL RESULTS</span><h2>{monthLabel(month)}绩效公示</h2>{(period?.published || role === 'HR') && <p>{period?.published ? `公示时间 ${period.publishedAt || period.generatedAt || '未记录'} · ${role === '员工' ? '仅展示本人结果与部门汇总' : role === '主管' ? '展示当前团队最终结果' : '展示全员最终结果'}` : '本月结果尚未公示'}</p>}</div>
-        {role === 'HR' && (period?.generated ? <Button onClick={openCycleSettings}>周期设置</Button> : <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>)}
+        {role === 'HR' && !period?.generated && <Button type="primary" icon={<PlusOutlined />} onClick={generatePeriod}>生成本月考核</Button>}
       </div>}
       {role === '主管' && period?.generated && !period.published && managerReviewOpen && <div className="kpi-inline-notice"><ClockCircleOutlined />当前团队有 {employees.filter(employee => employee.department === supervisorDepartment && ['待主管确认', '草稿'].includes(currentKpiStatus(employee.reviewStatus))).length} 位员工待确认。请在汇总复核中完成后提交给 HR 复审。<Button type="primary" onClick={() => setView('calculation')}>进入主管复核</Button></div>}
       {period?.published && role !== '员工' ? <>
@@ -571,7 +571,7 @@ export const KpiPerformanceDemoView: React.FC = () => {
     </section>}
 
     {view === 'calculation' && role !== '员工' && <section className="kpi-panel">
-      <div className="kpi-view-title"><div><span className="kpi-eyebrow">CALCULATION & REVIEW</span><h2>汇总计算与主管复核</h2><p>{role === '老板' ? '选择部门主管查看或评定本月主管绩效' : '主管确认后提交 HR 复审，HR 确认后计入正式结果'}</p></div>{role === 'HR' && <Button disabled={!period?.generated || period.published} onClick={openCycleSettings}>周期设置</Button>}</div>
+      <div className="kpi-view-title"><div><span className="kpi-eyebrow">CALCULATION & REVIEW</span><h2>汇总计算与主管复核</h2><p>{role === '老板' ? '选择部门主管查看或评定本月主管绩效' : '主管确认后提交 HR 复审，HR 确认后计入正式结果'}</p></div>{role === 'HR' && <Button disabled={!period?.generated} onClick={openCycleSettings}>周期设置</Button>}</div>
       {role === '主管' && <div className="kpi-inline-notice"><AuditOutlined />{period?.published ? <>本月结果已公示，评分已锁定。<Button type="primary" size="small" onClick={() => { setMonth('2026-11'); setSelectedId(state.periods['2026-11']?.employees.find(employee => employee.manager === supervisor)?.id || ''); }}>进入 11 月复核演示</Button></> : period?.cycleSettings && !managerReviewOpen ? '主管复核开关已关闭，评分只读且暂不可提交。' : !managerReviewOpen ? '本月尚未开启主管复核，评分只读。' : <>主管复核已开启。选择左侧待复核员工，填写复核说明后提交给 HR 审核。</>}</div>}
       {!period?.generated && <div className="kpi-inline-notice"><ClockCircleOutlined />生成考核后可提交主管复核。以下演示数据可供预览。</div>}
       {role === '主管' && selectedEmployee && <div className="kpi-manager-department-overview" role="region" aria-label="部门复核概览"><strong>{selectedEmployee.department}</strong><span>{reviewDepartmentEmployees.length} 位员工</span><span>当前平均 {reviewDepartmentEmployees.length ? (reviewDepartmentEmployees.reduce((sum, employee) => sum + scoreForEmployee(employee), 0) / reviewDepartmentEmployees.length).toFixed(1) : '0.0'} 分</span><span>复核后预览 {reviewDepartmentEmployees.length ? (reviewDepartmentEmployees.reduce((sum, employee) => sum + previewManagerScore(employee), 0) / reviewDepartmentEmployees.length).toFixed(1) : '0.0'} 分</span></div>}

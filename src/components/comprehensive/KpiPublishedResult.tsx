@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Tooltip } from 'antd';
+import { Button, Input, Tooltip } from 'antd';
 import { okrRepository, type OkrPerson, type OkrRecord } from '../../services/okrRepository';
 import { calculateOkrScore, scoreObjectivesFor, type ScoreObjective } from '../../services/okrPerformanceScore';
 import { EmployeePublishedScoreTable, employeeDetailGroups, type ScoreTableEditor } from './EmployeePublishedScoreTable';
@@ -27,6 +27,8 @@ function correctionTotals(employee: KpiEmployee, source: 'objective' | 'reports'
 function approvedComment(employee: KpiEmployee) {
   if (employee.reviewBook) {
     const actor = employee.performanceKind === 'supervisor' ? '老板' : '主管';
+    const explicitComment = employee.reviewBook.comments?.[actor];
+    if (explicitComment?.text.trim()) return { reason: explicitComment.text, actor: explicitComment.name || actor, at: explicitComment.at };
     const entry = employee.reviewBook.active[actor];
     const notes = [...new Set(Object.values(entry || {}).map(item => item.note).filter(Boolean))];
     const record = employee.reviewBook.history.slice().reverse().find(item => item.actor === actor && ['提交复核', '评定生效'].includes(item.action));
@@ -147,9 +149,9 @@ function scoreGroups(employee: KpiEmployee, objectives: ScoreObjective[], goalSt
   return groups.map(group => ({ ...group, explanation: moduleExplanation(employee, group.name) }));
 }
 
-export interface KpiPublishedResultProps { employee: KpiEmployee; departmentSummary: KpiDepartmentSummary; finalCoefficient: number; month: string; detailLayout?: 'standard' | 'employee-example'; showDepartment?: boolean; editor?: ScoreTableEditor; published?: boolean; actions?: React.ReactNode }
+export interface KpiPublishedResultProps { employee: KpiEmployee; departmentSummary: KpiDepartmentSummary; finalCoefficient: number; month: string; detailLayout?: 'standard' | 'employee-example'; showDepartment?: boolean; editor?: ScoreTableEditor; commentEditor?: { value: string; onChange: (value: string) => void }; published?: boolean; actions?: React.ReactNode }
 
-export const KpiPublishedResult: React.FC<KpiPublishedResultProps> = ({ employee, departmentSummary, finalCoefficient, month, detailLayout = 'employee-example', showDepartment = false, editor, published = true, actions }) => {
+export const KpiPublishedResult: React.FC<KpiPublishedResultProps> = ({ employee, departmentSummary, finalCoefficient, month, detailLayout = 'employee-example', showDepartment = false, editor, commentEditor, published = true, actions }) => {
   const score = scoreForEmployee(employee);
   const weightedScores = weightedKpiScores(employee);
   const grade = gradeForScore(score);
@@ -203,7 +205,7 @@ export const KpiPublishedResult: React.FC<KpiPublishedResultProps> = ({ employee
       const label = dimension.key === 'attendance' ? '考勤' : dimension.key === 'review' ? '周月报提交' : dimension.label.replace('（演示）', '');
       return <div key={dimension.key}><span>{label}</span><b>{value}<small> / {dimension.max} 分</small></b><i><em style={{ width: `${Math.max(0, Math.min(100, value / dimension.max * 100))}%` }} /></i></div>;
     })}</section>
-    <section className="kpi-published-comment" aria-label="绩效评语"><h3>绩效评语</h3><p>{comment?.reason || '暂无绩效评语'}</p>{comment && <small>{comment.actor} · {comment.at}</small>}</section>
+    <section className="kpi-published-comment" aria-label="绩效评语"><h3>绩效评语</h3>{commentEditor ? <Input.TextArea aria-label="主管绩效评语" className="kpi-performance-comment-editor" value={commentEditor.value} onChange={event => commentEditor.onChange(event.target.value)} maxLength={1000} showCount autoSize={{ minRows: 2, maxRows: 5 }} placeholder="请填写本月绩效评语，提交 HR 复审时必填" /> : <p>{(employee.reviewStatus === '待HR复审' ? employee.reviewBook?.commentDrafts?.主管?.text : '') || comment?.reason || '暂无绩效评语'}</p>}{comment && !commentEditor && <small>{comment.actor} · {comment.at}</small>}</section>
     <section className="kpi-published-breakdown" aria-label="评分明细">
       <header><div><h3>评分明细</h3><p>按计分项展示数据来源、规则判定与分数影响</p></div><strong className="kpi-heading-total">合计 {score.toFixed(1)} / 100 分</strong></header>
       {employee.redline?.active && <div className="kpi-published-personal-redline"><b>个人红线</b><span>{employee.redline.type}：{employee.redline.impact}</span></div>}

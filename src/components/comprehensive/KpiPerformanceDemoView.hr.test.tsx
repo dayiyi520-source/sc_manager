@@ -282,7 +282,7 @@ describe('HR 绩效公示', () => {
   it('按部门分组展示全员并保留公示操作', async () => {
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
 
-    expect(screen.getByRole('button', { name: '周期设置' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '周期设置' })).not.toBeInTheDocument();
     expect(await screen.findByRole('region', { name: '产品部绩效公示' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: '研发部绩效公示' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: '交付部绩效公示' })).toBeInTheDocument();

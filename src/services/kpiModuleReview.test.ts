@@ -18,13 +18,17 @@ describe('统一调分与老板评定', () => {
     const manager = blankAdjustments(); manager.objective = { bonus: 2, deduction: 1, note: '主管目标依据' };
     p = saveModuleReview(p, employee.id, context('主管', employee.manager), manager, 'draft', 0);
     expect(scoreForEmployee(p.employees[0])).toBe(base);
-    p = saveModuleReview(p, employee.id, context('主管', employee.manager), manager, 'submit', 1);
+    expect(p.employees[0].reviewBook?.commentDrafts?.主管?.text).toBe('');
+    expect(() => saveModuleReview(p, employee.id, context('主管', employee.manager), manager, 'submit', 1)).toThrow('请填写绩效评语');
+    p = saveModuleReview(p, employee.id, context('主管', employee.manager), manager, 'submit', 1, '按计划完成重点工作，跨团队协作及时。');
     expect(scoreForEmployee(p.employees[0])).toBe(base);
+    expect(p.employees[0].reviewBook?.commentDrafts?.主管?.text).toBe('按计划完成重点工作，跨团队协作及时。');
     const hr = blankAdjustments(); hr.objective = { bonus: 1, deduction: 0, note: 'HR核实补分' };
     p = saveModuleReview(p, employee.id, context('HR'), hr, 'apply', 2);
     p = approveModuleReview(p, employee.id, context('HR'), 'approve');
     expect(p.employees[0].reviewBook?.active.主管?.objective.note).toBe('主管目标依据');
     expect(p.employees[0].reviewBook?.active.HR?.objective.note).toBe('HR核实补分');
+    expect(p.employees[0].reviewBook?.comments?.主管?.text).toBe('按计划完成重点工作，跨团队协作及时。');
     expect(scoreForEmployee(p.employees[0])).toBeGreaterThan(base);
     const state = loadKpiDemo(); state.periods['2026-11'] = p; saveKpiDemo(state);
     expect(loadKpiDemo().periods['2026-11'].employees[0].reviewBook).toEqual(p.employees[0].reviewBook);
@@ -64,10 +68,16 @@ describe('统一调分与老板评定', () => {
   it('退回保留草稿但不生效，并补齐明确标记的十月主管演示评分', () => {
     let p = period(); const employee = p.employees[0], values = blankAdjustments();
     values.objective = { bonus: 3, deduction: 0, note: '待核实' };
-    p = saveModuleReview(p, employee.id, context('主管', employee.manager), values, 'submit', 0);
+    p = saveModuleReview(p, employee.id, context('主管', employee.manager), values, 'submit', 0, '请补充该员工阶段表现依据。');
     p = approveModuleReview(p, employee.id, context('HR'), 'return', '补充依据');
     expect(p.employees[0].reviewBook?.drafts.主管?.objective.bonus).toBe(3);
     expect(p.employees[0].reviewBook?.active.主管?.objective.bonus).toBe(0);
+    expect(p.employees[0].reviewBook?.commentDrafts?.主管?.text).toBe('请补充该员工阶段表现依据。');
     expect(loadKpiDemo().periods['2026-10'].supervisors?.every(item => item.bossRatedAt && item.supervisorDemoRated)).toBe(true);
+  });
+  it('限制主管评语长度并要求提交时填写非空内容', () => {
+    const p = period(), employee = p.employees[0], values = blankAdjustments();
+    expect(() => saveModuleReview(p, employee.id, context('主管', employee.manager), values, 'submit', 0, ' '.repeat(1001))).toThrow('绩效评语最多 1000 字');
+    expect(() => saveModuleReview(p, employee.id, context('主管', employee.manager), values, 'submit', 0)).toThrow('请填写绩效评语');
   });
 });

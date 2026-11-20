@@ -420,6 +420,17 @@ describe('绩效考核公示', () => {
     expect(screen.queryByText('允许主管复核修改')).not.toBeInTheDocument();
   });
 
+  it('周期设置入口仅出现在 HR 汇总复核界面', async () => {
+    render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    expect(screen.queryByRole('button', { name: '周期设置' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
+    expect(screen.getByRole('button', { name: '周期设置' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /月度公示/ }));
+    expect(screen.queryByRole('button', { name: '周期设置' })).not.toBeInTheDocument();
+  });
+
   it('HR通过公示开关保存后实际公示，锁定设置并按工作日开启申诉期', async () => {
     const state = loadKpiDemo();
     const period = state.periods['2026-11'];
@@ -439,6 +450,8 @@ describe('绩效考核公示', () => {
     view.unmount();
     document.querySelectorAll('.ant-modal-root').forEach(node => node.remove());
     render(<AntApp><KpiPerformanceDemoView /></AntApp>);
+    expect(screen.queryByRole('button', { name: '周期设置' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /汇总复核/ }));
     fireEvent.click(screen.getByRole('button', { name: '周期设置' }));
     await waitFor(() => expect(screen.getByRole('switch', { name: '绩效公示开关' })).toBeDisabled());
     expect(screen.getByLabelText('员工申诉期间工作日')).toBeDisabled();

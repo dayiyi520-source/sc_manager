@@ -36,3 +36,20 @@ it('restores demo data when the saved snapshot is malformed', () => {
 
   expect(loadPaymentCollection().plans.length).toBeGreaterThan(0);
 });
+
+it('restores missing legacy demo contract names from their contract codes', () => {
+  savePaymentCollection({
+    plans: [
+      { id: 'legacy-1', planCode: 'AR-OLD-1', contractCode: 'SC-CT-DEMO-001', customerName: '深圳职业技术大学', stageName: '初验款', planAmount: 100, receivedAmount: 0, uncollectedAmount: 100, dueDate: '2026-11-30', status: '待回款', manager: '财务' },
+      { id: 'legacy-2', planCode: 'AR-OLD-2', contractCode: 'SC-CT-DEMO-002', customerName: '金华职业技术大学', stageName: '初验款', planAmount: 100, receivedAmount: 0, uncollectedAmount: 100, dueDate: '2026-11-30', status: '待回款', manager: '财务' }
+    ],
+    records: []
+  });
+
+  const snapshot = loadPaymentCollection();
+  expect(snapshot.plans.map((plan) => plan.contractName)).toEqual([
+    '智慧校园一体化平台建设项目合同',
+    '在线精品课程资源库建设项目合同'
+  ]);
+  expect(JSON.parse(localStorage.getItem('shichuang.frontend.mock.paymentCollection') || '{}').plans).toEqual(snapshot.plans);
+});

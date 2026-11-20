@@ -197,6 +197,7 @@ const ALIAS_MAP: Record<string, SubMenuId> = {
 };
 
 export interface AppContextType {
+  isRemoteData: boolean;
   activeTabId: SubMenuId;
   openTabs: PageTab[];
   sidebarCollapsed: boolean;
@@ -1573,6 +1574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        isRemoteData: dataMode === 'remote',
         activeTabId,
         openTabs,
         sidebarCollapsed,

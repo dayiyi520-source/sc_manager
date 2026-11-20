@@ -401,6 +401,7 @@
 .kpi-published-comment { padding: 16px; border: 1px solid var(--border-main); border-radius: 8px; background: var(--bg-card); }
 .kpi-published-comment h3 { margin: 0 0 8px; font-size: 14px; color: var(--text-primary); }
 .kpi-published-comment p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }
+.kpi-published-comment .kpi-performance-comment-editor { font-size: 12px; line-height: 1.6; }
 .kpi-published-comment small { display: block; margin-top: 8px; color: var(--text-muted); font-size: 11px; }
 .kpi-published-table-wrap .kpi-detail-rule { min-width: 192px; max-width: 320px; overflow-wrap: anywhere; }
 .kpi-published-table-wrap .kpi-detail-rule-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; line-height: 1.5; cursor: help; }

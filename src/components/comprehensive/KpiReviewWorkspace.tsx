@@ -10,6 +10,7 @@ export const KpiReviewWorkspace: React.FC<{ employee: KpiEmployee; period: KpiPe
   const actor = context.role as ReviewActor;
   const book = reviewBookFor(employee);
   const [values, setValues] = useState<ModuleAdjustments>(() => structuredClone(book.drafts[actor] || book.active[actor] || blankAdjustments()));
+  const [performanceComment, setPerformanceComment] = useState(() => book.commentDrafts?.主管?.text ?? book.comments?.主管?.text ?? '');
   const [revision, setRevision] = useState(book.revision);
   const [saving, setSaving] = useState(false);
   const [api, holder] = message.useMessage();
@@ -17,11 +18,12 @@ export const KpiReviewWorkspace: React.FC<{ employee: KpiEmployee; period: KpiPe
   const previewBook = reviewBookFor(employee);
   if (actor === 'HR' && employee.reviewStatus === '待HR复审' && previewBook.drafts.主管) previewBook.active.主管 = previewBook.drafts.主管;
   if (editable) previewBook.active[actor] = values;
+  if (editable && actor === '主管') previewBook.commentDrafts = { ...previewBook.commentDrafts, 主管: { text: performanceComment, name: context.name, at: '' } };
   const preview = editable || employee.reviewBook ? { ...employee, reviewBook: previewBook } : employee;
   const save = (action: 'draft' | 'submit' | 'apply') => {
     setSaving(true);
     try {
-      const next = saveModuleReview(period, employee.id, context, values, action, revision);
+      const next = saveModuleReview(period, employee.id, context, values, action, revision, performanceComment);
       onChange(next);
       setRevision([...next.employees, ...(next.supervisors || [])].find(e => e.id === employee.id)?.reviewBook?.revision ?? revision);
       api.success(action === 'submit' ? '已提交 HR 复审' : action === 'apply' ? '评分已生效' : '草稿已保存');
@@ -37,7 +39,7 @@ export const KpiReviewWorkspace: React.FC<{ employee: KpiEmployee; period: KpiPe
   const dirty = JSON.stringify(values) !== JSON.stringify(book.drafts[actor] || book.active[actor] || blankAdjustments());
   return <section className="kpi-unified-review" aria-label={`${employee.name}评分复核`}>
     {holder}
-    <KpiPublishedResult employee={preview} month={context.month} departmentSummary={summary} finalCoefficient={gradeForScore(scoreForEmployee(preview)).coefficient} published={period.published} editor={editable ? { actor, values, onChange: setValues } : undefined} />
+    <KpiPublishedResult employee={preview} month={context.month} departmentSummary={summary} finalCoefficient={gradeForScore(scoreForEmployee(preview)).coefficient} published={period.published} editor={editable ? { actor, values, onChange: setValues } : undefined} commentEditor={editable && actor === '主管' ? { value: performanceComment, onChange: setPerformanceComment } : undefined} />
     <div className="kpi-review-actions">
       {editable && actor === '主管' && <><Button loading={saving} onClick={() => save('draft')}>保存草稿</Button><Button type="primary" loading={saving} onClick={() => save('submit')}>提交当前员工给 HR 复审</Button></>}
       {editable && actor !== '主管' && <Button type="primary" loading={saving} onClick={() => save('apply')}>{actor === '老板' ? '确认主管绩效评定' : '保存 HR 调分'}</Button>}
