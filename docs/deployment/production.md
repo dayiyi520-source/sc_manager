@@ -30,7 +30,7 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-最近成功发布：2026-11-11 14:58:03（北京时间）；发布编号 `20261111T065803Z`；源码提交 `054466f5bc3db3d12129a772e7fcd68e0fc8e96d`；发布目录 `/opt/sc-manager-frontend/releases/20261111T065803Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261111T065803Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
+最近成功发布：2026-11-20 18:01:17（北京时间）；发布编号 `20261120T100117Z`；源码提交 `517f1eee5c0ac90a7320d089d025fb9a7d9970a2`；发布目录 `/opt/sc-manager-frontend/releases/20261120T100117Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261120T100117Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
@@ -40,6 +40,13 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 上次已核实的发布：20261026T063816Z，源码 bbc9203。
 
 ## 最近成功发布
+
+- 发布时间：2026-11-20 18:01:17（北京时间）；发布编号 `20261120T100117Z`；发布源码 `517f1eee5c0ac90a7320d089d025fb9a7d9970a2`，分支 `project-frontend`。
+- 发布内容：整合已提交的进项发票附件校验、合同一计划及按阶段到账、手动阶段约定时间、到账时间、应收计划详情及合同演示数据，以及 KPI 汇总复核与公示结果更新。
+- 发布前部署准备通过：复用既有静态 Mock 发布脚本；专用路由 `/sc-manager-frontend/` 与 `/sc-manager-frontend/api/` 已预留，database.mode=none，无数据库操作。使用提交 `517f1eee` 的独立源码快照构建，未包含 `.tools`、`tmp` 或工作区其他未提交产物。
+- TypeScript 检查、生产构建及 59 项财务/KPI 定向测试通过；全量测试运行出现多项非本次发布相关的 AbortSignal、历史工作项状态流程/源码契约及 KPI 默认超时失败，未作为本次定向验收依据。构建保留现有大体积 bundle 警告。
+- 部署脚本核验公网首页、入口资源、业务直达路由、专用 Mock 健康状态与共享数据接口通过；发布模式为 persistent-mock，共享快照摘要与部署前一致。
+- 发布目录 `/opt/sc-manager-frontend/releases/20261120T100117Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261120T100117Z`。回滚按本次备份中的 `previous-target.txt` 切回旧版 `dist`，并使用本次发布目录 `mock-service/setup.py --rollback` 恢复服务、路由和共享数据。
 
 - 发布时间：2026-11-11 18:36:58（北京时间）；发布编号 `20261111T103658Z`；发布源码 `df4ce039eb4ff01a0bb88aa233fa6ada2060525e`，分支 `project-frontend`。
 - 发布内容：友商管理新增可选企业信用代码输入与列表列，历史无代码记录显示“—”；未改变当前演示保存限制。使用已推送提交的独立源码快照部署，未包含工作区未提交的绩效和其他业务改动。
