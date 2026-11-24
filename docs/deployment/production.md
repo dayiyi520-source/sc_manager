@@ -30,7 +30,7 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-最近成功发布：2026-11-24 09:22:52（北京时间）；发布编号 `20261124T012252Z`；源码提交 `ac0a8419523dbc47ff7f875a9ccf2dcf1036c3ed`；发布目录 `/opt/sc-manager-frontend/releases/20261124T012252Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261124T012252Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
+最近成功发布：2026-11-24 10:56:37（北京时间）；发布编号 `20261124T025637Z`；源码提交 `f34a03be4a6664b420f3978dcc1c888ae843f421`；发布目录 `/opt/sc-manager-frontend/releases/20261124T025637Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261124T025637Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
