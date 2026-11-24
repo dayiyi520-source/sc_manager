@@ -30,7 +30,7 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 
 ## 发布、核验与回滚
 
-最近成功发布：2026-11-24 10:56:37（北京时间）；发布编号 `20261124T025637Z`；源码提交 `f34a03be4a6664b420f3978dcc1c888ae843f421`；发布目录 `/opt/sc-manager-frontend/releases/20261124T025637Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261124T025637Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
+最近成功发布：2026-11-24 17:41:25（北京时间）；发布编号 `20261124T094125Z`；源码提交 `5d84afba0998f495fef11e9453bbf4d86172cc50`；发布目录 `/opt/sc-manager-frontend/releases/20261124T094125Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261124T094125Z`。公共地址为 `https://cp.stringedu.com/sc-manager-frontend/`。
 
 
 预检专属路由与 nginx -t；上传到 incoming，解压独立 releases 目录，保留旧资源支持打开中的页面。初始化共享数据及服务、核对健康状态，再原子切换 dist 链接。核验公共 index、JS、业务直达路由、Mock 健康状态及两份数据。release.json 记录源码版本、发布编号和上传 Mock 快照摘要，不含凭证。
@@ -40,6 +40,12 @@ python scripts/prepare_deployment.py --project <项目目录> --environment prod
 上次已核实的发布：20261026T063816Z，源码 bbc9203。
 
 ## 最近成功发布
+
+- 发布时间：2026-11-24 17:41:25（北京时间）；发布编号 `20261124T094125Z`；发布源码 `5d84afba0998f495fef11e9453bbf4d86172cc50`，分支 `project-frontend`。
+- 发布内容：首次访问且无采购快照时初始化带标识的项目采购演示记录；重排发票、应收计划及应付台账详情抽屉，统一摘要、字段分组、明细、备注和附件层级。已保存采购列表和服务器共享 Mock 数据保持不变。
+- 发布前检查：预检确认复用 `/sc-manager-frontend/` 专属路由且 `database.mode=none`；22 项采购/财务测试、TypeScript 检查和生产构建通过。构建保留既有大体积 chunk 提示；截图式浏览器检查因本机自动化通道不可用未执行。
+- 部署核验：公开站首页、入口资源、业务直达路由、Mock 健康状态和共享数据接口由部署流程核验通过；部署后公网首页返回 HTTP 200。
+- 发布目录 `/opt/sc-manager-frontend/releases/20261124T094125Z`；回滚备份 `/opt/sc-manager-frontend/backups/20261124T094125Z`。回滚从备份的 `previous-target.txt` 读取旧版 `dist`，再使用本次发布目录的 `mock-service/setup.py --rollback` 恢复服务、路由和共享数据。
 
 - 发布时间：2026-11-24 09:22:52（北京时间）；发布编号 `20261124T012252Z`；发布源码 `ac0a8419523dbc47ff7f875a9ccf2dcf1036c3ed`，分支 `project-frontend`。
 - 发布内容：项目采购页收敛为采购列表、四项统计和新建采购单；仅统计当前项目目录关联的采购，移除采购申请与入库联动页面；发票采购单下拉共享项目采购 Mock 数据。第三方采购审批入口继续不调用外部接口。
