@@ -20,6 +20,7 @@ import { loadInvoiceLedger, saveInvoiceLedger } from '../../services/invoiceLedg
 import { DEMO_INVOICE_CONTRACTS } from '../../services/invoiceLedgerDemoData';
 import { teamRepository } from '../../services/teamRepository';
 import { loadProcurementItems } from '../../services/procurementRepository';
+import { FinanceDetailFields, FinanceDetailMetrics, FinanceDetailSection } from './FinanceDetailPrimitives';
 
 const TAX_RATES = ['1%', '3%', '6%', '9%', '13%'];
 
@@ -56,7 +57,7 @@ export const InvoiceManagementView: React.FC = () => {
     addToast, invoices, setInvoices, customers, contracts, projects, paymentSchedules,
     setPaymentSchedules, invoiceApprovals, setInvoiceApprovals, partners, currentUser
   } = useApp();
-  const procurementItems = loadProcurementItems().filter((item) => projects.some((project) =>
+  const procurementItems = loadProcurementItems(projects).filter((item) => projects.some((project) =>
     item.projectId ? project.id === item.projectId : project.name === (item.projectName || item.relatedProject)
   ));
   const invoiceContracts: Contract[] = contracts.length ? contracts : DEMO_INVOICE_CONTRACTS;
@@ -110,6 +111,11 @@ export const InvoiceManagementView: React.FC = () => {
 
   const selectedContract = invoiceContracts.find((contract) => contract.id === invoiceForm.contractId);
   const selectedProject = projects.find((project) => project.id === invoiceForm.projectId);
+  const projectContracts = selectedProject ? invoiceContracts.filter((contract) => contract.relatedProduct === selectedProject.name || paymentSchedules.some((schedule) => schedule.contractId === contract.id && schedule.projectId === selectedProject.id)) : [];
+  const projectProcurementItems = selectedProject ? procurementItems.filter((item) => item.projectId ? item.projectId === selectedProject.id : (item.projectName || item.relatedProject) === selectedProject.name) : [];
+  const selectedProjectCustomer = selectedProject?.customerId
+    ? customers.find((customer) => customer.id === selectedProject.customerId)
+    : customers.find((customer) => customer.name === selectedProject?.customerName);
   const linkedPaymentSchedules = selectedContract
     ? paymentSchedules.filter((schedule) => schedule.contractId === selectedContract.id)
     : [];
@@ -204,15 +210,11 @@ export const InvoiceManagementView: React.FC = () => {
   };
 
   const handleContractChange = (contractId: string) => {
-    const contract = invoiceContracts.find((item) => item.id === contractId);
-    const schedules = paymentSchedules.filter((schedule) => schedule.contractId === contractId);
-    const candidateProjects = projects.filter((project) =>
-      (contract?.customerId && project.customerId === contract.customerId)
-      || (contract?.customerName && project.customerName === contract.customerName)
-    );
-    const scheduleProject = schedules.map((schedule) => schedule.projectId).find(Boolean);
-    const projectId = scheduleProject || (candidateProjects.length === 1 ? candidateProjects[0].id : '');
-    updateInvoiceForm({ contractId, paymentScheduleIds: [], amount: '', projectId });
+    updateInvoiceForm({ contractId, paymentScheduleIds: [], amount: '' });
+  };
+
+  const handleInvoiceProjectChange = (projectId: string) => {
+    updateInvoiceForm({ projectId, contractId: '', purchaseOrderCode: '', paymentScheduleIds: [], amount: '' });
   };
 
   const togglePaymentStage = (stageId: string, checked: boolean) => {
@@ -239,6 +241,10 @@ export const InvoiceManagementView: React.FC = () => {
     const customer = project?.customerId
       ? customers.find((item) => item.id === project.customerId)
       : customers.find((item) => item.name === project?.customerName);
+    if (!project || !customer) {
+      addToast('error', '发票信息不完整', !project ? '请选择关联项目' : '关联项目未匹配到客户，请检查项目资料');
+      return;
+    }
     const title = invoiceEntryType === '销项'
       ? taxProfiles.find((profile) => profile.id === invoiceForm.title)?.companyName || ''
       : invoiceForm.title;
@@ -435,7 +441,7 @@ export const InvoiceManagementView: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索发票单号、抬头名称、关联合同号、申请人..."
+              placeholder={activeTab === 'tax_profile' ? '搜索企业名称...' : '搜索发票单号、项目、客户、申请人...'}
               className="finance-input"
             />
           </div>
@@ -488,7 +494,7 @@ export const InvoiceManagementView: React.FC = () => {
                 <tr className="border-b border-[var(--border-main)] bg-[var(--bg-main)] text-[var(--text-muted)]">
                   <th className="py-3 px-3">发票代码/单号</th>
                   <th className="py-3 px-3">销方/供应商名称</th>
-                  <th className="py-3 px-3">关联采购单</th>
+                  <th className="py-3 px-3">关联采购单/合同</th>
                   <th className="py-3 px-3">含税开票金额</th>
                   <th className="py-3 px-3">适用税率</th>
                   <th className="py-3 px-3">关联项目</th>
@@ -498,12 +504,12 @@ export const InvoiceManagementView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-[var(--border-main)]">
                 {purchaseInvoices
-                  .filter((invoice) => [invoice.invoiceNo, invoice.customerOrSupplier, invoice.purchaseOrderCode, invoice.relatedProjectName, invoice.customerName, invoice.note].some((value) => value?.toLowerCase().includes(searchQuery.toLowerCase())))
+                  .filter((invoice) => [invoice.invoiceNo, invoice.customerOrSupplier, invoice.purchaseOrderCode, invoice.relatedContractCode, invoice.relatedProjectName, invoice.customerName, invoice.note].some((value) => value?.toLowerCase().includes(searchQuery.toLowerCase())))
                   .map((inv) => (
                     <tr key={inv.id} className="hover:bg-[var(--bg-elevated)] transition-colors">
                       <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{inv.invoiceNo}</td>
                       <td className="py-3 px-3 font-medium text-[var(--text-primary)]">{inv.customerOrSupplier || '—'}</td>
-                      <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{inv.purchaseOrderCode || '—'}</td>
+                      <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{[inv.purchaseOrderCode, inv.relatedContractCode].filter(Boolean).join(' / ') || '—'}</td>
                       <td className="finance-amount">¥ {inv.amount.toLocaleString()}</td>
                       <td className="py-3 px-3">{inv.taxRate}</td>
                       <td className="py-3 px-3">{inv.relatedProjectName || '—'}</td>
@@ -511,7 +517,7 @@ export const InvoiceManagementView: React.FC = () => {
                       <td className="py-3 px-3">{inv.note || '—'}</td>
                     </tr>
                   ))}
-                {!purchaseInvoices.some((invoice) => [invoice.invoiceNo, invoice.customerOrSupplier, invoice.purchaseOrderCode, invoice.relatedProjectName, invoice.customerName, invoice.note].some((value) => value?.toLowerCase().includes(searchQuery.toLowerCase()))) && <tr><td colSpan={8} className="finance-empty-cell"><Empty description={searchQuery ? '暂无匹配的进项发票' : '暂无进项发票'} /></td></tr>}
+                {!purchaseInvoices.some((invoice) => [invoice.invoiceNo, invoice.customerOrSupplier, invoice.purchaseOrderCode, invoice.relatedContractCode, invoice.relatedProjectName, invoice.customerName, invoice.note].some((value) => value?.toLowerCase().includes(searchQuery.toLowerCase()))) && <tr><td colSpan={8} className="finance-empty-cell"><Empty description={searchQuery ? '暂无匹配的进项发票' : '暂无进项发票'} /></td></tr>}
               </tbody>
             </table>
           </div>
@@ -577,15 +583,27 @@ export const InvoiceManagementView: React.FC = () => {
                 </select>
               </div>
             )}
+          </div>
+            {invoiceEntryType === '销项' && <div className="finance-form-grid">
+              <div>
+                <label>关联项目 <span className="text-[var(--danger)]">*</span></label>
+                <select aria-label="关联项目" required value={invoiceForm.projectId} onChange={(event) => handleInvoiceProjectChange(event.target.value)} className="finance-input">
+                  <option value="">请选择项目</option>
+                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label>关联客户 <span className="text-[var(--danger)]">*</span></label>
+                <input aria-label="关联客户" required readOnly value={selectedProjectCustomer?.name || selectedProject?.customerName || ''} className="finance-input" placeholder="选择项目后自动带入" />
+              </div>
+            </div>}
             {invoiceEntryType === '销项' && <div>
               <label>关联合同</label>
-              <select aria-label="关联合同" value={invoiceForm.contractId} onChange={(event) => handleContractChange(event.target.value)} className="finance-input">
-                <option value="">暂不关联合同</option>
-                {invoiceContracts.map((contract) => <option key={contract.id} value={contract.id}>{contract.code} · {contract.name}</option>)}
+              <select aria-label="关联合同" value={invoiceForm.contractId} disabled={!selectedProject} onChange={(event) => handleContractChange(event.target.value)} className="finance-input">
+                <option value="">{selectedProject ? '暂不关联合同' : '请先选择项目'}</option>
+                {projectContracts.map((contract) => <option key={contract.id} value={contract.id}>{contract.code} · {contract.name}</option>)}
               </select>
             </div>}
-          </div>
-
           {invoiceEntryType === '销项' ? (
             <>
               {selectedContract && <section className="invoice-contract-payment-panel">
@@ -606,19 +624,6 @@ export const InvoiceManagementView: React.FC = () => {
                 </table></div> : <Empty description="该合同未维护付款阶段" />}
               </section>}
               {selectedPaymentStages.length > 0 && <div className="finance-form-summary">所选阶段可开票余额合计：<strong>¥ {availableStageBalance?.toLocaleString()}</strong></div>}
-              <div className="finance-form-grid">
-                <div>
-                  <label>关联项目</label>
-                  <select aria-label="关联项目" value={invoiceForm.projectId} onChange={(event) => updateInvoiceForm({ projectId: event.target.value })} className="finance-input">
-                    <option value="">暂不关联项目</option>
-                    {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label>关联客户</label>
-                  <input aria-label="关联客户" readOnly value={selectedProject?.customerName || ''} className="finance-input" placeholder="选择合同或项目后自动带入" />
-                </div>
-              </div>
               <div className="finance-form-grid">
                 <div>
                   <label>含税开票金额 (元) <span className="text-[var(--danger)]">*</span></label>
@@ -647,27 +652,33 @@ export const InvoiceManagementView: React.FC = () => {
             </>
           ) : (
             <>
-              <div>
-                <label>关联采购单</label>
-                <select aria-label="关联采购单" value={invoiceForm.purchaseOrderCode} onChange={(event) => {
-                  const item = procurementItems.find((purchase) => purchase.code === event.target.value);
-                  updateInvoiceForm({ purchaseOrderCode: event.target.value, projectId: item?.projectId || invoiceForm.projectId });
-                }} className="finance-input">
-                  <option value="">暂不关联采购单</option>
-                  {procurementItems.map((item) => <option key={item.id} value={item.code}>{item.code} · {item.description || item.name || '项目采购'} · {item.projectName || item.relatedProject}</option>)}
-                </select>
-              </div>
               <div className="finance-form-grid">
                 <div>
-                  <label>关联项目</label>
-                  <select aria-label="关联项目" value={invoiceForm.projectId} onChange={(event) => updateInvoiceForm({ projectId: event.target.value })} className="finance-input">
-                    <option value="">暂不关联项目</option>
+                  <label>关联项目 <span className="text-[var(--danger)]">*</span></label>
+                  <select aria-label="关联项目" required value={invoiceForm.projectId} onChange={(event) => handleInvoiceProjectChange(event.target.value)} className="finance-input">
+                    <option value="">请选择项目</option>
                     {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label>关联客户</label>
-                  <input aria-label="关联客户" readOnly value={selectedProject?.customerName || ''} className="finance-input" placeholder="选择项目后自动带入" />
+                  <label>关联客户 <span className="text-[var(--danger)]">*</span></label>
+                  <input aria-label="关联客户" required readOnly value={selectedProjectCustomer?.name || selectedProject?.customerName || ''} className="finance-input" placeholder="选择项目后自动带入" />
+                </div>
+              </div>
+              <div className="finance-form-grid">
+                <div>
+                  <label>关联采购单</label>
+                  <select aria-label="关联采购单" disabled={!selectedProject} value={invoiceForm.purchaseOrderCode} onChange={(event) => updateInvoiceForm({ purchaseOrderCode: event.target.value })} className="finance-input">
+                    <option value="">{selectedProject ? '暂不关联采购单' : '请先选择项目'}</option>
+                    {projectProcurementItems.map((item) => <option key={item.id} value={item.code}>{item.code} · {item.description || item.name || '项目采购'} · {item.projectName || item.relatedProject}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label>关联合同</label>
+                  <select aria-label="关联合同" disabled={!selectedProject} value={invoiceForm.contractId} onChange={(event) => updateInvoiceForm({ contractId: event.target.value })} className="finance-input">
+                    <option value="">{selectedProject ? '暂不关联合同' : '请先选择项目'}</option>
+                    {projectContracts.map((contract) => <option key={contract.id} value={contract.id}>{contract.code} · {contract.name}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="finance-form-grid">
@@ -721,49 +732,36 @@ export const InvoiceManagementView: React.FC = () => {
         </form>
       </Modal>
 
-      <Drawer
-        isOpen={Boolean(detailInvoice)}
-        onClose={() => setDetailInvoice(null)}
-        title="销项发票详情"
-        subtitle={detailInvoice?.invoiceNo}
-        width="max-w-3xl"
-      >
-        {detailInvoice && <div className="space-y-5">
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-            {[
-              ['发票号码', detailInvoice.invoiceNo],
-              ['发票类型', detailInvoice.category || '销项发票'],
-              ['开票日期', detailInvoice.issueDate || detailInvoice.applyDate],
-              ['购方抬头', detailInvoice.customerOrSupplier],
-              ['关联合同', detailInvoice.contractRef || invoiceContracts.find((contract) => contract.code === detailInvoice.relatedContractCode)?.name],
-              ['合同编号', detailInvoice.relatedContractCode],
-              ['关联付款阶段', invoiceStageName(detailInvoice)],
-              ['关联项目', detailInvoice.relatedProjectName || projects.find((project) => project.id === detailInvoice.projectId)?.name],
-              ['关联客户', detailInvoice.customerName || customers.find((customer) => customer.id === detailInvoice.customerId)?.name],
-              ['含税开票金额', `¥ ${detailInvoice.amount.toLocaleString()}`],
-              ['适用税率', detailInvoice.taxRate],
-              ['税额', detailInvoice.taxAmount == null ? undefined : `¥ ${detailInvoice.taxAmount.toLocaleString()}`],
-              ['申请人', detailInvoice.applicant],
-              ['申请人部门', detailInvoice.applicantDepartment],
-              ['状态', detailInvoice.status]
-            ].map(([label, value]) => <div key={label} className="min-w-0 border-b border-[var(--border-main)] pb-3">
-              <dt className="mb-1 text-xs text-[var(--text-muted)]">{label}</dt>
-              <dd className="m-0 break-words text-sm text-[var(--text-primary)]">{value || '—'}</dd>
-            </div>)}
-            {detailInvoice.purchaseOrderCode && <div className="min-w-0 border-b border-[var(--border-main)] pb-3"><dt className="mb-1 text-xs text-[var(--text-muted)]">关联采购单</dt><dd className="m-0 break-words text-sm text-[var(--text-primary)]">{detailInvoice.purchaseOrderCode}</dd></div>}
-          </dl>
-          <section>
-            <h3 className="mb-2 text-sm font-medium text-[var(--text-primary)]">备注</h3>
-            <p className="m-0 whitespace-pre-wrap break-words text-sm text-[var(--text-body)]">{detailInvoice.note || '—'}</p>
-          </section>
-          <section>
-            <h3 className="mb-2 text-sm font-medium text-[var(--text-primary)]">发票附件</h3>
-            {detailInvoice.attachments?.length ? <ul className="m-0 list-inside list-disc space-y-2 text-sm">
-              {detailInvoice.attachments.map((attachment) => <li key={attachment.id}>{attachment.dataUrl
-                ? <a className="text-[var(--active-text)] hover:underline" href={attachment.dataUrl} target="_blank" rel="noreferrer">{attachment.name}</a>
-                : attachment.name}</li>)}
-            </ul> : <span className="text-sm text-[var(--text-muted)]">暂无附件</span>}
-          </section>
+      <Drawer isOpen={Boolean(detailInvoice)} onClose={() => setDetailInvoice(null)} title={<span className="font-sans tracking-normal">销项发票详情</span>} subtitle={detailInvoice?.invoiceNo ? <span className="font-mono tabular-nums">{detailInvoice.invoiceNo}</span> : undefined} width="max-w-4xl" contentClassName="overflow-y-auto">
+        {detailInvoice && <div className="finance-detail">
+          <FinanceDetailMetrics items={[
+            { label: '含税开票金额', value: detailInvoice.amount.toLocaleString() + ' 元' },
+            { label: '税额', value: detailInvoice.taxAmount == null ? '—' : detailInvoice.taxAmount.toLocaleString() + ' 元' },
+            { label: "状态", value: <StatusTag status={detailInvoice.status} /> }
+          ]} />
+          <FinanceDetailSection title="发票信息"><FinanceDetailFields items={[
+            { label: '发票号码', value: detailInvoice.invoiceNo, emphasis: true },
+            { label: '发票类型', value: detailInvoice.category || '销项发票' },
+            { label: '开票日期', value: detailInvoice.issueDate || detailInvoice.applyDate },
+            { label: '购方抬头', value: detailInvoice.customerOrSupplier },
+            { label: '适用税率', value: detailInvoice.taxRate },
+            { label: '申请人', value: detailInvoice.applicant },
+            { label: '申请人部门', value: detailInvoice.applicantDepartment }
+          ]} /></FinanceDetailSection>
+          <FinanceDetailSection title="业务关联"><FinanceDetailFields items={[
+            { label: '关联合同', value: detailInvoice.contractRef || invoiceContracts.find((contract) => contract.code === detailInvoice.relatedContractCode)?.name },
+            { label: '合同编号', value: detailInvoice.relatedContractCode },
+            { label: '关联付款阶段', value: invoiceStageName(detailInvoice) },
+            { label: '关联项目', value: detailInvoice.relatedProjectName || projects.find((project) => project.id === detailInvoice.projectId)?.name },
+            { label: '关联客户', value: detailInvoice.customerName || customers.find((customer) => customer.id === detailInvoice.customerId)?.name },
+            { label: '关联采购单', value: detailInvoice.purchaseOrderCode }
+          ]} /></FinanceDetailSection>
+          <FinanceDetailSection title="备注"><p className="finance-detail-note">{detailInvoice.note || "—"}</p></FinanceDetailSection>
+          <FinanceDetailSection title="发票附件">{detailInvoice.attachments?.length ? <ul className="finance-detail-attachments">
+            {detailInvoice.attachments.map((attachment) => <li key={attachment.id}>{attachment.dataUrl
+              ? <a href={attachment.dataUrl} target="_blank" rel="noreferrer">{attachment.name}</a>
+              : attachment.name}</li>)}
+          </ul> : <Empty description="暂无附件" />}</FinanceDetailSection>
         </div>}
       </Drawer>
 

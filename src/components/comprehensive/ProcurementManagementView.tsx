@@ -25,7 +25,7 @@ export const ProcurementManagementView: React.FC = () => {
   const [showItemModal, setShowItemModal] = useState(false);
 
   // 当前数据库快照没有采购相关表，演示初始状态保持为空。
-  const [procurementItems, setProcurementItems] = useState<ProcurementItem[]>(() => loadProcurementItems());
+  const [procurementItems, setProcurementItems] = useState<ProcurementItem[]>(() => loadProcurementItems(projects));
   const projectProcurementItems = procurementItems.filter((item) => projects.some((project) =>
     item.projectId ? project.id === item.projectId : project.name === (item.projectName || item.relatedProject)
   ));
@@ -176,7 +176,7 @@ export const ProcurementManagementView: React.FC = () => {
                   .filter((p) => [p.code, p.supplier, p.description, p.customerName, p.relatedCustomer, p.projectName, p.relatedProject].some((value) => value?.toLowerCase().includes(searchQuery.toLowerCase())))
                   .map((item) => (
                     <tr key={item.id} className="hover:bg-[var(--bg-elevated)] transition-colors">
-                      <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{item.code}</td>
+                      <td className="py-3 px-3"><div className="font-mono text-[var(--text-muted)]">{item.code}</div>{item.isDemo && <div className="mt-1"><StatusTag status="演示资料" type="info" /></div>}</td>
                       <td className="py-3 px-3"><StatusTag status={item.type} type="info" /></td>
                       <td className="py-3 px-3 font-medium text-[var(--text-primary)]">{item.supplier}</td>
                       <td className="py-3 px-3 text-[var(--text-body)] max-w-xs truncate">{item.description}</td>

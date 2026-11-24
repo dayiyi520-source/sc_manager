@@ -22,7 +22,10 @@ vi.mock('../../context/AppContext', async () => {
         isRemoteData: false,
         currentUser: { id: 'user-1', name: '测试申请人', department: '财务' },
         customers: [{ id: 'customer-1', name: '测试客户' }],
-        contracts: [{ id: 'contract-1', code: 'CT-001', name: '测试合同', customerId: 'customer-1', customerName: '测试客户', relatedProduct: '测试项目', type: '主合同', amount: 200000, signDate: '', status: '履行中', paymentStages: [{ phase: '第一笔', percentage: 30, amount: 60000, status: '待付款', triggerCondition: '合同签订后', dueDate: '2026-11-30' }, { phase: '尾款', percentage: 70, amount: 140000, status: '待付款', triggerCondition: '项目验收后', dueDate: '2026-12-30' }] }],
+        contracts: [
+          { id: 'contract-1', code: 'CT-001', name: '测试合同', customerId: 'customer-1', customerName: '测试客户', relatedProduct: '测试项目', type: '主合同', amount: 200000, signDate: '', status: '履行中', paymentStages: [{ phase: '第一笔', percentage: 30, amount: 60000, status: '待付款', triggerCondition: '合同签订后', dueDate: '2026-11-30' }, { phase: '尾款', percentage: 70, amount: 140000, status: '待付款', triggerCondition: '项目验收后', dueDate: '2026-12-30' }] },
+          { id: 'contract-2', code: 'CT-002', name: '其他项目合同', customerId: 'customer-2', customerName: '演示学校一', relatedProduct: '在线精品课程资源库建设项目', type: '主合同', amount: 100000, signDate: '', status: '履行中', paymentStages: [] }
+        ],
         projects: [{ id: 'project-1', code: 'P-001', name: '测试项目', customerId: 'customer-1', customerName: '测试客户', stage: '项目立项', progress: 20, pmName: '项目经理', startDate: '' }, ...directoryProjects()],
         partners: [{ id: 'partner-1', name: '测试供应商', type: '集成服务商', level: '一级', contactName: '联系人', contactPhone: '', status: '合作中' }]
       };
@@ -44,14 +47,17 @@ beforeEach(() => {
 
 it('loads mock ledger data and switches invoice actions by tab', () => {
   render(<InvoiceManagementView />);
+  expect(screen.getByPlaceholderText('搜索发票单号、项目、客户、申请人...')).toBeInTheDocument();
   expect(screen.getByRole('tablist', { name: '发票视图' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '开具发票' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '录入抬头资料' })).not.toBeInTheDocument();
   expect(screen.getByText('FP-DEMO-2026-001')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('tab', { name: '进项发票' }));
+  expect(screen.getByPlaceholderText('搜索发票单号、项目、客户、申请人...')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '录入发票' })).toBeInTheDocument();
   expect(screen.getByText('FP-DEMO-2026-101')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('tab', { name: '开票抬头信息库' }));
+  expect(screen.getByPlaceholderText('搜索企业名称...')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '开具发票' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '录入发票' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '录入抬头资料' })).toBeInTheDocument();
@@ -78,6 +84,9 @@ it('opens sales invoice details from the invoice number or detail action and con
 
   fireEvent.click(screen.getByRole('button', { name: 'FP-DEMO-2026-001' }));
   expect(screen.getByRole('heading', { name: '销项发票详情' })).toBeInTheDocument();
+  expect(document.querySelector('.finance-detail-metrics')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '发票信息' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '业务关联' })).toBeInTheDocument();
   expect(screen.getAllByText('SC-CT-2026-001')).toHaveLength(2);
   expect(screen.getAllByText('第二期（初验款）')).toHaveLength(1);
   expect(screen.getAllByText('国家电网华东分部数智调度中心')).toHaveLength(2);
@@ -111,7 +120,7 @@ it('requires an overage note and invoice attachment, and records date and organi
   fireEvent.click(screen.getByRole('button', { name: '开具发票' }));
   const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByRole('heading', { name: '开具增值税发票' })).toBeInTheDocument();
-  const salesFieldOrder = ['发票号码', '开票日期', '购方抬头/客户名称', '关联合同', '关联项目', '关联客户', '含税开票金额 (元)', '适用税率', '申请人', '备注', '上传发票'];
+  const salesFieldOrder = ['发票号码', '开票日期', '购方抬头/客户名称', '关联项目', '关联客户', '关联合同', '含税开票金额 (元)', '适用税率', '申请人', '备注', '上传发票'];
   const salesFormLabels = [...dialog.querySelectorAll('form label')].map((label) => label.textContent?.replace('*', '').trim());
   let lastFieldIndex = -1;
   for (const field of salesFieldOrder) {
@@ -132,7 +141,14 @@ it('requires an overage note and invoice attachment, and records date and organi
   fireEvent.change(within(dialog).getByLabelText('申请人'), { target: { value: 'user-2' } });
   const profileOption = within(dialog).getByRole('option', { name: '客户甲开票抬头' });
   fireEvent.change(within(dialog).getByLabelText('购方抬头/客户名称'), { target: { value: profileOption.getAttribute('value') } });
-  fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
+  const salesProject = within(dialog).getByLabelText('关联项目');
+  expect(salesProject).toBeRequired();
+  expect(within(dialog).getByLabelText('关联客户')).toBeRequired();
+  fireEvent.change(salesProject, { target: { value: 'project-1' } });
+  const salesContract = within(dialog).getByLabelText('关联合同');
+  expect(within(salesContract).getByRole('option', { name: 'CT-001 · 测试合同' })).toBeInTheDocument();
+  expect(within(salesContract).queryByRole('option', { name: /CT-002/ })).not.toBeInTheDocument();
+  fireEvent.change(salesContract, { target: { value: 'contract-1' } });
   fireEvent.click(within(dialog).getByLabelText('选择阶段-第一笔'));
   expect(within(dialog).getByLabelText('关联项目')).toHaveValue('project-1');
   expect(within(dialog).getByLabelText('关联客户')).toHaveValue('测试客户');
@@ -171,7 +187,9 @@ it('supports selecting multiple contract stages and editing the summed invoice a
   render(<InvoiceManagementView />);
   fireEvent.click(screen.getByRole('button', { name: '开具发票' }));
   const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
   fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
+  expect(within(dialog).getByLabelText('关联合同')).toHaveValue('contract-1');
   const amount = within(dialog).getByLabelText('含税开票金额 (元)');
   expect(within(dialog).queryByLabelText(/阶段约定时间/)).not.toBeInTheDocument();
   fireEvent.click(within(dialog).getByLabelText('选择阶段-第一笔'));
@@ -185,17 +203,40 @@ it('supports selecting multiple contract stages and editing the summed invoice a
 });
 
 it('requires and saves a purchase invoice attachment with project-derived customer and ledger columns', async () => {
-  localStorage.setItem('shichuang.frontend.mock.procurementItems', JSON.stringify([{ id: 'purchase-1', code: 'PO-001', type: '硬件设备', supplier: '测试供应商', description: '办公设备', amount: 500, status: '待审批', projectId: 'project-1', projectName: '测试项目', customerId: 'customer-1', customerName: '测试客户' }]));
+  localStorage.setItem('shichuang.frontend.mock.procurementItems', JSON.stringify([
+    { id: 'purchase-1', code: 'PO-001', type: '硬件设备', supplier: '测试供应商', description: '办公设备', amount: 500, status: '待审批', projectId: 'project-1', projectName: '测试项目', customerId: 'customer-1', customerName: '测试客户' },
+    { id: 'purchase-2', code: 'PO-002', type: '硬件设备', supplier: '其他供应商', description: '其他项目设备', amount: 600, status: '待审批', projectId: 'project-2', projectName: '其他项目', customerId: 'customer-2', customerName: '其他客户' }
+  ]));
   render(<InvoiceManagementView />);
   fireEvent.click(screen.getByRole('tab', { name: '进项发票' }));
   fireEvent.click(screen.getByRole('button', { name: '录入发票' }));
   const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByRole('heading', { name: '录入增值税发票' })).toBeInTheDocument();
+  expect(within(dialog).getByLabelText('关联合同')).not.toBeRequired();
+  expect(within(dialog).getByLabelText('关联项目')).toBeRequired();
+  expect(within(dialog).getByLabelText('关联客户')).toBeRequired();
+  expect(within(dialog).queryByText('合同付款阶段')).not.toBeInTheDocument();
+  const purchaseProject = within(dialog).getByLabelText('关联项目');
+  const purchaseSelector = within(dialog).getByLabelText('关联采购单');
+  expect(purchaseSelector).toBeDisabled();
+  fireEvent.change(purchaseProject, { target: { value: 'project-1' } });
+  expect(within(purchaseSelector).getByRole('option', { name: /PO-001/ })).toBeInTheDocument();
+  expect(within(purchaseSelector).queryByRole('option', { name: /PO-002/ })).not.toBeInTheDocument();
+  const purchaseContract = within(dialog).getByLabelText('关联合同');
+  expect(purchaseContract).not.toBeDisabled();
+  expect(within(purchaseContract).getByRole('option', { name: 'CT-001 · 测试合同' })).toBeInTheDocument();
+  expect(within(purchaseContract).queryByRole('option', { name: /CT-002/ })).not.toBeInTheDocument();
   fireEvent.change(within(dialog).getByLabelText('发票号码'), { target: { value: 'FP-P-001' } });
   fireEvent.change(within(dialog).getByLabelText('销方抬头/供应商名称'), { target: { value: '测试供应商' } });
-  fireEvent.change(within(dialog).getByLabelText('关联采购单'), { target: { value: 'PO-001' } });
-  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
+  fireEvent.change(purchaseSelector, { target: { value: 'PO-001' } });
+  fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
   expect(within(dialog).getByLabelText('关联客户')).toHaveValue('测试客户');
+  fireEvent.change(purchaseProject, { target: { value: 'project-2' } });
+  expect(within(dialog).getByLabelText('关联采购单')).toHaveValue('');
+  expect(within(dialog).getByLabelText('关联合同')).toHaveValue('');
+  fireEvent.change(purchaseProject, { target: { value: 'project-1' } });
+  fireEvent.change(within(dialog).getByLabelText('关联采购单'), { target: { value: 'PO-001' } });
+  fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
   fireEvent.change(within(dialog).getByLabelText('含税开票金额 (元)'), { target: { value: '500' } });
   fireEvent.change(within(dialog).getByLabelText('适用税率'), { target: { value: '13%' } });
   fireEvent.change(within(dialog).getByLabelText('备注'), { target: { value: '办公设备采购' } });
@@ -215,9 +256,26 @@ it('requires and saves a purchase invoice attachment with project-derived custom
   })]);
   expect(loadInvoiceLedger().invoices[0].attachments).toEqual(savedInvoice.attachments);
   expect(screen.getByText('FP-P-001')).toBeInTheDocument();
-  expect(screen.getByText('PO-001')).toBeInTheDocument();
+  expect(screen.getByText(/PO-001 \/ CT-001/)).toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: '关联采购单/合同' })).toBeInTheDocument();
+  expect(screen.getByText('CT-001', { exact: false })).toBeInTheDocument();
   expect(screen.getByText('办公设备采购')).toBeInTheDocument();
   expect(screen.getByText('¥ 500')).toBeInTheDocument();
+});
+
+it('blocks a purchase invoice when its required project is missing', async () => {
+  render(<InvoiceManagementView />);
+  fireEvent.click(screen.getByRole('tab', { name: '进项发票' }));
+  fireEvent.click(screen.getByRole('button', { name: '录入发票' }));
+  const dialog = screen.getByRole('dialog');
+  const project = within(dialog).getByLabelText('关联项目');
+  expect(project).toBeRequired();
+  expect(within(dialog).getByLabelText('关联客户')).toBeRequired();
+  fireEvent.change(within(dialog).getByLabelText('发票号码'), { target: { value: 'FP-P-NO-PROJECT' } });
+  fireEvent.change(within(dialog).getByLabelText('销方抬头/供应商名称'), { target: { value: '测试供应商' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '确认录入发票' }));
+  expect(project).toBeInvalid();
+  expect(JSON.parse(localStorage.getItem('shichuang.frontend.mock.invoiceLedger') || '{}').invoices.some((invoice: { invoiceNo: string }) => invoice.invoiceNo === 'FP-P-NO-PROJECT')).toBe(false);
 });
 
 it('creates one contract plan with all payment stages and allocates receipts across stages', () => {
@@ -230,10 +288,15 @@ it('creates one contract plan with all payment stages and allocates receipts acr
   fireEvent.click(screen.getByRole('tab', { name: '应收计划' }));
   fireEvent.click(screen.getByRole('button', { name: '新建应收计划' }));
   const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
+  expect(within(dialog).getByLabelText('关联合同')).toHaveValue('');
+  expect(within(dialog).getByLabelText('关联合同')).not.toBeDisabled();
+  expect(within(dialog).getByRole('option', { name: /CT-001 · 测试合同/ })).toBeInTheDocument();
+  expect(within(dialog).queryByRole('option', { name: /CT-002/ })).not.toBeInTheDocument();
   fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
   expect(within(dialog).queryByLabelText('合同付款阶段')).not.toBeInTheDocument();
   expect(within(dialog).getByLabelText('关联项目')).toHaveValue('project-1');
-  expect(within(dialog).getByLabelText('关联项目')).toBeDisabled();
+  expect(within(dialog).getByLabelText('关联项目')).not.toBeDisabled();
   expect(within(dialog).getByLabelText('客户名称')).toHaveValue('测试客户');
   expect(within(dialog).getByText('合同签订后')).toBeInTheDocument();
   expect(within(dialog).getByText('项目验收后')).toBeInTheDocument();
@@ -249,12 +312,15 @@ it('creates one contract plan with all payment stages and allocates receipts acr
   expect(screen.getByRole('columnheader', { name: '合同名称' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '新建应收计划' }));
   const duplicateDialog = screen.getByRole('dialog');
+  fireEvent.change(within(duplicateDialog).getByLabelText('关联项目'), { target: { value: 'project-1' } });
   expect(within(duplicateDialog).getByRole('option', { name: /CT-001 · 测试合同/ })).toBeDisabled();
   fireEvent.click(within(duplicateDialog).getByRole('button', { name: '关闭' }));
   const planRow = screen.getByRole('button', { name: createdPlan.planCode }).closest('tr') as HTMLElement;
   expect(within(planRow).getByRole('button', { name: createdPlan.planCode })).toHaveClass('finance-action-link');
   fireEvent.click(within(planRow).getByRole('button', { name: createdPlan.planCode }));
   expect(screen.getByRole('heading', { name: '应收计划详情' })).toBeInTheDocument();
+  expect(document.querySelector('.finance-detail-metrics')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '付款阶段' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '关闭' }));
   const detailButton = within(planRow).getByRole('button', { name: '详情' });
   expect(detailButton).toHaveClass('finance-action-link');
@@ -268,6 +334,11 @@ it('creates one contract plan with all payment stages and allocates receipts acr
   expect(screen.getByText('测试客户')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '登记到账' }));
   const receiptDialog = screen.getByRole('dialog');
+  const salesInvoiceSelector = within(receiptDialog).getByLabelText('关联销项发票');
+  expect(salesInvoiceSelector).not.toBeRequired();
+  expect(within(salesInvoiceSelector).getByRole('option', { name: 'FP-DEMO-2026-002 / 在线精品课程资源库建设项目' })).toBeInTheDocument();
+  expect(within(salesInvoiceSelector).queryByRole('option', { name: /FP-DEMO-2026-101/ })).not.toBeInTheDocument();
+  fireEvent.change(salesInvoiceSelector, { target: { value: 'demo-invoice-sales-002' } });
   const firstStageAllocation = within(receiptDialog).getByLabelText('到账分配-第一笔');
   const receiptDateTime = within(receiptDialog).getByLabelText('到账时间');
   expect(receiptDateTime).toBeRequired();
@@ -283,12 +354,14 @@ it('creates one contract plan with all payment stages and allocates receipts acr
   expect(within(receiptDialog).getByLabelText('本次到账金额')).toHaveTextContent('¥ 40,000');
   fireEvent.click(within(receiptDialog).getByRole('button', { name: '确认登记到账' }));
   const savedCollection = JSON.parse(localStorage.getItem('shichuang.frontend.mock.paymentCollection') || '{}');
-  expect(savedCollection.records[0]).toMatchObject({ amount: 40000, payDate: '2026-11-20T10:15', note: '首笔分段到账', stageAllocations: [{ stageId: 'contract-1-stage-0', amount: 30000 }, { stageId: 'contract-1-stage-1', amount: 10000 }] });
+  expect(savedCollection.records[0]).toMatchObject({ amount: 40000, payDate: '2026-11-20T10:15', note: '首笔分段到账', salesInvoiceId: 'demo-invoice-sales-002', salesInvoiceNo: 'FP-DEMO-2026-002', salesInvoiceProjectName: '在线精品课程资源库建设项目', stageAllocations: [{ stageId: 'contract-1-stage-0', amount: 30000 }, { stageId: 'contract-1-stage-1', amount: 10000 }] });
   expect(savedCollection.plans[0]).toMatchObject({ receivedAmount: 40000, uncollectedAmount: 160000, status: '部分回款' });
   expect(savedCollection.plans[0].stages).toMatchObject([{ receivedAmount: 30000 }, { receivedAmount: 10000 }]);
   fireEvent.click(screen.getByRole('tab', { name: '实际到账' }));
+  expect(screen.getByRole('columnheader', { name: '关联销项发票' })).toBeInTheDocument();
   expect(screen.queryByRole('columnheader', { name: '银行流水号' })).not.toBeInTheDocument();
   const receiptRow = screen.getByText(savedCollection.records[0].recordCode).closest('tr') as HTMLElement;
+  expect(within(receiptRow).getByText('FP-DEMO-2026-002 / 在线精品课程资源库建设项目')).toBeInTheDocument();
   expect(screen.queryByRole('columnheader', { name: '银行流水号' })).not.toBeInTheDocument();
   expect(within(receiptRow).getByRole('button', { name: createdPlan.planCode })).toHaveClass('finance-action-link');
   expect(within(receiptRow).getByText('2026-11-20 10:15')).toBeInTheDocument();
@@ -327,11 +400,22 @@ it('offers three linked receivable demo contracts with balanced stage terms in l
   render(<PaymentCollectionManagementView />);
   fireEvent.click(screen.getByRole('button', { name: '新建应收计划' }));
   const dialog = screen.getByRole('dialog');
+  const project = directoryProjects().find((item) => item.name === RECEIVABLE_DEMO_CONTRACTS[0].relatedProduct);
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: project?.id } });
   for (const contract of RECEIVABLE_DEMO_CONTRACTS) {
-    expect(within(dialog).getByRole('option', { name: new RegExp(contract.code + '.*演示') })).toBeInTheDocument();
+    const option = within(dialog).queryByRole('option', { name: new RegExp(contract.code + '.*演示') });
+    if (contract.id === RECEIVABLE_DEMO_CONTRACTS[0].id) expect(option).toBeInTheDocument();
+    else expect(option).not.toBeInTheDocument();
   }
+  const secondDemoProject = directoryProjects().find((item) => item.name === RECEIVABLE_DEMO_CONTRACTS[1].relatedProduct);
   fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: RECEIVABLE_DEMO_CONTRACTS[0].id } });
-  expect(within(dialog).getByLabelText('关联项目')).toHaveValue(directoryProjects().find((project) => project.name === RECEIVABLE_DEMO_CONTRACTS[0].relatedProduct)?.id);
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: secondDemoProject?.id } });
+  expect(within(dialog).getByLabelText('关联合同')).toHaveValue('');
+  expect(within(dialog).getByRole('option', { name: new RegExp(RECEIVABLE_DEMO_CONTRACTS[1].code + '.*演示') })).toBeInTheDocument();
+  expect(within(dialog).queryByRole('option', { name: new RegExp(RECEIVABLE_DEMO_CONTRACTS[0].code + '.*演示') })).not.toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: project?.id } });
+  fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: RECEIVABLE_DEMO_CONTRACTS[0].id } });
+  expect(within(dialog).getByLabelText('关联项目')).toHaveValue(project?.id);
   expect(within(dialog).getByLabelText('客户名称')).toHaveValue(RECEIVABLE_DEMO_CONTRACTS[0].customerName);
 });
 

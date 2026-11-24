@@ -12,7 +12,8 @@ vi.mock('../../context/AppContext', () => ({
       { id: 'project-2', code: 'P-002', name: '在线精品课程资源库建设项目', customerId: 'customer-2', customerName: '演示学校一', stage: '项目立项', progress: 20, pmName: '项目经理', startDate: '' },
       { id: 'project-3', code: 'P-003', name: '智慧实训基地升级项目', customerId: 'customer-3', customerName: '演示学校二', stage: '项目立项', progress: 20, pmName: '项目经理', startDate: '' }
     ],
-    contracts: [{ id: 'contract-1', code: 'CT-001', name: '分成合同', customerId: 'customer-1', customerName: '测试客户', relatedProduct: '测试项目', type: '代理合作协议', amount: 2000, signDate: '', status: '履行中' }]
+    contracts: [{ id: 'contract-1', code: 'CT-001', name: '分成合同', customerId: 'customer-1', customerName: '测试客户', relatedProduct: '测试项目', type: '代理合作协议', amount: 2000, signDate: '', status: '履行中' }],
+    invoices: [{ id: 'invoice-purchase-1', invoiceNo: 'FP-P-001', type: '进项', relatedProjectName: '测试项目', amount: 1000, taxRate: '13%', status: '待认证' }]
   })
 }));
 
@@ -52,12 +53,25 @@ it('creates a payable and records a partial payment persistently', () => {
   const row = screen.getAllByText('测试客户').find((element) => element.closest('tr'))?.closest('tr');
   expect(row).toBeTruthy();
   fireEvent.click(within(row as HTMLElement).getByRole('button', { name: '登记付款' }));
+  fireEvent.click(within(row as HTMLElement).getByRole('button', { name: '详情' }));
+  expect(screen.getByRole('heading', { name: '应付台账详情' })).toBeInTheDocument();
+  expect(document.querySelector('.finance-detail-metrics')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '应付信息' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '业务关联' })).toBeInTheDocument();
+  expect(within(document.querySelector('.finance-detail-fields') as HTMLElement).getByText('应付单号')).toBeInTheDocument();
+  fireEvent.click(document.getElementById('btn-drawer-close') as HTMLButtonElement);
   const paymentDialog = screen.getByRole('dialog');
+  const invoiceSelector = within(paymentDialog).getByLabelText('关联进项发票');
+  expect(invoiceSelector).not.toBeRequired();
+  expect(within(invoiceSelector).getByRole('option', { name: 'FP-P-001 / 测试项目' })).toBeInTheDocument();
+  fireEvent.change(invoiceSelector, { target: { value: 'invoice-purchase-1' } });
   fireEvent.change(within(paymentDialog).getByLabelText('本次付款金额 (元)'), { target: { value: '400' } });
   fireEvent.click(within(paymentDialog).getByRole('button', { name: '确认登记付款' }));
   expect(screen.getByText('¥ 600')).toBeInTheDocument();
   const saved = JSON.parse(localStorage.getItem('shichuang.frontend.mock.accountsPayable') || '{}');
   expect(saved.payments).toHaveLength(3);
+  expect(saved.payments[0]).toMatchObject({ invoiceId: 'invoice-purchase-1', invoiceNo: 'FP-P-001', invoiceProjectName: '测试项目' });
+  expect(within(row as HTMLElement).getByRole('button', { name: /AP-2026/ })).toHaveClass('finance-action-link');
   expect(saved.payables.find((item: { supplierName: string }) => item.supplierName === '测试客户')).toMatchObject({ supplierName: '测试客户', customerId: 'customer-1', customerName: '测试客户', paidAmount: 400, unpaidAmount: 600 });
 });
 

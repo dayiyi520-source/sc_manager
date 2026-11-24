@@ -65,3 +65,11 @@ it('requires a project and derives the customer when creating a project purchase
   const saved = JSON.parse(localStorage.getItem('shichuang.frontend.mock.procurementItems') || '[]');
   expect(saved[0]).toMatchObject({ projectId: 'project-1', projectName: '智慧校园项目', customerName: '测试学校', relatedProject: '智慧校园项目', relatedCustomer: '测试学校' });
 });
+
+it('shows initial project-linked procurement mock rows with an explicit demo marker', () => {
+  render(<ProcurementManagementView />);
+
+  expect(screen.getByText('PO-DEMO-INIT-001')).toBeInTheDocument();
+  expect(screen.getByText('演示资料')).toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem('shichuang.frontend.mock.procurementItems') || '[]')[0]).toMatchObject({ projectId: 'project-1', isDemo: true });
+});
