@@ -38,7 +38,7 @@ describe('design task navigation', () => {
       subMenus: [
         { id: 'comp_approval', title: '审批管理', mainMenuId: 'approval' },
         { id: 'comp_attendance', title: '考勤管理', mainMenuId: 'approval' },
-        { id: 'comp_procurement', title: '采购管理', mainMenuId: 'approval' },
+        { id: 'comp_procurement', title: '项目采购', mainMenuId: 'approval' },
         { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval' },
         { id: 'comp_invoice', title: '发票管理', mainMenuId: 'approval' },
         { id: 'comp_payment', title: '回款管理', mainMenuId: 'approval' },

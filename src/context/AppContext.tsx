@@ -122,7 +122,7 @@ export const MENU_GROUPS: MainMenuGroup[] = [
     subMenus: [
       { id: 'comp_approval', title: '审批管理', mainMenuId: 'approval', icon: 'ShieldCheck' },
       { id: 'comp_attendance', title: '考勤管理', mainMenuId: 'approval', icon: 'UserCheck' },
-      { id: 'comp_procurement', title: '采购管理', mainMenuId: 'approval', icon: 'ShoppingCart' },
+      { id: 'comp_procurement', title: '项目采购', mainMenuId: 'approval', icon: 'ShoppingCart' },
       { id: 'comp_asset', title: '资产管理', mainMenuId: 'approval', icon: 'Package' },
       { id: 'comp_invoice', title: '发票管理', mainMenuId: 'approval', icon: 'Receipt' },
       { id: 'comp_payment', title: '回款管理', mainMenuId: 'approval', icon: 'Wallet' },

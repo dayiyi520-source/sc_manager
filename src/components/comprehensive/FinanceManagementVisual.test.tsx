@@ -6,6 +6,7 @@ import { PaymentCollectionManagementView } from './PaymentCollectionManagementVi
 import { loadInvoiceLedger } from '../../services/invoiceLedgerRepository';
 import { RECEIVABLE_DEMO_CONTRACTS } from '../../services/receivableContractDemoData';
 import { directoryProjects } from '../../services/customerDirectoryData';
+import { ProcurementManagementView } from './ProcurementManagementView';
 
 const { addToast, teamOptions } = vi.hoisted(() => ({ addToast: vi.fn(), teamOptions: vi.fn() }));
 vi.mock('../../services/teamRepository', () => ({ teamRepository: { options: teamOptions } }));
@@ -79,7 +80,7 @@ it('requires an overage note and invoice attachment, and records date and organi
   fireEvent.click(screen.getByRole('tab', { name: '销项开票' }));
   fireEvent.click(screen.getByRole('button', { name: '开具发票' }));
   const dialog = screen.getByRole('dialog');
-  expect(within(dialog).getByRole('heading', { name: '开具/登记增值税全电发票' })).toBeInTheDocument();
+  expect(within(dialog).getByRole('heading', { name: '开具增值税发票' })).toBeInTheDocument();
   const salesFieldOrder = ['发票号码', '开票日期', '购方抬头/客户名称', '关联合同', '关联付款阶段', '关联项目', '关联客户', '含税开票金额 (元)', '适用税率', '申请人', '备注', '上传发票'];
   const salesFormLabels = [...dialog.querySelectorAll('form label')].map((label) => label.textContent?.replace('*', '').trim());
   let lastFieldIndex = -1;
@@ -133,10 +134,12 @@ it('requires an overage note and invoice attachment, and records date and organi
 });
 
 it('requires and saves a purchase invoice attachment with project-derived customer and ledger columns', async () => {
+  localStorage.setItem('shichuang.frontend.mock.procurementItems', JSON.stringify([{ id: 'purchase-1', code: 'PO-001', type: '硬件设备', supplier: '测试供应商', description: '办公设备', amount: 500, status: '待审批', projectId: 'project-1', projectName: '测试项目', customerId: 'customer-1', customerName: '测试客户' }]));
   render(<InvoiceManagementView />);
   fireEvent.click(screen.getByRole('tab', { name: '进项发票' }));
   fireEvent.click(screen.getByRole('button', { name: '录入发票' }));
   const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getByRole('heading', { name: '录入增值税发票' })).toBeInTheDocument();
   fireEvent.change(within(dialog).getByLabelText('发票号码'), { target: { value: 'FP-P-001' } });
   fireEvent.change(within(dialog).getByLabelText('销方抬头/供应商名称'), { target: { value: '测试供应商' } });
   fireEvent.change(within(dialog).getByLabelText('关联采购单'), { target: { value: 'PO-001' } });
@@ -279,6 +282,30 @@ it('offers three linked receivable demo contracts with balanced stage terms in l
   fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: RECEIVABLE_DEMO_CONTRACTS[0].id } });
   expect(within(dialog).getByLabelText('关联项目')).toHaveValue(directoryProjects().find((project) => project.name === RECEIVABLE_DEMO_CONTRACTS[0].relatedProduct)?.id);
   expect(within(dialog).getByLabelText('客户名称')).toHaveValue(RECEIVABLE_DEMO_CONTRACTS[0].customerName);
+});
+
+it('shows only project purchases, reports distinct project count, and keeps project required on creation', () => {
+  const project = { id: 'project-1', name: '测试项目', customerId: 'customer-1', customerName: '测试客户' };
+  localStorage.setItem('shichuang.frontend.mock.procurementItems', JSON.stringify([
+    { id: 'project-purchase-1', code: 'PO-001', supplier: '供应商甲', description: '项目设备', amount: 1200, status: '待审批', projectId: project.id, projectName: project.name, customerName: project.customerName },
+    { id: 'legacy-general-purchase', code: 'PO-GENERAL', supplier: '供应商乙', description: '行政用品', amount: 300, status: '待审批', relatedProject: '通用项目' }
+  ]));
+  render(<ProcurementManagementView />);
+  expect(screen.getByText('PO-001')).toBeInTheDocument();
+  expect(screen.queryByText('PO-GENERAL')).not.toBeInTheDocument();
+  expect(screen.getByText('关联项目数').parentElement?.parentElement).toHaveTextContent(/1\s*个/);
+  expect(screen.getByText('采购总金额').parentElement?.parentElement).toHaveTextContent('¥ 1,200');
+  expect(screen.queryByRole('tab', { name: '入库登记与资产联动' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '新建采购申请' })).not.toBeInTheDocument();
+  const approvalButton = screen.getByRole('button', { name: '发起采购审批' });
+  expect(approvalButton).toHaveClass('bg-[var(--bg-elevated)]');
+  expect(approvalButton).not.toHaveClass('bg-[var(--primary)]');
+  fireEvent.click(screen.getByRole('button', { name: '新建采购单' }));
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getByLabelText('关联项目')).toBeRequired();
+  expect(within(dialog).getByLabelText('关联客户')).toHaveAttribute('readonly');
+  fireEvent.change(within(dialog).getByLabelText('关联项目'), { target: { value: project.id } });
+  expect(within(dialog).getByLabelText('关联客户')).toHaveValue(project.customerName);
 });
 
 it('shows the matching contract name for a saved plan whose old contract id no longer resolves', () => {

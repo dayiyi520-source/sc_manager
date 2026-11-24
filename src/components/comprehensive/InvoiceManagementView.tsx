@@ -19,6 +19,7 @@ import { AttachmentMetadata, Contract, EmployeeOption, InvoiceApprovalRecord, In
 import { loadInvoiceLedger, saveInvoiceLedger } from '../../services/invoiceLedgerRepository';
 import { DEMO_INVOICE_CONTRACTS } from '../../services/invoiceLedgerDemoData';
 import { teamRepository } from '../../services/teamRepository';
+import { loadProcurementItems } from '../../services/procurementRepository';
 
 const TAX_RATES = ['1%', '3%', '6%', '9%', '13%'];
 
@@ -55,6 +56,9 @@ export const InvoiceManagementView: React.FC = () => {
     addToast, invoices, setInvoices, customers, contracts, projects, paymentSchedules,
     setPaymentSchedules, invoiceApprovals, setInvoiceApprovals, partners, currentUser
   } = useApp();
+  const procurementItems = loadProcurementItems().filter((item) => projects.some((project) =>
+    item.projectId ? project.id === item.projectId : project.name === (item.projectName || item.relatedProject)
+  ));
   const invoiceContracts: Contract[] = contracts.length ? contracts : DEMO_INVOICE_CONTRACTS;
 
   const [activeTab, setActiveTab] = useState<'sales' | 'purchase' | 'tax_profile'>('sales');
@@ -492,7 +496,7 @@ export const InvoiceManagementView: React.FC = () => {
         isOpen={showInvoiceModal}
         className="finance-dialog"
         onClose={() => setShowInvoiceModal(false)}
-        title="开具/登记增值税全电发票"
+        title={invoiceEntryType === '销项' ? '开具增值税发票' : '录入增值税发票'}
         maxWidth="3xl"
       >
         <form onSubmit={handleCreateInvoice} className="finance-form">
@@ -586,7 +590,13 @@ export const InvoiceManagementView: React.FC = () => {
             <>
               <div>
                 <label>关联采购单</label>
-                <input aria-label="关联采购单" value={invoiceForm.purchaseOrderCode} onChange={(event) => updateInvoiceForm({ purchaseOrderCode: event.target.value })} className="finance-input" placeholder="请输入采购单号（选填）" />
+                <select aria-label="关联采购单" value={invoiceForm.purchaseOrderCode} onChange={(event) => {
+                  const item = procurementItems.find((purchase) => purchase.code === event.target.value);
+                  updateInvoiceForm({ purchaseOrderCode: event.target.value, projectId: item?.projectId || invoiceForm.projectId });
+                }} className="finance-input">
+                  <option value="">暂不关联采购单</option>
+                  {procurementItems.map((item) => <option key={item.id} value={item.code}>{item.code} · {item.description || item.name || '项目采购'} · {item.projectName || item.relatedProject}</option>)}
+                </select>
               </div>
               <div className="finance-form-grid">
                 <div>
