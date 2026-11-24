@@ -68,6 +68,36 @@ it('loads mock ledger data and switches invoice actions by tab', () => {
   expect(card).toHaveTextContent('开户银行');
 });
 
+it('opens sales invoice details from the invoice number or detail action and confirms deletion', async () => {
+  render(<InvoiceManagementView />);
+  const salesTable = screen.getByRole('table');
+  expect(within(salesTable).queryByText('购方抬头')).not.toBeInTheDocument();
+  expect(within(salesTable).queryByText('状态')).not.toBeInTheDocument();
+  expect(within(salesTable).queryByText('关联付款阶段')).not.toBeInTheDocument();
+  expect(within(salesTable).getByText('开票日期').compareDocumentPosition(within(salesTable).getByText('申请人')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  fireEvent.click(screen.getByRole('button', { name: 'FP-DEMO-2026-001' }));
+  expect(screen.getByRole('heading', { name: '销项发票详情' })).toBeInTheDocument();
+  expect(screen.getAllByText('SC-CT-2026-001')).toHaveLength(2);
+  expect(screen.getAllByText('第二期（初验款）')).toHaveLength(1);
+  expect(screen.getAllByText('国家电网华东分部数智调度中心')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+
+  fireEvent.click(screen.getAllByRole('button', { name: '详情' })[0]);
+  expect(screen.getByRole('heading', { name: '销项发票详情' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+
+  const invoiceRow = screen.getByRole('button', { name: 'FP-DEMO-2026-001' }).closest('tr');
+  expect(invoiceRow).not.toBeNull();
+  fireEvent.click(within(invoiceRow as HTMLElement).getByRole('button', { name: '删除' }));
+  fireEvent.click(within(invoiceRow as HTMLElement).getByRole('button', { name: '删除' }));
+  await waitFor(() => expect(document.querySelectorAll('.ant-popconfirm-buttons button')).toHaveLength(2));
+  fireEvent.click(document.querySelectorAll('.ant-popconfirm-buttons button')[1]);
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'FP-DEMO-2026-001' })).not.toBeInTheDocument());
+  expect(loadInvoiceLedger().invoices.some((invoice) => invoice.id === 'demo-invoice-sales-001')).toBe(false);
+  expect(loadInvoiceLedger().paymentSchedules[0].invoicedAmount).toBe(0);
+});
+
 it('requires an overage note and invoice attachment, and records date and organization applicant', async () => {
   render(<InvoiceManagementView />);
   expect(screen.queryByRole('button', { name: '录入抬头资料' })).not.toBeInTheDocument();
@@ -81,7 +111,7 @@ it('requires an overage note and invoice attachment, and records date and organi
   fireEvent.click(screen.getByRole('button', { name: '开具发票' }));
   const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByRole('heading', { name: '开具增值税发票' })).toBeInTheDocument();
-  const salesFieldOrder = ['发票号码', '开票日期', '购方抬头/客户名称', '关联合同', '关联付款阶段', '关联项目', '关联客户', '含税开票金额 (元)', '适用税率', '申请人', '备注', '上传发票'];
+  const salesFieldOrder = ['发票号码', '开票日期', '购方抬头/客户名称', '关联合同', '关联项目', '关联客户', '含税开票金额 (元)', '适用税率', '申请人', '备注', '上传发票'];
   const salesFormLabels = [...dialog.querySelectorAll('form label')].map((label) => label.textContent?.replace('*', '').trim());
   let lastFieldIndex = -1;
   for (const field of salesFieldOrder) {
@@ -89,6 +119,8 @@ it('requires an overage note and invoice attachment, and records date and organi
     expect(fieldIndex, `${field} should follow the requested form order`).toBeGreaterThan(lastFieldIndex);
     lastFieldIndex = fieldIndex;
   }
+  expect(within(dialog).queryByLabelText('关联付款阶段')).not.toBeInTheDocument();
+  expect(within(dialog).queryByLabelText(/阶段约定时间/)).not.toBeInTheDocument();
   const noteWrapper = within(dialog).getByLabelText('备注').closest('div');
   const uploadWrapper = within(dialog).getByText('上传发票').closest('div');
   expect(noteWrapper?.parentElement).not.toHaveClass('finance-form-grid');
@@ -101,9 +133,10 @@ it('requires an overage note and invoice attachment, and records date and organi
   const profileOption = within(dialog).getByRole('option', { name: '客户甲开票抬头' });
   fireEvent.change(within(dialog).getByLabelText('购方抬头/客户名称'), { target: { value: profileOption.getAttribute('value') } });
   fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
-  fireEvent.change(within(dialog).getByLabelText('关联付款阶段'), { target: { value: 'demo-stage-contract-1-stage-2' } });
+  fireEvent.click(within(dialog).getByLabelText('选择阶段-第一笔'));
   expect(within(dialog).getByLabelText('关联项目')).toHaveValue('project-1');
   expect(within(dialog).getByLabelText('关联客户')).toHaveValue('测试客户');
+  expect(within(dialog).getByLabelText('含税开票金额 (元)')).toHaveValue(60000);
   fireEvent.change(within(dialog).getByLabelText('含税开票金额 (元)'), { target: { value: '1200000' } });
   fireEvent.change(within(dialog).getByLabelText('适用税率'), { target: { value: '6%' } });
   const reason = within(dialog).getByLabelText('备注');
@@ -121,16 +154,34 @@ it('requires an overage note and invoice attachment, and records date and organi
   await waitFor(() => expect(JSON.parse(localStorage.getItem('shichuang.frontend.mock.invoiceLedger') || '{}').invoices[0]?.invoiceNo).toBe('FP-001'));
   const savedLedger = JSON.parse(localStorage.getItem('shichuang.frontend.mock.invoiceLedger') || '{}');
   expect(savedLedger.invoiceApprovals[0]).toMatchObject({
-    contractId: 'contract-1', paymentScheduleId: 'demo-stage-contract-1-stage-2', requestedAmount: 1200000, availableAmount: 1152000,
-    overAmount: 48000, reason: '项目实施计划调整，申请提前开票', applicant: '其他申请人', applicantId: 'user-2', applicantDepartment: '商务部'
+    contractId: 'contract-1', paymentScheduleId: 'contract-1:第一笔', paymentScheduleIds: ['contract-1:第一笔'], requestedAmount: 1200000, availableAmount: 60000,
+    overAmount: 1140000, reason: '项目实施计划调整，申请提前开票', applicant: '其他申请人', applicantId: 'user-2', applicantDepartment: '商务部'
   });
   expect(savedLedger.invoices[0]).toMatchObject({
     invoiceNo: 'FP-001', issueDate: '2026-11-12', applicant: '其他申请人', applicantId: 'user-2', applicantDepartment: '商务部',
     note: '项目实施计划调整，申请提前开票', attachments: [expect.objectContaining({ name: 'invoice.pdf', mimeType: 'application/pdf', size: invoiceFile.size, dataUrl: expect.stringContaining('data:application/pdf;base64,') })]
   });
-  expect(screen.getByText('FP-001')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'FP-001' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'FP-001' }));
   expect(screen.getByText('待审批')).toBeInTheDocument();
-  expect(screen.getByText('2026-11-12')).toBeInTheDocument();
+  expect(screen.getAllByText('2026-11-12')).toHaveLength(2);
+});
+
+it('supports selecting multiple contract stages and editing the summed invoice amount', () => {
+  render(<InvoiceManagementView />);
+  fireEvent.click(screen.getByRole('button', { name: '开具发票' }));
+  const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('关联合同'), { target: { value: 'contract-1' } });
+  const amount = within(dialog).getByLabelText('含税开票金额 (元)');
+  expect(within(dialog).queryByLabelText(/阶段约定时间/)).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByLabelText('选择阶段-第一笔'));
+  expect(amount).toHaveValue(60000);
+  fireEvent.click(within(dialog).getByLabelText('选择阶段-尾款'));
+  expect(amount).toHaveValue(200000);
+  fireEvent.change(amount, { target: { value: '180000' } });
+  expect(amount).toHaveValue(180000);
+  fireEvent.click(within(dialog).getByLabelText('选择阶段-尾款'));
+  expect(amount).toHaveValue(60000);
 });
 
 it('requires and saves a purchase invoice attachment with project-derived customer and ledger columns', async () => {

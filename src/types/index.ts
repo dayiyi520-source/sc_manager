@@ -1077,6 +1077,7 @@ export interface InvoiceRecord {
   opportunityId?: string;
   projectId?: string;
   paymentScheduleId?: string;
+  paymentScheduleIds?: string[];
   customerOrSupplier?: string;
   customerName?: string;
   category?: string;
@@ -1109,6 +1110,7 @@ export interface InvoiceApprovalRecord {
   projectId?: string;
   contractId?: string;
   paymentScheduleId?: string;
+  paymentScheduleIds?: string[];
   customerName: string;
   contractName: string;
   stageName: string;

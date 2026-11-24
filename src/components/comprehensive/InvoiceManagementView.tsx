@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Empty, Upload, message } from 'antd';
+import { Button, Empty, Popconfirm, Upload, message } from 'antd';
 import type { UploadFile } from 'antd';
 import { PaperClipOutlined } from '@ant-design/icons';
 import './finance-management.css';
@@ -12,7 +12,7 @@ import {
   DollarSign, 
   Building
 } from '@/components/common/octicons-compat';
-import { StatCard, StatusTag, Modal } from '../common/UIComponents';
+import { Drawer, StatCard, StatusTag, Modal } from '../common/UIComponents';
 import { ComprehensivePage } from './ComprehensivePage';
 import { useApp } from '../../context/AppContext';
 import { AttachmentMetadata, Contract, EmployeeOption, InvoiceApprovalRecord, InvoiceRecord, TaxProfile } from '../../types';
@@ -28,7 +28,7 @@ type InvoiceFormValues = {
   issueDate: string;
   title: string;
   contractId: string;
-  paymentScheduleId: string;
+  paymentScheduleIds: string[];
   purchaseOrderCode: string;
   projectId: string;
   amount: string;
@@ -40,7 +40,7 @@ type InvoiceFormValues = {
 };
 
 const emptyInvoiceForm = (): InvoiceFormValues => ({
-  invoiceNo: '', issueDate: '', title: '', contractId: '', paymentScheduleId: '', purchaseOrderCode: '',
+  invoiceNo: '', issueDate: '', title: '', contractId: '', paymentScheduleIds: [], purchaseOrderCode: '',
   projectId: '', amount: '', taxRate: '', applicantId: '', approvalReason: '', note: '', attachments: []
 });
 
@@ -67,6 +67,7 @@ export const InvoiceManagementView: React.FC = () => {
   // Modals
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [detailInvoice, setDetailInvoice] = useState<InvoiceRecord | null>(null);
   const [invoiceEntryType, setInvoiceEntryType] = useState<'销项' | '进项'>('销项');
   const [invoiceForm, setInvoiceForm] = useState<InvoiceFormValues>(emptyInvoiceForm);
   const [applicantOptions, setApplicantOptions] = useState<EmployeeOption[]>([]);
@@ -113,26 +114,31 @@ export const InvoiceManagementView: React.FC = () => {
     ? paymentSchedules.filter((schedule) => schedule.contractId === selectedContract.id)
     : [];
   const paymentStageOptions = selectedContract
-    ? linkedPaymentSchedules.length
-      ? linkedPaymentSchedules.map((schedule) => ({
+    ? (selectedContract.paymentStages?.length
+      ? selectedContract.paymentStages.map((stage) => {
+          const schedule = linkedPaymentSchedules.find((item) => item.stageName === stage.phase);
+          return {
+            id: schedule?.id || `${selectedContract.id}:${stage.phase}`,
+            name: stage.phase,
+            triggerCondition: stage.triggerCondition,
+            percentage: stage.percentage,
+            amount: stage.amount,
+            invoicedAmount: schedule?.invoicedAmount || 0
+          };
+        })
+      : linkedPaymentSchedules.map((schedule) => ({
           id: schedule.id,
           name: schedule.stageName,
+          triggerCondition: undefined,
+          percentage: 0,
           amount: schedule.amount,
           invoicedAmount: schedule.invoicedAmount || 0
-        }))
-      : (selectedContract.paymentStages || []).map((stage) => ({
-          id: `${selectedContract.id}:${stage.phase}`,
-          name: stage.phase,
-          amount: stage.amount,
-          invoicedAmount: 0
-        }))
+        })))
     : [];
-  const selectedPaymentStage = paymentStageOptions.find((stage) => stage.id === invoiceForm.paymentScheduleId);
-  const existingStageInvoiceAmount = selectedPaymentStage
-    ? invoices.filter((invoice) => invoice.paymentScheduleId === selectedPaymentStage.id).reduce((sum, invoice) => sum + invoice.amount, 0)
-    : 0;
-  const availableStageBalance = selectedPaymentStage
-    ? Math.max(0, selectedPaymentStage.amount - Math.max(selectedPaymentStage.invoicedAmount, existingStageInvoiceAmount))
+  const selectedPaymentStages = paymentStageOptions.filter((stage) => invoiceForm.paymentScheduleIds.includes(stage.id));
+  const selectedStageAmount = selectedPaymentStages.reduce((sum, stage) => sum + stage.amount, 0);
+  const availableStageBalance = selectedPaymentStages.length
+    ? selectedPaymentStages.reduce((sum, stage) => sum + Math.max(0, stage.amount - stage.invoicedAmount), 0)
     : null;
   const requestedAmount = Number(invoiceForm.amount) || 0;
   const exceedsStageBalance = invoiceEntryType === '销项'
@@ -143,10 +149,47 @@ export const InvoiceManagementView: React.FC = () => {
   const salesTotal = salesInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
   const purchaseDeductionTotal = purchaseInvoices.reduce((sum, invoice) => sum + (invoice.taxAmount || 0), 0);
   const invoiceStageName = (invoice: InvoiceRecord) => {
-    const scheduleStage = paymentSchedules.find((schedule) => schedule.id === invoice.paymentScheduleId)?.stageName;
-    if (scheduleStage) return scheduleStage;
-    const [contractId, stageName] = invoice.paymentScheduleId?.split(':') || [];
-    return invoiceContracts.find((contract) => contract.id === contractId)?.paymentStages?.find((stage) => stage.phase === stageName)?.phase || '—';
+    const stageIds = invoice.paymentScheduleIds || (invoice.paymentScheduleId ? [invoice.paymentScheduleId] : []);
+    const stageNames = stageIds.map((stageId) => {
+      const scheduleStage = paymentSchedules.find((schedule) => schedule.id === stageId)?.stageName;
+      if (scheduleStage) return scheduleStage;
+      const [contractId, stageName] = stageId.split(':');
+      return invoiceContracts.find((contract) => contract.id === contractId)?.paymentStages?.find((stage) => stage.phase === stageName)?.phase || stageName;
+    }).filter(Boolean);
+    return stageNames.length ? stageNames.join('、') : '—';
+  };
+
+  const deleteInvoice = (invoice: InvoiceRecord) => {
+    const nextInvoices = invoices.filter((item) => item.id !== invoice.id);
+    const remainingStageAmount = invoice.paymentScheduleId
+      ? nextInvoices
+        .filter((item) => item.paymentScheduleId === invoice.paymentScheduleId)
+        .reduce((sum, item) => sum + item.amount, 0)
+      : 0;
+    const nextPaymentSchedules = invoice.paymentScheduleId
+      ? paymentSchedules.map((schedule) => schedule.id === invoice.paymentScheduleId
+        ? {
+            ...schedule,
+            invoicedAmount: Math.max(0, (schedule.invoicedAmount || 0) - invoice.amount),
+            invoiceStatus: remainingStageAmount > 0 ? '已开具' : '待开具',
+            isInvoiced: remainingStageAmount > 0
+          }
+        : schedule)
+      : paymentSchedules;
+    const nextApprovals = invoice.approvalRecordId || invoice.id
+      ? invoiceApprovals.filter((approval) => approval.id !== invoice.approvalRecordId && approval.invoiceId !== invoice.id)
+      : invoiceApprovals;
+
+    try {
+      saveInvoiceLedger({ invoices: nextInvoices, paymentSchedules: nextPaymentSchedules, invoiceApprovals: nextApprovals, taxProfiles, supplierOptions });
+    } catch (error) {
+      addToast('error', '删除发票失败', error instanceof Error ? error.message : '请稍后重试');
+      return;
+    }
+    setInvoices(nextInvoices);
+    setPaymentSchedules(nextPaymentSchedules);
+    setInvoiceApprovals(nextApprovals);
+    addToast('success', '发票已删除', `发票号码：${invoice.invoiceNo}`);
   };
 
   const openInvoiceModal = (type: '销项' | '进项') => {
@@ -169,7 +212,17 @@ export const InvoiceManagementView: React.FC = () => {
     );
     const scheduleProject = schedules.map((schedule) => schedule.projectId).find(Boolean);
     const projectId = scheduleProject || (candidateProjects.length === 1 ? candidateProjects[0].id : '');
-    updateInvoiceForm({ contractId, paymentScheduleId: '', projectId });
+    updateInvoiceForm({ contractId, paymentScheduleIds: [], amount: '', projectId });
+  };
+
+  const togglePaymentStage = (stageId: string, checked: boolean) => {
+    const paymentScheduleIds = checked
+      ? [...invoiceForm.paymentScheduleIds, stageId]
+      : invoiceForm.paymentScheduleIds.filter((id) => id !== stageId);
+    const total = paymentStageOptions
+      .filter((stage) => paymentScheduleIds.includes(stage.id))
+      .reduce((sum, stage) => sum + stage.amount, 0);
+    updateInvoiceForm({ paymentScheduleIds, amount: total ? String(total) : '' });
   };
 
   const handleCreateInvoice = (e: React.FormEvent) => {
@@ -190,16 +243,17 @@ export const InvoiceManagementView: React.FC = () => {
       ? taxProfiles.find((profile) => profile.id === invoiceForm.title)?.companyName || ''
       : invoiceForm.title;
     const taxRateValue = Number(invoiceForm.taxRate.replace('%', ''));
-    const approval: InvoiceApprovalRecord | undefined = exceedsStageBalance && selectedPaymentStage
+    const approval: InvoiceApprovalRecord | undefined = exceedsStageBalance && selectedPaymentStages.length
       ? {
           id: `invoice-approval-${Date.now()}`,
           contractId: contract?.id,
-          paymentScheduleId: selectedPaymentStage.id,
+          paymentScheduleId: selectedPaymentStages.length === 1 ? selectedPaymentStages[0].id : undefined,
+          paymentScheduleIds: selectedPaymentStages.map((stage) => stage.id),
           projectId: project?.id,
           customerId: customer?.id,
           customerName: customer?.name,
           contractName: contract?.name,
-          stageName: selectedPaymentStage.name,
+          stageName: selectedPaymentStages.map((stage) => stage.name).join('、'),
           requestedAmount,
           availableAmount: availableStageBalance || 0,
           overAmount: requestedAmount - (availableStageBalance || 0),
@@ -232,7 +286,8 @@ export const InvoiceManagementView: React.FC = () => {
       applicantDepartment: selectedApplicant?.department,
       attachments: invoiceForm.attachments,
       relatedContractCode: contract?.code,
-      paymentScheduleId: invoiceForm.paymentScheduleId || undefined,
+      paymentScheduleId: invoiceForm.paymentScheduleIds.length === 1 ? invoiceForm.paymentScheduleIds[0] : undefined,
+      paymentScheduleIds: invoiceForm.paymentScheduleIds,
       contractRef: contract?.name,
       projectId: project?.id,
       relatedProjectName: project?.name,
@@ -243,8 +298,8 @@ export const InvoiceManagementView: React.FC = () => {
 
     const nextInvoices = [inv, ...invoices];
     const nextApprovals = approval ? [approval, ...invoiceApprovals] : invoiceApprovals;
-    const nextPaymentSchedules = invoiceEntryType === '销项' && selectedPaymentStage
-      ? paymentSchedules.map((schedule) => schedule.id === selectedPaymentStage.id
+    const nextPaymentSchedules = invoiceEntryType === '销项' && selectedPaymentStages.length === 1
+      ? paymentSchedules.map((schedule) => schedule.id === selectedPaymentStages[0].id
         ? { ...schedule, invoicedAmount: (schedule.invoicedAmount || 0) + requestedAmount, invoiceStatus: approval ? '待开具' : '已开具', isInvoiced: !approval }
         : schedule)
       : paymentSchedules;
@@ -394,15 +449,13 @@ export const InvoiceManagementView: React.FC = () => {
                 <tr className="border-b border-[var(--border-main)] bg-[var(--bg-main)] text-[var(--text-muted)]">
                   <th className="py-3 px-3">发票号码</th>
                   <th className="py-3 px-3">开票日期</th>
-                  <th className="py-3 px-3">购方抬头</th>
                   <th className="py-3 px-3">关联合同</th>
-                  <th className="py-3 px-3">关联付款阶段</th>
                   <th className="py-3 px-3">关联项目</th>
                   <th className="py-3 px-3">关联客户</th>
                   <th className="py-3 px-3">含税开票金额</th>
                   <th className="py-3 px-3">适用税率 / 税额</th>
                   <th className="py-3 px-3">申请人</th>
-                  <th className="py-3 px-3">状态</th>
+                  <th className="py-3 px-3">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-main)]">
@@ -410,20 +463,18 @@ export const InvoiceManagementView: React.FC = () => {
                   .filter((invoice) => [invoice.invoiceNo, invoice.customerOrSupplier, invoice.customerName, invoice.relatedContractCode, invoice.relatedProjectName, invoice.applicant].some((value) => value?.toLowerCase().includes(searchQuery.toLowerCase())))
                   .map((inv) => (
                     <tr key={inv.id} className="hover:bg-[var(--bg-elevated)] transition-colors">
-                      <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{inv.invoiceNo}</td>
-                      <td className="py-3 px-3">{inv.issueDate || '—'}</td>
-                      <td className="py-3 px-3 font-medium text-[var(--text-primary)]">{inv.customerOrSupplier || '—'}</td>
+                      <td className="py-3 px-3 font-mono"><button type="button" className="finance-action-link" onClick={() => setDetailInvoice(inv)}>{inv.invoiceNo}</button></td>
+                      <td className="py-3 px-3">{inv.issueDate || inv.applyDate || '—'}</td>
                       <td className="py-3 px-3 font-mono text-[var(--text-muted)]">{inv.relatedContractCode || '—'}</td>
-                      <td className="py-3 px-3">{invoiceStageName(inv)}</td>
                       <td className="py-3 px-3">{inv.relatedProjectName || '—'}</td>
                       <td className="py-3 px-3">{inv.customerName || '—'}</td>
                       <td className="finance-amount">¥ {inv.amount.toLocaleString()}</td>
                       <td className="py-3 px-3 text-[var(--text-body)]">{inv.taxRate} (¥{inv.taxAmount})</td>
                       <td className="py-3 px-3 text-[var(--text-body)]">{inv.applicant}</td>
-                      <td className="py-3 px-3"><StatusTag status={inv.status} /></td>
+                      <td className="py-3 px-3 whitespace-nowrap"><button type="button" className="finance-action-link mr-3" onClick={() => setDetailInvoice(inv)}>详情</button><Popconfirm title={`确认删除发票 ${inv.invoiceNo}？`} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={() => deleteInvoice(inv)}><button type="button" className="finance-action-link finance-action-link-danger">删除</button></Popconfirm></td>
                     </tr>
                   ))}
-                {!salesInvoices.some((invoice) => [invoice.invoiceNo, invoice.customerOrSupplier, invoice.customerName, invoice.relatedContractCode, invoice.relatedProjectName, invoice.applicant].some((value) => value?.toLowerCase().includes(searchQuery.toLowerCase()))) && <tr><td colSpan={11} className="finance-empty-cell"><Empty description={searchQuery ? '暂无匹配的销项发票' : '暂无销项发票'} /></td></tr>}
+                {!salesInvoices.some((invoice) => [invoice.invoiceNo, invoice.customerOrSupplier, invoice.customerName, invoice.relatedContractCode, invoice.relatedProjectName, invoice.applicant].some((value) => value?.toLowerCase().includes(searchQuery.toLowerCase()))) && <tr><td colSpan={9} className="finance-empty-cell"><Empty description={searchQuery ? '暂无匹配的销项发票' : '暂无销项发票'} /></td></tr>}
               </tbody>
             </table>
           </div>
@@ -537,14 +588,25 @@ export const InvoiceManagementView: React.FC = () => {
 
           {invoiceEntryType === '销项' ? (
             <>
-              <div className="finance-form-grid">
-                <div>
-                  <label>关联付款阶段</label>
-                  <select aria-label="关联付款阶段" value={invoiceForm.paymentScheduleId} onChange={(event) => updateInvoiceForm({ paymentScheduleId: event.target.value })} className="finance-input" disabled={!invoiceForm.contractId}>
-                    <option value="">暂不关联付款阶段</option>
-                    {paymentStageOptions.map((stage) => <option key={stage.id} value={stage.id}>{stage.name} · 可开票 ¥{Math.max(0, stage.amount - stage.invoicedAmount).toLocaleString()}</option>)}
-                  </select>
+              {selectedContract && <section className="invoice-contract-payment-panel">
+                <div className="finance-form-summary grid grid-cols-2 gap-3">
+                  <div>合同名称：<strong>{selectedContract.name}</strong></div>
+                  <div>合同金额：<strong>¥ {selectedContract.amount.toLocaleString()}</strong></div>
+                  <div>合同客户：<strong>{selectedContract.customerName || '—'}</strong></div>
+                  <div>签订日期：<strong>{selectedContract.signDate || '—'}</strong></div>
                 </div>
+                <h3 className="invoice-contract-payment-title">合同付款阶段</h3>
+                {paymentStageOptions.length ? <div className="finance-table-scroll"><table className="finance-table finance-table-wide">
+                  <thead><tr><th>阶段名称</th><th>完成内容</th><th>占比</th><th>金额</th><th>选择阶段</th></tr></thead>
+                  <tbody>{paymentStageOptions.map((stage) => <tr key={stage.id}>
+                    <td>{stage.name}</td><td>{stage.triggerCondition || '—'}</td><td>{stage.percentage ? `${stage.percentage}%` : '—'}</td><td className="finance-amount">¥ {stage.amount.toLocaleString()}</td>
+                    <td><label className="finance-stage-check" title={`选择${stage.name}`}><input type="checkbox" aria-label={`选择阶段-${stage.name}`} checked={invoiceForm.paymentScheduleIds.includes(stage.id)} onChange={(event) => togglePaymentStage(stage.id, event.target.checked)} /><span aria-hidden="true" /></label></td>
+                  </tr>)}</tbody>
+                  <tfoot><tr><td colSpan={3}>所选阶段金额合计</td><td className="finance-amount">¥ {selectedStageAmount.toLocaleString()}</td><td /></tr></tfoot>
+                </table></div> : <Empty description="该合同未维护付款阶段" />}
+              </section>}
+              {selectedPaymentStages.length > 0 && <div className="finance-form-summary">所选阶段可开票余额合计：<strong>¥ {availableStageBalance?.toLocaleString()}</strong></div>}
+              <div className="finance-form-grid">
                 <div>
                   <label>关联项目</label>
                   <select aria-label="关联项目" value={invoiceForm.projectId} onChange={(event) => updateInvoiceForm({ projectId: event.target.value })} className="finance-input">
@@ -552,19 +614,16 @@ export const InvoiceManagementView: React.FC = () => {
                     {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
                   </select>
                 </div>
-              </div>
-              {selectedPaymentStage && <div className="finance-form-summary">付款阶段可开票余额：<strong>¥ {availableStageBalance?.toLocaleString()}</strong></div>}
-              <div className="finance-form-grid">
                 <div>
                   <label>关联客户</label>
                   <input aria-label="关联客户" readOnly value={selectedProject?.customerName || ''} className="finance-input" placeholder="选择合同或项目后自动带入" />
                 </div>
+              </div>
+              <div className="finance-form-grid">
                 <div>
                   <label>含税开票金额 (元) <span className="text-[var(--danger)]">*</span></label>
                   <input aria-label="含税开票金额 (元)" required type="number" min="0.01" step="0.01" value={invoiceForm.amount} onChange={(event) => updateInvoiceForm({ amount: event.target.value })} className="finance-input" placeholder="请输入开票金额" />
                 </div>
-              </div>
-              <div className="finance-form-grid">
                 <div>
                   <label>适用税率 <span className="text-[var(--danger)]">*</span></label>
                   <select aria-label="适用税率" required value={invoiceForm.taxRate} onChange={(event) => updateInvoiceForm({ taxRate: event.target.value })} className="finance-input">
@@ -572,6 +631,7 @@ export const InvoiceManagementView: React.FC = () => {
                     {TAX_RATES.map((rate) => <option key={rate} value={rate}>{rate}</option>)}
                   </select>
                 </div>
+              </div>
                 <div>
                   <label>申请人 <span className="text-[var(--danger)]">*</span></label>
                   <select aria-label="申请人" required value={invoiceForm.applicantId} disabled={applicantOptionsLoading || !!applicantOptionsError} onChange={(event) => updateInvoiceForm({ applicantId: event.target.value })} className="finance-input">
@@ -580,7 +640,6 @@ export const InvoiceManagementView: React.FC = () => {
                   </select>
                   {applicantOptionsError && <div role="alert" className="mt-2 text-xs text-[var(--danger)]">{applicantOptionsError}</div>}
                 </div>
-              </div>
               <div>
                 <label>备注{exceedsStageBalance ? '（超出付款阶段余额时必填）' : ''}</label>
                 <textarea aria-label="备注" required={exceedsStageBalance} value={invoiceForm.approvalReason} onChange={(event) => updateInvoiceForm({ approvalReason: event.target.value })} className="finance-input" rows={3} placeholder={exceedsStageBalance ? `超出可开票余额 ¥${(requestedAmount - (availableStageBalance || 0)).toLocaleString()}，请说明业务原因` : '选填'} />
@@ -661,6 +720,52 @@ export const InvoiceManagementView: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <Drawer
+        isOpen={Boolean(detailInvoice)}
+        onClose={() => setDetailInvoice(null)}
+        title="销项发票详情"
+        subtitle={detailInvoice?.invoiceNo}
+        width="max-w-3xl"
+      >
+        {detailInvoice && <div className="space-y-5">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            {[
+              ['发票号码', detailInvoice.invoiceNo],
+              ['发票类型', detailInvoice.category || '销项发票'],
+              ['开票日期', detailInvoice.issueDate || detailInvoice.applyDate],
+              ['购方抬头', detailInvoice.customerOrSupplier],
+              ['关联合同', detailInvoice.contractRef || invoiceContracts.find((contract) => contract.code === detailInvoice.relatedContractCode)?.name],
+              ['合同编号', detailInvoice.relatedContractCode],
+              ['关联付款阶段', invoiceStageName(detailInvoice)],
+              ['关联项目', detailInvoice.relatedProjectName || projects.find((project) => project.id === detailInvoice.projectId)?.name],
+              ['关联客户', detailInvoice.customerName || customers.find((customer) => customer.id === detailInvoice.customerId)?.name],
+              ['含税开票金额', `¥ ${detailInvoice.amount.toLocaleString()}`],
+              ['适用税率', detailInvoice.taxRate],
+              ['税额', detailInvoice.taxAmount == null ? undefined : `¥ ${detailInvoice.taxAmount.toLocaleString()}`],
+              ['申请人', detailInvoice.applicant],
+              ['申请人部门', detailInvoice.applicantDepartment],
+              ['状态', detailInvoice.status]
+            ].map(([label, value]) => <div key={label} className="min-w-0 border-b border-[var(--border-main)] pb-3">
+              <dt className="mb-1 text-xs text-[var(--text-muted)]">{label}</dt>
+              <dd className="m-0 break-words text-sm text-[var(--text-primary)]">{value || '—'}</dd>
+            </div>)}
+            {detailInvoice.purchaseOrderCode && <div className="min-w-0 border-b border-[var(--border-main)] pb-3"><dt className="mb-1 text-xs text-[var(--text-muted)]">关联采购单</dt><dd className="m-0 break-words text-sm text-[var(--text-primary)]">{detailInvoice.purchaseOrderCode}</dd></div>}
+          </dl>
+          <section>
+            <h3 className="mb-2 text-sm font-medium text-[var(--text-primary)]">备注</h3>
+            <p className="m-0 whitespace-pre-wrap break-words text-sm text-[var(--text-body)]">{detailInvoice.note || '—'}</p>
+          </section>
+          <section>
+            <h3 className="mb-2 text-sm font-medium text-[var(--text-primary)]">发票附件</h3>
+            {detailInvoice.attachments?.length ? <ul className="m-0 list-inside list-disc space-y-2 text-sm">
+              {detailInvoice.attachments.map((attachment) => <li key={attachment.id}>{attachment.dataUrl
+                ? <a className="text-[var(--active-text)] hover:underline" href={attachment.dataUrl} target="_blank" rel="noreferrer">{attachment.name}</a>
+                : attachment.name}</li>)}
+            </ul> : <span className="text-sm text-[var(--text-muted)]">暂无附件</span>}
+          </section>
+        </div>}
+      </Drawer>
 
       {/* Modal: 录入开票抬头信息 */}
       <Modal
